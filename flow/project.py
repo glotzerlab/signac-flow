@@ -39,19 +39,28 @@ class JobScript(io.StringIO):
         "Write one line to the job script."
         self.write(line + eol)
 
-    def write_cmd(self, cmd, env, parallel=False, np=1, **kwargs):
+    def write_cmd(self, cmd, parallel=False, np=1, mpi_cmd=None, **kwargs):
         """Write a command to the jobscript.
+
+        This command wrapper function is a convenience function, which
+        adds mpi and other directives whenever necessary.
+
+        The ``mpi_cmd`` argument should be a callable, with the following
+        signature: ``mpi_cmd(cmd, np, **kwargs)``.
 
         :param cmd: The command to write to the jobscript.
         :type cmd: str
-        :param env: The environment instance.
         :param parallel: Commands should be executed in parallel.
         :type parallel: bool
         :param np: The number of processors required for execution.
         :type np: int
+        :param mpi_cmd: MPI command wrapper.
+        :type mpi_cmd: callable
         :param kwargs: All other forwarded parameters."""
         if np > 1:
-            cmd = env.mpi_cmd(cmd).format(np=np)
+            if mpi_cmd is None:
+                raise RuntimeError("Requires mpi_cmd wrapper.")
+            cmd = mpi_cmd(cmd, np=np)
         if parallel:
             cmd += ' &'
         self.writeline(cmd)
@@ -142,7 +151,7 @@ class FlowProject(signac.contrib.Project):
         return ret
 
     def _submit(self, scheduler, to_submit, pretend,
-                serial, bundle, after, walltime, env=None, **kwargs):
+                serial, bundle, after, walltime, **kwargs):
         "Submit jobs to the scheduler."
         script = JobScript()
         self.write_header(
@@ -161,7 +170,7 @@ class FlowProject(signac.contrib.Project):
                 return int(value)
 
             np = self.write_user(
-                script=script, env=env, job=job, job_operation=job_operation,
+                script=script, job=job, job_operation=job_operation,
                 parallel=not serial and bundle is not None, **kwargs)
             if np is None:
                 raise RuntimeError(
@@ -215,25 +224,34 @@ class FlowProject(signac.contrib.Project):
         return ((j, jt) for j, jt in to_submit
                 if self._eligible(j, jt, **kwargs))
 
-    def submit_jobs(self, env, scheduler, to_submit, bundle=None,
-                    walltime=None, num=None, force=False, **kwargs):
-        """Submit jobs to the scheduler in a particular environment.
+    def submit_jobs(self, scheduler, to_submit, walltime=None,
+                    bundle=None, serial=False, after=None,
+                    num=None, pretend=False, force=False, **kwargs):
+        """Submit jobs to the scheduler.
 
-        :param env: The environment handle.
         :param scheduler: The scheduler instance.
         :type scheduler: :class:`~.flow.manage.Scheduler`
         :param to_submit: A sequence of (job_id, job_operation) tuples.
-        :param bundle: Bundle up to 'bundle' number of jobs during submission.
-        :type bundle: int
         :param walltime: The maximum wallclock time in hours.
         :type walltime: float
+        :param bundle: Bundle up to 'bundle' number of jobs during submission.
+        :type bundle: int
+        :param serial: Schedule jobs in serial or execute bundled
+            jobs in serial.
+        :type serial: bool
+        :param after: Execute all jobs after the completion of the job operation
+            with this job session id. Implementation is scheduler dependent.
+        :type after: str
         :param num: Do not submit more than 'num' jobs to the scheduler.
         :type num: int
+        :param pretend: Do not actually submit, but instruct the scheduler
+            to pretend scheduling.
+        :type pretend: bool
         :param force: Ignore all eligibility checks, just submit.
         :type force: bool
         :param kwargs: Other keyword arguments which are forwareded."""
-        logger.info("Submitting to environment '{}'...".format(env))
-        walltime = datetime.timedelta(hours=walltime)
+        if walltime is not None:
+            walltime = datetime.timedelta(hours=walltime)
         if not force:
             to_submit = self.filter_non_eligible(to_submit, **kwargs)
         to_submit = islice(to_submit, num)
@@ -241,22 +259,23 @@ class FlowProject(signac.contrib.Project):
             n = None if bundle == 0 else bundle
             while True:
                 ts = islice(to_submit, n)
-                if not self._submit(env, scheduler, ts, walltime=walltime,
-                                    bundle=bundle, **kwargs):
+                if not self._submit(scheduler, ts, walltime=walltime,
+                                    bundle=bundle, serial=serial, after=after,
+                                    num=num, pretend=pretend, force=force, **kwargs):
                     break
         else:
             for ts in to_submit:
-                self._submit(env, scheduler, [ts], walltime=walltime,
-                             bundle=bundle, **kwargs)
+                self._submit(scheduler, [ts], walltime=walltime,
+                             bundle=bundle, serial=serial, after=after,
+                             num=num, pretend=pretend, force=force, **kwargs)
 
-    def submit(self, env, scheduler, job_ids=None,
+    def submit(self, scheduler, job_ids=None,
                job_operation=None, job_filter=None, **kwargs):
         """Wrapper for :meth:`~.to_submit` and :meth:`~.submit_jobs`.
 
         This function passes the return value of :meth:`~.to_submit`
         to :meth:`~.submit_jobs`.
 
-        :param env: The environment handle.
         :param scheduler: The scheduler instance.
         :type scheduler: :class:`~.flow.manage.Scheduler`
         :param job_ids: A list of job_id's,
@@ -268,7 +287,7 @@ class FlowProject(signac.contrib.Project):
         :param kwargs: All other keyword arguments are forwarded
             to :meth:`~.submit_jobs`."""
         return self.submit_jobs(
-            env=env, scheduler=scheduler,
+            scheduler=scheduler,
             to_submit=self.to_submit(job_ids, job_operation, job_filter), **kwargs)
 
     @classmethod
@@ -351,7 +370,7 @@ class FlowProject(signac.contrib.Project):
         The default method writes nothing."""
         return
 
-    def write_user(self, script, job, job_operation, parallel, env=None, **kwargs):
+    def write_user(self, script, job, job_operation, parallel, mpi_cmd=None, **kwargs):
         """Write to the jobscript for job and job type."
 
         This function should be specialized for each project.
@@ -361,6 +380,9 @@ class FlowProject(signac.contrib.Project):
 
         See also: :meth:`~.JobScript.write_cmd`.
 
+        The ``mpi_cmd`` argument should be a callable, with the following
+        signature: ``mpi_cmd(cmd, np, **kwargs)``.
+
         :param script: The job script, to write to.
         :type script: :class:`~.JobScript`
         :param job: The signac job handle.
@@ -369,8 +391,8 @@ class FlowProject(signac.contrib.Project):
         :type job_operation: str
         :param parallel: Execute commands in parallel if True.
         :type parallel: bool
-        :param env: An optional environment handle.
-        :type env: :class:`~environment.ComputeEnvironment`
+        :param mpi_cmd: MPI command wrapper. Pass this function
+            to execute mpi commands in multiple environments.
 
         :returns: The number of required processors (nodes).
         :rtype: int
@@ -379,7 +401,7 @@ class FlowProject(signac.contrib.Project):
         cmd = 'python scripts/run.py {job_operation} {jobid}'
         return script.write_cmd(
             cmd.format(job_operation=job_operation, job_id=str(job)),
-            np=1, parallel=parallel)
+            np=1, parallel=parallel, mpi_cmd=mpi_cmd)
 
     def print_overview(self, stati, file=sys.stdout):
         "Print the project's status overview."
@@ -410,7 +432,7 @@ class FlowProject(signac.contrib.Project):
                 row.insert(i + 1, sps.get(sp))
         return row
 
-    def print_detailed_view(self, stati, parameters=None,
+    def print_detailed(self, stati, parameters=None,
                             skip_active=False, file=sys.stdout):
         "Print the project's detailed status."
         table_header = ['job_id', 'status', 'next_job', 'labels']
@@ -445,7 +467,7 @@ class FlowProject(signac.contrib.Project):
         print("Done.", file=file)
 
     def print_status(self, scheduler=None, job_filter=None,
-                     detailed_view=False, parameters=None, skip_active=False,
+                     detailed=False, parameters=None, skip_active=False,
                      file=sys.stdout, err=sys.stderr):
         """Print the status of the project.
 
@@ -453,8 +475,8 @@ class FlowProject(signac.contrib.Project):
         :type scheduler: :class:`~.manage.Scheduler`
         :param job_filter: A JSON encoded filter,
             that all jobs to be submitted need to match.
-        :param detailed_view: Print a detailed status of each job.
-        :type detailed_view: bool
+        :param detailed: Print a detailed status of each job.
+        :type detailed: bool
         :param parameters: Print the value of the specified parameters.
         :type parameters: list of str
         :param skip_active: Only print jobs that are currently inactive.
@@ -472,10 +494,10 @@ class FlowProject(signac.contrib.Project):
         title = "Status project '{}':".format(self)
         print('\n' + title, file=file)
         self.print_overview(stati)
-        if detailed_view:
+        if detailed:
             print(file=file)
             print("Detailed view:", file=file)
-            self.print_detailed_view(stati, parameters, skip_active, file)
+            self.print_detailed(stati, parameters, skip_active, file)
 
     @classmethod
     def add_print_status_args(cls, parser):
@@ -486,7 +508,7 @@ class FlowProject(signac.contrib.Project):
             type=str,
             help="Filter jobs.")
         parser.add_argument(
-            '-d', '--detailed-view',
+            '-d', '--detailed',
             action='store_true',
             help="Display a detailed view of the job stati.")
         parser.add_argument(

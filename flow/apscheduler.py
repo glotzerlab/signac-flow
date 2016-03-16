@@ -93,7 +93,7 @@ def submit_job(scheduler, queue, misfire_grace_time, next_job):
         run_job,
         id=next_job['jobsid'],
         args=(scheduler, next_job),
-        executor='processpool',
+        #executor='processpool',
         trigger=trigger,
         misfire_grace_time=misfire_grace_time)
     return next_job['jobsid']
@@ -193,7 +193,7 @@ def get_scheduler(num_procs=1):
                 collection='apscheduler')},
         executors={
             'threadpool': ThreadPoolExecutor(),
-            'processpool': ProcessPoolExecutor(max_workers=num_procs)
+            #'processpool': ProcessPoolExecutor(max_workers=num_procs)
             },
     )
 
@@ -239,7 +239,10 @@ def start_scheduler(num_procs, db):
 
 def main(args):
     db = signac.db.get_database(args.db)
-    start_scheduler(num_procs=args.num_procs, db=db)
+    if args.reset:
+        reset(db)
+    else:
+        start_scheduler(num_procs=args.num_procs, db=db)
 
 
 if __name__ == '__main__':
@@ -251,6 +254,10 @@ if __name__ == '__main__':
         type=int,
         default=1,
         help="The number of processors to use for execution.")
+    parser.add_argument(
+        '--reset',
+        action='store_true',
+        help="Do not start the scheduler, but reset all internal queues.")
     parser.add_argument(
         '--db',
         type=str,

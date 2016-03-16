@@ -400,7 +400,7 @@ class FlowProject(signac.contrib.Project):
         self.write_human_readable_statepoint(script, job)
         cmd = 'python scripts/run.py {job_operation} {jobid}'
         return script.write_cmd(
-            cmd.format(job_operation=job_operation, job_id=str(job)),
+            cmd.format(job_operation=job_operation, jobid=str(job)),
             np=1, parallel=parallel, mpi_cmd=mpi_cmd)
 
     def print_overview(self, stati, file=sys.stdout):

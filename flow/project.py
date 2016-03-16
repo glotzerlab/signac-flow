@@ -4,7 +4,6 @@ import io
 import logging
 import datetime
 import json
-import multiprocessing
 from collections import defaultdict
 from itertools import islice
 from hashlib import sha1
@@ -21,38 +20,61 @@ logger = logging.getLogger(__name__)
 DEFAULT_WALLTIME_HRS = 12
 
 
-class BasicFlowProject(signac.contrib.Project):
+def is_active(status):
+    for gid, s in status.items():
+        if s > manage.JobStatus.inactive:
+            return True
+    return False
 
-    pass
+
+def draw_progressbar(value, total, width=40):
+    n = int(value / total * width)
+    return '|' + ''.join(['#'] * n) + ''.join(['-'] * (width - n)) + '|'
 
 
-class FlowProject(BasicFlowProject):
+class JobScript(io.StringIO):
+    "Simple StringIO wrapper to implement cmd wrapping logic."
 
-    def is_active(self, status):
-        for gid, s in status.items():
-            if s > manage.JobStatus.inactive:
-                return True
-        return False
+    def writeline(self, line, eol='\n'):
+        "Write one line to the job script."
+        self.write(line + eol)
 
-    def create_script(self, max_walltime, walltime_buffer=None):
-        # Set default walltime buffer if necessary
-        if walltime_buffer is None:
-            walltime_buffer = datetime.timedelta(minutes=5)
+    def write_cmd(self, cmd, env, parallel=False, np=1, **kwargs):
+        """Write a command to the jobscript.
 
-        # Create submit script
-        script = io.StringIO()
+        :param cmd: The command to write to the jobscript.
+        :type cmd: str
+        :param env: The environment instance.
+        :param parallel: Commands should be executed in parallel.
+        :type parallel: bool
+        :param np: The number of processors required for execution.
+        :type np: int
+        :param kwargs: All other forwarded parameters."""
+        if np > 1:
+            cmd = env.mpi_cmd(cmd).format(np=np)
+        if parallel:
+            cmd += ' &'
+        self.writeline(cmd)
+        return np
 
-        # Write hoomd-walltime stop to script.
-        # (Does not harm even if we don't actually use hoomd-blue.)
-        script.write(
-            'export HOOMD_WALLTIME_STOP=$((`date +%s` + {}))\n'.format(
-                (max_walltime - walltime_buffer).total_seconds()))
 
-        # Enter the self's root directory before executing any command.
-        script.write('cd {root}\n'.format(root=self.root_directory()))
-        return script
+class FlowProject(signac.contrib.Project):
+    """A signac project class assisting in job scheduling.
 
-    def store_bundled(self, job_ids):
+    :param config: A signac configuaration, defaults to
+        the configuration loaded from the environment.
+    :type config: A signac config object."""
+
+    def _get_jobsid(self, job, job_type):
+        "Return a unique job session id based on the job and job_type."
+        return '{jobid}-{name}'.format(jobid=job, name=job_type)
+
+    def _store_bundled(self, job_ids):
+        """Store all job session ids part of one bundle.
+
+        The job session ids are stored in a text file in the project's
+        root directory. This is necessary to be able to identify each
+        job's individual status from the bundle id."""
         sid = '{self}-bundle-{sid}'.format(
             self=self,
             sid=sha1('.'.join(job_ids).encode('utf-8')).hexdigest())
@@ -61,8 +83,8 @@ class FlowProject(BasicFlowProject):
                 file.write(job_id + '\n')
         return sid
 
-    def expand_bundled_jobs(self, scheduler_jobs):
-        # Expand jobs which were submitted as part of a bundle
+    def _expand_bundled_jobs(self, scheduler_jobs):
+        "Expand jobs which were submitted as part of a bundle."
         for job in scheduler_jobs:
             if job.name().startswith('{}-bundle-'.format(self)):
                 fn_bundle = os.path.join(self.root_directory(), job.name())
@@ -72,24 +94,64 @@ class FlowProject(BasicFlowProject):
             else:
                 yield job
 
-    def _submit(self, env, jobs, jobnames, args):
-        assert len(jobs) == len(jobnames)
-        if args.minutes:
-            walltime = datetime.timedelta(minutes=args.walltime)
-        else:
-            walltime = datetime.timedelta(hours=args.walltime)
-        if args.minutes:
-            walltime_buffer = datetime.timedelta(
-                minutes=max(0, min(args.walltime - 1, 5)))
-        else:
-            walltime_buffer = datetime.timedelta(minutes=10)
+    def _fetch_scheduler_jobs(self, scheduler):
+        """Fetch jobs from the scheduler.
 
-        script = io.StringIO()
-        self.write_header(script, walltime, walltime_buffer)
+        This function does not select specific jobs, but relies on the
+        scheduler implementation to make a pre-selection of jobs, which
+        might be associated with this project."""
+        return {job.name(): job
+                for job in self._expand_bundled_jobs(scheduler.jobs())}
+
+    def _update_status(self, job, scheduler_jobs):
+        "Determine the scheduler status of job."
+        manage.update_status(job, scheduler_jobs)
+
+    def get_job_status(self, job):
+        "Return the detailed status of jobs."
+        result = dict()
+        result['job_id'] = str(job)
+        status = job.document.get('status', dict())
+        result['active'] = is_active(status)
+        result['labels'] = sorted(set(self.classify(job)))
+        result['job_type'] = self.next_job_type(job)
+        highest_status = max(status.values()) if len(status) else 1
+        result['submission_status'] = [manage.JobStatus(highest_status).name]
+        return result
+
+    def _blocked(self, job, job_type, **kwargs):
+        "Check if job, job_type combination is blocked for scheduling."
+        try:
+            status = job.document['status'][self._get_jobsid(job, job_type)]
+            return status >= manage.JobStatus.submitted
+        except KeyError:
+            return False
+
+    def _eligible(self, job, job_type=None, **kwargs):
+        """Internal check for the job's eligible for job_type.
+
+        A job is only eligible if the public :meth:`~.eligible` method
+        returns True and the job is not blocked by the scheduler.
+
+        :raises RuntimeError: If the public eligible method returns None."""
+        ret = self.eligible(job, job_type, **kwargs) \
+            and not self._blocked(job, job_type, **kwargs)
+        if ret is None:
+            raise RuntimeError("Unable to determine eligiblity for job '{}' "
+                               "and job type '{}'.".format(job, job_type))
+        return ret
+
+    def _submit(self, env, scheduler, to_submit, pretend,
+                serial, bundle, after, walltime, **kwargs):
+        "Submit jobs to the scheduler."
+        script = JobScript()
+        self.write_header(
+            script=script, walltime=walltime, serial=serial,
+            bundle=bundle, after=after, ** kwargs)
         jobids_bundled = []
         np_total = 0
-        for job, jobname in zip(jobs, jobnames):
-            jobsid = self.get_jobsid(job, jobname)
+        for job, job_type in to_submit:
+            jobsid = self._get_jobsid(job, job_type)
 
             def set_status(value):
                 "Update the job's status dictionary."
@@ -97,9 +159,15 @@ class FlowProject(BasicFlowProject):
                 status_doc[jobsid] = int(value)
                 job.document['status'] = status_doc
                 return int(value)
-            np = self.write_user(env, script, job, jobname, args)
-            np_total = max(np, np_total) if args.serial else np_total + np
-            if args.pretend:
+
+            np = self.write_user(
+                script=script, env=env, job=job, job_type=job_type,
+                parallel=not serial and bundle is not None, **kwargs)
+            if np is None:
+                raise RuntimeError(
+                    "Failed to return 'num_procs' value in write_user()!")
+            np_total = max(np, np_total) if serial else np_total + np
+            if pretend:
                 set_status(manage.JobStatus.registered)
             else:
                 set_status(manage.JobStatus.submitted)
@@ -110,47 +178,102 @@ class FlowProject(BasicFlowProject):
             return False
 
         if len(jobids_bundled) > 1:
-            sid = self.store_bundled(jobids_bundled)
+            sid = self._store_bundled(jobids_bundled)
         else:
             sid = jobsid
-        scheduler = env.get_scheduler(
-            env, mode='gpu' if args.gpu else 'cpu')
         scheduler_job_id = scheduler.submit(
             script=script, jobsid=sid,
-            np=np_total, walltime=walltime, pretend=args.pretend,
-            force=args.force, after=args.after, hold=args.hold)
+            np=np_total, walltime=walltime, pretend=pretend, **kwargs)
         logger.info("Submitted {}.".format(sid))
-        if args.serial and not args.bundle:
-            if args.after is None:
-                args.after = ''
-            args.after = ':'.join(args.after.split(':') + [scheduler_job_id])
+        if serial and not bundle:
+            if after is None:
+                after = ''
+            after = ':'.join(after.split(':') + [scheduler_job_id])
         return True
 
-    def get_jobsid(self, job, jobname):
-        return '{jobid}-{name}'.format(jobid=job, name=jobname)
+    def to_submit(self, job_ids=None, job_type=None, job_filter=None):
+        """Generate a sequence of (job_id, job_type) value pairs for submission.
 
-    def submit(self, env, args):
-        if args.filter and args.jobid:
-            raise ValueError("Can't filter argument with specified job ids.")
-        logger.info("Environment: {}".format(env))
-        filter = None if args.filter is None else eval(args.filter)
-        if args.jobid:
-            jobs = (self.open_job(id=jobid) for jobid in args.jobid)
+        :param job_ids: A list of job_id's,
+            defaults to all jobs found in the workspace.
+        :param job_type: A specific job_type,
+            defaults to the result of :meth:`~.next_job_type`.
+        :param job_filter: A JSON encoded filter,
+            that all jobs to be submitted need to match."""
+        if job_ids is None:
+            jobs = list(self.find_jobs(job_filter))
         else:
-            jobs = self.find_jobs(filter)
-        if not args.force:
-            jobs = (job for job in jobs if self.eligible(job, args.job, args.gpu))
-        jobs = list(islice(jobs, args.num))
-        jobnames = (self.next_job(job) if args.target is None else args.target for job in jobs)
-        if args.bundle is not None:
-            n = None if args.bundle == 0 else args.bundle
-            while(self._submit(islice(jobs, n), islice(jobnames, n), args)):
-                pass
+            jobs = [self.open_job(id=jobid) for jobid in job_ids]
+        if job_type is None:
+            job_types = (self.next_job_type(job) for job in jobs)
         else:
-            for job, jobname in zip(jobs, jobnames):
-                self._submit([job], [jobname], args)
+            job_types = [job_type] * len(jobs)
+        return zip(jobs, job_types)
 
-    def add_submit_parser_arguments(self, parser):
+    def filter_non_eligible(self, to_submit, **kwargs):
+        "Return only those jobs for submittal, which are eligible."
+        return ((j, jt) for j, jt in to_submit
+                if self._eligible(j, jt, **kwargs))
+
+    def submit_jobs(self, env, scheduler, to_submit, bundle=None,
+                    walltime=None, num=None, force=False, **kwargs):
+        """Submit jobs to the scheduler in a particular environment.
+
+        :param env: The environment handle.
+        :param scheduler: The scheduler instance.
+        :type scheduler: :class:`~.flow.manage.Scheduler`
+        :param to_submit: A sequence of (job_id, job_type) tuples.
+        :param bundle: Bundle up to 'bundle' number of jobs during submission.
+        :type bundle: int
+        :param walltime: The maximum wallclock time in hours.
+        :type walltime: float
+        :param num: Do not submit more than 'num' jobs to the scheduler.
+        :type num: int
+        :param force: Ignore all eligibility checks, just submit.
+        :type force: bool
+        :param kwargs: Other keyword arguments which are forwareded."""
+        logger.info("Submitting to environment '{}'...".format(env))
+        walltime = datetime.timedelta(hours=walltime)
+        if not force:
+            to_submit = self.filter_non_eligible(to_submit, **kwargs)
+        to_submit = islice(to_submit, num)
+        if bundle is not None:
+            n = None if bundle == 0 else bundle
+            while True:
+                ts = islice(to_submit, n)
+                if not self._submit(env, scheduler, ts, walltime=walltime,
+                                    bundle=bundle, **kwargs):
+                    break
+        else:
+            for ts in to_submit:
+                self._submit(env, scheduler, [ts], walltime=walltime,
+                             bundle=bundle, **kwargs)
+
+    def submit(self, env, scheduler,
+               job_ids=None, job_type=None, job_filter=None, **kwargs):
+        """Wrapper for :meth:`~.to_submit` and :meth:`~.submit_jobs`.
+
+        This function passes the return value of :meth:`~.to_submit`
+        to :meth:`~.submit_jobs`.
+
+        :param env: The environment handle.
+        :param scheduler: The scheduler instance.
+        :type scheduler: :class:`~.flow.manage.Scheduler`
+        :param job_ids: A list of job_id's,
+            defaults to all jobs found in the workspace.
+        :param job_type: A specific job_type,
+            defaults to the result of :meth:`~.next_job_type`.
+        :param job_filter: A JSON encoded filter that all jobs
+            to be submitted need to match.
+        :param kwargs: All other keyword arguments are forwarded
+            to :meth:`~.submit_jobs`."""
+        return self.submit_jobs(
+            env=env, scheduler=scheduler,
+            to_submit=self.to_submit(job_ids, job_type, job_filter), **kwargs)
+
+    @classmethod
+    def add_submit_args(cls, parser):
+        "Add arguments to parser for the :meth:`~.submit` method."
         parser.add_argument(
             'jobid',
             type=str,
@@ -158,18 +281,14 @@ class FlowProject(BasicFlowProject):
             help="The job id of the jobs to submit. "
             "Omit to automatically select all eligible jobs.")
         parser.add_argument(
-            '-j', '--job',
+            '-j', '--job_type',
             type=str,
             help="Limit the the type of jobs to submit.")
         parser.add_argument(
             '-w', '--walltime',
-            type=int,
+            type=float,
             default=DEFAULT_WALLTIME_HRS,
             help="The wallclock time in hours.")
-        parser.add_argument(
-            '--minutes',
-            action='store_true',
-            help="Set the walltime clock in minutes.")
         parser.add_argument(
             '--pretend',
             action='store_true',
@@ -184,6 +303,7 @@ class FlowProject(BasicFlowProject):
             help="Do not check job status or classification, just submit.")
         parser.add_argument(
             '-f', '--filter',
+            dest='job_filter',
             type=str,
             help="Filter jobs.")
         parser.add_argument(
@@ -203,26 +323,12 @@ class FlowProject(BasicFlowProject):
             help="Specify how many jobs to bundle into one submission. "
                  "Omit a specific value to bundle all eligible jobs.")
         parser.add_argument(
-            '--gpu',
-            action='store_true',
-            help="Submit to a gpu queue.")
-        parser.add_argument(
             '--hold',
             action='store_true',
             help="Submit job with user hold applied.")
 
-    def blocked(self, job, jobname):
-        try:
-            status = job.document['status'][self.get_jobsid(job, jobname)]
-            return status >= manage.JobStatus.submitted
-        except KeyError:
-            return False
-
-    def _eligible(self, job, jobname=None):
-        return self.eligible(job, jobname) and not self.blocked(job, jobname)
-
     def write_human_readable_statepoint(self, script, job):
-        "Write statepoint in human-readable format to script."
+        "Write statepoint of job in human-readable format to script."
         script.write('# Statepoint:\n#\n')
         sp_dump = json.dumps(job.statepoint(), indent=2).replace(
             '{', '{{').replace('}', '}}')
@@ -230,64 +336,46 @@ class FlowProject(BasicFlowProject):
             script.write('# ' + line + '\n')
         script.write('\n')
 
-    def write_header(self, script, walltime, walltime_buffer, job=None, jobname=None):
-        self.write_human_readable_statepoint(script, job)
+    def write_header(self, env, script, walltime, job=None, job_type=None):
+        """Write a general jobscript header to the script.
 
-        # Write hoomd-walltime stop to script.
-        # (Does not harm even if we don't actually use hoomd-blue.)
-        script.write('export HOOMD_WALLTIME_STOP=$((`date +%s` + {}))\n'.format(
-            (walltime - walltime_buffer).total_seconds()))
+        The header is written only once for each job script, whereas the
+        output of :meth:`~.write_user` may be written multiple times to
+        one job script for bundled jobs.
 
-        # Enter the self's root directory before executing any command.
-        script.write('cd {root}\n'.format(root=self.root_directory()))
-
-    def write_user(self, env, script, job, jobname, args):
-        np = 1
-        cmd = 'python scripts/run.py {jobname} {jobid}'.format(
-            jobname=jobname, jobid=job)
-        if args.bundle is not None and not args.serial:
-            cmd += ' &'
-        if np > 1:
-            cmd = env.mpi_cmd(cmd).format(np=np)
-        return np
-
-    def eligible(job, jobname=None, gpu=False):
+        The default method writes nothing."""
         return None
 
-    def fetch_job_status(self, args):
-        self, job, scheduler_jobs = args
-        result = dict()
-        result['job_id'] = str(job)
-        manage.update_status(job, scheduler_jobs)
-        status = job.document.get('status', dict())
-        result['active'] = self.is_active(status)
-        result['labels'] = sorted(set(self.classify(job)))
-        if not result['labels']:
-            return
-        result['jobname'] = self.next_job(job)
-        highest_status = max(status.values()) if len(status) else 1
-        result['submission_status'] = [manage.JobStatus(highest_status).name]
-        return result
+    def write_user(self, script, env, job, job_type, parallel, **kwargs):
+        """Write to the jobscript for job and job type."
 
-    def format_row(self, status, statepoint=None):
-        row = [
-            status['job_id'],
-            ', '.join(status['submission_status']),
-            status['jobname'],
-            ', '.join(status.get('labels', [])),
-        ]
-        if statepoint:
-            sps = self.open_job(id=status['job_id']).statepoint()
-            for i, sp in enumerate(statepoint):
-                row.insert(i + 1, sps.get(sp))
-        return row
+        This function should be specialized for each project.
+        Please note, that all commands should obey the parallel flag, i.e.
+        should be executed in parallel if set to True.
+        You should `assert not parallel` if that is not possible.
 
-    def draw_progressbar(self, value, total, width=40):
-        n = int(value / total * width)
-        return '|' + ''.join(['#'] * n) + ''.join(['-'] * (width - n)) + '|'
+        See also: :meth:`~.JobScript.write_cmd`.
+
+        :param script: The job script, to write to.
+        :type script: :class:`~.JobScript`
+        :param job: The signac job handle.
+        :type job: :class:`signac.contrib.Job`
+        :param job_type: The job type to execute.
+        :type job_type: str
+        :param parallel: Execute commands in parallel if True.
+        :type parallel: bool
+
+        :returns: The number of required processors (nodes).
+        :rtype: int
+        """
+        self.write_human_readable_statepoint(script, job)
+        cmd = 'python scripts/run.py {job_type} {jobid}'
+        return script.write_cmd(
+            cmd.format(job_type=job_type, job_id=str(job)),
+            np=1, parallel=parallel)
 
     def print_overview(self, stati, file=sys.stdout):
-        # determine progress of all labels
+        "Print the project's status overview."
         progress = defaultdict(int)
         for status in stati:
             for label in status['labels']:
@@ -296,68 +384,99 @@ class FlowProject(BasicFlowProject):
             progress.items(), key=lambda x: (x[1], x[0]), reverse=True)
         table_header = ['label', 'progress']
         rows = ([label, '{} {:0.2f}%'.format(
-            self.draw_progressbar(num, len(stati)), 100 * num / len(stati))]
+            draw_progressbar(num, len(stati)), 100 * num / len(stati))]
             for label, num in progress_sorted)
         print("Total # of jobs: {}".format(len(stati)), file=file)
         print(util.tabulate.tabulate(rows, headers=table_header), file=file)
 
-    def print_detailed_view(self, stati, statepoint=None, file=sys.stdout):
-        table_header = ['job_id', 'status', 'jobname', 'labels']
+    def format_row(self, status, statepoint=None):
+        "Format each row in the detailed status output."
+        row = [
+            status['job_id'],
+            ', '.join(status['submission_status']),
+            status['job_type'],
+            ', '.join(status.get('labels', [])),
+        ]
         if statepoint:
+            sps = self.open_job(id=status['job_id']).statepoint()
             for i, sp in enumerate(statepoint):
-                table_header.insert(i + 1, sp)
-        rows = (self.format_row(status, statepoint)
-                for status in stati if not
-                (args.inactive and status['active']) and
-                (status['active'] or status['jobname']))
+                row.insert(i + 1, sps.get(sp))
+        return row
+
+    def print_detailed_view(self, stati, parameters=None,
+                            skip_active=False, file=sys.stdout):
+        "Print the project's detailed status."
+        table_header = ['job_id', 'status', 'next_job', 'labels']
+        if parameters:
+            for i, value in enumerate(parameters):
+                table_header.insert(i + 1, value)
+        rows = (self.format_row(status, parameters)
+                for status in stati if not (skip_active and status['active']))
         print(util.tabulate.tabulate(rows, headers=table_header), file=file)
 
-    def print_status(self, env, args, file=sys.stdout, err=sys.stderr):
-        try:
-            scheduler = env.get_scheduler()
-            scheduler_jobs = {job.name(): job for job in
-                              self.expand_bundled_jobs(self, scheduler.jobs())}
-        except ImportError as error:
-            print("WARNING: Requested scheduler not available. "
-                  "Unable to determine batch job status.", file=err)
-            print(error, file=err)
-            scheduler_jobs = None
-        filter_ = None if args.filter is None else eval(args.filter)
-        print("Finding all jobs...", file=err)
-        N = self.num_jobs()
-        if args.cache:
-            query = {'statepoint.states': {'$exists': True}}
-            docs = signac.get_database('shape_potentials').index.find(query)
-            jobs = [self.open_job(id=doc['signac_id'])
-                    for doc in tqdm(docs, total=docs.count())]
-        else:
-            jobs = [job for job in tqdm(islice(self.find_jobs(
-                filter_), N), total=N) if 'states' in job.statepoint()]
-            print("Determine job stati...", file=err)
-        with multiprocessing.Pool() as pool:
-            stati = pool.imap_unordered(
-                self.fetch_job_status, [(self, job, scheduler_jobs) for job in jobs])
-            stati = [status for status in filter(
-                None, tqdm(stati, total=len(jobs)))]
-        print("Done.", file=err)
-        job_dict = {str(job): job for job in jobs}
-        if args.export:
-            mc = signac.get_database(str(self)).job_stati
-            for status in stati:
-                status['statepoint'] = job_dict[status['job_id']].statepoint()
-                mc.update_one({'_id': status['job_id']}, {
-                              '$set': status}, upsert=True)
-        title = "Status self '{}':".format(self)
+    def export_job_stati(self, collection, stati):
+        for status in stati:
+            job = self.open_job(id=status['job_id'])
+            status['statepoint'] = job.statepoint()
+            collection.update_one({'_id': status['job_id']},
+                                  {'$set': status}, upsert=True)
+
+    def update_stati(self, scheduler, jobs=None, file=sys.stderr):
+        """Update the status of all jobs with the given scheduler.
+
+        :param scheduler: The scheduler instance used to feth the job stati.
+        :type scheduler: :class:`~.manage.Scheduler`
+        :param jobs: A sequence of :class:`~.signac.contrib.Job` instances.
+        :param file: The file to write output to, defaults to `sys.stderr`."""
+        if jobs is None:
+            jobs = self.find_jobs()
+        print("Query scheduler...", file=file)
+        scheduler_jobs = self._fetch_scheduler_jobs(scheduler)
+        print("Determine job stati...", file=file)
+        for job in tqdm(jobs, file=file):
+            self._update_status(job, scheduler_jobs)
+        print("Done.", file=file)
+
+    def print_status(self, env, scheduler=None, job_filter=None,
+                     detailed_view=False, parameters=None, skip_active=False,
+                     file=sys.stdout, err=sys.stderr):
+        """Print the status of the project.
+
+        :param env: The environment handle.
+        :param scheduler: The scheduler instance used to feth the job stati.
+        :type scheduler: :class:`~.manage.Scheduler`
+        :param job_filter: A JSON encoded filter,
+            that all jobs to be submitted need to match.
+        :param detailed_view: Print a detailed status of each job.
+        :type detailed_view: bool
+        :param parameters: Print the value of the specified parameters.
+        :type parameters: list of str
+        :param skip_active: Only print jobs that are currently inactive.
+        :type skip_active: bool
+        :param file: Print all output to this file,
+            defaults to sys.stdout
+        :param err: Pirnt all error output to this file,
+            defaults to sys.stderr"""
+        if job_filter is not None and isinstance(job_filter, str):
+            job_filter = json.loads(job_filter)
+        jobs = list(self.find_jobs(job_filter))
+        if scheduler is not None:
+            self.update_stati(scheduler, jobs, file=err)
+        stati = [self.get_job_status(job) for job in jobs]
+        title = "Status project '{}':".format(self)
         print('\n' + title, file=file)
         self.print_overview(stati)
-        if args.detailed_view:
+        if detailed_view:
             print(file=file)
             print("Detailed view:", file=file)
-            self.print_detailed_view(stati, args.statepoint, file)
+            self.print_detailed_view(stati, parameters, skip_active, file)
 
-    def add_status_parser_arguments(self, parser):
+    @classmethod
+    def add_print_status_args(cls, parser):
+        "Add arguments to parser for the :meth:`~.print_status` method."
         parser.add_argument(
             '-f', '--filter',
+            dest='job_filter',
             type=str,
             help="Filter jobs.")
         parser.add_argument(
@@ -365,26 +484,36 @@ class FlowProject(BasicFlowProject):
             action='store_true',
             help="Display a detailed view of the job stati.")
         parser.add_argument(
-            '-s', '--statepoint',
+            '-p', '--parameters',
             type=str,
             nargs='*',
-            help="Display a select parameter of the statepoint "
-                 "with the detailed view.")
+            help="Display select parameters of the job's "
+                 "statepoint with the detailed view.")
         parser.add_argument(
-            '-i', '--inactive',
+            '--skip-active',
             action='store_true',
-            help="Display all jobs, that require attention.")
-        parser.add_argument(
-            '-e', '--export',
-            action='store_true',
-            help="Export job stati to MongoDB database collection.")
-        parser.add_argument(
-            '-c', '--cache',
-            action='store_true',
-            help="Use the cached index for loading jobs.")
+            help="Display only jobs, which are currently not active.")
 
     def classify(self, job):
-        yield None
+        """Generator function which yields labels for job.
 
-    def next_job(self, job):
+        :param job: The signac job handle.
+        :type job: :class:`signac.contrib.Job`
+        :yields: The labels to classify job.
+        :yield type: str"""
+
+    def next_job_type(self, job):
+        """Determine the next job type for job.
+
+        You can, but don't have to use this function to simplify
+        the submission process. The default method returns None.
+
+        :param job: The signac job handle.
+        :type job: :class:`signac.contrib.Job`
+        :returns: A job type to execute next.
+        :rtype: str"""
         return
+
+    def eligible(self, job, job_type=None, **kwargs):
+        """Determine if job is eligible for job_type."""
+        return None

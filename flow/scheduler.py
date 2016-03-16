@@ -1,6 +1,7 @@
 import warnings
 from .moab import MoabScheduler
 from .slurm import SlurmScheduler
+from .fakescheduler import FakeScheduler
 
 
 try:
@@ -18,4 +19,4 @@ except ImportError:
         def __init__(self, *args, **kwargs):
             raise ImportError("Install apscheduler to enable this scheduler.")
 
-__all__ = ['MoabScheduler', 'SlurmScheduler', 'APScheduler']
+__all__ = ['MoabScheduler', 'SlurmScheduler', 'APScheduler', 'FakeScheduler']

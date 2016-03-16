@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Define environments to automate submission scripts.
 
 Partially adapted from clusterutils package by
@@ -7,7 +6,7 @@ Matthew Spellings."""
 import re
 import socket
 import logging
-from six import with_metaclass
+from signac.common.six import with_metaclass
 
 
 logger = logging.getLogger(__name__)

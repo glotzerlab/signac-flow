@@ -11,7 +11,8 @@ Welcome to signac-flow's documentation!
 .. toctree::
    :maxdepth: 2
 
-   modules
+   example
+   flow
 
 
 

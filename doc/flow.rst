@@ -1,56 +1,5 @@
-flow package
-============
-
-Submodules
-----------
-
-flow.environment module
------------------------
-
-.. automodule:: flow.environment
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-flow.fakescheduler module
--------------------------
-
-.. automodule:: flow.fakescheduler
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-flow.manage module
-------------------
-
-.. automodule:: flow.manage
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-flow.moab module
-----------------
-
-.. automodule:: flow.moab
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-flow.mongodb_queue module
--------------------------
-
-.. automodule:: flow.mongodb_queue
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-flow.mongodb_set module
------------------------
-
-.. automodule:: flow.mongodb_set
-    :members:
-    :undoc-members:
-    :show-inheritance:
+flow API
+========
 
 flow.project module
 -------------------
@@ -64,6 +13,39 @@ flow.scheduler module
 ---------------------
 
 .. automodule:: flow.scheduler
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+flow.environment module
+-----------------------
+
+.. automodule:: flow.environment
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
+flow.manage module
+------------------
+
+.. automodule:: flow.manage
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+flow.fakescheduler module
+-------------------------
+
+.. automodule:: flow.fakescheduler
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+flow.moab module
+----------------
+
+.. automodule:: flow.moab
     :members:
     :undoc-members:
     :show-inheritance:

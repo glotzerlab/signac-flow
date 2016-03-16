@@ -53,30 +53,6 @@ class ClusterJob(object):
     def status(self):
         return self._status
 
-    def registered(self):
-        warnings.warn("Use status() instead.", DeprecationWarning)
-        return self.status() == JobStatus.registered
-
-    def submitted(self):
-        warnings.warn("Use status() instead.", DeprecationWarning)
-        return self.status() == JobStatus.submitted
-
-    def active(self):
-        warnings.warn("Use status() instead.", DeprecationWarning)
-        return self.status() == JobStatus.active
-
-    def queued(self):
-        warnings.warn("Use status() instead.", DeprecationWarning)
-        return self.status() == JobStatus.queued
-
-    def completed(self):
-        warnings.warn("Use status() instead.", DeprecationWarning)
-        return self.status() == JobStatus.inactive
-
-    def held(self):
-        warnings.warn("Use status() instead.", DeprecationWarning)
-        return self.status() == JobStatus.held
-
 
 class Scheduler(object):
     "Generic Scheduler ABC"

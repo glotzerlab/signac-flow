@@ -12,9 +12,9 @@ from setuptools import setup, find_packages
 
 setup(
     name='signac-flow',
-    version='0.1.2',
+    version='0.1.3',
     packages=find_packages(),
-    # zip_safe=True,
+    zip_safe=True,
 
     author='Carl Simon Adorf',
     author_email='csadorf@umich.edu',

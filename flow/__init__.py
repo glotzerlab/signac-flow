@@ -8,7 +8,7 @@ from . import scheduler
 from . import manage
 from . project import FlowProject
 
-__version__ = '0.1.2'
+__version__ = '0.1.3'
 
 __all__ = [
     'environment',

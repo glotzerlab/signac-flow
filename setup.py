@@ -4,6 +4,10 @@ if sys.version_info < (2,7,0):
     print("Error: signac requires python version >= 2.7.x.")
     sys.exit(1)
 
+requirements = []
+if sys.version_info < (3,4,0):
+    requirements.append('enum34')
+
 from setuptools import setup, find_packages
 
 setup(
@@ -23,4 +27,6 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Topic :: Scientific/Engineering :: Physics",
     ],
+
+    install_requires = requirements,
 )

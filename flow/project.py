@@ -436,7 +436,7 @@ class FlowProject(signac.contrib.Project):
     def print_detailed(self, stati, parameters=None,
                        skip_active=False, file=sys.stdout):
         "Print the project's detailed status."
-        table_header = ['job_id', 'status', 'next_job', 'labels']
+        table_header = ['job_id', 'status', 'next_operation', 'labels']
         if parameters:
             for i, value in enumerate(parameters):
                 table_header.insert(i + 1, value)

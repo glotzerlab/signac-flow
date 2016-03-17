@@ -175,8 +175,7 @@ class APScheduler(Scheduler):
             'after': after,
             'script': script.read().format(
                 jobsid=jobsid, np=np, walltime=format_timedelta(walltime)),
-            'kwargs': kwargs}
-        job_doc.update(kwargs)
+        }
         if pretend:
             print(type(self), "Pretend to submit:\n\n", job_doc)
             return jobsid

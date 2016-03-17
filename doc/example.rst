@@ -29,18 +29,18 @@ To get started, specialize a :py:class:`~flow.FlowProject`:
             script.writeline('cd {}'.format(self.root_directory()))
 
         # All operations are defined in the write_user function:
-        def write_user(self, script, job, job_operation, **kwargs):
-            if job_operation == 'init':
+        def write_user(self, script, job, operation, **kwargs):
+            if operation == 'init':
                 cmd = 'python scripts/init.py {}'.format(job)
                 return script.write_cmd(cmd, **kwargs)
-            elif job_operation == 'process':
+            elif operation == 'process':
                 cmd = 'process -a {a} -b {b} {in} {out}'.format(
                   in=os.path.join(job.workspace(), 'init.txt'),
                   out=os.path.join(job.workspace(), 'out.txt'),
                   ** job.statepoint())
                 return script.write_cmd(cmd, np=job.statepoint()['b'], **kwargs)
             else:
-                raise RuntimeError("Unknown operation '{}'.".format(job_operation))
+                raise RuntimeError("Unknown operation '{}'.".format(operation))
 
         # The classification of our job workspace is simple:
         def classify(self, job):
@@ -49,14 +49,14 @@ To get started, specialize a :py:class:`~flow.FlowProject`:
             if job.isfile('out.txt'):
                 yield 'processed'
 
-        # We only want to execute the 'process' step if the job is initialized:
-        def eligible(self, job, job_operation):
-            if job_operation == 'process':
+        # We only want to execute the 'process' operation if the job is initialized:
+        def eligible(self, job, operation):
+            if operation == 'process':
                 return 'initialized' in set(self.classify(job))
             else:
               return True
 
-        def next_job_operation(self, job):
+        def next_operation(self, job):
             labels = set(self.classify(job))
             if 'initialized' in labels and 'processed' not in labels:
                 return 'process'

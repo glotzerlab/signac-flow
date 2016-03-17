@@ -3,6 +3,7 @@
 Partially adapted from clusterutils package by
 Matthew Spellings."""
 
+from __future__ import print_function
 import re
 import socket
 import logging

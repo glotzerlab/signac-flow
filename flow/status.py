@@ -3,6 +3,7 @@
 
 This module will use the local environment to determine the status of jobs."""
 
+from __future__ import print_function
 import os
 import sys
 import argparse

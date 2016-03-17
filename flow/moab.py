@@ -1,5 +1,6 @@
 """Routines for the MOAB environment."""
 
+from __future__ import print_function
 import io
 import getpass
 import subprocess

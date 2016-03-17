@@ -3,6 +3,7 @@
 Functions defined in this module are called from the run.py module.
 Furthermore we provide functions to classify jobs and determine the
 next operation."""
+from __future__ import print_function
 import os
 import six
 import logging

@@ -2,7 +2,6 @@
 
 import logging
 import enum
-import warnings
 
 
 logger = logging.getLogger(__name__)

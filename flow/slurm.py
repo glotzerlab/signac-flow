@@ -7,7 +7,6 @@ import subprocess
 import tempfile
 import math
 import logging
-import xml.etree.ElementTree as ET
 
 from .manage import Scheduler
 from .manage import ClusterJob, JobStatus

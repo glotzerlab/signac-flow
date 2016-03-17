@@ -15,7 +15,6 @@ import apscheduler
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.jobstores.mongodb import MongoDBJobStore
 from apscheduler.executors.pool import ProcessPoolExecutor, ThreadPoolExecutor
-from apscheduler.triggers.base import BaseTrigger
 from apscheduler.triggers.date import DateTrigger
 
 from .mongodb_queue import MongoDBQueue, Empty
@@ -84,12 +83,14 @@ def run_job(scheduler, job_doc):
     finally:
         transfer(job_doc['jobsid'], 'active', 'completed')
 
+
 def submit_job(scheduler, queue, misfire_grace_time, next_job):
     run_date = next_job.get('run_date', datetime.now())
     run_date += timedelta(seconds=10+int(random.random() * 10))
     after = next_job.get('after')
+    assert after is None
     trigger = DateTrigger(run_date=run_date)
-    job = scheduler.add_job(
+    scheduler.add_job(
         run_job,
         id=next_job['jobsid'],
         args=(scheduler, next_job),
@@ -97,6 +98,7 @@ def submit_job(scheduler, queue, misfire_grace_time, next_job):
         trigger=trigger,
         misfire_grace_time=misfire_grace_time)
     return next_job['jobsid']
+
 
 def poll_submits(scheduler, queue, misfire_grace_time=None):
     logger.debug("Pulling from submittal queue.")
@@ -109,7 +111,7 @@ def poll_submits(scheduler, queue, misfire_grace_time=None):
             if next_job.get('after') is None:
                 submit_job(scheduler, queue, misfire_grace_time, next_job)
             else:
-                jobid='submitafter-{}'.format(next_job['after'])
+                jobid = 'submitafter-{}'.format(next_job['after'])
                 scheduler.add_job(
                     submit_after,
                     id=jobid,

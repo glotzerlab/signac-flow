@@ -434,7 +434,7 @@ class FlowProject(signac.contrib.Project):
         return row
 
     def print_detailed(self, stati, parameters=None,
-                            skip_active=False, file=sys.stdout):
+                       skip_active=False, file=sys.stdout):
         "Print the project's detailed status."
         table_header = ['job_id', 'status', 'next_job', 'labels']
         if parameters:

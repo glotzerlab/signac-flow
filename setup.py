@@ -1,11 +1,11 @@
 import sys
 
-if sys.version_info < (2,7,0):
+if sys.version_info < (2, 7, 0):
     print("Error: signac requires python version >= 2.7.x.")
     sys.exit(1)
 
 requirements = []
-if sys.version_info < (3,4,0):
+if sys.version_info < (3, 4, 0):
     requirements.append('enum34')
 
 from setuptools import setup, find_packages
@@ -14,7 +14,7 @@ setup(
     name='signac-flow',
     version='0.1.2',
     packages=find_packages(),
-    zip_safe=True,
+    # zip_safe=True,
 
     author='Carl Simon Adorf',
     author_email='csadorf@umich.edu',
@@ -28,5 +28,5 @@ setup(
         "Topic :: Scientific/Engineering :: Physics",
     ],
 
-    install_requires = requirements,
+    install_requires=requirements,
 )

@@ -88,7 +88,8 @@ class MoabScheduler(Scheduler):
         submit_script.write(script.read())
         submit_script.seek(0)
         submit = submit_script.read().format(
-            np=np, nn=num_nodes, walltime=format_timedelta(walltime), jobsid=jobsid)
+            np=np, nn=num_nodes,
+            walltime=format_timedelta(walltime), jobsid=jobsid)
         if pretend:
             print("#\n# Pretend to submit:\n")
             print(submit, "\n")

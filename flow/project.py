@@ -371,10 +371,10 @@ class FlowProject(signac.contrib.Project):
         The default method writes nothing."""
         return
 
-    def write_user(self, script, job, operation, parallel, mpi_cmd=None, **kwargs):
+    def write_user(self, script, job, operation, parallel, **kwargs):
         """Write to the jobscript for job and job type."
 
-        This function should be specialized for each project.
+        This function needs to be specialized for each project.
         Please note, that all commands should obey the parallel flag, i.e.
         should be executed in parallel if set to True.
         You should `assert not parallel` if that is not possible.
@@ -398,11 +398,7 @@ class FlowProject(signac.contrib.Project):
         :returns: The number of required processors (nodes).
         :rtype: int
         """
-        self.write_human_readable_statepoint(script, job)
-        cmd = 'python scripts/run.py {operation} {jobid}'
-        return script.write_cmd(
-            cmd.format(operation=operation, jobid=str(job)),
-            np=1, parallel=parallel, mpi_cmd=mpi_cmd)
+        raise NotImplementedError()
 
     def print_overview(self, stati, file=sys.stdout):
         "Print the project's status overview."

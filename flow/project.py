@@ -295,7 +295,7 @@ class FlowProject(signac.contrib.Project):
     def add_submit_args(cls, parser):
         "Add arguments to parser for the :meth:`~.submit` method."
         parser.add_argument(
-            'jobid',
+            'job_ids',
             type=str,
             nargs='*',
             help="The job id of the jobs to submit. "

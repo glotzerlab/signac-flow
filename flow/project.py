@@ -287,6 +287,8 @@ class FlowProject(signac.contrib.Project):
             to be submitted need to match.
         :param kwargs: All other keyword arguments are forwarded
             to :meth:`~.submit_jobs`."""
+        if job_ids is not None and not len(job_ids):
+            job_ids = None
         return self.submit_jobs(
             scheduler=scheduler,
             to_submit=self.to_submit(job_ids, operation, job_filter), **kwargs)

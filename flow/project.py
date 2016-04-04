@@ -291,7 +291,8 @@ class FlowProject(signac.contrib.Project):
             job_ids = None
         return self.submit_jobs(
             scheduler=scheduler,
-            to_submit=self.to_submit(job_ids, operation, job_filter), **kwargs)
+            to_submit=self.to_submit(job_ids, operation, job_filter),
+            **kwargs)
 
     @classmethod
     def add_submit_args(cls, parser):
@@ -304,6 +305,7 @@ class FlowProject(signac.contrib.Project):
             "Omit to automatically select all eligible jobs.")
         parser.add_argument(
             '-j', '--job-operation',
+            dest='operation',
             type=str,
             help="Only submit jobs eligible for the specified operation.")
         parser.add_argument(

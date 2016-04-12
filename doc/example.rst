@@ -101,6 +101,15 @@ To print the status of your project:
     # ...
     >>>
 
+.. tip::
+
+      Use a multiprocessing pool to speed up the status determination:
+
+      .. code-block:: python
+
+          with multiprocessing.Pool() as pool:
+              project.print_status(detailed=True, params=('a',), pool=pool)
+
 We will use the :py:class:`~flow.scheduler.FakeScheduler` for demonstration of the submit process, which simply prints the job scripts to screen:
 
 .. code-block:: python

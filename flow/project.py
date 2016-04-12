@@ -32,6 +32,9 @@ def draw_progressbar(value, total, width=40):
     n = int(value / total * width)
     return '|' + ''.join(['#'] * n) + ''.join(['-'] * (width - n)) + '|'
 
+def _update_status(args):
+    return manage.update_status(* args)
+
 
 class JobScript(io.StringIO):
     "Simple StringIO wrapper to implement cmd wrapping logic."
@@ -451,7 +454,7 @@ class FlowProject(signac.contrib.Project):
             collection.update_one({'_id': status['job_id']},
                                   {'$set': status}, upsert=True)
 
-    def update_stati(self, scheduler, jobs=None, file=sys.stderr):
+    def update_stati(self, scheduler, jobs=None, file=sys.stderr, pool=None):
         """Update the status of all jobs with the given scheduler.
 
         :param scheduler: The scheduler instance used to feth the job stati.
@@ -463,13 +466,17 @@ class FlowProject(signac.contrib.Project):
         print("Query scheduler...", file=file)
         scheduler_jobs = self._fetch_scheduler_jobs(scheduler)
         print("Determine job stati...", file=file)
-        for job in tqdm(jobs, file=file):
-            self._update_status(job, scheduler_jobs)
-        print("Done.", file=file)
+        if pool is None:
+            for job in tqdm(jobs, file=file):
+                self._update_status(job, scheduler_jobs)
+        else:
+            jobs_ = ((job, scheduler_jobs) for job in jobs)
+            pool.map(_update_status, tqdm(jobs_, total=len(jobs), file=file))
 
     def print_status(self, scheduler=None, job_filter=None,
                      detailed=False, parameters=None, skip_active=False,
-                     file=sys.stdout, err=sys.stderr):
+                     file=sys.stdout, err=sys.stderr,
+                     pool=None):
         """Print the status of the project.
 
         :param scheduler: The scheduler instance used to fetch the job stati.
@@ -484,14 +491,20 @@ class FlowProject(signac.contrib.Project):
         :type skip_active: bool
         :param file: Print all output to this file,
             defaults to sys.stdout
-        :param err: Pirnt all error output to this file,
-            defaults to sys.stderr"""
+        :param err: Print all error output to this file,
+            defaults to sys.stderr
+        :param pool: A multiprocessing or threading pool. Providing a pool
+            parallelizes this method."""
         if job_filter is not None and isinstance(job_filter, str):
             job_filter = json.loads(job_filter)
         jobs = list(self.find_jobs(job_filter))
         if scheduler is not None:
-            self.update_stati(scheduler, jobs, file=err)
-        stati = [self.get_job_status(job) for job in jobs]
+            self.update_stati(scheduler, jobs, file=err, pool=pool)
+        print("Generate output...", file=err)
+        if pool is None:
+            stati = [self.get_job_status(job) for job in jobs]
+        else:
+            stati = pool.map(self.get_job_status, jobs)
         title = "Status project '{}':".format(self)
         print('\n' + title, file=file)
         self.print_overview(stati)

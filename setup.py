@@ -22,7 +22,7 @@ setup(
     author='Carl Simon Adorf',
     author_email='csadorf@umich.edu',
     description="Simple workflow management based on signac.",
-    keywords='workflow management singac framework database',
+    keywords='workflow management signac framework database',
 
     classifiers=[
         "Development Status :: 3 - Alpha",

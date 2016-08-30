@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 #
 # signac-flow documentation build configuration file, created by
 # sphinx-quickstart on Wed Mar 16 14:21:08 2016.

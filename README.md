@@ -13,7 +13,7 @@ The signac-flow package provides the basic infrastructure to easily configure wo
 
 ## Installation
 
-This package is available via the Glotzer Group conda channel: `conda install signac-flow`.
+This package is available via the Glotzer Group conda channel: `conda install -c glotzer signac-flow`.
 
 ## Documentation
 

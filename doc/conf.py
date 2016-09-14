@@ -292,5 +292,5 @@ texinfo_documents = [
 # Example configuration for intersphinx: refer to the Python standard library.
 intersphinx_mapping = {
     'https://docs.python.org/': None,
-    'signac': ('https://glotzerlab.engin.umich.edu/signac', None)
+    'signac': ('http://signac.readthedocs.io/en/latest/', None),
 }

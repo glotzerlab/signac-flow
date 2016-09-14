@@ -23,8 +23,7 @@ or
 
 ## Documentation
 
-You can either [download](https://bitbucket.org/glotzer/signac-flow/downloads/signac-flow-doc.tar.gz) the documentation for this package or build it yourself with sphinx:
-
+The documentation for this package can be found online at http://signac-flow.readthedocs.io/ or built manually using sphinx:
 ```
 #!bash
 cd doc

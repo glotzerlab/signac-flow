@@ -435,8 +435,17 @@ class FlowProject(signac.contrib.Project):
         ]
         if statepoint:
             sps = self.open_job(id=status['job_id']).statepoint()
-            for i, sp in enumerate(statepoint):
-                row.insert(i + 1, sps.get(sp))
+            def get(k, m):
+                if m is None:
+                    return
+                t = k.split('.')
+                if len(t) > 1:
+                    return get('.'.join(t[1:]), m.get(t[0]))
+                else:
+                    return m.get(k)
+
+            for i, k in enumerate(statepoint):
+                row.insert(i + 1, get(k, sps))
         return row
 
     def print_detailed(self, stati, parameters=None,

@@ -93,7 +93,33 @@ class FlowProject(signac.contrib.Project):
 
     :param config: A signac configuaration, defaults to
         the configuration loaded from the environment.
-    :type config: A signac config object."""
+    :type config: A signac config object.
+    """
+    NAMES = {
+        'next_operation': 'next_op',
+    }
+
+    @classmethod
+    def _tr(cls, x):
+        "Use name translation table for x."
+        return cls.NAMES.get(x, x)
+
+    ALIASES = dict(
+        status='S',
+        unknown='U',
+        registered='R',
+        queued='Q',
+        active='A')
+
+    @classmethod
+    def _alias(cls, x):
+        "Use alias if specified."
+        return abbreviate(x, cls.ALIASES.get(x, x))
+
+    @classmethod
+    def update_aliases(cls, aliases):
+        "Update the ALIASES table for this class."
+        cls.ALIASES.update(aliases)
 
     def _get_jobsid(self, job, operation):
         "Return a unique job session id based on the job and operation."
@@ -477,18 +503,18 @@ class FlowProject(signac.contrib.Project):
         rows = ([label, '{} {:0.2f}%'.format(
             draw_progressbar(num, len(stati)), 100 * num / len(stati))]
             for label, num in progress_sorted)
-        print("Total # of jobs: {}".format(len(stati)), file=file)
+        print("{} {}".format(self._tr("Total # of jobs:"), len(stati)), file=file)
         print(util.tabulate.tabulate(rows, headers=table_header), file=file)
         if max_lines is not None:
             lines_skipped = len(progress) - max_lines
             if lines_skipped:
-                print("Note: Ommitted {} more status lines.".format(lines_skipped), file=file)
+                print("{} {}".format(self._tr("Lines omitted:"), lines_skipped), file=file)
 
     def format_row(self, status, statepoint=None, max_width=-1):
         "Format each row in the detailed status output."
         row = [
             status['job_id'],
-            ', '.join(status['submission_status']),
+            ', '.join((self._alias(s) for s in status['submission_status'])),
             status['operation'],
             ', '.join(status.get('labels', [])),
         ]
@@ -505,7 +531,7 @@ class FlowProject(signac.contrib.Project):
                     return m.get(k)
 
             for i, k in enumerate(statepoint):
-                v = self._sp_alias(get(k, sps))
+                v = self._alias(get(k, sps))
                 row.insert(i + 1, None if v is None else shorten(str(v), max_width))
         return row
 
@@ -513,16 +539,16 @@ class FlowProject(signac.contrib.Project):
                        skip_active=False, param_max_width=-1,
                        file=sys.stdout):
         "Print the project's detailed status."
-        table_header = ['job_id', 'status', 'next_operation', 'labels']
+        table_header = [self._tr(self._alias(s)) for s in ('job_id', 'status', 'next_operation', 'labels')]
         if parameters:
             for i, value in enumerate(parameters):
-                table_header.insert(i + 1, shorten(self._sp_alias(str(value)), param_max_width))
+                table_header.insert(i + 1, shorten(self._alias(str(value)), param_max_width))
         rows = (self.format_row(status, parameters, param_max_width)
                 for status in stati if not (skip_active and status['active']))
         print(util.tabulate.tabulate(rows, headers=table_header), file=file)
         if abbreviate.table:
             print()
-            print("Abbreviations used:", file=file)
+            print(self._tr("Abbreviations used:"), file=file)
             for a in sorted(abbreviate.table):
                 print('{}: {}'.format(a, abbreviate.table[a]))
 
@@ -542,9 +568,9 @@ class FlowProject(signac.contrib.Project):
         :param file: The file to write output to, defaults to `sys.stderr`."""
         if jobs is None:
             jobs = self.find_jobs()
-        print("Query scheduler...", file=file)
+        print(self._tr("Query scheduler..."), file=file)
         scheduler_jobs = {sjob.name(): sjob for sjob in self.scheduler_jobs(scheduler)}
-        print("Determine job stati...", file=file)
+        print(self._tr("Determine job stati..."), file=file)
         if pool is None:
             for job in tqdm(jobs, file=file):
                 self._update_status(job, scheduler_jobs)
@@ -581,18 +607,18 @@ class FlowProject(signac.contrib.Project):
         jobs = list(self.find_jobs(job_filter))
         if scheduler is not None:
             self.update_stati(scheduler, jobs, file=err, pool=pool)
-        print("Generate output...", file=err)
+        print(self._tr("Generate output..."), file=err)
         if pool is None:
             stati = [self.get_job_status(job) for job in jobs]
         else:
             stati = pool.map(self.get_job_status, jobs)
-        title = "Status project '{}':".format(self)
+        title = "{} '{}':".format(self._tr("Status project"), self)
         print('\n' + title, file=file)
         if overview:
             self.print_overview(stati, max_lines=overview_max_lines)
         if detailed:
             print(file=file)
-            print("Detailed view:", file=file)
+            print(self._tr("Detailed view:"), file=file)
             self.print_detailed(stati, parameters, skip_active,
                                 param_max_width, file)
 

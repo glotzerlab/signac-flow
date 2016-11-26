@@ -75,6 +75,7 @@ class SlurmScheduler(Scheduler):
         self.user = user
 
     def jobs(self):
+        self._prevent_dos()
         for job in _fetch(user=self.user):
             yield job
 

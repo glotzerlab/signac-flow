@@ -5,6 +5,7 @@
 
 import logging
 import enum
+import time
 
 
 logger = logging.getLogger(__name__)
@@ -58,6 +59,16 @@ class ClusterJob(object):
 
 class Scheduler(object):
     "Generic Scheduler ABC"
+    _last_query = None
+    _dos_timeout = 10
+
+    @classmethod
+    def _prevent_dos(cls):
+        if cls._last_query is not None:
+            if time.time() - cls._last_query < cls._dos_timeout:
+                raise RuntimeError(
+                    "Too many scheduler requests within a short time!")
+        cls._last_query = time.time()
 
     def jobs(self):
         "yields ClusterJob"

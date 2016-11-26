@@ -69,14 +69,15 @@ class MoabScheduler(Scheduler):
     submit_cmd = ['qsub']
 
     def __init__(self, root=None, user=None, header=None, cores_per_node=None):
-        if root is None:
-            root = _fetch(user=user)
+        self.user = user
         self.root = root
         self.header = header
         self.cores_per_node = cores_per_node
 
     def jobs(self):
-        for node in self.root.findall('Job'):
+        self._prevent_dos()
+        nodes = _fetch(user=self.user)
+        for node in nodes.findall('Job'):
             yield MoabJob(node)
 
     def submit(self, jobsid, np, walltime, script, resume=None,

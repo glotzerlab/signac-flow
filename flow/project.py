@@ -109,7 +109,10 @@ class FlowProject(signac.contrib.Project):
         unknown='U',
         registered='R',
         queued='Q',
-        active='A')
+        active='A',
+        inactive='I',
+        requires_attention='!'
+        )
 
     @classmethod
     def _alias(cls, x):
@@ -532,17 +535,20 @@ class FlowProject(signac.contrib.Project):
 
             for i, k in enumerate(statepoint):
                 v = self._alias(get(k, sps))
-                row.insert(i + 1, None if v is None else shorten(str(v), max_width))
+                row.insert(i + 3, None if v is None else shorten(str(v), max_width))
+        if status['operation'] and not status['active']:
+            row[1] += ' ' + self._alias('requires_attention')
         return row
 
     def print_detailed(self, stati, parameters=None,
                        skip_active=False, param_max_width=-1,
+                       use_colors=True,
                        file=sys.stdout):
         "Print the project's detailed status."
         table_header = [self._tr(self._alias(s)) for s in ('job_id', 'status', 'next_operation', 'labels')]
         if parameters:
             for i, value in enumerate(parameters):
-                table_header.insert(i + 1, shorten(self._alias(str(value)), param_max_width))
+                table_header.insert(i + 3, shorten(self._alias(str(value)), param_max_width))
         rows = (self.format_row(status, parameters, param_max_width)
                 for status in stati if not (skip_active and status['active']))
         print(util.tabulate.tabulate(rows, headers=table_header), file=file)

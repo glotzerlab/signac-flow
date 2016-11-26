@@ -36,11 +36,17 @@ def draw_progressbar(value, total, width=40):
     return '|' + ''.join(['#'] * n) + ''.join(['-'] * (width - n)) + '|'
 
 
-def abbreviate(x, max_length=-1):
-    if max_length < 0 or len(x) <= max_length:
+def abbreviate(x, a):
+    if x == a:
         return x
     else:
-        return x[:max_length-2] + '..'
+        abbreviate.table[a] = x
+        return a
+abbreviate.table = dict()
+
+
+def shorten(x, max_length=-1):
+    return abbreviate(x, x[:max_length])
 
 
 def _update_status(args):
@@ -499,8 +505,8 @@ class FlowProject(signac.contrib.Project):
                     return m.get(k)
 
             for i, k in enumerate(statepoint):
-                v = get(k, sps)
-                row.insert(i + 1, None if v is None else abbreviate(str(v), max_width))
+                v = self._sp_alias(get(k, sps))
+                row.insert(i + 1, None if v is None else shorten(str(v), max_width))
         return row
 
     def print_detailed(self, stati, parameters=None,
@@ -510,10 +516,15 @@ class FlowProject(signac.contrib.Project):
         table_header = ['job_id', 'status', 'next_operation', 'labels']
         if parameters:
             for i, value in enumerate(parameters):
-                table_header.insert(i + 1, abbreviate(str(value), param_max_width))
+                table_header.insert(i + 1, shorten(self._sp_alias(str(value)), param_max_width))
         rows = (self.format_row(status, parameters, param_max_width)
                 for status in stati if not (skip_active and status['active']))
         print(util.tabulate.tabulate(rows, headers=table_header), file=file)
+        if abbreviate.table:
+            print()
+            print("Abbreviations used:", file=file)
+            for a in sorted(abbreviate.table):
+                print('{}: {}'.format(a, abbreviate.table[a]))
 
     def export_job_stati(self, collection, stati):
         for status in stati:

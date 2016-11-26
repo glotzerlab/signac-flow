@@ -36,6 +36,13 @@ def draw_progressbar(value, total, width=40):
     return '|' + ''.join(['#'] * n) + ''.join(['-'] * (width - n)) + '|'
 
 
+def abbreviate(x, max_length=-1):
+    if max_length < 0 or len(x) <= max_length:
+        return x
+    else:
+        return x[:max_length-2] + '..'
+
+
 def _update_status(args):
     return manage.update_status(* args)
 
@@ -471,7 +478,7 @@ class FlowProject(signac.contrib.Project):
             if lines_skipped:
                 print("Note: Ommitted {} more status lines.".format(lines_skipped), file=file)
 
-    def format_row(self, status, statepoint=None):
+    def format_row(self, status, statepoint=None, max_width=-1):
         "Format each row in the detailed status output."
         row = [
             status['job_id'],
@@ -492,17 +499,19 @@ class FlowProject(signac.contrib.Project):
                     return m.get(k)
 
             for i, k in enumerate(statepoint):
-                row.insert(i + 1, get(k, sps))
+                v = get(k, sps)
+                row.insert(i + 1, None if v is None else abbreviate(str(v), max_width))
         return row
 
     def print_detailed(self, stati, parameters=None,
-                       skip_active=False, file=sys.stdout):
+                       skip_active=False, param_max_width=-1,
+                       file=sys.stdout):
         "Print the project's detailed status."
         table_header = ['job_id', 'status', 'next_operation', 'labels']
         if parameters:
             for i, value in enumerate(parameters):
-                table_header.insert(i + 1, value)
-        rows = (self.format_row(status, parameters)
+                table_header.insert(i + 1, abbreviate(str(value), param_max_width))
+        rows = (self.format_row(status, parameters, param_max_width)
                 for status in stati if not (skip_active and status['active']))
         print(util.tabulate.tabulate(rows, headers=table_header), file=file)
 
@@ -535,6 +544,7 @@ class FlowProject(signac.contrib.Project):
     def print_status(self, scheduler=None, job_filter=None,
                      overview=True, overview_max_lines=None,
                      detailed=False, parameters=None, skip_active=False,
+                     param_max_width=-1,
                      file=sys.stdout, err=sys.stderr,
                      pool=None):
         """Print the status of the project.
@@ -572,7 +582,8 @@ class FlowProject(signac.contrib.Project):
         if detailed:
             print(file=file)
             print("Detailed view:", file=file)
-            self.print_detailed(stati, parameters, skip_active, file)
+            self.print_detailed(stati, parameters, skip_active,
+                                param_max_width, file)
 
     @classmethod
     def add_print_status_args(cls, parser):
@@ -601,6 +612,11 @@ class FlowProject(signac.contrib.Project):
             nargs='*',
             help="Display select parameters of the job's "
                  "statepoint with the detailed view.")
+        parser.add_argument(
+            '--param-max-width',
+            type=int,
+            default=-1,
+            help="Limit the width of each parameter row.")
         parser.add_argument(
             '--skip-active',
             action='store_true',

@@ -452,20 +452,24 @@ class FlowProject(signac.contrib.Project):
         """
         raise NotImplementedError()
 
-    def print_overview(self, stati, file=sys.stdout):
+    def print_overview(self, stati, max_lines=None, file=sys.stdout):
         "Print the project's status overview."
         progress = defaultdict(int)
         for status in stati:
             for label in status['labels']:
                 progress[label] += 1
-        progress_sorted = sorted(
-            progress.items(), key=lambda x: (x[1], x[0]), reverse=True)
+        progress_sorted = islice(sorted(
+            progress.items(), key=lambda x: (x[1], x[0]), reverse=True), max_lines)
         table_header = ['label', 'progress']
         rows = ([label, '{} {:0.2f}%'.format(
             draw_progressbar(num, len(stati)), 100 * num / len(stati))]
             for label, num in progress_sorted)
         print("Total # of jobs: {}".format(len(stati)), file=file)
         print(util.tabulate.tabulate(rows, headers=table_header), file=file)
+        if max_lines is not None:
+            lines_skipped = len(progress) - max_lines
+            if lines_skipped:
+                print("Note: Ommitted {} more status lines.".format(lines_skipped), file=file)
 
     def format_row(self, status, statepoint=None):
         "Format each row in the detailed status output."
@@ -477,6 +481,7 @@ class FlowProject(signac.contrib.Project):
         ]
         if statepoint:
             sps = self.open_job(id=status['job_id']).statepoint()
+
             def get(k, m):
                 if m is None:
                     return
@@ -528,6 +533,7 @@ class FlowProject(signac.contrib.Project):
             pool.map(_update_status, tqdm(jobs_, total=len(jobs), file=file))
 
     def print_status(self, scheduler=None, job_filter=None,
+                     overview=True, overview_max_lines=None,
                      detailed=False, parameters=None, skip_active=False,
                      file=sys.stdout, err=sys.stderr,
                      pool=None):
@@ -561,7 +567,8 @@ class FlowProject(signac.contrib.Project):
             stati = pool.map(self.get_job_status, jobs)
         title = "Status project '{}':".format(self)
         print('\n' + title, file=file)
-        self.print_overview(stati)
+        if overview:
+            self.print_overview(stati, max_lines=overview_max_lines)
         if detailed:
             print(file=file)
             print("Detailed view:", file=file)
@@ -575,6 +582,15 @@ class FlowProject(signac.contrib.Project):
             dest='job_filter',
             type=str,
             help="Filter jobs.")
+        parser.add_argument(
+            '--no-overview',
+            action='store_false',
+            dest='overview',
+            help="Do not print an overview.")
+        parser.add_argument(
+            '-m', '--overview-max-lines',
+            type=int,
+            help="Limit the number of lines in the overview.")
         parser.add_argument(
             '-d', '--detailed',
             action='store_true',

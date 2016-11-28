@@ -82,11 +82,13 @@ def _status_local(jobsid):
 
 def _status_scheduler(jobsid, scheduler_jobs):
     """Attempt to determine status with information from the scheduler."""
-    cjob = scheduler_jobs.get(jobsid)
-    if cjob is None:
+    cjobs = scheduler_jobs.get(jobsid)
+    if cjobs is None:
         status = JobStatus.unknown
     else:
-        status = max(JobStatus.registered, cjob.status())
+        status = JobStatus.registered
+        for cjob in cjobs:
+            status = max(status, cjob.status())
     return status
 
 

@@ -184,24 +184,26 @@ class FlowProject(signac.contrib.Project):
         This function fetches all scheduled jobs from the scheduler
         and generates a nested dictionary, where the first key is
         the job id, the second key the operation name and the last
-        value is the cooresponding scheduler job.
+        value are the cooresponding scheduler jobs.
 
-        To find all scheduler job ids associated with a specific job:
+        For example, to print the status of all scheduler jobs, associated
+        with a specific job operation, execute:
 
         .. code::
 
-                sjob_map = project.map_scheduler_jobs(scheduler)
-                for op, cjob in sjob_map[job.get_id()].items():
-                    print(cjob._id())
+                sjobs = project.scheduler_jobs(scheduler)
+                sjobs_map = project.map_scheduler_jobs(sjobs)
+                for sjob in sjobs_map[job.get_id()][operation]:
+                    print(sjob._id(), sjob.status())
 
-        :param scheduler: The scheduler instance.
-        :type scheduler: :class:`~.flow.manage.Scheduler`
-        :returns: A nested dictionary (job_id, op_name, cluster job)
+        :param scheduler_jobs: An iterable of scheduler job instances.
+        :returns: A nested dictionary (job_id, op_name, scheduler jobs)
         """
-        jobs_map = defaultdict(dict)
+        sjobs_map = defaultdict(dict)
         for job_id, op, sjob in self._map_scheduler_jobs(scheduler_jobs):
-            jobs_map[job_id][op] = sjob
-        return jobs_map
+            sjobs = sjobs_map[job_id].setdefault(op, list())
+            sjobs.append(sjob)
+        return sjobs_map
 
     def _update_status(self, job, scheduler_jobs):
         "Determine the scheduler status of job."
@@ -575,13 +577,15 @@ class FlowProject(signac.contrib.Project):
         if jobs is None:
             jobs = self.find_jobs()
         print(self._tr("Query scheduler..."), file=file)
-        scheduler_jobs = {sjob.name(): sjob for sjob in self.scheduler_jobs(scheduler)}
+        sjobs_map = defaultdict(list)
+        for sjob in self.scheduler_jobs(scheduler):
+            sjobs_map[sjob.name()].append(sjob)
         print(self._tr("Determine job stati..."), file=file)
         if pool is None:
             for job in tqdm(jobs, file=file):
-                self._update_status(job, scheduler_jobs)
+                self._update_status(job, sjobs_map)
         else:
-            jobs_ = ((job, scheduler_jobs) for job in jobs)
+            jobs_ = ((job, sjobs_map) for job in jobs)
             pool.map(_update_status, tqdm(jobs_, total=len(jobs), file=file))
 
     def print_status(self, scheduler=None, job_filter=None,

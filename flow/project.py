@@ -45,8 +45,11 @@ def abbreviate(x, a):
 abbreviate.table = dict()
 
 
-def shorten(x, max_length=-1):
-    return abbreviate(x, x[:max_length])
+def shorten(x, max_length=None):
+    if max_length is None:
+        return x
+    else:
+        return abbreviate(x, x[:max_length])
 
 
 def _update_status(args):
@@ -661,7 +664,6 @@ class FlowProject(signac.contrib.Project):
         parser.add_argument(
             '--param-max-width',
             type=int,
-            default=-1,
             help="Limit the width of each parameter row.")
         parser.add_argument(
             '--skip-active',

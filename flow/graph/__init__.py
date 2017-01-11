@@ -2,6 +2,6 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 from . import graph
-from . graph import FlowGraph
+from . graph import FlowGraph, And, Or
 
 __all__ = ['graph']

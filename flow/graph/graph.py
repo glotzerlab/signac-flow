@@ -2,7 +2,21 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 import networkx as nx
+class And:
+    def __init__(self, first, second):
+        self.first = first;
+        self.second = second;
 
+    def __call__(self, job):
+        return self.first(job) and self.second(job)
+
+class Or:
+    def __init__(self, first, second):
+        self.first = first;
+        self.second = second;
+
+    def __call__(self, job):
+        return self.first(job) or self.second(job)
 # not sure if we want this?
 class FlowOperation:
     def __init__(self, name, callback, pre, post):

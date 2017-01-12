@@ -74,11 +74,15 @@ class FlowGraph:
         assert all(isinstance(c, FlowCondition) for c in chain(pre, post))
         return all(c(job) for c in pre) and not all(c(job) for c in post)
 
-    def eligible_operations(self, job):
+    def operations(self):
         for node in self._graph.nodes():
             if isinstance(node, FlowOperation):
-                if self.eligible(node, job):
-                    yield node
+                yield node
+
+    def eligible_operations(self, job):
+        for op in self.operations():
+            if self.eligible(op, job):
+                yield node
 
     def operation_chain(self, job, finish, start=None):
         src = FlowCondition.as_this_type(start)

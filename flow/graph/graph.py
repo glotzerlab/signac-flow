@@ -23,8 +23,7 @@ class Or:
 
 class FlowOperation:
 
-    def __init__(self, name, callback):
-        self._name = name
+    def __init__(self,callback):
         self._callback = callback
 
     def __eq__(self, other):
@@ -65,15 +64,15 @@ class FlowGraph:
     def __init__(self):
         self._graph = nx.DiGraph();
 
-    def add_operation(self, name, callback, prereq, postconds):
-        self._graph.add_edge(FlowCondition(prereq), FlowOperation(name, callback))
-        self._graph.add_edge(FlowCondition(prereq), FlowOperation(name, callback))
+    def add_operation(self, callback, prereq, postconds):
+        self._graph.add_edge(FlowCondition(prereq), FlowOperation(callback))
+        self._graph.add_edge(FlowCondition(prereq), FlowOperation(callback))
         
-        assert hash(FlowOperation(name, callback)) == hash(FlowOperation(name, callback))
-        self._graph.add_edge(FlowCondition(prereq), FlowOperation(name, callback))
+        assert hash(FlowOperation(callback)) == hash(FlowOperation(callback))
+        self._graph.add_edge(FlowCondition(prereq), FlowOperation(callback))
         for c in postconds:
             assert hash(FlowCondition(c)) == hash(FlowCondition(c))
-            self._graph.add_edge(FlowOperation(name, callback), FlowCondition(c))
+            self._graph.add_edge(FlowOperation(callback), FlowCondition(c))
 
     def next_operations(self, job):
         for node in self._graph.nodes():

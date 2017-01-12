@@ -5,22 +5,6 @@ from itertools import chain
 
 import networkx as nx
 
-class And:
-    def __init__(self, first, second):
-        self.first = first;
-        self.second = second;
-
-    def __call__(self, job):
-        return self.first(job) and self.second(job)
-
-class Or:
-    def __init__(self, first, second):
-        self.first = first;
-        self.second = second;
-
-    def __call__(self, job):
-        return self.first(job) or self.second(job)
-
 class FlowOperation:
 
     def __init__(self,callback):
@@ -66,8 +50,6 @@ class FlowGraph:
 
     def add_operation(self, callback, prereq, postconds):
         self._graph.add_edge(FlowCondition(prereq), FlowOperation(callback))
-        self._graph.add_edge(FlowCondition(prereq), FlowOperation(callback))
-        
         assert hash(FlowOperation(callback)) == hash(FlowOperation(callback))
         self._graph.add_edge(FlowCondition(prereq), FlowOperation(callback))
         for c in postconds:

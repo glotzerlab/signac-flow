@@ -68,12 +68,6 @@ class FlowGraph:
                     FlowOperation.as_this_type(callback),
                     FlowCondition.as_this_type(c))
 
-    def eligible(self, node, job):
-        pre = self._graph.predecessors(node)
-        post = self._graph.successors(node)
-        assert all(isinstance(c, FlowCondition) for c in chain(pre, post))
-        return all(c(job) for c in pre) and not all(c(job) for c in post)
-
     def conditions(self):
         for node in self._graph.nodes():
             if isinstance(node, FlowCondition):
@@ -83,6 +77,12 @@ class FlowGraph:
         for node in self._graph.nodes():
             if isinstance(node, FlowOperation):
                 yield node
+
+    def eligible(self, node, job):
+        pre = self._graph.predecessors(node)
+        post = self._graph.successors(node)
+        assert all(isinstance(c, FlowCondition) for c in chain(pre, post))
+        return all(c(job) for c in pre) and not all(c(job) for c in post)
 
     def eligible_operations(self, job):
         for op in self.operations():

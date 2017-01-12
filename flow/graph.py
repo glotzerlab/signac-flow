@@ -87,7 +87,7 @@ class FlowGraph:
     def eligible_operations(self, job):
         for op in self.operations():
             if self.eligible(op, job):
-                yield node
+                yield op
 
     def operation_chain(self, job, finish, start=None):
         src = FlowCondition.as_this_type(start)

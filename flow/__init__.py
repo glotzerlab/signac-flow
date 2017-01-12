@@ -10,6 +10,7 @@ from . import environment
 from . import scheduler
 from . import manage
 from . project import FlowProject
+from . import conditions
 from . import graph
 
 __version__ = '0.3.2'
@@ -19,4 +20,6 @@ __all__ = [
     'scheduler',
     'manage',
     'FlowProject'
+    'conditions',
+    'graph',
 ]

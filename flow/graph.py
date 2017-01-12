@@ -41,10 +41,8 @@ class FlowGraph:
 
     def add_operation(self, callback, prereq, postconds):
         self._graph.add_edge(FlowCondition(prereq), FlowOperation(callback))
-        assert hash(FlowOperation(callback)) == hash(FlowOperation(callback))
         self._graph.add_edge(FlowCondition(prereq), FlowOperation(callback))
         for c in postconds:
-            assert hash(FlowCondition(c)) == hash(FlowCondition(c))
             self._graph.add_edge(FlowOperation(callback), FlowCondition(c))
 
     def next_operations(self, job):

@@ -20,6 +20,14 @@ class FlowNode:
     def __repr__(self):
         return "{}({})".format(type(self), self._callback)
 
+    def __str__(self):
+        if self._callback is None:
+            return repr(self)
+        elif callable(self._callback):
+            return self._callback.__name__
+        else:
+            return str(self._callback)
+
     @classmethod
     def as_this_type(cls, node):
         if isinstance(node, cls):

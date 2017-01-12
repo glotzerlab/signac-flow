@@ -57,10 +57,11 @@ class FlowGraph:
     def __init__(self):
         self._graph = nx.DiGraph();
 
-    def add_operation(self, callback, prereq, postconds):
+    def add_operation(self, callback, prereq=None, postconds=None):
         self._graph.add_edge(FlowCondition.as_this_type(prereq), FlowOperation.as_this_type(callback))
-        for c in postconds:
-            self._graph.add_edge(FlowOperation.as_this_type(callback), FlowCondition.as_this_type(c))
+        if postconds is not None:
+            for c in postconds:
+                self._graph.add_edge(FlowOperation.as_this_type(callback), FlowCondition.as_this_type(c))
 
     def eligible_operations(self, job):
         for node in self._graph.nodes():

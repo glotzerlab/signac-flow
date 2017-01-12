@@ -5,6 +5,7 @@ from itertools import chain
 
 import networkx as nx
 
+
 class FlowNode:
 
     def __init__(self, callback):
@@ -55,13 +56,23 @@ class FlowCondition(FlowNode):
 class FlowGraph:
 
     def __init__(self):
-        self._graph = nx.DiGraph();
+        self._graph = nx.DiGraph()
 
     def add_operation(self, callback, prereq=None, postconds=None):
-        self._graph.add_edge(FlowCondition.as_this_type(prereq), FlowOperation.as_this_type(callback))
+        self._graph.add_edge(
+            FlowCondition.as_this_type(prereq),
+            FlowOperation.as_this_type(callback))
         if postconds is not None:
             for c in postconds:
-                self._graph.add_edge(FlowOperation.as_this_type(callback), FlowCondition.as_this_type(c))
+                self._graph.add_edge(
+                    FlowOperation.as_this_type(callback),
+                    FlowCondition.as_this_type(c))
+
+    def eligible(self, node, job):
+        pre = self._graph.predecessors(node)
+        post = self._graph.successors(node)
+        assert all(isinstance(c, FlowCondition) for c in chain(pre, post))
+        return all(c(job) for c in pre) and not all(c(job) for c in post)
 
     def eligible_operations(self, job):
         for node in self._graph.nodes():
@@ -77,9 +88,3 @@ class FlowGraph:
                 if isinstance(node, FlowOperation):
                     if self.eligible(node, job):
                         yield node
-
-    def eligible(self, node, job):
-        pre = self._graph.predecessors(node)
-        post = self._graph.successors(node)
-        assert all(isinstance(c, FlowCondition) for c in chain(pre, post))
-        return all(c(job) for c in pre) and not all(c(job) for c in post)

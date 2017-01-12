@@ -6,7 +6,7 @@ from itertools import chain
 import networkx as nx
 
 
-class FlowNode:
+class _FlowNode:
 
     def __init__(self, callback):
         self._callback = callback
@@ -36,7 +36,7 @@ class FlowNode:
             return cls(node)
 
 
-class FlowOperation(FlowNode):
+class FlowOperation(_FlowNode):
 
     def __init__(self, callback):
         if callback is None or not callable(callback):
@@ -47,7 +47,7 @@ class FlowOperation(FlowNode):
         return self._callback(job)
 
 
-class FlowCondition(FlowNode):
+class FlowCondition(_FlowNode):
 
     def __init__(self, callback):
         if callback is not None and not callable(callback):

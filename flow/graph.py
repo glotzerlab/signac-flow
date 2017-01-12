@@ -80,7 +80,7 @@ class FlowGraph:
                 if self.eligible(node, job):
                     yield node
 
-    def get_operation_chain(self, job, finish, start=None):
+    def operation_chain(self, job, finish, start=None):
         src = FlowCondition.as_this_type(start)
         dst = FlowCondition.as_this_type(finish)
         for path in nx.all_simple_paths(self._graph, src, dst):

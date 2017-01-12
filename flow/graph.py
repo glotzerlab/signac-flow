@@ -7,7 +7,7 @@ import networkx as nx
 
 class FlowNode:
 
-    def __init__(self,callback):
+    def __init__(self, callback):
         self._callback = callback
 
     def __eq__(self, other):
@@ -19,20 +19,38 @@ class FlowNode:
     def __repr__(self):
         return "{}({})".format(type(self), self._callback)
 
+    @classmethod
+    def as_this_type(cls, node):
+        if isinstance(node, cls):
+            return node
+        else:
+            return cls(node)
+
+
+class FlowOperation(FlowNode):
+
+    def __init__(self, callback):
+        if callback is None or not callable(callback):
+            raise ValueError(callback)
+        super().__init__(callback)
+
     def __call__(self, job):
         return self._callback(job)
 
-class FlowOperation(FlowNode):
-    pass
 
 class FlowCondition(FlowNode):
+
+    def __init__(self, callback):
+        if callback is not None and not callable(callback):
+            raise ValueError(callback)
+        super().__init__(callback)
 
     def __call__(self, job):
         if self._callback is None:
             return True
         else:
             return self._callback(job)
-        
+
 
 class FlowGraph:
 
@@ -40,10 +58,9 @@ class FlowGraph:
         self._graph = nx.DiGraph();
 
     def add_operation(self, callback, prereq, postconds):
-        self._graph.add_edge(FlowCondition(prereq), FlowOperation(callback))
-        self._graph.add_edge(FlowCondition(prereq), FlowOperation(callback))
+        self._graph.add_edge(FlowCondition.as_this_type(prereq), FlowOperation.as_this_type(callback))
         for c in postconds:
-            self._graph.add_edge(FlowOperation(callback), FlowCondition(c))
+            self._graph.add_edge(FlowOperation.as_this_type(callback), FlowCondition.as_this_type(c))
 
     def next_operations(self, job):
         for node in self._graph.nodes():
@@ -52,8 +69,8 @@ class FlowGraph:
                     yield node
 
     def get_operation_chain(self, job, finish, start=None):
-        src = FlowCondition(start)
-        dst = FlowCondition(finish)
+        src = FlowCondition.as_this_type(start)
+        dst = FlowCondition.as_this_type(finish)
         for path in nx.all_simple_paths(self._graph, src, dst):
             for node in path:
                 if isinstance(node, FlowOperation):

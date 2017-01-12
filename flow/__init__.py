@@ -9,8 +9,8 @@ signac workspace executed by a scheduler."""
 from . import environment
 from . import scheduler
 from . import manage
-from . project import FlowProject
-from . import graph
+from .project import FlowProject
+from .graph import FlowGraph
 
 __version__ = '0.3.2'
 
@@ -19,5 +19,5 @@ __all__ = [
     'scheduler',
     'manage',
     'FlowProject'
-    'graph',
+    'FlowGraph',
 ]

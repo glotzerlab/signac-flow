@@ -62,7 +62,7 @@ class FlowGraph:
         for c in postconds:
             self._graph.add_edge(FlowOperation.as_this_type(callback), FlowCondition.as_this_type(c))
 
-    def next_operations(self, job):
+    def eligible_operations(self, job):
         for node in self._graph.nodes():
             if isinstance(node, FlowOperation):
                 if self.eligible(node, job):

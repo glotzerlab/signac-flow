@@ -38,11 +38,6 @@ class _FlowNode:
 
 class FlowOperation(_FlowNode):
 
-    def __init__(self, callback):
-        if callback is None or not callable(callback):
-            raise ValueError(callback)
-        super().__init__(callback)
-
     def __call__(self, job):
         return self._callback(job)
 

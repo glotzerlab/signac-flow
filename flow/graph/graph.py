@@ -1,7 +1,10 @@
 # Copyright (c) 2016 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
+from itertools import chain
+
 import networkx as nx
+
 class And:
     def __init__(self, first, second):
         self.first = first;
@@ -17,53 +20,78 @@ class Or:
 
     def __call__(self, job):
         return self.first(job) or self.second(job)
-# not sure if we want this?
+
 class FlowOperation:
-    def __init__(self, name, callback, pre, post):
+
+    def __init__(self, name, callback):
         self._name = name
         self._callback = callback
-        self._preconditions = pre
-        self._post_condtions = post if post else list()
+
+    def __eq__(self, other):
+        return self._callback == other._callback
+
+    def __hash__(self):
+        return hash(self._callback)
 
     def __repr__(self):
         return self._name
 
-    def eligible(self, job):
-        # if no conditions all will return True. is this correct?
-        pre = self._preconditions(job) #all([ cond(job) for cond in self._preconditions])
-        post = not all([ cond(job) for cond in self._post_condtions]) # if no post conditions this will return False => must supply at least one post condition
-        return pre and post
+    def __call__(self, job):
+        return self._callback(job)
+
+
+class FlowCondition:
+    def __init__(self, callback):
+        self._callback = callback
+
+    def __hash__(self):
+        return hash(self._callback)
+
+    def __eq__(self, other):
+        return self._callback == other._callback
+
+    def __call__(self, job):
+        if self._callback is None:
+            return True
+        else:
+            return self._callback(job)
+
+    def __repr__(self):
+        return repr(self._callback)
+        
 
 class FlowGraph:
+
     def __init__(self):
-        self._operations = []; #make this a dict?
         self._graph = nx.DiGraph();
 
-    def add_operation(self, name, callback, prereqs, postcond):
-        self._operations.append( FlowOperation(name, callback, pre=prereqs, post=postcond));
+    def add_operation(self, name, callback, prereq, postconds):
+        self._graph.add_edge(FlowCondition(prereq), FlowOperation(name, callback))
+        self._graph.add_edge(FlowCondition(prereq), FlowOperation(name, callback))
+        
+        assert hash(FlowOperation(name, callback)) == hash(FlowOperation(name, callback))
+        self._graph.add_edge(FlowCondition(prereq), FlowOperation(name, callback))
+        for c in postconds:
+            assert hash(FlowCondition(c)) == hash(FlowCondition(c))
+            self._graph.add_edge(FlowOperation(name, callback), FlowCondition(c))
 
     def next_operations(self, job):
-        for op in self._operations:
-            if op.eligible(job):
-                yield op
+        for node in self._graph.nodes():
+            if isinstance(node, FlowOperation):
+                if self.eligible(node, job):
+                    yield node
 
-    def _build_graph(self):
-        def _connection(op1, op2):
-            for out_cond in op1._post_condtions:
-                for in_cond in op2._preconditions:
-                    if out_cond == in_cond:
-                        return True;
-            return False;
+    def get_operation_chain(self, job, finish, start=None):
+        src = FlowCondition(start)
+        dst = FlowCondition(finish)
+        for path in nx.all_simple_paths(self._graph, src, dst):
+            for node in path:
+                if isinstance(node, FlowOperation):
+                    if self.eligible(node, job):
+                        yield node
 
-        self._graph = nx.DiGraph();
-        nodes = [op._name for op in self._operations]
-        self._graph.add_nodes(nodes);
-
-        for i in range(0,len(self._operations)):
-            for j in range(i+1, len(self._operations)):
-                if _connection(self._operations[i], self._operations[j]):
-                    self._graph.add_edge(self._operations[i]._name, self._operations[j].name); # i -> j
-
-    def get_operation_chain(self, job, condition):
-        # not sure about this is yet.
-        pass;
+    def eligible(self, node, job):
+        pre = self._graph.predecessors(node)
+        post = self._graph.successors(node)
+        assert all(isinstance(c, FlowCondition) for c in chain(pre, post))
+        return all(c(job) for c in pre) and not all(c(job) for c in post)

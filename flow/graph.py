@@ -5,7 +5,7 @@ from itertools import chain
 
 import networkx as nx
 
-class FlowOperation:
+class FlowNode:
 
     def __init__(self,callback):
         self._callback = callback
@@ -17,30 +17,21 @@ class FlowOperation:
         return hash(self._callback)
 
     def __repr__(self):
-        return self._name
+        return "{}({})".format(type(self), self._callback)
 
     def __call__(self, job):
         return self._callback(job)
 
+class FlowOperation(FlowNode):
+    pass
 
-class FlowCondition:
-    def __init__(self, callback):
-        self._callback = callback
-
-    def __hash__(self):
-        return hash(self._callback)
-
-    def __eq__(self, other):
-        return self._callback == other._callback
+class FlowCondition(FlowNode):
 
     def __call__(self, job):
         if self._callback is None:
             return True
         else:
             return self._callback(job)
-
-    def __repr__(self):
-        return repr(self._callback)
         
 
 class FlowGraph:

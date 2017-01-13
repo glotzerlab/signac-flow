@@ -95,11 +95,22 @@ class FlowGraph:
             if self.eligible(op, job):
                 yield op
 
-    def operation_chain(self, job, target, start=None):
-        src = FlowCondition.as_this_type(start)
-        dst = FlowCondition.as_this_type(target)
+    def _operation_chain(self, job, src, dst):
         for path in nx.all_simple_paths(self._graph, src, dst):
+            print('path', path)
             for node in path:
                 if isinstance(node, FlowOperation):
                     if self.eligible(node, job):
                         yield node
+
+    def operation_chain(self, job, target, start=None):
+        src = FlowCondition.as_this_type(start)
+        dst = FlowCondition.as_this_type(target)
+        if dst not in self._graph:
+            raise ValueError("Target '{}' not in flow graph.".format(dst))
+        if src not in self._graph:
+            raise ValueError("Start '{}' not in flow graph.".format(src))
+        if not nx.has_path(self._graph, src, dst):
+            raise RuntimeError("No path between '{}' and '{}'.".format(src, dst))
+        for node in self._operation_chain(job, src, dst):
+            yield node

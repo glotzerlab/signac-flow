@@ -71,6 +71,9 @@ class FlowGraph:
                     FlowOperation.as_this_type(callback),
                     FlowCondition.as_this_type(c))
 
+    def link_conditions(self, a, b):
+        self._graph.add_edge(FlowCondition.as_this_type(a), FlowCondition.as_this_type(b))
+
     def conditions(self):
         for node in self._graph.nodes():
             if isinstance(node, FlowCondition):

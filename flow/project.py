@@ -45,8 +45,11 @@ def abbreviate(x, a):
 abbreviate.table = dict()
 
 
-def shorten(x, max_length=-1):
-    return abbreviate(x, x[:max_length])
+def shorten(x, max_length=None):
+    if max_length is None:
+        return x
+    else:
+        return abbreviate(x, x[:max_length])
 
 
 def _update_status(args):
@@ -544,7 +547,6 @@ class FlowProject(signac.contrib.Project):
 
     def print_detailed(self, stati, parameters=None,
                        skip_active=False, param_max_width=-1,
-                       use_colors=True,
                        file=sys.stdout):
         "Print the project's detailed status."
         table_header = [self._tr(self._alias(s)) for s in ('job_id', 'status', 'next_operation', 'labels')]
@@ -555,10 +557,10 @@ class FlowProject(signac.contrib.Project):
                 for status in stati if not (skip_active and status['active']))
         print(util.tabulate.tabulate(rows, headers=table_header), file=file)
         if abbreviate.table:
-            print()
+            print(file=file)
             print(self._tr("Abbreviations used:"), file=file)
             for a in sorted(abbreviate.table):
-                print('{}: {}'.format(a, abbreviate.table[a]))
+                print('{}: {}'.format(a, abbreviate.table[a]), file=file)
 
     def export_job_stati(self, collection, stati):
         for status in stati:
@@ -625,7 +627,7 @@ class FlowProject(signac.contrib.Project):
         title = "{} '{}':".format(self._tr("Status project"), self)
         print('\n' + title, file=file)
         if overview:
-            self.print_overview(stati, max_lines=overview_max_lines)
+            self.print_overview(stati, max_lines=overview_max_lines, file=file)
         if detailed:
             print(file=file)
             print(self._tr("Detailed view:"), file=file)
@@ -662,7 +664,6 @@ class FlowProject(signac.contrib.Project):
         parser.add_argument(
             '--param-max-width',
             type=int,
-            default=-1,
             help="Limit the width of each parameter row.")
         parser.add_argument(
             '--skip-active',

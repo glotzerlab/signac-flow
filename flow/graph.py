@@ -97,7 +97,6 @@ class FlowGraph:
 
     def _operation_chain(self, job, src, dst):
         for path in nx.all_simple_paths(self._graph, src, dst):
-            print('path', path)
             for node in path:
                 if isinstance(node, FlowOperation):
                     if self.eligible(node, job):

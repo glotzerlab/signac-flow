@@ -518,7 +518,7 @@ class FlowProject(signac.contrib.Project):
             if lines_skipped:
                 print("{} {}".format(self._tr("Lines omitted:"), lines_skipped), file=file)
 
-    def format_row(self, status, statepoint=None, max_width=-1):
+    def format_row(self, status, statepoint=None, max_width=None):
         "Format each row in the detailed status output."
         row = [
             status['job_id'],
@@ -546,7 +546,7 @@ class FlowProject(signac.contrib.Project):
         return row
 
     def print_detailed(self, stati, parameters=None,
-                       skip_active=False, param_max_width=-1,
+                       skip_active=False, param_max_width=None,
                        file=sys.stdout):
         "Print the project's detailed status."
         table_header = [self._tr(self._alias(s)) for s in ('job_id', 'status', 'next_operation', 'labels')]
@@ -593,7 +593,7 @@ class FlowProject(signac.contrib.Project):
     def print_status(self, scheduler=None, job_filter=None,
                      overview=True, overview_max_lines=None,
                      detailed=False, parameters=None, skip_active=False,
-                     param_max_width=-1,
+                     param_max_width=None,
                      file=sys.stdout, err=sys.stderr,
                      pool=None):
         """Print the status of the project.

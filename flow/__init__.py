@@ -11,8 +11,8 @@ configure and implement a workflow to operate on a signac_ data space.
 from . import environment
 from . import scheduler
 from . import manage
-from . project import FlowProject
-from . import graph
+from .project import FlowProject
+from .graph import FlowGraph
 
 __version__ = '0.3.3'
 
@@ -21,5 +21,5 @@ __all__ = [
     'scheduler',
     'manage',
     'FlowProject'
-    'graph',
+    'FlowGraph',
 ]

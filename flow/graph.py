@@ -6,7 +6,7 @@ from itertools import chain
 import networkx as nx
 
 
-class FlowNode:
+class _FlowNode:
 
     def __init__(self, callback):
         self._callback = callback
@@ -20,6 +20,14 @@ class FlowNode:
     def __repr__(self):
         return "{}({})".format(type(self), self._callback)
 
+    def __str__(self):
+        if self._callback is None:
+            return repr(self)
+        elif callable(self._callback):
+            return self._callback.__name__
+        else:
+            return str(self._callback)
+
     @classmethod
     def as_this_type(cls, node):
         if isinstance(node, cls):
@@ -28,18 +36,13 @@ class FlowNode:
             return cls(node)
 
 
-class FlowOperation(FlowNode):
-
-    def __init__(self, callback):
-        if callback is None or not callable(callback):
-            raise ValueError(callback)
-        super().__init__(callback)
+class FlowOperation(_FlowNode):
 
     def __call__(self, job):
         return self._callback(job)
 
 
-class FlowCondition(FlowNode):
+class FlowCondition(_FlowNode):
 
     def __init__(self, callback):
         if callback is not None and not callable(callback):
@@ -68,6 +71,9 @@ class FlowGraph:
                     FlowOperation.as_this_type(callback),
                     FlowCondition.as_this_type(c))
 
+    def link_conditions(self, a, b):
+        self._graph.add_edge(FlowCondition.as_this_type(a), FlowCondition.as_this_type(b))
+
     def conditions(self):
         for node in self._graph.nodes():
             if isinstance(node, FlowCondition):
@@ -89,11 +95,21 @@ class FlowGraph:
             if self.eligible(op, job):
                 yield op
 
-    def operation_chain(self, job, target, start=None):
-        src = FlowCondition.as_this_type(start)
-        dst = FlowCondition.as_this_type(target)
+    def _operation_chain(self, job, src, dst):
         for path in nx.all_simple_paths(self._graph, src, dst):
             for node in path:
                 if isinstance(node, FlowOperation):
                     if self.eligible(node, job):
                         yield node
+
+    def operation_chain(self, job, target, start=None):
+        src = FlowCondition.as_this_type(start)
+        dst = FlowCondition.as_this_type(target)
+        if dst not in self._graph:
+            raise ValueError("Target '{}' not in flow graph.".format(dst))
+        if src not in self._graph:
+            raise ValueError("Start '{}' not in flow graph.".format(src))
+        if not nx.has_path(self._graph, src, dst):
+            raise RuntimeError("No path between '{}' and '{}'.".format(src, dst))
+        for node in self._operation_chain(job, src, dst):
+            yield node

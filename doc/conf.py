@@ -52,7 +52,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'signac-flow'
-copyright = '2016, Carl Simon Adorf, Paul Dodd'
+copyright = '2017, Carl Simon Adorf, Paul Dodd'
 author = 'Carl Simon Adorf, Paul Dodd'
 
 # The version info for the project you're documenting, acts as replacement for

@@ -1,0 +1,12 @@
+image: python:3.6
+
+pipelines:
+  tags:
+   v*:
+     - step:
+          script:
+            - pip install -U twine
+            - python --version
+            - twine --version
+            - python setup.py build
+            - bash .deploy.bash

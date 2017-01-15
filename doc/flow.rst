@@ -1,6 +1,14 @@
 flow API
 ========
 
+Module contents
+---------------
+
+.. automodule:: flow
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 flow.project module
 -------------------
 
@@ -54,15 +62,6 @@ flow.slurm module
 -----------------
 
 .. automodule:: flow.slurm
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-
-Module contents
----------------
-
-.. automodule:: flow
     :members:
     :undoc-members:
     :show-inheritance:

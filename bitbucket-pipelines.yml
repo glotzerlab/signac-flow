@@ -6,6 +6,7 @@ pipelines:
      - step:
           script:
             - pip install -U twine
+            - pip install -U wheel
             - python --version
             - twine --version
             - python setup.py build

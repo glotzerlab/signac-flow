@@ -13,6 +13,7 @@ from itertools import islice
 from hashlib import sha1
 
 import signac
+from signac.common.six import with_metaclass
 
 from . import manage
 from . import util
@@ -56,6 +57,31 @@ def _update_status(args):
     return manage.update_status(* args)
 
 
+def label(func):
+    func._label = True
+    return func
+
+
+def staticlabel(func):
+    return staticmethod(label(func))
+
+
+def classlabel(func):
+    return classmethod(label(func))
+
+
+def _is_label_func(func):
+    return getattr(getattr(func, '__func__', func), '_label', False)
+
+
+class _FlowProjectClass(type):
+
+    def __new__(metacls, name, bases, namespace, **kwrgs):
+        cls = type.__new__(metacls, name, bases, dict(namespace))
+        cls._labels = {func for func in namespace.values() if _is_label_func(func)}
+        return cls
+
+
 class JobScript(io.StringIO):
     "Simple StringIO wrapper to implement cmd wrapping logic."
 
@@ -91,7 +117,7 @@ class JobScript(io.StringIO):
         return np
 
 
-class FlowProject(signac.contrib.Project):
+class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
     """A signac project class assisting in job scheduling.
 
     :param config: A signac configuaration, defaults to
@@ -669,6 +695,16 @@ class FlowProject(signac.contrib.Project):
             '--skip-active',
             action='store_true',
             help="Display only jobs, which are currently not active.")
+
+    @classmethod
+    def labels(cls, job):
+        for label in cls._labels:
+            if hasattr(label, '__func__'):
+                label = getattr(cls, label.__func__.__name__)
+                if label(job):
+                    yield label.__name__
+            elif label(cls, job):
+                yield label.__name__
 
     def classify(self, job):
         """Generator function which yields labels for job.

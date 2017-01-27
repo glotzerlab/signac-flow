@@ -15,6 +15,7 @@ from .project import FlowProject
 from .project import label
 from .project import classlabel
 from .project import staticlabel
+from .graph import FlowGraph
 
 __version__ = '0.3.3'
 
@@ -26,4 +27,5 @@ __all__ = [
     'label',
     'classlabel',
     'staticlabel',
+    'FlowGraph',
 ]

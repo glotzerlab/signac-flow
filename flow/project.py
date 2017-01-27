@@ -69,12 +69,16 @@ class label(object):
         return func
 
 
-def staticlabel(func, *args, **kwargs):
-    return staticmethod(label(func, *args, **kwargs))
+class staticlabel(label):
+
+    def __call__(self, func):
+        return staticmethod(super(staticlabel, self).__call__(func))
 
 
-def classlabel(func, *args, **kwargs):
-    return classmethod(label(func, *args, **kwargs))
+class classlabel(label):
+
+    def __call__(self, func):
+        return classmethod(super(classlabel, self).__call__(func))
 
 
 def _is_label_func(func):

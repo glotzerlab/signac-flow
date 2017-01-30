@@ -16,6 +16,17 @@ import sys
 import os
 
 import sphinx_rtd_theme
+from unittest.mock import MagicMock
+
+class Mock(MagicMock):
+    @classmethod
+    def __getattr__(cls, name):
+        if name == '_mock_methods':
+            return []
+        return Mock()
+
+MOCK_MODULES = ['networkx']
+sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the

@@ -707,14 +707,13 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             action='store_true',
             help="Display only jobs, which are currently not active.")
 
-    @classmethod
-    def labels(cls, job):
-        for label in cls._labels:
+    def labels(self, job):
+        for label in self._labels:
             if hasattr(label, '__func__'):
-                label = getattr(cls, label.__func__.__name__)
+                label = getattr(self, label.__func__.__name__)
                 if label(job):
                     yield getattr(label, '_label_name', label.__name__)
-            elif label(cls, job):
+            elif label(self, job):
                 yield getattr(label, '_label_name', label.__name__)
 
     def classify(self, job):

@@ -17,6 +17,14 @@ flow.project module
     :undoc-members:
     :show-inheritance:
 
+flow.graph module
+-------------------
+
+.. automodule:: flow.graph
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 flow.scheduler module
 ---------------------
 

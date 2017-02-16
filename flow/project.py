@@ -1,6 +1,19 @@
 # Copyright (c) 2017 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
+"""Workflow definition with the FlowProject.
+
+The FlowProject is a signac Project, that allows the user to define
+a workflow based on job classification and job operations.
+
+A job may be classified based on its metadata and data in the form
+of str labels. These str-labels are yielded in the classify() method.
+
+Based on the classification a "next operation" may be identified, that
+should be executed next to further the workflow. While the user is free
+to choose any method for the determination of the "next operation", one
+option is to use a FlowGraph.
+"""
 from __future__ import print_function
 import sys
 import os
@@ -35,6 +48,12 @@ def _mkdir_p(path):
 
 
 def is_active(status):
+    """True if a specific status is considered 'active'.
+
+    A active status usually means that no further operation should
+    be executed at the same time to prevent race conditions and other
+    related issues.
+    """
     for gid, s in status.items():
         if s > manage.JobStatus.inactive:
             return True
@@ -42,11 +61,13 @@ def is_active(status):
 
 
 def draw_progressbar(value, total, width=40):
+    "Helper function for the visualization of progress."
     n = int(value / total * width)
     return '|' + ''.join(['#'] * n) + ''.join(['-'] * (width - n)) + '|'
 
 
 def abbreviate(x, a):
+    "Abbreviate x with a and add to the abbreviation table."
     if x == a:
         return x
     else:
@@ -56,6 +77,7 @@ abbreviate.table = dict()  # noqa
 
 
 def shorten(x, max_length=None):
+    "Shorten x to max_length and add to abbreviation table."
     if max_length is None:
         return x
     else:
@@ -67,6 +89,33 @@ def _update_status(args):
 
 
 class label(object):
+    """Decorate a function to be a label function.
+
+    The label() method as part of FlowProject iterates over all
+    methods decorated with this label and yields the method's name
+    or the provided name.
+
+    For example:
+
+        class MyProject(FlowProject):
+
+            @label()
+            def foo(self, job):
+                return True
+
+            @label()
+            def bar(self, job):
+                return 'a' in job.statepoint()
+
+        >>> for label in MyProject().labels(job):
+        ...     print(label)
+
+        The code segment above will always print the label 'foo',
+        but the label 'bar' only if 'a' is part of a job's state point.
+
+    This enables the user to quickly write classification functions
+    and use them for labeling, for example in the classify() method.
+    """
 
     def __init__(self, name=None):
         self.name = name
@@ -79,12 +128,20 @@ class label(object):
 
 
 class staticlabel(label):
+    """A label decorator for staticmethods.
+
+    This decorator implies "staticmethod"!
+    """
 
     def __call__(self, func):
         return staticmethod(super(staticlabel, self).__call__(func))
 
 
 class classlabel(label):
+    """A label decorator for classmethods.
+
+    This decorator implies "classmethod"!
+    """
 
     def __call__(self, func):
         return classmethod(super(classlabel, self).__call__(func))
@@ -95,6 +152,12 @@ def _is_label_func(func):
 
 
 def make_bundles(operations, size=None):
+    """Utility function for the generation of bundles.
+
+    This function splits a iterable of operations into
+    equally sized bundles and a possibly smaller final
+    bundle.
+    """
     n = None if size == 0 else size
     while True:
         b = list(islice(operations, n))
@@ -105,6 +168,29 @@ def make_bundles(operations, size=None):
 
 
 class JobOperation:
+    """Define operations to apply to a job.
+
+    A operation function in the context of signac is a function, with only
+    one job argument. This in principle ensures that operations are deterministic
+    in the sense that both input and output only depend on the job's metadata and
+    data.
+
+    This class is designed to define commands to be executed on the command
+    line that constitue an operation.
+
+    .. note::
+
+            The command arguments should only depend on the job metadata to
+            ensure deterministic operations.
+
+    :param name: The name of this JobOperation instance. The name is arbitrary,
+        but helps to concisely identify the operation in various contexts.
+    :type name: str
+    :param job: The job instance associated with this operation.
+    :type job: :py:class:`signac.Job`.
+    :param cmd: The command that constitutes the operation.
+    :type cmd: str
+    """
 
     def __init__(self, name, job, cmd):
         self.name = name
@@ -124,12 +210,13 @@ class JobOperation:
         return self.get_id() == other.get_id()
 
     def set_status(self, value):
-        "Update the job's status dictionary."
+        "Store the operation's status."
         status_doc = self.job.document.get('status', dict())
         status_doc[self.get_id()] = int(value)
         self.job.document['status'] = status_doc
 
     def get_status(self):
+        "Retrieve the operation's last known status."
         try:
             return self.job.document['status'][self.get_id()]
         except KeyError:
@@ -268,7 +355,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         manage.update_status(job, scheduler_jobs)
 
     def get_job_status(self, job):
-        "Return the detailed status of jobs."
+        "Return the detailed status of a job."
         result = dict()
         result['job_id'] = str(job)
         status = job.document.get('status', dict())
@@ -410,15 +497,15 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         parser.add_argument(
             '--pretend',
             action='store_true',
-            help="Do not really submit, but print the submittal script.")
+            help="Do not really submit, but print the submittal script to screen.")
         parser.add_argument(
             '-n', '--num',
             type=int,
-            help="Limit the number of jobs submitted at once.")
+            help="Limit the number of operations to be submitted.")
         parser.add_argument(
             '--force',
             action='store_true',
-            help="Do not check job status or classification, just submit.")
+            help="Ignore all warnings and checks, just submit.")
         parser.add_argument(
             '--bundle',
             type=int,
@@ -426,32 +513,33 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             const=0,
             default=1,
             dest='bundle_size',
-            help="Specify how many jobs to bundle into one submission. "
-                 "Omit a specific value to bundle all eligible jobs.")
+            help="Specify how many operations to bundle into one submission. "
+                 "When no specific size is give, all eligible operations are "
+                 "bundled into one submission.")
         parser.add_argument(
             '-s', '--serial',
             action='store_true',
-            help="Schedule the jobs to be executed serially.")
+            help="Schedule the operations to be executed in serial.")
         parser.add_argument(
             '--after',
             type=str,
             help="Schedule this job to be executed after "
-                 "completion of job with this id.")
+                 "completion of a cluster job with this id.")
         parser.add_argument(
             '--hold',
             action='store_true',
-            help="Submit job with user hold applied.")
+            help="All operations will be scheduled with a scheduler hold.")
         parser.add_argument(
             '--cmd',
             type=str,
-            help="Submit this command to the scheduler for jobs"
-                 "with lables specified with --requires argument.")
+            help="Directly specify the command that executes the desired operation.")
         parser.add_argument(
             '--requires',
             type=str,
             nargs='*',
-            help="the labels required for the job to be considered eligible used"
-                 "with the --cmd option otherwise it is ignored.")
+            help="Manually specify all labels, that are required for a job to be "
+                 "considered eligible for submission. This is especially useful "
+                 "in combination with '--cmd'.")
 
     def write_human_readable_statepoint(self, script, job):
         "Write statepoint of job in human-readable format to script."
@@ -527,6 +615,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 print('{}: {}'.format(a, abbreviate.table[a]), file=file)
 
     def export_job_stati(self, collection, stati):
+        "Export the job stati to a database collection."
         for status in stati:
             job = self.open_job(id=status['job_id'])
             status['statepoint'] = job.statepoint()
@@ -652,15 +741,13 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         :yield type: str"""
 
     def next_operation(self, job):
-        """Determine the next operation for job.
-
-        You can, but don't have to use this function to simplify
-        the submission process. The default method returns None.
+        """Determine the next operation for this job.
 
         :param job: The signac job handle.
         :type job: :class:`~signac.contrib.job.Job`
-        :returns: The name of the operation to execute next.
-        :rtype: str"""
+        :returns: A JobOpereation instance to execute next.
+        :rtype: :py:class:`~.JobOperation`
+        """
         return
 
     def eligible(self, job_operation, **kwargs):

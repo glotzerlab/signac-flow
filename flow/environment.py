@@ -49,7 +49,7 @@ class ComputeEnvironmentType(type):
 
 
 class JobScript(io.StringIO):
-    "Simple StringIO wrapper for the creation of job submission scripts.
+    """"Simple StringIO wrapper for the creation of job submission scripts.
 
     Using this class to write a job submission script allows us to use
     environment specific expressions, for example for MPI commands.
@@ -128,7 +128,7 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
         """
         try:
             return getattr(cls, 'scheduler_type')()
-        except AttributeError:
+        except (AttributeError, TypeError):
             raise AttributeError("You must define a scheduler type for every environment")
 
     @classmethod

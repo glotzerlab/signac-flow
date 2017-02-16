@@ -457,10 +457,10 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 labels = list(self.classify(op.job))
                 if not all([req in labels for req in requires]):
                     return False
-            return self.eligible_for_submission(job)
+            return self.eligible_for_submission(op)
 
         # Get the first num eligible operations
-        operations = islice(op for op in map(get_op, jobs) if eligible(op), num)
+        operations = islice((op for op in map(get_op, jobs) if eligible(op)), num)
 
         # Bundle all eligible operations and submit the bundles
         for bundle in make_bundles(operations, bundle_size):

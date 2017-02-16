@@ -101,14 +101,16 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
 
 
 class UnknownEnvironment(ComputeEnvironment):
-    scheduler_type = scheduler.FakeScheduler
+    "This is a default environment, which is always present."
+    scheduler_type = None
+
+    @classmethod
+    def is_present(cls):
+        return True
 
     @classmethod
     def script(cls, **kwargs):
-        js = super(UnknownEnvironment, cls).script(**kwargs)
-        for key in sorted(kwargs):
-            js.writeline('#TEST {}={}'.format(key, kwargs[key]))
-        return js
+        return super(UnknownEnvironment, cls).script(**kwargs)
 
 
 class TestEnvironment(ComputeEnvironment):

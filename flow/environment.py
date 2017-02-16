@@ -114,7 +114,21 @@ class UnknownEnvironment(ComputeEnvironment):
 
 
 class TestEnvironment(ComputeEnvironment):
+    """This is a test environment.
+
+    The test environment will print a mocked submission script
+    and submission commands to screen. This enables testing of
+    the job submission script generation in environments without
+    an real scheduler.
+    """
     scheduler_type = scheduler.FakeScheduler
+
+    @classmethod
+    def script(cls, **kwargs):
+        return super(TestEnvironment, cls).script(**kwargs)
+        for key in sorted(kwargs):
+            js.writeline('#TEST {}={}'.format(key, kwargs[key]))
+        return js
 
 
 class MoabEnvironment(ComputeEnvironment):

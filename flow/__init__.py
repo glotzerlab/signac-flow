@@ -12,6 +12,7 @@ from . import environment
 from . import scheduler
 from . import manage
 from .project import FlowProject
+from .project import JobOperation
 from .project import label
 from .project import classlabel
 from .project import staticlabel
@@ -24,6 +25,7 @@ __all__ = [
     'scheduler',
     'manage',
     'FlowProject',
+    'JobOperation',
     'label',
     'classlabel',
     'staticlabel',

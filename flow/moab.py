@@ -2,13 +2,11 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 """Routines for the MOAB environment."""
-
 from __future__ import print_function
 import io
 import getpass
 import subprocess
 import tempfile
-import math
 import logging
 import xml.etree.ElementTree as ET
 
@@ -29,13 +27,6 @@ def _fetch(user=None):
         raise RuntimeError("Moab not available.")
     tree = ET.parse(source=result)
     return tree.getroot()
-
-
-def format_timedelta(delta):
-    hours, r = divmod(delta.seconds, 3600)
-    minutes, seconds = divmod(r, 60)
-    hours += delta.days * 24
-    return "{:0>2}:{:0>2}:{:0>2}".format(hours, minutes, seconds)
 
 
 class MoabJob(ClusterJob):
@@ -68,11 +59,8 @@ class MoabJob(ClusterJob):
 class MoabScheduler(Scheduler):
     submit_cmd = ['qsub']
 
-    def __init__(self, root=None, user=None, header=None, cores_per_node=None):
+    def __init__(self, user=None):
         self.user = user
-        self.root = root
-        self.header = header
-        self.cores_per_node = cores_per_node
 
     def jobs(self):
         self._prevent_dos()
@@ -80,32 +68,21 @@ class MoabScheduler(Scheduler):
         for node in nodes.findall('Job'):
             yield MoabJob(node)
 
-    def submit(self, jobsid, np, walltime, script, resume=None,
-               after=None, pretend=False, hold=False, *args, **kwargs):
-        submit_script = io.StringIO()
-        num_nodes = math.ceil(np / self.cores_per_node)
-        if (np / (num_nodes * self.cores_per_node)) < 0.9:
-            logger.warning("Bad node utilization!")
-        submit_script.write(self.header.format(
-            jobsid=jobsid, nn=num_nodes, walltime=format_timedelta(walltime)))
-        submit_script.write('\n')
-        submit_script.write(script.read())
-        submit_script.seek(0)
-        submit = submit_script.read().format(
-            np=np, nn=num_nodes,
-            walltime=format_timedelta(walltime), jobsid=jobsid)
+    def submit(self, script,
+               resume=None, after=None, pretend=False, hold=False, *args, **kwargs):
+        submit_cmd = self.submit_cmd
+        if after is not None:
+            submit_cmd.extend(
+                ['-W', 'depend="afterok:{}"'.format(after.split('.')[0])])
+        if hold:
+            submit_cmd += ['-h']
         if pretend:
-            print("#\n# Pretend to submit:\n")
-            print(submit, "\n")
+            print("# Submit command: {}".format(' '.join(submit_cmd)))
+            print(script.read())
+            print()
         else:
-            submit_cmd = self.submit_cmd
-            if after is not None:
-                submit_cmd.extend(
-                    ['-W', 'depend="afterok:{}"'.format(after.split('.')[0])])
-            if hold:
-                submit_cmd += ['-h']
             with tempfile.NamedTemporaryFile() as tmp_submit_script:
-                tmp_submit_script.write(submit.encode('utf-8'))
+                tmp_submit_script.write(script.read().encode('utf-8'))
                 tmp_submit_script.flush()
                 output = subprocess.check_output(
                     submit_cmd + [tmp_submit_script.name])

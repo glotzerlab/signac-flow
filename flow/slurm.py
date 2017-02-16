@@ -4,11 +4,9 @@
 """Routines for the MOAB environment."""
 
 from __future__ import print_function
-import io
 import getpass
 import subprocess
 import tempfile
-import math
 import logging
 
 from .manage import Scheduler
@@ -55,13 +53,6 @@ def _fetch(user=None):
             yield SlurmJob(info['Job_Name'], parse_status(info['job_state']))
 
 
-def format_timedelta(delta):
-    hours, r = divmod(delta.seconds, 3600)
-    minutes, seconds = divmod(r, 60)
-    hours += delta.days * 24
-    return "{:0>2}:{:0>2}:{:0>2}".format(hours, minutes, seconds)
-
-
 class SlurmJob(ClusterJob):
     pass
 
@@ -69,9 +60,7 @@ class SlurmJob(ClusterJob):
 class SlurmScheduler(Scheduler):
     submit_cmd = ['sbatch']
 
-    def __init__(self, user=None, header=None, cores_per_node=None):
-        self.header = header
-        self.cores_per_node = cores_per_node
+    def __init__(self, user=None):
         self.user = user
 
     def jobs(self):
@@ -79,30 +68,21 @@ class SlurmScheduler(Scheduler):
         for job in _fetch(user=self.user):
             yield job
 
-    def submit(self, jobsid, np, walltime, script, resume=None,
-               after=None, pretend=False, *args, **kwargs):
-        submit_script = io.StringIO()
-        num_nodes = math.ceil(np / self.cores_per_node)
-        if (np / (num_nodes * self.cores_per_node)) < 0.9:
-            logger.warning("Bad node utilization!")
-        submit_script.write(self.header.format(
-            jobsid=jobsid, nn=num_nodes, walltime=format_timedelta(walltime)))
-        submit_script.write('\n')
-        submit_script.write(script.read())
-        submit_script.seek(0)
-        submit = submit_script.read().format(
-            np=np, nn=num_nodes, walltime=format_timedelta(walltime), jobsid=jobsid)
+    def submit(self, script, resume=None, after=None,
+               hold=False, pretend=False, **kwargs):
+        submit_cmd = self.submit_cmd
+        if after is not None:
+            submit_cmd.extend(
+                ['-W', 'depend="afterany:{}"'.format(after.split('.')[0])])
+        if hold:
+            submit_cmd += ['--hold']
         if pretend:
-            print("#\n# Pretend to submit:\n")
-            print(submit, "\n")
+            print("# Submit command: {}".format('  '.join(submit_cmd)))
+            print(script.read())
+            print()
         else:
-            submit_cmd = self.submit_cmd
-            if after is not None:
-                submit_cmd.extend(
-                    ['-W', 'depend="afterany:{}"'.format(after.split('.')[0])])
             with tempfile.NamedTemporaryFile() as tmp_submit_script:
-                tmp_submit_script.write(submit.encode('utf-8'))
+                tmp_submit_script.write(script.read().encode('utf-8'))
                 tmp_submit_script.flush()
-                output = subprocess.check_output(
-                    submit_cmd + [tmp_submit_script.name])
-            return jobsid
+                subprocess.check_output(submit_cmd + [tmp_submit_script.name])
+                return True

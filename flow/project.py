@@ -280,38 +280,60 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         return result
 
     def submit_user(self, env, _id, operations, walltime=None, force=False, **kwargs):
+        """Implement this method to submit operations in combination with submit().
+
+        The :py:func:`~.submit` method provides an interface for the submission of
+        operations to the environment's scheduler. Operations will be optionally bundled
+        into one submission and.
+
+        The submit_user() method enables the user to create and submit a job submission
+        script that controls the execution of all operations for this particular project.
+
+        :param env: The environment to submit to.
+        :type env: :class:`~.flow.manage.ComputeEnvironment`
+        :param _id: A unique identifier, automatically calculated for this submission.
+        :tpype _id: str
+        :param operations: A list of operations that should be executed as part of this
+            submission.
+        :param walltime: The submission should be limited to the provided walltime.
+        :type walltime: :py:class:`datetime.timedelta`
+        :force: Warnings and other checks should be ignored if this argument is True.
+        :type force: bool
+        """
         raise NotImplementedError()
 
     def submit(self, env, job_ids=None, operation_name=None, walltime=None,
                num=None, force=False, bundle_size=1, cmd=None, requires=None, **kwargs):
-        """Submit jobs to the scheduler.
+        """Submit job-operations to the scheduler.
+
+        This method will submit an operation for each job to the environment's scheduler,
+        unless the job is considered active, e.g., because an operation associated with
+        the same job has alreay been submitted.
+
+        The actualy execution of operations is controlled in the :py:meth:`~.submit_user`
+        method which must be implemented by the user.
 
         :param env: The env instance.
         :type env: :class:`~.flow.manage.ComputeEnvironment`
-        :param job_ids: A list of job_id's,
-            defaults to all jobs found in the workspace.
-        :param operation: A specific operation,
-            defaults to the result of :meth:`~.next_operation`.
-        :param job_filter: A JSON encoded filter that all jobs
-            to be submitted need to match.
+        :param job_ids: A list of job_id's, whose next operation shall be executed.
+            Defaults to all jobs found in the workspace.
+        :param operation_name: If not None, only execute operations with this name.
         :param walltime: The maximum wallclock time in hours.
         :type walltime: float
-        :param bundle: Bundle up to 'bundle' number of jobs during submission.
-        :type bundle: int
-        :param serial: Schedule jobs in serial or execute bundled
-            jobs in serial.
-        :type serial: bool
-        :param after: Execute all jobs after the completion of the job operation
-            with this job session id. Implementation is scheduler dependent.
-        :type after: str
-        :param num: Do not submit more than 'num' jobs to the scheduler.
+        :param num: If not None, limit number of submitted operations to `num`.
         :type num: int
-        :param pretend: Do not actually submit, but instruct the scheduler
-            to pretend scheduling.
-        :type pretend: bool
-        :param force: Ignore all eligibility checks, just submit.
+        :param force: Ignore warnings and checks during submission, just submit.
         :type force: bool
-        :param kwargs: Other keyword arguments which are forwareded."""
+        :param bundle_size: Bundle up to 'bundle_size' number of operations during submission.
+        :type bundle: int
+        :param cmd: Construct and submit an operation "on-the-fly" instead of submitting
+            the "next operation".
+        :type cmd: str
+        :param requires: A job's set of classification labels must fully intersect with
+            the labels provided as part of this argument to be considered for submission.
+        :type requires: Iterable of str
+        :param kwargs: Other keyword arguments which are forwareded to down-stream methods.
+        """
         # Backwards-compatilibity check...
         if isinstance(env, manage.Scheduler):
             # Entering legacy mode!
@@ -328,32 +350,32 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             walltime = datetime.timedelta(hours=walltime)
 
         if job_ids:
-            jobs = [self.open_job(id=_id) for _id in job_ids]
+            jobs = (self.open_job(id=_id) for _id in job_ids)
         else:
             jobs = iter(self)
 
-        if cmd is None:
-            def op(job):
-                op = self.next_operation(job)
-                if isinstance(op, str):
-                    warnings.warn("Returning job-operations as str is deprecated.",
-                                  DeprecationWarning)
-                    op = JobOperation(op, job, 'python scripts/run.py {} {}'.format(op, job))
-                if operation_name is None or op.name == operation_name:
-                    return op
-        else:
-            def op(job):
-                if requires is not None:
-                    labels = list(self.labels(job))
-                    if not all([req in labels for req in requires]):
-                        return
-                job.ws = job.workspace()  # Extending the job namespace
+        def get_op(job):
+            if cmd is None:
+                return self.next_operation(job)
+            else:
                 return JobOperation(name='user-cmd', cmd=cmd.format(job=job), job=job)
 
-        operations = filter(None, map(op, jobs))
-        operations = (op for op in operations if op.get_status() < manage.JobStatus.submitted)
-        operations = islice(operations, num)
+        def eligible(op):
+            if force:
+                return True
+            if cmd is None:
+                if operation_name is not None and op.name != operation:
+                    return False
+            if requires is not None:
+                labels = list(self.classify(op.job))
+                if not all([req in labels for req in requires]):
+                    return False
+            return self.eligible_for_submission(job)
 
+        # Get the first num eligible operations
+        operations = islice(op for op in map(get_op, jobs) if eligible(op), num)
+
+        # Bundle all eligible operations and submit the bundles
         for bundle in make_bundles(operations, bundle_size):
             status = self.submit_user(
                 env=env,
@@ -362,7 +384,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 walltime=walltime,
                 force=force,
                 **kwargs)
-            if status:
+            if status is not None:
                 for op in bundle:
                     op.set_status(status)
 
@@ -643,4 +665,13 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 
     def eligible(self, job_operation, **kwargs):
         """Determine if job is eligible for operation."""
+        # Deprecated!
         return None
+
+    def eligible_for_submission(self, job_operation):
+        "Determine if a job-operation is eligible for submission."
+        if job_operation is None:
+            return False
+        if job_operation.get_status() >= manage.JobStatus.submitted:
+            return False
+        return True

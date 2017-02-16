@@ -18,9 +18,6 @@ from signac.common.six import with_metaclass
 
 from . import manage
 from . import util
-from .fakescheduler import FakeScheduler
-from .moab import MoabScheduler
-from .slurm import SlurmScheduler
 from .util.tqdm import tqdm
 
 
@@ -316,7 +313,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         :type force: bool
         :param kwargs: Other keyword arguments which are forwareded."""
         # Backwards-compatilibity check...
-        if any((isinstance(env, s) for s in (FakeScheduler, MoabScheduler, SlurmScheduler))):
+        if isinstance(env, manage.Scheduler):
             # Entering legacy mode!
             from .project_legacy import submit as submit_legacy
             logger.warning("You are using a deprecated FlowProject API!")

@@ -16,6 +16,14 @@ class FakeScheduler(Scheduler):
         yield
 
     def submit(self, script, *args, **kwargs):
-        fake_cmd = ' '.join('--{}{}'.format(k, '' if v is True else v) for k, v in kwargs.items())
+        def format_arg(k, v):
+            if v is True:
+                return '--{}'.format(k)
+            elif v is False or v is None:
+                return
+            else:
+                return '--{}={}'.format(k, v)
+
+        fake_cmd = ' '.join(filter(None, (format_arg(k, v) for k, v in kwargs.items())))
         print("# Submit command: testsub {}".format(fake_cmd))
         print(script.read())

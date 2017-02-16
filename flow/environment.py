@@ -1,7 +1,14 @@
 # Copyright (c) 2017 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-"""Define environments to automate submission scripts."""
+"""Detection of compute environments.
+
+This module provides the ComputeEnvironment class, which can be
+subclassed to automatically detect specific computational environments.
+
+This enables the user to adjust their workflow based on the present
+environment, e.g. for the adjustemt of scheduler submission scripts.
+"""
 from __future__ import print_function
 import re
 import socket
@@ -19,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 def format_timedelta(delta):
+    "Format a time delta for interpretation by schedulers."
     hours, r = divmod(delta.seconds, 3600)
     minutes, seconds = divmod(r, 60)
     hours += delta.days * 24
@@ -26,6 +34,11 @@ def format_timedelta(delta):
 
 
 class ComputeEnvironmentType(type):
+    """Meta class for the definition of ComputeEnvironments.
+
+    This meta class automatically registers ComputeEnvironment definitions,
+    which enables the automatic determination of the present environment.
+    """
 
     def __init__(cls, name, bases, dct):
         if not hasattr(cls, 'registry'):
@@ -36,7 +49,11 @@ class ComputeEnvironmentType(type):
 
 
 class JobScript(io.StringIO):
-    "Simple StringIO wrapper to implement cmd wrapping logic."
+    "Simple StringIO wrapper for the creation of job submission scripts.
+
+    Using this class to write a job submission script allows us to use
+    environment specific expressions, for example for MPI commands.
+    """
     eol = '\n'
 
     def __init__(self, parent):
@@ -66,15 +83,36 @@ class JobScript(io.StringIO):
 
 
 class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
+    """Define computational environments.
+
+    The ComputeEnvironment class allows us to automatically determine
+    specific environments in order to programatically adjust workflows
+    in different environments.
+
+    The default method for the detection of a specific environemnt is to
+    provide a regular expression matching the environment's hostname.
+    For example, if the hostname is my_server.com, one could identify the
+    environment by setting the hostname_pattern to 'my_server'.
+    """
     scheduler = None
     hostname_pattern = None
 
     @classmethod
     def script(cls, **kwargs):
+        """Return a JobScript instance.
+
+        Derived ComputeEnvironment classes may require additional
+        arguments for the creation of a job submission script.
+        """
         return JobScript(cls)
 
     @classmethod
     def is_present(cls):
+        """Determine whether this specific compute environment is present.
+
+        The default method for environment detection is trying to match a
+        hostname pattern.
+        """
         if cls.hostname_pattern is None:
             return False
         else:
@@ -83,6 +121,11 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
 
     @classmethod
     def get_scheduler(cls):
+        """Return a environment specific scheduler driver.
+
+        The returned scheduler class provides a standardized interface to
+        different scheduler implementations.
+        """
         try:
             return getattr(cls, 'scheduler_type')()
         except AttributeError:
@@ -90,6 +133,11 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
 
     @classmethod
     def submit(cls, script, *args, **kwargs):
+        """Submit a job submission script to the environment's scheduler.
+
+        Scripts should be submitted to the environment, instead of directly
+        to the scheduler to allow for environment specific post-processing.
+        """
         # Hand off the actual submission to the scheduler
         script.seek(0)
         if cls.get_scheduler().submit(script, *args, **kwargs):
@@ -97,6 +145,7 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
 
     @staticmethod
     def bg(cmd):
+        "Wrap a command (cmd) to be executed in the background."
         return cmd + ' &'
 
 
@@ -132,22 +181,27 @@ class TestEnvironment(ComputeEnvironment):
 
 
 class MoabEnvironment(ComputeEnvironment):
+    "An environment with Moab scheduler."
     scheduler_type = scheduler.MoabScheduler
 
 
 class SlurmEnvironment(ComputeEnvironment):
+    "An environment with slurm scheduler."
     scheduler_type = scheduler.SlurmScheduler
 
 
-class CPUEnvironment(ComputeEnvironment):
-    pass
-
-
-class GPUEnvironment(ComputeEnvironment):
-    pass
-
-
 def get_environment(test=False):
+    """Attempt to detect the present environment.
+
+    This function iterates through all defined ComputeEnvironment
+    classes in reversed order of definition and and returns the
+    first EnvironmentClass where the is_present() method returns
+    True.
+
+    :param test: Return the TestEnvironment
+    :type tets: bool
+    :returns: The detected environment class.
+    """
     if test:
         return TestEnvironment
     else:

@@ -464,14 +464,16 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 
         # Bundle all eligible operations and submit the bundles
         for bundle in make_bundles(operations, bundle_size):
+            _id = self._store_bundled(bundle)
             status = self.submit_user(
                 env=env,
-                _id=self._store_bundled(bundle),
+                _id=_id,
                 operations=bundle,
                 walltime=walltime,
                 force=force,
                 **kwargs)
             if status is not None:
+                logger.info("Submitted job '{}' ({}).".format(_id, status.name))
                 for op in bundle:
                     op.set_status(status)
 

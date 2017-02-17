@@ -161,6 +161,11 @@ class UnknownEnvironment(ComputeEnvironment):
     def script(cls, **kwargs):
         return super(UnknownEnvironment, cls).script(**kwargs)
 
+    @classmethod
+    def get_scheduler(cls):
+        raise RuntimeError(
+            "This is an unknown environment without defined scheduler.")
+
 
 class TestEnvironment(ComputeEnvironment):
     """This is a test environment.

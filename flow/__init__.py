@@ -17,6 +17,7 @@ from .project import label
 from .project import classlabel
 from .project import staticlabel
 from .graph import FlowGraph
+from .environment import get_environment
 
 __version__ = '0.3.3'
 
@@ -30,4 +31,5 @@ __all__ = [
     'classlabel',
     'staticlabel',
     'FlowGraph',
+    'get_environment',
 ]

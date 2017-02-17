@@ -93,7 +93,7 @@ class TorqueScheduler(Scheduler):
     def is_present(cls):
         try:
             subprocess.check_call(['qsub', '--version'])
-        except IOError:
+        except (IOError, OSError):
             return False
         else:
             return True

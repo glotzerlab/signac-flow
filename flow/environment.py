@@ -273,7 +273,8 @@ def get_environment(test=False):
     if test:
         return TestEnvironment
     else:
-        for env_type in reversed(ComputeEnvironment.registry.values()):
+        env_types = list(ComputeEnvironment.registry.values())
+        for env_type in reversed(env_types):
             if env_type.is_present():
                 return env_type
         else:

@@ -10,6 +10,7 @@ pipelines:
         script:
           - python --version
           - pip --version
+          - pip install signac
           - pip install networkx
           - python setup.py build
           - python -m unittest discover tests/ -v
@@ -21,6 +22,7 @@ pipelines:
             - python3.6 --version
             - pip3.6 --version
             - pip3.6 install -U coverage
+            - pip3.6 install -U signac
             - pip3.6 install -U networkx
             - python3.6 -m coverage --version
             - tox --version
@@ -35,6 +37,7 @@ pipelines:
             - python3.6 --version
             - pip3.6 --version
             - pip3.6 install -U coverage
+            - pip3.6 install -U signac
             - pip3.6 install -U networkx
             - python3.6 -m coverage --version
             - tox --version
@@ -49,6 +52,7 @@ pipelines:
             - python3.6 --version
             - pip3.6 --version
             - pip3.6 install -U coverage
+            - pip3.6 install -U signac
             - pip3.6 install -U networkx
             - python3.6 -m coverage --version
             - tox --version
@@ -65,6 +69,7 @@ pipelines:
             - python3.6 --version
             - pip3.6 --version
             - pip3.6 install -U coverage
+            - pip3.6 install -U signac
             - pip3.6 install -U networkx
             - python3.6 -m coverage --version
             - tox --version

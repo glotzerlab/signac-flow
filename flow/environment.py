@@ -194,6 +194,14 @@ class SlurmEnvironment(ComputeEnvironment):
     scheduler_type = scheduler.SlurmScheduler
 
 
+class CPUEnvironment(ComputeEnvironment):
+    pass
+
+
+class GPUEnvironment(ComputeEnvironment):
+    pass
+
+
 def get_environment(test=False):
     """Attempt to detect the present environment.
 

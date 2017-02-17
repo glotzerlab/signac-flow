@@ -451,7 +451,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             if force:
                 return True
             if cmd is None:
-                if operation_name is not None and op.name != operation:
+                if operation_name is not None and op.name != operation_name:
                     return False
             if requires is not None:
                 labels = list(self.classify(op.job))

@@ -184,9 +184,18 @@ class TestEnvironment(ComputeEnvironment):
         return js
 
 
+class TorqueEnvironment(ComputeEnvironment):
+    "An environment with TORQUE scheduler."
+    scheduler_type = scheduler.TorqueScheduler
+
+
 class MoabEnvironment(ComputeEnvironment):
-    "An environment with Moab scheduler."
-    scheduler_type = scheduler.MoabScheduler
+    """"An environment with TORQUE scheduler.
+
+    This class is deprecated and only kept for backwards
+    compatibility.
+    """
+    scheduler_type = scheduler.TorqueScheduler
 
 
 class SlurmEnvironment(ComputeEnvironment):

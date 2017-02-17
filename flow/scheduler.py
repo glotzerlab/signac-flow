@@ -4,8 +4,22 @@
 import warnings
 
 from .fakescheduler import FakeScheduler
-from .moab import MoabScheduler
+from .torque import TorqueScheduler
 from .slurm import SlurmScheduler
 
 
-__all__ = ['FakeScheduler', 'MoabScheduler', 'SlurmScheduler']
+class MoabScheduler(TorqueScheduler):
+
+    def __init__(self, *args, **kwargs):
+        warnings.warn(
+            DeprecationWarning,
+            "The MoabScheduler has been renamed to TorqueScheduler.")
+        super(MoabScheduler, self).__init__(*args, **kwargs)
+
+
+__all__ = [
+    'FakeScheduler',
+    'TorqueScheduler',
+    'SlurmScheduler',
+    'MoabScheduler',
+    ]

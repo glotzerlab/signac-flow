@@ -24,12 +24,12 @@ def _fetch(user=None):
     try:
         result = io.BytesIO(subprocess.check_output(cmd.split()))
     except FileNotFoundError:
-        raise RuntimeError("Moab not available.")
+        raise RuntimeError("Torque not available.")
     tree = ET.parse(source=result)
     return tree.getroot()
 
 
-class MoabJob(ClusterJob):
+class TorqueJob(ClusterJob):
 
     def __init__(self, node):
         self.node = node
@@ -56,7 +56,7 @@ class MoabJob(ClusterJob):
         return JobStatus.registered
 
 
-class MoabScheduler(Scheduler):
+class TorqueScheduler(Scheduler):
     submit_cmd = ['qsub']
 
     def __init__(self, user=None):
@@ -66,7 +66,7 @@ class MoabScheduler(Scheduler):
         self._prevent_dos()
         nodes = _fetch(user=self.user)
         for node in nodes.findall('Job'):
-            yield MoabJob(node)
+            yield TorqueJob(node)
 
     def submit(self, script,
                resume=None, after=None, pretend=False, hold=False, *args, **kwargs):
@@ -88,3 +88,12 @@ class MoabScheduler(Scheduler):
                     submit_cmd + [tmp_submit_script.name])
             jobsid = output.decode('utf-8').strip()
             return jobsid
+
+    @classmethod
+    def is_present(cls):
+        try:
+            subprocess.check_call(['qsub', '--version'])
+        except IOError:
+            return False
+        else:
+            return True

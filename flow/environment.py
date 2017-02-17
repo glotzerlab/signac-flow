@@ -163,8 +163,8 @@ class UnknownEnvironment(ComputeEnvironment):
 
     @classmethod
     def get_scheduler(cls):
-        raise RuntimeError(
-            "This is an unknown environment without defined scheduler.")
+        raise AttributeError(
+            "No scheduler defined for unknown environment.")
 
 
 class TestEnvironment(ComputeEnvironment):

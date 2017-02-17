@@ -178,6 +178,10 @@ class TestEnvironment(ComputeEnvironment):
     scheduler_type = scheduler.FakeScheduler
 
     @classmethod
+    def mpi_cmd(cls, cmd, np):
+        return 'mpirun -np {np} {cmd}'.format(np=np, cmd=cmd)
+
+    @classmethod
     def script(cls, **kwargs):
         js = super(TestEnvironment, cls).script(**kwargs)
         for key in sorted(kwargs):

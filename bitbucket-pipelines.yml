@@ -29,7 +29,7 @@ pipelines:
             - python3.6 setup.py build
             - python3.6 -m unittest discover tests/ -v
             - tox
-            - python3.6 -m coverage report -i --include="signac*"
+            - python3.6 -m coverage report -i --include="flow*"
     develop:
       - step:
           image: themattrix/tox
@@ -44,7 +44,7 @@ pipelines:
             - python3.6 setup.py build
             - python3.6 -m unittest discover tests/ -v
             - tox
-            - python3.6 -m coverage report -i --include="signac*"
+            - python3.6 -m coverage report -i --include="flow*"
     v*:
       - step:
           image: themattrix/tox
@@ -59,7 +59,7 @@ pipelines:
             - python3.6 setup.py build
             - python3.6 -m unittest discover tests/ -v
             - tox
-            - python3.6 -m coverage report -i --include="signac*"
+            - python3.6 -m coverage report -i --include="flow*"
   tags:
    v*:
      - step:
@@ -77,5 +77,5 @@ pipelines:
             - python3.6 setup.py build
             - python3.6 -m unittest discover tests/ -v
             - tox
-            - python3.6 -m coverage report -i --include="signac*"
+            - python3.6 -m coverage report -i --include="flow*"
             - bash .deploy.bash

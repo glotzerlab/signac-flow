@@ -1,13 +1,76 @@
+# This is a sample build configuration for Python.
+# Only use spaces to indent your .yml configuration.
+# -----
+# You can specify a custom docker image from Dockerhub as your build environment.
 image: python:3.6
 
 pipelines:
+  default:
+    - step:
+        script:
+          - python --version
+          - pip --version
+          - pip install networkx
+          - python setup.py build
+          - python -m unittest discover tests/ -v
+  branches:
+    master:
+      - step:
+          image: themattrix/tox
+          script:
+            - python3.6 --version
+            - pip3.6 --version
+            - pip3.6 install -U coverage
+            - pip3.6 install -U networkx
+            - python3.6 -m coverage --version
+            - tox --version
+            - python3.6 setup.py build
+            - python3.6 -m unittest discover tests/ -v
+            - tox
+            - python3.6 -m coverage report -i --include="signac*"
+    develop:
+      - step:
+          image: themattrix/tox
+          script:
+            - python3.6 --version
+            - pip3.6 --version
+            - pip3.6 install -U coverage
+            - pip3.6 install -U networkx
+            - python3.6 -m coverage --version
+            - tox --version
+            - python3.6 setup.py build
+            - python3.6 -m unittest discover tests/ -v
+            - tox
+            - python3.6 -m coverage report -i --include="signac*"
+    v*:
+      - step:
+          image: themattrix/tox
+          script:
+            - python3.6 --version
+            - pip3.6 --version
+            - pip3.6 install -U coverage
+            - pip3.6 install -U networkx
+            - python3.6 -m coverage --version
+            - tox --version
+            - python3.6 setup.py build
+            - python3.6 -m unittest discover tests/ -v
+            - tox
+            - python3.6 -m coverage report -i --include="signac*"
   tags:
    v*:
      - step:
+          image: themattrix/tox
           script:
-            - pip install -U twine
-            - pip install -U wheel
-            - python --version
+            - pip3.6 install -U twine
+            - python3.6 --version
+            - pip3.6 --version
+            - pip3.6 install -U coverage
+            - pip3.6 install -U networkx
+            - python3.6 -m coverage --version
+            - tox --version
             - twine --version
-            - python setup.py build
+            - python3.6 setup.py build
+            - python3.6 -m unittest discover tests/ -v
+            - tox
+            - python3.6 -m coverage report -i --include="signac*"
             - bash .deploy.bash

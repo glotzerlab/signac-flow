@@ -86,3 +86,12 @@ class SlurmScheduler(Scheduler):
                 tmp_submit_script.flush()
                 subprocess.check_output(submit_cmd + [tmp_submit_script.name])
                 return True
+
+    @classmethod
+    def is_present(cls):
+        try:
+            return subprocess.check_call(['sbatch', '--version'])
+        except IOError:
+            return False
+        else:
+            return True

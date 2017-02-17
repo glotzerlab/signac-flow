@@ -203,6 +203,52 @@ class SlurmEnvironment(ComputeEnvironment):
     scheduler_type = scheduler.SlurmScheduler
 
 
+class DefaultTorqueEnvironment(TorqueEnvironment):
+    "A default environment for environments with TORQUE scheduler."
+
+    @classmethod
+    def is_present(cls):
+        return cls.scheduler_type.is_present()
+
+    @classmethod
+    def mpi_cmd(cls, cmd, np):
+        return 'mpirun -np {np} {cmd}'.format(n=np, cmd=cmd)
+
+    @classmethod
+    def script(cls, _id, nn, walltime, ppn=None, **kwargs):
+        if ppn is None:
+            ppn = cls.cores_per_node
+        js = super(DefaultTorqueEnvironment, cls).script()
+        js.writeline('#PBS -N {}'.format(_id))
+        js.writeline('#PBS -l nodes={}:ppn={}'.format(nn, ppn))
+        js.writeline('#PBS -l walltime={}'.format(format_timedelta(walltime)))
+        return js
+
+
+class DefaultSlurmEnvironment(SlurmEnvironment):
+    "A default environment for environments with slurm scheduler."
+
+    @classmethod
+    def is_present(cls):
+        return cls.scheduler_type.is_present()
+
+    @classmethod
+    def mpi_cmd(cls, cmd, np):
+        pass
+
+    @classmethod
+    def script(cls, _id, nn, walltime, ppn=None, **kwargs):
+        if ppn is None:
+            ppn = cls.cores_per_node
+        js = super(DefaultSlurmEnvironment, cls).script()
+        js.writeline('#!/bin/bash')
+        js.writeline('#SBATCH --job-name={}'.format(_id))
+        js.writeline('#SBATCH --nodes={}'.format(nn))
+        js.writeline('#SBATCH --ntasks-per-node={}'.format(ppn))
+        js.writeline('#SBATCH -t {}'.format(format_timedelta(walltime)))
+        return js
+
+
 class CPUEnvironment(ComputeEnvironment):
     pass
 

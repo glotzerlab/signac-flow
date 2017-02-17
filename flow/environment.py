@@ -173,10 +173,6 @@ class TestEnvironment(ComputeEnvironment):
     scheduler_type = scheduler.FakeScheduler
 
     @classmethod
-    def is_present(cls):
-        return True
-
-    @classmethod
     def script(cls, **kwargs):
         js = super(TestEnvironment, cls).script(**kwargs)
         for key in sorted(kwargs):
@@ -269,8 +265,11 @@ def get_environment(test=False):
     :type tets: bool
     :returns: The detected environment class.
     """
-    for env_type in reversed(ComputeEnvironment.registry.values()):
-        if env_type.is_present():
-            return env_type
+    if test:
+        return TestEnvironment:
     else:
-        return UnknownEnvironment
+        for env_type in reversed(ComputeEnvironment.registry.values()):
+            if env_type.is_present():
+                return env_type
+        else:
+            return UnknownEnvironment

@@ -178,7 +178,7 @@ class TestEnvironment(ComputeEnvironment):
 
     @classmethod
     def script(cls, **kwargs):
-        return super(TestEnvironment, cls).script(**kwargs)
+        js = super(TestEnvironment, cls).script(**kwargs)
         for key in sorted(kwargs):
             js.writeline('#TEST {}={}'.format(key, kwargs[key]))
         return js

@@ -266,7 +266,7 @@ def get_environment(test=False):
     :returns: The detected environment class.
     """
     if test:
-        return TestEnvironment:
+        return TestEnvironment
     else:
         for env_type in reversed(ComputeEnvironment.registry.values()):
             if env_type.is_present():

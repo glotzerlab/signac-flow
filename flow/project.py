@@ -650,7 +650,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                      detailed=False, parameters=None, skip_active=False,
                      param_max_width=None,
                      file=sys.stdout, err=sys.stderr,
-                     pool=None, **kwargs):
+                     pool=None):
         """Print the status of the project.
 
         :param scheduler: The scheduler instance used to fetch the job stati.

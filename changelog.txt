@@ -1,9 +1,5 @@
-develop:
+0.4.0:
 
-	- Add the FlowGraph, which allows the user to implement workflows in
-		form of a graph.
-	- Add the label decorators, allowing a more concise definition of
-		methods which are to be used for classification.
 	- The submission logic has been refactored:
 		- The write_user() function has been replaced by submit_user() with
 			slightly adjusted API.
@@ -18,3 +14,8 @@ develop:
 		- Improved testing capabilities for unknown environments.
 		- The determination of present environments is determistic and based
 			on reversed definition order.
+	- Add the label decorators, allowing a more concise definition of
+		methods which are to be used for classification.
+	- Add the FlowGraph, which allows the user to implement workflows in
+		form of a graph.
+	- Implement unit tests for all core functionalities.

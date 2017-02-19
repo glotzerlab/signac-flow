@@ -154,13 +154,8 @@ class FlowGraphTest(unittest.TestCase):
             list(g.operation_chain(None, bar, start=false))
 
         chain = list(g.operation_chain(None, false, start=bar))
-        self.assertEqual(len(chain), 0)
-        foo[0] = True
-        chain = list(g.operation_chain(None, false, start=bar))
         self.assertEqual(len(chain), 1)
-        foo[0] = False
-        chain = list(g.operation_chain(None, false, start=bar))
-        self.assertEqual(len(chain), 0)
+        self.assertEqual(chain[0], FlowOperation('test'))
 
     def test_link_conditions(self):
         foo = [False]
@@ -178,21 +173,15 @@ class FlowGraphTest(unittest.TestCase):
         g.add_operation('foo', prereq=None, postconds=[bar])
         g.add_operation('foo2', prereq=bar_, postconds=[false])
         self.assertEqual(len(list(g.operation_chain(None, bar))), 1)
-        self.assertEqual(len(list(g.operation_chain(None, false, bar_))), 0)
-        foo[0] = True
-        self.assertEqual(len(list(g.operation_chain(None, bar))), 0)
         self.assertEqual(len(list(g.operation_chain(None, false, bar_))), 1)
-        foo[0] = False
 
         with self.assertRaises(RuntimeError):
             list(g.operation_chain(None, false))
 
         g.link_conditions(bar, bar_)
-        list(g.operation_chain(None, false))
+        self.assertEqual(len(list(g.operation_chain(None, false))), 2)
+
         self.assertEqual(len(list(g.operation_chain(None, bar))), 1)
-        self.assertEqual(len(list(g.operation_chain(None, false, bar_))), 0)
-        foo[0] = True
-        self.assertEqual(len(list(g.operation_chain(None, bar))), 0)
         self.assertEqual(len(list(g.operation_chain(None, false, bar_))), 1)
 
 

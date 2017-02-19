@@ -99,8 +99,8 @@ class FlowGraph:
         for path in nx.all_simple_paths(self._graph, src, dst):
             for node in path:
                 if isinstance(node, FlowOperation):
-                    if self.eligible(node, job):
-                        yield node
+                    yield node
+            break
 
     def operation_chain(self, job, target, start=None):
         src = FlowCondition.as_this_type(start)

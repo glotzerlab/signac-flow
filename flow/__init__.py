@@ -19,7 +19,7 @@ from .project import staticlabel
 from .graph import FlowGraph
 from .environment import get_environment
 
-__version__ = '0.3.3'
+__version__ = '0.4.0'
 
 __all__ = [
     'environment',

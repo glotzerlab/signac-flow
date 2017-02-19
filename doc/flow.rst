@@ -58,10 +58,10 @@ flow.fakescheduler module
     :undoc-members:
     :show-inheritance:
 
-flow.moab module
-----------------
+flow.torque module
+------------------
 
-.. automodule:: flow.moab
+.. automodule:: flow.torque
     :members:
     :undoc-members:
     :show-inheritance:

@@ -94,6 +94,39 @@ pipelines:
           - python scripts/run.py auto
           - python -m my_project.status --detailed
           - python -m jupyter nbconvert --to html --execute analysis/notebook.ipynb
+    v*:
+      - step:
+        script:
+          - conda --version
+          - python --version
+          - conda config --add channels glotzer
+          - conda config --add channels conda-forge
+          - conda create -n py36 --yes python=3.6 coverage signac networkx
+          - source activate py36
+          - python setup.py build
+          - python -m coverage run -m unittest discover tests/
+          - source deactivate
+          - conda create -n py35 --yes python=3.5 coverage signac networkx
+          - source activate py35
+          - python setup.py build
+          - python -m coverage run -m unittest discover tests/
+          - source deactivate
+          - conda create -n py34 --yes python=3.4 coverage signac networkx hoomd jupyter matplotlib
+          - source activate py34
+          - python setup.py build
+          - python -m coverage run -m unittest discover tests/
+          - python -m coverage report
+          - python setup.py install
+          - git clone https://github.com/glotzer-lab/signac-project-template.git template
+          - cd template
+          - git checkout fix-submit
+          - python -m my_project.init 0
+          - python -m my_project.status --detailed
+          # TODO Enable once the fix-submit branch has been merged into master
+          #- python -m my_project.submit --test --ppn 1
+          - python scripts/run.py auto
+          - python -m my_project.status --detailed
+          - python -m jupyter nbconvert --to html --execute analysis/notebook.ipynb
   tags:
    v*:
      - step:

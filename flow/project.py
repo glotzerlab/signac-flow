@@ -554,7 +554,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             script.write('# ' + line + '\n')
         script.write('\n')
 
-    def print_overview(self, stati, max_lines=None, file=sys.stdout):
+    def _print_overview(self, stati, max_lines=None, file=sys.stdout):
         "Print the project's status overview."
         progress = defaultdict(int)
         for status in stati:
@@ -600,9 +600,9 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             row[1] += ' ' + self._alias('requires_attention')
         return row
 
-    def print_detailed(self, stati, parameters=None,
-                       skip_active=False, param_max_width=None,
-                       file=sys.stdout):
+    def _print_detailed(self, stati, parameters=None,
+                        skip_active=False, param_max_width=None,
+                        file=sys.stdout):
         "Print the project's detailed status."
         table_header = [self._tr(self._alias(s))
                         for s in ('job_id', 'status', 'next_operation', 'labels')]
@@ -684,12 +684,12 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         title = "{} '{}':".format(self._tr("Status project"), self)
         print('\n' + title, file=file)
         if overview:
-            self.print_overview(stati, max_lines=overview_max_lines, file=file)
+            self._print_overview(stati, max_lines=overview_max_lines, file=file)
         if detailed:
             print(file=file)
             print(self._tr("Detailed view:"), file=file)
-            self.print_detailed(stati, parameters, skip_active,
-                                param_max_width, file)
+            self._print_detailed(stati, parameters, skip_active,
+                                 param_max_width, file)
 
     @classmethod
     def add_print_status_args(cls, parser):

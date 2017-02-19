@@ -51,9 +51,8 @@ pipelines:
             - python -m coverage run -m unittest discover tests/
             - python -m coverage report
             - python setup.py install
-            - git clone https://github.com/glotzer-lab/signac-project-template.git template
+            - git clone https://github.com/glotzerlab/signac-project-template.git template
             - cd template
-            - git checkout fix-submit
             - python -m my_project.init 0
             - python -m my_project.status --detailed
             # TODO Enable once the fix-submit branch has been merged into master
@@ -84,9 +83,8 @@ pipelines:
             - python -m coverage run -m unittest discover tests/
             - python -m coverage report
             - python setup.py install
-            - git clone https://github.com/glotzer-lab/signac-project-template.git template
+            - git clone https://github.com/glotzerlab/signac-project-template.git template
             - cd template
-            - git checkout fix-submit
             - python -m my_project.init 0
             - python -m my_project.status --detailed
             # TODO Enable once the fix-submit branch has been merged into master
@@ -117,9 +115,8 @@ pipelines:
             - python -m coverage run -m unittest discover tests/
             - python -m coverage report
             - python setup.py install
-            - git clone https://github.com/glotzer-lab/signac-project-template.git template
+            - git clone https://github.com/glotzerlab/signac-project-template.git template
             - cd template
-            - git checkout fix-submit
             - python -m my_project.init 0
             - python -m my_project.status --detailed
             # TODO Enable once the fix-submit branch has been merged into master
@@ -151,9 +148,8 @@ pipelines:
             - python -m coverage run -m unittest discover tests/
             - python -m coverage report
             - python setup.py install
-            - git clone https://github.com/glotzer-lab/signac-project-template.git template
+            - git clone https://github.com/glotzerlab/signac-project-template.git template
             - cd template
-            - git checkout fix-submit
             - python -m my_project.init 0
             - python -m my_project.status --detailed
             # TODO Enable once the fix-submit branch has been merged into master

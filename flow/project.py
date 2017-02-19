@@ -203,6 +203,7 @@ class JobOperation:
         return self.name
 
     def get_id(self):
+        "Return a name, which identifies this job-operation."
         return '{}-{}'.format(self.job, self.name)
 
     def __hash__(self):
@@ -234,7 +235,7 @@ class _FlowProjectClass(type):
 
 
 class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
-    """A signac project class assisting in job scheduling.
+    """A signac project class assisting in workflow management.
 
     :param config: A signac configuaration, defaults to
         the configuration loaded from the environment.
@@ -659,15 +660,21 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         :type scheduler: :class:`~.manage.Scheduler`
         :param job_filter: A JSON encoded filter,
             that all jobs to be submitted need to match.
+        :param overview: Aggregate an overview of the project' status.
+        :type overview: bool
+        :param overview_max_lines: Limit the number of overview lines.
+        :type overview_max_lines: int
         :param detailed: Print a detailed status of each job.
         :type detailed: bool
         :param parameters: Print the value of the specified parameters.
         :type parameters: list of str
         :param skip_active: Only print jobs that are currently inactive.
         :type skip_active: bool
-        :param file: Print all output to this file,
+        :param param_max_width: Limit the number of characters of parameter
+            columns, see also: :py:meth:`~.update_aliases`.
+        :param file: Redirect all output to this file,
             defaults to sys.stdout
-        :param err: Print all error output to this file,
+        :param err: Redirect all error output to this file,
             defaults to sys.stderr
         :param pool: A multiprocessing or threading pool. Providing a pool
             parallelizes this method."""
@@ -728,6 +735,37 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             help="Display only jobs, which are currently not active.")
 
     def labels(self, job):
+        """Auto-generate labels from label-functions.
+
+        This generator function will automatically yield labels,
+        from project methods decorated with the ``@label`` decorator.
+
+        For example, we can define a function like this:
+
+        .. code-block:: python
+
+            class MyProject(FlowProject):
+
+                @label()
+                def is_foo(self, job):
+                    return job.document.get('foo', False)
+
+        The ``labels()`` generator method will now yield a ``is_foo``
+        label whenever the job document has a field ``foo`` which
+        evaluates to True.
+
+        By default, the label name is equal to the function's name,
+        but you can specify a custom label as the first argument to the
+        label decorator, e.g.: ``@label('foo_label')``.
+
+        .. tip::
+
+            In this particular case it may make sense to define the
+            ``is_foo()`` method as a *staticmethod*, since it does not
+            actually depend on the project instance. We can do this by
+            using the ``@staticlabel()`` decorator, equivalently the
+            ``@classlabel()`` for *class methods*.
+        """
         for label in self._labels:
             if hasattr(label, '__func__'):
                 label = getattr(self, label.__func__.__name__)
@@ -755,8 +793,13 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         return
 
     def eligible(self, job_operation, **kwargs):
-        """Determine if job is eligible for operation."""
-        # Deprecated!
+        """Determine if job is eligible for operation.
+
+        .. warning::
+
+            This function is deprecated, please use
+            :py:meth:`~.eligible_for_submission` instead.
+        """
         return None
 
     def eligible_for_submission(self, job_operation):

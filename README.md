@@ -26,7 +26,7 @@ or
 
 ## Documentation
 
-The documentation for this package can be found online at http://signac-flow.readthedocs.io/ or built manually using sphinx:
+The documentation for this package can be found online at [signac-flow.readthedocs.io](https://signac-flow.readthedocs.io/) or built manually using sphinx:
 ```
 #!bash
 cd doc

@@ -97,6 +97,8 @@ class label(object):
 
     For example:
 
+    .. code::
+
         class MyProject(FlowProject):
 
             @label()
@@ -110,8 +112,8 @@ class label(object):
         >>> for label in MyProject().labels(job):
         ...     print(label)
 
-        The code segment above will always print the label 'foo',
-        but the label 'bar' only if 'a' is part of a job's state point.
+    The code segment above will always print the label 'foo',
+    but the label 'bar' only if 'a' is part of a job's state point.
 
     This enables the user to quickly write classification functions
     and use them for labeling, for example in the classify() method.

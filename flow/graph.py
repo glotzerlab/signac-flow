@@ -58,7 +58,7 @@ class FlowCondition(_FlowNode):
             return self._callback(job)
 
 
-class FlowGraph:
+class FlowGraph(object):
     """Define a workflow based on conditions and operations as a graph.
 
     The ``FlowGraph`` class is designed to simplify the definition of

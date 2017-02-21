@@ -13,6 +13,7 @@ from __future__ import print_function
 import re
 import socket
 import logging
+import warnings
 import io
 from collections import OrderedDict
 
@@ -197,6 +198,12 @@ class MoabEnvironment(ComputeEnvironment):
     compatibility.
     """
     scheduler_type = scheduler.TorqueScheduler
+
+    def __init__(self, *args, **kwargs):
+        warnings.warn(
+            DeprecationWarning,
+            "The MoabEnvironment has been replaced by the TorqueEnvironment.")
+        super(MoabEnvironment, self).__init__(*args, **kwargs)
 
 
 class SlurmEnvironment(ComputeEnvironment):

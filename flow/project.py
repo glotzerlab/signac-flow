@@ -781,6 +781,8 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         :type job: :class:`~signac.contrib.job.Job`
         :yields: The labels to classify job.
         :yield type: str"""
+        yield
+        return
 
     def next_operation(self, job):
         """Determine the next operation for this job.

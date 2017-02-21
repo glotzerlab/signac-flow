@@ -158,10 +158,6 @@ class UnknownEnvironment(ComputeEnvironment):
         return True
 
     @classmethod
-    def script(cls, **kwargs):
-        return super(UnknownEnvironment, cls).script(**kwargs)
-
-    @classmethod
     def get_scheduler(cls):
         raise AttributeError(
             "No scheduler defined for unknown environment.")

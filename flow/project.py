@@ -228,7 +228,7 @@ class JobOperation:
 
 class _FlowProjectClass(type):
 
-    def __new__(metacls, name, bases, namespace, **kwrgs):
+    def __new__(metacls, name, bases, namespace, **kwargs):
         cls = type.__new__(metacls, name, bases, dict(namespace))
         cls._labels = {func for func in namespace.values() if _is_label_func(func)}
         return cls

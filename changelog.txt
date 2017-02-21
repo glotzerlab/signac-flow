@@ -12,7 +12,7 @@
 		- An attempt is made to detect the use of the deprecated API which will
 			trigger the use of a legacy code path and the emission of warnings.
 		- Improved testing capabilities for unknown environments.
-		- The determination of present environments is determistic and based
+		- The determination of present environments is deterministic and based
 			on reversed definition order.
 	- Add the label decorators, allowing a more concise definition of
 		methods which are to be used for classification.

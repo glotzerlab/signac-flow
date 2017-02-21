@@ -11,7 +11,7 @@ Welcome to signac-flow's documentation!
 .. tip::
 
     The signac-project-template_ is a complete working implementation of a :py:class:`~flow.FlowProject`,
-    which serves both as exampe, but can also be used as a template to start new projects.
+    which serves both as example, but can also be used as a template to start new projects.
 
 .. _signac-project-template: https://github.com/glotzerlab/signac-project-template
 

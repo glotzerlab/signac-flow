@@ -19,8 +19,8 @@ contains the commands to execute these.
 For the sake of example, let's make the following assumptions:
 
   1. We operate on a signac data space spanned by parameters ``a`` and ``b``.
-  2. We initialize the data space and each job in  a ``init.py`` script by initializing
-     each job and creating an ``init.txt`` file.
+  2. We initialize the data space in an ``init.py`` script by creating an ``init.txt`` file
+     for each job.
   3. After initialization we want to execute a *job-operation* on a cluster using the ``foo``
      program which requires the name of the input file and a parameter ``a`` as arguments.
   4. The output of ``foo`` will be stored in a file called ``out.txt``.

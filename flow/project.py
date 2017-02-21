@@ -178,7 +178,7 @@ class JobOperation:
     data.
 
     This class is designed to define commands to be executed on the command
-    line that constitue an operation.
+    line that constitute an operation.
 
     .. note::
 
@@ -400,7 +400,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         unless the job is considered active, e.g., because an operation associated with
         the same job has alreay been submitted.
 
-        The actualy execution of operations is controlled in the :py:meth:`~.submit_user`
+        The actual execution of operations is controlled in the :py:meth:`~.submit_user`
         method which must be implemented by the user.
 
         :param env: The env instance.
@@ -415,14 +415,14 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         :param force: Ignore warnings and checks during submission, just submit.
         :type force: bool
         :param bundle_size: Bundle up to 'bundle_size' number of operations during submission.
-        :type bundle: int
+        :type bundle_size: int
         :param cmd: Construct and submit an operation "on-the-fly" instead of submitting
             the "next operation".
         :type cmd: str
         :param requires: A job's set of classification labels must fully intersect with
             the labels provided as part of this argument to be considered for submission.
         :type requires: Iterable of str
-        :param kwargs: Other keyword arguments which are forwareded to down-stream methods.
+        :param kwargs: Other keyword arguments which are forwarded to down-stream methods.
         """
         # Backwards-compatilibity check...
         if isinstance(env, manage.Scheduler):

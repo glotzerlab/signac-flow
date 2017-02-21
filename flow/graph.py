@@ -63,7 +63,7 @@ class FlowGraph:
 
     The ``FlowGraph`` class is designed to simplify the definition of
     more complex workflows, by adding operations to a graph, linking them
-    by pre- and post-conditions. The assumption is that a operation is
+    by pre- and post-conditions. The assumption is that an operation is
     *eligible* for operation when the pre-condition is met, and at least
     one of the post-conditions is not met.
 
@@ -115,7 +115,7 @@ class FlowGraph:
         will eventually lead to all post-conditions to be met.
 
         The operation may be any object that can be uniquely compared
-        vias ``hash()``, e.g. a ``str`` or an instance of
+        via ``hash()``, e.g. a ``str`` or an instance of
         :py:class:`flow.JobOperation` and *callables*.
 
         All conditions must be callables, with exactly one argument.

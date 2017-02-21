@@ -57,8 +57,8 @@ class JobScript(io.StringIO):
     """
     eol = '\n'
 
-    def __init__(self, parent):
-        self._parent = parent
+    def __init__(self, env):
+        self._env = env
         super().__init__()
 
     def writeline(self, line=''):
@@ -77,9 +77,9 @@ class JobScript(io.StringIO):
         :type np: int
         """
         if np > 1:
-            cmd = self._parent.mpi_cmd(cmd, np=np)
+            cmd = self._env.mpi_cmd(cmd, np=np)
         if bg:
-            cmd = self._parent.bg(cmd)
+            cmd = self._env.bg(cmd)
         self.writeline(cmd)
 
 

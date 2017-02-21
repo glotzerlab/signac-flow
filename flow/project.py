@@ -457,7 +457,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 if operation_name is not None and op.name != operation_name:
                     return False
             if requires is not None:
-                labels = list(self.classify(op.job))
+                labels = set(self.classify(op.job))
                 if not all([req in labels for req in requires]):
                     return False
             return self.eligible_for_submission(op)

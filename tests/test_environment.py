@@ -36,7 +36,7 @@ class ProjectTest(unittest.TestCase):
         sscript = env.script()
         sscript_ = JobScript(env)
         self.assertEqual(type(sscript), type(sscript_))
-        self.assertEqual(sscript._parent, sscript_._parent)
+        self.assertEqual(sscript._env, sscript_._env)
         self.assertEqual(len(sscript.read()), 0)
         sscript.writeline('test')
         sscript.seek(0)

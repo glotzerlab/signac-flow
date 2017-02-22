@@ -12,8 +12,8 @@ class MoabScheduler(TorqueScheduler):
 
     def __init__(self, *args, **kwargs):
         warnings.warn(
-            DeprecationWarning,
-            "The MoabScheduler has been renamed to TorqueScheduler.")
+            "The MoabScheduler has been renamed to TorqueScheduler.",
+            DeprecationWarning)
         super(MoabScheduler, self).__init__(*args, **kwargs)
 
 

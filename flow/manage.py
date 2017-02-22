@@ -62,6 +62,12 @@ class Scheduler(object):
     _last_query = None
     _dos_timeout = 10
 
+    def __init__(self,
+                 header=None, cores_per_node=None,  # legacy arguments
+                 *args, **kwargs):
+        self.header = header
+        self.cores_per_node = cores_per_node
+
     @classmethod
     def _prevent_dos(cls):
         if cls._last_query is not None:

@@ -59,7 +59,8 @@ class TorqueJob(ClusterJob):
 class TorqueScheduler(Scheduler):
     submit_cmd = ['qsub']
 
-    def __init__(self, user=None):
+    def __init__(self, user=None, **kwargs):
+        super(TorqueScheduler, self).__init__(**kwargs)
         self.user = user
 
     def jobs(self):

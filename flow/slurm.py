@@ -60,7 +60,8 @@ class SlurmJob(ClusterJob):
 class SlurmScheduler(Scheduler):
     submit_cmd = ['sbatch']
 
-    def __init__(self, user=None):
+    def __init__(self, user=None, **kwargs):
+        super(SlurmScheduler, self).__init__(**kwargs)
         self.user = user
 
     def jobs(self):

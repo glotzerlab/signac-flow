@@ -201,8 +201,8 @@ class MoabEnvironment(ComputeEnvironment):
 
     def __init__(self, *args, **kwargs):
         warnings.warn(
-            DeprecationWarning,
-            "The MoabEnvironment has been replaced by the TorqueEnvironment.")
+            "The MoabEnvironment has been replaced by the TorqueEnvironment.",
+            DeprecationWarning)
         super(MoabEnvironment, self).__init__(*args, **kwargs)
 
 

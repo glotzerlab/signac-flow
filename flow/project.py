@@ -431,7 +431,6 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             # Entering legacy mode!
             logger.warning("You are using a deprecated FlowProject API!")
             warnings.warn("You are using a deprecated FlowProject API!", DeprecationWarning)
-            warnings.warn("You are using a deprecated FlowProject API!")  # higher visibility
             LEGACY = True
         else:
             LEGACY = False
@@ -822,9 +821,19 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         return True
 
     def _submit_legacy(self, env, _id, operations, walltime, force, mpi_cmd,
-                       serial=False, ppn=None, **kwargs):
+                       serial=False, ppn=None, pretend=False, after=None, hold=False,
+                       **kwargs):
+        from flow.environment import format_timedelta
         assert isinstance(env, manage.Scheduler)
         scheduler = env
+
+        if mpi_cmd is None:
+            
+            def mpi_cmd(cmd, np=1):
+                if np > 1:
+                    return 'mpirun -np {} {}'.format(np, cmd)
+                else:
+                    return cmd
 
         if ppn is None:
             ppn = getattr(scheduler, 'cores_per_node', 1)
@@ -868,16 +877,16 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             script.writeline('wait')
         script.seek(0)
 
-        np_total = max(nps) if serial else sum(nps)
-        nn = ceil(np_total / ppn)
+        np = max(nps) if serial else sum(nps)
+        nn = ceil(np / ppn)
 
         sscript = JobScriptLegacy()
         try:
             header = scheduler.header.format()
-            sscript.write(header.format(jobsid=_id, nn=nn, walltime=format_timedelta(walltime)))
+            sscript.write(header.format(jobsid=_id, np=np, nn=nn, walltime=format_timedelta(walltime)))
         except AttributeError:
             pass
         sscript.write(script.read())
         sscript.seek(0)
-        scheduler.submit(sscript)
+        scheduler.submit(sscript, pretend=pretend, hold=hold, after=after)
         return manage.JobStatus.submitted

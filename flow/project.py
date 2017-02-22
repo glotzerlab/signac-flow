@@ -169,7 +169,7 @@ def make_bundles(operations, size=None):
             break
 
 
-class JobOperation:
+class JobOperation(object):
     """Define operations to apply to a job.
 
     A operation function in the context of signac is a function, with only

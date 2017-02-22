@@ -828,7 +828,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         scheduler = env
 
         if mpi_cmd is None:
-            
+
             def mpi_cmd(cmd, np=1):
                 if np > 1:
                     return 'mpirun -np {} {}'.format(np, cmd)
@@ -837,11 +837,12 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 
         if ppn is None:
             ppn = getattr(scheduler, 'cores_per_node', 1)
-
-        is_parallel = False
+            if ppn is None:
+                ppn = 1
 
         class JobScriptLegacy(io.StringIO):
             "Simple StringIO wrapper to implement cmd wrapping logic."
+            parallel = False
 
             def writeline(self, line, eol='\n'):
                 "Write one line to the job script."
@@ -854,6 +855,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                         raise RuntimeError("Requires mpi_cmd wrapper.")
                     cmd = mpi_cmd(cmd, np=np)
                 if parallel:
+                    self.parallel = True
                     cmd += ' &'
                 self.writeline(cmd)
                 return np
@@ -873,7 +875,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 parallel=not serial,
                 mpi_cmd=mpi_cmd,
                 **kwargs))
-        if is_parallel:
+        if script.parallel:
             script.writeline('wait')
         script.seek(0)
 
@@ -883,7 +885,8 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         sscript = JobScriptLegacy()
         try:
             header = scheduler.header.format()
-            sscript.write(header.format(jobsid=_id, np=np, nn=nn, walltime=format_timedelta(walltime)))
+            sscript.write(header.format(jobsid=_id, np=np, nn=nn,
+                          walltime=format_timedelta(walltime)))
         except AttributeError:
             pass
         sscript.write(script.read())

@@ -17,11 +17,13 @@ option is to use a FlowGraph.
 from __future__ import print_function
 import sys
 import os
+import io
 import logging
 import warnings
 import datetime
 import json
 import errno
+from math import ceil
 from collections import defaultdict
 from itertools import islice
 from hashlib import sha1
@@ -427,14 +429,12 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         # Backwards-compatilibity check...
         if isinstance(env, manage.Scheduler):
             # Entering legacy mode!
-            from .project_legacy import submit as submit_legacy
             logger.warning("You are using a deprecated FlowProject API!")
             warnings.warn("You are using a deprecated FlowProject API!", DeprecationWarning)
             warnings.warn("You are using a deprecated FlowProject API!")  # higher visibility
-            submit_legacy(self, scheduler=env, job_ids=job_ids, operation=operation_name,
-                          walltime=walltime, num=num, force=force, bundle=bundle_size,
-                          **kwargs)
-            return
+            LEGACY = True
+        else:
+            LEGACY = False
 
         if walltime is not None:
             walltime = datetime.timedelta(hours=walltime)
@@ -445,8 +445,13 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             jobs = iter(self)
 
         def get_op(job):
+            if LEGACY and operation_name is not None:
+                return JobOperation(name=operation_name, job=job, cmd=None)
             if cmd is None:
-                return self.next_operation(job)
+                if LEGACY:
+                    return JobOperation(name=self.next_operation(job), job=job, cmd=None)
+                else:
+                    return self.next_operation(job)
             else:
                 return JobOperation(name='user-cmd', cmd=cmd.format(job=job), job=job)
 
@@ -460,7 +465,10 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 labels = set(self.classify(op.job))
                 if not all([req in labels for req in requires]):
                     return False
-            return self.eligible_for_submission(op)
+            if LEGACY:
+                return self.eligible(job=op.job, operation=op.name, **kwargs)
+            else:
+                return self.eligible_for_submission(op)
 
         # Get the first num eligible operations
         operations = islice((op for op in map(get_op, jobs) if eligible(op)), num)
@@ -468,7 +476,8 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         # Bundle all eligible operations and submit the bundles
         for bundle in make_bundles(operations, bundle_size):
             _id = self._store_bundled(bundle)
-            status = self.submit_user(
+            _submit = self._submit_legacy if LEGACY else self.submit_user
+            status = _submit(
                 env=env,
                 _id=_id,
                 operations=bundle,
@@ -811,3 +820,64 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         if job_operation.get_status() >= manage.JobStatus.submitted:
             return False
         return True
+
+    def _submit_legacy(self, env, _id, operations, walltime, force, mpi_cmd,
+                       serial=False, ppn=None, **kwargs):
+        assert isinstance(env, manage.Scheduler)
+        scheduler = env
+
+        if ppn is None:
+            ppn = getattr(scheduler, 'cores_per_node', 1)
+
+        is_parallel = False
+
+        class JobScriptLegacy(io.StringIO):
+            "Simple StringIO wrapper to implement cmd wrapping logic."
+
+            def writeline(self, line, eol='\n'):
+                "Write one line to the job script."
+                self.write(line + eol)
+
+            def write_cmd(self, cmd, parallel=False, np=1, mpi_cmd=None, **kwargs):
+                "Write a command to the jobscript."
+                if np > 1:
+                    if mpi_cmd is None:
+                        raise RuntimeError("Requires mpi_cmd wrapper.")
+                    cmd = mpi_cmd(cmd, np=np)
+                if parallel:
+                    cmd += ' &'
+                self.writeline(cmd)
+                return np
+
+        script = JobScriptLegacy()
+        try:
+            self.write_header(script=script, walltime=walltime, **kwargs)
+        except AttributeError:
+            logger.warning("Did not find a write_header() function.")
+
+        nps = list()
+        for op in operations:
+            nps.append(self.write_user(
+                script=script,
+                job=op.job,
+                operation=op.name,
+                parallel=not serial,
+                mpi_cmd=mpi_cmd,
+                **kwargs))
+        if is_parallel:
+            script.writeline('wait')
+        script.seek(0)
+
+        np_total = max(nps) if serial else sum(nps)
+        nn = ceil(np_total / ppn)
+
+        sscript = JobScriptLegacy()
+        try:
+            header = scheduler.header.format()
+            sscript.write(header.format(jobsid=_id, nn=nn, walltime=format_timedelta(walltime)))
+        except AttributeError:
+            pass
+        sscript.write(script.read())
+        sscript.seek(0)
+        scheduler.submit(sscript)
+        return manage.JobStatus.submitted

@@ -1,0 +1,21 @@
+0.4.0:
+
+	- The submission logic has been refactored:
+		- The write_user() function has been replaced by submit_user() with
+			slightly adjusted API.
+		- The header and environment module have been merged into a single
+			environment module.
+		- All submit logic has been removed from the scheduler drivers.
+		- Any submit logic implemented as part of the environment module has
+			been reduced to the bare minimum.
+		- The submission flow has been refactored to be based on JobOperations.
+		- An attempt is made to detect the use of the deprecated API which will
+			trigger the use of a legacy code path and the emission of warnings.
+		- Improved testing capabilities for unknown environments.
+		- The determination of present environments is deterministic and based
+			on reversed definition order.
+	- Add the label decorators, allowing a more concise definition of
+		methods which are to be used for classification.
+	- Add the FlowGraph, which allows the user to implement workflows in
+		form of a graph.
+	- Implement unit tests for all core functionalities.

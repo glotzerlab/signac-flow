@@ -1,18 +1,35 @@
 # Copyright (c) 2017 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
+"""Workflow definition with the FlowProject.
+
+The FlowProject is a signac Project, that allows the user to define
+a workflow based on job classification and job operations.
+
+A job may be classified based on its metadata and data in the form
+of str labels. These str-labels are yielded in the classify() method.
+
+Based on the classification a "next operation" may be identified, that
+should be executed next to further the workflow. While the user is free
+to choose any method for the determination of the "next operation", one
+option is to use a FlowGraph.
+"""
 from __future__ import print_function
 import sys
 import os
 import io
 import logging
+import warnings
 import datetime
 import json
+import errno
+from math import ceil
 from collections import defaultdict
 from itertools import islice
 from hashlib import sha1
 
 import signac
+from signac.common.six import with_metaclass
 
 from . import manage
 from . import util
@@ -24,7 +41,21 @@ logger = logging.getLogger(__name__)
 DEFAULT_WALLTIME_HRS = 12
 
 
+def _mkdir_p(path):
+    try:
+        os.makedirs(path)
+    except OSError as error:
+        if not (error.errno == errno.EEXIST and os.path.isdir(path)):
+            raise
+
+
 def is_active(status):
+    """True if a specific status is considered 'active'.
+
+    A active status usually means that no further operation should
+    be executed at the same time to prevent race conditions and other
+    related issues.
+    """
     for gid, s in status.items():
         if s > manage.JobStatus.inactive:
             return True
@@ -32,64 +63,181 @@ def is_active(status):
 
 
 def draw_progressbar(value, total, width=40):
+    "Helper function for the visualization of progress."
     n = int(value / total * width)
     return '|' + ''.join(['#'] * n) + ''.join(['-'] * (width - n)) + '|'
 
 
 def abbreviate(x, a):
+    "Abbreviate x with a and add to the abbreviation table."
     if x == a:
         return x
     else:
         abbreviate.table[a] = x
         return a
-abbreviate.table = dict()
+abbreviate.table = dict()  # noqa
 
 
-def shorten(x, max_length=-1):
-    return abbreviate(x, x[:max_length])
+def shorten(x, max_length=None):
+    "Shorten x to max_length and add to abbreviation table."
+    if max_length is None:
+        return x
+    else:
+        return abbreviate(x, x[:max_length])
 
 
 def _update_status(args):
     return manage.update_status(* args)
 
 
-class JobScript(io.StringIO):
-    "Simple StringIO wrapper to implement cmd wrapping logic."
+class label(object):
+    """Decorate a function to be a label function.
 
-    def writeline(self, line, eol='\n'):
-        "Write one line to the job script."
-        self.write(line + eol)
+    The label() method as part of FlowProject iterates over all
+    methods decorated with this label and yields the method's name
+    or the provided name.
 
-    def write_cmd(self, cmd, parallel=False, np=1, mpi_cmd=None, **kwargs):
-        """Write a command to the jobscript.
+    For example:
 
-        This command wrapper function is a convenience function, which
-        adds mpi and other directives whenever necessary.
+    .. code::
 
-        The ``mpi_cmd`` argument should be a callable, with the following
-        signature: ``mpi_cmd(cmd, np, **kwargs)``.
+        class MyProject(FlowProject):
 
-        :param cmd: The command to write to the jobscript.
-        :type cmd: str
-        :param parallel: Commands should be executed in parallel.
-        :type parallel: bool
-        :param np: The number of processors required for execution.
-        :type np: int
-        :param mpi_cmd: MPI command wrapper.
-        :type mpi_cmd: callable
-        :param kwargs: All other forwarded parameters."""
-        if np > 1:
-            if mpi_cmd is None:
-                raise RuntimeError("Requires mpi_cmd wrapper.")
-            cmd = mpi_cmd(cmd, np=np)
-        if parallel:
-            cmd += ' &'
-        self.writeline(cmd)
-        return np
+            @label()
+            def foo(self, job):
+                return True
+
+            @label()
+            def bar(self, job):
+                return 'a' in job.statepoint()
+
+        >>> for label in MyProject().labels(job):
+        ...     print(label)
+
+    The code segment above will always print the label 'foo',
+    but the label 'bar' only if 'a' is part of a job's state point.
+
+    This enables the user to quickly write classification functions
+    and use them for labeling, for example in the classify() method.
+    """
+
+    def __init__(self, name=None):
+        self.name = name
+
+    def __call__(self, func):
+        func._label = True
+        if self.name is not None:
+            func._label_name = self.name
+        return func
 
 
-class FlowProject(signac.contrib.Project):
-    """A signac project class assisting in job scheduling.
+class staticlabel(label):
+    """A label decorator for staticmethods.
+
+    This decorator implies "staticmethod"!
+    """
+
+    def __call__(self, func):
+        return staticmethod(super(staticlabel, self).__call__(func))
+
+
+class classlabel(label):
+    """A label decorator for classmethods.
+
+    This decorator implies "classmethod"!
+    """
+
+    def __call__(self, func):
+        return classmethod(super(classlabel, self).__call__(func))
+
+
+def _is_label_func(func):
+    return getattr(getattr(func, '__func__', func), '_label', False)
+
+
+def make_bundles(operations, size=None):
+    """Utility function for the generation of bundles.
+
+    This function splits a iterable of operations into
+    equally sized bundles and a possibly smaller final
+    bundle.
+    """
+    n = None if size == 0 else size
+    while True:
+        b = list(islice(operations, n))
+        if b:
+            yield b
+        else:
+            break
+
+
+class JobOperation(object):
+    """Define operations to apply to a job.
+
+    A operation function in the context of signac is a function, with only
+    one job argument. This in principle ensures that operations are deterministic
+    in the sense that both input and output only depend on the job's metadata and
+    data.
+
+    This class is designed to define commands to be executed on the command
+    line that constitute an operation.
+
+    .. note::
+
+            The command arguments should only depend on the job metadata to
+            ensure deterministic operations.
+
+    :param name: The name of this JobOperation instance. The name is arbitrary,
+        but helps to concisely identify the operation in various contexts.
+    :type name: str
+    :param job: The job instance associated with this operation.
+    :type job: :py:class:`signac.Job`.
+    :param cmd: The command that constitutes the operation.
+    :type cmd: str
+    """
+
+    def __init__(self, name, job, cmd):
+        self.name = name
+        self.job = job
+        self.cmd = cmd
+
+    def __str__(self):
+        return self.name
+
+    def get_id(self):
+        "Return a name, which identifies this job-operation."
+        return '{}-{}'.format(self.job, self.name)
+
+    def __hash__(self):
+        return int(sha1(self.get_id().encode('utf-8')).hexdigest(), 16)
+
+    def __eq__(self, other):
+        return self.get_id() == other.get_id()
+
+    def set_status(self, value):
+        "Store the operation's status."
+        status_doc = self.job.document.get('status', dict())
+        status_doc[self.get_id()] = int(value)
+        self.job.document['status'] = status_doc
+
+    def get_status(self):
+        "Retrieve the operation's last known status."
+        try:
+            return self.job.document['status'][self.get_id()]
+        except KeyError:
+            return manage.JobStatus.unknown
+
+
+class _FlowProjectClass(type):
+
+    def __new__(metacls, name, bases, namespace, **kwargs):
+        cls = type.__new__(metacls, name, bases, dict(namespace))
+        cls._labels = {func for func in namespace.values() if _is_label_func(func)}
+        return cls
+
+
+class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
+    """A signac project class assisting in workflow management.
 
     :param config: A signac configuaration, defaults to
         the configuration loaded from the environment.
@@ -112,7 +260,7 @@ class FlowProject(signac.contrib.Project):
         active='A',
         inactive='I',
         requires_attention='!'
-        )
+    )
 
     @classmethod
     def _alias(cls, x):
@@ -124,30 +272,32 @@ class FlowProject(signac.contrib.Project):
         "Update the ALIASES table for this class."
         cls.ALIASES.update(aliases)
 
-    def _get_jobsid(self, job, operation):
-        "Return a unique job session id based on the job and operation."
-        return '{jobid}-{operation}'.format(jobid=job, operation=operation)
+    def _fn_bundle(self, bundle_id):
+        return os.path.join(self.root_directory(), '.bundles', bundle_id)
 
-    def _store_bundled(self, job_ids):
+    def _store_bundled(self, operations):
         """Store all job session ids part of one bundle.
 
         The job session ids are stored in a text file in the project's
         root directory. This is necessary to be able to identify each
         job's individual status from the bundle id."""
-        sid = '{self}-bundle-{sid}'.format(
-            self=self,
-            sid=sha1('.'.join(job_ids).encode('utf-8')).hexdigest())
-        with open(os.path.join(self.root_directory(), sid), 'w') as file:
-            for job_id in job_ids:
-                file.write(job_id + '\n')
-        return sid
+        if len(operations) == 1:
+            return operations[0].get_id()
+        else:
+            h = '.'.join(op.get_id() for op in operations)
+            bid = '{}-bundle-{}'.format(self, sha1(h.encode('utf-8')).hexdigest())
+            fn_bundle = self._fn_bundle(bid)
+            _mkdir_p(os.path.dirname(fn_bundle))
+            with open(fn_bundle, 'w') as file:
+                for operation in operations:
+                    file.write(operation.get_id() + '\n')
+            return bid
 
     def _expand_bundled_jobs(self, scheduler_jobs):
         "Expand jobs which were submitted as part of a bundle."
         for job in scheduler_jobs:
             if job.name().startswith('{}-bundle-'.format(self)):
-                fn_bundle = os.path.join(self.root_directory(), job.name())
-                with open(fn_bundle) as file:
+                with open(self._fn_bundle(job.name())) as file:
                     for line in file:
                         yield manage.ClusterJob(line.strip(), job.status())
             else:
@@ -210,7 +360,7 @@ class FlowProject(signac.contrib.Project):
         manage.update_status(job, scheduler_jobs)
 
     def get_job_status(self, job):
-        "Return the detailed status of jobs."
+        "Return the detailed status of a job."
         result = dict()
         result['job_id'] = str(job)
         status = job.document.get('status', dict())
@@ -221,170 +371,125 @@ class FlowProject(signac.contrib.Project):
         result['submission_status'] = [manage.JobStatus(highest_status).name]
         return result
 
-    def _blocked(self, job, operation, **kwargs):
-        "Check if job, operation combination is blocked for scheduling."
-        try:
-            status = job.document['status'][self._get_jobsid(job, operation)]
-            return status >= manage.JobStatus.submitted
-        except KeyError:
-            return False
+    def submit_user(self, env, _id, operations, walltime=None, force=False, **kwargs):
+        """Implement this method to submit operations in combination with submit().
 
-    def _eligible(self, job, operation=None, **kwargs):
-        """Internal check for the job's eligible for operation.
+        The :py:func:`~.submit` method provides an interface for the submission of
+        operations to the environment's scheduler. Operations will be optionally bundled
+        into one submission and.
 
-        A job is only eligible if the public :meth:`~.eligible` method
-        returns True and the job is not blocked by the scheduler.
+        The submit_user() method enables the user to create and submit a job submission
+        script that controls the execution of all operations for this particular project.
 
-        :raises RuntimeError: If the public eligible method returns None."""
-        ret = self.eligible(job, operation, **kwargs) \
-            and not self._blocked(job, operation, **kwargs)
-        if ret is None:
-            raise RuntimeError("Unable to determine eligiblity for job '{}' "
-                               "and job type '{}'.".format(job, operation))
-        return ret
+        :param env: The environment to submit to.
+        :type env: :class:`~.flow.manage.ComputeEnvironment`
+        :param _id: A unique identifier, automatically calculated for this submission.
+        :tpype _id: str
+        :param operations: A list of operations that should be executed as part of this
+            submission.
+        :param walltime: The submission should be limited to the provided walltime.
+        :type walltime: :py:class:`datetime.timedelta`
+        :force: Warnings and other checks should be ignored if this argument is True.
+        :type force: bool
+        """
+        raise NotImplementedError()
 
-    def _submit(self, scheduler, to_submit, pretend,
-                serial, bundle, after, walltime, **kwargs):
-        "Submit jobs to the scheduler."
-        script = JobScript()
-        self.write_header(
-            script=script, walltime=walltime, serial=serial,
-            bundle=bundle, after=after, ** kwargs)
-        jobids_bundled = []
-        np_total = 0
-        for job, operation in to_submit:
-            jobsid = self._get_jobsid(job, operation)
+    def submit(self, env, job_ids=None, operation_name=None, walltime=None,
+               num=None, force=False, bundle_size=1, cmd=None, requires=None, **kwargs):
+        """Submit job-operations to the scheduler.
 
-            def set_status(value):
-                "Update the job's status dictionary."
-                status_doc = job.document.get('status', dict())
-                status_doc[jobsid] = int(value)
-                job.document['status'] = status_doc
-                return int(value)
+        This method will submit an operation for each job to the environment's scheduler,
+        unless the job is considered active, e.g., because an operation associated with
+        the same job has alreay been submitted.
 
-            np = self.write_user(
-                script=script, job=job, operation=operation,
-                parallel=not serial and bundle is not None, **kwargs)
-            if np is None:
-                raise RuntimeError(
-                    "Failed to return 'num_procs' value in write_user()!")
-            np_total = max(np, np_total) if serial else np_total + np
-            if pretend:
-                set_status(manage.JobStatus.registered)
-            else:
-                set_status(manage.JobStatus.submitted)
-            jobids_bundled.append(jobsid)
-        script.write('wait')
-        script.seek(0)
-        if not len(jobids_bundled):
-            return False
+        The actual execution of operations is controlled in the :py:meth:`~.submit_user`
+        method which must be implemented by the user.
 
-        if len(jobids_bundled) > 1:
-            sid = self._store_bundled(jobids_bundled)
-        else:
-            sid = jobsid
-        scheduler_job_id = scheduler.submit(
-            script=script, jobsid=sid,
-            np=np_total, walltime=walltime, pretend=pretend, **kwargs)
-        logger.info("Submitted {}.".format(sid))
-        if serial and not bundle:
-            if after is None:
-                after = ''
-            after = ':'.join(after.split(':') + [scheduler_job_id])
-        return True
-
-    def to_submit(self, job_ids=None, operation=None, job_filter=None):
-        """Generate a sequence of (job_id, operation) value pairs for submission.
-
-        :param job_ids: A list of job_id's,
-            defaults to all jobs found in the workspace.
-        :param operation: A specific operation,
-            defaults to the result of :meth:`~.next_operation`.
-        :param job_filter: A JSON encoded filter,
-            that all jobs to be submitted need to match."""
-        if job_ids is None:
-            jobs = list(self.find_jobs(job_filter))
-        else:
-            jobs = [self.open_job(id=jobid) for jobid in job_ids]
-        if operation is None:
-            operations = (self.next_operation(job) for job in jobs)
-        else:
-            operations = [operation] * len(jobs)
-        return zip(jobs, operations)
-
-    def filter_non_eligible(self, to_submit, **kwargs):
-        "Return only those jobs for submittal, which are eligible."
-        return ((j, jt) for j, jt in to_submit
-                if self._eligible(j, jt, **kwargs))
-
-    def submit_jobs(self, scheduler, to_submit, walltime=None,
-                    bundle=None, serial=False, after=None,
-                    num=None, pretend=False, force=False, **kwargs):
-        """Submit jobs to the scheduler.
-
-        :param scheduler: The scheduler instance.
-        :type scheduler: :class:`~.flow.manage.Scheduler`
-        :param to_submit: A sequence of (job_id, operation) tuples.
+        :param env: The env instance.
+        :type env: :class:`~.flow.manage.ComputeEnvironment`
+        :param job_ids: A list of job_id's, whose next operation shall be executed.
+            Defaults to all jobs found in the workspace.
+        :param operation_name: If not None, only execute operations with this name.
         :param walltime: The maximum wallclock time in hours.
         :type walltime: float
-        :param bundle: Bundle up to 'bundle' number of jobs during submission.
-        :type bundle: int
-        :param serial: Schedule jobs in serial or execute bundled
-            jobs in serial.
-        :type serial: bool
-        :param after: Execute all jobs after the completion of the job operation
-            with this job session id. Implementation is scheduler dependent.
-        :type after: str
-        :param num: Do not submit more than 'num' jobs to the scheduler.
+        :param num: If not None, limit number of submitted operations to `num`.
         :type num: int
-        :param pretend: Do not actually submit, but instruct the scheduler
-            to pretend scheduling.
-        :type pretend: bool
-        :param force: Ignore all eligibility checks, just submit.
+        :param force: Ignore warnings and checks during submission, just submit.
         :type force: bool
-        :param kwargs: Other keyword arguments which are forwareded."""
+        :param bundle_size: Bundle up to 'bundle_size' number of operations during submission.
+        :type bundle_size: int
+        :param cmd: Construct and submit an operation "on-the-fly" instead of submitting
+            the "next operation".
+        :type cmd: str
+        :param requires: A job's set of classification labels must fully intersect with
+            the labels provided as part of this argument to be considered for submission.
+        :type requires: Iterable of str
+        :param kwargs: Other keyword arguments which are forwarded to down-stream methods.
+        """
+        # Backwards-compatilibity check...
+        if isinstance(env, manage.Scheduler):
+            raise ValueError(
+                "The submit() API has changed with signac-flow version 0.4, "
+                "please update your project. ")
+        LEGACY = self._check_legacy_api()
+        if LEGACY:
+            logger.warning("Deprecated FlowProject API, switching to legacy mode.")
+            warnings.warn(
+                "Deprecated FlowProject API, switching to legacy mode.",
+                PendingDeprecationWarning)
+
         if walltime is not None:
             walltime = datetime.timedelta(hours=walltime)
-        if not force:
-            to_submit = self.filter_non_eligible(to_submit, **kwargs)
-        to_submit = islice(to_submit, num)
-        if bundle is not None:
-            n = None if bundle == 0 else bundle
-            while True:
-                ts = islice(to_submit, n)
-                if not self._submit(scheduler, ts, walltime=walltime,
-                                    bundle=bundle, serial=serial, after=after,
-                                    num=num, pretend=pretend, force=force, **kwargs):
-                    break
+
+        if job_ids:
+            jobs = (self.open_job(id=_id) for _id in job_ids)
         else:
-            for ts in to_submit:
-                self._submit(scheduler, [ts], walltime=walltime,
-                             bundle=bundle, serial=serial, after=after,
-                             num=num, pretend=pretend, force=force, **kwargs)
+            jobs = iter(self)
 
-    def submit(self, scheduler, job_ids=None,
-               operation=None, job_filter=None, **kwargs):
-        """Wrapper for :meth:`~.to_submit` and :meth:`~.submit_jobs`.
+        def get_op(job):
+            if LEGACY and operation_name is not None:
+                return JobOperation(name=operation_name, job=job, cmd=None)
+            if cmd is None:
+                if LEGACY:
+                    return JobOperation(name=self.next_operation(job), job=job, cmd=None)
+                else:
+                    return self.next_operation(job)
+            else:
+                return JobOperation(name='user-cmd', cmd=cmd.format(job=job), job=job)
 
-        This function passes the return value of :meth:`~.to_submit`
-        to :meth:`~.submit_jobs`.
+        def eligible(op):
+            if force:
+                return True
+            if cmd is None:
+                if operation_name is not None and op.name != operation_name:
+                    return False
+            if requires is not None:
+                labels = set(self.classify(op.job))
+                if not all([req in labels for req in requires]):
+                    return False
+            if LEGACY:
+                return self.eligible(job=op.job, operation=op.name, **kwargs)
+            else:
+                return self.eligible_for_submission(op)
 
-        :param scheduler: The scheduler instance.
-        :type scheduler: :class:`~.flow.manage.Scheduler`
-        :param job_ids: A list of job_id's,
-            defaults to all jobs found in the workspace.
-        :param operation: A specific operation,
-            defaults to the result of :meth:`~.next_operation`.
-        :param job_filter: A JSON encoded filter that all jobs
-            to be submitted need to match.
-        :param kwargs: All other keyword arguments are forwarded
-            to :meth:`~.submit_jobs`."""
-        if job_ids is not None and not len(job_ids):
-            job_ids = None
-        return self.submit_jobs(
-            scheduler=scheduler,
-            to_submit=self.to_submit(job_ids, operation, job_filter),
-            **kwargs)
+        # Get the first num eligible operations
+        operations = islice((op for op in map(get_op, jobs) if eligible(op)), num)
+
+        # Bundle all eligible operations and submit the bundles
+        for bundle in make_bundles(operations, bundle_size):
+            _id = self._store_bundled(bundle)
+            _submit = self._submit_legacy if LEGACY else self.submit_user
+            status = _submit(
+                env=env,
+                _id=_id,
+                operations=bundle,
+                walltime=walltime,
+                force=force,
+                **kwargs)
+            if status is not None:
+                logger.info("Submitted job '{}' ({}).".format(_id, status.name))
+                for op in bundle:
+                    op.set_status(status)
 
     @classmethod
     def add_submit_args(cls, parser):
@@ -397,7 +502,7 @@ class FlowProject(signac.contrib.Project):
             "Omit to automatically select all eligible jobs.")
         parser.add_argument(
             '-j', '--job-operation',
-            dest='operation',
+            dest='operation_name',
             type=str,
             help="Only submit jobs eligible for the specified operation.")
         parser.add_argument(
@@ -408,40 +513,49 @@ class FlowProject(signac.contrib.Project):
         parser.add_argument(
             '--pretend',
             action='store_true',
-            help="Do not really submit, but print the submittal script.")
+            help="Do not really submit, but print the submittal script to screen.")
         parser.add_argument(
             '-n', '--num',
             type=int,
-            help="Limit the number of jobs submitted at once.")
+            help="Limit the number of operations to be submitted.")
         parser.add_argument(
             '--force',
             action='store_true',
-            help="Do not check job status or classification, just submit.")
-        parser.add_argument(
-            '-f', '--filter',
-            dest='job_filter',
-            type=str,
-            help="Filter jobs.")
-        parser.add_argument(
-            '--after',
-            type=str,
-            help="Schedule this job to be executed after "
-                 "completion of job with this id.")
-        parser.add_argument(
-            '-s', '--serial',
-            action='store_true',
-            help="Schedule the jobs to be executed serially.")
+            help="Ignore all warnings and checks, just submit.")
         parser.add_argument(
             '--bundle',
             type=int,
             nargs='?',
             const=0,
-            help="Specify how many jobs to bundle into one submission. "
-                 "Omit a specific value to bundle all eligible jobs.")
+            default=1,
+            dest='bundle_size',
+            help="Specify how many operations to bundle into one submission. "
+                 "When no specific size is give, all eligible operations are "
+                 "bundled into one submission.")
+        parser.add_argument(
+            '-s', '--serial',
+            action='store_true',
+            help="Schedule the operations to be executed in serial.")
+        parser.add_argument(
+            '--after',
+            type=str,
+            help="Schedule this job to be executed after "
+                 "completion of a cluster job with this id.")
         parser.add_argument(
             '--hold',
             action='store_true',
-            help="Submit job with user hold applied.")
+            help="All operations will be scheduled with a scheduler hold.")
+        parser.add_argument(
+            '--cmd',
+            type=str,
+            help="Directly specify the command that executes the desired operation.")
+        parser.add_argument(
+            '--requires',
+            type=str,
+            nargs='*',
+            help="Manually specify all labels, that are required for a job to be "
+                 "considered eligible for submission. This is especially useful "
+                 "in combination with '--cmd'.")
 
     def write_human_readable_statepoint(self, script, job):
         "Write statepoint of job in human-readable format to script."
@@ -452,51 +566,7 @@ class FlowProject(signac.contrib.Project):
             script.write('# ' + line + '\n')
         script.write('\n')
 
-    def write_header(self, script, walltime, env=None, **kwargs):
-        """Write a general jobscript header to the script.
-
-        The header is written only once for each job script, whereas the
-        output of :meth:`~.write_user` may be written multiple times to
-        one job script for bundled jobs.
-
-        :param script: The job script, to write to.
-        :type script: :class:`~.JobScript`
-        :param walltime: The maximum allowed walltime for this operation.
-        :type walltime: :class:`datetime.timedelta`
-
-        The default method writes nothing."""
-        return
-
-    def write_user(self, script, job, operation, parallel, **kwargs):
-        """Write to the jobscript for job and job type."
-
-        This function needs to be specialized for each project.
-        Please note, that all commands should obey the parallel flag, i.e.
-        should be executed in parallel if set to True.
-        You should `assert not parallel` if that is not possible.
-
-        See also: :meth:`~.JobScript.write_cmd`.
-
-        The ``mpi_cmd`` argument should be a callable, with the following
-        signature: ``mpi_cmd(cmd, np, **kwargs)``.
-
-        :param script: The job script, to write to.
-        :type script: :class:`~.JobScript`
-        :param job: The signac job handle.
-        :type job: :class:`signac.contrib.Job`
-        :param operation: The name of the operation to execute.
-        :type operation: str
-        :param parallel: Execute commands in parallel if True.
-        :type parallel: bool
-        :param mpi_cmd: MPI command wrapper. Pass this function
-            to execute mpi commands in multiple environments.
-
-        :returns: The number of required processors (nodes).
-        :rtype: int
-        """
-        raise NotImplementedError()
-
-    def print_overview(self, stati, max_lines=None, file=sys.stdout):
+    def _print_overview(self, stati, max_lines=None, file=sys.stdout):
         "Print the project's status overview."
         progress = defaultdict(int)
         for status in stati:
@@ -515,7 +585,7 @@ class FlowProject(signac.contrib.Project):
             if lines_skipped:
                 print("{} {}".format(self._tr("Lines omitted:"), lines_skipped), file=file)
 
-    def format_row(self, status, statepoint=None, max_width=-1):
+    def format_row(self, status, statepoint=None, max_width=None):
         "Format each row in the detailed status output."
         row = [
             status['job_id'],
@@ -542,12 +612,12 @@ class FlowProject(signac.contrib.Project):
             row[1] += ' ' + self._alias('requires_attention')
         return row
 
-    def print_detailed(self, stati, parameters=None,
-                       skip_active=False, param_max_width=-1,
-                       use_colors=True,
-                       file=sys.stdout):
+    def _print_detailed(self, stati, parameters=None,
+                        skip_active=False, param_max_width=None,
+                        file=sys.stdout):
         "Print the project's detailed status."
-        table_header = [self._tr(self._alias(s)) for s in ('job_id', 'status', 'next_operation', 'labels')]
+        table_header = [self._tr(self._alias(s))
+                        for s in ('job_id', 'status', 'next_operation', 'labels')]
         if parameters:
             for i, value in enumerate(parameters):
                 table_header.insert(i + 3, shorten(self._alias(str(value)), param_max_width))
@@ -555,12 +625,13 @@ class FlowProject(signac.contrib.Project):
                 for status in stati if not (skip_active and status['active']))
         print(util.tabulate.tabulate(rows, headers=table_header), file=file)
         if abbreviate.table:
-            print()
+            print(file=file)
             print(self._tr("Abbreviations used:"), file=file)
             for a in sorted(abbreviate.table):
-                print('{}: {}'.format(a, abbreviate.table[a]))
+                print('{}: {}'.format(a, abbreviate.table[a]), file=file)
 
     def export_job_stati(self, collection, stati):
+        "Export the job stati to a database collection."
         for status in stati:
             job = self.open_job(id=status['job_id'])
             status['statepoint'] = job.statepoint()
@@ -591,7 +662,7 @@ class FlowProject(signac.contrib.Project):
     def print_status(self, scheduler=None, job_filter=None,
                      overview=True, overview_max_lines=None,
                      detailed=False, parameters=None, skip_active=False,
-                     param_max_width=-1,
+                     param_max_width=None,
                      file=sys.stdout, err=sys.stderr,
                      pool=None):
         """Print the status of the project.
@@ -600,15 +671,21 @@ class FlowProject(signac.contrib.Project):
         :type scheduler: :class:`~.manage.Scheduler`
         :param job_filter: A JSON encoded filter,
             that all jobs to be submitted need to match.
+        :param overview: Aggregate an overview of the project' status.
+        :type overview: bool
+        :param overview_max_lines: Limit the number of overview lines.
+        :type overview_max_lines: int
         :param detailed: Print a detailed status of each job.
         :type detailed: bool
         :param parameters: Print the value of the specified parameters.
         :type parameters: list of str
         :param skip_active: Only print jobs that are currently inactive.
         :type skip_active: bool
-        :param file: Print all output to this file,
+        :param param_max_width: Limit the number of characters of parameter
+            columns, see also: :py:meth:`~.update_aliases`.
+        :param file: Redirect all output to this file,
             defaults to sys.stdout
-        :param err: Print all error output to this file,
+        :param err: Redirect all error output to this file,
             defaults to sys.stderr
         :param pool: A multiprocessing or threading pool. Providing a pool
             parallelizes this method."""
@@ -625,12 +702,12 @@ class FlowProject(signac.contrib.Project):
         title = "{} '{}':".format(self._tr("Status project"), self)
         print('\n' + title, file=file)
         if overview:
-            self.print_overview(stati, max_lines=overview_max_lines)
+            self._print_overview(stati, max_lines=overview_max_lines, file=file)
         if detailed:
             print(file=file)
             print(self._tr("Detailed view:"), file=file)
-            self.print_detailed(stati, parameters, skip_active,
-                                param_max_width, file)
+            self._print_detailed(stati, parameters, skip_active,
+                                 param_max_width, file)
 
     @classmethod
     def add_print_status_args(cls, parser):
@@ -662,12 +739,51 @@ class FlowProject(signac.contrib.Project):
         parser.add_argument(
             '--param-max-width',
             type=int,
-            default=-1,
             help="Limit the width of each parameter row.")
         parser.add_argument(
             '--skip-active',
             action='store_true',
             help="Display only jobs, which are currently not active.")
+
+    def labels(self, job):
+        """Auto-generate labels from label-functions.
+
+        This generator function will automatically yield labels,
+        from project methods decorated with the ``@label`` decorator.
+
+        For example, we can define a function like this:
+
+        .. code-block:: python
+
+            class MyProject(FlowProject):
+
+                @label()
+                def is_foo(self, job):
+                    return job.document.get('foo', False)
+
+        The ``labels()`` generator method will now yield a ``is_foo``
+        label whenever the job document has a field ``foo`` which
+        evaluates to True.
+
+        By default, the label name is equal to the function's name,
+        but you can specify a custom label as the first argument to the
+        label decorator, e.g.: ``@label('foo_label')``.
+
+        .. tip::
+
+            In this particular case it may make sense to define the
+            ``is_foo()`` method as a *staticmethod*, since it does not
+            actually depend on the project instance. We can do this by
+            using the ``@staticlabel()`` decorator, equivalently the
+            ``@classlabel()`` for *class methods*.
+        """
+        for label in self._labels:
+            if hasattr(label, '__func__'):
+                label = getattr(self, label.__func__.__name__)
+                if label(job):
+                    yield getattr(label, '_label_name', label.__name__)
+            elif label(self, job):
+                yield getattr(label, '_label_name', label.__name__)
 
     def classify(self, job):
         """Generator function which yields labels for job.
@@ -676,19 +792,100 @@ class FlowProject(signac.contrib.Project):
         :type job: :class:`~signac.contrib.job.Job`
         :yields: The labels to classify job.
         :yield type: str"""
+        yield
+        return
 
     def next_operation(self, job):
-        """Determine the next operation for job.
-
-        You can, but don't have to use this function to simplify
-        the submission process. The default method returns None.
+        """Determine the next operation for this job.
 
         :param job: The signac job handle.
         :type job: :class:`~signac.contrib.job.Job`
-        :returns: The name of the operation to execute next.
-        :rtype: str"""
+        :returns: A JobOpereation instance to execute next.
+        :rtype: :py:class:`~.JobOperation`
+        """
         return
 
-    def eligible(self, job, operation=None, **kwargs):
-        """Determine if job is eligible for operation."""
+    def eligible(self, job_operation, **kwargs):
+        """Determine if job is eligible for operation.
+
+        .. warning::
+
+            This function is deprecated, please use
+            :py:meth:`~.eligible_for_submission` instead.
+        """
         return None
+
+    def eligible_for_submission(self, job_operation):
+        "Determine if a job-operation is eligible for submission."
+        if job_operation is None:
+            return False
+        if job_operation.get_status() >= manage.JobStatus.submitted:
+            return False
+        return True
+
+    def _check_legacy_api(self):
+        return hasattr(self, 'write_user')
+
+    def _submit_legacy(self, env, _id, operations, walltime, force,
+                       serial=False, ppn=None, pretend=False, after=None, hold=False,
+                       **kwargs):
+        if 'np' in kwargs:
+            kwargs['nc'] = kwargs.pop('np')
+
+        mpi_cmd = getattr(env, 'mpi_cmd', None)
+
+        if mpi_cmd is None:
+
+            def mpi_cmd(cmd, np=1):
+                if np > 1:
+                    return 'mpirun -np {} {}'.format(np, cmd)
+                else:
+                    return cmd
+
+        if ppn is None:
+            ppn = getattr(env, 'cores_per_node', 1)
+            if ppn is None:
+                ppn = 1
+
+        class JobScriptLegacy(io.StringIO):
+            "Simple StringIO wrapper to implement cmd wrapping logic."
+            parallel = False
+
+            def writeline(self, line, eol='\n'):
+                "Write one line to the job script."
+                self.write(line + eol)
+
+            def write_cmd(self, cmd, parallel=False, np=1, mpi_cmd=None, **kwargs):
+                "Write a command to the jobscript."
+                if np > 1:
+                    if mpi_cmd is None:
+                        raise RuntimeError("Requires mpi_cmd wrapper.")
+                    cmd = mpi_cmd(cmd, np=np)
+                if parallel:
+                    self.parallel = True
+                    cmd += ' &'
+                self.writeline(cmd)
+                return np
+
+        script = JobScriptLegacy()
+
+        nps = list()
+        for op in operations:
+            nps.append(self.write_user(
+                script=script,
+                job=op.job,
+                operation=op.name,
+                parallel=not serial,
+                mpi_cmd=mpi_cmd,
+                **kwargs))
+        if script.parallel:
+            script.writeline('wait')
+        script.seek(0)
+
+        np = max(nps) if serial else sum(nps)
+        nn = ceil(np / ppn)
+
+        sscript = env.script(_id=_id, np=np, nn=nn, walltime=walltime, **kwargs)
+        sscript.write(script.read())
+        sscript.seek(0)
+        return env.submit(sscript, pretend=pretend, hold=hold, after=after)

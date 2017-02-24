@@ -11,13 +11,23 @@ configure and implement a workflow to operate on a signac_ data space.
 from . import environment
 from . import scheduler
 from . import manage
-from . project import FlowProject
+from .project import FlowProject
+from .project import JobOperation
+from .project import label
+from .project import classlabel
+from .project import staticlabel
+from .environment import get_environment
 
-__version__ = '0.3.3'
+__version__ = '0.4.0'
 
 __all__ = [
     'environment',
     'scheduler',
     'manage',
-    'FlowProject'
+    'FlowProject',
+    'JobOperation',
+    'label',
+    'classlabel',
+    'staticlabel',
+    'get_environment',
 ]

@@ -17,6 +17,14 @@ flow.project module
     :undoc-members:
     :show-inheritance:
 
+flow.graph module
+-------------------
+
+.. automodule:: flow.graph
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 flow.scheduler module
 ---------------------
 
@@ -50,10 +58,10 @@ flow.fakescheduler module
     :undoc-members:
     :show-inheritance:
 
-flow.moab module
-----------------
+flow.torque module
+------------------
 
-.. automodule:: flow.moab
+.. automodule:: flow.torque
     :members:
     :undoc-members:
     :show-inheritance:

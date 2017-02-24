@@ -2,24 +2,24 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 import warnings
-from .moab import MoabScheduler
-from .slurm import SlurmScheduler
+
 from .fakescheduler import FakeScheduler
+from .torque import TorqueScheduler
+from .slurm import SlurmScheduler
 
 
-try:
-    from .apscheduler import APScheduler  # noqa
-except ImportError:
-    warnings.warn("Failed to import apscheduler. "
-                  "The test scheduler will not be available.",
-                  ImportWarning)
+class MoabScheduler(TorqueScheduler):
 
-    class APScheduler(object):
-        """This is a mock class.
+    def __init__(self, *args, **kwargs):
+        warnings.warn(
+            "The MoabScheduler has been renamed to TorqueScheduler.",
+            DeprecationWarning)
+        super(MoabScheduler, self).__init__(*args, **kwargs)
 
-        Install apscheduler to enable the test environment."""
 
-        def __init__(self, *args, **kwargs):
-            raise ImportError("Install apscheduler to enable this scheduler.")
-
-__all__ = ['MoabScheduler', 'SlurmScheduler', 'APScheduler', 'FakeScheduler']
+__all__ = [
+    'FakeScheduler',
+    'TorqueScheduler',
+    'SlurmScheduler',
+    'MoabScheduler',
+    ]

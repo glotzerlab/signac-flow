@@ -173,6 +173,7 @@ class TestEnvironment(ComputeEnvironment):
     an real scheduler.
     """
     scheduler_type = scheduler.FakeScheduler
+    cores_per_node = 1
 
     @classmethod
     def mpi_cmd(cls, cmd, np):

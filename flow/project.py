@@ -885,7 +885,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         np = max(nps) if serial else sum(nps)
         nn = ceil(np / ppn)
 
-        sscript = env.script(_id=_id, np=np, nn=nn, walltime=walltime, **kwargs)
+        sscript = env.script(_id=_id, nn=nn, ppn=ppn, walltime=walltime, **kwargs)
         sscript.write(script.read())
         sscript.seek(0)
         return env.submit(sscript, pretend=pretend, hold=hold, after=after)

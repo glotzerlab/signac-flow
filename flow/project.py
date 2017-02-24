@@ -888,5 +888,4 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         sscript = env.script(_id=_id, np=np, nn=nn, walltime=walltime, **kwargs)
         sscript.write(script.read())
         sscript.seek(0)
-        env.submit(sscript, pretend=pretend, hold=hold, after=after)
-        return manage.JobStatus.submitted
+        return env.submit(sscript, pretend=pretend, hold=hold, after=after)

@@ -27,4 +27,5 @@ class FakeScheduler(Scheduler):
         fake_cmd = ' '.join(filter(None, (format_arg(k, v) for k, v in kwargs.items())))
         print("# Submit command: testsub {}".format(fake_cmd))
         print(script.read())
-        return JobStatus.submitted
+        # return status is None, meaning, 'not actually submitted'
+        return None

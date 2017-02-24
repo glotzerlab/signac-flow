@@ -1,3 +1,8 @@
+0.4.1:
+
+	- Fix ppn issue when submitting in legacy mode.
+	- Enable optional parallelization during submit.
+
 0.4.0:
 
 	- The submission logic has been refactored:

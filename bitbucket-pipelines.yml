@@ -122,8 +122,8 @@ pipelines:
             - python -m my_project.status --detailed
             - python -m jupyter nbconvert --to html --execute analysis/notebook.ipynb
   tags:
-   v*:
-     - step:
+    v*:
+      - step:
           script:
             - conda --version
             - python --version

@@ -395,7 +395,8 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         raise NotImplementedError()
 
     def submit(self, env, job_ids=None, operation_name=None, walltime=None,
-               num=None, force=False, bundle_size=1, cmd=None, requires=None, **kwargs):
+               num=None, force=False, bundle_size=1, cmd=None, requires=None,
+               pool=None, **kwargs):
         """Submit job-operations to the scheduler.
 
         This method will submit an operation for each job to the environment's scheduler,
@@ -473,7 +474,8 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 return self.eligible_for_submission(op)
 
         # Get the first num eligible operations
-        operations = islice((op for op in map(get_op, jobs) if eligible(op)), num)
+        map_ = map if pool is None else pool.imap  # parallelization
+        operations = islice((op for op in map_(get_op, jobs) if eligible(op)), num)
 
         # Bundle all eligible operations and submit the bundles
         for bundle in make_bundles(operations, bundle_size):

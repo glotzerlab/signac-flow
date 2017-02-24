@@ -428,12 +428,15 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         """
         # Backwards-compatilibity check...
         if isinstance(env, manage.Scheduler):
-            # Entering legacy mode!
-            logger.warning("You are using a deprecated FlowProject API!")
-            warnings.warn("You are using a deprecated FlowProject API!", DeprecationWarning)
-            LEGACY = True
-        else:
-            LEGACY = False
+            raise ValueError(
+                "The submit() API has changed with signac-flow version 0.4, "
+                "please update your project. ")
+        LEGACY = self._check_legacy_api()
+        if LEGACY:
+            logger.warning("Deprecated FlowProject API, switching to legacy mode.")
+            warnings.warn(
+                "Deprecated FlowProject API, switching to legacy mode.",
+                PendingDeprecationWarning)
 
         if walltime is not None:
             walltime = datetime.timedelta(hours=walltime)
@@ -820,12 +823,16 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             return False
         return True
 
-    def _submit_legacy(self, env, _id, operations, walltime, force, mpi_cmd,
+    def _check_legacy_api(self):
+        return hasattr(self, 'write_user')
+
+    def _submit_legacy(self, env, _id, operations, walltime, force,
                        serial=False, ppn=None, pretend=False, after=None, hold=False,
                        **kwargs):
-        from flow.environment import format_timedelta
-        assert isinstance(env, manage.Scheduler)
-        scheduler = env
+        if 'np' in kwargs:
+            kwargs['nc'] = kwargs.pop('np')
+
+        mpi_cmd = getattr(env, 'mpi_cmd', None)
 
         if mpi_cmd is None:
 
@@ -836,7 +843,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                     return cmd
 
         if ppn is None:
-            ppn = getattr(scheduler, 'cores_per_node', 1)
+            ppn = getattr(env, 'cores_per_node', 1)
             if ppn is None:
                 ppn = 1
 
@@ -861,10 +868,6 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 return np
 
         script = JobScriptLegacy()
-        try:
-            self.write_header(script=script, walltime=walltime, **kwargs)
-        except AttributeError:
-            logger.warning("Did not find a write_header() function.")
 
         nps = list()
         for op in operations:
@@ -882,14 +885,8 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         np = max(nps) if serial else sum(nps)
         nn = ceil(np / ppn)
 
-        sscript = JobScriptLegacy()
-        try:
-            header = scheduler.header.format()
-            sscript.write(header.format(jobsid=_id, np=np, nn=nn,
-                          walltime=format_timedelta(walltime)))
-        except AttributeError:
-            pass
+        sscript = env.script(_id=_id, np=np, nn=nn, walltime=walltime, **kwargs)
         sscript.write(script.read())
         sscript.seek(0)
-        scheduler.submit(sscript, pretend=pretend, hold=hold, after=after)
+        env.submit(sscript, pretend=pretend, hold=hold, after=after)
         return manage.JobStatus.submitted

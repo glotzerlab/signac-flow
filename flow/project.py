@@ -871,6 +871,8 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 
         script = JobScriptLegacy()
 
+        script.write_header(script, walltime, **kwargs)
+
         nps = list()
         for op in operations:
             nps.append(self.write_user(

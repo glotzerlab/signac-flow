@@ -1,5 +1,8 @@
 # README
 
+[![Anaconda-Server Badge](https://anaconda.org/glotzer/signac-flow/badges/version.svg)](https://anaconda.org/glotzer/signac-flow)
+[![PyPi](https://img.shields.io/pypi/v/signac-flow.svg)](https://img.shields.io/pypi/v/signac-flow.svg)
+
 ## About
 
 Workflow management based on the signac framework.

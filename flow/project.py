@@ -469,7 +469,10 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 if not all([req in labels for req in requires]):
                     return False
             if LEGACY:
-                return self.eligible(job=op.job, operation=op.name, **kwargs)
+                if op.get_status() >= manage.JobStatus.submitted:
+                    return False
+                else:
+                    return self.eligible(job=op.job, operation=op.name, **kwargs)
             else:
                 return self.eligible_for_submission(op)
 
@@ -870,6 +873,8 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 return np
 
         script = JobScriptLegacy()
+
+        self.write_header(script, walltime, **kwargs)
 
         nps = list()
         for op in operations:

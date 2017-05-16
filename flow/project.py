@@ -944,6 +944,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 
         parser_submit = subparsers.add_parser('submit')
         self.add_submit_args(parser_submit)
+        env.add_args(parser_submit)
         parser_submit.set_defaults(func=submit)
 
         args = parser.parse_args()

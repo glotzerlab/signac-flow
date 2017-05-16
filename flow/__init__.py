@@ -17,6 +17,7 @@ from .project import label
 from .project import classlabel
 from .project import staticlabel
 from .environment import get_environment
+from .util.run import run
 
 __version__ = '0.4.1'
 
@@ -30,4 +31,5 @@ __all__ = [
     'classlabel',
     'staticlabel',
     'get_environment',
+    'run',
 ]

@@ -1,5 +1,7 @@
 import argparse
+import logging
 import inspect
+from contextlib import contextmanager
 
 from signac import get_project
 from signac.common import six
@@ -49,3 +51,20 @@ def run(parser=None):
             raise KeyError("Unknown operation '{}'.".format(args.operation))
         else:
             operation(job)
+
+
+@contextmanager
+def redirect_log(job, filename='run.log', formatter=None, logger=None):
+    if formatter is None:
+        formatter = logging.Formatter(
+            '%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
+    if logger is None:
+        logger = logging.getLogger()
+
+    filehandler = logging.FileHandler(filename=job.fn('run.log'))
+    filehandler.setFormatter(formatter)
+    logger.addHandler(filehandler)
+    try:
+        yield
+    finally:
+        logger.removeHandler(filehandler)

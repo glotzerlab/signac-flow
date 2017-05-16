@@ -17,7 +17,8 @@ from .project import label
 from .project import classlabel
 from .project import staticlabel
 from .environment import get_environment
-from .util.run import run
+from .util.operations import run
+from .util.operations import redirect_log
 
 __version__ = '0.4.1'
 
@@ -32,4 +33,5 @@ __all__ = [
     'staticlabel',
     'get_environment',
     'run',
+    'redirect_log',
 ]

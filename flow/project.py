@@ -373,7 +373,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         result['submission_status'] = [manage.JobStatus(highest_status).name]
         return result
 
-    def submit_user(self, env, _id, operations, walltime=None, force=False, **kwargs):
+    def submit_user(self, env, _id, operations, np=1, serial=True, **kwargs):
         """Implement this method to submit operations in combination with submit().
 
         The :py:func:`~.submit` method provides an interface for the submission of
@@ -394,7 +394,27 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         :force: Warnings and other checks should be ignored if this argument is True.
         :type force: bool
         """
-        raise NotImplementedError()
+        sscript = env.script(_id=_id, **kwargs)
+        # Add some whitespace
+        sscript.writeline()
+        # Don't use uninitialized environment variables.
+        sscript.writeline('set -u')
+        # Exit on errors.
+        sscript.writeline('set -e')
+        # Switch into the project root directory
+        sscript.writeline('cd {}'.format(self.root_directory()))
+        sscript.writeline()
+
+        # Iterate over all job-operations and write the command to the script
+        for op in operations:
+            self.write_human_readable_statepoint(sscript, op.job)
+            sscript.write_cmd(op.cmd, np=np, bg=not serial)
+
+        # Wait until all processes have finished
+        sscript.writeline('wait')
+
+        # Submit the script to the environment specific scheduler
+        return env.submit(sscript, **kwargs)
 
     def submit(self, env, job_ids=None, operation_name=None, walltime=None,
                num=None, force=False, bundle_size=1, cmd=None, requires=None,

@@ -819,7 +819,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         :type job: :class:`~signac.contrib.job.Job`
         :yields: The labels to classify job.
         :yield type: str"""
-        yield
+        yield from self.labels(job)
         return
 
     def next_operation(self, job):

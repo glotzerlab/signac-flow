@@ -19,6 +19,7 @@ import sys
 import os
 import io
 import logging
+import argparse
 import warnings
 import datetime
 import json
@@ -31,6 +32,7 @@ from hashlib import sha1
 import signac
 from signac.common.six import with_metaclass
 
+from .environment import get_environment
 from . import manage
 from . import util
 from .util.tqdm import tqdm
@@ -896,3 +898,37 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         sscript.write(script.read())
         sscript.seek(0)
         return env.submit(sscript, pretend=pretend, hold=hold, after=after)
+
+    def main(self, parser=None, pool=None):
+        env = get_environment()
+
+        def status(args):
+            args = vars(args)
+            del args['func']
+            try:
+                self.print_status(env.get_scheduler(), pool=pool, **args)
+            except AttributeError:
+                self.print_status(None, pool=pool, **args)
+
+        def submit(args):
+            self.submit(env, **vars(args))
+
+        if parser is None:
+            parser = argparse.ArgumentParser()
+
+        subparsers = parser.add_subparsers()
+
+        parser_status = subparsers.add_parser('status')
+        self.add_print_status_args(parser_status)
+        parser_status.set_defaults(func=status)
+
+        parser_submit = subparsers.add_parser('submit')
+        self.add_submit_args(parser_submit)
+        parser_submit.set_defaults(func=submit)
+
+        args = parser.parse_args()
+        if not hasattr(args, 'func'):
+            parser.print_usage()
+            sys.exit(2)
+
+        args.func(args)

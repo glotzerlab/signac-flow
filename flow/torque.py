@@ -69,14 +69,21 @@ class TorqueScheduler(Scheduler):
         for node in nodes.findall('Job'):
             yield TorqueJob(node)
 
-    def submit(self, script,
-               resume=None, after=None, pretend=False, hold=False, *args, **kwargs):
-        submit_cmd = self.submit_cmd
+    def submit(self, script, after=None, pretend=False, hold=False, flags=None, *args, **kwargs):
+        if flags is None:
+            flags = []
+        elif isinstance(flags, str):
+            flags = flags.split()
+
+        submit_cmd = self.submit_cmd + flags
+
         if after is not None:
             submit_cmd.extend(
                 ['-W', 'depend="afterok:{}"'.format(after.split('.')[0])])
+
         if hold:
             submit_cmd += ['-h']
+
         if pretend:
             print("# Submit command: {}".format(' '.join(submit_cmd)))
             print(script.read())

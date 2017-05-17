@@ -95,7 +95,7 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
     For example, if the hostname is my_server.com, one could identify the
     environment by setting the hostname_pattern to 'my_server'.
     """
-    scheduler = None
+    scheduler_type = None
     hostname_pattern = None
 
     @classmethod
@@ -115,7 +115,10 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
         hostname pattern.
         """
         if cls.hostname_pattern is None:
-            return False
+            if cls.scheduler_type is None:
+                return False
+            else:
+                return cls.scheduler_type.is_present()
         else:
             return re.match(
                 cls.hostname_pattern, socket.gethostname()) is not None
@@ -220,20 +223,44 @@ class DefaultTorqueEnvironment(TorqueEnvironment):
     "A default environment for environments with TORQUE scheduler."
 
     @classmethod
-    def is_present(cls):
-        return cls.scheduler_type.is_present()
-
-    @classmethod
     def mpi_cmd(cls, cmd, np):
         return 'mpirun -np {np} {cmd}'.format(n=np, cmd=cmd)
 
     @classmethod
-    def script(cls, _id, nn, walltime, ppn=None, **kwargs):
-        if ppn is None:
-            ppn = cls.cores_per_node
+    def add_args(cls, parser):
+        super(DefaultTorqueEnvironment, cls).add_args(parser)
+        group = parser.add_argument_group('torque')
+        group.add_argument(
+            '-w', '--walltime',
+            type=float,
+            default=12,
+            help="The wallclock time in hours.")
+        group.add_argument(
+            '--nn',
+            type=int,
+            help="Specify the number of nodes.")
+        group.add_argument(
+            '--ppn',
+            type=int,
+            help="Specify the number of processors allocated to each node.")
+        group.add_argument(
+            '--hold',
+            action='store_true',
+            help="Submit jobs, but put them on hold.")
+        group.add_argument(
+            '--after',
+            type=str,
+            help="Schedule this job to be executed after "
+                 "completion of a cluster job with this id.")
+
+    @classmethod
+    def script(cls, _id, nn=None, ppn=None, walltime=None, **kwargs):
         js = super(DefaultTorqueEnvironment, cls).script()
         js.writeline('#PBS -N {}'.format(_id))
-        js.writeline('#PBS -l nodes={}:ppn={}'.format(nn, ppn))
+        if nn is None != ppn is None:
+            raise ValueError("Number of nodes (nn) provided, but not processors per node (ppn).")
+        if nn is not None and ppn is not None:
+            js.writeline('#PBS -l nodes={}:ppn={}'.format(nn, ppn))
         js.writeline('#PBS -l walltime={}'.format(format_timedelta(walltime)))
         return js
 
@@ -242,23 +269,22 @@ class DefaultSlurmEnvironment(SlurmEnvironment):
     "A default environment for environments with slurm scheduler."
 
     @classmethod
-    def is_present(cls):
-        return cls.scheduler_type.is_present()
-
-    @classmethod
     def mpi_cmd(cls, cmd, np):
         pass
 
     @classmethod
-    def script(cls, _id, nn, walltime, ppn=None, **kwargs):
+    def script(cls, _id, nn=None, ppn=None, walltime=None, **kwargs):
         if ppn is None:
-            ppn = cls.cores_per_node
+            ppn = getattr(cls, 'cores_per_node', None)
         js = super(DefaultSlurmEnvironment, cls).script()
         js.writeline('#!/bin/bash')
         js.writeline('#SBATCH --job-name={}'.format(_id))
-        js.writeline('#SBATCH --nodes={}'.format(nn))
-        js.writeline('#SBATCH --ntasks-per-node={}'.format(ppn))
-        js.writeline('#SBATCH -t {}'.format(format_timedelta(walltime)))
+        if nn is not None:
+            js.writeline('#SBATCH --nodes={}'.format(nn))
+        if ppn is not None:
+            js.writeline('#SBATCH --ntasks-per-node={}'.format(ppn))
+        if walltime is not None:
+            js.writeline('#SBATCH -t {}'.format(format_timedelta(walltime)))
         return js
 
 

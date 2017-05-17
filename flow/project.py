@@ -24,6 +24,7 @@ import warnings
 import datetime
 import json
 import errno
+import subprocess
 from math import ceil
 from collections import defaultdict
 from itertools import islice
@@ -372,6 +373,15 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         highest_status = max(status.values()) if len(status) else 1
         result['submission_status'] = [manage.JobStatus(highest_status).name]
         return result
+
+    def run(self, pretend=False):
+        for job in self:
+            next_op = self.next_operation(job)
+            if next_op is not None:
+                if pretend:
+                    print(self.next_operation(job).cmd)
+                else:
+                    subprocess.run(self.next_operation(job).cmd.split())
 
     def submit_user(self, env, _id, operations, np=1, serial=True, **kwargs):
         """Implement this method to submit operations in combination with submit().
@@ -930,6 +940,9 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             except AttributeError:
                 self.print_status(None, pool=pool, **args)
 
+        def run(args):
+            self.run(pretend=args.pretend)
+
         def submit(args):
             self.submit(env, **vars(args))
 
@@ -941,6 +954,13 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         parser_status = subparsers.add_parser('status')
         self.add_print_status_args(parser_status)
         parser_status.set_defaults(func=status)
+
+        parser_run = subparsers.add_parser('run')
+        parser_run.add_argument(
+            '-p', '--pretend',
+            action='store_true',
+            help="Do not actually execute commands, just show them.")
+        parser_run.set_defaults(func=run)
 
         parser_submit = subparsers.add_parser('submit')
         self.add_submit_args(parser_submit)

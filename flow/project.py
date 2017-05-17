@@ -493,6 +493,8 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         def eligible(op):
             if force:
                 return True
+            if op is None:
+                return False
             if cmd is None:
                 if operation_name is not None and op.name != operation_name:
                     return False

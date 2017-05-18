@@ -10,20 +10,39 @@ This enables the user to adjust their workflow based on the present
 environment, e.g. for the adjustemt of scheduler submission scripts.
 """
 from __future__ import print_function
+import sys
 import re
 import socket
 import logging
 import warnings
 import io
+from math import ceil
 from collections import OrderedDict
 
 
 from signac.common.six import with_metaclass
+from signac.common.config import load_config
 from . import scheduler
 from . import manage
+from .errors import SubmitError
 
 
 logger = logging.getLogger(__name__)
+
+
+UTILIZATION_WARNING = """You either specified or the environment is configured to use {ppn}
+processors per node (ppn), however you only use {usage:0.2%} of each node.
+Consider to increase the number of processors per operation (--np)
+or adjust the processors per node (--ppn).
+
+Alternatively, you can also use --force to ignore this warning.
+"""
+
+MISSING_ENV_CONF_KEY_MSG = """Your environment is missing the following configuration key: '{key}'
+Please provide the missing information, for example by adding it to your global configuration:
+
+signac config set --global {key} <VALUE>
+"""
 
 
 def format_timedelta(delta):
@@ -134,7 +153,7 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
         try:
             return getattr(cls, 'scheduler_type')()
         except (AttributeError, TypeError):
-            raise AttributeError("You must define a scheduler type for every environment")
+            raise SubmitError("You must define a scheduler type for every environment")
 
     @classmethod
     def submit(cls, script, flags=None, *args, **kwargs):
@@ -162,6 +181,20 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
     @classmethod
     def add_args(cls, parser):
         return
+
+    @classmethod
+    def get_config_value(cls, key, default=None):
+        try:
+            flow_config = load_config()['flow']
+            env_config = flow_config[cls.__name__]
+            return env_config[key]
+        except KeyError:
+            if default is None:
+                k = '{}.{}'.format(cls.__name__, key)
+                print(MISSING_ENV_CONF_KEY_MSG.format(key='flow.' + k))
+                raise SubmitError("Missing environment configuration key: '{}'".format(k))
+            else:
+                return default
 
 
 class UnknownEnvironment(ComputeEnvironment):
@@ -225,7 +258,44 @@ class SlurmEnvironment(ComputeEnvironment):
     scheduler_type = scheduler.SlurmScheduler
 
 
-class DefaultTorqueEnvironment(TorqueEnvironment):
+class NodesEnvironment(ComputeEnvironment):
+
+    @classmethod
+    def add_args(cls, parser):
+        super(NodesEnvironment, cls).add_args(parser)
+        parser.add_argument(
+            '--nn',
+            type=int,
+            help="Specify the number of nodes.")
+        parser.add_argument(
+            '--ppn',
+            type=int,
+            help="Specify the number of processors allocated to each node.")
+
+    @classmethod
+    def calc_num_nodes(cls, operations, ppn, np=None, serial=True, force=False):
+        if np is None:
+            np = 1
+        if ppn is None:
+            ppn = getattr(cls, 'cores_per_node', None)
+        if ppn is None:
+            raise SubmitError(
+                "Unable to determine number of required nodes (nn), please provide "
+                "directly or processors per node (ppn).")
+        else:
+            # Calculate the total number of required processors
+            np_total = np if serial else np * len(operations)
+            # Calculate the total number of required nodes
+            nn = ceil(np_total / ppn)
+            if not force:  # Perform basic check concerning the node utilization.
+                usage = np * len(operations) / nn / ppn
+                if usage < 0.9:
+                    print(UTILIZATION_WARNING.format(ppn=ppn, usage=usage), file=sys.stderr)
+                    raise SubmitError("Bad node utilization!")
+            return nn
+
+
+class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
     "A default environment for environments with TORQUE scheduler."
 
     @classmethod
@@ -240,14 +310,6 @@ class DefaultTorqueEnvironment(TorqueEnvironment):
             type=float,
             default=12,
             help="The wallclock time in hours.")
-        parser.add_argument(
-            '--nn',
-            type=int,
-            help="Specify the number of nodes.")
-        parser.add_argument(
-            '--ppn',
-            type=int,
-            help="Specify the number of processors allocated to each node.")
         parser.add_argument(
             '--hold',
             action='store_true',
@@ -268,26 +330,21 @@ class DefaultTorqueEnvironment(TorqueEnvironment):
                 js.writeline('#PBS -l nodes={}'.format(nn))
             else:
                 js.writeline('#PBS -l nodes={}:ppn={}'.format(nn, ppn))
-        elif ppn is not None:
-            raise ValueError(
-                "Number of processors per node (ppn) provided, but not number of nodes (nn).")
         js.writeline('#PBS -l walltime={}'.format(format_timedelta(walltime)))
         if not no_copy_env:
             js.writeline('#PBS -V')
         return js
 
 
-class DefaultSlurmEnvironment(SlurmEnvironment):
+class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
     "A default environment for environments with slurm scheduler."
 
     @classmethod
     def mpi_cmd(cls, cmd, np):
-        pass
+        return 'mpirun -np {np} {cmd}'.format(np=np, cmd=cmd)
 
     @classmethod
     def script(cls, _id, nn=None, ppn=None, walltime=None, **kwargs):
-        if ppn is None:
-            ppn = getattr(cls, 'cores_per_node', None)
         js = super(DefaultSlurmEnvironment, cls).script()
         js.writeline('#!/bin/bash')
         js.writeline('#SBATCH --job-name={}'.format(_id))
@@ -301,19 +358,12 @@ class DefaultSlurmEnvironment(SlurmEnvironment):
 
     @classmethod
     def add_args(cls, parser):
+        super(DefaultSlurmEnvironment, cls).add_args(parser)
         parser.add_argument(
             '-w', '--walltime',
             type=float,
             default=12,
             help="The wallclock time in hours.")
-        parser.add_argument(
-            '--nn',
-            type=int,
-            help="Specify the number of nodes.")
-        parser.add_argument(
-            '--ppn',
-            type=int,
-            help="Specify the number of processors allocated to each node.")
         parser.add_argument(
             '--hold',
             action='store_true',

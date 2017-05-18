@@ -25,10 +25,10 @@ import datetime
 import json
 import errno
 import subprocess
-from math import ceil
 from collections import defaultdict
 from itertools import islice
 from hashlib import sha1
+from math import ceil
 
 import signac
 from signac.common.six import with_metaclass
@@ -36,21 +36,13 @@ from signac.common.six import with_metaclass
 from .environment import get_environment
 from . import manage
 from . import util
+from .errors import SubmitError
 from .util.tqdm import tqdm
 
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_WALLTIME_HRS = 12
-
-
-UTILIZATION_WARNING = """You either specified or the environment is configured to use {ppn}
-processors per node (ppn), however you only use {usage:0.2%} of each node.
-Consider to increase the number of processors per operation (--np)
-or adjust the processors per node (--ppn).
-
-Alternatively, you can also use --force to ignore this warning.
-"""
 
 
 def _mkdir_p(path):
@@ -436,19 +428,13 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         :force: Warnings and other checks should be ignored if this argument is True.
         :type force: bool
         """
-        if ppn is not None:
-            # Calculate the total number of required processors
-            np_total = np if serial else np * len(operations)
-            # Calculate the total number of required nodes
-            nn = ceil(np_total / ppn)
-
-            if not force:  # Perform basic check concerning the node utilization.
-                usage = np * len(operations) / nn / ppn
-                if usage < 0.9:
-                    print(UTILIZATION_WARNING.format(ppn=ppn, usage=usage), file=sys.stderr)
-                    raise RuntimeError("Bad node utilization!")
-        else:
-            nn = None
+        # Determine required number of nodes
+        if nn is None:
+            nn = env.calc_num_nodes(
+                operations=operations, ppn=ppn, np=np, serial=serial, force=force)
+        elif ppn is not None:
+            raise ValueError(
+                "Can't provide both number of nodes (nn) and processors per node (ppn)!")
 
         # Get job script from environment
         script = env.script(_id=_id, nn=nn, ppn=ppn, **kwargs)
@@ -987,14 +973,20 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 self.print_status(env.get_scheduler(), pool=pool, **args)
             except AttributeError:
                 self.print_status(None, pool=pool, **args)
+            return 0
 
         def run(env, args):
             self.run(pretend=args.pretend)
+            return 0
 
         def submit(env, args):
-            if args.ppn is None:
-                args.ppn = getattr(env, 'cores_per_node', None)
-            self.submit(env, **vars(args))
+            try:
+                self.submit(env, **vars(args))
+            except SubmitError as e:
+                print("Error:", e, file=sys.stderr)
+                return 1
+            else:
+                return 0
 
         env = get_environment()
         print("Detected environment:", env.__name__, file=sys.stderr, end='\n\n')
@@ -1026,4 +1018,4 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             parser.print_usage()
             sys.exit(2)
 
-        args.func(env, args)
+        sys.exit(args.func(env, args))

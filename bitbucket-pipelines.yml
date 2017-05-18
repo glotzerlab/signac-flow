@@ -10,6 +10,8 @@ pipelines:
         script:
           - conda --version
           - python --version
+          - conda install flake8
+          - python -m flake8 --show-source flow/
           - conda config --add channels glotzer
           - conda config --add channels conda-forge
           - conda create -n py36 --yes python=3.6 coverage signac networkx
@@ -33,6 +35,8 @@ pipelines:
           script:
             - conda --version
             - python --version
+            - conda install flake8
+            - python -m flake8 --show-source flow/
             - conda config --add channels glotzer
             - conda config --add channels conda-forge
             - conda create -n py36 --yes python=3.6 coverage signac networkx
@@ -64,6 +68,8 @@ pipelines:
           script:
             - conda --version
             - python --version
+            - conda install flake8
+            - python -m flake8 --show-source flow/
             - conda config --add channels glotzer
             - conda config --add channels conda-forge
             - conda create -n py36 --yes python=3.6 coverage signac networkx
@@ -127,6 +133,8 @@ pipelines:
           script:
             - conda --version
             - python --version
+            - conda install flake8
+            - python -m flake8 --show-source flow/
             - conda config --add channels glotzer
             - conda config --add channels conda-forge
             - conda create -n py36 --yes python=3.6 coverage signac networkx

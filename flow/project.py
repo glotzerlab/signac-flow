@@ -44,6 +44,15 @@ logger = logging.getLogger(__name__)
 DEFAULT_WALLTIME_HRS = 12
 
 
+UTILIZATION_WARNING = """You either specified or the environment is configured to use {ppn}
+processors per node (ppn), however you only use {usage:0.2%} of each node.
+Consider to increase the number of processors per operation (--np)
+or adjust the processors per node (--ppn).
+
+Alternatively, you can also use --force to ignore this warning.
+"""
+
+
 def _mkdir_p(path):
     try:
         os.makedirs(path)
@@ -404,7 +413,9 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         # Wait until all processes have finished
         script.writeline('wait')
 
-    def submit_user(self, env, _id, operations, np=1, nn=None, ppn=None, serial=True, force=False, **kwargs):
+    def submit_user(self, env, _id, operations,
+                    np=1, nn=None, ppn=None, serial=True,
+                    force=False, **kwargs):
         """Implement this method to submit operations in combination with submit().
 
         The :py:func:`~.submit` method provides an interface for the submission of
@@ -434,6 +445,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             if not force:  # Perform basic check concerning the node utilization.
                 usage = np * len(operations) / nn / ppn
                 if usage < 0.9:
+                    print(UTILIZATION_WARNING.format(ppn=ppn, usage=usage), file=sys.stderr)
                     raise RuntimeError("Bad node utilization!")
         else:
             nn = None
@@ -588,6 +600,11 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             help="Limit the number of operations to be submitted.")
 
         distribution_group = parser.add_argument_group('distribution')
+        distribution_group.add_argument(
+            '--np',
+            type=int,
+            default=1,
+            help="Specify the number of processors required per operation.")
         distribution_group.add_argument(
             '--bundle',
             type=int,
@@ -1000,7 +1017,8 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 
         parser_submit = subparsers.add_parser('submit')
         self.add_submit_args(parser_submit)
-        env.add_args(parser_submit)
+        env_group = parser_submit.add_argument_group('{} options'.format(env.__name__))
+        env.add_args(env_group)
         parser_submit.set_defaults(func=submit)
 
         args = parser.parse_args()

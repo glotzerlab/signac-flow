@@ -97,6 +97,7 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
     """
     scheduler_type = None
     hostname_pattern = None
+    submit_flags = None
 
     @classmethod
     def script(cls, **kwargs):
@@ -136,15 +137,21 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
             raise AttributeError("You must define a scheduler type for every environment")
 
     @classmethod
-    def submit(cls, script, *args, **kwargs):
+    def submit(cls, script, flags=None, *args, **kwargs):
         """Submit a job submission script to the environment's scheduler.
 
         Scripts should be submitted to the environment, instead of directly
         to the scheduler to allow for environment specific post-processing.
         """
+        if flags is None:
+            flags = []
+        env_flags = getattr(cls, 'submit_flags', [])
+        if env_flags:
+            flags.extend(env_flags)
+
         # Hand off the actual submission to the scheduler
         script.seek(0)
-        if cls.get_scheduler().submit(script, *args, **kwargs):
+        if cls.get_scheduler().submit(script, flags=flags, *args, **kwargs):
             return manage.JobStatus.submitted
 
     @staticmethod
@@ -159,7 +166,6 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
 
 class UnknownEnvironment(ComputeEnvironment):
     "This is a default environment, which is always present."
-    scheduler_type = None
 
     @classmethod
     def is_present(cls):
@@ -224,44 +230,50 @@ class DefaultTorqueEnvironment(TorqueEnvironment):
 
     @classmethod
     def mpi_cmd(cls, cmd, np):
-        return 'mpirun -np {np} {cmd}'.format(n=np, cmd=cmd)
+        return 'mpirun -np {np} {cmd}'.format(np=np, cmd=cmd)
 
     @classmethod
     def add_args(cls, parser):
         super(DefaultTorqueEnvironment, cls).add_args(parser)
-        group = parser.add_argument_group('torque')
-        group.add_argument(
+        parser.add_argument(
             '-w', '--walltime',
             type=float,
             default=12,
             help="The wallclock time in hours.")
-        group.add_argument(
+        parser.add_argument(
             '--nn',
             type=int,
             help="Specify the number of nodes.")
-        group.add_argument(
+        parser.add_argument(
             '--ppn',
             type=int,
             help="Specify the number of processors allocated to each node.")
-        group.add_argument(
+        parser.add_argument(
             '--hold',
             action='store_true',
             help="Submit jobs, but put them on hold.")
-        group.add_argument(
+        parser.add_argument(
             '--after',
             type=str,
             help="Schedule this job to be executed after "
                  "completion of a cluster job with this id.")
+        parser.add_argument('--no-copy-env', action='store_true')
 
     @classmethod
-    def script(cls, _id, nn=None, ppn=None, walltime=None, **kwargs):
+    def script(cls, _id, nn=None, ppn=None, walltime=None, no_copy_env=False, **kwargs):
         js = super(DefaultTorqueEnvironment, cls).script()
         js.writeline('#PBS -N {}'.format(_id))
-        if nn is None != ppn is None:
-            raise ValueError("Number of nodes (nn) provided, but not processors per node (ppn).")
-        if nn is not None and ppn is not None:
-            js.writeline('#PBS -l nodes={}:ppn={}'.format(nn, ppn))
+        if nn is not None:
+            if ppn is None:
+                js.writeline('#PBS -l nodes={}'.format(nn))
+            else:
+                js.writeline('#PBS -l nodes={}:ppn={}'.format(nn, ppn))
+        elif ppn is not None:
+            raise ValueError(
+                "Number of processors per node (ppn) provided, but not number of nodes (nn).")
         js.writeline('#PBS -l walltime={}'.format(format_timedelta(walltime)))
+        if not no_copy_env:
+            js.writeline('#PBS -V')
         return js
 
 
@@ -286,6 +298,31 @@ class DefaultSlurmEnvironment(SlurmEnvironment):
         if walltime is not None:
             js.writeline('#SBATCH -t {}'.format(format_timedelta(walltime)))
         return js
+
+    @classmethod
+    def add_args(cls, parser):
+        parser.add_argument(
+            '-w', '--walltime',
+            type=float,
+            default=12,
+            help="The wallclock time in hours.")
+        parser.add_argument(
+            '--nn',
+            type=int,
+            help="Specify the number of nodes.")
+        parser.add_argument(
+            '--ppn',
+            type=int,
+            help="Specify the number of processors allocated to each node.")
+        parser.add_argument(
+            '--hold',
+            action='store_true',
+            help="Submit jobs, but put them on hold.")
+        parser.add_argument(
+            '--after',
+            type=str,
+            help="Schedule this job to be executed after "
+                 "completion of a cluster job with this id.")
 
 
 class CPUEnvironment(ComputeEnvironment):
@@ -312,6 +349,9 @@ def get_environment(test=False):
         return TestEnvironment
     else:
         env_types = list(ComputeEnvironment.registry.values())
+        for env_type in env_types:
+            if getattr(env_type, 'DEBUG', False):
+                return env_type
         for env_type in reversed(env_types):
             if env_type.is_present():
                 return env_type

@@ -4,7 +4,8 @@
 from __future__ import print_function
 import logging
 
-from .manage import Scheduler, JobStatus
+from .manage import Scheduler
+
 
 logger = logging.getLogger(__name__)
 

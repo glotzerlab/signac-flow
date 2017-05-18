@@ -17,8 +17,8 @@ from .project import label
 from .project import classlabel
 from .project import staticlabel
 from .environment import get_environment
-from .util.operations import run
-from .util.operations import redirect_log
+from .operations import run
+from .operations import redirect_log
 
 __version__ = '0.4.1'
 

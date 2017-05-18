@@ -6,7 +6,6 @@ import logging
 
 from .manage import Scheduler
 
-
 logger = logging.getLogger(__name__)
 
 

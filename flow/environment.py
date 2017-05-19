@@ -149,6 +149,10 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
         "Wrap a command (cmd) to be executed in the background."
         return cmd + ' &'
 
+    @classmethod
+    def add_args(cls, parser):
+        return
+
 
 class UnknownEnvironment(ComputeEnvironment):
     "This is a default environment, which is always present."

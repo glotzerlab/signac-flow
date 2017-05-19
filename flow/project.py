@@ -20,10 +20,12 @@ import sys
 import os
 import io
 import logging
+import argparse
 import warnings
 import datetime
 import json
 import errno
+import subprocess
 from math import ceil
 from collections import defaultdict
 from itertools import islice
@@ -32,6 +34,7 @@ from hashlib import sha1
 import signac
 from signac.common.six import with_metaclass
 
+from .environment import get_environment
 from . import manage
 from . import util
 from .util.tqdm import tqdm
@@ -424,7 +427,16 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         result['submission_status'] = [manage.JobStatus(highest_status).name]
         return result
 
-    def submit_user(self, env, _id, operations, walltime=None, force=False, **kwargs):
+    def run(self, pretend=False):
+        for job in self:
+            next_op = self.next_operation(job)
+            if next_op is not None:
+                if pretend:
+                    print(self.next_operation(job).cmd)
+                else:
+                    subprocess.run(self.next_operation(job).cmd.split())
+
+    def submit_user(self, env, _id, operations, np=1, serial=True, **kwargs):
         """Implement this method to submit operations in combination with submit().
 
         The :py:func:`~.submit` method provides an interface for the submission of
@@ -445,7 +457,27 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         :force: Warnings and other checks should be ignored if this argument is True.
         :type force: bool
         """
-        raise NotImplementedError()
+        sscript = env.script(_id=_id, **kwargs)
+        # Add some whitespace
+        sscript.writeline()
+        # Don't use uninitialized environment variables.
+        sscript.writeline('set -u')
+        # Exit on errors.
+        sscript.writeline('set -e')
+        # Switch into the project root directory
+        sscript.writeline('cd {}'.format(self.root_directory()))
+        sscript.writeline()
+
+        # Iterate over all job-operations and write the command to the script
+        for op in operations:
+            self.write_human_readable_statepoint(sscript, op.job)
+            sscript.write_cmd(op.cmd, np=np, bg=not serial)
+
+        # Wait until all processes have finished
+        sscript.writeline('wait')
+
+        # Submit the script to the environment specific scheduler
+        return env.submit(sscript, **kwargs)
 
     def submit(self, env, job_ids=None, operation_name=None, walltime=None,
                num=None, force=False, bundle_size=1, cmd=None, requires=None,
@@ -514,6 +546,8 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         def eligible(op):
             if force:
                 return True
+            if op is None:
+                return False
             if cmd is None:
                 if operation_name is not None and op.name != operation_name:
                     return False
@@ -1015,3 +1049,48 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         sscript.write(script.read())
         sscript.seek(0)
         return env.submit(sscript, pretend=pretend, hold=hold, after=after)
+
+    def main(self, parser=None, pool=None):
+        env = get_environment()
+
+        def status(args):
+            args = vars(args)
+            del args['func']
+            try:
+                self.print_status(env.get_scheduler(), pool=pool, **args)
+            except AttributeError:
+                self.print_status(None, pool=pool, **args)
+
+        def run(args):
+            self.run(pretend=args.pretend)
+
+        def submit(args):
+            self.submit(env, **vars(args))
+
+        if parser is None:
+            parser = argparse.ArgumentParser()
+
+        subparsers = parser.add_subparsers()
+
+        parser_status = subparsers.add_parser('status')
+        self.add_print_status_args(parser_status)
+        parser_status.set_defaults(func=status)
+
+        parser_run = subparsers.add_parser('run')
+        parser_run.add_argument(
+            '-p', '--pretend',
+            action='store_true',
+            help="Do not actually execute commands, just show them.")
+        parser_run.set_defaults(func=run)
+
+        parser_submit = subparsers.add_parser('submit')
+        self.add_submit_args(parser_submit)
+        env.add_args(parser_submit)
+        parser_submit.set_defaults(func=submit)
+
+        args = parser.parse_args()
+        if not hasattr(args, 'func'):
+            parser.print_usage()
+            sys.exit(2)
+
+        args.func(args)

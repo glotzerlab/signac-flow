@@ -32,6 +32,7 @@ from hashlib import sha1
 from math import ceil
 
 import signac
+from signac.common import six
 from signac.common.six import with_metaclass
 
 from .environment import get_environment
@@ -432,7 +433,10 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 if pretend:
                     print(self.next_operation(job).cmd.format(job=job))
                 else:
-                    subprocess.run(self.next_operation(job).cmd.format(job=job).split())
+                    if six.PY2:
+                        subprocess.call(self.next_operation(job).cmd.format(job=job).split())
+                    else:
+                        subprocess.run(self.next_operation(job).cmd.format(job=job).split())
 
     def write_script_header(self, script, **kwargs):
         # Add some whitespace

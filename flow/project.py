@@ -452,7 +452,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         "Iterate over all job-operations and write the command to the script."
         for op in operations:
             self.write_human_readable_statepoint(script, op.job)
-            script.write_cmd(op.cmd, np=np, bg=background)
+            script.write_cmd(op.cmd.format(job=op.job), np=np, bg=background)
 
     def write_script_footer(self, script, **kwargs):
         # Wait until all processes have finished

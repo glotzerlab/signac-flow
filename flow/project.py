@@ -41,7 +41,6 @@ from . import util
 from .errors import SubmitError
 from .util.tqdm import tqdm
 
-
 logger = logging.getLogger(__name__)
 
 DEFAULT_WALLTIME_HRS = 12
@@ -53,6 +52,17 @@ def _mkdir_p(path):
     except OSError as error:
         if not (error.errno == errno.EEXIST and os.path.isdir(path)):
             raise
+
+
+def _execute(cmd):
+    if six.PY2:
+        subprocess.call(cmd)
+    else:
+        subprocess.run(cmd)
+
+
+def _show_cmd(cmd):
+    print(' '.join(cmd))
 
 
 def is_active(status):
@@ -426,21 +436,34 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         result['submission_status'] = [manage.JobStatus(highest_status).name]
         return result
 
-    def run(self, names=None, pretend=False):
+    def run(self, names=None, pretend=False, mpi=False):
         names = set() if names is None else set(names)
 
-        for job in self:
-            next_op = self.next_operation(job)
-            if next_op is not None:
-                if names and next_op.name not in (names):
-                    continue
-                if pretend:
-                    print(self.next_operation(job).cmd.format(job=job))
-                else:
-                    if six.PY2:
-                        subprocess.call(self.next_operation(job).cmd.format(job=job).split())
-                    else:
-                        subprocess.run(self.next_operation(job).cmd.format(job=job).split())
+        def select(op):
+            if names:
+                return op.name in names
+            else:
+                return True
+
+        def _cmd(op):
+            return op.cmd.format(job=op.job).split()
+
+        ops = (self.next_operation(job) for job in self)
+        cmds = [_cmd(op) for op in ops if select(op)]
+
+        _run = _show_cmd if pretend else _execute
+
+        if mpi:
+            try:
+                from signac.contrib import MPIPool
+            except ImportError:
+                raise RuntimeError("mpi4py not installed")
+            else:
+                with MPIPool() as pool:
+                    pool.map(_run, cmds)
+        else:
+            for cmd in cmds:
+                _run(cmd)
 
     def write_script_header(self, script, **kwargs):
         # Add some whitespace
@@ -1100,7 +1123,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             return 0
 
         def run(env, args):
-            self.run(names=args.name, pretend=args.pretend)
+            self.run(names=args.name, pretend=args.pretend, mpi=args.mpi)
             return 0
 
         def submit(env, args):
@@ -1135,6 +1158,10 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             '-p', '--pretend',
             action='store_true',
             help="Do not actually execute commands, just show them.")
+        parser_run.add_argument(
+            '--mpi',
+            action='store_true',
+            help="Use MPI parallelization for the execution of operatons.")
         parser_run.set_defaults(func=run)
 
         parser_submit = subparsers.add_parser('submit')

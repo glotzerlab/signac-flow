@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 def main_init(args):
     try:
-        return _cli.init.init(alias=args.alias)
+        return _cli.init.init(alias=args.alias, template=args.template)
     except OSError as e:
         raise RuntimeError(
             "Error occured while trying to initialize a fow project: {}".format(e))
@@ -44,6 +44,13 @@ def main():
         type=str,
         nargs='?',
         help="Name of the flow project to initialize"
+    )
+    parser_init.add_argument(
+        '-t', '--template',
+        type=str,
+        choices=tuple(sorted(_cli.template.TEMPLATES.keys())),
+        default='minimal',
+        help="Specify a specific to template to use."
     )
 
     if '--version' in sys.argv:

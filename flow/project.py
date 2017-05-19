@@ -234,9 +234,6 @@ class JobOperation(object):
         except KeyError:
             return manage.JobStatus.unknown
 
-# NOTE: Slightly modified version from flow.graph so we don't require networkx
-# can then automatically create a graph so those features can be used.
-
 
 class FlowCondition:
 

@@ -1,7 +1,10 @@
+from __future__ import print_function
+import sys
 import argparse
 import logging
 import inspect
 from contextlib import contextmanager
+from multiprocessing import Pool
 
 from signac import get_project
 from signac.common import six
@@ -34,23 +37,62 @@ def run(parser=None):
         nargs='*',
         help="The job ids, as registered in the signac project. "
              "Omit to default to all statepoints.")
+    parser.add_argument(
+        '--np',
+        type=int,
+        default=0,
+        help="Specify the number of cores to parallelize to. The "
+             "default value of 0 means as many cores as are available.")
+    parser.add_argument(
+        '-t', '--timeout',
+        type=int,
+        help="A timeout in seconds after which the parallel execution "
+             "of operations is canceled.")
     args = parser.parse_args()
 
     project = get_project()
 
+    def _open_job_by_id(_id):
+        try:
+            return project.open_job(id=_id)
+        except KeyError:
+            msg = "Did not find job corresponding to id '{}'.".format(_id)
+            raise KeyError(msg)
+        except LookupError as error:
+            raise LookupError("Multiple matches for id '{}'.".format(_id))
+
     if len(args.jobid):
-        jobs = (project.open_job(id=jid) for jid in args.jobid)
+        try:
+            jobs = [_open_job_by_id(jid) for jid in args.jobid]
+        except (KeyError, LookupError) as e:
+            print(e, file=sys.stderr)
+            sys.exit(1)
     else:
         jobs = project
 
-    for job in jobs:
-        try:
-            module = inspect.getmodule(inspect.currentframe().f_back)
-            operation = getattr(module, args.operation)
-        except AttributeError:
-            raise KeyError("Unknown operation '{}'.".format(args.operation))
-        else:
+    module = inspect.getmodule(inspect.currentframe().f_back)
+    try:
+        operation = getattr(module, args.operation)
+    except AttributeError:
+        raise KeyError("Unknown operation '{}'.".format(args.operation))
+
+    # Serial execution
+    if args.np == 1:
+        for job in jobs:
             operation(job)
+
+    # Parallel execution
+    elif six.PY2:
+        pool = Pool(None if args.np == 0 else args.np)
+
+        # Due to Python 2.7 issue #8296 (http://bugs.python.org/issue8296) we
+        # always need to provide a timeout to avoid issues with "hanging"
+        # processing pools.
+        timeout = sys.maxint if args.timeout is None else args.timeout
+        pool.map_async(operation, jobs).get(timeout)
+    else:
+        with Pool(None if args.np == 0 else args.np) as pool:
+            pool.map_async(operation, jobs).get(args.timeout)
 
 
 @contextmanager

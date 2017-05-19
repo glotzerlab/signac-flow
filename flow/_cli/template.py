@@ -3,7 +3,7 @@
 TEMPLATES = {
 
 
-# minimal templates:
+    # minimal templates:
     'minimal': {
         '{alias}.py': """from flow import FlowProject
 
@@ -15,9 +15,9 @@ class {project_class}(FlowProject):
 if __name__ == '__main__':
     {project_class}().main()""",
     },
-# end of minimal
+    # end of minimal
 
-# example:
+    # example:
     'example': {
         '{alias}.py': """from flow import FlowProject
 from flow import JobOperation
@@ -46,7 +46,7 @@ class {project_class}(FlowProject):
 if __name__ == '__main__':
     {project_class}().main()""",
 
-    'operations.py': """def hello(job):
+        'operations.py': """def hello(job):
     print("Hello", job)
     with job:
         with open('hello.txt', 'w') as f:
@@ -57,10 +57,10 @@ if __name__ == '__main__':
     import flow
     flow.run()"""
     },
-# end of example
+    # end of example
 
 
-# example conditions:
+    # example conditions:
     'example-conditions': {
         '{alias}.py': """from flow import FlowProject
 from flow import staticlabel
@@ -96,7 +96,7 @@ class {project_class}(FlowProject):
 if __name__ == '__main__':
     {project_class}().main()""",
 
-    'operations.py': """def hello(job):
+        'operations.py': """def hello(job):
     print("Hello", job)
     with job:
         with open('hello.txt', 'w') as f:
@@ -107,6 +107,6 @@ if __name__ == '__main__':
     import flow
     flow.run()"""
     }
-# end of example-conditions
+    # end of example-conditions
 
 }

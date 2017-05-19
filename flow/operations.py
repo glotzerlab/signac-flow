@@ -9,6 +9,8 @@ from multiprocessing import Pool
 from signac import get_project
 from signac.common import six
 
+from .util.tqdm import tqdm
+
 
 def _get_operations():
     module = inspect.getmodule(inspect.currentframe().f_back.f_back)
@@ -40,7 +42,6 @@ def run(parser=None):
     parser.add_argument(
         '--np',
         type=int,
-        default=0,
         help="Specify the number of cores to parallelize to. The "
              "default value of 0 means as many cores as are available.")
     parser.add_argument(
@@ -48,6 +49,10 @@ def run(parser=None):
         type=int,
         help="A timeout in seconds after which the parallel execution "
              "of operations is canceled.")
+    parser.add_argument(
+        '--progress',
+        action='store_true',
+        help="Display a progress bar during execution.")
     args = parser.parse_args()
 
     project = get_project()
@@ -78,21 +83,24 @@ def run(parser=None):
 
     # Serial execution
     if args.np == 1:
-        for job in jobs:
+        for job in tqdm(jobs) if args.progress else jobs:
             operation(job)
 
     # Parallel execution
     elif six.PY2:
-        pool = Pool(None if args.np == 0 else args.np)
-
         # Due to Python 2.7 issue #8296 (http://bugs.python.org/issue8296) we
         # always need to provide a timeout to avoid issues with "hanging"
         # processing pools.
         timeout = sys.maxint if args.timeout is None else args.timeout
-        pool.map_async(operation, jobs).get(timeout)
+        pool = Pool(args.np)
+        result = pool.imap_unordered(operation, jobs)
+        for _ in tqdm(jobs) if args.progress else jobs:
+            result.next(timeout)
     else:
-        with Pool(None if args.np == 0 else args.np) as pool:
-            pool.map_async(operation, jobs).get(args.timeout)
+        with Pool(args.np) as pool:
+            result = pool.imap_unordered(operation, jobs)
+            for _ in tqdm(jobs) if args.progress else jobs:
+                result.next(args.timeout)
 
 
 @contextmanager

@@ -30,6 +30,9 @@ from collections import defaultdict
 from itertools import islice
 from hashlib import sha1
 from math import ceil
+from multiprocessing import Pool
+from multiprocessing import TimeoutError
+from subprocess import TimeoutExpired
 
 import signac
 from signac.common import six
@@ -54,14 +57,14 @@ def _mkdir_p(path):
             raise
 
 
-def _execute(cmd):
+def _execute(cmd, timeout=None):
     if six.PY2:
-        subprocess.call(cmd)
+        subprocess.call(cmd, timeout=timeout)
     else:
-        subprocess.run(cmd)
+        subprocess.run(cmd, timeout=timeout)
 
 
-def _show_cmd(cmd):
+def _show_cmd(cmd, timeout=None):
     print(' '.join(cmd))
 
 
@@ -436,7 +439,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         result['submission_status'] = [manage.JobStatus(highest_status).name]
         return result
 
-    def run(self, names=None, pretend=False, mpi=False):
+    def run(self, names=None, pretend=False, np=None, timeout=None, progress=False):
         names = set() if names is None else set(names)
 
         def select(op):
@@ -453,17 +456,23 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 
         _run = _show_cmd if pretend else _execute
 
-        if mpi:
-            try:
-                from signac.contrib import MPIPool
-            except ImportError:
-                raise RuntimeError("mpi4py not installed")
-            else:
-                with MPIPool() as pool:
-                    pool.map(_run, cmds)
+        if np == 1:
+            for cmd in tqdm(cmds) if progress else cmds:
+                _run(cmd, timeout=timeout)
+        elif six.PY2:
+            # Due to Python 2.7 issue #8296 (http://bugs.python.org/issue8296) we
+            # always need to provide a timeout to avoid issues with "hanging"
+            # processing pools.
+            timeout = sys.maxint if timeout is None else timeout
+            pool = Pool(np)
+            result = pool.imap_unordered(_run, cmds)
+            for _ in tqdm(cmds) if progress else cmds:
+                result.next(timeout)
         else:
-            for cmd in cmds:
-                _run(cmd)
+            with Pool(np) as pool:
+                result = pool.imap_unordered(_run, cmds)
+                for _ in tqdm(cmds) if progress else cmds:
+                    result.next(timeout)
 
     def write_script_header(self, script, **kwargs):
         # Add some whitespace
@@ -1122,8 +1131,20 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 self.print_status(None, pool=pool, **args)
             return 0
 
+        def next(env, args):
+            for job in self:
+                if self.next_operation(job).name == args.name:
+                    print(job)
+
         def run(env, args):
-            self.run(names=args.name, pretend=args.pretend, mpi=args.mpi)
+            try:
+                self.run(names=args.name, pretend=args.pretend, np=args.np,
+                         timeout=args.timeout, progress=args.progress)
+            except (TimeoutError, TimeoutExpired):
+                print(
+                    "Error: Failed to complete due to timeout ({}s)!".format(args.timeout),
+                    file=sys.stderr)
+                return 1
             return 0
 
         def submit(env, args):
@@ -1136,7 +1157,6 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 return 0
 
         env = get_environment()
-        print("Detected environment:", env.__name__, file=sys.stderr, end='\n\n')
 
         if parser is None:
             parser = argparse.ArgumentParser()
@@ -1146,6 +1166,15 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         parser_status = subparsers.add_parser('status')
         self.add_print_status_args(parser_status)
         parser_status.set_defaults(func=status)
+
+        parser_next = subparsers.add_parser(
+            'next',
+            description="Determine jobs that are eligible for a specific operation.")
+        parser_next.add_argument(
+            'name',
+            type=str,
+            help="The name of the operation.")
+        parser_next.set_defaults(func=next)
 
         parser_run = subparsers.add_parser('run')
         parser_run.add_argument(
@@ -1159,9 +1188,19 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             action='store_true',
             help="Do not actually execute commands, just show them.")
         parser_run.add_argument(
-            '--mpi',
+            '--np',
+            type=int,
+            help="Specify the number of cores to parallelize to. The "
+                 "default value of 0 means as many cores as are available.")
+        parser_run.add_argument(
+            '-t', '--timeout',
+            type=int,
+            help="A timeout in seconds after which the parallel execution "
+                 "of operations is canceled.")
+        parser_run.add_argument(
+            '--progress',
             action='store_true',
-            help="Use MPI parallelization for the execution of operatons.")
+            help="Display a progress bar during execution.")
         parser_run.set_defaults(func=run)
 
         parser_submit = subparsers.add_parser('submit')

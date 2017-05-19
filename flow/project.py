@@ -432,9 +432,9 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             next_op = self.next_operation(job)
             if next_op is not None:
                 if pretend:
-                    print(self.next_operation(job).cmd)
+                    print(self.next_operation(job).cmd.format(job=job))
                 else:
-                    subprocess.run(self.next_operation(job).cmd.split())
+                    subprocess.run(self.next_operation(job).cmd.format(job=job).split())
 
     def submit_user(self, env, _id, operations, np=1, serial=True, **kwargs):
         """Implement this method to submit operations in combination with submit().
@@ -471,7 +471,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         # Iterate over all job-operations and write the command to the script
         for op in operations:
             self.write_human_readable_statepoint(sscript, op.job)
-            sscript.write_cmd(op.cmd, np=np, bg=not serial)
+            sscript.write_cmd(op.cmd.format(job=op.job), np=np, bg=not serial)
 
         # Wait until all processes have finished
         sscript.writeline('wait')

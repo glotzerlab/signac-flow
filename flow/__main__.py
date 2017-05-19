@@ -8,7 +8,7 @@ import sys
 from signac.common import six
 
 from . import __version__
-from . import _cli
+from . import template
 
 
 logger = logging.getLogger(__name__)
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 def main_init(args):
     try:
-        return _cli.init.init(alias=args.alias, template=args.template)
+        return template.init(alias=args.alias, template=args.template)
     except OSError as e:
         raise RuntimeError(
             "Error occured while trying to initialize a fow project: {}".format(e))
@@ -48,7 +48,7 @@ def main():
     parser_init.add_argument(
         '-t', '--template',
         type=str,
-        choices=tuple(sorted(_cli.template.TEMPLATES.keys())),
+        choices=tuple(sorted(template.TEMPLATES)),
         default='minimal',
         help="Specify a specific to template to use."
     )

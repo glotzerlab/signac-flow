@@ -9,6 +9,7 @@ a workflow based on job classification and job operations.
 A job may be classified based on its metadata and data in the form
 of str labels. These str-labels are yielded in the classify() method.
 
+
 Based on the classification a "next operation" may be identified, that
 should be executed next to further the workflow. While the user is free
 to choose any method for the determination of the "next operation", one
@@ -75,6 +76,8 @@ def abbreviate(x, a):
     else:
         abbreviate.table[a] = x
         return a
+
+
 abbreviate.table = dict()  # noqa
 
 
@@ -227,6 +230,52 @@ class JobOperation(object):
         except KeyError:
             return manage.JobStatus.unknown
 
+# NOTE: Slightly modified version from flow.graph so we don't require networkx
+# can then automatically create a graph so those features can be used.
+
+
+class FlowCondition:
+
+    def __init__(self, callback):
+        self._callback = callback
+
+    def __call__(self, job):
+        if self._callback is None:
+            return True
+        return self._callback(job)
+
+    def __hash__(self):
+        return hash(self._callback)
+
+    def __eq__(self, other):
+        return self._callback == other._callback
+
+
+class FlowOperation:
+
+    def __init__(self, cmd, prereqs, postconds):
+        if prereqs is None:
+            prereqs = [None]
+        if postconds is None:
+            postconds = [None]
+
+        self._prerequistes = [FlowCondition(cond) for cond in prereqs]
+        self._postconditions = [FlowCondition(cond) for cond in postconds]
+        self._cmd = cmd
+
+    def eligible(self, job):
+        # if preconditions are all true and at least one post condition is false.
+        pre = all([cond(job) for cond in self._prerequistes])
+        post = not all([cond(job) for cond in self._postconditions])
+        return pre and post
+
+    def complete(self, job):
+        return all([cond(job) for cond in self._postconditions]) and\
+                all([cond(job) for cond in self._prerequistes])
+
+    def formatted_command(self, job):
+        return self._cmd.format(job=job)
+
 
 class _FlowProjectClass(type):
 
@@ -246,6 +295,10 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
     NAMES = {
         'next_operation': 'next_op',
     }
+
+    def __init__(self, config=None):
+        signac.contrib.Project.__init__(self, config)
+        self._operations = dict()
 
     @classmethod
     def _tr(cls, x):
@@ -790,25 +843,91 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             elif label(self, job):
                 yield getattr(label, '_label_name', label.__name__)
 
+    def add_operation(self, name, cmd, prereqs=None, postconds=None):
+        """
+        Add an operation to the workflow.
+
+        :param name: Name of the operation.
+        :type name: str
+        :param cmd: script that will execute the operation from the command line.
+                    Usually contains {job} format field to specify which job the operation
+                    will run for.
+        :type cmd: str
+        :param prereqs: list of unary functions that return a bool value. All prequisites
+            must be true for a job to be considered 'eligible' for execution.
+        :type prereqs: list
+        :param postconds: list of unary functions that return a bool value. All post conditions
+            must be true for a job to be considered 'completed' for execution.
+        :type postconds: list
+
+        A note on job eligibilty: As stated above all prereqs must evaluate to true and at least
+        one post condition must evaluate to false. When all prereqs and post conditions are true
+        then the job operation is considered to be complete.
+
+        Eligibility in this contexts refers only to the workflow pipline and not to
+        other contributing factors like the whether the job-operation is currently
+        running or queued.
+        """
+        self._operations[name] = FlowOperation(cmd=cmd, prereqs=prereqs, postconds=postconds)
+
     def classify(self, job):
         """Generator function which yields labels for job.
 
         :param job: The signac job handle.
         :type job: :class:`~signac.contrib.job.Job`
         :yields: The labels to classify job.
-        :yield type: str"""
-        yield
-        return
+        :yield type: str
+        """
+        for label in self.labels(job):
+            yield label
+
+    def completed_operations(self, job):
+        """Determine which operations have been completed for job.
+
+        :param job: The signac job handle.
+        :type job: :class:`~signac.contrib.job.Job`
+        :returns: The name of the operations that are complete.
+        :rtype: str"""
+        for name, op in self._operations.items():
+            if op.complete(job):
+                yield name
+
+    def next_operations(self, job):
+        """Determine the next operation for job.
+
+        You can, but don't have to use this function to simplify
+        the submission process. The default method returns the next
+        operation for the job as defined by the 'add_operation' method.
+
+        :param job: The signac job handle.
+        :type job: :class:`~signac.contrib.job.Job`
+        :returns: The name of the operation to execute next.
+        :rtype: str"""
+        for name, op in self._operations.items():
+            if op.eligible(job):
+                yield name
 
     def next_operation(self, job):
         """Determine the next operation for this job.
 
         :param job: The signac job handle.
         :type job: :class:`~signac.contrib.job.Job`
-        :returns: A JobOpereation instance to execute next.
-        :rtype: :py:class:`~.JobOperation`
+        :returns: A JobOpereation instance to execute next or `None` if no operation is eligible.
+        :rtype: :py:class:`~.JobOperation` or `NoneType`
         """
-        return
+        for name in self.next_operations(job):
+            return JobOperation(name, job, self._operations[name].formatted_command(job))
+        return None
+
+    @property
+    def operations(self):
+        """
+        The dictionary of operations that have been added to the workflow.
+        :return: a dictionary with the key values are the names of the operations and
+                 the values are instances of :py:class:`~.FlowOperation`
+        :rtype: dict
+        """
+        return self._operations
 
     def eligible(self, job_operation, **kwargs):
         """Determine if job is eligible for operation.

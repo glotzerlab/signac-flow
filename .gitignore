@@ -40,7 +40,6 @@ nosetests.xml
 .*.swp
 
 # custom
-_*
 *.log
 
 .DS_Store

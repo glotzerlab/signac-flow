@@ -69,14 +69,21 @@ class SlurmScheduler(Scheduler):
         for job in _fetch(user=self.user):
             yield job
 
-    def submit(self, script, resume=None, after=None,
-               hold=False, pretend=False, **kwargs):
-        submit_cmd = self.submit_cmd
+    def submit(self, script, after=None, hold=False, pretend=False, flags=None, **kwargs):
+        if flags is None:
+            flags = []
+        elif isinstance(flags, str):
+            flags = flags.split()
+
+        submit_cmd = self.submit_cmd + flags
+
         if after is not None:
             submit_cmd.extend(
                 ['-W', 'depend="afterany:{}"'.format(after.split('.')[0])])
+
         if hold:
             submit_cmd += ['--hold']
+
         if pretend:
             print("# Submit command: {}".format('  '.join(submit_cmd)))
             print(script.read())
@@ -91,7 +98,7 @@ class SlurmScheduler(Scheduler):
     @classmethod
     def is_present(cls):
         try:
-            return subprocess.check_call(['sbatch', '--version'])
+            subprocess.check_call(['sbatch', '--version'])
         except (IOError, OSError):
             return False
         else:

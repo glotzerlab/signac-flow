@@ -29,3 +29,7 @@ class FakeScheduler(Scheduler):
         print(script.read())
         # return status is None, meaning, 'not actually submitted'
         return None
+
+    @classmethod
+    def is_present(cls):
+        return False

@@ -26,10 +26,10 @@ import datetime
 import json
 import errno
 import subprocess
-from math import ceil
 from collections import defaultdict
 from itertools import islice
 from hashlib import sha1
+from math import ceil
 
 import signac
 from signac.common.six import with_metaclass
@@ -37,6 +37,7 @@ from signac.common.six import with_metaclass
 from .environment import get_environment
 from . import manage
 from . import util
+from .errors import SubmitError
 from .util.tqdm import tqdm
 
 
@@ -436,7 +437,30 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 else:
                     subprocess.run(self.next_operation(job).cmd.format(job=job).split())
 
-    def submit_user(self, env, _id, operations, np=1, serial=True, **kwargs):
+    def write_script_header(self, script, **kwargs):
+        # Add some whitespace
+        script.writeline()
+        # Don't use uninitialized environment variables.
+        script.writeline('set -u')
+        # Exit on errors.
+        script.writeline('set -e')
+        # Switch into the project root directory
+        script.writeline('cd {}'.format(self.root_directory()))
+        script.writeline()
+
+    def write_script_operations(self, script, operations, np=1, background=False, **kwargs):
+        "Iterate over all job-operations and write the command to the script."
+        for op in operations:
+            self.write_human_readable_statepoint(script, op.job)
+            script.write_cmd(op.cmd, np=np, bg=background)
+
+    def write_script_footer(self, script, **kwargs):
+        # Wait until all processes have finished
+        script.writeline('wait')
+
+    def submit_user(self, env, _id, operations,
+                    np=1, nn=None, ppn=None, serial=True,
+                    force=False, **kwargs):
         """Implement this method to submit operations in combination with submit().
 
         The :py:func:`~.submit` method provides an interface for the submission of
@@ -457,27 +481,23 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         :force: Warnings and other checks should be ignored if this argument is True.
         :type force: bool
         """
-        sscript = env.script(_id=_id, **kwargs)
-        # Add some whitespace
-        sscript.writeline()
-        # Don't use uninitialized environment variables.
-        sscript.writeline('set -u')
-        # Exit on errors.
-        sscript.writeline('set -e')
-        # Switch into the project root directory
-        sscript.writeline('cd {}'.format(self.root_directory()))
-        sscript.writeline()
+        # Determine required number of nodes
+        if nn is None:
+            nn = env.calc_num_nodes(
+                operations=operations, ppn=ppn, np=np, serial=serial, force=force)
+        elif ppn is not None:
+            raise ValueError(
+                "Can't provide both number of nodes (nn) and processors per node (ppn)!")
 
-        # Iterate over all job-operations and write the command to the script
-        for op in operations:
-            self.write_human_readable_statepoint(sscript, op.job)
-            sscript.write_cmd(op.cmd.format(job=op.job), np=np, bg=not serial)
+        # Get job script from environment
+        script = env.script(_id=_id, nn=nn, ppn=ppn, **kwargs)
 
-        # Wait until all processes have finished
-        sscript.writeline('wait')
+        self.write_script_header(script, **kwargs)
+        self.write_script_operations(script, operations, np=np, background=not serial)
+        self.write_script_footer(script, **kwargs)
 
         # Submit the script to the environment specific scheduler
-        return env.submit(sscript, **kwargs)
+        return env.submit(script, nn=nn, **kwargs)
 
     def submit(self, env, job_ids=None, operation_name=None, walltime=None,
                num=None, force=False, bundle_size=1, cmd=None, requires=None,
@@ -586,35 +606,45 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
     @classmethod
     def add_submit_args(cls, parser):
         "Add arguments to parser for the :meth:`~.submit` method."
+
         parser.add_argument(
-            'job_ids',
+            'flags',
             type=str,
             nargs='*',
+            help="Flags to be forwarded to the scheduler.")
+        parser.add_argument(
+            '-j', '--job-id',
+            type=str,
+            nargs='+',
             help="The job id of the jobs to submit. "
             "Omit to automatically select all eligible jobs.")
-        parser.add_argument(
-            '-j', '--job-operation',
-            dest='operation_name',
-            type=str,
-            help="Only submit jobs eligible for the specified operation.")
-        parser.add_argument(
-            '-w', '--walltime',
-            type=float,
-            default=DEFAULT_WALLTIME_HRS,
-            help="The wallclock time in hours.")
         parser.add_argument(
             '--pretend',
             action='store_true',
             help="Do not really submit, but print the submittal script to screen.")
         parser.add_argument(
-            '-n', '--num',
-            type=int,
-            help="Limit the number of operations to be submitted.")
-        parser.add_argument(
             '--force',
             action='store_true',
             help="Ignore all warnings and checks, just submit.")
-        parser.add_argument(
+
+        selection_group = parser.add_argument_group('job operation selection')
+        selection_group.add_argument(
+            '-o', '--operation',
+            dest='operation_name',
+            type=str,
+            help="Only submit jobs eligible for the specified operation.")
+        selection_group.add_argument(
+            '-n', '--num',
+            type=int,
+            help="Limit the number of operations to be submitted.")
+
+        distribution_group = parser.add_argument_group('distribution')
+        distribution_group.add_argument(
+            '--np',
+            type=int,
+            default=1,
+            help="Specify the number of processors required per operation.")
+        distribution_group.add_argument(
             '--bundle',
             type=int,
             nargs='?',
@@ -624,24 +654,17 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             help="Specify how many operations to bundle into one submission. "
                  "When no specific size is give, all eligible operations are "
                  "bundled into one submission.")
-        parser.add_argument(
+        distribution_group.add_argument(
             '-s', '--serial',
             action='store_true',
             help="Schedule the operations to be executed in serial.")
-        parser.add_argument(
-            '--after',
-            type=str,
-            help="Schedule this job to be executed after "
-                 "completion of a cluster job with this id.")
-        parser.add_argument(
-            '--hold',
-            action='store_true',
-            help="All operations will be scheduled with a scheduler hold.")
-        parser.add_argument(
+
+        manual_cmd_group = parser.add_argument_group("manual cmd")
+        manual_cmd_group.add_argument(
             '--cmd',
             type=str,
             help="Directly specify the command that executes the desired operation.")
-        parser.add_argument(
+        manual_cmd_group.add_argument(
             '--requires',
             type=str,
             nargs='*',
@@ -730,7 +753,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             collection.update_one({'_id': status['job_id']},
                                   {'$set': status}, upsert=True)
 
-    def update_stati(self, scheduler, jobs=None, file=sys.stderr, pool=None):
+    def update_stati(self, scheduler, jobs=None, file=sys.stderr, pool=None, ignore_errors=False):
         """Update the status of all jobs with the given scheduler.
 
         :param scheduler: The scheduler instance used to feth the job stati.
@@ -741,8 +764,14 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             jobs = self.find_jobs()
         print(self._tr("Query scheduler..."), file=file)
         sjobs_map = defaultdict(list)
-        for sjob in self.scheduler_jobs(scheduler):
-            sjobs_map[sjob.name()].append(sjob)
+        try:
+            for sjob in self.scheduler_jobs(scheduler):
+                sjobs_map[sjob.name()].append(sjob)
+        except RuntimeError as e:
+            if ignore_errors:
+                logger.warning("WARNING: Error while queyring scheduler: '{}'.".format(e))
+            else:
+                raise RuntimeError("Error while querying scheduler: '{}'.".format(e))
         print(self._tr("Determine job stati..."), file=file)
         if pool is None:
             for job in tqdm(jobs, file=file):
@@ -756,7 +785,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                      detailed=False, parameters=None, skip_active=False,
                      param_max_width=None,
                      file=sys.stdout, err=sys.stderr,
-                     pool=None):
+                     pool=None, ignore_errors=False):
         """Print the status of the project.
 
         :param scheduler: The scheduler instance used to fetch the job stati.
@@ -785,7 +814,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             job_filter = json.loads(job_filter)
         jobs = list(self.find_jobs(job_filter))
         if scheduler is not None:
-            self.update_stati(scheduler, jobs, file=err, pool=pool)
+            self.update_stati(scheduler, jobs, file=err, pool=pool, ignore_errors=ignore_errors)
         print(self._tr("Generate output..."), file=err)
         if pool is None:
             stati = [self.get_job_status(job) for job in jobs]
@@ -836,6 +865,10 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             '--skip-active',
             action='store_true',
             help="Display only jobs, which are currently not active.")
+        parser.add_argument(
+            '--ignore-errors',
+            action='store_true',
+            help="Ignore errors that might occur when querying the scheduler.")
 
     def labels(self, job):
         """Auto-generate labels from label-functions.
@@ -1051,21 +1084,31 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         return env.submit(sscript, pretend=pretend, hold=hold, after=after)
 
     def main(self, parser=None, pool=None):
-        env = get_environment()
 
-        def status(args):
+        def status(env, args):
             args = vars(args)
             del args['func']
             try:
                 self.print_status(env.get_scheduler(), pool=pool, **args)
             except AttributeError:
                 self.print_status(None, pool=pool, **args)
+            return 0
 
-        def run(args):
+        def run(env, args):
             self.run(pretend=args.pretend)
+            return 0
 
-        def submit(args):
-            self.submit(env, **vars(args))
+        def submit(env, args):
+            try:
+                self.submit(env, **vars(args))
+            except SubmitError as e:
+                print("Error:", e, file=sys.stderr)
+                return 1
+            else:
+                return 0
+
+        env = get_environment()
+        print("Detected environment:", env.__name__, file=sys.stderr, end='\n\n')
 
         if parser is None:
             parser = argparse.ArgumentParser()
@@ -1085,7 +1128,8 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 
         parser_submit = subparsers.add_parser('submit')
         self.add_submit_args(parser_submit)
-        env.add_args(parser_submit)
+        env_group = parser_submit.add_argument_group('{} options'.format(env.__name__))
+        env.add_args(env_group)
         parser_submit.set_defaults(func=submit)
 
         args = parser.parse_args()
@@ -1093,4 +1137,4 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             parser.print_usage()
             sys.exit(2)
 
-        args.func(args)
+        sys.exit(args.func(env, args))

@@ -426,10 +426,14 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         result['submission_status'] = [manage.JobStatus(highest_status).name]
         return result
 
-    def run(self, pretend=False):
+    def run(self, names=None, pretend=False):
+        names = set() if names is None else set(names)
+
         for job in self:
             next_op = self.next_operation(job)
             if next_op is not None:
+                if names and next_op.name not in (names):
+                    continue
                 if pretend:
                     print(self.next_operation(job).cmd.format(job=job))
                 else:
@@ -1096,7 +1100,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             return 0
 
         def run(env, args):
-            self.run(pretend=args.pretend)
+            self.run(names=args.name, pretend=args.pretend)
             return 0
 
         def submit(env, args):
@@ -1121,6 +1125,12 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         parser_status.set_defaults(func=status)
 
         parser_run = subparsers.add_parser('run')
+        parser_run.add_argument(
+            'name',
+            type=str,
+            nargs='*',
+            help="If provided, only run operations where the identifier "
+                 "matches the provided set of names.")
         parser_run.add_argument(
             '-p', '--pretend',
             action='store_true',

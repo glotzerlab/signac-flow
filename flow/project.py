@@ -46,7 +46,14 @@ from .util.tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_WALLTIME_HRS = 12
+
+NUM_NODES_CALC_WARNING = \
+"""Unable to determine the reqired number of nodes (nn) for this submission.
+Either provide this value directly with '--nn', provide the number of
+processors per node: '--ppn'.
+
+Please note you can ignore this message by specifying extra submission options
+with '--' or by using the '--force' option."""
 
 
 def _mkdir_p(path):
@@ -497,7 +504,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 
     def submit_user(self, env, _id, operations,
                     np=1, nn=None, ppn=None, serial=True,
-                    force=False, **kwargs):
+                    flags=None, force=False, **kwargs):
         """Implement this method to submit operations in combination with submit().
 
         The :py:func:`~.submit` method provides an interface for the submission of
@@ -520,10 +527,14 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         """
         # Determine required number of nodes
         if nn is None:
-            nn = env.calc_num_nodes(
-                operations=operations, ppn=ppn, np=np, serial=serial, force=force)
+            try:
+                nn = env.calc_num_nodes(
+                    operations=operations, ppn=ppn, np=np, serial=serial)
+            except AttributeError:
+                if not force and not flags:
+                    raise SubmitError(NUM_NODES_CALC_WARNING)
         elif ppn is not None:
-            raise ValueError(
+            raise SubmitError(
                 "Can't provide both number of nodes (nn) and processors per node (ppn)!")
 
         # Get job script from environment
@@ -1152,7 +1163,10 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 self.submit(env, **vars(args))
             except SubmitError as e:
                 print("Error:", e, file=sys.stderr)
-                return 1
+                if args.debug:
+                    raise
+                else:
+                    return 1
             else:
                 return 0
 
@@ -1160,6 +1174,10 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 
         if parser is None:
             parser = argparse.ArgumentParser()
+        parser.add_argument(
+            '-d', '--debug',
+            action="store_true",
+            help="Print debugging information.")
 
         subparsers = parser.add_subparsers()
 

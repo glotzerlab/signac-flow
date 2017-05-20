@@ -273,26 +273,22 @@ class NodesEnvironment(ComputeEnvironment):
             help="Specify the number of processors allocated to each node.")
 
     @classmethod
-    def calc_num_nodes(cls, operations, ppn, np=None, serial=True, force=False):
+    def calc_num_nodes(cls, operations, ppn, np=None, serial=True):
         if np is None:
             np = 1
         if ppn is None:
-            ppn = getattr(cls, 'cores_per_node', None)
-        if ppn is None:
-            raise SubmitError(
-                "Unable to determine number of required nodes (nn), please provide "
-                "directly or processors per node (ppn).")
-        else:
-            # Calculate the total number of required processors
-            np_total = np if serial else np * len(operations)
-            # Calculate the total number of required nodes
-            nn = ceil(np_total / ppn)
-            if not force:  # Perform basic check concerning the node utilization.
-                usage = np * len(operations) / nn / ppn
-                if usage < 0.9:
-                    print(UTILIZATION_WARNING.format(ppn=ppn, usage=usage), file=sys.stderr)
-                    raise SubmitError("Bad node utilization!")
-            return nn
+            ppn = getattr(cls, 'cores_per_node')
+
+        # Calculate the total number of required processors
+        np_total = np if serial else np * len(operations)
+        # Calculate the total number of required nodes
+        nn = ceil(np_total / ppn)
+        if not force:  # Perform basic check concerning the node utilization.
+            usage = np * len(operations) / nn / ppn
+            if usage < 0.9:
+                print(UTILIZATION_WARNING.format(ppn=ppn, usage=usage), file=sys.stderr)
+                raise SubmitError("Bad node utilization!")
+        return nn
 
 
 class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):

@@ -273,7 +273,7 @@ class NodesEnvironment(ComputeEnvironment):
             help="Specify the number of processors allocated to each node.")
 
     @classmethod
-    def calc_num_nodes(cls, operations, ppn, np=None, serial=True):
+    def calc_num_nodes(cls, operations, ppn, np=None, serial=True, force=False):
         if np is None:
             np = 1
         if ppn is None:

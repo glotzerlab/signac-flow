@@ -47,8 +47,7 @@ from .util.tqdm import tqdm
 logger = logging.getLogger(__name__)
 
 
-NUM_NODES_CALC_WARNING = \
-"""Unable to determine the reqired number of nodes (nn) for this submission.
+NUM_NODES_CALC_WARNING = """Unable to determine the reqired number of nodes (nn) for this submission.
 Either provide this value directly with '--nn', provide the number of
 processors per node: '--ppn'.
 
@@ -529,7 +528,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         if nn is None:
             try:
                 nn = env.calc_num_nodes(
-                    operations=operations, ppn=ppn, np=np, serial=serial)
+                    operations=operations, ppn=ppn, np=np, serial=serial, force=force)
             except AttributeError:
                 if not force and not flags:
                     raise SubmitError(NUM_NODES_CALC_WARNING)

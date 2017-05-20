@@ -10,21 +10,30 @@ This enables the user to adjust their workflow based on the present
 environment, e.g. for the adjustemt of scheduler submission scripts.
 """
 from __future__ import print_function
+import os
 import sys
 import re
 import socket
 import logging
 import warnings
 import io
+import importlib
+import setuptools
+from setuptools.command.install import install
 from math import ceil
 from collections import OrderedDict
 
-
+from signac.common import config
+from signac.common import six
 from signac.common.six import with_metaclass
-from signac.common.config import load_config
 from . import scheduler
 from . import manage
 from .errors import SubmitError
+
+if six.PY2:
+    import imp
+else:
+    import importlib.machinery
 
 
 logger = logging.getLogger(__name__)
@@ -43,6 +52,40 @@ Please provide the missing information, for example by adding it to your global 
 
 signac config set --global {key} <VALUE>
 """
+
+
+def setup(py_modules, **attrs):
+    """Setup function for environment modules.
+
+    Use this function in place of setuptools.setup to not only install
+    a environments module, but also register it with the global signac
+    configuration. Once registered, is automatically imported when the
+    get_environment() function is called.
+    """
+
+    class InstallAndConfig(install):
+
+        def run(self):
+            super(InstallAndConfig, self).run()
+            cfg = config.read_config_file(config.FN_CONFIG)
+            try:
+                envs = cfg['flow'].as_list('environment_modules')
+            except KeyError:
+                envs = []
+            new = set(py_modules).difference(envs)
+            if new:
+                for name in new:
+                    self.announce(
+                        msg="registering module '{}' in global signac configuration".format(name),
+                        level=2)
+                cfg.setdefault('flow', dict())
+                cfg['flow']['environment_modules'] = envs + list(new)
+                cfg.write()
+
+    return setuptools.setup(
+        py_modules=py_modules,
+        cmdclass={'install': InstallAndConfig},
+        **attrs)
 
 
 def format_timedelta(delta):
@@ -185,9 +228,7 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
     @classmethod
     def get_config_value(cls, key, default=None):
         try:
-            flow_config = load_config()['flow']
-            env_config = flow_config[cls.__name__]
-            return env_config[key]
+            return config.load_config()['flow'][cls.__name__][key]
         except KeyError:
             if default is None:
                 k = '{}.{}'.format(cls.__name__, key)
@@ -379,7 +420,45 @@ class GPUEnvironment(ComputeEnvironment):
     pass
 
 
-def get_environment(test=False):
+def _import_configured_environment_modules():
+    try:
+        for name in config.load_config()['flow']['environments']:
+            try:
+                importlib.import_module(name)
+            except ImportError:
+                logger.warning(name)
+    except KeyError:
+        pass
+
+
+def _import_packaged_environments():
+    from .environments import incite   # noqa
+    from .environments import xsede    # noqa
+
+
+def _import_module(fn):
+    if six.PY2:
+        return imp.load_source(os.path.splitext(fn)[0], fn)
+    else:
+        return importlib.machinery.SourceFileLoader(fn, fn).load_module()
+
+
+def _import_modules(prefix):
+    for fn in os.path.listdir(prefix):
+        if os.path.isfile(fn) and os.path.splitext(fn)[1] == '.py':
+            _import_module(os.path.join(prefix, fn))
+
+
+def _import_registered_environments():
+    cfg = config.load_config(config.FN_CONFIG)
+    try:
+        for name in cfg['flow'].as_list('environment_modules'):
+            importlib.import_module(name)
+    except KeyError:
+        pass
+
+
+def get_environment(test=False, import_packaged=True, import_registered=True):
     """Attempt to detect the present environment.
 
     This function iterates through all defined ComputeEnvironment
@@ -394,12 +473,22 @@ def get_environment(test=False):
     if test:
         return TestEnvironment
     else:
+        if import_packaged:
+            _import_packaged_environments()
+        if import_registered:
+            _import_registered_environments()
+
         env_types = list(ComputeEnvironment.registry.values())
+        logger.debug(
+            "List of registered environments:\n\t{}".format(
+                '\n\t'.join((str(env.__name__) for env in env_types))))
         for env_type in env_types:
             if getattr(env_type, 'DEBUG', False):
+                logger.debug("Select environment '{}'; DEBUG=True.".format(env_type.__name__))
                 return env_type
         for env_type in reversed(env_types):
             if env_type.is_present():
+                logger.debug("Select environment '{}'; is present.".format(env_type.__name__))
                 return env_type
         else:
             return UnknownEnvironment

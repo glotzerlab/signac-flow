@@ -98,7 +98,7 @@ class SlurmScheduler(Scheduler):
     @classmethod
     def is_present(cls):
         try:
-            subprocess.check_call(['sbatch', '--version'])
+            subprocess.check_output(['sbatch', '--version'], stderr=subprocess.STDOUT)
         except (IOError, OSError):
             return False
         else:

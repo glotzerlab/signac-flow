@@ -29,6 +29,8 @@ from signac.common.six import with_metaclass
 from . import scheduler
 from . import manage
 from .errors import SubmitError
+from .errors import NoSchedulerError
+
 
 if six.PY2:
     import imp
@@ -127,7 +129,7 @@ class JobScript(io.StringIO):
         "Write one line to the job script."
         self.write(line + self.eol)
 
-    def write_cmd(self, cmd, np=1, bg=False):
+    def write_cmd(self, cmd, np=None, bg=False):
         """Write a command to the jobscript.
 
         This command wrapper function is a convenience function, which
@@ -138,6 +140,8 @@ class JobScript(io.StringIO):
         :param np: The number of processors required for execution.
         :type np: int
         """
+        if np is None:
+            np = 1
         if np > 1:
             cmd = self._env.mpi_cmd(cmd, np=np)
         if bg:
@@ -196,7 +200,8 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
         try:
             return getattr(cls, 'scheduler_type')()
         except (AttributeError, TypeError):
-            raise SubmitError("You must define a scheduler type for every environment")
+            raise NoSchedulerError(
+                "No scheduler defined for environment '{}'.".format(cls.__name__))
 
     @classmethod
     def submit(cls, script, flags=None, *args, **kwargs):
@@ -247,8 +252,11 @@ class UnknownEnvironment(ComputeEnvironment):
 
     @classmethod
     def get_scheduler(cls):
-        raise AttributeError(
-            "No scheduler defined for unknown environment.")
+        raise NoSchedulerError("No scheduler defined for unknown environment.")
+
+    @classmethod
+    def mpi_cmd(cls, cmd, np):
+        return 'mpirun -np {np} {cmd}'.format(np=np, cmd=cmd)
 
 
 class TestEnvironment(ComputeEnvironment):
@@ -260,7 +268,6 @@ class TestEnvironment(ComputeEnvironment):
     an real scheduler.
     """
     scheduler_type = scheduler.FakeScheduler
-    cores_per_node = 1
 
     @classmethod
     def mpi_cmd(cls, cmd, np):

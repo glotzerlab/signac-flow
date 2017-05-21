@@ -42,6 +42,7 @@ from .environment import get_environment
 from . import manage
 from . import util
 from .errors import SubmitError
+from .errors import NoSchedulerError
 from .util.tqdm import tqdm
 
 logger = logging.getLogger(__name__)
@@ -223,10 +224,11 @@ class JobOperation(object):
     :type cmd: str
     """
 
-    def __init__(self, name, job, cmd):
+    def __init__(self, name, job, cmd, np=None):
         self.name = name
         self.job = job
         self.cmd = cmd
+        self.np = np
 
     def __str__(self):
         return self.name
@@ -274,15 +276,19 @@ class FlowCondition:
 
 class FlowOperation:
 
-    def __init__(self, cmd, prereqs, postconds):
+    def __init__(self, cmd, prereqs=None, postconds=None, np=None):
         if prereqs is None:
             prereqs = []
         if postconds is None:
             postconds = []
+        self._np = None
 
         self._prerequistes = [FlowCondition(cond) for cond in prereqs]
         self._postconditions = [FlowCondition(cond) for cond in postconds]
         self._cmd = cmd
+
+    def __str__(self):
+        return "{type}(cmd='{cmd}')".format(type=type(self).__name__, cmd=self._cmd)
 
     def eligible(self, job):
         # if preconditions are all true and at least one post condition is false.
@@ -296,8 +302,11 @@ class FlowOperation:
     def complete(self, job):
         return not self.eligible(job)
 
-    def formatted_command(self, job):
+    def __call__(self, job=None):
         return self._cmd.format(job=job)
+
+    def np(self, job):
+        return self._np
 
 
 class _FlowProjectClass(type):
@@ -689,13 +698,13 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             type=int,
             help="Limit the number of operations to be submitted.")
 
-        distribution_group = parser.add_argument_group('distribution')
-        distribution_group.add_argument(
+        execution_group = parser.add_argument_group('execution')
+        execution_group.add_argument(
             '--np',
             type=int,
             default=1,
             help="Specify the number of processors required per operation.")
-        distribution_group.add_argument(
+        execution_group.add_argument(
             '--bundle',
             type=int,
             nargs='?',
@@ -705,7 +714,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             help="Specify how many operations to bundle into one submission. "
                  "When no specific size is give, all eligible operations are "
                  "bundled into one submission.")
-        distribution_group.add_argument(
+        execution_group.add_argument(
             '-s', '--serial',
             action='store_true',
             help="Schedule the operations to be executed in serial.")
@@ -730,7 +739,6 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             '{', '{{').replace('}', '}}')
         for line in sp_dump.splitlines():
             script.write('# ' + line + '\n')
-        script.write('\n')
 
     def _print_overview(self, stati, max_lines=None, file=sys.stdout):
         "Print the project's status overview."
@@ -965,7 +973,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             elif label(self, job):
                 yield getattr(label, '_label_name', label.__name__)
 
-    def add_operation(self, name, cmd, prereqs=None, postconds=None):
+    def add_operation(self, name, cmd, prereqs=None, postconds=None, np=None, **kwargs):
         """
         Add an operation to the workflow.
 
@@ -990,7 +998,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         other contributing factors like the whether the job-operation is currently
         running or queued.
         """
-        self._operations[name] = FlowOperation(cmd=cmd, prereqs=prereqs, postconds=postconds)
+        self._operations[name] = FlowOperation(cmd=cmd, prereqs=prereqs, postconds=postconds, np=np, **kwargs)
 
     def classify(self, job):
         """Generator function which yields labels for job.
@@ -1015,7 +1023,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 yield name
 
     def next_operations(self, job):
-        """Determine the next operation for job.
+        """Determine the next operations for job.
 
         You can, but don't have to use this function to simplify
         the submission process. The default method returns the next
@@ -1025,9 +1033,9 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         :type job: :class:`~signac.contrib.job.Job`
         :returns: The name of the operation to execute next.
         :rtype: str"""
-        for name, op in self._operations.items():
+        for name, op in self.operations.items():
             if op.eligible(job):
-                yield name
+                yield JobOperation(name, job, self._operations[name](job))
 
     def next_operation(self, job):
         """Determine the next operation for this job.
@@ -1037,8 +1045,8 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         :returns: A JobOpereation instance to execute next or `None` if no operation is eligible.
         :rtype: :py:class:`~.JobOperation` or `NoneType`
         """
-        for name in self.next_operations(job):
-            return JobOperation(name, job, self._operations[name].formatted_command(job))
+        for op in self.next_operations(job):
+            return op
 
     @property
     def operations(self):
@@ -1144,7 +1152,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             del args['func']
             try:
                 self.print_status(env.get_scheduler(), pool=pool, **args)
-            except AttributeError:
+            except NoSchedulerError:
                 self.print_status(None, pool=pool, **args)
             return 0
 
@@ -1166,15 +1174,23 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 
         def submit(env, args):
             kwargs = vars(args)
+            del kwargs['func']
             debug = kwargs.pop('debug')
+            test = kwargs.pop('test')
+            if test:
+                env = get_environment(test=True)
             try:
                 self.submit(env, **kwargs)
+            except NoSchedulerError as e:
+                print("Error:", e, "Consider using '--test', for testing purposes.", file=sys.stderr)
+                if debug:
+                    raise
+                return 1
             except SubmitError as e:
                 print("Submission error:", e, file=sys.stderr)
                 if debug:
                     raise
-                else:
-                    return 1
+                return 1
             else:
                 return 0
 
@@ -1231,6 +1247,9 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             '-d', '--debug',
             action="store_true",
             help="Print debugging information.")
+        parser_submit.add_argument(
+            '-t', '--test',
+            action='store_true')
         env_group = parser_submit.add_argument_group('{} options'.format(env.__name__))
         env.add_args(env_group)
         parser_submit.set_defaults(func=submit)

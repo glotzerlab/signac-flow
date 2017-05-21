@@ -1167,9 +1167,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         def _script(env, args):
             kwargs = vars(args)
             del kwargs['func']
-            test = kwargs.pop('test')
-            if test:
-                env = get_environment(test=True)
+            env = get_environment(test=True)
             ops = self.gather_operations(**kwargs)
             for bundle in make_bundles(ops, args.bundle_size):
                 script = env.script()
@@ -1249,9 +1247,6 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 
         parser_script = subparsers.add_parser('script')
         self.add_script_args(parser_script)
-        parser_script.add_argument(
-            '-t', '--test',
-            action='store_true')
         parser_script.set_defaults(func=_script)
 
         parser_submit = subparsers.add_parser('submit')

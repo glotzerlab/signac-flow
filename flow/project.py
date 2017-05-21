@@ -1149,7 +1149,8 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 
         def _next(env, args):
             for job in self:
-                if self.next_operation(job).name == args.name:
+                next_op = self.next_operation(job)
+                if next_op is not None and next_op.name == args.name:
                     print(job)
 
         def _run(env, args):

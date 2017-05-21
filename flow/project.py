@@ -734,18 +734,22 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         for status in stati:
             for label in status['labels']:
                 progress[label] += 1
-        progress_sorted = islice(sorted(
-            progress.items(), key=lambda x: (x[1], x[0]), reverse=True), max_lines)
+        print("{} {}\n".format(self._tr("Total # of jobs:"), len(stati)), file=file)
+        progress_sorted = list(islice(sorted(
+            progress.items(), key=lambda x: (x[1], x[0]), reverse=True), max_lines))
         table_header = ['label', 'progress']
-        rows = ([label, '{} {:0.2f}%'.format(
-            draw_progressbar(num, len(stati)), 100 * num / len(stati))]
-            for label, num in progress_sorted)
-        print("{} {}".format(self._tr("Total # of jobs:"), len(stati)), file=file)
-        print(util.tabulate.tabulate(rows, headers=table_header), file=file)
-        if max_lines is not None:
-            lines_skipped = len(progress) - max_lines
-            if lines_skipped:
-                print("{} {}".format(self._tr("Lines omitted:"), lines_skipped), file=file)
+        if progress_sorted:
+            rows = ([label, '{} {:0.2f}%'.format(
+                draw_progressbar(num, len(stati)), 100 * num / len(stati))]
+                for label, num in progress_sorted)
+            print(util.tabulate.tabulate(rows, headers=table_header), file=file)
+            if max_lines is not None:
+                lines_skipped = len(progress) - max_lines
+                if lines_skipped:
+                    print("{} {}".format(self._tr("Lines omitted:"), lines_skipped), file=file)
+        else:
+            print(util.tabulate.tabulate([], headers=table_header), file=file)
+            print("[no labels]", file=file)
 
     def format_row(self, status, statepoint=None, max_width=None):
         "Format each row in the detailed status output."

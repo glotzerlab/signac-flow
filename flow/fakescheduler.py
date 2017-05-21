@@ -15,7 +15,7 @@ class FakeScheduler(Scheduler):
         return
         yield
 
-    def submit(self, script, *args, **kwargs):
+    def submit(self, script, pretend=False, flags=[], *args, **kwargs):
         def format_arg(k, v):
             if v is True:
                 return '--{}'.format(k)
@@ -25,6 +25,7 @@ class FakeScheduler(Scheduler):
                 return '--{}={}'.format(k, v)
 
         fake_cmd = ' '.join(filter(None, (format_arg(k, v) for k, v in kwargs.items())))
+        fake_cmd += ' ' + ' '.join(flags)
         print("# Submit command: testsub {}".format(fake_cmd))
         print(script.read())
         # return status is None, meaning, 'not actually submitted'

@@ -21,7 +21,6 @@ import os
 import io
 import logging
 import argparse
-import warnings
 import datetime
 import json
 import errno
@@ -39,6 +38,7 @@ from signac.common import six
 from signac.common.six import with_metaclass
 
 from .environment import get_environment
+from .environment import NodesEnvironment
 from . import manage
 from . import util
 from .errors import SubmitError
@@ -46,14 +46,6 @@ from .errors import NoSchedulerError
 from .util.tqdm import tqdm
 
 logger = logging.getLogger(__name__)
-
-
-NUM_NODES_CALC_WARNING = """Unable to determine the reqired number of nodes (nn) for this submission.
-Either provide this value directly with '--nn' or provide the number of processors
-per node: '--ppn'.
-
-Please note, you can ignore this message by specifying extra submission options
-with '--' or by using the '--force' option."""
 
 
 def _mkdir_p(path):
@@ -220,15 +212,15 @@ class JobOperation(object):
     :type name: str
     :param job: The job instance associated with this operation.
     :type job: :py:class:`signac.Job`.
-    :param cmd: The command that constitutes the operation.
     :type cmd: str
     """
 
-    def __init__(self, name, job, cmd, np=None):
+    def __init__(self, name, job, cmd, np=None, mpi=False):
         self.name = name
         self.job = job
         self.cmd = cmd
         self.np = np
+        self.mpi = mpi
 
     def __str__(self):
         return self.name
@@ -284,22 +276,25 @@ class FlowCondition:
 
 class FlowOperation:
 
-    def __init__(self, cmd, prereqs=None, postconds=None, np=None):
+    def __init__(self, cmd, prereqs=None, postconds=None, np=None, mpi=False):
         if prereqs is None:
             prereqs = []
         if postconds is None:
             postconds = []
-        self._np = None
+        if np is None:
+            np = 1
+        self._cmd = cmd
+        self._np = np
+        self.mpi = False
 
         self._prerequistes = [FlowCondition(cond) for cond in prereqs]
         self._postconditions = [FlowCondition(cond) for cond in postconds]
-        self._cmd = cmd
 
     def __str__(self):
         return "{type}(cmd='{cmd}')".format(type=type(self).__name__, cmd=self._cmd)
 
     def eligible(self, job):
-        # if preconditions are all true and at least one post condition is false.
+        "Eligible, when all preconditions are true and at least one post condition is false."
         pre = all([cond(job) for cond in self._prerequistes])
         if len(self._postconditions):
             post = any([not cond(job) for cond in self._postconditions])
@@ -311,10 +306,16 @@ class FlowOperation:
         return not self.eligible(job)
 
     def __call__(self, job=None):
-        return self._cmd.format(job=job)
+        if callable(self._cmd):
+            return self._cmd(job)
+        else:
+            return self._cmd.format(job=job)
 
     def np(self, job):
-        return self._np
+        if callable(self._np):
+            return self._np(job)
+        else:
+            return self._np
 
 
 class _FlowProjectClass(type):
@@ -512,18 +513,26 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         script.writeline('cd {}'.format(self.root_directory()))
         script.writeline()
 
-    def write_script_operations(self, script, operations, np=1, background=False, **kwargs):
+    def write_script_operations(self, script, operations, background=False):
         "Iterate over all job-operations and write the command to the script."
         for op in operations:
             self.write_human_readable_statepoint(script, op.job)
-            script.write_cmd(op.cmd.format(job=op.job), np=np, bg=background)
+            if op.mpi:
+                script.write_cmd(op.cmd.format(job=op.job), np=op.np, bg=background)
+            else:
+                script.write_cmd(op.cmd.format(job=op.job), bg=background)
+            script.writeline()
 
     def write_script_footer(self, script, **kwargs):
         # Wait until all processes have finished
         script.writeline('wait')
 
-    def submit_user(self, env, _id, operations,
-                    np=1, nn=None, ppn=None, serial=True,
+    def write_script(self, script, operations, background=False):
+        self.write_script_header(script)
+        self.write_script_operations(script, operations, background=background)
+        self.write_script_footer(script)
+
+    def submit_user(self, env, _id, operations, nn=None, ppn=None, serial=False,
                     flags=None, force=False, **kwargs):
         """Implement this method to submit operations in combination with submit().
 
@@ -545,31 +554,51 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         :force: Warnings and other checks should be ignored if this argument is True.
         :type force: bool
         """
-        # Determine required number of nodes
-        if nn is None:
-            try:
-                nn = env.calc_num_nodes(
-                    operations=operations, ppn=ppn, np=np, serial=serial, force=force)
-            except AttributeError:
-                if not force and not flags:
-                    raise SubmitError(NUM_NODES_CALC_WARNING)
-        elif ppn is not None:
-            raise SubmitError(
-                "Can't provide both number of nodes (nn) and processors per node (ppn)!")
+        if issubclass(env, NodesEnvironment):
+            if nn is None and not (flags or force):
+                if serial:
+                    np_total = max(op.np for op in operations)
+                else:
+                    np_total = sum(op.np for op in operations)
+                nn = env.calc_num_nodes(np_total, ppn, force)
 
-        # Get job script from environment
         script = env.script(_id=_id, nn=nn, ppn=ppn, **kwargs)
+        self.write_script(script, operations, background=not serial)
+        return env.submit(script, nn=nn, ppn=ppn, flags=flags, **kwargs)
 
-        self.write_script_header(script, **kwargs)
-        self.write_script_operations(script, operations, np=np, background=not serial)
-        self.write_script_footer(script, **kwargs)
+    def gather_operations(self, job_id=None, operation_name=None, num=None, bundle_size=1,
+                          cmd=None, requires=None, pool=None, serial=False, force=False, **kwargs):
+        if job_id:
+            jobs = (self.open_job(id=_id) for _id in job_id)
+        else:
+            jobs = iter(self)
 
-        # Submit the script to the environment specific scheduler
-        return env.submit(script, nn=nn, **kwargs)
+        def get_op(job):
+            if cmd is None:
+                return self.next_operation(job)
+            else:
+                return JobOperation(name='user-cmd', cmd=cmd.format(job=job), job=job)
 
-    def submit(self, env, job_ids=None, operation_name=None, walltime=None,
-               num=None, force=False, bundle_size=1, cmd=None, requires=None,
-               pool=None, **kwargs):
+        def eligible(op):
+            if op is None:
+                return False
+            if force:
+                return True
+            if cmd is None:
+                if operation_name is not None and op.name != operation_name:
+                    return False
+            if requires is not None:
+                labels = set(self.classify(op.job))
+                if not all([req in labels for req in requires]):
+                    return False
+            return self.eligible_for_submission(op)
+
+        # Get the first num eligible operations
+        map_ = map if pool is None else pool.imap  # parallelization
+        return islice((op for op in map_(get_op, jobs) if eligible(op)), num)
+
+    def submit(self, env, bundle_size=1, serial=False, force=False,
+               nn=None, ppn=None, walltime=None, **kwargs):
         """Submit job-operations to the scheduler.
 
         This method will submit an operation for each job to the environment's scheduler,
@@ -605,69 +634,19 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             raise ValueError(
                 "The submit() API has changed with signac-flow version 0.4, "
                 "please update your project. ")
-        LEGACY = self._check_legacy_api()
-        if LEGACY:
-            logger.warning("Deprecated FlowProject API, switching to legacy mode.")
-            warnings.warn(
-                "Deprecated FlowProject API, switching to legacy mode.",
-                PendingDeprecationWarning)
+        if self._check_legacy_api():
+            raise DeprecationWarning(
+                "You are using a deprecated FlowProject API, please update your project.")
 
         if walltime is not None:
             walltime = datetime.timedelta(hours=walltime)
 
-        if job_ids:
-            jobs = (self.open_job(id=_id) for _id in job_ids)
-        else:
-            jobs = iter(self)
-
-        def get_op(job):
-            if LEGACY and operation_name is not None:
-                return JobOperation(name=operation_name, job=job, cmd=None)
-            if cmd is None:
-                if LEGACY:
-                    return JobOperation(name=self.next_operation(job), job=job, cmd=None)
-                else:
-                    return self.next_operation(job)
-            else:
-                return JobOperation(name='user-cmd', cmd=cmd.format(job=job), job=job)
-
-        def eligible(op):
-            if force:
-                return True
-            if op is None:
-                return False
-            if cmd is None:
-                if operation_name is not None and op.name != operation_name:
-                    return False
-            if requires is not None:
-                labels = set(self.classify(op.job))
-                if not all([req in labels for req in requires]):
-                    return False
-            if LEGACY:
-                if op.get_status() >= manage.JobStatus.submitted:
-                    return False
-                else:
-                    return self.eligible(job=op.job, operation=op.name, **kwargs)
-            else:
-                return self.eligible_for_submission(op)
-
-        # Get the first num eligible operations
-        map_ = map if pool is None else pool.imap  # parallelization
-        operations = islice((op for op in map_(get_op, jobs) if eligible(op)), num)
-
-        # Bundle all eligible operations and submit the bundles
+        operations = self.gather_operations(**kwargs)
         for bundle in make_bundles(operations, bundle_size):
             _id = self._store_bundled(bundle)
-            _submit = self._submit_legacy if LEGACY else self.submit_user
-            status = _submit(
-                env=env,
-                _id=_id,
-                operations=bundle,
-                walltime=walltime,
-                force=force,
-                **kwargs)
+            status = self.submit_user(env=env, _id=_id, operations=bundle, nn=nn, ppn=ppn,
+                                      serial=serial, force=force, walltime=walltime, **kwargs)
             if status is not None:
-                logger.info("Submitted job '{}' ({}).".format(_id, status.name))
                 for op in bundle:
                     op.set_status(status)
 
@@ -681,12 +660,6 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             nargs='*',
             help="Flags to be forwarded to the scheduler.")
         parser.add_argument(
-            '-j', '--job-id',
-            type=str,
-            nargs='+',
-            help="The job id of the jobs to submit. "
-            "Omit to automatically select all eligible jobs.")
-        parser.add_argument(
             '--pretend',
             action='store_true',
             help="Do not really submit, but print the submittal script to screen.")
@@ -694,7 +667,17 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             '--force',
             action='store_true',
             help="Ignore all warnings and checks, just submit.")
+        cls.add_script_args(parser)
 
+    @classmethod
+    def add_script_args(cls, parser):
+        "Add arguments to parser for the :meth:`~.submit` method."
+        parser.add_argument(
+            '-j', '--job-id',
+            type=str,
+            nargs='+',
+            help="The job id of the jobs to submit. "
+            "Omit to automatically select all eligible jobs.")
         selection_group = parser.add_argument_group('job operation selection')
         selection_group.add_argument(
             '-o', '--operation',
@@ -706,13 +689,8 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             type=int,
             help="Limit the number of operations to be submitted.")
 
-        execution_group = parser.add_argument_group('execution')
-        execution_group.add_argument(
-            '--np',
-            type=int,
-            default=1,
-            help="Specify the number of processors required per operation.")
-        execution_group.add_argument(
+        bundling_group = parser.add_argument_group('bundling')
+        bundling_group.add_argument(
             '--bundle',
             type=int,
             nargs='?',
@@ -722,7 +700,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             help="Specify how many operations to bundle into one submission. "
                  "When no specific size is give, all eligible operations are "
                  "bundled into one submission.")
-        execution_group.add_argument(
+        bundling_group.add_argument(
             '-s', '--serial',
             action='store_true',
             help="Schedule the operations to be executed in serial.")
@@ -890,7 +868,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         if pool is None:
             stati = [self.get_job_status(job) for job in jobs]
         else:
-            stati = pool.map(self.get_job_status, jobs)
+            stati = list(pool.map(self.get_job_status, jobs))
         title = "{} '{}':".format(self._tr("Status project"), self)
         print('\n' + title, file=file)
         if overview:
@@ -1006,7 +984,8 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         other contributing factors like the whether the job-operation is currently
         running or queued.
         """
-        self._operations[name] = FlowOperation(cmd=cmd, prereqs=prereqs, postconds=postconds, np=np, **kwargs)
+        self._operations[name] = FlowOperation(
+            cmd=cmd, prereqs=prereqs, postconds=postconds, np=np, **kwargs)
 
     def classify(self, job):
         """Generator function which yields labels for job.
@@ -1043,7 +1022,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         :rtype: str"""
         for name, op in self.operations.items():
             if op.eligible(job):
-                yield JobOperation(name, job, self._operations[name](job))
+                yield JobOperation(name=name, job=job, cmd=op(job), np=op.np(job), mpi=op.mpi)
 
     def next_operation(self, job):
         """Determine the next operation for this job.
@@ -1155,7 +1134,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 
     def main(self, parser=None, pool=None):
 
-        def status(env, args):
+        def _status(env, args):
             args = vars(args)
             del args['func']
             try:
@@ -1164,12 +1143,12 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 self.print_status(None, pool=pool, **args)
             return 0
 
-        def next(env, args):
+        def _next(env, args):
             for job in self:
                 if self.next_operation(job).name == args.name:
                     print(job)
 
-        def run(env, args):
+        def _run(env, args):
             try:
                 self.run(names=args.name, pretend=args.pretend, np=args.np,
                          timeout=args.timeout, progress=args.progress)
@@ -1180,7 +1159,20 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 return 1
             return 0
 
-        def submit(env, args):
+        def _script(env, args):
+            kwargs = vars(args)
+            del kwargs['func']
+            test = kwargs.pop('test')
+            if test:
+                env = get_environment(test=True)
+            ops = self.gather_operations(**kwargs)
+            for bundle in make_bundles(ops, args.bundle_size):
+                script = env.script()
+                self.write_script(script, bundle, background=not args.serial)
+                script.seek(0)
+                print(script.read())
+
+        def _submit(env, args):
             kwargs = vars(args)
             del kwargs['func']
             debug = kwargs.pop('debug')
@@ -1190,7 +1182,8 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             try:
                 self.submit(env, **kwargs)
             except NoSchedulerError as e:
-                print("Error:", e, "Consider using '--test', for testing purposes.", file=sys.stderr)
+                print(
+                    "Error:", e, "Consider using '--test', for testing purposes.", file=sys.stderr)
                 if debug:
                     raise
                 return 1
@@ -1211,7 +1204,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 
         parser_status = subparsers.add_parser('status')
         self.add_print_status_args(parser_status)
-        parser_status.set_defaults(func=status)
+        parser_status.set_defaults(func=_status)
 
         parser_next = subparsers.add_parser(
             'next',
@@ -1220,7 +1213,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             'name',
             type=str,
             help="The name of the operation.")
-        parser_next.set_defaults(func=next)
+        parser_next.set_defaults(func=_next)
 
         parser_run = subparsers.add_parser('run')
         parser_run.add_argument(
@@ -1247,7 +1240,14 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             '--progress',
             action='store_true',
             help="Display a progress bar during execution.")
-        parser_run.set_defaults(func=run)
+        parser_run.set_defaults(func=_run)
+
+        parser_script = subparsers.add_parser('script')
+        self.add_script_args(parser_script)
+        parser_script.add_argument(
+            '-t', '--test',
+            action='store_true')
+        parser_script.set_defaults(func=_script)
 
         parser_submit = subparsers.add_parser('submit')
         self.add_submit_args(parser_submit)
@@ -1260,7 +1260,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             action='store_true')
         env_group = parser_submit.add_argument_group('{} options'.format(env.__name__))
         env.add_args(env_group)
-        parser_submit.set_defaults(func=submit)
+        parser_submit.set_defaults(func=_submit)
 
         args = parser.parse_args()
         if not hasattr(args, 'func'):

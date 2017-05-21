@@ -39,6 +39,13 @@ else:
 logger = logging.getLogger(__name__)
 
 
+NUM_NODES_WARNING = """Unable to determine the reqired number of nodes (nn) for this submission.
+Either provide this value directly with '--nn' or provide the number of processors
+per node: '--ppn'.
+
+Please note, you can ignore this message by specifying extra submission options
+with '--' or by using the '--force' option."""
+
 UTILIZATION_WARNING = """You either specified or the environment is configured to use {ppn}
 processors per node (ppn), however you only use {usage:0.2%} of each node.
 Consider to increase the number of processors per operation (--np)
@@ -127,7 +134,7 @@ class JobScript(io.StringIO):
         "Write one line to the job script."
         self.write(line + self.eol)
 
-    def write_cmd(self, cmd, np=None, bg=False):
+    def write_cmd(self, cmd, bg=False, np=None):
         """Write a command to the jobscript.
 
         This command wrapper function is a convenience function, which
@@ -138,10 +145,10 @@ class JobScript(io.StringIO):
         :param np: The number of processors required for execution.
         :type np: int
         """
-        if np is None:
-            np = 1
-        if np > 1:
-            cmd = self._env.mpi_cmd(cmd, np=np)
+        if np is not None:
+            warnings.warn(DeprecationWarning("Do not provide np with write_cmd()!"))
+            if np > 1:
+                cmd = self._env.mpi_cmd(cmd, np=np)
         if bg:
             cmd = self._env.bg(cmd)
         self.writeline(cmd)
@@ -319,18 +326,18 @@ class NodesEnvironment(ComputeEnvironment):
             help="Specify the number of processors allocated to each node.")
 
     @classmethod
-    def calc_num_nodes(cls, operations, ppn, np=None, serial=True, force=False):
-        if np is None:
-            np = 1
+    def calc_num_nodes(cls, np_total, ppn, force=False):
         if ppn is None:
-            ppn = getattr(cls, 'cores_per_node')
+            try:
+                ppn = getattr(cls, 'cores_per_node')
+            except AttributeError:
+                raise SubmitError(NUM_NODES_WARNING)
 
-        # Calculate the total number of required processors
-        np_total = np if serial else np * len(operations)
         # Calculate the total number of required nodes
         nn = ceil(np_total / ppn)
+
         if not force:  # Perform basic check concerning the node utilization.
-            usage = np * len(operations) / nn / ppn
+            usage = np_total / nn / ppn
             if usage < 0.9:
                 print(UTILIZATION_WARNING.format(ppn=ppn, usage=usage), file=sys.stderr)
                 raise SubmitError("Bad node utilization!")
@@ -372,7 +379,8 @@ class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
                 js.writeline('#PBS -l nodes={}'.format(nn))
             else:
                 js.writeline('#PBS -l nodes={}:ppn={}'.format(nn, ppn))
-        js.writeline('#PBS -l walltime={}'.format(format_timedelta(walltime)))
+        if walltime is not None:
+            js.writeline('#PBS -l walltime={}'.format(format_timedelta(walltime)))
         if not no_copy_env:
             js.writeline('#PBS -V')
         return js
@@ -449,7 +457,7 @@ def _import_modules(prefix):
             _import_module(os.path.join(prefix, fn))
 
 
-def _import_registered_environments():
+def _import_configured_environments():
     cfg = config.load_config(config.FN_CONFIG)
     try:
         for name in cfg['flow'].as_list('environment_modules'):
@@ -458,7 +466,13 @@ def _import_registered_environments():
         pass
 
 
-def get_environment(test=False, import_registered=True):
+def registered_environments(import_configured=True):
+    if import_configured:
+        _import_configured_environments()
+    return list(ComputeEnvironment.registry.values())
+
+
+def get_environment(test=False, import_configured=True):
     """Attempt to detect the present environment.
 
     This function iterates through all defined ComputeEnvironment
@@ -473,10 +487,7 @@ def get_environment(test=False, import_registered=True):
     if test:
         return TestEnvironment
     else:
-        if import_registered:
-            _import_registered_environments()
-
-        env_types = list(ComputeEnvironment.registry.values())
+        env_types = registered_environments(import_configured=import_configured)
         logger.debug(
             "List of registered environments:\n\t{}".format(
                 '\n\t'.join((str(env.__name__) for env in env_types))))

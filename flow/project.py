@@ -1171,7 +1171,9 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             ops = self.gather_operations(**kwargs)
             for bundle in make_bundles(ops, args.bundle_size):
                 script = env.script()
+                script.writeline("# --------- BEGIN SCRIPT ----------")
                 self.write_script(script, bundle, background=not args.serial)
+                script.writeline("# ---------- END SCRIPT -----------")
                 script.seek(0)
                 print(script.read())
 

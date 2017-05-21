@@ -48,10 +48,10 @@ logger = logging.getLogger(__name__)
 
 
 NUM_NODES_CALC_WARNING = """Unable to determine the reqired number of nodes (nn) for this submission.
-Either provide this value directly with '--nn', provide the number of
-processors per node: '--ppn'.
+Either provide this value directly with '--nn' or provide the number of processors
+per node: '--ppn'.
 
-Please note you can ignore this message by specifying extra submission options
+Please note, you can ignore this message by specifying extra submission options
 with '--' or by using the '--force' option."""
 
 

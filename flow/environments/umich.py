@@ -15,22 +15,27 @@ class FluxEnvironment(DefaultTorqueEnvironment):
 
     @classmethod
     def script(cls, _id, nn, ppn, mode, **kwargs):
+        if ppn is None:
+            ppn = cls.cores_per_node
         js = super(FluxEnvironment, cls).script(_id=_id, **kwargs)
         js.writeline('#PBS -A {}'.format(cls.get_config_value('account')))
         js.writeline('#PBS -l qos={}'.format(cls.get_config_value('qos', 'flux')))
         if mode == 'cpu':
             js.writeline('#PBS -q {}'.format(cls.get_config_value('cpu_queue', 'flux')))
-            js.writeline('#PBS -l nodes={nn}:ppn={ppn}'.format(nn=nn, ppn=ppn))
+            if nn is not None:
+                js.writeline('#PBS -l nodes={nn}:ppn={ppn}'.format(nn=nn, ppn=ppn))
         elif mode == 'gpu':
             q = cls.get_config_value('gpu_queue', cls.get_config_value('cpu_queue', 'flux') + 'g')
             js.writeline('#PBS -q {}'.format(q))
-            js.writeline('#PBS -l nodes={nn}:ppn={ppn}:gpus=1'.format(nn=nn, ppn=ppn))
+            if nn is not None:
+                js.writeline('#PBS -l nodes={nn}:ppn={ppn}:gpus=1'.format(nn=nn, ppn=ppn))
         else:
             raise ValueError("Unknown mode '{}'.".format(mode))
         return js
 
     @classmethod
     def add_args(cls, parser):
+        super(FluxEnvironment, cls).add_args(parser)
         parser.add_argument(
             '--mode',
             choices=('cpu', 'gpu'),

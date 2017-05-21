@@ -555,12 +555,16 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         :type force: bool
         """
         if issubclass(env, NodesEnvironment):
-            if nn is None and not (flags or force):
+            if nn is None:
                 if serial:
                     np_total = max(op.np for op in operations)
                 else:
                     np_total = sum(op.np for op in operations)
-                nn = env.calc_num_nodes(np_total, ppn, force)
+                try:
+                    nn = env.calc_num_nodes(np_total, ppn, force)
+                except SubmitError as e:
+                    if not (flags or force):
+                        raise e
 
         script = env.script(_id=_id, nn=nn, ppn=ppn, **kwargs)
         self.write_script(script, operations, background=not serial)

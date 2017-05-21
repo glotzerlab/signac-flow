@@ -24,6 +24,7 @@ from .operations import redirect_log
 # Imports of packaged environments
 from .environments import incite  # noqa
 from .environments import xsede   # noqa
+from .environments import umich   # noqa
 
 
 __version__ = '0.5.0dev0'

@@ -233,6 +233,14 @@ class JobOperation(object):
     def __str__(self):
         return self.name
 
+    def __repr__(self):
+        return "{type}(name='{name}', job='{job}', cmd={cmd}, np={np})".format(
+            type=type(self).__name__,
+            name=self.name,
+            job=str(self.job),
+            cmd=repr(self.cmd),
+            np=self.np)
+
     def get_id(self):
         "Return a name, which identifies this job-operation."
         return '{}-{}'.format(self.job, self.name)

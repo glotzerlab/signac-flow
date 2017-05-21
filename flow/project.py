@@ -1165,11 +1165,13 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             return 0
 
         def submit(env, args):
+            kwargs = vars(args)
+            debug = kwargs.pop('debug')
             try:
-                self.submit(env, **vars(args))
+                self.submit(env, **kwargs)
             except SubmitError as e:
-                print("Error:", e, file=sys.stderr)
-                if args.debug:
+                print("Submission error:", e, file=sys.stderr)
+                if debug:
                     raise
                 else:
                     return 1
@@ -1180,10 +1182,6 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 
         if parser is None:
             parser = argparse.ArgumentParser()
-        parser.add_argument(
-            '-d', '--debug',
-            action="store_true",
-            help="Print debugging information.")
 
         subparsers = parser.add_subparsers()
 
@@ -1229,6 +1227,10 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 
         parser_submit = subparsers.add_parser('submit')
         self.add_submit_args(parser_submit)
+        parser_submit.add_argument(
+            '-d', '--debug',
+            action="store_true",
+            help="Print debugging information.")
         env_group = parser_submit.add_argument_group('{} options'.format(env.__name__))
         env.add_args(env_group)
         parser_submit.set_defaults(func=submit)

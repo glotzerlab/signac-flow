@@ -31,12 +31,10 @@ from . import manage
 from .errors import SubmitError
 from .errors import NoSchedulerError
 
-
 if six.PY2:
     import imp
 else:
     import importlib.machinery
-
 
 logger = logging.getLogger(__name__)
 
@@ -438,11 +436,6 @@ def _import_configured_environment_modules():
         pass
 
 
-def _import_packaged_environments():
-    from .environments import incite   # noqa
-    from .environments import xsede    # noqa
-
-
 def _import_module(fn):
     if six.PY2:
         return imp.load_source(os.path.splitext(fn)[0], fn)
@@ -465,7 +458,7 @@ def _import_registered_environments():
         pass
 
 
-def get_environment(test=False, import_packaged=True, import_registered=True):
+def get_environment(test=False, import_registered=True):
     """Attempt to detect the present environment.
 
     This function iterates through all defined ComputeEnvironment
@@ -480,8 +473,6 @@ def get_environment(test=False, import_packaged=True, import_registered=True):
     if test:
         return TestEnvironment
     else:
-        if import_packaged:
-            _import_packaged_environments()
         if import_registered:
             _import_registered_environments()
 

@@ -9,6 +9,8 @@ configure and implement a workflow to operate on a signac_ data space.
 .. _signac: https://signac.readthedocs.io
 """
 from . import environment
+from .environments import incite  # noqa
+from .environments import xsede   # nqa
 from . import scheduler
 from . import manage
 from . import errors
@@ -20,6 +22,7 @@ from .project import staticlabel
 from .environment import get_environment
 from .operations import run
 from .operations import redirect_log
+
 
 __version__ = '0.5.0dev0'
 
@@ -36,4 +39,4 @@ __all__ = [
     'get_environment',
     'run',
     'redirect_log',
-]
+    ]

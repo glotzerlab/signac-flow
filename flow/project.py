@@ -451,6 +451,8 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         names = set() if names is None else set(names)
 
         def select(op):
+            if op is None:
+                return False
             if names:
                 return op.name in names
             else:

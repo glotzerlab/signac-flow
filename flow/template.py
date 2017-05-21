@@ -33,8 +33,6 @@ def init(alias=None, template=None):
 
 TEMPLATES = {
 
-
-    # minimal templates:
     'minimal': {
         '{alias}.py': """from flow import FlowProject
 
@@ -48,10 +46,8 @@ if __name__ == '__main__':
 """,
 
     },
-    # end of minimal
 
-    # example:
-    'example': {
+    'example-next_operation': {
         '{alias}.py': """from flow import FlowProject
 from flow import JobOperation
 from flow import staticlabel
@@ -96,7 +92,7 @@ if __name__ == '__main__':
 
 
     # example conditions:
-    'example-conditions': {
+    'example': {
         '{alias}.py': """from flow import FlowProject
 from flow import staticlabel
 
@@ -143,6 +139,4 @@ if __name__ == '__main__':
     flow.run()
 """,
     }
-    # end of example-conditions
-
 }

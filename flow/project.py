@@ -276,9 +276,9 @@ class FlowOperation:
 
     def __init__(self, cmd, prereqs, postconds):
         if prereqs is None:
-            prereqs = [None]
+            prereqs = []
         if postconds is None:
-            postconds = [None]
+            postconds = []
 
         self._prerequistes = [FlowCondition(cond) for cond in prereqs]
         self._postconditions = [FlowCondition(cond) for cond in postconds]
@@ -287,12 +287,14 @@ class FlowOperation:
     def eligible(self, job):
         # if preconditions are all true and at least one post condition is false.
         pre = all([cond(job) for cond in self._prerequistes])
-        post = not all([cond(job) for cond in self._postconditions])
+        if len(self._postconditions):
+            post = any([not cond(job) for cond in self._postconditions])
+        else:
+            post = True
         return pre and post
 
     def complete(self, job):
-        return all([cond(job) for cond in self._postconditions]) and\
-                all([cond(job) for cond in self._prerequistes])
+        return not self.eligible(job)
 
     def formatted_command(self, job):
         return self._cmd.format(job=job)
@@ -1035,7 +1037,6 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         """
         for name in self.next_operations(job):
             return JobOperation(name, job, self._operations[name].formatted_command(job))
-        return None
 
     @property
     def operations(self):

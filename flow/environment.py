@@ -57,7 +57,7 @@ Alternatively, you can also use --force to ignore this warning.
 MISSING_ENV_CONF_KEY_MSG = """Your environment is missing the following configuration key: '{key}'
 Please provide the missing information, for example by adding it to your global configuration:
 
-signac config set --global {key} <VALUE>
+signac config --global set {key} <VALUE>
 """
 
 

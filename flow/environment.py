@@ -357,7 +357,6 @@ class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
         parser.add_argument(
             '-w', '--walltime',
             type=float,
-            default=12,
             help="The wallclock time in hours.")
         parser.add_argument(
             '--hold',
@@ -368,7 +367,10 @@ class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
             type=str,
             help="Schedule this job to be executed after "
                  "completion of a cluster job with this id.")
-        parser.add_argument('--no-copy-env', action='store_true')
+        parser.add_argument(
+            '--no-copy-env',
+            action='store_true',
+            help="Do not copy current environment variables into compute node environment.")
 
     @classmethod
     def script(cls, _id, nn=None, ppn=None, walltime=None, no_copy_env=False, **kwargs):

@@ -1177,12 +1177,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 
     @property
     def operations(self):
-        """
-        The dictionary of operations that have been added to the workflow.
-        :return: a dictionary with the key values are the names of the operations and
-                 the values are instances of :py:class:`~.FlowOperation`
-        :rtype: dict
-        """
+        "The dictionary of operations that have been added to the workflow."
         return self._operations
 
     def eligible(self, job_operation, **kwargs):

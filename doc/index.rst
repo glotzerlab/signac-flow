@@ -8,17 +8,15 @@ Welcome to signac-flow's documentation!
 
 .. automodule:: flow
 
-.. tip::
+.. raw:: html
 
-    The signac-project-template_ is a complete working implementation of a :py:class:`~flow.FlowProject`,
-    which serves both as example, but can also be used as a template to start new projects.
+    <script type="text/javascript" src="https://asciinema.org/a/6uyqoqk87w1r5y0k09zj43ibp.js" id="asciicast-6uyqoqk87w1r5y0k09zj43ibp" async></script>
 
-.. _signac-project-template: https://github.com/glotzerlab/signac-project-template
 
 .. toctree::
    :maxdepth: 2
 
-   example
+   reference
    flow
 
 

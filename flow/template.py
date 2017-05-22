@@ -38,10 +38,13 @@ TEMPLATES = {
 
     'minimal': {
         '{alias}.py': """from flow import FlowProject
+# import flow.environments  # uncomment to use default environments
 
 
 class {project_class}(FlowProject):
-    pass
+
+    def __init__(self, *args, **kwargs):
+        super({project_class}, self).__init__(*args, **kwargs)
 
 
 if __name__ == '__main__':
@@ -54,9 +57,13 @@ if __name__ == '__main__':
         '{alias}.py': """from flow import FlowProject
 from flow import JobOperation
 from flow import staticlabel
+# import flow.environments  # uncomment to use default environments
 
 
 class {project_class}(FlowProject):
+
+    def __init__(self, *args, **kwargs):
+        super({project_class}, self).__init__(*args, **kwargs)
 
     @staticlabel()
     def greeted(job):
@@ -71,7 +78,7 @@ class {project_class}(FlowProject):
                 # A reference to the job that this operation operates on
                 job,
 
-                # The command (/script) to be executed for this operation
+                # The command/script to be executed for this operation
                 cmd='python operations.py hello {{job}}')
 
 
@@ -98,6 +105,7 @@ if __name__ == '__main__':
     'example': {
         '{alias}.py': """from flow import FlowProject
 from flow import staticlabel
+# import flow.environments  # uncomment to use default environments
 
 
 class {project_class}(FlowProject):
@@ -106,8 +114,8 @@ class {project_class}(FlowProject):
     def greeted(job):
         return job.isfile('hello.txt')
 
-    def __init__(self, config=None):
-        super({project_class}, self).__init__(config=config)
+    def __init__(self, *args, **kwargs):
+        super({project_class}, self).__init__(*args, **kwargs)
 
         # Add hello world operation
         self.add_operation(
@@ -115,20 +123,30 @@ class {project_class}(FlowProject):
             # The name of the operation (may be freely choosen)
             name='hello',
 
-            # The command (/script) to be executed for this operation
-            cmd='python operations.py hello {{job}}',
+            # The command/script to be executed for this operation; any attribute of
+            # job may be used as field:
+            cmd='python operations.py hello {{job._id}}',
 
-            # A list of functions that determine wether this operation is 'ready',
-            # a value of None means that the operation is always ready.
-            prereqs=None,
+            # Alternatively, you can construct commands/scripts dynamically by providing a callable:
+            # cmd=lambda job: "python operations.py hello {{}}".format(job),
 
-            # A list of functions that determine, when this operation is 'finished', e.g.,
-            # this operation is 'done', if the file 'hello.txt' exists in the job's workspace.
-            postconds = [{project_class}.greeted]
+            # A list of functions that represent requirement for the execution of this operation
+            # for a specific job. The requirement is met when all functions return True.
+            # An empty list means: 'No requirements.'
+            prereqs=[],
+
+            # A list of functions that represent whether this operation is 'completed' for a
+            # specific job.
+            # An empty list means that the operation is never considered 'completed'.
+            postconds=[{project_class}.greeted]
+
+            # The number of processors required for this operation (may be a callable)
+            # np = 1,
             )
 
 if __name__ == '__main__':
-    {project_class}().main()""",
+    {project_class}().main()
+""",
 
         'operations.py': """def hello(job):
     print("Hello", job)

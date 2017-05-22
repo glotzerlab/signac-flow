@@ -23,6 +23,16 @@ else:
     from tempfile import TemporaryDirectory
 
 
+class StringIO(io.StringIO):
+    "PY27 compatibility layer."
+
+    def write(self, s):
+        if six.PY2:
+            super(StringIO, self).write(unicode(s))
+        else:
+            super(StringIO, self).write(s)
+
+
 class MockScheduler(Scheduler):
     _jobs = {}  # needs to be singleton
 
@@ -140,7 +150,7 @@ class ProjectTest(unittest.TestCase):
             list(project.classify(job))
             self.assertEqual(project.next_operation(job).name, 'a_op')
             self.assertEqual(project.next_operation(job).job, job)
-        fd = io.StringIO()
+        fd = StringIO()
         project.print_status(file=fd, err=fd)
 
     def test_single_submit(self):
@@ -199,7 +209,7 @@ class ProjectTest(unittest.TestCase):
         project.submit(env, bundle_size=2, num=4)
         self.assertEqual(len(list(sched.jobs())), 3)
         sched.reset()
-        project.update_stati(sched, file=io.StringIO())
+        project.update_stati(sched, file=StringIO())
         project.submit(env, bundle_size=0)
         self.assertEqual(len(list(sched.jobs())), 1)
 
@@ -212,7 +222,7 @@ class ProjectTest(unittest.TestCase):
             list(project.classify(job))
             self.assertEqual(project.next_operation(job).name, 'a_op')
             self.assertEqual(project.next_operation(job).job, job)
-        fd = io.StringIO()
+        fd = StringIO()
         project.submit(env)
         self.assertEqual(len(list(sched.jobs())), len(project))
 

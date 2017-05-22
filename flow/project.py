@@ -216,6 +216,8 @@ class JobOperation(object):
     """
 
     def __init__(self, name, job, cmd, np=None, mpi=False):
+        if np is None:
+            np = 1
         self.name = name
         self.job = job
         self.cmd = cmd

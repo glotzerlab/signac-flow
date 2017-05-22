@@ -1,6 +1,10 @@
 "Example files that may be used for faster initialization."
 import os
 import sys
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 def init(alias=None, template=None):
@@ -23,10 +27,9 @@ def init(alias=None, template=None):
             with open(fn_, 'x') as fw:
                 fw.write(code.format(alias=alias, project_class=project_class_name))
         except OSError as e:
-            raise RuntimeError(
+            logger.error(
                 "Error while trying to initialize flow project with alias '{alias}', a file named "
-                "'{fn}' already exists! Please choose a different name to continue.".format(
-                    alias=alias, fn=fn_))
+                "'{fn}' already exists!".format(alias=alias, fn=fn_))
         else:
             print("Created file '{}'.".format(fn_), file=sys.stderr)
 

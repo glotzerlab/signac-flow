@@ -128,7 +128,13 @@ class JobScript(io.StringIO):
 
     def __init__(self, env):
         self._env = env
-        super().__init__()
+        super(JobScript, self).__init__()
+
+    def write(self, s):
+        if six.PY2:
+            super(JobScript, self).write(unicode(s))
+        else:
+            super(JobScript, self).write(s)
 
     def writeline(self, line=''):
         "Write one line to the job script."

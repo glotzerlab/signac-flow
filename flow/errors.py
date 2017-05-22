@@ -2,5 +2,5 @@ class SubmitError(RuntimeError):
     pass
 
 
-class NoSchedulerError(SubmitError):
+class NoSchedulerError(AttributeError):
     pass

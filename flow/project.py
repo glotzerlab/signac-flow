@@ -1324,9 +1324,9 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 
         def _run(env, args):
             "Run all (or select) job operations."
-            names = set(args.names) if args.names is not None else set()
+            names = set(args.name)
 
-            if args.jobid is None:
+            if args.job_id is None:
                 jobs = self
             else:
                 jobs = (self.open_job(id=_id) for _id in args.jobid)
@@ -1416,6 +1416,12 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             nargs='*',
             help="If provided, only run operations where the identifier "
                  "matches the provided set of names.")
+        parser_run.add_argument(
+            '-j', '--job-id',
+            type=str,
+            nargs='+',
+            help="The job id of the jobs to run. "
+            "Omit to automatically select all jobs.")
         parser_run.add_argument(
             '-p', '--pretend',
             action='store_true',

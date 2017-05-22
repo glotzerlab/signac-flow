@@ -31,7 +31,7 @@ Let's initialize a few jobs, by executing the following script:
     # init.py
     import signac
 
-    project = siganc.init_project('MyProject')
+    project = signac.init_project('MyProject')
     for i in range(10):
         project.open_job({'a': i}).init()
 
@@ -113,7 +113,7 @@ That means in order to implement a workflow, we need to determine two things:
   2. What needs to happen **next**?
 
 We answer the first question by evaluating unary condition functions for each job.
-Based on those *conditions*, we can determine what should happen next.
+Based on those *conditions*, we can then determine what should happen next.
 
 Following the example from above, we define a ``greeted`` condition that determines whether the ``hello()`` operation was executed, e.g. the ``hello.txt`` file exists:
 

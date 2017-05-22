@@ -6,10 +6,6 @@ The FlowProject
 
 This chapter describes how to setup a complete workflow via the implementation of a :py:class:`~.FlowProject`.
 
-.. raw:: html
-
-    <script type="text/javascript" src="https://asciinema.org/a/6uyqoqk87w1r5y0k09zj43ibp.js" id="asciicast-6uyqoqk87w1r5y0k09zj43ibp" async></script>
-
 .. _project-setup:
 
 Setup and Interface
@@ -38,6 +34,11 @@ Executing this script on the command line will give us access to the project's c
 
     $ python project.py
     usage: project.py [-h] {status,next,run,script,submit} ...
+
+.. raw:: html
+
+    <script type="text/javascript" src="https://asciinema.org/a/1t8omjgtokjpnto0gnqnz5hoq.js" id="asciicast-1t8omjgtokjpnto0gnqnz5hoq" async></script>
+
 
 .. _classification:
 
@@ -94,6 +95,10 @@ We can check that by executing the ``hello`` operation for a few job and then lo
     Abbreviations used:
     S: status
     U: unknown
+
+.. raw:: html
+
+    <script type="text/javascript" src="https://asciinema.org/a/48bs64h7cdo7mncnkk88ilrzm.js" id="asciicast-48bs64h7cdo7mncnkk88ilrzm" async></script>
 
 .. _next-operation:
 
@@ -172,6 +177,10 @@ In this case, the ``hello`` operation will only be executed, when ``greeted()`` 
     S: status
     U: unknown
 
+.. raw:: html
+
+    <script type="text/javascript" src="https://asciinema.org/a/cfx50fgliekgzu8xt7r79s5n7.js" id="asciicast-cfx50fgliekgzu8xt7r79s5n7" async></script>
+
 .. _project-run:
 
 Running project operations
@@ -199,6 +208,10 @@ Let's remove a few random ``hello.txt`` files to regain pending operations:
 
     $ rm workspace/2af7905ebe91ada597a8d4bb91a1c0fc/hello.txt
     $ rm workspace/9bfd29df07674bc4aa960cf661b5acd2/hello.txt
+
+.. raw:: html
+
+    <script type="text/javascript" src="https://asciinema.org/a/2gfl9hfbveyu7583j338x6day.js" id="asciicast-2gfl9hfbveyu7583j338x6day" async></script>
 
 .. _project-script:
 
@@ -246,6 +259,11 @@ Using the ``script`` command, we can generate an **operation** execution script 
 These scripts can be used for the execution of operations directly, or they could be submitted to a cluster environment for remote execution.
 This brings us to the final chapter.
 
+.. raw:: html
+
+    <script type="text/javascript" src="https://asciinema.org/a/4jwqh0azk01rkterytxvzvr7g.js" id="asciicast-4jwqh0azk01rkterytxvzvr7g" async></script>
+
+
 Cluster submission
 ==================
 
@@ -257,3 +275,14 @@ The basic options will be as similar as possible, however there might be slight 
 
 You can check out the options available to you using the ``python project.py submit --help`` command.
 For more information, please see the :ref:`cluster-submission` chapter.
+
+.. _flow-project-demo:
+
+Full Demonstration
+==================
+
+The screencast below is a complete demonstration of all steps:
+
+.. raw:: html
+
+    <script type="text/javascript" src="https://asciinema.org/a/6uyqoqk87w1r5y0k09zj43ibp.js" id="asciicast-6uyqoqk87w1r5y0k09zj43ibp" async></script>

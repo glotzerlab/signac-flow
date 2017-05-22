@@ -130,15 +130,15 @@ class {project_class}(FlowProject):
             # Alternatively, you can construct commands/scripts dynamically by providing a callable:
             # cmd=lambda job: "python operations.py hello {{}}".format(job),
 
-            # A list of functions that represent requirement for the execution of this operation
+            # A list of functions that represent requirements for the execution of this operation
             # for a specific job. The requirement is met when all functions return True.
             # An empty list means: 'No requirements.'
-            prereqs=[],
+            pre=[],
 
             # A list of functions that represent whether this operation is 'completed' for a
             # specific job.
             # An empty list means that the operation is never considered 'completed'.
-            postconds=[{project_class}.greeted]
+            post=[{project_class}.greeted]
 
             # The number of processors required for this operation (may be a callable)
             # np = 1,

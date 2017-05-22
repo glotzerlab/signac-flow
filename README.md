@@ -1,5 +1,8 @@
 # README
 
+[![Anaconda-Server Badge](https://anaconda.org/glotzer/signac-flow/badges/version.svg)](https://anaconda.org/glotzer/signac-flow)
+[![PyPi](https://img.shields.io/pypi/v/signac-flow.svg)](https://img.shields.io/pypi/v/signac-flow.svg)
+
 ## About
 
 Workflow management based on the signac framework.
@@ -14,7 +17,7 @@ The signac-flow package provides the basic infrastructure to easily configure wo
 ## Installation
 
 The recommendend installation method for **signac-flow** is through **conda** or **pip**.
-The software is tested for Python versions 3.3 and is built for all major platforms.
+The software is tested for Python versions 3.3+ and is built for all major platforms.
 
 This package is available via the Glotzer Group conda channel:
 

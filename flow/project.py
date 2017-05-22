@@ -32,7 +32,6 @@ from hashlib import sha1
 from math import ceil
 from multiprocessing import Pool
 from multiprocessing import TimeoutError
-from subprocess import TimeoutExpired
 
 import signac
 from signac.common import six
@@ -45,6 +44,9 @@ from . import util
 from .errors import SubmitError
 from .errors import NoSchedulerError
 from .util.tqdm import tqdm
+
+if not six.PY2:
+    from subprocess import TimeoutExpired
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +61,7 @@ def _mkdir_p(path):
 
 def _execute(cmd, timeout=None):
     if six.PY2:
-        subprocess.call(cmd, timeout=timeout)
+        subprocess.call(cmd)
     else:
         subprocess.run(cmd, timeout=timeout)
 
@@ -1338,10 +1340,11 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             ops = (self.next_operation(job) for job in jobs)
             ops = [op for op in ops if select(op)]
 
+            exceptions = (TimeoutError, ) if six.PY2 else (TimeoutError, TimeoutExpired)
             try:
                 self.run(operations=ops, pretend=args.pretend, np=args.np,
                          timeout=args.timeout, progress=args.progress)
-            except (TimeoutError, TimeoutExpired):
+            except exceptions:
                 print(
                     "Error: Failed to complete due to timeout ({}s)!".format(args.timeout),
                     file=sys.stderr)

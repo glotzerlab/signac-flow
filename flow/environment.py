@@ -441,17 +441,6 @@ class GPUEnvironment(ComputeEnvironment):
     pass
 
 
-def _import_configured_environment_modules():
-    try:
-        for name in config.load_config()['flow']['environments']:
-            try:
-                importlib.import_module(name)
-            except ImportError:
-                logger.warning(name)
-    except KeyError:
-        pass
-
-
 def _import_module(fn):
     if six.PY2:
         return imp.load_source(os.path.splitext(fn)[0], fn)
@@ -469,7 +458,10 @@ def _import_configured_environments():
     cfg = config.load_config(config.FN_CONFIG)
     try:
         for name in cfg['flow'].as_list('environment_modules'):
-            importlib.import_module(name)
+            try:
+                importlib.import_module(name)
+            except ImportError as e:
+                logger.warning(e)
     except KeyError:
         pass
 

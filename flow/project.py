@@ -627,7 +627,8 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         self.write_script_footer(script)
 
     def _gather_operations(self, job_id=None, operation_name=None, num=None, bundle_size=1,
-                           cmd=None, requires=None, pool=None, serial=False, force=False, **kwargs):
+                           cmd=None, requires=None, pool=None, serial=False, force=False,
+                           legacy=False, **kwargs):
         "Gather operations to be executed or submitted."
         if job_id:
             jobs = (self.open_job(id=_id) for _id in job_id)
@@ -635,8 +636,13 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             jobs = iter(self)
 
         def get_op(job):
+            if legacy and operation_name is not None:
+                return JobOperation(name=operation_name, job=job, cmd=None)
             if cmd is None:
-                return self.next_operation(job)
+                if legacy:
+                    return JobOperation(name=self.next_operation(job), job=job, cmd=None)
+                else:
+                    return self.next_operation(job)
             else:
                 return JobOperation(name='user-cmd', cmd=cmd.format(job=job), job=job)
 
@@ -652,7 +658,13 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 labels = set(self.classify(op.job))
                 if not all([req in labels for req in requires]):
                     return False
-            return self.eligible_for_submission(op)
+            if legacy:
+                if op.get_status() >= manage.JobStatus.submitted:
+                    return False
+                else:
+                    return self.eligible(job=op.job, operation=op.name, **kwargs)
+            else:
+                return self.eligible_for_submission(op)
 
         # Get the first num eligible operations
         map_ = map if pool is None else pool.imap  # parallelization
@@ -695,22 +707,56 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             raise ValueError(
                 "The submit() API has changed with signac-flow version 0.4, "
                 "please update your project. ")
-        if self._check_legacy_api():
-            raise DeprecationWarning(
-                "You are using a deprecated FlowProject API, please update your project.")
+        LEGACY = self._check_legacy_api()
+        if LEGACY:
+            warnings.warn(
+                "You are using a deprecated FlowProject API (version 0.3.x), "
+                "please update your project.", DeprecationWarning)
+            logger.warning(
+                "You are using a deprecated FlowProject API (version 0.3.x), "
+                "please update your project. Entering legacy mode.")
 
         if walltime is not None:
             walltime = datetime.timedelta(hours=walltime)
 
-        operations = self._gather_operations(**kwargs)
+        operations = self._gather_operations(legacy=LEGACY, **kwargs)
+        _submit = self._submit_legacy if LEGACY else self.submit_user
+
         for bundle in make_bundles(operations, bundle_size):
             _id = self._store_bundled(bundle)
-            status = self.submit_operations(
-                env=env, _id=_id, operations=bundle, nn=nn, ppn=ppn,
-                serial=serial, force=force, walltime=walltime, **kwargs)
+            try:
+                status = _submit(
+                    env=env, _id=_id, operations=bundle, nn=nn, ppn=ppn,
+                    serial=serial, force=force, walltime=walltime, **kwargs)
+
+# BEGIN LEGACY MODE FOR VERSION 0.4.x:
+            except TypeError as e:
+                if "script() got multiple values for keyword argument 'nn'" == e.args[0]:
+                    warnings.warn(
+                        "Entering legacy mode for API version 0.4.x!", PendingDeprecationWarning)
+                    logger.warning("Entering legacy mode for API version 0.4.x!")
+                    if walltime is None:
+                        walltime = datetime.timedelta(hours=12)
+                    if nn is not None:
+                        raise RuntimeError(
+                            "You can't directly provide the number of nodes with the legacy API "
+                            "for version 0.4.x!")
+                    status = _submit(
+                        env=env, _id=_id, operations=bundle, ppn=ppn,
+                        serial=serial, force=force, walltime=walltime, **kwargs)
+                else:
+                    raise
+# END LEGACY MODE FOR VERSION 0.4.x.
+
             if status is not None:
                 for op in bundle:
                     op.set_status(status)
+
+    def submit_user(self, env, _id, operations, nn=None, ppn=None, serial=False,
+                    walltime=None, force=False, **kwargs):
+        return self.submit_operations(
+                env=env, _id=_id, operations=operations, nn=nn, ppn=ppn,
+                serial=serial, force=force, walltime=walltime, **kwargs)
 
     @classmethod
     def add_submit_args(cls, parser):

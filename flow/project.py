@@ -567,8 +567,8 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                         raise e
 
         script = env.script(_id=_id, nn=nn, ppn=ppn, **kwargs)
-        self.write_script(script, operations, background=not serial)
-        return env.submit(script, nn=nn, ppn=ppn, flags=flags, **kwargs)
+        self.write_script(script=script, operations=operations, background=not serial)
+        return env.submit(script=script, nn=nn, ppn=ppn, flags=flags, **kwargs)
 
     def gather_operations(self, job_id=None, operation_name=None, num=None, bundle_size=1,
                           cmd=None, requires=None, pool=None, serial=False, force=False, **kwargs):

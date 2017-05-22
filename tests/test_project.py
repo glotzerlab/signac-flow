@@ -4,8 +4,8 @@
 import unittest
 import io
 import uuid
-from tempfile import TemporaryDirectory
 
+from signac.common import six
 from flow import FlowProject
 from flow import JobOperation
 from flow import get_environment
@@ -16,6 +16,11 @@ from flow.environment import ComputeEnvironment
 from flow import label
 from flow import classlabel
 from flow import staticlabel
+
+if six.PY2:
+    from tempdir import TemporaryDirectory
+else:
+    from tempfile import TemporaryDirectory
 
 
 class MockScheduler(Scheduler):

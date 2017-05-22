@@ -6,15 +6,6 @@ Module contents
 
 .. automodule:: flow
     :members:
-    :undoc-members:
-    :show-inheritance:
-
-flow.project module
--------------------
-
-.. automodule:: flow.project
-    :members:
-    :undoc-members:
     :show-inheritance:
 
 flow.scheduler module

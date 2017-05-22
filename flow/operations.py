@@ -25,6 +25,43 @@ def _get_operations():
 
 
 def run(parser=None):
+    """Access to the "run" interface of an operations module.
+
+    Executing this function within a module will start a command line interface,
+    that can be used to execute operations defined within the same module.
+    All **top-level unary functions** will be intepreted as executable operation functions.
+
+    For example, if we have a module as such:
+
+    .. code-block:: python
+
+        # operations.py
+
+        def hello(job):
+            print('hello', job)
+
+        if __name__ == '__main__':
+            import flow
+            flow.run()
+
+    Then we can execute the ``hello`` operation for all jobs from the command like like this:
+
+    .. code-block:: bash
+
+        $ python operations.py hello
+
+    .. note::
+
+        The execution of operations is automatically parallelized.
+        You can control the degree of parallelization with the ``--np`` argument.
+
+
+    For more information, see:
+
+    .. code-block:: bash
+
+        $ python operations.py --help
+    """
     if parser is None:
         parser = argparse.ArgumentParser()
 

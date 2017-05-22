@@ -27,8 +27,9 @@ To implement a more automated workflow, we can subclass a :py:class:`~.FlowProje
 .. tip::
 
     You can generate boiler-plate templates like the one above with the ``$ flow init`` function.
+    There are multiple different templates available via the ``-t/--template`` option.
 
-Executing this script on the command line will give us access to the project's command line interface:
+Executing this script on the command line will give us access to this project's specific command line interface:
 
 .. code-block:: bash
 
@@ -39,6 +40,12 @@ Executing this script on the command line will give us access to the project's c
 
     <script type="text/javascript" src="https://asciinema.org/a/1t8omjgtokjpnto0gnqnz5hoq.js" id="asciicast-1t8omjgtokjpnto0gnqnz5hoq" async></script>
 
+.. note::
+
+    You can have **multiple** implementations of :py:class:`~.FlowProject` that all operate on the same **signac** project!
+    This may be useful, for example, if you want to implement two very distinct workflows that operate on the same data space.
+    Simply put those in different modules, *e.g.*, ``project_a.py`` and ``project_b.py``.
+
 
 .. _classification:
 
@@ -46,7 +53,7 @@ Classification
 ==============
 
 The :py:class:`~.FlowProject` uses a :py:meth:`~.FlowProject.classify` method to generate *labels* for a job.
-A label is a short text string, that essential represents a condition.
+A label is a short text string, that essentially represents a condition.
 Following last chapter's example, we could implement a ``greeted`` label like this:
 
 .. code-block:: python
@@ -96,6 +103,10 @@ We can check that by executing the ``hello`` operation for a few job and then lo
     S: status
     U: unknown
 
+.. note::
+
+    The status overview will show ``[no labels]`` -- even if you have implemented label-functions -- as long as none of the label functions actually returns ``True``.
+
 .. raw:: html
 
     <script type="text/javascript" src="https://asciinema.org/a/48bs64h7cdo7mncnkk88ilrzm.js" id="asciicast-48bs64h7cdo7mncnkk88ilrzm" async></script>
@@ -143,8 +154,9 @@ Alternatively, we can define a function that returns a command or script, e.g.:
 Finally, the ``post`` argument is a list of unary condition functions.
 
 .. admonition:: Definition:
+    :class: note
 
-    A specific operation is **eligible for execution**, whenever all pre-conditions (``pre``) are met and at least one of the post-conditions is not met.
+    A specific operation is **eligible for execution**, whenever all pre-conditions (``pre``) are met and at least one of the post-conditions (``post``) is not met.
 
 In this case, the ``hello`` operation will only be executed, when ``greeted()`` returns ``False``; we can check that again by looking at the status:
 

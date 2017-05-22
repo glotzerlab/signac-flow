@@ -11,6 +11,9 @@ This chapter introduces the two **fundamental concepts** for the implementation 
 Data Space Operations
 =====================
 
+Concept
+-------
+
 It is highly recommended to divide individual modifications of your project's data space into distinct functions.
 In this context, a *data space operation* is defined as a unary function with an instance of :py:class:`~.Project.Job` as its only argument.
 
@@ -50,13 +53,21 @@ We could execute this *operation* for the complete data space, for example in th
    hello 2af7905ebe91ada597a8d4bb91a1c0fc
    >>>
 
+The *flow.run()*-interface
+--------------------------
+
 However, we can simplify this.
 The flow package provides a command line interface for modules that contain *operations*.
 We can access this interface by calling the :py:func:`~.run` function:
 
+.. sidebar:: The *run*-interface
+
+      The :py:func:`.run` function parses the module from where it was called and interprets all **top-level unary functions** as operations.
+
 .. code-block:: python
 
     # operations.py
+
     def hello(job):
         print('hello', job)
         with job:
@@ -67,7 +78,8 @@ We can access this interface by calling the :py:func:`~.run` function:
         import flow
         flow.run()
 
-Now we can execute our operations directly from the command line:
+Since the ``hello()`` function is a top-level function with only one argument, it is interpreted as a dataspace-operation.
+That means we can execute it directly from the command line:
 
 .. code-block:: bash
 
@@ -82,7 +94,10 @@ This is a brief demonstration on how to implement the ``operations.py`` module:
 
     <script type="text/javascript" src="https://asciinema.org/a/5sj5n5xb11iw9j41lv3obi873.js" id="asciicast-5sj5n5xb11iw9j41lv3obi873" async></script>
 
-The :py:func:`~.run` function will actually automatically parallelize.
+Parallelized Execution
+----------------------
+
+The :py:func:`.run` function automatically executes all operations in parallel on as a many processors as there are available.
 We can test that by adding a "cost-function" to our example *operation*:
 
 .. code-block:: python
@@ -93,7 +108,7 @@ We can test that by adding a "cost-function" to our example *operation*:
         sleep(1)
         # ...
 
-Executing this with ``$ python operations.py hello``, will automatically parallelize the execution to as many processors as there are available:
+Executing this with ``$ python operations.py hello`` we can now see how many operations are executed in parallel:
 
 .. raw::  html
 

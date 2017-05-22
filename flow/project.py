@@ -309,7 +309,9 @@ class FlowOperation(object):
         op = FlowOperation('hello', cmd='hello {job._id}')
         op = FlowOperation('hello', cmd=lambda 'hello {}'.format(job._id))
 
-    Here are some more useful examples for str-substitutions:
+    Here is another example for possible str-substitutions:
+
+    .. code-block:: python
 
         # Substitute job state point parameters:
         op = FlowOperation('hello', cmd='cd {job.ws}; hello {job.sp.a}')

@@ -10,7 +10,8 @@ The following sections describe briefly how to setup a submission process.
 The *submit* interface
 ======================
 
-In general, we submit operations through the primary interface of the :py:class:`~.FlowProject`, e.g. by setting up a ``project.py`` module, like this:
+In general, we submit operations through the primary interface of the :py:class:`~.FlowProject`.
+If we have a ``project.py`` module (:ref:`as shown earlier <project-setup>`), which looks something like this:
 
 .. code-block:: python
 
@@ -23,7 +24,7 @@ In general, we submit operations through the primary interface of the :py:class:
     if __name__ == '__main__':
         Project().main()
 
-We can then submit operation from the command line with the following command:
+Then we can submit operations from the command line with the following command:
 
 .. code-block:: bash
 
@@ -38,8 +39,8 @@ For example, the options available to you will be different when running this on
 
 .. note::
 
-    Unless you have one of the supported schedulers installed, you will not be able to submit any operations on your local laptop, however you will be able to run some test commands in order to debug the process as best as you can.
-    On the other hand, if you are in one of the natively supported high-performance super computing environments (e.g. XSEDE), you may take advantage of configurations profiles specifically taylored to those environments.
+    Unless you have one of the supported schedulers installed, you will not be able to submit any operations on your computer, however you will be able to run some test commands in order to debug the process as best as you can.
+    On the other hand, if you are in one of the natively supported high-performance super computing environments (e.g. XSEDE), you may take advantage of configurations profiles specifically tailored to those environments.
 
 Submitting Operations
 =====================
@@ -63,7 +64,7 @@ For example the following command would submit a total number of 5 ``hello`` ope
 Operation Bundling
 ==================
 
-By default all operations will be submitted as a seperate cluster job.
+By default all operations will be submitted as a separate cluster job.
 However, you may choose to bundle multiple operations into one submission using the ``--bundle`` option, e.g., if you need to run multiple processes in parallel to fully utilize one node.
 
 If you have many small operations, you can *bundle* them and run them in *serial* using the ``--serial`` option.

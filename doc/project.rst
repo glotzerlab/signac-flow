@@ -38,7 +38,9 @@ Executing this script on the command line will give us access to this project's 
 
 .. raw:: html
 
-    <script type="text/javascript" src="https://asciinema.org/a/1t8omjgtokjpnto0gnqnz5hoq.js" id="asciicast-1t8omjgtokjpnto0gnqnz5hoq" async></script>
+    <div align="center">
+      <script type="text/javascript" src="https://asciinema.org/a/1t8omjgtokjpnto0gnqnz5hoq.js" id="asciicast-1t8omjgtokjpnto0gnqnz5hoq" async></script>
+    </div>
 
 .. note::
 
@@ -109,7 +111,9 @@ We can check that by executing the ``hello`` operation for a few job and then lo
 
 .. raw:: html
 
-    <script type="text/javascript" src="https://asciinema.org/a/48bs64h7cdo7mncnkk88ilrzm.js" id="asciicast-48bs64h7cdo7mncnkk88ilrzm" async></script>
+    <div align="center">
+      <script type="text/javascript" src="https://asciinema.org/a/48bs64h7cdo7mncnkk88ilrzm.js" id="asciicast-48bs64h7cdo7mncnkk88ilrzm" async></script>
+    </div>
 
 .. _next-operation:
 
@@ -191,7 +195,9 @@ In this case, the ``hello`` operation will only be executed, when ``greeted()`` 
 
 .. raw:: html
 
-    <script type="text/javascript" src="https://asciinema.org/a/cfx50fgliekgzu8xt7r79s5n7.js" id="asciicast-cfx50fgliekgzu8xt7r79s5n7" async></script>
+    <div align="center">
+      <script type="text/javascript" src="https://asciinema.org/a/cfx50fgliekgzu8xt7r79s5n7.js" id="asciicast-cfx50fgliekgzu8xt7r79s5n7" async></script>
+    </div>
 
 .. _project-run:
 
@@ -223,7 +229,9 @@ Let's remove a few random ``hello.txt`` files to regain pending operations:
 
 .. raw:: html
 
-    <script type="text/javascript" src="https://asciinema.org/a/2gfl9hfbveyu7583j338x6day.js" id="asciicast-2gfl9hfbveyu7583j338x6day" async></script>
+    <div align="center">
+      <script type="text/javascript" src="https://asciinema.org/a/2gfl9hfbveyu7583j338x6day.js" id="asciicast-2gfl9hfbveyu7583j338x6day" async></script>
+    </div>
 
 .. _project-script:
 
@@ -273,7 +281,9 @@ This brings us to the final chapter.
 
 .. raw:: html
 
-    <script type="text/javascript" src="https://asciinema.org/a/4jwqh0azk01rkterytxvzvr7g.js" id="asciicast-4jwqh0azk01rkterytxvzvr7g" async></script>
+    <div align="center">
+      <script type="text/javascript" src="https://asciinema.org/a/4jwqh0azk01rkterytxvzvr7g.js" id="asciicast-4jwqh0azk01rkterytxvzvr7g" async></script>
+    </div>
 
 
 Cluster submission
@@ -297,4 +307,6 @@ The screencast below is a complete demonstration of all steps:
 
 .. raw:: html
 
-    <script type="text/javascript" src="https://asciinema.org/a/6uyqoqk87w1r5y0k09zj43ibp.js" id="asciicast-6uyqoqk87w1r5y0k09zj43ibp" async></script>
+    <div align="center">
+      <script type="text/javascript" src="https://asciinema.org/a/6uyqoqk87w1r5y0k09zj43ibp.js" id="asciicast-6uyqoqk87w1r5y0k09zj43ibp" async></script>
+    </div>

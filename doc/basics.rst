@@ -92,7 +92,9 @@ This is a brief demonstration on how to implement the ``operations.py`` module:
 
 .. raw:: html
 
-    <script type="text/javascript" src="https://asciinema.org/a/5sj5n5xb11iw9j41lv3obi873.js" id="asciicast-5sj5n5xb11iw9j41lv3obi873" async></script>
+    <div align="center">
+      <script type="text/javascript" src="https://asciinema.org/a/5sj5n5xb11iw9j41lv3obi873.js" id="asciicast-5sj5n5xb11iw9j41lv3obi873" async></script>
+    </div>
 
 Parallelized Execution
 ----------------------
@@ -112,7 +114,9 @@ Executing this with ``$ python operations.py hello`` we can now see how many ope
 
 .. raw::  html
 
-    <script type="text/javascript" src="https://asciinema.org/a/2w8kuoj8h7xde7p22w26obc4i.js" id="asciicast-2w8kuoj8h7xde7p22w26obc4i" async></script>
+    <div align="center">
+      <script type="text/javascript" src="https://asciinema.org/a/2w8kuoj8h7xde7p22w26obc4i.js" id="asciicast-2w8kuoj8h7xde7p22w26obc4i" async></script>
+    </div>
 
 .. _conditions:
 

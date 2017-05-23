@@ -37,6 +37,7 @@ else:
     import importlib.machinery
 
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 
 NUM_NODES_WARNING = """Unable to determine the reqired number of nodes (nn) for this submission.

@@ -1,3 +1,54 @@
+0.5.0b1:
+
+	- Major updates and new features:
+
+		- The documentation has been completely revised; most components are now
+			covered by a reference documentation; the reference documentation serves
+			also as basic tutorial.
+		- The signac-flow package now officially supports Python version 2.7 in
+			addition to versions 3.4+; the support for version 3.3 has been dropped.
+		- Add comand line interface for instances of `FlowProject`, to be
+			accessed via the `FlowProject.main()` function. This makes it easier to
+			interact with specific workflow implementations on the command line, for
+			example to view the project's status, execute operations or submit them to
+			a scheduler.
+		- The `$ flow init` command initializes a new very lean workflow module that
+			replaces the need to use project templates. Setting up a workflow with
+			signac-flow is now much easier; template projects are no longer needed.
+			Th `$ flow init` command can be invoked with an optional `-t/--template`
+			argument to initialize project modules with example code.
+		- Add the `flow.run()` function to turn python modules that implement
+			functions to be used as data space operations into executables.
+			Executing the `flow.run()` function opens a command line interface that
+			can be used to execute operations defined within the same module
+			directly from the command line in serial and parallel.
+		- The definition of operations on the project level is now possible via
+			the `FlowProject.operations` dictionary; operations can either be added
+			directly or via the `FlowProject.add_operation()` function.
+		- Environment with torque or slurm scheduler are now immediately supported
+			via a default environment profile.
+		- The submission process is generally streamlined and it is easier to forward
+			arguments to the underlying scheduler; this is is supposed to enable the
+			user to directly submit scripts and operations without the need to setup
+			a custom environment profile.
+		- Some environment profiles for large cluster environments are bundled
+			with the package; it is no longer needed to install external packages to
+			be able to use profiles on some HPC resources.
+
+	- API changes (breaking):
+
+		- The use of `JobScript.write_cmd()` with an `np` argument is pending
+			deprecation, the adjustment of commands to the local environment is
+			moved to an earlier stage (for instance, during project instance
+			construction).
+		- The official project template is still functional via a legacy API
+			layer, however it is recommended that users update projects to use with
+			this version; the update process is described in the README document.
+		- Most of the environment specific command line arguments are now directly
+			provided by the environment profile via profile specific
+			`add_parser_args()` functions; that means that existing environment
+			might be require some tweaking to work with this version.
+	
 0.4.2:
 
 	- Fix issue in the submit legacy mode, the write_header()

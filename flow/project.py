@@ -1308,6 +1308,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             "Print status overview."
             args = vars(args)
             del args['func']
+            del args['debug']
             try:
                 self.print_status(env.get_scheduler(), pool=pool, **args)
             except NoSchedulerError:
@@ -1348,6 +1349,8 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 print(
                     "Error: Failed to complete due to timeout ({}s)!".format(args.timeout),
                     file=sys.stderr)
+                if args.debug:
+                    raise
                 return 1
             return 0
 
@@ -1355,6 +1358,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             "Generate a script for the execution of operations."
             kwargs = vars(args)
             del kwargs['func']
+            del kwargs['debug']
             env = get_environment(test=True)
             ops = self._gather_operations(**kwargs)
             for bundle in make_bundles(ops, args.bundle_size):
@@ -1393,6 +1397,11 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 
         if parser is None:
             parser = argparse.ArgumentParser()
+
+        parser.add_argument(
+            '-d', '--debug',
+            action='store_true',
+            help="Increase output verbosity for debugging.")
 
         subparsers = parser.add_subparsers()
 
@@ -1463,5 +1472,9 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         if not hasattr(args, 'func'):
             parser.print_usage()
             sys.exit(2)
+        if args.debug:
+            logging.basicConfig(level=logging.DEBUG)
+        else:
+            logging.basicConfig(level=logging.WARNING)
 
         sys.exit(args.func(env, args))

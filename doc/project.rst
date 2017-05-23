@@ -85,7 +85,7 @@ We can check that by executing the ``hello`` operation for a few job and then lo
 
     label    progress
     -------  ----------
-    [no labels]
+    greeted  |########--------------------------------| 20.00%
 
     Detailed view:
     job_id                            S      next_op  labels
@@ -104,10 +104,6 @@ We can check that by executing the ``hello`` operation for a few job and then lo
     Abbreviations used:
     S: status
     U: unknown
-
-.. note::
-
-    The status overview will show ``[no labels]`` -- even if you have implemented label-functions -- as long as none of the label functions actually returns ``True``.
 
 .. raw:: html
 
@@ -292,8 +288,8 @@ Cluster submission
 While it is always possible to submit scripts like the one shown in the previous section manually to a cluster, the advantage of using the flow interface is, that flow will be able to **keep track of submitted jobs** and for example prevent the resubmission of active operations.
 
 The signac-flow submit interface will be adjusted based on the environment it is executed in.
-For example, submitting to a torque scheduler might be a different compared to submitting to a slurm scheduler.
-The basic options will be as similar as possible, however there might be slight subtleties that cannot all be covered here.
+For example, submitting to a torque scheduler might be slightly different compared to submitting to a slurm scheduler.
+The basic options will be as similar as possible, however there might be subtleties that cannot all be covered here.
 
 You can check out the options available to you using the ``python project.py submit --help`` command.
 For more information, please see the :ref:`cluster-submission` chapter.

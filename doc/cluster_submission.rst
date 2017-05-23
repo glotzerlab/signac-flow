@@ -53,8 +53,8 @@ The submission process consists of the following steps:
 
 The first step is largely determined by your project *workflow*.
 You can see which operation might be submitted by looking at the output of ``$ python project.py status --detailed``.
-You may further reduce the operations to be submitted by selecting specifc job (``-j``), specific operations (``-o``) or generally reduce the total number of operations to be submitted (``-n``).
-For example the following command would submit a total number of 5 ``hello`` operations:
+You may further reduce the operations to be submitted by selecting specifc jobs (``-j``), specific operations (``-o``), or generally reduce the total number of operations to be submitted (``-n``).
+For example the following command would submit up to 5 ``hello`` operations:
 
 .. code-block:: bash
 
@@ -118,7 +118,7 @@ Different environment use different MPI-commands, you can use your environment-s
 Managing Environments
 =====================
 
-The **signac-flow** package attempts to detect your local environment and based on that adjust the options provided by the ``submit`` interface.
+The **signac-flow** package attempts to detect your local environment and based on that adjusts the options provided by the ``submit`` interface.
 You can check which environment you are using, by looking at the output of ``submit --help``.
 
 The :py:func:`~.get_environment` function will go through all defined :py:class:`~.ComputeEnvironment` classes and return the one, where the :py:meth:`~.ComputeEnvironment.is_present` class method returns ``True``.

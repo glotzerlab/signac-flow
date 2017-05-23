@@ -35,3 +35,19 @@ The documentation for this package can be found online at [signac-flow.readthedo
 cd doc
 make html
 ```
+
+## Update legacy projects for version 0.5:
+
+Although legacy projects should be mostly supported via compatibility layers, it is generally recommended to update projects for version 0.5.
+These are the steps required to update:
+
+  1. Remove all status and submission related modules, these functions should now be provided by the `FlowProject.main()` interface.
+  2. Consider interfacing with modules that implement operations via the `flow.run()` function.
+
+Please note, if you don't want to update, we recommend to copy the source code of a working version directly into the project directory.
+You should link the flow package into the project's root directoy, for example with the following command:
+```
+#!bash
+$ cd my_project
+$ git clone git@bitbucket.org:glotzer/signac-flow.git && git fetch && git checkout v0.4.2 && ln -s signac-flow/flow
+```

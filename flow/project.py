@@ -1328,7 +1328,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             if args.job_id is None:
                 jobs = self
             else:
-                jobs = (self.open_job(id=_id) for _id in args.jobid)
+                jobs = (self.open_job(id=_id) for _id in args.job_id)
 
             def select(op):
                 if op is None:

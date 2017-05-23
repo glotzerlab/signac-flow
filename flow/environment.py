@@ -133,7 +133,7 @@ class JobScript(io.StringIO):
 
     def write(self, s):
         if six.PY2:
-            super(JobScript, self).write(unicode(s))
+            super(JobScript, self).write(unicode(s))  # noqa
         else:
             super(JobScript, self).write(s)
 

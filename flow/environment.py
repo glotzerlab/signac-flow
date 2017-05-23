@@ -19,7 +19,6 @@ import warnings
 import io
 import importlib
 import setuptools
-from setuptools.command.install import install
 from math import ceil
 from collections import OrderedDict
 
@@ -70,6 +69,7 @@ def setup(py_modules, **attrs):
     configuration. Once registered, is automatically imported when the
     get_environment() function is called.
     """
+    from setuptools.command.install import install
 
     class InstallAndConfig(install):
 

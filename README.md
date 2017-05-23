@@ -7,7 +7,8 @@
 
 Workflow management based on the signac framework.
 
-The signac-flow package provides the basic infrastructure to easily configure workflow for data operations on a signac workspace executed by a scheduler.
+The signac-flow tool provides the basic components to setup simple to complex workflows for [signac projects](https://glotzerlab.engin.umich.edu/signac).
+That includes the definition of data pipelines, execution of data space operations and the submission of operations to high-performance super computers.
 
 ## Maintainers
 
@@ -17,7 +18,7 @@ The signac-flow package provides the basic infrastructure to easily configure wo
 ## Installation
 
 The recommendend installation method for **signac-flow** is through **conda** or **pip**.
-The software is tested for Python versions 3.3+ and is built for all major platforms.
+The software is tested for Python versions 2.7 and 3.4+ and is built for all major platforms.
 
 This package is available via the Glotzer Group conda channel:
 
@@ -44,7 +45,7 @@ These are the steps required to update:
   1. Remove all status and submission related modules, these functions should now be provided by the `FlowProject.main()` interface.
   2. Consider interfacing with modules that implement operations via the `flow.run()` function.
 
-Please note, if you don't want to update, we recommend to copy the source code of a working version directly into the project directory.
+Please note, if you don't want to update, we recommend copying the source code of a working version directly into the project directory.
 You should link the flow package into the project's root directoy, for example with the following command:
 ```
 #!bash

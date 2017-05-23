@@ -13,7 +13,7 @@ Welcome to signac-flow's documentation!
    :target: https://img.shields.io/pypi/v/signac-flow.svg
 
 The signac-flow tool provides the basic components to setup simple to complex workflows for `signac projects <https://glotzerlab.engin.umich.edu/signac>`_.
-That includes the definition of data pipelines, execution of data space operations and the submissionof operations to high-performance super computers.
+That includes the definition of data pipelines, execution of data space operations and the submission of operations to high-performance super computers.
 
 The implementation is in pure Python, requires signac_ and is tested for Python versions 2.7 and 3.4+.
 

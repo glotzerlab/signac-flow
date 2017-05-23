@@ -1,4 +1,4 @@
-0.5.0b2:
+0.5.0b3:
 
 	- Major updates and new features:
 

@@ -273,7 +273,7 @@ Using the ``script`` command, we can generate an **operation** execution script 
     ---- END SCRIPT ----
 
 These scripts can be used for the execution of operations directly, or they could be submitted to a cluster environment for remote execution.
-This brings us to the final chapter.
+For more information about how to submit operations for execution to a cluster environment, see the :ref:`cluster-submission` chapter.
 
 .. raw:: html
 
@@ -281,18 +281,6 @@ This brings us to the final chapter.
       <script type="text/javascript" src="https://asciinema.org/a/4jwqh0azk01rkterytxvzvr7g.js" id="asciicast-4jwqh0azk01rkterytxvzvr7g" async></script>
     </div>
 
-
-Cluster submission
-==================
-
-While it is always possible to submit scripts like the one shown in the previous section manually to a cluster, the advantage of using the flow interface is, that flow will be able to **keep track of submitted jobs** and for example prevent the resubmission of active operations.
-
-The signac-flow submit interface will be adjusted based on the environment it is executed in.
-For example, submitting to a torque scheduler might be slightly different compared to submitting to a slurm scheduler.
-The basic options will be as similar as possible, however there might be subtleties that cannot all be covered here.
-
-You can check out the options available to you using the ``python project.py submit --help`` command.
-For more information, please see the :ref:`cluster-submission` chapter.
 
 .. _flow-project-demo:
 
@@ -306,3 +294,5 @@ The screencast below is a complete demonstration of all steps:
     <div align="center">
       <script type="text/javascript" src="https://asciinema.org/a/6uyqoqk87w1r5y0k09zj43ibp.js" id="asciicast-6uyqoqk87w1r5y0k09zj43ibp" async></script>
     </div>
+
+Checkout the :ref:`next chapter <cluster-submission>` for a guide on how to submit operations to a cluster environment.

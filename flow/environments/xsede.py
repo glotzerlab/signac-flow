@@ -1,11 +1,15 @@
 # Copyright (c) 2017 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-"""Environments for XSEDE super computers."""
+"""Environments for XSEDE supercomputers."""
 from ..environment import DefaultSlurmEnvironment
 
 
 class CometEnvironment(DefaultSlurmEnvironment):
+    """Environment profile for the Comet supercomputer.
+
+    http://www.sdsc.edu/services/hpc/hpc_systems.html#comet
+    """
     hostname_pattern = 'comet'
     cores_per_node = 24
 

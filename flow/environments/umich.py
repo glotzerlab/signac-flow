@@ -6,6 +6,10 @@ from ..environment import DefaultTorqueEnvironment
 
 
 class FluxEnvironment(DefaultTorqueEnvironment):
+    """Environment profile for the flux supercomputing environment.
+
+    http://arc-ts.umich.edu/systems-and-services/flux/
+    """
     hostname_pattern = '(nyx|flux).*.umich.edu'
     cores_per_node = 1
 

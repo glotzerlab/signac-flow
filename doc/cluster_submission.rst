@@ -4,8 +4,12 @@
 Cluster Submission
 ==================
 
-Using **signac-flow** to manage the submission of operations to a cluster environment, enables us to **keep track** of the status of individual operations, such as whether they are queued or running.
-The following sections describe briefly how to setup a submission process.
+While it is always possible to manually submit scripts like the one shown in the :ref:`previous chapter <project-script>` to a cluster, using the *flow interface* will allows us to **keep track of submitted operations** for example to prevent the resubmission of active operations.
+
+In addition, **signac-flow** may utilize *environment profiles* to adjust the submission process based on your local environment.
+That is because different cluster environments will offer different resources and require slightly different options for submission.
+While the basic options will be as similar as possible, the *submit interface* will be slightly adapted to the local environment.
+You can check out the available options with the ``python project.py submit --help`` command.
 
 The *submit* interface
 ======================
@@ -19,7 +23,9 @@ If we have a ``project.py`` module (:ref:`as shown earlier <project-setup>`), wh
     from flow import FlowProject
 
     class Project(FlowProject):
-        pass
+
+        def __init__(*args, **kwargs):
+            super(Project, self).__init__(*args, **kwargs)
 
     if __name__ == '__main__':
         Project().main()
@@ -30,16 +36,26 @@ Then we can submit operations from the command line with the following command:
 
       $ python project.py submit
 
-.. tip::
+.. note::
 
-    Use the ``script`` command to debug the generation of execution scripts before generating submission scripts.
+      From here on we will abbreviate the ``$ python project.py submit`` command with ``$ <project> submit``.
+      That is because the module may be named differently.
 
-In general, the ``submit`` interface options will depend on your local environment.
-For example, the options available to you will be different when running this on your local laptop compared to a high-performance super computer.
+In many cases you will need to provide additional arguments to the scheduler, such as your *account name*, the required *walltime*, and other information about requested resources.
+Some of these options can be specified through the native interface, that means flow knows about these options and you can see them when executing ``submit --help``.
+
+However, you can **always** forward any arguments directly to the scheduler command as positional arguments.
+For example, if we wanted to specify an account name with a *torque* scheduler, we could use the following command:
+
+.. code-block:: bash
+
+      $ <project> submit -- -l A:my_account_name
+
+Everything after the two dashes ``--`` will not be interpreted by the *submit* interface, but directly forwarded to the scheduler *as is*.
 
 .. note::
 
-    Unless you have one of the supported schedulers installed, you will not be able to submit any operations on your computer, however you will be able to run some test commands in order to debug the process as best as you can.
+    Unless you have one of the :ref:`supported schedulers <environments>` installed, you will not be able to submit any operations on your computer, however you will be able to run some test commands in order to debug the process as best as you can.
     On the other hand, if you are in one of the natively supported high-performance super computing environments (e.g. XSEDE), you may take advantage of configurations profiles specifically tailored to those environments.
 
 Submitting Operations
@@ -47,28 +63,36 @@ Submitting Operations
 
 The submission process consists of the following steps:
 
-  1. Gathering of all operations eligible for submission.
+  1. *Gathering* of all operations *eligible* for submission.
   2. Generating of scripts to execute those operations.
   3. Submission of those scripts to the scheduler.
 
 The first step is largely determined by your project *workflow*.
-You can see which operation might be submitted by looking at the output of ``$ python project.py status --detailed``.
+You can see which operation might be submitted by looking at the output of ``$ <project> status --detailed``.
 You may further reduce the operations to be submitted by selecting specifc jobs (``-j``), specific operations (``-o``), or generally reduce the total number of operations to be submitted (``-n``).
 For example the following command would submit up to 5 ``hello`` operations:
 
 .. code-block:: bash
 
-    $ python project.py submit -o hello -n 5
+    $ <project> submit -o hello -n 5
 
+By default, all operations are *eligible for submission*, however you can overload the :py:meth:`.FlowProject.eligible_for_submission` method to customize this behavior.
 
-Operation Bundling
-==================
+The scripts for submission are generated by the :py:meth:`.FlowProject.write_script` method.
+This method itself calls the following methods:
 
-By default all operations will be submitted as a separate cluster job.
-However, you may choose to bundle multiple operations into one submission using the ``--bundle`` option, e.g., if you need to run multiple processes in parallel to fully utilize one node.
+.. code-block:: python
 
-If you have many small operations, you can *bundle* them and run them in *serial* using the ``--serial`` option.
+      write_script_header(script)
+      write_script_operations(script, operations, ...)
+      write_script_footer(script)
 
+This means by default, each script will contain one header and footer at the beginning and end of the script and the commands for each operation will be written in between.
+In order to customize the generation of scripts, it is recommended to overload any of these three functions, or to overload the :py:meth:`~.FlowProject.write_script` method itself.
+
+.. tip::
+
+    Use the :ref:`script command <project-script>` to debug the generation of execution scripts.
 
 Parallelization
 ===============
@@ -76,7 +100,8 @@ Parallelization
 When submitting operations to the cluster, **signac-flow** assumes that each operations requires one processor and will generate a script requesting the resources accordingly.
 
 When you execute *parallelized* operations you need to specify that with your *operation*.
-For example, assuming that we a program called ``foo``, which will automatically parallelize onto 24, cores we could need to specify this for our operation like that:
+For example, assuming that we want to execute a program called ``foo``, which will automatically parallelize onto 24 cores.
+Then we would need to specify the operation like this:
 
 .. code-block:: python
 
@@ -90,7 +115,7 @@ For example, assuming that we a program called ``foo``, which will automatically
                   np=24,                              # foo requires 24 cores
                 )
 
-If you are using MPI for parallelization, you may need to prefix your command:
+If you are using MPI for parallelization, you may need to prefix your command accordingly:
 
 .. code-block:: python
 
@@ -115,17 +140,38 @@ Different environment use different MPI-commands, you can use your environment-s
 
     Both the ``cmd``-argument and the ``np``-argument may be *callables*, that means you can specify both the command itself, but also the number of processors **as a function of job**!
 
+    Here is an example using `lambda <https://docs.python.org/3/reference/expressions.html#lambda>`_-expressions: 
+
+    .. code-block:: python
+
+        self.add_operation(
+            name='foo',
+            cmd=lambda job: env.mpi_cmd("foo input.txt", np=job.sp.a),
+            np=lambda job: job.sp.a)
+
+Operation Bundling
+==================
+
+By default all operations will be submitted as separate cluster jobs.
+This is usually the best model for clusters that scale well with the *size* of your operations.
+However, you may choose to *bundle* multiple operations into one submission using the ``--bundle`` option, *e.g.*, if you need to run multiple processes in parallel to fully utilize one node.
+
+For example, the following command will bundle *up to 5* operations into a single cluster job:
+
+.. code-block:: bash
+
+    $ <project> submit --bundle 5
+
+These 5 operations will be executed *in parallel*, that means the resources for this cluster jobs will be the sum of the resources required for each operation.
+Without any argument the ``--bundle`` option will bundle **all** operations into a single cluster job.
+
+Finally, if you have many small operations, you could bundle them into a single cluster job submission with the ``--serial`` option.
+In this mode, all bundled operations will be executed in serial and the resources required will be determined by the operation which requires the most resources.
+
 Managing Environments
 =====================
 
 The **signac-flow** package attempts to detect your local environment and based on that adjusts the options provided by the ``submit`` interface.
 You can check which environment you are using, by looking at the output of ``submit --help``.
 
-The :py:func:`~.get_environment` function will go through all defined :py:class:`~.ComputeEnvironment` classes and return the one, where the :py:meth:`~.ComputeEnvironment.is_present` class method returns ``True``.
-
-To use an environment, you need to define or import it prior to calling the ``submit`` interface.
-This means in practice, that you will need to either define them directly or import them within your ``project.py`` module.
-
-.. tip::
-
-    If you are running on a high-performance super computer, add the following line to your ``project.py`` module to import default profiles: ``import flow.environments``
+For more information, see the :ref:`next chapter <environments>`.

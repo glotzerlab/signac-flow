@@ -244,6 +244,28 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
 
     @classmethod
     def get_config_value(cls, key, default=None):
+        """Request a value from the user's configuration.
+
+        This method should be used whenever values need to be provided
+        that are specific to a users's environment. A good example are
+        account names.
+
+        When a key is not configured and no default value is provided,
+        a :py:class:`~.errors.SubmitError` will be raised and the user will
+        be prompted to add the missing key to their configuration.
+
+        Please note, that the key will be automatically expanded to
+        be specific to this environment definition. For example, a
+        key should be 'account', not 'MyEnvironment.account`.
+
+        :param key: The environment specific configuration key.
+        :type key: str
+        :param default: A default value in case the key cannot be found
+            within the user's configuration.
+        :return: The value or default value.
+        :raises SubmitError: If the key is not in the user's configuration
+            and no default value is provided.
+        """
         try:
             return config.load_config()['flow'][cls.__name__][key]
         except KeyError:

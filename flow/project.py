@@ -606,15 +606,15 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         script.writeline('wait')
 
     def write_script(self, script, operations, background=False):
-        """"Write a script for the execution of operations.
+        """Write a script for the execution of operations.
 
         By default, this function will generate a script with the following components:
 
         .. code-block:: python
 
-            self.write_script_header(script)
-            self.write_script_operations(script, operations, background=background)
-            self.write_script_footer(script)
+            write_script_header(script)
+            write_script_operations(script, operations, background=background)
+            write_script_footer(script)
 
         Consider overloading any of the methods above, before overloading this method.
 

@@ -14,3 +14,5 @@ Contents:
    basics
    project
    cluster_submission
+   environments
+   packaged_envs

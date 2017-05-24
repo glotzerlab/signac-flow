@@ -6,10 +6,28 @@ import unittest
 import io
 from contextlib import contextmanager
 
+from signac.common import six
 from flow import get_environment
 from flow.environment import JobScript
 from flow.environment import ComputeEnvironment
 from flow.environment import TestEnvironment
+
+
+class StringIO(io.StringIO):
+    "PY27 compatibility layer."
+
+    def write(self, s):
+        if six.PY2:
+            super(StringIO, self).write(unicode(s))
+        else:
+            super(StringIO, self).write(s)
+
+    def read(self):
+        if six.PY2:
+            return str(super(StringIO, self).read())
+        else:
+            return super(StringIO, self).read()
+
 
 
 @contextmanager
@@ -66,7 +84,7 @@ class ProjectTest(unittest.TestCase):
         env = get_environment(test=True)
         sscript = env.script(a=0)
         sscript.seek(0)
-        tmp_out = io.StringIO()
+        tmp_out = StringIO()
         with redirect_stdout(tmp_out):
             env.submit(sscript, hold=True)
         tmp_out.seek(0)

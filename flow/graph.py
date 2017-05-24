@@ -1,9 +1,18 @@
 # Copyright (c) 2016 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
+import warnings
+import logging
 from itertools import chain
 
 import networkx as nx
+
+logger = logging.getLogger(__name__)
+
+warnings.warn(
+    "The graph module is provisional and may be deprecated in future version.",
+    PendingDeprecationWarning)
+logger.warning("The graph module is provisional and may be deprecated in future version.")
 
 
 class _FlowNode:

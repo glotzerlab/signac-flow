@@ -1,8 +1,7 @@
 # Copyright (c) 2017 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-"""Routines for the MOAB environment."""
-
+"""Routines for the SLURM environment."""
 from __future__ import print_function
 import getpass
 import subprocess
@@ -69,14 +68,21 @@ class SlurmScheduler(Scheduler):
         for job in _fetch(user=self.user):
             yield job
 
-    def submit(self, script, resume=None, after=None,
-               hold=False, pretend=False, **kwargs):
-        submit_cmd = self.submit_cmd
+    def submit(self, script, after=None, hold=False, pretend=False, flags=None, **kwargs):
+        if flags is None:
+            flags = []
+        elif isinstance(flags, str):
+            flags = flags.split()
+
+        submit_cmd = self.submit_cmd + flags
+
         if after is not None:
             submit_cmd.extend(
                 ['-W', 'depend="afterany:{}"'.format(after.split('.')[0])])
+
         if hold:
             submit_cmd += ['--hold']
+
         if pretend:
             print("# Submit command: {}".format('  '.join(submit_cmd)))
             print(script.read())
@@ -91,7 +97,7 @@ class SlurmScheduler(Scheduler):
     @classmethod
     def is_present(cls):
         try:
-            return subprocess.check_call(['sbatch', '--version'])
+            subprocess.check_output(['sbatch', '--version'], stderr=subprocess.STDOUT)
         except (IOError, OSError):
             return False
         else:

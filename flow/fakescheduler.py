@@ -4,7 +4,7 @@
 from __future__ import print_function
 import logging
 
-from .manage import Scheduler, JobStatus
+from .manage import Scheduler
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +15,7 @@ class FakeScheduler(Scheduler):
         return
         yield
 
-    def submit(self, script, *args, **kwargs):
+    def submit(self, script, pretend=False, hold=False, flags=[], *args, **kwargs):
         def format_arg(k, v):
             if v is True:
                 return '--{}'.format(k)
@@ -24,8 +24,16 @@ class FakeScheduler(Scheduler):
             else:
                 return '--{}={}'.format(k, v)
 
-        fake_cmd = ' '.join(filter(None, (format_arg(k, v) for k, v in kwargs.items())))
+        fake_cmd = '--hold' if hold else ''
+        if kwargs:
+            fake_cmd += ' ' + ' '.join(filter(None, (format_arg(k, v) for k, v in kwargs.items())))
+        if flags:
+            fake_cmd += ' ' + ' '.join(flags)
         print("# Submit command: testsub {}".format(fake_cmd))
         print(script.read())
         # return status is None, meaning, 'not actually submitted'
         return None
+
+    @classmethod
+    def is_present(cls):
+        return False

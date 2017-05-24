@@ -15,7 +15,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='signac-flow',
-    version='0.4.2',
+    version='0.5.0',
     packages=find_packages(),
     zip_safe=True,
 
@@ -30,11 +30,14 @@ setup(
         "License :: OSI Approved :: BSD License",
         "Topic :: Scientific/Engineering :: Physics",
         "Programming Language :: Python :: 2.7",
-        "Programming Language :: Python :: 3.3",
         "Programming Language :: Python :: 3.4",
         "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
     ],
-
+    entry_points={
+        'console_scripts': [
+            'flow = flow.__main__:main',
+        ],
+    },
     install_requires=requirements,
 )

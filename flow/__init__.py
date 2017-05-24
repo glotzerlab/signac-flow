@@ -6,28 +6,35 @@
 The signac-flow package provides the basic infrastructure to easily
 configure and implement a workflow to operate on a signac_ data space.
 
-.. _signac: https://signac.readthedocs.io
+.. _signac: https://glotzerlab.engin.umich.edu/signac
 """
+from __future__ import absolute_import
 from . import environment
 from . import scheduler
 from . import manage
+from . import errors
 from .project import FlowProject
 from .project import JobOperation
 from .project import label
 from .project import classlabel
 from .project import staticlabel
 from .environment import get_environment
+from .operations import run
+from .operations import redirect_log
 
-__version__ = '0.4.2'
+__version__ = '0.5.0'
 
 __all__ = [
     'environment',
     'scheduler',
     'manage',
+    'errors',
     'FlowProject',
     'JobOperation',
     'label',
     'classlabel',
     'staticlabel',
     'get_environment',
-]
+    'run',
+    'redirect_log',
+    ]

@@ -6,25 +6,38 @@
 Welcome to signac-flow's documentation!
 =======================================
 
-.. automodule:: flow
+.. image:: https://anaconda.org/glotzer/signac-flow/badges/version.svg
+   :target: https://anaconda.org/glotzer/signac-flow
 
-.. tip::
+.. image:: https://img.shields.io/pypi/v/signac-flow.svg
+   :target: https://img.shields.io/pypi/v/signac-flow.svg
 
-    The signac-project-template_ is a complete working implementation of a :py:class:`~flow.FlowProject`,
-    which serves both as example, but can also be used as a template to start new projects.
+The signac-flow tool provides the basic components to setup simple to complex workflows for `signac projects <https://glotzerlab.engin.umich.edu/signac>`_.
+That includes the definition of data pipelines, execution of data space operations and the submission of operations to high-performance super computers.
 
-.. _signac-project-template: https://github.com/glotzerlab/signac-project-template
+The implementation is in pure Python, requires signac_ and is tested for Python versions 2.7 and 3.4+.
+
+.. _signac: https://glotzerlab.engin.umich.edu/signac
+
+The screencast below demonstrates the general concept of setting up a workflow with **signac-flow**.
+For a detailed introduction, please checkout the :ref:`reference` documentation!
+
+.. raw:: html
+
+    <div align="center">
+      <script type="text/javascript" src="https://asciinema.org/a/6uyqoqk87w1r5y0k09zj43ibp.js" id="asciicast-6uyqoqk87w1r5y0k09zj43ibp" async></script>
+    </div>
 
 .. toctree::
    :maxdepth: 2
+   :hidden:
 
-   example
+   installation
+   reference
    flow
 
-
-
 Indices and tables
-==================
+------------------
 
 * :ref:`genindex`
 * :ref:`modindex`

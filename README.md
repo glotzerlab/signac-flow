@@ -14,6 +14,7 @@ That includes the definition of data pipelines, execution of data space operatio
 
   * Carl Simon Adorf (csadorf@umich.edu)
   * Paul Dodd (pdodd@umich.edu)
+  * Vyas Ramasubramani (vramasub@umich.edu)
 
 ## Installation
 

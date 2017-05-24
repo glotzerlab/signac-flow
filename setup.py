@@ -15,7 +15,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='signac-flow',
-    version='0.5.0rc1',
+    version='0.5.0',
     packages=find_packages(),
     zip_safe=True,
 

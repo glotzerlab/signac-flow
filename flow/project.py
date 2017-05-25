@@ -590,7 +590,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         script.writeline('cd {}'.format(self.root_directory()))
         script.writeline()
 
-    def write_script_operations(self, script, operations, background=False):
+    def write_script_operations(self, script, operations, background=False, **kwargs):
         "Write the commands for the execution of operations as part of a script."
         for op in operations:
             self.write_human_readable_statepoint(script, op.job)
@@ -605,7 +605,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         # Wait until all processes have finished
         script.writeline('wait')
 
-    def write_script(self, script, operations, background=False):
+    def write_script(self, script, operations, background=False, **kwargs):
         """Write a script for the execution of operations.
 
         By default, this function will generate a script with the following components:
@@ -626,9 +626,9 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         :type background: bool
 
         """
-        self.write_script_header(script)
-        self.write_script_operations(script, operations, background=background)
-        self.write_script_footer(script)
+        self.write_script_header(script, **kwargs)
+        self.write_script_operations(script, operations, background=background, **kwargs)
+        self.write_script_footer(script, **kwargs)
 
     def _gather_operations(self, job_id=None, operation_name=None, num=None, bundle_size=1,
                            cmd=None, requires=None, pool=None, serial=False, force=False,
@@ -690,7 +690,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                         raise e
 
         script = env.script(_id=_id, nn=nn, ppn=ppn, **kwargs)
-        self.write_script(script=script, operations=operations, background=not serial)
+        self.write_script(script=script, operations=operations, background=not serial, **kwargs)
         return env.submit(script=script, nn=nn, ppn=ppn, flags=flags, **kwargs)
 
     def submit(self, env, bundle_size=1, serial=False, force=False,

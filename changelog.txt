@@ -1,3 +1,8 @@
+0.5.1dev:
+
+	- Exclude private functions, that means functions with a name that start
+	with an underscore, from the operations listing when using flow.run().
+
 0.5.0:
 
 	- Major updates and new features:

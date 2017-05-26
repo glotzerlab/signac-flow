@@ -57,7 +57,7 @@ This is an example for a typical environment class definition:
 
 .. code-block:: python
 
-      class MyUniversityCluster(flow.TorqueEnvironment):
+      class MyUniversityCluster(flow.DefaultTorqueEnvironment):
 
           hostname_pattern = 'mycluster.*.university.edu'
           cores_per_node = 32

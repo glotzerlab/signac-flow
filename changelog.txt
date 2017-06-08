@@ -3,6 +3,7 @@
 	- Exclude private functions, that means functions with a name that start
 	with an underscore, from the operations listing when using flow.run().
 	- Forward all extra submit arguments into the write_script() methods.
+	- Fix an issue with `$flow init`/`flow.init()` in combination with Python 2.7.
 
 0.5.0:
 

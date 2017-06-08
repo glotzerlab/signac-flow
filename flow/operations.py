@@ -12,9 +12,11 @@ from signac.common import six
 from .util.tqdm import tqdm
 
 
-def _get_operations():
+def _get_operations(include_private=False):
     module = inspect.getmodule(inspect.currentframe().f_back.f_back)
     for name, obj in inspect.getmembers(module):
+        if not include_private and name.startswith('_'):
+            continue
         if inspect.isfunction(obj):
             if six.PY2:
                 signature = inspect.getargspec(obj)

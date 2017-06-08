@@ -21,8 +21,9 @@ from .project import staticlabel
 from .environment import get_environment
 from .operations import run
 from .operations import redirect_log
+from .template import init
 
-__version__ = '0.5.0'
+__version__ = '0.5.1'
 
 __all__ = [
     'environment',
@@ -37,4 +38,5 @@ __all__ = [
     'get_environment',
     'run',
     'redirect_log',
+    'init',
     ]

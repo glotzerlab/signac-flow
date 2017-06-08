@@ -45,7 +45,7 @@ Defining New Environments
 In order to implement a new environment, create a new class that inherits from :py:class:`.ComputeEnvironment`.
 You will need to define a detection algorithm for your environment, be default we use a regular expression that matches the return value of ``socket.gethostname()``.
 
-Those are ususally the steps we need to take:
+Those are the steps usually required to define a new environment:
 
   1. Subclass from :py:class:`.ComputeEnvironment`.
   2. Determine a host name pattern that would match the output of :py:func:`socket.gethostname()`.
@@ -57,7 +57,7 @@ This is an example for a typical environment class definition:
 
 .. code-block:: python
 
-      class MyUniversityCluster(flow.TorqueEnvironment):
+      class MyUniversityCluster(flow.DefaultTorqueEnvironment):
 
           hostname_pattern = 'mycluster.*.university.edu'
           cores_per_node = 32

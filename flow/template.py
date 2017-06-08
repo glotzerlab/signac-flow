@@ -2,18 +2,23 @@
 from __future__ import print_function
 import os
 import sys
+import errno
 import logging
+
+from signac.common import six
 
 
 logger = logging.getLogger(__name__)
 
 
-def init(alias=None, template=None):
+def init(alias=None, template=None, root=None, out=None):
     "Initialize a templated FlowProject workflow module."
     if alias is None:
         alias = 'project'
     if template is None:
         template = 'minimal'
+    if out is None:
+        out = sys.stderr
 
     if os.path.splitext(alias)[1]:
         raise RuntimeError("Please provide a name without suffix!")
@@ -22,17 +27,34 @@ def init(alias=None, template=None):
     if not project_class_name.endswith('Project'):
         project_class_name += 'Project'
 
+    files_created = []
     for fn, code in TEMPLATES[template].items():
         try:
             fn_ = fn.format(alias=alias)   # some of the filenames may depend on the alias
-            with open(fn_, 'x') as fw:
-                fw.write(code.format(alias=alias, project_class=project_class_name))
+            if root is not None:
+                fn_ = os.path.join(root, fn_)
+            if six.PY2:
+                # Adapted from: http://stackoverflow.com/questions/10978869/
+                flags = os.O_CREAT | os.O_WRONLY | os.O_EXCL
+                fd = os.open(fn_, flags)
+                with os.fdopen(fd, 'w') as file:
+                    file.write(code.format(alias=alias, project_class=project_class_name))
+            else:
+                with open(fn_, 'x') as fw:
+                    fw.write(code.format(alias=alias, project_class=project_class_name))
         except OSError as e:
-            logger.error(
-                "Error while trying to initialize flow project with alias '{alias}', a file named "
-                "'{fn}' already exists!".format(alias=alias, fn=fn_))
+            if e.errno == errno.EEXIST:
+                logger.error(
+                    "Error while trying to initialize flow project with alias '{alias}', "
+                    "a file named '{fn}' already exists!".format(alias=alias, fn=fn_))
+            else:
+                logger.error(
+                    "Error while trying to initialize flow project with alias '{alias}': "
+                    "'{error}'.".format(alias=alias, error=e))
         else:
-            print("Created file '{}'.".format(fn_), file=sys.stderr)
+            files_created.append(fn_)
+            print("Created file '{}'.".format(fn_), file=out)
+    return files_created
 
 
 TEMPLATES = {

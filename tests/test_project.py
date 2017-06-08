@@ -4,6 +4,7 @@
 import unittest
 import io
 import uuid
+import os
 
 from signac.common import six
 from flow import FlowProject
@@ -16,6 +17,7 @@ from flow.environment import ComputeEnvironment
 from flow import label
 from flow import classlabel
 from flow import staticlabel
+from flow import init
 
 if six.PY2:
     from tempdir import TemporaryDirectory
@@ -235,6 +237,12 @@ class ProjectTest(unittest.TestCase):
 
         for job in project:
             self.assertEqual(project.next_operation(job).get_status(), JobStatus.queued)
+
+    def test_init(self):
+        with open(os.devnull, 'w') as out:
+            for fn in init(root=self._tmp_dir.name, out=out):
+                self.assertTrue(os.path.isfile(fn))
+
 
 
 if __name__ == '__main__':

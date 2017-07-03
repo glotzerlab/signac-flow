@@ -121,7 +121,7 @@ def run(parser=None):
         raise KeyError("Unknown operation '{}'.".format(args.operation))
 
     # Serial execution
-    if args.np == 1:
+    if args.np == 1 or len(jobs) < 2:
         for job in tqdm(jobs) if args.progress else jobs:
             operation(job)
 

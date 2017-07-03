@@ -12,6 +12,9 @@ from signac.common import six
 from .util.tqdm import tqdm
 
 
+logger = logging.getLogger(__name__)
+
+
 def _get_operations(include_private=False):
     module = inspect.getmodule(inspect.currentframe().f_back.f_back)
     for name, obj in inspect.getmembers(module):
@@ -122,6 +125,8 @@ def run(parser=None):
 
     # Serial execution
     if args.np == 1 or len(jobs) < 2:
+        if args.timeout is not None:
+            logger.warning("A timeout has no effect in serial execution!")
         for job in tqdm(jobs) if args.progress else jobs:
             operation(job)
 

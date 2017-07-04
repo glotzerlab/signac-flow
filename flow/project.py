@@ -639,16 +639,17 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         else:
             jobs = iter(self)
 
-        def get_op(job):
+        def get_ops(job):
             if legacy and operation_name is not None:
-                return JobOperation(name=operation_name, job=job, cmd=None)
+                yield JobOperation(name=operation_name, job=job, cmd=None)
             if cmd is None:
                 if legacy:
-                    return JobOperation(name=self.next_operation(job), job=job, cmd=None)
+                    yield JobOperation(name=self.next_operation(job), job=job, cmd=None)
                 else:
-                    return self.next_operation(job)
+                    for op in self.next_operations(job):
+                        yield op
             else:
-                return JobOperation(name='user-cmd', cmd=cmd.format(job=job), job=job)
+                yield JobOperation(name='user-cmd', cmd=cmd.format(job=job), job=job)
 
         def eligible(op):
             if op is None:
@@ -672,7 +673,8 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 
         # Get the first num eligible operations
         map_ = map if pool is None else pool.imap  # parallelization
-        return islice((op for op in map_(get_op, jobs) if eligible(op)), num)
+        ops = (op for ops in map_(get_ops, jobs) for op in ops)
+        return islice((op for op in ops if eligible(op)), num)
 
     def submit_operations(self, env, _id, operations, nn=None, ppn=None, serial=False,
                           flags=None, force=False, **kwargs):
@@ -688,6 +690,12 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 except SubmitError as e:
                     if not (flags or force):
                         raise e
+
+        def _msg(op):
+            print("Submitting operation '{}' for job '{}'.".format(op.name, op.job))
+            return op
+
+        operations = map(_msg, operations)
 
         script = env.script(_id=_id, nn=nn, ppn=ppn, **kwargs)
         self.write_script(script=script, operations=operations, background=not serial, **kwargs)

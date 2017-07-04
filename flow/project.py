@@ -1338,12 +1338,12 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                     return op.name in names
                 return True
 
-            ops = (self.next_operation(job) for job in jobs)
-            ops = [op for op in ops if select(op)]
+            all_ops = (self.next_operations(job) for job in jobs)
+            ops_to_run = [op for ops in all_ops for op in ops if select(op)]
 
             exceptions = (TimeoutError, ) if six.PY2 else (TimeoutError, TimeoutExpired)
             try:
-                self.run(operations=ops, pretend=args.pretend, np=args.np,
+                self.run(operations=ops_to_run, pretend=args.pretend, np=args.np,
                          timeout=args.timeout, progress=args.progress)
             except exceptions:
                 print(

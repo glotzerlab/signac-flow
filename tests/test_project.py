@@ -103,6 +103,9 @@ class MockProject(FlowProject):
         if 'has_a' in labels:
             return JobOperation('a_op', job, 'run_a_op {}'.format(job))
 
+    def next_operations(self, job):
+        yield self.next_operation(job)
+
     def submit_user(self, env, _id, operations, **kwargs):
         js = env.script(_id=_id)
         for op in operations:

@@ -434,7 +434,10 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
     @classmethod
     def _alias(cls, x):
         "Use alias if specified."
-        return abbreviate(x, cls.ALIASES.get(x, x))
+        try:
+            return abbreviate(x, cls.ALIASES.get(x, x))
+        except TypeError:
+            return x
 
     @classmethod
     def update_aliases(cls, aliases):

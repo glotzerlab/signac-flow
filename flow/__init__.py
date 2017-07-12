@@ -23,7 +23,7 @@ from .operations import run
 from .operations import redirect_log
 from .template import init
 
-__version__ = '0.5.1'
+__version__ = '0.5.2'
 
 __all__ = [
     'environment',

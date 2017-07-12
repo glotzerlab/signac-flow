@@ -1,3 +1,12 @@
+0.5.2:
+
+	- Fix bug in detailed status output in combination with unhashable types.
+	- Do not fork when executing only a single operation with `flow.run()`.
+	- Run all next operations for each job with `flow.run()` instead of only
+	one of the next operations.
+	- Gather all next operations when submitting, instead of only one of the
+	nex operations for each job.
+
 0.5.1:
 
 	- Exclude private functions, that means functions with a name that start

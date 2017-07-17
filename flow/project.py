@@ -649,7 +649,9 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 if legacy:
                     yield JobOperation(name=self.next_operation(job), job=job, cmd=None)
                 else:
-                    for op in self.next_operations(job):
+                    ops = set(self.next_operations(job))
+                    ops.add(self.next_operation(job))
+                    for op in ops:
                         yield op
             else:
                 yield JobOperation(name='user-cmd', cmd=cmd.format(job=job), job=job)

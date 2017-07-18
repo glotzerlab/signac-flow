@@ -28,7 +28,6 @@ import errno
 import subprocess
 from collections import defaultdict
 from itertools import islice
-from itertools import chain
 from hashlib import sha1
 from math import ceil
 from multiprocessing import Pool
@@ -1340,26 +1339,13 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             "Run all (or select) job operations."
             names = set(args.name)
 
-            if args.job_id is None:
-                jobs = self
-            else:
-                jobs = (self.open_job(id=_id) for _id in args.job_id)
-
             def select(op):
-                if op is None:
-                    return False
                 if names:
                     return op.name in names
-                return True
+                else:
+                    return True
 
-            # We gather next operations from both the next_operations() and the
-            # next_operation() method to ensure backwards-compatibility. Duplicates
-            # are automatically discarded, because JobOperation objects are hashable
-            # and can therefore be evaluated as set.
-            next_ops = [self.next_operations(job) for job in jobs]
-            next_next_ops = [self.next_operation(job) for job in jobs]
-            all_next_ops = chain(next_ops + [next_next_ops])
-            ops_to_run = {op for ops in all_next_ops for op in ops if select(op)}
+            ops_to_run = {op for op in self._gather_operations(job_id=args.job_id) if select(op)}
 
             exceptions = (TimeoutError, ) if six.PY2 else (TimeoutError, TimeoutExpired)
             try:

@@ -1,3 +1,8 @@
+0.5.3:
+
+	- Fix issue where the return value of `FlowProject.next_operation()` is
+	ignored in combination with the <project> submit / run / script interface.
+
 0.5.2:
 
 	- Fix bug in detailed status output in combination with unhashable types.

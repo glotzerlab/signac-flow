@@ -649,7 +649,9 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 if legacy:
                     yield JobOperation(name=self.next_operation(job), job=job, cmd=None)
                 else:
-                    for op in self.next_operations(job):
+                    ops = set(self.next_operations(job))
+                    ops.add(self.next_operation(job))
+                    for op in ops:
                         yield op
             else:
                 yield JobOperation(name='user-cmd', cmd=cmd.format(job=job), job=job)
@@ -1337,20 +1339,13 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             "Run all (or select) job operations."
             names = set(args.name)
 
-            if args.job_id is None:
-                jobs = self
-            else:
-                jobs = (self.open_job(id=_id) for _id in args.job_id)
-
             def select(op):
-                if op is None:
-                    return False
                 if names:
                     return op.name in names
-                return True
+                else:
+                    return True
 
-            all_ops = (self.next_operations(job) for job in jobs)
-            ops_to_run = [op for ops in all_ops for op in ops if select(op)]
+            ops_to_run = {op for op in self._gather_operations(job_id=args.job_id) if select(op)}
 
             exceptions = (TimeoutError, ) if six.PY2 else (TimeoutError, TimeoutExpired)
             try:

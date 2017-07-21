@@ -1,6 +1,6 @@
 # README
 
-[![Anaconda-Server Badge](https://anaconda.org/glotzer/signac-flow/badges/version.svg)](https://anaconda.org/glotzer/signac-flow)
+[![Anaconda-Server Badge](https://anaconda.org/conda-forge/signac-flow/badges/version.svg)](https://anaconda.org/conda-forge/signac-flow)
 [![PyPi](https://img.shields.io/pypi/v/signac-flow.svg)](https://img.shields.io/pypi/v/signac-flow.svg)
 
 ## About

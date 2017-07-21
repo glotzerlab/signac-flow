@@ -6,8 +6,8 @@
 Welcome to signac-flow's documentation!
 =======================================
 
-.. image:: https://anaconda.org/glotzer/signac-flow/badges/version.svg
-   :target: https://anaconda.org/glotzer/signac-flow
+.. image:: https://anaconda.org/conda-forge/signac-flow/badges/version.svg
+   :target: https://anaconda.org/conda-forge/signac-flow
 
 .. image:: https://img.shields.io/pypi/v/signac-flow.svg
    :target: https://img.shields.io/pypi/v/signac-flow.svg

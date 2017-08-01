@@ -1,3 +1,15 @@
+0.5.4:
+
+	- Fix issue with <project> run, where operation commands consist of multiple
+	shell commands.
+	- Fix issue where the <project> status output showed negative values for the
+	number of lines omitted (issue #12).
+	- Raise error when trying to provide a timeout for <project> run in serial
+	execution in combination with Python 2.7; this mode of execution is not
+	supported for Python versions 2.7.x.
+	- Enfore that the <project> status --overview-max-lines (-m) argument is
+	positive.
+
 0.5.3:
 
 	- Fix issue where the return value of `FlowProject.next_operation()` is

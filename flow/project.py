@@ -61,9 +61,11 @@ def _mkdir_p(path):
 
 def _execute(cmd, timeout=None):
     if six.PY2:
-        subprocess.call(cmd)
-    else:
-        subprocess.run(cmd, timeout=timeout)
+        subprocess.call(cmd, shell=True)
+    elif sys.version_info >= (3, 5):
+        subprocess.run(cmd, timeout=timeout, shell=True)
+    else:    # Older high-level API
+        subprocess.call(cmd, timeout=timeout, shell=True)
 
 
 def _show_cmd(cmd, timeout=None):
@@ -558,7 +560,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             operations = [op for op in operations if op is not None]
 
         # Prepare commands for each operation
-        cmds = [op.cmd.format(job=op.job).split() for op in operations]
+        cmds = [op.cmd.format(job=op.job) for op in operations]
 
         # Either actually execute or just show the commands
         _run = _show_cmd if pretend else _execute

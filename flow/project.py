@@ -68,10 +68,6 @@ def _execute(cmd, timeout=None):
         subprocess.call(cmd, timeout=timeout, shell=True)
 
 
-def _show_cmd(cmd, timeout=None):
-    print(' '.join(cmd))
-
-
 def _positive_int(value):
     try:
         ivalue = int(value)
@@ -574,7 +570,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         cmds = [op.cmd.format(job=op.job) for op in operations]
 
         # Either actually execute or just show the commands
-        _run = _show_cmd if pretend else _execute
+        _run = print if pretend else _execute
 
         if np == 1:      # serial execution
             for cmd in tqdm(cmds) if progress else cmds:

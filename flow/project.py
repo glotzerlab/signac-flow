@@ -575,7 +575,8 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         if np == 1:      # serial execution
             if six.PY2 and timeout is not None:
                 raise RuntimeError(
-                    "Using a timeout with serial execution is not supported for Python version 2.7.")
+                    "Using a timeout with serial execution is "
+                    "not supported for Python version 2.7.")
             for cmd in tqdm(cmds) if progress else cmds:
                 _run(cmd, timeout=timeout)
         elif six.PY2:   # parallel execution (py27)

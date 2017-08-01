@@ -72,6 +72,17 @@ def _show_cmd(cmd, timeout=None):
     print(' '.join(cmd))
 
 
+def _positive_int(value):
+    try:
+        ivalue = int(value)
+        if ivalue <= 0:
+            raise argparse.ArgumentTypeError("Value must be positive.")
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError(
+            "{} must be a positive integer.".format(value))
+    return ivalue
+
+
 def is_active(status):
     """True if a specific status is considered 'active'.
 
@@ -1020,7 +1031,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             help="Do not print an overview.")
         parser.add_argument(
             '-m', '--overview-max-lines',
-            type=int,
+            type=_positive_int,
             help="Limit the number of lines in the overview.")
         parser.add_argument(
             '-d', '--detailed',

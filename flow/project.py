@@ -61,13 +61,22 @@ def _mkdir_p(path):
 
 def _execute(cmd, timeout=None):
     if six.PY2:
-        subprocess.call(cmd)
-    else:
-        subprocess.run(cmd, timeout=timeout)
+        subprocess.call(cmd, shell=True)
+    elif sys.version_info >= (3, 5):
+        subprocess.run(cmd, timeout=timeout, shell=True)
+    else:    # Older high-level API
+        subprocess.call(cmd, timeout=timeout, shell=True)
 
 
-def _show_cmd(cmd, timeout=None):
-    print(' '.join(cmd))
+def _positive_int(value):
+    try:
+        ivalue = int(value)
+        if ivalue <= 0:
+            raise argparse.ArgumentTypeError("Value must be positive.")
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError(
+            "{} must be a positive integer.".format(value))
+    return ivalue
 
 
 def is_active(status):
@@ -558,12 +567,16 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             operations = [op for op in operations if op is not None]
 
         # Prepare commands for each operation
-        cmds = [op.cmd.format(job=op.job).split() for op in operations]
+        cmds = [op.cmd.format(job=op.job) for op in operations]
 
         # Either actually execute or just show the commands
-        _run = _show_cmd if pretend else _execute
+        _run = print if pretend else _execute
 
         if np == 1:      # serial execution
+            if six.PY2 and timeout is not None:
+                raise RuntimeError(
+                    "Using a timeout with serial execution is "
+                    "not supported for Python version 2.7.")
             for cmd in tqdm(cmds) if progress else cmds:
                 _run(cmd, timeout=timeout)
         elif six.PY2:   # parallel execution (py27)
@@ -867,7 +880,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             print(util.tabulate.tabulate(rows, headers=table_header), file=file)
             if max_lines is not None:
                 lines_skipped = len(progress) - max_lines
-                if lines_skipped:
+                if lines_skipped > 0:
                     print("{} {}".format(self._tr("Lines omitted:"), lines_skipped), file=file)
         else:
             print(util.tabulate.tabulate([], headers=table_header), file=file)
@@ -1018,7 +1031,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             help="Do not print an overview.")
         parser.add_argument(
             '-m', '--overview-max-lines',
-            type=int,
+            type=_positive_int,
             help="Limit the number of lines in the overview.")
         parser.add_argument(
             '-d', '--detailed',

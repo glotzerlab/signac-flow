@@ -186,4 +186,5 @@ pipelines:
             - python scripts/run.py auto
             - python -m my_project.status --detailed
             - python -m jupyter nbconvert --to html --execute analysis/notebook.ipynb
+            - cd ..
             - ./deploy.bash

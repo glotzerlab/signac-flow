@@ -869,7 +869,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             print(util.tabulate.tabulate(rows, headers=table_header), file=file)
             if max_lines is not None:
                 lines_skipped = len(progress) - max_lines
-                if lines_skipped:
+                if lines_skipped > 0:
                     print("{} {}".format(self._tr("Lines omitted:"), lines_skipped), file=file)
         else:
             print(util.tabulate.tabulate([], headers=table_header), file=file)

@@ -24,7 +24,7 @@ This is an example for a simple *operation*, which creates a file called ``hello
     def hello(job):
         print('hello', job)
         with job:
-            with open('hello.txt', 'w') as f:
+            with open('hello.txt', 'w') as file:
                 file.write('world!\n')
 
 Let's initialize a few jobs, by executing the following script:

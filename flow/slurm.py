@@ -7,6 +7,7 @@ import getpass
 import subprocess
 import tempfile
 import logging
+import errno
 
 from .manage import Scheduler
 from .manage import ClusterJob, JobStatus
@@ -38,7 +39,10 @@ def _fetch(user=None):
     except subprocess.CalledProcessError as error:
         print('error', error)
         raise
-    except FileNotFoundError:
+    except IOError as error:
+      if error.errno != errno.ENOENT:
+        raise
+      else:
         raise RuntimeError("Slurm not available.")
     lines = result.split('\n')
     for line in lines:

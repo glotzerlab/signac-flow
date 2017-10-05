@@ -363,7 +363,7 @@ class NodesEnvironment(ComputeEnvironment):
                 raise SubmitError(NUM_NODES_WARNING)
 
         # Calculate the total number of required nodes
-        nn = ceil(np_total / ppn)
+        nn = int(ceil(np_total / ppn))
 
         if not force:  # Perform basic check concerning the node utilization.
             usage = np_total / nn / ppn

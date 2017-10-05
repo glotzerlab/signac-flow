@@ -40,10 +40,10 @@ def _fetch(user=None):
         print('error', error)
         raise
     except IOError as error:
-      if error.errno != errno.ENOENT:
-        raise
-      else:
-        raise RuntimeError("Slurm not available.")
+        if error.errno != errno.ENOENT:
+            raise
+        else:
+            raise RuntimeError("Slurm not available.")
     lines = result.split('\n')
     for line in lines:
         if line:

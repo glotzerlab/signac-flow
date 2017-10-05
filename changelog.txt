@@ -1,3 +1,8 @@
+0.5.5:
+
+	- Fix issue with the SLURM scheduler, where the queue status could not be
+		parsed.
+
 0.5.4:
 
 	- Fix issue with <project> run, where operation commands consist of multiple

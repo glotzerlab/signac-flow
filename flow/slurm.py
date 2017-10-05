@@ -16,40 +16,35 @@ logger = logging.getLogger(__name__)
 
 
 def _fetch(user=None):
+
     def parse_status(s):
-        if s == 'Q':
+        s = s.strip()
+        if s == 'PD':
             return JobStatus.queued
         elif s == 'R':
             return JobStatus.active
-        elif s == 'C':
+        elif s in ['CG', 'CD', 'CA', 'TO']:
             return JobStatus.inactive
-        else:
-            assert 0
+        elif s in ['F', 'NF']:
+            return JobStatus.error
+        return JobStatus.registered
 
     if user is None:
         user = getpass.getuser()
-    cmd = "qstat -f"
+
+    cmd = ['squeue', '-u', user, '-h', '-o "%2t %100j"']
     try:
-        result = subprocess.check_output(cmd.split()).decode()
+        result = subprocess.check_output(cmd).decode()
     except subprocess.CalledProcessError as error:
-        if error.returncode == 153:
-            return
-        else:
-            raise
+        print('error', error)
+        raise
     except FileNotFoundError:
         raise RuntimeError("Slurm not available.")
-    jobs = result.split('\n\n')
-    for jobinfo in jobs:
-        if not jobinfo:
-            continue
-        lines = jobinfo.split('\n')
-        assert lines[0].startswith('Job Id:')
-        info = dict()
-        for line in lines[1:]:
-            tokens = line.split('=')
-            info[tokens[0].strip()] = tokens[1].strip()
-        if info['euser'].startswith(user):
-            yield SlurmJob(info['Job_Name'], parse_status(info['job_state']))
+    lines = result.split('\n')
+    for line in lines:
+        if line:
+            status, name = line.strip()[1:-1].split()
+            yield ClusterJob(name, parse_status(status))
 
 
 class SlurmJob(ClusterJob):

@@ -35,7 +35,7 @@ def _fetch(user=None):
 
     cmd = ['squeue', '-u', user, '-h', '-o "%2t %100j"']
     try:
-        result = subprocess.check_output(cmd).decode()
+        result = subprocess.check_output(cmd).decode('utf-8')
     except subprocess.CalledProcessError as error:
         print('error', error)
         raise

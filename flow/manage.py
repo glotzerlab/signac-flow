@@ -105,8 +105,9 @@ def update_status(job, scheduler_jobs=None):
         status = _status_local(jobsid)
         if scheduler_jobs is not None:
             status = max(_status_scheduler(jobsid, scheduler_jobs), status)
-        status_doc[jobsid] = int(status)
-        job.document['status'] = status_doc
+        if status_doc[jobsid] != int(status):
+            status_doc[jobsid] = int(status)
+            job.document['status'] = status_doc
 
 
 def submit(env, project, state_point, script,

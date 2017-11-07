@@ -21,11 +21,11 @@ That includes the definition of data pipelines, execution of data space operatio
 The recommendend installation method for **signac-flow** is through **conda** or **pip**.
 The software is tested for Python versions 2.7 and 3.4+ and is built for all major platforms.
 
-This package is available via the Glotzer Group conda channel:
+This package is available via the [conda-forge](https://conda-forge.github.io/) conda channel:
 
-`conda install -c glotzer signac-flow`
+`conda install -c conda-forge signac-flow`
 
-or 
+or pip:
 
 `pip install --user signac-flow`
 

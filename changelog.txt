@@ -1,3 +1,8 @@
+next:
+
+	- Fix issue, where operations with spaces in their name would not be
+		accepted by the SLURM scheduler.
+
 0.5.5:
 
 	- Fix issue with the SLURM scheduler, where the queue status could not be

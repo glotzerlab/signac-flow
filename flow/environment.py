@@ -428,7 +428,7 @@ class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
     def script(cls, _id, nn=None, ppn=None, walltime=None, **kwargs):
         js = super(DefaultSlurmEnvironment, cls).script()
         js.writeline('#!/bin/bash')
-        js.writeline('#SBATCH --job-name={}'.format(_id))
+        js.writeline('#SBATCH --job-name="{}"'.format(_id))
         if nn is not None:
             js.writeline('#SBATCH --nodes={}'.format(nn))
         if ppn is not None:

@@ -46,9 +46,9 @@ class CometEnvironment(DefaultSlurmEnvironment):
 
         parser.add_argument(
             '--job-output',
-            help='What to name the job output file. "
-            "If omitted, uses the system default "
-            "(slurm default is "slurm-\%j.out").')
+            help='What to name the job output file. '
+            'If omitted, uses the system default '
+            '(slurm default is "slurm-\%j.out").')
 
 
 __all__ = ['CometEnvironment']

@@ -41,14 +41,14 @@ class CometEnvironment(DefaultSlurmEnvironment):
         super(CometEnvironment, cls).add_args(parser)
         parser.add_argument(
             '--memory',
-            help="Specify how much memory to reserve per node. "
-            "Only relevant for shared queue jobs.")
+            help=("Specify how much memory to reserve per node. "
+            "Only relevant for shared queue jobs."))
 
         parser.add_argument(
             '--job-output',
-            help='What to name the job output file. '
+            help=('What to name the job output file. '
             'If omitted, uses the system default '
-            '(slurm default is "slurm-\%j.out").')
+            '(slurm default is "slurm-%%j.out").'))
 
 
 __all__ = ['CometEnvironment']

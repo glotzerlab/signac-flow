@@ -41,7 +41,7 @@ class CometEnvironment(DefaultSlurmEnvironment):
         super(CometEnvironment, cls).add_args(parser)
         parser.add_argument(
             '--memory',
-            help=("Specify how much memory to reserve per node. "
+            help=("Specify how much memory to reserve per node in GB. "
                   "Only relevant for shared queue jobs."))
 
         parser.add_argument(

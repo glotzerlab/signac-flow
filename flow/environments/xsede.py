@@ -2,7 +2,11 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 """Environments for XSEDE supercomputers."""
+from __future__ import print_function
+import sys
+
 from ..environment import DefaultSlurmEnvironment
+from ..errors import SubmitError
 
 
 class CometEnvironment(DefaultSlurmEnvironment):
@@ -51,4 +55,40 @@ class CometEnvironment(DefaultSlurmEnvironment):
                   '(slurm default is "slurm-%%j.out").'))
 
 
-__all__ = ['CometEnvironment']
+class BridgesEnvironment(DefaultSlurmEnvironment):
+    """Environment profile for the Bridges super computer.
+
+    https://portal.xsede.org/psc-bridges
+    """
+    hostname_pattern = '.*\.bridges\.psc\.edu$'
+    cores_per_node = 28
+
+    @classmethod
+    def calc_num_nodes(cls, np_total, ppn, force, partition, **kwargs):
+        if 'shared' in partition.lower():
+            return 1
+        else:
+            try:
+                return super(BridgesEnvironment, cls).calc_num_nodes(np_total, ppn, force)
+            except SubmitError as error:
+                if error.args[0] == "Bad node utilization!":
+                    print("Use the '--partition=RM-SHARED' for incomplete node utilization!", file=sys.stderr)
+                    raise error
+
+    @classmethod
+    def script(cls, _id, ppn, partition, **kwargs):
+        js = super(BridgesEnvironment, cls).script(_id=_id, ppn=ppn, **kwargs)
+        js.writeline('#SBATCH --partition={}'.format(partition))
+        return js
+
+    @classmethod
+    def add_args(cls, parser):
+        super(BridgesEnvironment, cls).add_args(parser)
+        parser.add_argument(
+          '-p', '--partition',
+          choices=['RM', 'RM-shared', 'RM-small', 'GPU', 'GPU-shared', 'LM'],
+          default='RM-shared',
+          help="Specify the partition to submit to.")
+
+
+__all__ = ['CometEnvironment', 'BridgesEnvironment']

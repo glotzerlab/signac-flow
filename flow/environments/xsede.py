@@ -30,14 +30,7 @@ class CometEnvironment(DefaultSlurmEnvironment):
                     raise error
 
     @classmethod
-    def script(cls, _id, ppn, memory=None, job_output=None, **kwargs):
-        if ppn != cls.cores_per_node:
-            partition = 'shared'
-        else:
-            if memory is not None:
-                raise RuntimeError("Specifying memory is only valid for shared queue jobs")
-            partition = 'compute'
-
+    def script(cls, _id, ppn, partition, memory=None, job_output=None, **kwargs):
         js = super(CometEnvironment, cls).script(_id=_id, ppn=ppn, **kwargs)
         js.writeline('#SBATCH -A {}'.format(cls.get_config_value('account')))
         js.writeline('#SBATCH --partition={}'.format(partition))

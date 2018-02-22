@@ -18,6 +18,18 @@ class CometEnvironment(DefaultSlurmEnvironment):
     cores_per_node = 24
 
     @classmethod
+    def calc_num_nodes(cls, np_total, ppn, force, partition, **kwargs):
+        if 'shared' in partition:
+            return 1
+        else:
+            try:
+                return super(CometEnvironment, cls).calc_num_nodes(np_total, ppn, force)
+            except SubmitError as error:
+                if error.args[0] == "Bad node utilization!":
+                    print("Use a shared partition for incomplete node utilization!", file=sys.stderr)
+                    raise error
+
+    @classmethod
     def script(cls, _id, ppn, memory=None, job_output=None, **kwargs):
         if ppn != cls.cores_per_node:
             partition = 'shared'
@@ -43,6 +55,13 @@ class CometEnvironment(DefaultSlurmEnvironment):
     @classmethod
     def add_args(cls, parser):
         super(CometEnvironment, cls).add_args(parser)
+
+        parser.add_argument(
+          '-p', '--partition',
+          choices=['compute', 'gpu', 'gpu-shared', 'shared', 'large-shared', 'debug'],
+          default='shared',
+          help="Specify the partition to submit to.")
+
         parser.add_argument(
             '--memory',
             help=("Specify how much memory to reserve per node in GB. "
@@ -72,7 +91,7 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
                 return super(BridgesEnvironment, cls).calc_num_nodes(np_total, ppn, force)
             except SubmitError as error:
                 if error.args[0] == "Bad node utilization!":
-                    print("Use the '--partition=RM-SHARED' for incomplete node utilization!", file=sys.stderr)
+                    print("Use a shared partition for incomplete node utilization!", file=sys.stderr)
                     raise error
 
     @classmethod

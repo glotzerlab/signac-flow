@@ -26,7 +26,8 @@ class CometEnvironment(DefaultSlurmEnvironment):
                 return super(CometEnvironment, cls).calc_num_nodes(np_total, ppn, force)
             except SubmitError as error:
                 if error.args[0] == "Bad node utilization!":
-                    print("Use a shared partition for incomplete node utilization!", file=sys.stderr)
+                    print("Use a shared partition for incomplete node utilization!",
+                          file=sys.stderr)
                     raise error
 
     @classmethod
@@ -84,7 +85,8 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
                 return super(BridgesEnvironment, cls).calc_num_nodes(np_total, ppn, force)
             except SubmitError as error:
                 if error.args[0] == "Bad node utilization!":
-                    print("Use a shared partition for incomplete node utilization!", file=sys.stderr)
+                    print("Use a shared partition for incomplete node utilization!",
+                          file=sys.stderr)
                     raise error
 
     @classmethod

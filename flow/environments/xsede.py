@@ -75,17 +75,15 @@ class Stampede2Environment(DefaultSlurmEnvironment):
     https://www.tacc.utexas.edu/systems/stampede2
     """
     hostname_pattern = '.*stampede2'
-    cores_per_node = None
+    cores_per_node = 48
 
     @classmethod
-    def script(cls, _id, ppn, node_type='skx', job_output=None, **kwargs):
-        if node_type == 'skx':
-            partition = 'skx-normal'
-            cores_per_node = 48
-        elif node_type == 'knl':
-            partition = 'normal'
-            cores_per_node = 68
+    def calc_num_nodes(cls, np_total, ppn, force=False, **kwargs):
+        # Always just the number of nodes
+        return np_total
 
+    @classmethod
+    def script(cls, _id, tpn, ppn, partition, job_output=None, **kwargs):
         js = super(Stampede2Environment, cls).script(_id=_id, ppn=ppn, **kwargs)
         # Stampede does not require account specification if you only
         # have one, so it is optional here.
@@ -97,8 +95,7 @@ class Stampede2Environment(DefaultSlurmEnvironment):
                     "No account found, assuming you can submit without one",
                     UserWarning)
         js.writeline('#SBATCH --partition={}'.format(partition))
-        if ppn is None:
-            js.writeline('#SBATCH --ntasks-per-node={}'.format(cores_per_node))
+        js.writeline('#SBATCH --ntasks-per-node={}'.format(tpn))
         if job_output is not None:
             js.writeline('#SBATCH --output="{}"'.format(job_output))
             js.writeline('#SBATCH --error="{}"'.format(job_output))
@@ -111,17 +108,32 @@ class Stampede2Environment(DefaultSlurmEnvironment):
     @classmethod
     def add_args(cls, parser):
         super(Stampede2Environment, cls).add_args(parser)
+        # Hack to remove the undesirable ppn argument in this case
+        ppn_id = [i for i, action in enumerate(parser._actions)
+                  if "--ppn" in action.option_strings][0]
+        parser._handle_conflict_resolve(
+                None,
+                [('--ppn', parser._actions[ppn_id])])
         parser.add_argument(
-            '--node-type',
-            default='skx',
-            choices=['skx', 'knl'],
-            help=("On stampede, can submit to either Skylake (skx) or"
-                  "Knights Landing (knl) nodes. Skylake is default"))
+            '-p', '--partition',
+            choices=['development', 'normal', 'large', 'flat-quadrant',
+                     'skx-dev', 'skx-normal', 'skx-large'],
+            default='skx-normal',
+            help="Specify the partition to submit to.")
+        parser.add_argument(
+            '--tpn',
+            type=int,
+            default=1,
+            help="The number of tasks per node. Note that this is NOT "
+                 "the number of processors you are allocated; you are "
+                 "always allocated complete nodes on stampede. This "
+                 "arg is passed to ibrun to control MPI jobs.")
         parser.add_argument(
             '--job-output',
             help=('What to name the job output file. '
                   'If omitted, uses the system default '
                   '(slurm default is "slurm-%%j.out").'))
+
 
 class BridgesEnvironment(DefaultSlurmEnvironment):
     """Environment profile for the Bridges super computer.

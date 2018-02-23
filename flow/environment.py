@@ -10,6 +10,7 @@ This enables the user to adjust their workflow based on the present
 environment, e.g. for the adjustemt of scheduler submission scripts.
 """
 from __future__ import print_function
+from __future__ import division
 import os
 import sys
 import re
@@ -355,7 +356,7 @@ class NodesEnvironment(ComputeEnvironment):
             help="Specify the number of processors allocated to each node.")
 
     @classmethod
-    def calc_num_nodes(cls, np_total, ppn, force=False):
+    def calc_num_nodes(cls, np_total, ppn, force=False, **kwargs):
         if ppn is None:
             try:
                 ppn = getattr(cls, 'cores_per_node')

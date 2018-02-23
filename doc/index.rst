@@ -34,8 +34,8 @@ For a detailed introduction, please checkout the :ref:`reference` documentation!
 
    installation
    reference
-   flow
    acknowledge
+   flow
 
 Indices and tables
 ------------------

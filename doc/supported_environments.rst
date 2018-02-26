@@ -10,7 +10,7 @@ The package currently ships with drivers for:
   * `SLURM schedulers <https://slurm.schedmd.com/>`_
   * `PBS (Torque) schedulers <http://www.adaptivecomputing.com/products/open-source/torque/>`_
 
-Any supercomputing system utilizing these schedulers are supported out of the box.
+Any supercomputing system utilizing these schedulers is supported out of the box.
 
 In addition, the package provides specialized submission profiles for the following environments:
 

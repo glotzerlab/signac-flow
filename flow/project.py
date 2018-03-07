@@ -1101,13 +1101,12 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             label_name = getattr(label, '_label_name', label.__name__)
             if isinstance(label_value, six.string_types):
                 yield label_value
-            elif label_value == True:
+            elif label_value is True:
                 yield label_name
             elif not isinstance(label_value, bool) and \
-                    not label_value is None:
+                    label_value is not None:
                 raise ValueError('The label function \'{}\' must return a '
                                  'string, bool, or None.'.format(label_name))
-
 
     def add_operation(self, name, cmd, pre=None, post=None, np=None, **kwargs):
         """

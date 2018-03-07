@@ -1074,11 +1074,14 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 
         The ``labels()`` generator method will now yield a ``is_foo``
         label whenever the job document has a field ``foo`` which
-        evaluates to True.
+        evaluates to True. If the field ``foo`` is a string, it will be
+        returned instead of the function name.
 
-        By default, the label name is equal to the function's name,
-        but you can specify a custom label as the first argument to the
-        label decorator, e.g.: ``@label('foo_label')``.
+        You can specify a custom label by providing a string argument to the
+        label decorator, e.g.: ``@label('foo_label')``, or by returning
+        a string from the label function. The order of precedence for label
+        name is (1) returned string, (2) ``@label(string)`` decorator argument,
+        (3) label function name.
 
         .. tip::
 
@@ -1087,14 +1090,24 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             actually depend on the project instance. We can do this by
             using the ``@staticlabel()`` decorator, equivalently the
             ``@classlabel()`` for *class methods*.
-        """
+
+       """
         for label in self._labels:
             if hasattr(label, '__func__'):
                 label = getattr(self, label.__func__.__name__)
-                if label(job):
-                    yield getattr(label, '_label_name', label.__name__)
-            elif label(self, job):
-                yield getattr(label, '_label_name', label.__name__)
+                label_value = label(job)
+            else:
+                label_value = label(self, job)
+            label_name = getattr(label, '_label_name', label.__name__)
+            if isinstance(label_value, six.string_types):
+                yield label_value
+            elif label_value == True:
+                yield label_name
+            elif not isinstance(label_value, bool) and \
+                    not label_value is None:
+                raise ValueError('The label function \'{}\' must return a '
+                                 'string, bool, or None.'.format(label_name))
+
 
     def add_operation(self, name, cmd, pre=None, post=None, np=None, **kwargs):
         """

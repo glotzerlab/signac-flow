@@ -11,6 +11,7 @@ The basic options will always be the same, however there might be some subtle di
 .. tip::
 
     If you are running on a high-performance super computer, add the following line to your ``project.py`` module to import packaged profiles: ``import flow.environments``
+    Please see :ref:`supported_environments` for more information.
 
 How to Use Environments
 =======================

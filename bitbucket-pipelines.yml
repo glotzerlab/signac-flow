@@ -38,6 +38,7 @@ pipelines:
     master:
       - step:
           script:
+            - conda update -n base conda
             - conda --version
             - python --version
             - conda install flake8
@@ -76,6 +77,7 @@ pipelines:
     develop:
       - step:
           script:
+            - conda update -n base conda
             - conda --version
             - python --version
             - conda install flake8
@@ -114,6 +116,7 @@ pipelines:
     release-*:
       - step:
           script:
+            - conda update -n base conda
             - conda --version
             - python --version
             - conda config --add channels glotzer
@@ -151,6 +154,7 @@ pipelines:
     v*:
       - step:
           script:
+            - conda update -n base conda
             - conda --version
             - python --version
             - conda install flake8

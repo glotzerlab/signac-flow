@@ -1119,7 +1119,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             op = FlowOperation('hello', cmd=lambda 'hello {}'.format(job._id))
 
         Here are some more useful examples for str-substitutions:
-        
+
         .. code-block:: python
 
             # Substitute job state point parameters:

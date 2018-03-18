@@ -8,6 +8,7 @@ pipelines:
   default:
     - step:
         script:
+          - conda update -n base conda
           - conda --version
           - python --version
           - conda install flake8

@@ -1,3 +1,17 @@
+0.5.6:
+
+	- Fix issue, where operations with spaces in their name would not be
+		accepted by the SLURM scheduler.
+	- Add environment profile for XSEDE Bridges.
+	- Update the environment profile for XSEDE comet to use the shared queue
+		by default and provide options to specify the memory allocation.
+	- Improve performance of the project update status function.
+
+0.5.5:
+
+	- Fix issue with the SLURM scheduler, where the queue status could not be
+		parsed.
+
 0.5.4:
 
 	- Fix issue with <project> run, where operation commands consist of multiple

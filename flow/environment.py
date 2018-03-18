@@ -10,6 +10,7 @@ This enables the user to adjust their workflow based on the present
 environment, e.g. for the adjustemt of scheduler submission scripts.
 """
 from __future__ import print_function
+from __future__ import division
 import os
 import sys
 import re
@@ -355,7 +356,7 @@ class NodesEnvironment(ComputeEnvironment):
             help="Specify the number of processors allocated to each node.")
 
     @classmethod
-    def calc_num_nodes(cls, np_total, ppn, force=False):
+    def calc_num_nodes(cls, np_total, ppn, force=False, **kwargs):
         if ppn is None:
             try:
                 ppn = getattr(cls, 'cores_per_node')
@@ -363,7 +364,7 @@ class NodesEnvironment(ComputeEnvironment):
                 raise SubmitError(NUM_NODES_WARNING)
 
         # Calculate the total number of required nodes
-        nn = ceil(np_total / ppn)
+        nn = int(ceil(np_total / ppn))
 
         if not force:  # Perform basic check concerning the node utilization.
             usage = np_total / nn / ppn
@@ -428,7 +429,7 @@ class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
     def script(cls, _id, nn=None, ppn=None, walltime=None, **kwargs):
         js = super(DefaultSlurmEnvironment, cls).script()
         js.writeline('#!/bin/bash')
-        js.writeline('#SBATCH --job-name={}'.format(_id))
+        js.writeline('#SBATCH --job-name="{}"'.format(_id))
         if nn is not None:
             js.writeline('#SBATCH --nodes={}'.format(nn))
         if ppn is not None:

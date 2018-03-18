@@ -704,7 +704,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 else:
                     np_total = sum(op.np for op in operations)
                 try:
-                    nn = env.calc_num_nodes(np_total, ppn, force)
+                    nn = env.calc_num_nodes(np_total, ppn, force, **kwargs)
                 except SubmitError as e:
                     if not (flags or force):
                         raise e

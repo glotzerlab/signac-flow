@@ -178,7 +178,7 @@ class ProjectTest(unittest.TestCase):
         project = self.mock_project(project_class=InvalidLabelMockProject)
         for job in project:
             with self.assertRaises(ValueError):
-                labels = list(project.labels(job))
+                list(project.labels(job))
 
     def test_print_status(self):
         project = self.mock_project()
@@ -276,7 +276,6 @@ class ProjectTest(unittest.TestCase):
         with open(os.devnull, 'w') as out:
             for fn in init(root=self._tmp_dir.name, out=out):
                 self.assertTrue(os.path.isfile(fn))
-
 
 
 if __name__ == '__main__':

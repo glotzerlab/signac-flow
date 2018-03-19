@@ -29,7 +29,6 @@ class StringIO(io.StringIO):
             return super(StringIO, self).read()
 
 
-
 @contextmanager
 def redirect_stdout(file):
     try:

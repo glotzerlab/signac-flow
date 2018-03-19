@@ -1069,24 +1069,23 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             class MyProject(FlowProject):
 
                 @label()
-                def is_foo(self, job):
-                    return job.document.get('foo', False)
+                def foo_label(self, job):
+                    if job.document.get('foo', False):
+                        return 'foo-label-text'
 
-        The ``labels()`` generator method will now yield a ``is_foo``
-        label whenever the job document has a field ``foo`` which
-        evaluates to True. If the field ``foo`` is a string, it will be
-        returned instead of the function name.
+        The ``labels()`` generator method will now yield a label with message
+        ``foo-label-text`` whenever the job document has a field ``foo`` which
+        evaluates to True.
 
-        You can specify a custom label by providing a string argument to the
-        label decorator, e.g.: ``@label('foo_label')``, or by returning
-        a string from the label function. The order of precedence for label
-        name is (1) returned string, (2) ``@label(string)`` decorator argument,
-        (3) label function name.
+        If the label function returns ``True``, the label message is the
+        argument of the ``@label('label_text')`` decorator, or the function
+        name if no decorator argument is provided. A label function that
+        returns ``False`` or ``None`` will not show a label.
 
         .. tip::
 
             In this particular case it may make sense to define the
-            ``is_foo()`` method as a *staticmethod*, since it does not
+            ``foo_label()`` method as a *staticmethod*, since it does not
             actually depend on the project instance. We can do this by
             using the ``@staticlabel()`` decorator, equivalently the
             ``@classlabel()`` for *class methods*.
@@ -1103,8 +1102,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 yield label_value
             elif label_value is True:
                 yield label_name
-            elif not isinstance(label_value, bool) and \
-                    label_value is not None:
+            elif not (label_value is False or label_value is None):
                 raise ValueError('The label function \'{}\' must return a '
                                  'string, bool, or None.'.format(label_name))
 

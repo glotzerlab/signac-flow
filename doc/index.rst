@@ -34,8 +34,9 @@ For a detailed introduction, please checkout the :ref:`reference` documentation!
 
    installation
    reference
-   flow
+   supported_environments
    acknowledge
+   flow
 
 Indices and tables
 ------------------

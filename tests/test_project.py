@@ -88,9 +88,22 @@ class MockProject(FlowProject):
     def c(job):
         return True
 
+    # Test label decorator argument
+    @staticlabel('has_a')
+    def d(job):
+        return 'a' in job.statepoint() and not job.document.get('a', False)
+
     @staticlabel()
     def b_is_even(job):
         return job.sp.b % 2 == 0
+
+    # Test string label return
+    @staticlabel()
+    def a_gt_zero(job):
+        if job.sp.a > 0:
+            return 'a is {}'.format(job.sp.a)
+        else:
+            return None
 
     def classify(self, job):
         if 'a' in job.statepoint() and not job.document.get('a', False):
@@ -113,6 +126,15 @@ class MockProject(FlowProject):
         return env.submit(js, _id=_id)
 
 
+class InvalidLabelMockProject(MockProject):
+
+    # Test invalid label exception when returning a value that isn't a string,
+    # bool, or None
+    @staticlabel()
+    def a_float(job):
+        return float(job.sp.a)
+
+
 class ProjectTest(unittest.TestCase):
 
     def setUp(self):
@@ -122,8 +144,8 @@ class ProjectTest(unittest.TestCase):
             name='FlowTestProject',
             root=self._tmp_dir.name)
 
-    def mock_project(self):
-        project = MockProject.get_project(root=self._tmp_dir.name)
+    def mock_project(self, project_class=MockProject):
+        project = project_class.get_project(root=self._tmp_dir.name)
         for a in range(3):
             for b in range(3):
                 project.open_job(dict(a=a, b=b)).init()
@@ -143,11 +165,20 @@ class ProjectTest(unittest.TestCase):
         project = self.mock_project()
         for job in project:
             labels = list(project.labels(job))
-            if job.sp.b % 2:
-                self.assertEqual(set(labels), {'a', 'b', 'c'})
+            if job.sp.a == 0:
+                if job.sp.b % 2:
+                    self.assertEqual(set(labels), {'a', 'b', 'c', 'has_a'})
+                else:
+                    self.assertEqual(len(labels), 5)
+                    self.assertIn('b_is_even', labels)
             else:
-                self.assertEqual(len(labels), 4)
-                self.assertIn('b_is_even', labels)
+                self.assertIn('a is {}'.format(job.sp.a), labels)
+
+    def test_invalid_labels(self):
+        project = self.mock_project(project_class=InvalidLabelMockProject)
+        for job in project:
+            with self.assertRaises(ValueError):
+                list(project.labels(job))
 
     def test_print_status(self):
         project = self.mock_project()
@@ -245,7 +276,6 @@ class ProjectTest(unittest.TestCase):
         with open(os.devnull, 'w') as out:
             for fn in init(root=self._tmp_dir.name, out=out):
                 self.assertTrue(os.path.isfile(fn))
-
 
 
 if __name__ == '__main__':

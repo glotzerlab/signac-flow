@@ -11,6 +11,7 @@ from flow import get_environment
 from flow.environment import JobScript
 from flow.environment import ComputeEnvironment
 from flow.environment import TestEnvironment
+from flow.errors import SubmitError
 
 
 class StringIO(io.StringIO):
@@ -88,6 +89,19 @@ class ProjectTest(unittest.TestCase):
             env.submit(sscript, hold=True)
         tmp_out.seek(0)
         self.assertEqual(tmp_out.read(), "# Submit command: testsub --hold\n#TEST a=0\n\n")
+
+    def test_environment_get_config_value(self):
+        env = get_environment(test=True)
+
+        with redirect_stdout(StringIO()):
+            with self.assertRaises(SubmitError):
+                a = env.get_config_value('a')
+
+        a = env.get_config_value('a', None)
+        self.assertIsNone(a)
+
+        a = env.get_config_value('a', 42)
+        self.assertEqual(a, 42)
 
 
 if __name__ == '__main__':

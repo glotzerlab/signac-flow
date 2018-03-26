@@ -61,6 +61,13 @@ signac config --global set {key} <VALUE>
 """
 
 
+class _GetConfigValueNoneType(object):
+    pass
+
+
+_GET_CONFIG_VALUE_NONE = _GetConfigValueNoneType()
+
+
 def setup(py_modules, **attrs):
     """Setup function for environment modules.
 
@@ -244,7 +251,7 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
         return
 
     @classmethod
-    def get_config_value(cls, key, default=None):
+    def get_config_value(cls, key, default=_GET_CONFIG_VALUE_NONE):
         """Request a value from the user's configuration.
 
         This method should be used whenever values need to be provided
@@ -270,7 +277,7 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
         try:
             return config.load_config()['flow'][cls.__name__][key]
         except KeyError:
-            if default is None:
+            if default is _GET_CONFIG_VALUE_NONE:
                 k = '{}.{}'.format(cls.__name__, key)
                 print(MISSING_ENV_CONF_KEY_MSG.format(key='flow.' + k))
                 raise SubmitError("Missing environment configuration key: '{}'".format(k))

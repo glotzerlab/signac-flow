@@ -4,9 +4,13 @@
 """Environments for XSEDE supercomputers."""
 from __future__ import print_function
 import sys
+import logging
 
 from ..environment import DefaultSlurmEnvironment
 from ..errors import SubmitError
+
+
+logger = logging.getLogger(__name__)
 
 
 class CometEnvironment(DefaultSlurmEnvironment):
@@ -68,6 +72,71 @@ class CometEnvironment(DefaultSlurmEnvironment):
                   '(slurm default is "slurm-%%j.out").'))
 
 
+class Stampede2Environment(DefaultSlurmEnvironment):
+    """Environment profile for the Stampede2 supercomputer.
+
+    https://www.tacc.utexas.edu/systems/stampede2
+    """
+    hostname_pattern = '.*stampede2'
+    cores_per_node = 48
+
+    @classmethod
+    def calc_num_nodes(cls, np_total, ppn, force=False, **kwargs):
+        # Always just the number of nodes
+        return np_total
+
+    @classmethod
+    def script(cls, _id, tpn, ppn, partition, job_output=None, **kwargs):
+        js = super(Stampede2Environment, cls).script(_id=_id, ppn=ppn, **kwargs)
+        # Stampede does not require account specification if you only
+        # have one, so it is optional here.
+        acct = cls.get_config_value('account', None)
+        if acct is None:
+            logger.debug(
+                    "No account found, assuming you can submit without one")
+        else:
+            js.writeline('#SBATCH -A {}'.format(acct))
+        js.writeline('#SBATCH --partition={}'.format(partition))
+        js.writeline('#SBATCH --ntasks-per-node={}'.format(tpn))
+        if job_output is not None:
+            js.writeline('#SBATCH --output="{}"'.format(job_output))
+            js.writeline('#SBATCH --error="{}"'.format(job_output))
+        return js
+
+    @classmethod
+    def mpi_cmd(cls, cmd, np):
+        return "ibrun {cmd}".format(cmd=cmd)
+
+    @classmethod
+    def add_args(cls, parser):
+        super(Stampede2Environment, cls).add_args(parser)
+        # Hack to remove the undesirable ppn argument in this case
+        ppn_id = [i for i, action in enumerate(parser._actions)
+                  if "--ppn" in action.option_strings][0]
+        parser._handle_conflict_resolve(
+                None,
+                [('--ppn', parser._actions[ppn_id])])
+        parser.add_argument(
+            '-p', '--partition',
+            choices=['development', 'normal', 'large', 'flat-quadrant',
+                     'skx-dev', 'skx-normal', 'skx-large'],
+            default='skx-normal',
+            help="Specify the partition to submit to.")
+        parser.add_argument(
+            '--tpn',
+            type=int,
+            default=1,
+            help="The number of tasks per node. Note that this is NOT "
+                 "the number of processors you are allocated; you are "
+                 "always allocated complete nodes on stampede. This "
+                 "arg is passed to ibrun to control MPI jobs.")
+        parser.add_argument(
+            '--job-output',
+            help=('What to name the job output file. '
+                  'If omitted, uses the system default '
+                  '(slurm default is "slurm-%%j.out").'))
+
+
 class BridgesEnvironment(DefaultSlurmEnvironment):
     """Environment profile for the Bridges super computer.
 
@@ -105,4 +174,4 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
           help="Specify the partition to submit to.")
 
 
-__all__ = ['CometEnvironment', 'BridgesEnvironment']
+__all__ = ['CometEnvironment', 'Stampede2Environment', 'BridgesEnvironment']

@@ -17,6 +17,7 @@ In addition, the package provides specialized submission profiles for the follow
   * `Titan (Incite) <https://www.olcf.ornl.gov/titan/>`_
   * `Comet (XSEDE) <http://www.sdsc.edu/services/hpc/hpc_systems.html#comet>`_
   * `Bridges (XSEDE) <https://www.psc.edu/bridges>`_
+  * `Stampede (XSEDE) <https://www.tacc.utexas.edu/systems/stampede2>`_
   * `flux (University of Michigan) <http://arc-ts.umich.edu/systems-services/flux/>`_
 
 To use these environment profiles, make sure to add the following line to your ``project.py`` file:

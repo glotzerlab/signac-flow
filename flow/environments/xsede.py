@@ -4,10 +4,13 @@
 """Environments for XSEDE supercomputers."""
 from __future__ import print_function
 import sys
+import logging
 
 from ..environment import DefaultSlurmEnvironment
 from ..errors import SubmitError
-import warnings
+
+
+logger = logging.getLogger(__name__)
 
 
 class CometEnvironment(DefaultSlurmEnvironment):
@@ -87,13 +90,12 @@ class Stampede2Environment(DefaultSlurmEnvironment):
         js = super(Stampede2Environment, cls).script(_id=_id, ppn=ppn, **kwargs)
         # Stampede does not require account specification if you only
         # have one, so it is optional here.
-        acct = cls.get_config_value('account', 'None')
-        if acct != 'None':
-            js.writeline('#SBATCH -A {}'.format(acct))
+        acct = cls.get_config_value('account', None)
+        if acct is None:
+            logger.debug(
+                    "No account found, assuming you can submit without one")
         else:
-            warnings.warn(
-                    "No account found, assuming you can submit without one",
-                    UserWarning)
+            js.writeline('#SBATCH -A {}'.format(acct))
         js.writeline('#SBATCH --partition={}'.format(partition))
         js.writeline('#SBATCH --ntasks-per-node={}'.format(tpn))
         if job_output is not None:

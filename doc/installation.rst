@@ -8,25 +8,18 @@ The recommendend installation method for **signac-flow** is via conda_ or pip_.
 The software is tested for Python versions 3.4+ and only depends on the signac_ package.
 
 .. _conda: https://anaconda.org/
+.. _conda-forge: https://conda-forge.org/
 .. _pip: https://docs.python.org/3.5/installing/index.html
 .. _signac: https://glotzerlab.engin.umich.edu/signac
 
 Install with conda
 ==================
 
-To install **signac-flow** via conda, you first need to add the glotzer_ channel with:
-
-.. _glotzer: https://anaconda.org/glotzer
+You can install **signac-flow** via conda (available on the conda-forge_ channel), with:
 
 .. code:: bash
 
-    $ conda config --add channels glotzer
-
-Once the **glotzer** channel has been enabled, **signac-flow** can be installed with:
-
-.. code:: bash
-
-    $ conda install signac-flow
+    $ conda install -c conda-forge signac-flow
 
 All additional dependencies will be installed automatically.
 To upgrade the package, execute:

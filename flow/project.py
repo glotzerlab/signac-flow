@@ -292,6 +292,14 @@ class _condition(object):
     def key_true(cls, key):
         return cls(lambda job: job.document.get(key, False))
 
+    @classmethod
+    def always(cls, func):
+        return cls(lambda _: True)(func)
+
+    @classmethod
+    def never(cls, func):
+        return cls(lambda _: False)(func)
+
 
 class _pre(_condition):
 

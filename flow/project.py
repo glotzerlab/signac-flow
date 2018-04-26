@@ -202,6 +202,12 @@ def _update_status(args):
     return manage.update_status(* args)
 
 
+def aggregate(func):
+    "Decorator for aggregation functions."
+    func._flow_aggregate = True
+    return func
+
+
 class label(object):
     """Decorate a function to be a label function.
 
@@ -1616,8 +1622,11 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             except KeyError:
                 raise KeyError("Unknown operation '{}'.".format(args.operation))
 
-            for job in jobs:
-                operation(job)
+            if getattr(operation, '_flow_aggregate', False):
+                operation(jobs)
+            else:
+                for job in jobs:
+                    operation(job)
 
         def _script(env, args):
             "Generate a script for the execution of operations."

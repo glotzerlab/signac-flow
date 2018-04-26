@@ -843,30 +843,35 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
     _OPERATION_FUNCTIONS = dict()
 
     @classmethod
-    def operation(cls, func):
-        if func.__name__ in cls._OPERATION_FUNCTIONS:
+    def operation(cls, func, name=None):
+        if isinstance(func, six.string_types):
+            return lambda op: cls.operation(op, name=func)
+        if name is None:
+            name = func.__name__
+
+        if name in cls._OPERATION_FUNCTIONS:
             raise ValueError(
-                "An operation with name '{}' is already registered.".format(func.__name__))
+                "An operation with name '{}' is already registered.".format(name))
 
         signature = inspect.signature(func)
         for i, (k, v) in enumerate(signature.parameters.items()):
             if i and v.default is inspect.Parameter.empty:
                 raise ValueError(
                     "Only the first argument in an operation argument may not have "
-                    "a default value! ({})".format(func.__name__))
-        cls._OPERATION_FUNCTIONS[func.__name__] = func
+                    "a default value! ({})".format(name))
+        cls._OPERATION_FUNCTIONS[name] = func
         return func
 
     def _register_operations(self):
         # To internal registry
 
-        def _guess_cmd(func):
+        def _guess_cmd(func, name):
             path = inspect.getsourcefile(func)
-            return 'python {} execute {} {{job._id}}'.format(path, func.__name__)
+            return 'python {} execute {} {{job._id}}'.format(path, name)
 
         self._operations = {
             name: FlowOperation(
-                cmd=func if func in self._CMD_FUNCTIONS else _guess_cmd(func),
+                cmd=func if func in self._CMD_FUNCTIONS else _guess_cmd(func, name),
                 pre=getattr(func, '_flow_pre', None),
                 post=getattr(func, '_flow_post', None),
             ) for name, func in self._OPERATION_FUNCTIONS.items()

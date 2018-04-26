@@ -53,6 +53,28 @@ if not six.PY2:
 logger = logging.getLogger(__name__)
 
 
+def _get_git_commit():
+    try:
+        import git
+        try:
+            return str(git.Repo().head.commit)
+        except git.exc.InvalidGitRepositoryError:
+            logger.warning("Not a git repo.")
+    except ImportError:
+        logger.warning('git module missing')
+
+
+def _git_stage_is_dirty():
+    try:
+        import git
+        try:
+            return git.Repo().is_dirty()
+        except git.exc.InvalidGitRepositoryError:
+            logger.warning("Not a git repo.")
+    except ImportError:
+        logger.warning('git module missing')
+
+
 def _mkdir_p(path):
     try:
         os.makedirs(path)
@@ -97,6 +119,7 @@ def _execute(args):
     no_tracking = job is None or (no_track is not None and True in no_track)
     if not no_tracking:
         table_init = dict(_hash_files(job.workspace(), no_track))
+        git = _get_git_commit()
 
     if six.PY2:
         subprocess.call(cmd, shell=True)
@@ -114,9 +137,9 @@ def _execute(args):
             log = op_log.setdefault(fn_, dict())
             log[time()] = {
                 'cmd': cmd,
-                'before': table_init.get(fn),
-                'after': table_final[fn],
-                'git': None,     # not implemented yet
+                'md5_before': table_init.get(fn),
+                'mdd5_after': table_final[fn],
+                'git_before': git,
             }
 
 
@@ -523,10 +546,13 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         'next_operation': 'next_op',
     }
 
+    ignore_git = False
+
     def __init__(self, config=None):
         signac.contrib.Project.__init__(self, config)
         self._register_operations()
         self._register_labels()
+        self.ignore_git = self.ignore_git
 
     @classmethod
     def _tr(cls, x):
@@ -671,6 +697,12 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         """Execute the next operations as specified by the project's workflow.
 
         """
+        # Check git stage (optional)
+        if not self.ignore_git:
+            if _git_stage_is_dirty():
+                raise RuntimeError(
+                    "Git staging area is dirty or uncommitted changes.")
+
         if operations is None:
             operations = (self.next_operation(job) for job in self)
             operations = [op for op in operations if op is not None]

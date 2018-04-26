@@ -508,7 +508,7 @@ class FlowOperation(object):
 
     def eligible(self, job):
         "Eligible, when all pre-conditions are true and at least one post-condition is false."
-        pre = all([cond(job) for cond in self._prereqs])
+        pre = len(self._prereqs) and all([cond(job) for cond in self._prereqs])
         if len(self._postconds):
             post = any([not cond(job) for cond in self._postconds])
         else:

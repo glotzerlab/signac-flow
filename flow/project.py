@@ -54,13 +54,15 @@ if not six.PY2:
 logger = logging.getLogger(__name__)
 
 
-def _get_git_commit():
+def _git_get_commit():
     try:
         import git
         try:
             return str(git.Repo().head.commit)
         except git.exc.InvalidGitRepositoryError:
-            logger.warning("Not a git repo.")
+            logger.debug("Not a git repo.")
+        except ValueError:
+            logger.warning("No commit.")
     except ImportError:
         logger.warning('git module missing')
 
@@ -71,7 +73,7 @@ def _git_stage_is_dirty():
         try:
             return git.Repo().is_dirty()
         except git.exc.InvalidGitRepositoryError:
-            logger.warning("Not a git repo.")
+            logger.debug("Not a git repo.")
     except ImportError:
         logger.warning('git module missing')
 
@@ -111,15 +113,15 @@ def _find_modified_files(a, b):
 
 def _execute(args):
     cmd, job_id, timeout, no_track = args
-    # Check whether we need to track at all
     job = signac.get_project().open_job(id=job_id)
     logger.info("Executing '{}' ('{}').".format(cmd, str(job)[:8]))
     print("Executing '{}' ['{}'].".format(cmd, str(job)[:8]))
 
+    # Check whether we need to track at all
     no_tracking = job is None or (no_track is not None and True in no_track)
     if not no_tracking:
         table_init = dict(_hash_files(job.workspace(), no_track))
-        git = _get_git_commit()
+        git = _git_get_commit()
 
     if six.PY2:
         subprocess.call(cmd, shell=True)
@@ -508,7 +510,8 @@ class FlowOperation(object):
 
     def eligible(self, job):
         "Eligible, when all pre-conditions are true and at least one post-condition is false."
-        pre = len(self._prereqs) and all([cond(job) for cond in self._prereqs])
+        pre = len(self._prereqs) or len(self._postconds)
+        pre = pre and all([cond(job) for cond in self._prereqs])
         if len(self._postconds):
             post = any([not cond(job) for cond in self._postconds])
         else:
@@ -713,7 +716,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         """
         # Check git stage (optional)
         if not self.ignore_git:
-            if _git_stage_is_dirty():
+            if _git_stage_is_dirty() or _git_get_commit() is None:
                 raise RuntimeError(
                     "Git staging area is dirty or uncommitted changes.")
 
@@ -1320,10 +1323,21 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 
        """
         for label in self._labels:
-            label_name = getattr(label, '_label_name')
+            try:
+                label_value = label(job)
+            except TypeError:
+                try:
+                    label_value = label(self, job)
+                except Exception:
+                    label = getattr(self, label.__func__.__name__)
+                    label_value = label(job)
+
+            label_name = getattr(label, '_label_name', None)
+
             if label_name is None:
-                label_name = label.__name__
-            label_value = label(job)
+                label_name = getattr(label, '__name__', type(label).__name__)
+            assert label_name is not None
+
             if isinstance(label_value, six.string_types):
                 yield label_value
             elif label_value is True:

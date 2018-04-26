@@ -38,6 +38,7 @@ from multiprocessing import TimeoutError
 import signac
 from signac.common import six
 from signac.common.six import with_metaclass
+from signac.contrib.indexing import md5
 
 from .environment import get_environment
 from .environment import NodesEnvironment
@@ -84,7 +85,6 @@ def _mkdir_p(path):
 
 
 def _hash_files(root, no_track=None):
-    from signac.contrib.indexing import md5
     import re
     for local_root, dirs, files in os.walk(root):
         for fn in files:
@@ -138,7 +138,7 @@ def _execute(args):
             log[time()] = {
                 'cmd': cmd,
                 'md5_before': table_init.get(fn),
-                'mdd5_after': table_final[fn],
+                'md5_after': table_final[fn],
                 'git_before': git,
             }
 

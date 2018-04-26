@@ -1737,6 +1737,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         parser_execute.add_argument(
             'operation',
             type=str,
+            choices=list(sorted(self._operations)),
             help="The operation to execute.")
         parser_execute.add_argument(
             'jobid',

@@ -31,6 +31,7 @@ from collections import defaultdict
 from itertools import islice
 from hashlib import sha1
 from math import ceil
+from time import time
 from multiprocessing import Pool
 from multiprocessing import TimeoutError
 
@@ -60,7 +61,43 @@ def _mkdir_p(path):
             raise
 
 
-def _execute(cmd, timeout=None):
+def _hash_files(root, no_track=None):
+    from signac.contrib.indexing import md5
+    import re
+    for local_root, dirs, files in os.walk(root):
+        for fn in files:
+            fn_ = os.path.join(local_root, fn)
+            if no_track:
+                fn_rel = os.path.relpath(fn_, root)
+                skip = False
+                for p in no_track:
+                    if re.match(p, fn_rel):
+                        skip = True
+                        break
+                if skip:
+                    continue
+            if os.path.isfile(fn_):
+                with open(fn_, 'rb') as file:
+                    yield fn_, md5(file)
+
+
+def _find_modified_files(a, b):
+    for fn in b:
+        if fn not in a or a[fn] != b[fn]:
+            yield fn
+
+
+def _execute(args):
+    cmd, job_id, timeout, no_track = args
+    # Check whether we need to track at all
+    job = signac.get_project().open_job(id=job_id)
+    logger.info("Executing '{}' ('{}').".format(cmd, str(job)[:8]))
+    print("Executing '{}' ['{}'].".format(cmd, str(job)[:8]))
+
+    no_tracking = job is None or (no_track is not None and True in no_track)
+    if not no_tracking:
+        table_init = dict(_hash_files(job.workspace(), no_track))
+
     if six.PY2:
         subprocess.call(cmd, shell=True)
     elif sys.version_info >= (3, 5):
@@ -68,8 +105,23 @@ def _execute(cmd, timeout=None):
     else:    # Older high-level API
         subprocess.call(cmd, timeout=timeout, shell=True)
 
+    if not no_tracking:
+        table_final = dict(_hash_files(job.workspace(), no_track))
+        op_log = job.document.setdefault('_op_log', dict())
+        diff = _find_modified_files(table_init, table_final)
+        for fn in diff:
+            fn_ = os.path.relpath(fn, job.workspace())
+            log = op_log.setdefault(fn_, dict())
+            log[time()] = {
+                'cmd': cmd,
+                'before': table_init.get(fn),
+                'after': table_final[fn],
+                'git': None,     # not implemented yet
+            }
 
-def _print(cmd, timeout=None):
+
+def _print(args):
+    cmd, job_id, timeout, no_track = args
     print(cmd, '[TIMEOUT={}]'.format(-1 if timeout is None else timeout))
 
 
@@ -609,6 +661,12 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         result['submission_status'] = [manage.JobStatus(highest_status).name]
         return result
 
+    _DO_NOT_TRACK = set()
+
+    @classmethod
+    def do_not_track(cls, pattern=True):
+        cls._DO_NOT_TRACK.add(pattern)
+
     def run(self, operations=None, pretend=False, np=None, timeout=None, progress=False):
         """Execute the next operations as specified by the project's workflow.
 
@@ -618,7 +676,8 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             operations = [op for op in operations if op is not None]
 
         # Prepare commands for each operation
-        cmds = [op.cmd.format(job=op.job) for op in operations]
+        cmds = [(op.cmd.format(job=op.job), op.job.get_id(), timeout, self._DO_NOT_TRACK)
+                for op in operations]
 
         # Either actually execute or just show the commands
         _run = _print if pretend else _execute
@@ -628,8 +687,8 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 raise RuntimeError(
                     "Using a timeout with serial execution is "
                     "not supported for Python version 2.7.")
-            for cmd in tqdm(cmds) if progress else cmds:
-                _run(cmd, timeout=timeout)
+            for args in tqdm(cmds) if progress else cmds:
+                _run(args)
         elif six.PY2:   # parallel execution (py27)
             # Due to Python 2.7 issue #8296 (http://bugs.python.org/issue8296) we
             # always need to provide a timeout to avoid issues with "hanging"
@@ -1524,6 +1583,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 operation = self._OPERATION_FUNCTIONS[args.operation]
             except KeyError:
                 raise KeyError("Unknown operation '{}'.".format(args.operation))
+
             for job in jobs:
                 operation(job)
 

@@ -198,10 +198,21 @@ class _cmd(object):
         return func
 
 
-class _pre(object):
+class _condition(object):
 
     def __init__(self, condition):
         self.condition = condition
+
+    @classmethod
+    def isfile(cls, filename):
+        return cls(lambda job: job.isfile(filename))
+
+    @classmethod
+    def key_true(cls, key):
+        return cls(lambda job: job.document.get(key, False))
+
+
+class _pre(_condition):
 
     def __call__(self, func):
         pre_conditions = getattr(func, '_flow_pre', list())
@@ -210,7 +221,7 @@ class _pre(object):
         return func
 
 
-class _post(object):
+class _post(_condition):
 
     def __init__(self, condition):
         self.condition = condition

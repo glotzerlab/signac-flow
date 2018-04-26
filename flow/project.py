@@ -26,6 +26,7 @@ import datetime
 import json
 import errno
 import subprocess
+import inspect
 from collections import defaultdict
 from itertools import islice
 from hashlib import sha1
@@ -66,6 +67,10 @@ def _execute(cmd, timeout=None):
         subprocess.run(cmd, timeout=timeout, shell=True)
     else:    # Older high-level API
         subprocess.call(cmd, timeout=timeout, shell=True)
+
+
+def _print(cmd, timeout=None):
+    print(cmd, '[TIMEOUT={}]'.format(-1 if timeout is None else timeout))
 
 
 def _positive_int(value):
@@ -181,6 +186,40 @@ class classlabel(label):
 
     def __call__(self, func):
         return classmethod(super(classlabel, self).__call__(func))
+
+
+class _cmd(object):
+
+    def __init__(self, cmd=None):
+        self.cmd = cmd
+
+    def __call__(self, func):
+        func._flow_cmd = self.cmd
+        return func
+
+
+class _pre(object):
+
+    def __init__(self, condition):
+        self.condition = condition
+
+    def __call__(self, func):
+        pre_conditions = getattr(func, '_flow_pre', list())
+        pre_conditions.append(self.condition)
+        func._flow_pre = pre_conditions
+        return func
+
+
+class _post(object):
+
+    def __init__(self, condition):
+        self.condition = condition
+
+    def __call__(self, func):
+        post_conditions = getattr(func, '_flow_post', list())
+        post_conditions.append(self.condition)
+        func._flow_post = post_conditions
+        return func
 
 
 def _is_label_func(func):
@@ -423,7 +462,8 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 
     def __init__(self, config=None):
         signac.contrib.Project.__init__(self, config)
-        self._operations = dict()
+        self._register_operations()
+        self._register_labels()
 
     @classmethod
     def _tr(cls, x):
@@ -570,7 +610,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         cmds = [op.cmd.format(job=op.job) for op in operations]
 
         # Either actually execute or just show the commands
-        _run = print if pretend else _execute
+        _run = _print if pretend else _execute
 
         if np == 1:      # serial execution
             if six.PY2 and timeout is not None:
@@ -785,8 +825,75 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
     def submit_user(self, env, _id, operations, nn=None, ppn=None, serial=False,
                     walltime=None, force=False, **kwargs):
         return self.submit_operations(
-                env=env, _id=_id, operations=operations, nn=nn, ppn=ppn,
-                serial=serial, force=force, walltime=walltime, **kwargs)
+            env=env, _id=_id, operations=operations, nn=nn, ppn=ppn,
+            serial=serial, force=force, walltime=walltime, **kwargs)
+
+# BEGIN NEW INTERFACE
+    _OPERATION_FUNCTIONS = dict()
+
+    @classmethod
+    def operation(cls, func):
+        if func.__name__ in cls._OPERATION_FUNCTIONS:
+            raise ValueError(
+                "An operation with name '{}' is already registered.".format(func.__name__))
+
+        signature = inspect.signature(func)
+        for i, (k, v) in enumerate(signature.parameters.items()):
+            if i and v.default is inspect.Parameter.empty:
+                raise ValueError(
+                    "Only the first argument in an operation argument may not have "
+                    "a default value! ({})".format(func.__name__))
+        cls._OPERATION_FUNCTIONS[func.__name__] = func
+        return func
+
+    def _register_operations(self):
+        # To internal registry
+
+        def _guess_cmd(func):
+            path = inspect.getsourcefile(func)
+            return 'python {} execute {} {{job._id}}'.format(path, func.__name__)
+
+        self._operations = {
+            name: FlowOperation(
+                cmd=func if func in self._CMD_FUNCTIONS else _guess_cmd(func),
+                pre=getattr(func, '_flow_pre', None),
+                post=getattr(func, '_flow_post', None),
+            ) for name, func in self._OPERATION_FUNCTIONS.items()
+        }
+
+    pre = _pre
+    post = _post
+
+    _CMD_FUNCTIONS = set()
+
+    @classmethod
+    def cmd(cls, func):
+        cls._CMD_FUNCTIONS.add(func)
+        return func
+
+    _LABEL_FUNCTIONS = dict()
+
+    @classmethod
+    def label(cls, label_name_or_func=None):
+        if callable(label_name_or_func):
+            cls._LABEL_FUNCTIONS[label_name_or_func] = None
+            return label_name_or_func
+
+        def label_func(func):
+            cls._LABEL_FUNCTIONS[func] = label_name_or_func
+            return func
+
+        return label_func
+
+    def _register_labels(self):
+        # Convert class variable to instance variable:
+        self._labels = self._labels.copy()
+        for func, label_name in self._LABEL_FUNCTIONS.items():
+            func._label_name = label_name
+            self._labels.add(func)
+
+
+# END NEW INTERFACE
 
     @classmethod
     def add_submit_args(cls, parser):
@@ -1092,12 +1199,10 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 
        """
         for label in self._labels:
-            if hasattr(label, '__func__'):
-                label = getattr(self, label.__func__.__name__)
-                label_value = label(job)
-            else:
-                label_value = label(self, job)
-            label_name = getattr(label, '_label_name', label.__name__)
+            label_name = getattr(label, '_label_name')
+            if label_name is None:
+                label_name = label.__name__
+            label_value = label(job)
             if isinstance(label_value, six.string_types):
                 yield label_value
             elif label_value is True:
@@ -1385,6 +1490,27 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 return 1
             return 0
 
+        def _open_job_by_id(_id):
+            try:
+                return self.open_job(id=_id)
+            except KeyError:
+                msg = "Did not find job corresponding to id '{}'.".format(_id)
+                raise KeyError(msg)
+            except LookupError as error:
+                raise LookupError("Multiple matches for id '{}'.".format(_id))
+
+        def _execute(env, args):
+            if len(args.jobid):
+                jobs = [_open_job_by_id(jid) for jid in args.jobid]
+            else:
+                jobs = self
+            try:
+                operation = self._OPERATION_FUNCTIONS[args.operation]
+            except KeyError:
+                raise KeyError("Unknown operation '{}'.".format(args.operation))
+            for job in jobs:
+                operation(job)
+
         def _script(env, args):
             "Generate a script for the execution of operations."
             kwargs = vars(args)
@@ -1481,6 +1607,19 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             action='store_true',
             help="Display a progress bar during execution.")
         parser_run.set_defaults(func=_run)
+
+        parser_execute = subparsers.add_parser('execute')
+        parser_execute.add_argument(
+            'operation',
+            type=str,
+            help="The operation to execute.")
+        parser_execute.add_argument(
+            'jobid',
+            type=str,
+            nargs='*',
+            help="The job ids, as registered in the signac project. "
+                 "Omit to default to all statepoints.")
+        parser_execute.set_defaults(func=_execute)
 
         parser_script = subparsers.add_parser('script')
         self.add_script_args(parser_script)

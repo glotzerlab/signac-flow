@@ -302,6 +302,13 @@ class _condition(object):
     def never(cls, func):
         return cls(lambda _: False)(func)
 
+    @classmethod
+    def after(cls, other_func):
+        def check_preconds(job):
+            post_conds = getattr(other_func, '_flow_post', list())
+            return all(c(job) for c in post_conds)
+        return cls(check_preconds)
+
 
 class _pre(_condition):
 

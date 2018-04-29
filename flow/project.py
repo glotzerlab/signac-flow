@@ -723,8 +723,13 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 
         operations = map(_msg, operations)
 
-        from jinja2 import Environment, PackageLoader
-        template_env = Environment(loader=PackageLoader('flow', 'templates'), trim_blocks=True)
+        from jinja2 import Environment, PackageLoader, ChoiceLoader, FileSystemLoader
+        template_env = Environment(
+            loader=ChoiceLoader([
+                FileSystemLoader(self.fn('templates')),
+                PackageLoader('flow', 'templates'),
+                ]),
+            trim_blocks=True)
         template_env.filters['timedelta'] = _format_timedelta
         template = template_env.get_template('submit.sh')
 
@@ -738,9 +743,6 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 
         script = template.render(** context)
         return env.submit(script=script, nn=nn, ppn=ppn, flags=flags, **kwargs)
-        #script = env.script(_id=_id, nn=nn, ppn=ppn, **kwargs)
-        #self.write_script(script=script, operations=operations, background=not serial, **kwargs)
-        #return env.submit(script=script, nn=nn, ppn=ppn, flags=flags, **kwargs)
 
     def submit(self, env, bundle_size=1, serial=False, force=False,
                nn=None, ppn=None, walltime=None, **kwargs):

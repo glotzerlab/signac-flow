@@ -84,7 +84,7 @@ class SlurmScheduler(Scheduler):
 
         if pretend:
             print("# Submit command: {}".format('  '.join(submit_cmd)))
-            print(script.read())
+            print(script)
             print()
         else:
             with tempfile.NamedTemporaryFile() as tmp_submit_script:

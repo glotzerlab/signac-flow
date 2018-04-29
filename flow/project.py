@@ -79,6 +79,14 @@ def _positive_int(value):
     return ivalue
 
 
+def _format_timedelta(delta):
+    "Format a time delta for interpretation by schedulers."
+    hours, r = divmod(delta.seconds, 3600)
+    minutes, seconds = divmod(r, 60)
+    hours += delta.days * 24
+    return "{:0>2}:{:0>2}:{:0>2}".format(hours, minutes, seconds)
+
+
 def is_active(status):
     """True if a specific status is considered 'active'.
 
@@ -715,9 +723,24 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 
         operations = map(_msg, operations)
 
-        script = env.script(_id=_id, nn=nn, ppn=ppn, **kwargs)
-        self.write_script(script=script, operations=operations, background=not serial, **kwargs)
+        from jinja2 import Environment, PackageLoader
+        template_env = Environment(loader=PackageLoader('flow', 'templates'), trim_blocks=True)
+        template_env.filters['timedelta'] = _format_timedelta
+        template = template_env.get_template('submit.sh')
+
+        context = kwargs.copy()
+        context['project'] = self
+        context['id'] = _id
+        context['operations'] = operations
+        context['nn'] = nn
+        context['ppn'] = ppn
+        context['serial'] = serial
+
+        script = template.render(** context)
         return env.submit(script=script, nn=nn, ppn=ppn, flags=flags, **kwargs)
+        #script = env.script(_id=_id, nn=nn, ppn=ppn, **kwargs)
+        #self.write_script(script=script, operations=operations, background=not serial, **kwargs)
+        #return env.submit(script=script, nn=nn, ppn=ppn, flags=flags, **kwargs)
 
     def submit(self, env, bundle_size=1, serial=False, force=False,
                nn=None, ppn=None, walltime=None, **kwargs):

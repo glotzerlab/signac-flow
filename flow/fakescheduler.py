@@ -30,7 +30,7 @@ class FakeScheduler(Scheduler):
         if flags:
             fake_cmd += ' ' + ' '.join(flags)
         print("# Submit command: testsub {}".format(fake_cmd))
-        print(script.read())
+        print(script)
         # return status is None, meaning, 'not actually submitted'
         return None
 

@@ -39,6 +39,10 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 
+# Global variable can be used to override detected environment
+ENVIRONMENT = None
+
+
 NUM_NODES_WARNING = """Unable to determine the reqired number of nodes (nn) for this submission.
 Either provide this value directly with '--nn' or provide the number of processors
 per node: '--ppn'.
@@ -237,7 +241,6 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
             flags.extend(env_flags)
 
         # Hand off the actual submission to the scheduler
-        script.seek(0)
         if cls.get_scheduler().submit(script, flags=flags, *args, **kwargs):
             return manage.JobStatus.submitted
 
@@ -518,6 +521,8 @@ def get_environment(test=False, import_configured=True):
     if test:
         return TestEnvironment
     else:
+        if ENVIRONMENT is not None:
+            return ENVIRONMENT
         env_types = registered_environments(import_configured=import_configured)
         logger.debug(
             "List of registered environments:\n\t{}".format(

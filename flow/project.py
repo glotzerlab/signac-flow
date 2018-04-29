@@ -295,7 +295,7 @@ class _condition(object):
         return cls(lambda job: job.isfile(filename))
 
     @classmethod
-    def key_true(cls, key):
+    def true(cls, key):
         return cls(lambda job: job.document.get(key, False))
 
     @classmethod

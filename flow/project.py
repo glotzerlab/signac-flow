@@ -54,6 +54,10 @@ if not six.PY2:
 logger = logging.getLogger(__name__)
 
 
+def _git_is_repo(project):
+    return os.path.isdir(project.fn('.git'))
+
+
 def _git_get_commit():
     try:
         import git
@@ -723,7 +727,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         """
         # Check git stage (optional)
         if not self.ignore_git:
-            if _git_stage_is_dirty() or _git_get_commit() is None:
+            if _git_is_repo(self) and (_git_stage_is_dirty() or _git_get_commit() is None):
                 raise RuntimeError(
                     "Git staging area is dirty or uncommitted changes.")
 

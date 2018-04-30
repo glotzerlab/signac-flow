@@ -18,7 +18,6 @@ option is to use a FlowGraph.
 from __future__ import print_function
 import sys
 import os
-import io
 import logging
 import warnings
 import argparse
@@ -29,7 +28,6 @@ import subprocess
 from collections import defaultdict
 from itertools import islice
 from hashlib import sha1
-from math import ceil
 from multiprocessing import Pool
 from multiprocessing import TimeoutError
 
@@ -227,30 +225,24 @@ class JobOperation(object):
     :type cmd: str
     """
 
-    def __init__(self, name, job, cmd, np=None, mpi=False):
+    def __init__(self, name, job, cmd, np=None):
         if np is None:
             np = 1
         self.name = name
         self.job = job
         self.cmd = cmd
         self.np = np
-        if mpi:
-            warnings.warn(
-                "Dynamic MPI-command substitution may be deprecated in future releases.",
-                PendingDeprecationWarning)
-        self.mpi = mpi
 
     def __str__(self):
         return self.name
 
     def __repr__(self):
-        return "{type}(name='{name}', job='{job}', cmd={cmd}, np={np}, mpi={mpi})".format(
+        return "{type}(name='{name}', job='{job}', cmd={cmd}, np={np})".format(
             type=type(self).__name__,
             name=self.name,
             job=str(self.job),
             cmd=repr(self.cmd),
-            np=self.np,
-            mpi=self.mpi)
+            np=self.np)
 
     def get_id(self):
         "Return a name, which identifies this job-operation."
@@ -346,11 +338,9 @@ class FlowOperation(object):
     :param np: Specify the number of processors this operation requires,
         defaults to 1.
     :type np: int
-    :param mpi: Specify whether this operation may be extended as an MPI command;
-        required for backwards-compatibility (pending deprecation)
     """
 
-    def __init__(self, cmd, pre=None, post=None, np=None, mpi=False):
+    def __init__(self, cmd, pre=None, post=None, np=None):
         if pre is None:
             pre = []
         if post is None:
@@ -359,7 +349,6 @@ class FlowOperation(object):
             np = 1
         self._cmd = cmd
         self._np = np
-        self.mpi = False
 
         self._prereqs = [FlowCondition(cond) for cond in pre]
         self._postconds = [FlowCondition(cond) for cond in post]
@@ -613,10 +602,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         "Write the commands for the execution of operations as part of a script."
         for op in operations:
             self.write_human_readable_statepoint(script, op.job)
-            if op.mpi:
-                script.write_cmd(op.cmd.format(job=op.job), np=op.np, bg=background)
-            else:
-                script.write_cmd(op.cmd.format(job=op.job), bg=background)
+            script.write_cmd(op.cmd.format(job=op.job), bg=background)
             script.writeline()
 
     def write_script_footer(self, script, **kwargs):
@@ -650,8 +636,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         self.write_script_footer(script, **kwargs)
 
     def _gather_operations(self, job_id=None, operation_name=None, num=None, bundle_size=1,
-                           cmd=None, requires=None, pool=None, serial=False, force=False,
-                           legacy=False, **kwargs):
+                           cmd=None, requires=None, pool=None, serial=False, force=False, **kwargs):
         "Gather operations to be executed or submitted."
         if job_id:
             jobs = (self.open_job(id=_id) for _id in job_id)
@@ -659,16 +644,11 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             jobs = iter(self)
 
         def get_ops(job):
-            if legacy and operation_name is not None:
-                yield JobOperation(name=operation_name, job=job, cmd=None)
             if cmd is None:
-                if legacy:
-                    yield JobOperation(name=self.next_operation(job), job=job, cmd=None)
-                else:
-                    ops = set(self.next_operations(job))
-                    ops.add(self.next_operation(job))
-                    for op in ops:
-                        yield op
+                ops = set(self.next_operations(job))
+                ops.add(self.next_operation(job))
+                for op in ops:
+                    yield op
             else:
                 yield JobOperation(name='user-cmd', cmd=cmd.format(job=job), job=job)
 
@@ -684,13 +664,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 labels = set(self.classify(op.job))
                 if not all([req in labels for req in requires]):
                     return False
-            if legacy:
-                if op.get_status() >= manage.JobStatus.submitted:
-                    return False
-                else:
-                    return self.eligible(job=op.job, operation=op.name, **kwargs)
-            else:
-                return self.eligible_for_submission(op)
+            return self.eligible_for_submission(op)
 
         # Get the first num eligible operations
         map_ = map if pool is None else pool.imap  # parallelization
@@ -740,46 +714,18 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             raise ValueError(
                 "The submit() API has changed with signac-flow version 0.4, "
                 "please update your project. ")
-        LEGACY = self._check_legacy_api()
-        if LEGACY:
-            warnings.warn(
-                "You are using a deprecated FlowProject API (version 0.3.x), "
-                "please update your project.", DeprecationWarning)
-            logger.warning(
-                "You are using a deprecated FlowProject API (version 0.3.x), "
-                "please update your project. Entering legacy mode.")
 
         if walltime is not None:
             walltime = datetime.timedelta(hours=walltime)
 
-        operations = self._gather_operations(legacy=LEGACY, **kwargs)
-        _submit = self._submit_legacy if LEGACY else self.submit_user
+        operations = self._gather_operations(**kwargs)
+        _submit = self.submit_user
 
         for bundle in make_bundles(operations, bundle_size):
             _id = self._store_bundled(bundle)
-            try:
-                status = _submit(
-                    env=env, _id=_id, operations=bundle, nn=nn, ppn=ppn,
-                    serial=serial, force=force, walltime=walltime, **kwargs)
-
-# BEGIN LEGACY MODE FOR VERSION 0.4.x:
-            except TypeError as e:
-                if "script() got multiple values for keyword argument 'nn'" == e.args[0]:
-                    warnings.warn(
-                        "Entering legacy mode for API version 0.4.x!", PendingDeprecationWarning)
-                    logger.warning("Entering legacy mode for API version 0.4.x!")
-                    if walltime is None:
-                        walltime = datetime.timedelta(hours=12)
-                    if nn is not None:
-                        raise RuntimeError(
-                            "You can't directly provide the number of nodes with the legacy API "
-                            "for version 0.4.x!")
-                    status = _submit(
-                        env=env, _id=_id, operations=bundle, ppn=ppn,
-                        serial=serial, force=force, walltime=walltime, **kwargs)
-                else:
-                    raise
-# END LEGACY MODE FOR VERSION 0.4.x.
+            status = _submit(
+                env=env, _id=_id, operations=bundle, nn=nn, ppn=ppn,
+                serial=serial, force=force, walltime=walltime, **kwargs)
 
             if status is not None:
                 for op in bundle:
@@ -1206,7 +1152,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         """
         for name, op in self.operations.items():
             if op.eligible(job):
-                yield JobOperation(name=name, job=job, cmd=op(job), np=op.np(job), mpi=op.mpi)
+                yield JobOperation(name=name, job=job, cmd=op(job), np=op.np(job))
 
     def next_operation(self, job):
         """Determine the next operation for this job.
@@ -1233,6 +1179,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             This function is deprecated, please use
             :py:meth:`~.eligible_for_submission` instead.
         """
+        warnings.warn(DeprecationWarning())
         return None
 
     def eligible_for_submission(self, job_operation):
@@ -1241,85 +1188,12 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         By default, an operation is eligible for submission when it
         is not considered active, that means already queued or running.
         """
+        warnings.warn(DeprecationWarning())
         if job_operation is None:
             return False
         if job_operation.get_status() >= manage.JobStatus.submitted:
             return False
         return True
-
-    def _check_legacy_api(self):
-        "Used for backwards-compatibility."
-        return hasattr(self, 'write_user')
-
-    def _submit_legacy(self, env, _id, operations, walltime, force,
-                       serial=False, ppn=None, pretend=False, after=None, hold=False,
-                       **kwargs):
-        """This method simulates legacy submission behavior to ensure backwards-compatibility.
-
-        May be removed in a future version.
-        """
-        if 'np' in kwargs:
-            kwargs['nc'] = kwargs.pop('np')
-
-        mpi_cmd = getattr(env, 'mpi_cmd', None)
-
-        if mpi_cmd is None:
-
-            def mpi_cmd(cmd, np=1):
-                if np > 1:
-                    return 'mpirun -np {} {}'.format(np, cmd)
-                else:
-                    return cmd
-
-        if ppn is None:
-            ppn = getattr(env, 'cores_per_node', 1)
-            if ppn is None:
-                ppn = 1
-
-        class JobScriptLegacy(io.StringIO):
-            "Simple StringIO wrapper to implement cmd wrapping logic."
-            parallel = False
-
-            def writeline(self, line, eol='\n'):
-                "Write one line to the job script."
-                self.write(line + eol)
-
-            def write_cmd(self, cmd, parallel=False, np=1, mpi_cmd=None, **kwargs):
-                "Write a command to the jobscript."
-                if np > 1:
-                    if mpi_cmd is None:
-                        raise RuntimeError("Requires mpi_cmd wrapper.")
-                    cmd = mpi_cmd(cmd, np=np)
-                if parallel:
-                    self.parallel = True
-                    cmd += ' &'
-                self.writeline(cmd)
-                return np
-
-        script = JobScriptLegacy()
-
-        self.write_header(script, walltime, **kwargs)
-
-        nps = list()
-        for op in operations:
-            nps.append(self.write_user(
-                script=script,
-                job=op.job,
-                operation=op.name,
-                parallel=not serial,
-                mpi_cmd=mpi_cmd,
-                **kwargs))
-        if script.parallel:
-            script.writeline('wait')
-        script.seek(0)
-
-        np = max(nps) if serial else sum(nps)
-        nn = ceil(np / ppn)
-
-        sscript = env.script(_id=_id, nn=nn, ppn=ppn, walltime=walltime, **kwargs)
-        sscript.write(script.read())
-        sscript.seek(0)
-        return env.submit(sscript, pretend=pretend, hold=hold, after=after)
 
     def main(self, parser=None, pool=None):
         """Call this function to use the main command line interface.

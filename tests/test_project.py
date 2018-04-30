@@ -8,7 +8,6 @@ import os
 
 from signac.common import six
 from flow import FlowProject
-from flow import JobOperation
 from flow import get_environment
 from flow.manage import Scheduler
 from flow.manage import ClusterJob
@@ -111,14 +110,6 @@ class MockProject(FlowProject):
         if job.sp.b % 2 == 0:
             yield 'b_is_even'
 
-    def next_operation(self, job):
-        labels = self.classify(job)
-        if 'has_a' in labels:
-            return JobOperation('a_op', job, 'run_a_op {}'.format(job))
-
-    def next_operations(self, job):
-        yield self.next_operation(job)
-
     def submit_user(self, env, _id, operations, **kwargs):
         js = env.script(_id=_id)
         for op in operations:
@@ -146,6 +137,8 @@ class ProjectTest(unittest.TestCase):
 
     def mock_project(self, project_class=MockProject):
         project = project_class.get_project(root=self._tmp_dir.name)
+        project.add_operation(
+            name='a_op', cmd='run_a_op {job._id}', pre=[lambda job: 'has_a' in project.labels(job)])
         for a in range(3):
             for b in range(3):
                 project.open_job(dict(a=a, b=b)).init()

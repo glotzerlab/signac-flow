@@ -326,6 +326,12 @@ class ProjectTest(unittest.TestCase):
             for fn in init(root=self._tmp_dir.name, out=out):
                 self.assertTrue(os.path.isfile(fn))
 
+    def test_main(self):
+        project = self.mock_project()
+        with redirect_stdout(StringIO()):
+            with self.assertRaises(SystemExit):
+                project.main()
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -421,9 +421,12 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         'next_operation': 'next_op',
     }
 
-    def __init__(self, config=None):
+    def __init__(self, config=None, environment=None):
+        if environment is None:
+            environment = get_environment()
         signac.contrib.Project.__init__(self, config)
         self._operations = dict()
+        self._environment = environment
 
     @classmethod
     def _tr(cls, x):
@@ -719,7 +722,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         self.write_script(script=script, operations=operations, background=not serial, **kwargs)
         return env.submit(script=script, nn=nn, ppn=ppn, flags=flags, **kwargs)
 
-    def submit(self, env, bundle_size=1, serial=False, force=False,
+    def submit(self, env=None, bundle_size=1, serial=False, force=False,
                nn=None, ppn=None, walltime=None, **kwargs):
         """Submit function for the project's main submit interface.
 
@@ -1390,7 +1393,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             kwargs = vars(args)
             del kwargs['func']
             del kwargs['debug']
-            env = get_environment(test=True)
+            env = get_environment(test=True)    # back hack... ignoring the env argument here
             ops = self._gather_operations(**kwargs)
             for bundle in make_bundles(ops, args.bundle_size):
                 script = env.script()
@@ -1407,7 +1410,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             debug = kwargs.pop('debug')
             test = kwargs.pop('test')
             if test:
-                env = get_environment(test=True)
+                env = get_environment(test=True)    # bad hack... ignoring the env argument here
             try:
                 self.submit(env, **kwargs)
             except NoSchedulerError as e:
@@ -1423,8 +1426,6 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 return 1
             else:
                 return 0
-
-        env = get_environment()
 
         if parser is None:
             parser = argparse.ArgumentParser()
@@ -1495,8 +1496,9 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         parser_submit.add_argument(
             '-t', '--test',
             action='store_true')
-        env_group = parser_submit.add_argument_group('{} options'.format(env.__name__))
-        env.add_args(env_group)
+        env_group = parser_submit.add_argument_group(
+            '{} options'.format(self._environment.__name__))
+        self._environment.add_args(env_group)
         parser_submit.set_defaults(func=_submit)
 
         args = parser.parse_args()
@@ -1508,7 +1510,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         else:
             logging.basicConfig(level=logging.WARNING)
 
-        sys.exit(args.func(env, args))
+        sys.exit(args.func(self._environment, args))
 
 #####
 #   BEGIN LEGACY API

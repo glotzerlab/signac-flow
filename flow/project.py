@@ -736,7 +736,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         template = template_env.get_template('submit.sh')
 
         context = kwargs.copy()
-        context['base'] = env.template
+        context['base_submit'] = env.template
         context['environment'] = env.__name__
         context['project'] = self
         context['id'] = _id

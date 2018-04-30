@@ -294,7 +294,7 @@ class ProjectTest(unittest.TestCase):
         project.submit(env, bundle_size=2, num=4)
         self.assertEqual(len(list(sched.jobs())), 3)
         sched.reset()
-        project.update_stati(sched, file=StringIO())
+        project._update_stati(sched, file=StringIO())
         project.submit(env, bundle_size=0)
         self.assertEqual(len(list(sched.jobs())), 1)
 
@@ -316,7 +316,7 @@ class ProjectTest(unittest.TestCase):
 
         sched.step()
         sched.step()
-        project.update_stati(sched, file=fd)
+        project._update_stati(sched, file=fd)
 
         for job in project:
             self.assertEqual(project.next_operation(job).get_status(), JobStatus.queued)
@@ -326,6 +326,7 @@ class ProjectTest(unittest.TestCase):
             for fn in init(root=self._tmp_dir.name, out=out):
                 self.assertTrue(os.path.isfile(fn))
 
+    @unittest.skipIf(__name__ != '__main__', 'can only be tested if __main__')
     def test_main(self):
         project = self.mock_project()
         with redirect_stdout(StringIO()):

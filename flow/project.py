@@ -789,7 +789,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 serial=serial, force=force, walltime=walltime, **kwargs)
 
     @classmethod
-    def add_submit_args(cls, parser):
+    def _add_submit_args(cls, parser):
         "Add arguments to parser for the :meth:`~.submit` method."
         parser.add_argument(
             'flags',
@@ -804,10 +804,10 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             '--force',
             action='store_true',
             help="Ignore all warnings and checks, just submit.")
-        cls.add_script_args(parser)
+        cls._add_script_args(parser)
 
     @classmethod
-    def add_script_args(cls, parser):
+    def _add_script_args(cls, parser):
         "Add arguments to parser for the :meth:`~.script` method."
         parser.add_argument(
             '-j', '--job-id',
@@ -886,7 +886,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             print(util.tabulate.tabulate([], headers=table_header), file=file)
             print("[no labels]", file=file)
 
-    def format_row(self, status, statepoint=None, max_width=None):
+    def _format_row(self, status, statepoint=None, max_width=None):
         "Format each row in the detailed status output."
         row = [
             status['job_id'],
@@ -922,7 +922,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         if parameters:
             for i, value in enumerate(parameters):
                 table_header.insert(i + 3, shorten(self._alias(str(value)), param_max_width))
-        rows = (self.format_row(status, parameters, param_max_width)
+        rows = (self._format_row(status, parameters, param_max_width)
                 for status in stati if not (skip_active and status['active']))
         print(util.tabulate.tabulate(rows, headers=table_header), file=file)
         if abbreviate.table:
@@ -939,7 +939,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             collection.update_one({'_id': status['job_id']},
                                   {'$set': status}, upsert=True)
 
-    def update_stati(self, scheduler, jobs=None, file=sys.stderr, pool=None, ignore_errors=False):
+    def _update_stati(self, scheduler, jobs=None, file=sys.stderr, pool=None, ignore_errors=False):
         """Update the status of all jobs with the given scheduler.
 
         :param scheduler: The scheduler instance used to feth the job stati.
@@ -1000,7 +1000,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             job_filter = json.loads(job_filter)
         jobs = list(self.find_jobs(job_filter))
         if scheduler is not None:
-            self.update_stati(scheduler, jobs, file=err, pool=pool, ignore_errors=ignore_errors)
+            self._update_stati(scheduler, jobs, file=err, pool=pool, ignore_errors=ignore_errors)
         print(self._tr("Generate output..."), file=err)
         if pool is None:
             stati = [self.get_job_status(job) for job in jobs]
@@ -1017,7 +1017,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                                  param_max_width, file)
 
     @classmethod
-    def add_print_status_args(cls, parser):
+    def _add_print_status_args(cls, parser):
         "Add arguments to parser for the :meth:`~.print_status` method."
         parser.add_argument(
             '-f', '--filter',
@@ -1437,7 +1437,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         subparsers = parser.add_subparsers()
 
         parser_status = subparsers.add_parser('status')
-        self.add_print_status_args(parser_status)
+        self._add_print_status_args(parser_status)
         parser_status.set_defaults(func=_status)
 
         parser_next = subparsers.add_parser(
@@ -1483,11 +1483,11 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         parser_run.set_defaults(func=_run)
 
         parser_script = subparsers.add_parser('script')
-        self.add_script_args(parser_script)
+        self._add_script_args(parser_script)
         parser_script.set_defaults(func=_script)
 
         parser_submit = subparsers.add_parser('submit')
-        self.add_submit_args(parser_submit)
+        self._add_submit_args(parser_submit)
         parser_submit.add_argument(
             '-d', '--debug',
             action="store_true",
@@ -1509,3 +1509,28 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             logging.basicConfig(level=logging.WARNING)
 
         sys.exit(args.func(env, args))
+
+#####
+#   BEGIN LEGACY API
+    @classmethod
+    def add_submit_args(cls, parser):
+        warnings.warn("The add_submit_args() method is private as of version 0.6.")
+        return cls._add_submit_args(parser=parser)
+
+    @classmethod
+    def add_script_args(cls, parser):
+        warnings.warn("The add_script_args() method is private as of version 0.6.")
+        return cls._add_script_args(parser=parser)
+
+    @classmethod
+    def add_print_status_args(cls, parser):
+        warnings.warn("The add_print_status_args() method is private as of version 0.6.")
+        return cls._add_print_status_args(parser=parser)
+
+    def format_row(self, *args, **kwargs):
+        warnings.warn("The format_row() method is private as of version 0.6.")
+        return self._format_row(*args, **kwargs)
+
+    def update_stati(self, *args, **kwargs):
+        warnings.warn("The update_stati() method is private as of version 0.6.")
+        return self._update_stati(*args, **kwargs)

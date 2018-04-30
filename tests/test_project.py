@@ -75,6 +75,17 @@ class MockEnvironment(ComputeEnvironment):
 
 class MockProject(FlowProject):
 
+    def __init__(self, *args, **kwargs):
+        super(MockProject, self).__init__(*args, **kwargs)
+        self.add_operation(
+            name='a_op',
+            cmd='echo "hello" > {job.ws}/world.txt',
+            pre=[lambda job: 'has_a' in self.labels(job)])
+
+    @label()
+    def said_hello(self, job):
+        return job.isfile('world.txt')
+
     @label()
     def a(self, job):
         return True
@@ -137,8 +148,6 @@ class ProjectTest(unittest.TestCase):
 
     def mock_project(self, project_class=MockProject):
         project = project_class.get_project(root=self._tmp_dir.name)
-        project.add_operation(
-            name='a_op', cmd='run_a_op {job._id}', pre=[lambda job: 'has_a' in project.labels(job)])
         for a in range(3):
             for b in range(3):
                 project.open_job(dict(a=a, b=b)).init()
@@ -181,6 +190,12 @@ class ProjectTest(unittest.TestCase):
             self.assertEqual(project.next_operation(job).job, job)
         fd = StringIO()
         project.print_status(file=fd, err=fd)
+
+    def test_run(self):
+        project = self.mock_project()
+        project.run()
+        for job in project:
+            self.assertIn('said_hello', list(project.labels(job)))
 
     def test_single_submit(self):
         env = get_environment()

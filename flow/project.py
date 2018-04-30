@@ -703,8 +703,10 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         return islice((op for op in ops if eligible(op)), num)
 
     def submit_operations(self, env, _id, operations, nn=None, ppn=None, serial=False,
-                          flags=None, force=False, **kwargs):
+                          flags=None, force=False, template=None, **kwargs):
         "Submit a sequence of operations to the scheduler."
+        if template is None:
+            template = env.template
         if issubclass(env, NodesEnvironment):
             if nn is None:
                 if serial:
@@ -734,6 +736,8 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         template = template_env.get_template('submit.sh')
 
         context = kwargs.copy()
+        context['base'] = env.template
+        context['environment'] = env.__name__
         context['project'] = self
         context['id'] = _id
         context['operations'] = operations

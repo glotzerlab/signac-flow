@@ -188,6 +188,7 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
     scheduler_type = None
     hostname_pattern = None
     submit_flags = None
+    template = 'submit.sh'
 
     @classmethod
     def script(cls, **kwargs):
@@ -251,7 +252,11 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
 
     @classmethod
     def add_args(cls, parser):
-        return
+        parser.add_argument(
+            '--template',
+            default=cls.template,
+            help="The template script to use for submission scripts. "
+                 "Default='templates/{}'.".format(cls.template))
 
     @classmethod
     def get_config_value(cls, key, default=_GET_CONFIG_VALUE_NONE):
@@ -329,6 +334,7 @@ class TestEnvironment(ComputeEnvironment):
 class TorqueEnvironment(ComputeEnvironment):
     "An environment with TORQUE scheduler."
     scheduler_type = scheduler.TorqueScheduler
+    template = 'torque.sh'
 
 
 class MoabEnvironment(ComputeEnvironment):
@@ -349,6 +355,7 @@ class MoabEnvironment(ComputeEnvironment):
 class SlurmEnvironment(ComputeEnvironment):
     "An environment with slurm scheduler."
     scheduler_type = scheduler.SlurmScheduler
+    template = 'slurm.sh'
 
 
 class NodesEnvironment(ComputeEnvironment):

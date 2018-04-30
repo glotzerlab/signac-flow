@@ -86,9 +86,10 @@ class TorqueScheduler(Scheduler):
 
         if pretend:
             print("# Submit command: {}".format(' '.join(submit_cmd)))
-            print(script.read())
+            print(script)
             print()
         else:
+            raise NotImplementedError()
             with tempfile.NamedTemporaryFile() as tmp_submit_script:
                 tmp_submit_script.write(script.read().encode('utf-8'))
                 tmp_submit_script.flush()

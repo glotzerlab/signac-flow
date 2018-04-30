@@ -87,6 +87,7 @@ class SlurmScheduler(Scheduler):
             print(script)
             print()
         else:
+            raise NotImplementedError()
             with tempfile.NamedTemporaryFile() as tmp_submit_script:
                 tmp_submit_script.write(script.read().encode('utf-8'))
                 tmp_submit_script.flush()

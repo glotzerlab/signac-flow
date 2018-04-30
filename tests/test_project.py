@@ -5,6 +5,7 @@ import unittest
 import io
 import uuid
 import os
+import sys
 
 from signac.common import six
 from flow import FlowProject
@@ -22,6 +23,20 @@ if six.PY2:
     from tempdir import TemporaryDirectory
 else:
     from tempfile import TemporaryDirectory
+
+if six.PY2:
+    from contextlib import contextmanager
+
+    @contextmanager
+    def redirect_stdout(new_target):
+        old_target = sys.stdout
+        try:
+            sys.stdout = new_target
+            yield
+        finally:
+            sys.stdout = old_target
+else:
+    from contextlib import redirect_stdout
 
 
 class StringIO(io.StringIO):
@@ -41,7 +56,11 @@ class MockScheduler(Scheduler):
         for job in self._jobs.values():
             yield job
 
-    def submit(self, script, _id, *args, **kwargs):
+    def submit(self, script, _id=None, *args, **kwargs):
+        if _id is None:
+            for line in script:
+                _id = str(line)
+                break
         cid = uuid.uuid4()
         self._jobs[cid] = ClusterJob(_id, status=JobStatus.submitted)
         return JobStatus.submitted
@@ -71,6 +90,13 @@ class MockEnvironment(ComputeEnvironment):
     @classmethod
     def is_present(cls):
         return True
+
+    @classmethod
+    def script(cls, _id=None, **kwargs):
+        js = super(MockEnvironment, cls).script()
+        if _id is not None:
+            js.write(str(_id))
+        return js
 
 
 class MockProject(FlowProject):
@@ -207,6 +233,21 @@ class ProjectTest(unittest.TestCase):
         self.assertEqual(len(list(scheduler.jobs())), 1)
         for job in scheduler.jobs():
             self.assertEqual(job.status(), JobStatus.submitted)
+
+    def test_submit_operations(self):
+        env = get_environment()
+        sched = env.scheduler_type()
+        sched.reset()
+        project = self.mock_project()
+        operations = []
+        for job in project:
+            operations.extend(project.next_operations(job))
+        self.assertEqual(len(list(sched.jobs())), 0)
+        cluster_job_id = project._store_bundled(operations)
+        with redirect_stdout(io.StringIO()):
+            project.submit_operations(_id=cluster_job_id, env=env, operations=operations)
+        self.assertEqual(len(list(sched.jobs())), 1)
+        sched.reset()
 
     def test_submit(self):
         env = get_environment()

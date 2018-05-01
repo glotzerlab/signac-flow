@@ -28,6 +28,7 @@ import subprocess
 from collections import defaultdict
 from itertools import islice
 from hashlib import sha1
+from functools import partial
 from multiprocessing import Pool
 from multiprocessing import TimeoutError
 
@@ -36,6 +37,7 @@ from signac.common import six
 from signac.common.six import with_metaclass
 
 from .environment import get_environment
+from .environment import ComputeEnvironment
 from .environment import NodesEnvironment
 from . import manage
 from . import util
@@ -263,7 +265,7 @@ class JobOperation(object):
     def get_status(self):
         "Retrieve the operation's last known status."
         try:
-            return self.job.document['status'][self.get_id()]
+            return manage.JobStatus(self.job.document['status'][self.get_id()])
         except KeyError:
             return manage.JobStatus.unknown
 
@@ -410,12 +412,13 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         'next_operation': 'next_op',
     }
 
-    def __init__(self, config=None, environment=None):
+    def __init__(self, config=None, environment=None, pool=None):
         if environment is None:
             environment = get_environment()
         signac.contrib.Project.__init__(self, config)
         self._operations = dict()
         self._environment = environment
+        self._pool = pool
 
     @classmethod
     def _tr(cls, x):
@@ -671,9 +674,21 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         ops = (op for ops in map_(get_ops, jobs) for op in ops)
         return islice((op for op in ops if eligible(op)), num)
 
-    def submit_operations(self, env, _id, operations, nn=None, ppn=None, serial=False,
+    def submit_operations(self, operations, _id=None, env=None, nn=None, ppn=None, serial=False,
                           flags=None, force=False, **kwargs):
+        # env, _id, operations, nn, ppn, serial, flags, force, **kwargs
         "Submit a sequence of operations to the scheduler."
+        # Check for legacy API:
+        if isinstance(operations, ComputeEnvironment) and isinstance(env, list):
+            warnings.warn(
+                "The FloewProject.submit_operations() signature has changed!", DeprecationWarning)
+            tmp = env
+            env = operations
+            operations = tmp
+
+        if _id is None:
+            _id = self._store_bundled(operations)
+
         if issubclass(env, NodesEnvironment):
             if nn is None:
                 if serial:
@@ -709,33 +724,35 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         and will automatically prevent the submission of the same operation multiple times if
         it is considered active (e.g. queued or running).
         """
-        # Backwards-compatilibity check...
+        # Backwards-compatilibity checks:
         if isinstance(env, manage.Scheduler):
             raise ValueError(
                 "The submit() API has changed with signac-flow version 0.4, "
                 "please update your project. ")
+        submit_user = getattr(self, 'submit_user', None)
+        if submit_user is not None:
+            warnings.warn("The submit_user() function is deprecated!", DeprecationWarning)
 
+        if env is None:
+            env = self._environment
         if walltime is not None:
             walltime = datetime.timedelta(hours=walltime)
 
         operations = self._gather_operations(**kwargs)
-        _submit = self.submit_user
 
         for bundle in make_bundles(operations, bundle_size):
-            _id = self._store_bundled(bundle)
-            status = _submit(
-                env=env, _id=_id, operations=bundle, nn=nn, ppn=ppn,
+            if submit_user is not None:  # entering legacy mode
+                submit = partial(self.submit_user, _id=self._store_bundled(bundle))
+            else:
+                submit = self.submit_operations
+
+            status = submit(
+                env=env, operations=bundle, nn=nn, ppn=ppn,
                 serial=serial, force=force, walltime=walltime, **kwargs)
 
             if status is not None:
                 for op in bundle:
                     op.set_status(status)
-
-    def submit_user(self, env, _id, operations, nn=None, ppn=None, serial=False,
-                    walltime=None, force=False, **kwargs):
-        return self.submit_operations(
-                env=env, _id=_id, operations=operations, nn=nn, ppn=ppn,
-                serial=serial, force=force, walltime=walltime, **kwargs)
 
     @classmethod
     def _add_submit_args(cls, parser):
@@ -880,51 +897,42 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             for a in sorted(abbreviate.table):
                 print('{}: {}'.format(a, abbreviate.table[a]), file=file)
 
-    def export_job_stati(self, collection, stati):
-        "Export the job stati to a database collection."
-        for status in stati:
-            job = self.open_job(id=status['job_id'])
-            status['statepoint'] = job.statepoint()
-            collection.update_one({'_id': status['job_id']},
-                                  {'$set': status}, upsert=True)
-
-    def _update_stati(self, scheduler, jobs=None, file=sys.stderr, pool=None, ignore_errors=False):
-        """Update the status of all jobs with the given scheduler.
-
-        :param scheduler: The scheduler instance used to feth the job stati.
-        :type scheduler: :class:`~.manage.Scheduler`
-        :param jobs: A sequence of :class:`~.signac.contrib.Job` instances.
-        :param file: The file to write output to, defaults to `sys.stderr`."""
+    def fetch_status(self, jobs=None, file=sys.stderr, ignore_errors=False, scheduler=None):
+        if scheduler is None:
+            scheduler = self._environment.get_scheduler()
         if jobs is None:
-            jobs = self.find_jobs()
-        print(self._tr("Query scheduler..."), file=file)
-        sjobs_map = defaultdict(list)
-        try:
-            for sjob in self.scheduler_jobs(scheduler):
-                sjobs_map[sjob.name()].append(sjob)
-        except RuntimeError as e:
-            if ignore_errors:
-                logger.warning("WARNING: Error while queyring scheduler: '{}'.".format(e))
+            jobs = list(self.find_jobs())
+        if scheduler is not None:
+            print(self._tr("Query scheduler..."), file=file)
+            sjobs_map = defaultdict(list)
+            try:
+                for sjob in self.scheduler_jobs(scheduler):
+                    sjobs_map[sjob.name()].append(sjob)
+            except RuntimeError as e:
+                if ignore_errors:
+                    logger.warning("WARNING: Error while querying scheduler: '{}'.".format(e))
+                else:
+                    raise RuntimeError("Error while querying scheduler: '{}'.".format(e))
+            if self._pool is None:
+                for job in tqdm(jobs, file=file):
+                    self._update_status(job, sjobs_map)
             else:
-                raise RuntimeError("Error while querying scheduler: '{}'.".format(e))
-        print(self._tr("Determine job stati..."), file=file)
-        if pool is None:
-            for job in tqdm(jobs, file=file):
-                self._update_status(job, sjobs_map)
-        else:
-            jobs_ = ((job, sjobs_map) for job in jobs)
-            pool.map(_update_status, tqdm(jobs_, total=len(jobs), file=file))
+                jobs_ = ((job, sjobs_map) for job in jobs)
+                self._pool.map(_update_status, tqdm(jobs_, total=len(jobs), file=file))
+        return {job: self.get_job_status(job) for job in jobs}
 
-    def print_status(self, scheduler=None, job_filter=None,
-                     overview=True, overview_max_lines=None,
-                     detailed=False, parameters=None, skip_active=False,
-                     param_max_width=None,
-                     file=sys.stdout, err=sys.stderr,
-                     pool=None, ignore_errors=False):
+    def update_stati(self, scheduler, jobs=None, file=sys.stderr, pool=None, ignore_errors=False):
+        warnings.warn(
+            "The update_stati() method has been replaced by fetch_status() as of version 0.6.",
+            DeprecationWarning)
+        self.fetch_status(scheduler=scheduler, jobs=jobs, file=file, ignore_errors=ignore_errors)
+
+    def print_status(self, job_filter=None, overview=True, overview_max_lines=None,
+                     detailed=False, parameters=None, skip_active=False, param_max_width=None,
+                     file=sys.stdout, err=sys.stderr, ignore_errors=False,
+                     scheduler=None, pool=None):
         """Print the status of the project.
 
-        :param scheduler: The scheduler instance used to fetch the job stati.
-        :type scheduler: :class:`~.manage.Scheduler`
         :param job_filter: A JSON encoded filter,
             that all jobs to be submitted need to match.
         :param overview: Aggregate an overview of the project' status.
@@ -944,26 +952,47 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         :param err: Redirect all error output to this file,
             defaults to sys.stderr
         :param pool: A multiprocessing or threading pool. Providing a pool
-            parallelizes this method."""
+            parallelizes this method.
+        :param scheduler: The scheduler instance used to fetch the job stati.
+        :type scheduler: :class:`~.manage.Scheduler`
+        """
+        if pool is not None:
+            warnings.warn("print_status(): Ignoring pool argument.", DeprecationWarning)
+
         if job_filter is not None and isinstance(job_filter, str):
             job_filter = json.loads(job_filter)
         jobs = list(self.find_jobs(job_filter))
-        if scheduler is not None:
-            self._update_stati(scheduler, jobs, file=err, pool=pool, ignore_errors=ignore_errors)
-        print(self._tr("Generate output..."), file=err)
-        if pool is None:
-            stati = [self.get_job_status(job) for job in jobs]
+
+        if scheduler is None:
+            scheduler = self._environment.get_scheduler()
         else:
-            stati = list(pool.map(self.get_job_status, jobs))
+            warnings.warn(
+                "print_status(): the scheduler argument is deprecated!", DeprecationWarning)
+
+        stati = self.fetch_status(
+            jobs=jobs, file=err, ignore_errors=ignore_errors, scheduler=scheduler).values()
+
+        print(self._tr("Generate output..."), file=err)
+
         title = "{} '{}':".format(self._tr("Status project"), self)
         print('\n' + title, file=file)
+
         if overview:
             self._print_overview(stati, max_lines=overview_max_lines, file=file)
+
         if detailed:
             print(file=file)
             print(self._tr("Detailed view:"), file=file)
             self._print_detailed(stati, parameters, skip_active,
                                  param_max_width, file)
+
+    def export_job_stati(self, collection, stati):
+        "Export the job stati to a database collection."
+        for status in stati:
+            job = self.open_job(id=status['job_id'])
+            status['statepoint'] = job.statepoint()
+            collection.update_one({'_id': status['job_id']},
+                                  {'$set': status}, upsert=True)
 
     @classmethod
     def _add_print_status_args(cls, parser):
@@ -1179,7 +1208,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             This function is deprecated, please use
             :py:meth:`~.eligible_for_submission` instead.
         """
-        warnings.warn(DeprecationWarning())
+        warnings.warn("The eligible() method is deprecated.", DeprecationWarning)
         return None
 
     def eligible_for_submission(self, job_operation):
@@ -1188,7 +1217,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         By default, an operation is eligible for submission when it
         is not considered active, that means already queued or running.
         """
-        warnings.warn(DeprecationWarning())
+        warnings.warn("The eligible_for_submission method is deprecated.", DeprecationWarning)
         if job_operation is None:
             return False
         if job_operation.get_status() >= manage.JobStatus.submitted:
@@ -1390,23 +1419,22 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 #   BEGIN LEGACY API
     @classmethod
     def add_submit_args(cls, parser):
-        warnings.warn("The add_submit_args() method is private as of version 0.6.")
+        warnings.warn(
+            "The add_submit_args() method is private as of version 0.6.", DeprecationWarning)
         return cls._add_submit_args(parser=parser)
 
     @classmethod
     def add_script_args(cls, parser):
-        warnings.warn("The add_script_args() method is private as of version 0.6.")
+        warnings.warn(
+            "The add_script_args() method is private as of version 0.6.", DeprecationWarning)
         return cls._add_script_args(parser=parser)
 
     @classmethod
     def add_print_status_args(cls, parser):
-        warnings.warn("The add_print_status_args() method is private as of version 0.6.")
+        warnings.warn(
+            "The add_print_status_args() method is private as of version 0.6.", DeprecationWarning)
         return cls._add_print_status_args(parser=parser)
 
     def format_row(self, *args, **kwargs):
-        warnings.warn("The format_row() method is private as of version 0.6.")
+        warnings.warn("The format_row() method is private as of version 0.6.", DeprecationWarning)
         return self._format_row(*args, **kwargs)
-
-    def update_stati(self, *args, **kwargs):
-        warnings.warn("The update_stati() method is private as of version 0.6.")
-        return self._update_stati(*args, **kwargs)

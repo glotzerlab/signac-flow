@@ -59,7 +59,7 @@ class MockScheduler(Scheduler):
     def submit(self, script, _id=None, *args, **kwargs):
         if _id is None:
             for line in script:
-                _id = str(line)
+                _id = str(line).strip()
                 break
         cid = uuid.uuid4()
         self._jobs[cid] = ClusterJob(_id, status=JobStatus.submitted)
@@ -166,6 +166,7 @@ class InvalidLabelMockProject(MockProject):
 class ProjectTest(unittest.TestCase):
 
     def setUp(self):
+        MockScheduler.reset()
         self._tmp_dir = TemporaryDirectory(prefix='signac-flow_')
         self.addCleanup(self._tmp_dir.cleanup)
         self.project = FlowProject.init_project(
@@ -294,7 +295,7 @@ class ProjectTest(unittest.TestCase):
         project.submit(env, bundle_size=2, num=4)
         self.assertEqual(len(list(sched.jobs())), 3)
         sched.reset()
-        project._update_stati(sched, file=StringIO())
+        project.fetch_status(file=StringIO())
         project.submit(env, bundle_size=0)
         self.assertEqual(len(list(sched.jobs())), 1)
 
@@ -307,8 +308,8 @@ class ProjectTest(unittest.TestCase):
             list(project.classify(job))
             self.assertEqual(project.next_operation(job).name, 'a_op')
             self.assertEqual(project.next_operation(job).job, job)
-        fd = StringIO()
-        project.submit(env)
+        with redirect_stdout(StringIO()):
+            project.submit(env)
         self.assertEqual(len(list(sched.jobs())), len(project))
 
         for job in project:
@@ -316,7 +317,7 @@ class ProjectTest(unittest.TestCase):
 
         sched.step()
         sched.step()
-        project._update_stati(sched, file=fd)
+        project.fetch_status(file=StringIO())
 
         for job in project:
             self.assertEqual(project.next_operation(job).get_status(), JobStatus.queued)

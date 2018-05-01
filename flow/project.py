@@ -778,11 +778,13 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 
     def fetch_status(self, jobs=None, file=sys.stderr,
                      ignore_errors=False, scheduler=None, pool=None):
-        if scheduler is None:
-            scheduler = self._environment.get_scheduler()
         if jobs is None:
             jobs = list(self.find_jobs())
-        if scheduler is not None:
+        try:
+            scheduler = self._environment.get_scheduler()
+        except NoSchedulerError:
+            logger.debug("No scheduler available to update job status.")
+        else:
             print(self._tr("Query scheduler..."), file=file)
             sjobs_map = defaultdict(list)
             try:
@@ -840,9 +842,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             job_filter = json.loads(job_filter)
         jobs = list(self.find_jobs(job_filter))
 
-        if scheduler is None:
-            scheduler = self._environment.get_scheduler()
-        else:
+        if scheduler is not None:
             warnings.warn(
                 "print_status(): the scheduler argument is deprecated!", DeprecationWarning)
 
@@ -956,11 +956,8 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             label_name = getattr(_label, '_label_name', _label.__name__)
             if isinstance(label_value, six.string_types):
                 yield label_value
-            elif label_value is True:
+            elif bool(label_value) is True:
                 yield label_name
-            elif not (label_value is False or label_value is None):
-                raise ValueError('The label function \'{}\' must return a '
-                                 'string, bool, or None.'.format(label_name))
 
     def add_operation(self, name, cmd, pre=None, post=None, np=None, **kwargs):
         """
@@ -1132,9 +1129,9 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             del args['func']
             del args['debug']
             try:
-                self.print_status(env.get_scheduler(), pool=pool, **args)
+                self.print_status(pool=pool, **args)
             except NoSchedulerError:
-                self.print_status(None, pool=pool, **args)
+                self.print_status(pool=pool, **args)
             return 0
 
         def _next(env, args):

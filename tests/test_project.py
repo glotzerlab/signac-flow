@@ -154,15 +154,6 @@ class MockProject(FlowProject):
         return env.submit(js, _id=_id)
 
 
-class InvalidLabelMockProject(MockProject):
-
-    # Test invalid label exception when returning a value that isn't a string,
-    # bool, or None
-    @staticlabel()
-    def a_float(job):
-        return float(job.sp.a)
-
-
 class ProjectTest(unittest.TestCase):
 
     def setUp(self):
@@ -202,12 +193,6 @@ class ProjectTest(unittest.TestCase):
                     self.assertIn('b_is_even', labels)
             else:
                 self.assertIn('a is {}'.format(job.sp.a), labels)
-
-    def test_invalid_labels(self):
-        project = self.mock_project(project_class=InvalidLabelMockProject)
-        for job in project:
-            with self.assertRaises(ValueError):
-                list(project.labels(job))
 
     def test_print_status(self):
         project = self.mock_project()

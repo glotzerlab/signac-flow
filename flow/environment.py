@@ -25,8 +25,11 @@ from collections import OrderedDict
 from signac.common import config
 from signac.common import six
 from signac.common.six import with_metaclass
-from . import scheduler
-from . import manage
+
+from .scheduling.slurm import SlurmScheduler
+from .scheduling.torque import TorqueScheduler
+from .scheduling.fakescheduler import FakeScheduler
+from .scheduling.models import JobStatus
 from .errors import SubmitError
 from .errors import NoSchedulerError
 
@@ -239,7 +242,7 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
         # Hand off the actual submission to the scheduler
         script.seek(0)
         if cls.get_scheduler().submit(script, flags=flags, *args, **kwargs):
-            return manage.JobStatus.submitted
+            return JobStatus.submitted
 
     @staticmethod
     def bg(cmd):
@@ -309,7 +312,7 @@ class TestEnvironment(ComputeEnvironment):
     the job submission script generation in environments without
     an real scheduler.
     """
-    scheduler_type = scheduler.FakeScheduler
+    scheduler_type = FakeScheduler
 
     @classmethod
     def mpi_cmd(cls, cmd, np):
@@ -325,7 +328,7 @@ class TestEnvironment(ComputeEnvironment):
 
 class TorqueEnvironment(ComputeEnvironment):
     "An environment with TORQUE scheduler."
-    scheduler_type = scheduler.TorqueScheduler
+    scheduler_type = TorqueScheduler
 
 
 class MoabEnvironment(ComputeEnvironment):
@@ -334,7 +337,7 @@ class MoabEnvironment(ComputeEnvironment):
     This class is deprecated and only kept for backwards
     compatibility.
     """
-    scheduler_type = scheduler.TorqueScheduler
+    scheduler_type = TorqueScheduler
 
     def __init__(self, *args, **kwargs):
         warnings.warn(
@@ -345,7 +348,7 @@ class MoabEnvironment(ComputeEnvironment):
 
 class SlurmEnvironment(ComputeEnvironment):
     "An environment with slurm scheduler."
-    scheduler_type = scheduler.SlurmScheduler
+    scheduler_type = SlurmScheduler
 
 
 class NodesEnvironment(ComputeEnvironment):

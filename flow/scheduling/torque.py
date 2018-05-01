@@ -10,8 +10,8 @@ import tempfile
 import logging
 import xml.etree.ElementTree as ET
 
-from .manage import Scheduler
-from .manage import ClusterJob, JobStatus
+from .models import Scheduler
+from .models import ClusterJob, JobStatus
 
 
 logger = logging.getLogger(__name__)

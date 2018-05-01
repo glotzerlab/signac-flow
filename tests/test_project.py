@@ -10,9 +10,9 @@ import sys
 from signac.common import six
 from flow import FlowProject
 from flow import get_environment
-from flow.manage import Scheduler
-from flow.manage import ClusterJob
-from flow.manage import JobStatus
+from flow.scheduling.models import Scheduler
+from flow.scheduling.models import ClusterJob
+from flow.scheduling.models import JobStatus
 from flow.environment import ComputeEnvironment
 from flow import label
 from flow import classlabel

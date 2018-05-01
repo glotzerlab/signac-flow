@@ -4,7 +4,7 @@
 from __future__ import print_function
 import logging
 
-from .manage import Scheduler
+from .models import Scheduler
 
 logger = logging.getLogger(__name__)
 

@@ -38,10 +38,13 @@ from signac.common.six import with_metaclass
 from .environment import get_environment
 from .environment import ComputeEnvironment
 from .environment import NodesEnvironment
-from . import manage
-from . import util
+from .scheduling.models import Scheduler
+from .scheduling.models import ClusterJob
+from .scheduling.models import JobStatus
+from .scheduling.status import update_status
 from .errors import SubmitError
 from .errors import NoSchedulerError
+from .util import tabulate
 from .util.tqdm import tqdm
 from .util.misc import _positive_int
 from .util.misc import _mkdir_p
@@ -207,9 +210,9 @@ class JobOperation(object):
     def get_status(self):
         "Retrieve the operation's last known status."
         try:
-            return manage.JobStatus(self.job.document['status'][self.get_id()])
+            return JobStatus(self.job.document['status'][self.get_id()])
         except KeyError:
-            return manage.JobStatus.unknown
+            return JobStatus.unknown
 
 
 class FlowCondition(object):
@@ -422,7 +425,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             if job.name().startswith('{}-bundle-'.format(self)):
                 with open(self._fn_bundle(job.name())) as file:
                     for line in file:
-                        yield manage.ClusterJob(line.strip(), job.status())
+                        yield ClusterJob(line.strip(), job.status())
             else:
                 yield job
 
@@ -478,10 +481,6 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             sjobs.append(sjob)
         return sjobs_map
 
-    def _update_status(self, job, scheduler_jobs):
-        "Determine the scheduler status of job."
-        manage.update_status(job, scheduler_jobs)
-
     def get_job_status(self, job):
         "Return the detailed status of a job."
         result = dict()
@@ -491,7 +490,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         result['labels'] = sorted(set(self.classify(job)))
         result['operation'] = self.next_operation(job)
         highest_status = max(status.values()) if len(status) else 1
-        result['submission_status'] = [manage.JobStatus(highest_status).name]
+        result['submission_status'] = [JobStatus(highest_status).name]
         return result
 
     def run(self, operations=None, pretend=False, np=None, timeout=None, progress=False):
@@ -666,7 +665,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         it is considered active (e.g. queued or running).
         """
         # Backwards-compatilibity checks:
-        if isinstance(env, manage.Scheduler):
+        if isinstance(env, Scheduler):
             raise ValueError(
                 "The submit() API has changed with signac-flow version 0.4, "
                 "please update your project. ")
@@ -784,13 +783,13 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             rows = ([label, '{} {:0.2f}%'.format(
                 draw_progressbar(num, len(stati)), 100 * num / len(stati))]
                 for label, num in progress_sorted)
-            print(util.tabulate.tabulate(rows, headers=table_header), file=file)
+            print(tabulate.tabulate(rows, headers=table_header), file=file)
             if max_lines is not None:
                 lines_skipped = len(progress) - max_lines
                 if lines_skipped > 0:
                     print("{} {}".format(self._tr("Lines omitted:"), lines_skipped), file=file)
         else:
-            print(util.tabulate.tabulate([], headers=table_header), file=file)
+            print(tabulate.tabulate([], headers=table_header), file=file)
             print("[no labels]", file=file)
 
     def _format_row(self, status, statepoint=None, max_width=None):
@@ -831,7 +830,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 table_header.insert(i + 3, shorten(self._alias(str(value)), param_max_width))
         rows = (self._format_row(status, parameters, param_max_width)
                 for status in stati if not (skip_active and status['active']))
-        print(util.tabulate.tabulate(rows, headers=table_header), file=file)
+        print(tabulate.tabulate(rows, headers=table_header), file=file)
         if abbreviate.table:
             print(file=file)
             print(self._tr("Abbreviations used:"), file=file)
@@ -1160,7 +1159,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         warnings.warn("The eligible_for_submission method is deprecated.", DeprecationWarning)
         if job_operation is None:
             return False
-        if job_operation.get_status() >= manage.JobStatus.submitted:
+        if job_operation.get_status() >= JobStatus.submitted:
             return False
         return True
 
@@ -1384,12 +1383,12 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 # Status-related functions
 def _update_status(args):
     "Wrapper-function, that is probably obsolete."
-    return manage.update_status(* args)
+    return update_status(* args)
 
 
 def _update_job_status(job, scheduler_jobs):
     "Update the status entry for job."
-    manage.update_status(job, scheduler_jobs)
+    update_status(job, scheduler_jobs)
 
 
 def is_active(status):
@@ -1400,6 +1399,6 @@ def is_active(status):
     related issues.
     """
     for gid, s in status.items():
-        if s > manage.JobStatus.inactive:
+        if s > JobStatus.inactive:
             return True
     return False

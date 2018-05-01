@@ -29,3 +29,11 @@ def draw_progressbar(value, total, width=40):
     "Helper function for the visualization of progress."
     n = int(value / total * width)
     return '|' + ''.join(['#'] * n) + ''.join(['-'] * (width - n)) + '|'
+
+
+def _format_timedelta(delta):
+    "Format a time delta for interpretation by schedulers."
+    hours, r = divmod(delta.seconds, 3600)
+    minutes, seconds = divmod(r, 60)
+    hours += delta.days * 24
+    return "{:0>2}:{:0>2}:{:0>2}".format(hours, minutes, seconds)

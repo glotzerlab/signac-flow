@@ -7,7 +7,7 @@ if sys.version_info < (2, 7, 0):
     print("Error: signac-flow requires python version >= 2.7.x.")
     sys.exit(1)
 
-requirements = []
+requirements = ['jinja2']
 if sys.version_info < (3, 4, 0):
     requirements.append('enum34')
 

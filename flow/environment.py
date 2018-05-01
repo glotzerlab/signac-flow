@@ -42,6 +42,10 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 
+# Global variable can be used to override detected environment
+ENVIRONMENT = None
+
+
 NUM_NODES_WARNING = """Unable to determine the reqired number of nodes (nn) for this submission.
 Either provide this value directly with '--nn' or provide the number of processors
 per node: '--ppn'.
@@ -187,6 +191,7 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
     scheduler_type = None
     hostname_pattern = None
     submit_flags = None
+    template = 'base_submit.sh'
 
     @classmethod
     def script(cls, **kwargs):
@@ -240,7 +245,6 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
             flags.extend(env_flags)
 
         # Hand off the actual submission to the scheduler
-        script.seek(0)
         if cls.get_scheduler().submit(script, flags=flags, *args, **kwargs):
             return JobStatus.submitted
 
@@ -251,7 +255,11 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
 
     @classmethod
     def add_args(cls, parser):
-        return
+        parser.add_argument(
+            '--template',
+            default=cls.template,
+            help="The template script to use for submission scripts. "
+                 "Default='templates/{}'.".format(cls.template))
 
     @classmethod
     def get_config_value(cls, key, default=_GET_CONFIG_VALUE_NONE):
@@ -329,6 +337,7 @@ class TestEnvironment(ComputeEnvironment):
 class TorqueEnvironment(ComputeEnvironment):
     "An environment with TORQUE scheduler."
     scheduler_type = TorqueScheduler
+    template = 'torque.sh'
 
 
 class MoabEnvironment(ComputeEnvironment):
@@ -349,6 +358,7 @@ class MoabEnvironment(ComputeEnvironment):
 class SlurmEnvironment(ComputeEnvironment):
     "An environment with slurm scheduler."
     scheduler_type = SlurmScheduler
+    template = 'slurm.sh'
 
 
 class NodesEnvironment(ComputeEnvironment):
@@ -521,6 +531,8 @@ def get_environment(test=False, import_configured=True):
     if test:
         return TestEnvironment
     else:
+        if ENVIRONMENT is not None:
+            return ENVIRONMENT
         env_types = registered_environments(import_configured=import_configured)
         logger.debug(
             "List of registered environments:\n\t{}".format(

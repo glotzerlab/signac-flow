@@ -34,6 +34,10 @@ from multiprocessing import TimeoutError
 import signac
 from signac.common import six
 from signac.common.six import with_metaclass
+from jinja2 import Environment
+from jinja2 import PackageLoader
+from jinja2 import ChoiceLoader
+from jinja2 import FileSystemLoader
 
 from .environment import get_environment
 from .environment import ComputeEnvironment
@@ -49,6 +53,7 @@ from .util.tqdm import tqdm
 from .util.misc import _positive_int
 from .util.misc import _mkdir_p
 from .util.misc import draw_progressbar
+from .util.misc import _format_timedelta
 from .util.translate import abbreviate
 from .util.translate import shorten
 from .labels import label
@@ -554,8 +559,7 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         return islice((op for op in ops if eligible(op)), num)
 
     def submit_operations(self, operations, _id=None, env=None, nn=None, ppn=None, serial=False,
-                          flags=None, force=False, **kwargs):
-        # env, _id, operations, nn, ppn, serial, flags, force, **kwargs
+                          flags=None, force=False, template=None, **kwargs):
         "Submit a sequence of operations to the scheduler."
         # Check for legacy API:
         if isinstance(operations, ComputeEnvironment) and isinstance(env, list):
@@ -567,6 +571,9 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 
         if _id is None:
             _id = self._store_bundled(operations)
+
+        if template is None:
+            template = env.template
 
         if issubclass(env, NodesEnvironment):
             if nn is None:
@@ -586,8 +593,26 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
 
         operations = map(_msg, operations)
 
-        script = env.script(_id=_id, nn=nn, ppn=ppn, **kwargs)
-        self.write_script(script=script, operations=operations, background=not serial, **kwargs)
+        template_env = Environment(
+            loader=ChoiceLoader([
+                FileSystemLoader(self.fn('templates')),
+                PackageLoader('flow', 'templates'),
+                ]),
+            trim_blocks=True)
+        template_env.filters['timedelta'] = _format_timedelta
+        template = template_env.get_template('submit.sh')
+
+        context = kwargs.copy()
+        context['base_submit'] = env.template
+        context['environment'] = env.__name__
+        context['project'] = self
+        context['id'] = _id
+        context['operations'] = operations
+        context['nn'] = nn
+        context['ppn'] = ppn
+        context['serial'] = serial
+
+        script = template.render(** context)
         return env.submit(script=script, nn=nn, ppn=ppn, flags=flags, **kwargs)
 
     def submit(self, env=None, bundle_size=1, serial=False, force=False,

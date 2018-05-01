@@ -304,9 +304,16 @@ class FlowProject(signac.contrib.Project):
         signac.contrib.Project.__init__(self, config)
         self._operations = dict()
         self._environment = environment
+        self._template_environment = Environment(
+            loader=ChoiceLoader([
+                FileSystemLoader(self.fn('templates')),
+                PackageLoader('flow', 'templates'),
+                ]),
+            trim_blocks=True)
+        self._template_environment.filters['time_delta'] = _format_timedelta
         self._label_functions = self._LABEL_FUNCTIONS.copy()
         self._register_legacy_labels()
-        self._check_legacy_templating()
+        self._setup_legacy_templating()
 
     @classmethod
     def label(cls, label_name_or_func=None):
@@ -498,7 +505,7 @@ class FlowProject(signac.contrib.Project):
                     result.next(timeout)
 
 # BEGIN LEGACY TEMPLATING SYSTEM:
-    def _check_legacy_templating(self):
+    def _setup_legacy_templating(self):
         self._legacy_templating = False
         legacy_methods = set()
         for method in _LEGACY_TEMPLATING_METHODS:
@@ -612,16 +619,59 @@ class FlowProject(signac.contrib.Project):
         ops = (op for ops in map_(get_ops, jobs) for op in ops)
         return islice((op for op in ops if eligible(op)), num)
 
+    def _get_template_context(self):
+        context = dict()
+        context['project'] = self
+        return context
+
+    def _generate_script(self, operations, parallel=False, template='run.sh'):
+        if self._legacy_templating:
+            from .environment import TestEnvironment
+            fn_template = os.path.join(self.root_directory(), 'templates', template)
+            if os.path.isfile(fn_template):
+                raise RuntimeError(
+                    "In legacy templating mode, unable to use template '{}'.".format(fn_template))
+            script = TestEnvironment.script()
+            self.write_script(script, operations, background=parallel)
+            script.seek(0)
+            return script.read()
+        else:
+            template = self._template_environment.get_template(template)
+            context = self._get_template_context()
+            context['base_run'] = 'base_run.sh'
+            context['operations'] = list(operations)
+            context['parallel'] = parallel
+            return template.render(** context)
+
+    def _generate_submit_script(self, operations, _id=None, env=None, template=None, **kwargs):
+        "Generate submission script to execute operation with scheduler."
+        if template is None:
+            template = env.template
+
+        if self._legacy_templating:
+            serial = kwargs.get('serial', False)
+            script = env.script(_id=_id, **kwargs)
+            self.write_script(script=script, operations=operations, background=not serial, **kwargs)
+            script.seek(0)
+            return script.read()
+        else:
+            template = self._template_environment.get_template('submit.sh')
+            context = self._get_template_context()
+            context['base_submit'] = env.template
+            context['environment'] = env.__name__
+            context['id'] = _id
+            context['operations'] = operations
+            context.update(kwargs)
+            return template.render(** context)
+
     def submit_operations(self, operations, _id=None, env=None, nn=None, ppn=None, serial=False,
-                          flags=None, force=False, template=None, **kwargs):
+                          flags=None, force=False, template=None, pretend=False, **kwargs):
         "Submit a sequence of operations to the scheduler."
-        # Check for legacy API:
+        # Account for legacy API
         if isinstance(operations, ComputeEnvironment) and isinstance(env, list):
             warnings.warn(
                 "The FlowProject.submit_operations() signature has changed!", DeprecationWarning)
-            tmp = env
-            env = operations
-            operations = tmp
+            env, operations = operations, env
 
         if _id is None:
             _id = self._store_bundled(operations)
@@ -646,32 +696,10 @@ class FlowProject(signac.contrib.Project):
             return op
 
         operations = map(_msg, operations)
-
-        if self._legacy_templating:
-            script = env.script(_id=_id, nn=nn, ppn=ppn, **kwargs)
-            self.write_script(script=script, operations=operations, background=not serial, **kwargs)
-            return env.submit(script=script, nn=nn, ppn=ppn, flags=flags, **kwargs)
-        else:
-            template_env = Environment(
-                loader=ChoiceLoader([
-                    FileSystemLoader(self.fn('templates')),
-                    PackageLoader('flow', 'templates'),
-                    ]),
-                trim_blocks=True)
-            template_env.filters['timedelta'] = _format_timedelta
-            template = template_env.get_template('submit.sh')
-
-            context = kwargs.copy()
-            context['base_submit'] = env.template
-            context['environment'] = env.__name__
-            context['project'] = self
-            context['id'] = _id
-            context['operations'] = operations
-            context['nn'] = nn
-            context['ppn'] = ppn
-            context['serial'] = serial
-            script = template.render(** context)
-            return env.submit(script=script, nn=nn, ppn=ppn, flags=flags, **kwargs)
+        script = self._generate_submit_script(
+            operations=operations, _id=_id, env=env, nn=nn, ppn=ppn, serial=serial,
+            force=force or flags)
+        return env.submit(script=script, nn=nn, ppn=ppn, flags=flags, **kwargs)
 
     def submit(self, env=None, bundle_size=1, serial=False, force=False,
                nn=None, ppn=None, walltime=None, **kwargs):
@@ -1254,7 +1282,7 @@ class FlowProject(signac.contrib.Project):
             kwargs = vars(args)
             del kwargs['func']
             del kwargs['debug']
-            env = get_environment(test=True)    # back hack... ignoring the env argument here
+            env = get_environment(test=True)    # bad hack... ignoring the env argument here
             ops = self._gather_operations(**kwargs)
             for bundle in make_bundles(ops, args.bundle_size):
                 script = env.script()

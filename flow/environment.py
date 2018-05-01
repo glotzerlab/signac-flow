@@ -146,6 +146,9 @@ class JobScript(io.StringIO):
         self._env = env
         super(JobScript, self).__init__()
 
+    def __str__(self):
+        return self.read()
+
     def write(self, s):
         if six.PY2:
             super(JobScript, self).write(unicode(s))  # noqa

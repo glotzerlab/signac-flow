@@ -220,6 +220,29 @@ class ProjectTest(unittest.TestCase):
         fd = StringIO()
         project.print_status(file=fd, err=fd)
 
+    def test_script(self):
+        project = self.mock_project()
+        for job in project:
+            script = project._generate_script(project.next_operations(job))
+            self.assertIn('echo "hello"', script)
+            self.assertIn(str(job), script)
+
+    def test_script_with_custom_script(self):
+        project = self.mock_project()
+        if project._legacy_templating:
+            return
+        os.mkdir(project.fn('templates'))
+        with open(project.fn('templates/run.sh'), 'w') as file:
+            file.write("{% extends base_run %}\n")
+            file.write("{% block header %}\n")
+            file.write("THIS IS A CUSTOM SCRIPT!\n")
+            file.write("{% endblock %}\n")
+        for job in project:
+            script = project._generate_script(project.next_operations(job))
+            self.assertIn("THIS IS A CUSTOM SCRIPT", script)
+            self.assertIn('echo "hello"', script)
+            self.assertIn(str(job), script)
+
     def test_run(self):
         project = self.mock_project()
         project.run()

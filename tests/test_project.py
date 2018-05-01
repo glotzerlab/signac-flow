@@ -35,8 +35,18 @@ if six.PY2:
             yield
         finally:
             sys.stdout = old_target
+
+    @contextmanager
+    def redirect_stderr(new_target):
+        old_target = sys.stderr
+        try:
+            sys.stderr = new_target
+            yield
+        finally:
+            sys.stderr = old_target
 else:
     from contextlib import redirect_stdout
+    from contextlib import redirect_stderr
 
 
 class StringIO(io.StringIO):
@@ -108,7 +118,7 @@ class MockProject(FlowProject):
             cmd='echo "hello" > {job.ws}/world.txt',
             pre=[lambda job: 'has_a' in self.labels(job)])
 
-    @label()
+    @FlowProject.label
     def said_hello(self, job):
         return job.isfile('world.txt')
 
@@ -154,7 +164,15 @@ class MockProject(FlowProject):
         return env.submit(js, _id=_id)
 
 
+class LegacyMockProject(MockProject):
+
+    def write_script_header(self, script, **kwargs):
+        #script.writeline('echo legacy templating!')
+        super(MockProjectLegacyTemplating, self).write_script_header(self, script, **kwargs)
+
+
 class ProjectTest(unittest.TestCase):
+    project_class = MockProject
 
     def setUp(self):
         MockScheduler.reset()
@@ -164,8 +182,8 @@ class ProjectTest(unittest.TestCase):
             name='FlowTestProject',
             root=self._tmp_dir.name)
 
-    def mock_project(self, project_class=MockProject):
-        project = project_class.get_project(root=self._tmp_dir.name)
+    def mock_project(self):
+        project = self.project_class.get_project(root=self._tmp_dir.name)
         for a in range(3):
             for b in range(3):
                 project.open_job(dict(a=a, b=b)).init()
@@ -315,9 +333,14 @@ class ProjectTest(unittest.TestCase):
     @unittest.skipIf(__name__ != '__main__', 'can only be tested if __main__')
     def test_main(self):
         project = self.mock_project()
-        with redirect_stdout(StringIO()):
-            with self.assertRaises(SystemExit):
-                project.main()
+        with redirect_stderr(StringIO()):
+            with redirect_stdout(StringIO()):
+                with self.assertRaises(SystemExit):
+                    project.main()
+
+
+class LegacyProjectTest(ProjectTest):
+    project_class = LegacyMockProject
 
 
 if __name__ == '__main__':

@@ -287,16 +287,16 @@ class FlowProject(signac.contrib.Project):
         'next_operation': 'next_op',
     }
 
+    _LABEL_FUNCTIONS = dict()
+
     def __init__(self, config=None, environment=None):
         if environment is None:
             environment = get_environment()
         signac.contrib.Project.__init__(self, config)
         self._operations = dict()
         self._environment = environment
-        self._register_legacy_labels()
         self._label_functions = self._LABEL_FUNCTIONS.copy()
-
-    _LABEL_FUNCTIONS = dict()
+        self._register_legacy_labels()
 
     @classmethod
     def label(cls, label_name_or_func=None):
@@ -310,8 +310,7 @@ class FlowProject(signac.contrib.Project):
 
         return label_func
 
-    @classmethod
-    def _register_legacy_labels(cls):
+    def _register_legacy_labels(self):
         "Legacy support for old label decorators."
         import inspect
         from .labels import _is_label_func
@@ -319,9 +318,9 @@ class FlowProject(signac.contrib.Project):
         def predicate(m):
             return inspect.ismethod(m) or inspect.isfunction(m)
 
-        for name, method in inspect.getmembers(cls, predicate=predicate):
+        for name, method in inspect.getmembers(type(self), predicate=predicate):
             if _is_label_func(method):
-                cls._LABEL_FUNCTIONS[method] = getattr(method, '_label_name', None)
+                self._label_functions[method] = None
 
     @classmethod
     def _tr(cls, x):

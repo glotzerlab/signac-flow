@@ -33,7 +33,6 @@ from multiprocessing import TimeoutError
 
 import signac
 from signac.common import six
-from signac.common.six import with_metaclass
 from jinja2 import Environment
 from jinja2 import PackageLoader
 from jinja2 import ChoiceLoader
@@ -276,21 +275,7 @@ class FlowOperation(object):
             return self._np
 
 
-class _FlowProjectClass(type):
-    """Meta-class for the FlowProject class.
-
-    This meta-class is used to auto-magically evaluate the lables() method for all
-    class methods and functions that are decorated with one of the labels-decorators.
-    """
-
-    def __new__(metacls, name, bases, namespace, **kwargs):
-        from .labels import _is_label_func
-        cls = type.__new__(metacls, name, bases, dict(namespace))
-        cls._labels = {func for func in namespace.values() if _is_label_func(func)}
-        return cls
-
-
-class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
+class FlowProject(signac.contrib.Project):
     """A signac project class assisting in workflow management.
 
     :param config: A signac configuaration, defaults to
@@ -307,6 +292,35 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         signac.contrib.Project.__init__(self, config)
         self._operations = dict()
         self._environment = environment
+        self._register_legacy_labels()
+        self._label_functions = self._LABEL_FUNCTIONS.copy()
+
+    _LABEL_FUNCTIONS = dict()
+
+    @classmethod
+    def label(cls, label_name_or_func=None):
+        if callable(label_name_or_func):
+            cls._LABEL_FUNCTIONS[label_name_or_func] = None
+            return label_name_or_func
+
+        def label_func(func):
+            cls._LABEL_FUNCTIONS[func] = label_name_or_func
+            return func
+
+        return label_func
+
+    @classmethod
+    def _register_legacy_labels(cls):
+        "Legacy support for old label decorators."
+        import inspect
+        from .labels import _is_label_func
+
+        def predicate(m):
+            return inspect.ismethod(m) or inspect.isfunction(m)
+
+        for name, method in inspect.getmembers(cls, predicate=predicate):
+            if _is_label_func(method):
+                cls._LABEL_FUNCTIONS[method] = getattr(method, '_label_name', None)
 
     @classmethod
     def _tr(cls, x):
@@ -971,14 +985,22 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             using the ``@staticlabel()`` decorator, equivalently the
             ``@classlabel()`` for *class methods*.
 
-       """
-        for _label in self._labels:
-            if hasattr(_label, '__func__'):
-                _label = getattr(self, _label.__func__.__name__)
-                label_value = _label(job)
-            else:
-                label_value = _label(self, job)
-            label_name = getattr(_label, '_label_name', _label.__name__)
+        """
+        for label_func, label_name in self._label_functions.items():
+            if label_name is None:
+                label_name = getattr(label, '_label_name',
+                                     getattr(label, '__name__', type(label).__name__))
+            try:
+                label_value = label_func(job)
+            except TypeError:
+                try:
+                    label_value = label_func(self, job)
+                except Exception:
+                    label_func = getattr(self, label.__func__.__name__)
+                    label_value = label_func(job)
+
+            label_name = getattr(label_func, '_label_name', label_func.__name__)
+            assert label_name is not None
             if isinstance(label_value, six.string_types):
                 yield label_value
             elif bool(label_value) is True:

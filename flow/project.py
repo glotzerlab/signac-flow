@@ -23,7 +23,6 @@ import warnings
 import argparse
 import datetime
 import json
-import errno
 import subprocess
 from collections import defaultdict
 from itertools import islice
@@ -44,19 +43,16 @@ from . import util
 from .errors import SubmitError
 from .errors import NoSchedulerError
 from .util.tqdm import tqdm
+from .util.misc import _positive_int
+from .util.misc import _mkdir_p
+from .util.misc import draw_progressbar
+from .util.translate import abbreviate
+from .util.translate import shorten
 
 if not six.PY2:
     from subprocess import TimeoutExpired
 
 logger = logging.getLogger(__name__)
-
-
-def _mkdir_p(path):
-    try:
-        os.makedirs(path)
-    except OSError as error:
-        if not (error.errno == errno.EEXIST and os.path.isdir(path)):
-            raise
 
 
 def _execute(cmd, timeout=None):
@@ -66,60 +62,6 @@ def _execute(cmd, timeout=None):
         subprocess.run(cmd, timeout=timeout, shell=True)
     else:    # Older high-level API
         subprocess.call(cmd, timeout=timeout, shell=True)
-
-
-def _positive_int(value):
-    try:
-        ivalue = int(value)
-        if ivalue <= 0:
-            raise argparse.ArgumentTypeError("Value must be positive.")
-    except (TypeError, ValueError):
-        raise argparse.ArgumentTypeError(
-            "{} must be a positive integer.".format(value))
-    return ivalue
-
-
-def is_active(status):
-    """True if a specific status is considered 'active'.
-
-    A active status usually means that no further operation should
-    be executed at the same time to prevent race conditions and other
-    related issues.
-    """
-    for gid, s in status.items():
-        if s > manage.JobStatus.inactive:
-            return True
-    return False
-
-
-def draw_progressbar(value, total, width=40):
-    "Helper function for the visualization of progress."
-    n = int(value / total * width)
-    return '|' + ''.join(['#'] * n) + ''.join(['-'] * (width - n)) + '|'
-
-
-def abbreviate(x, a):
-    "Abbreviate x with a and add to the abbreviation table."
-    if x == a:
-        return x
-    else:
-        abbreviate.table[a] = x
-        return a
-
-
-abbreviate.table = dict()  # noqa
-
-
-def shorten(x, max_length=None):
-    "Shorten x to max_length and add to abbreviation table."
-    if max_length is None:
-        return x
-    else:
-        return abbreviate(x, x[:max_length])
-
-
-def _update_status(args):
-    return manage.update_status(* args)
 
 
 class label(object):
@@ -412,13 +354,12 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         'next_operation': 'next_op',
     }
 
-    def __init__(self, config=None, environment=None, pool=None):
+    def __init__(self, config=None, environment=None):
         if environment is None:
             environment = get_environment()
         signac.contrib.Project.__init__(self, config)
         self._operations = dict()
         self._environment = environment
-        self._pool = pool
 
     @classmethod
     def _tr(cls, x):
@@ -897,7 +838,8 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             for a in sorted(abbreviate.table):
                 print('{}: {}'.format(a, abbreviate.table[a]), file=file)
 
-    def fetch_status(self, jobs=None, file=sys.stderr, ignore_errors=False, scheduler=None):
+    def fetch_status(self, jobs=None, file=sys.stderr,
+                     ignore_errors=False, scheduler=None, pool=None):
         if scheduler is None:
             scheduler = self._environment.get_scheduler()
         if jobs is None:
@@ -913,12 +855,12 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                     logger.warning("WARNING: Error while querying scheduler: '{}'.".format(e))
                 else:
                     raise RuntimeError("Error while querying scheduler: '{}'.".format(e))
-            if self._pool is None:
+            if pool is None:
                 for job in tqdm(jobs, file=file):
-                    self._update_status(job, sjobs_map)
+                    _update_job_status(job, sjobs_map)
             else:
-                jobs_ = ((job, sjobs_map) for job in jobs)
-                self._pool.map(_update_status, tqdm(jobs_, total=len(jobs), file=file))
+                jobs_ = list((job, sjobs_map) for job in jobs)
+                pool.map(_update_status, tqdm(jobs_, total=len(jobs), file=file))
         return {job: self.get_job_status(job) for job in jobs}
 
     def update_stati(self, scheduler, jobs=None, file=sys.stderr, pool=None, ignore_errors=False):
@@ -956,9 +898,6 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         :param scheduler: The scheduler instance used to fetch the job stati.
         :type scheduler: :class:`~.manage.Scheduler`
         """
-        if pool is not None:
-            warnings.warn("print_status(): Ignoring pool argument.", DeprecationWarning)
-
         if job_filter is not None and isinstance(job_filter, str):
             job_filter = json.loads(job_filter)
         jobs = list(self.find_jobs(job_filter))
@@ -970,7 +909,8 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
                 "print_status(): the scheduler argument is deprecated!", DeprecationWarning)
 
         stati = self.fetch_status(
-            jobs=jobs, file=err, ignore_errors=ignore_errors, scheduler=scheduler).values()
+            jobs=jobs, file=err, ignore_errors=ignore_errors,
+            scheduler=scheduler, pool=pool).values()
 
         print(self._tr("Generate output..."), file=err)
 
@@ -1438,3 +1378,28 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
     def format_row(self, *args, **kwargs):
         warnings.warn("The format_row() method is private as of version 0.6.", DeprecationWarning)
         return self._format_row(*args, **kwargs)
+
+
+###
+# Status-related functions
+def _update_status(args):
+    "Wrapper-function, that is probably obsolete."
+    return manage.update_status(* args)
+
+
+def _update_job_status(job, scheduler_jobs):
+    "Update the status entry for job."
+    manage.update_status(job, scheduler_jobs)
+
+
+def is_active(status):
+    """True if a specific status is considered 'active'.
+
+    A active status usually means that no further operation should
+    be executed at the same time to prevent race conditions and other
+    related issues.
+    """
+    for gid, s in status.items():
+        if s > manage.JobStatus.inactive:
+            return True
+    return False

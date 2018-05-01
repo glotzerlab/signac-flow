@@ -1,4 +1,4 @@
-# Copyright (c) 2017 The Regents of the University of Michigan
+# Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 """Workflow definition with the FlowProject.
@@ -51,6 +51,9 @@ from .util.misc import _mkdir_p
 from .util.misc import draw_progressbar
 from .util.translate import abbreviate
 from .util.translate import shorten
+from .labels import label
+from .labels import staticlabel
+from .labels import classlabel
 
 if not six.PY2:
     from subprocess import TimeoutExpired
@@ -65,71 +68,6 @@ def _execute(cmd, timeout=None):
         subprocess.run(cmd, timeout=timeout, shell=True)
     else:    # Older high-level API
         subprocess.call(cmd, timeout=timeout, shell=True)
-
-
-class label(object):
-    """Decorate a function to be a label function.
-
-    The label() method as part of FlowProject iterates over all
-    methods decorated with this label and yields the method's name
-    or the provided name.
-
-    For example:
-
-    .. code::
-
-        class MyProject(FlowProject):
-
-            @label()
-            def foo(self, job):
-                return True
-
-            @label()
-            def bar(self, job):
-                return 'a' in job.statepoint()
-
-        >>> for label in MyProject().labels(job):
-        ...     print(label)
-
-    The code segment above will always print the label 'foo',
-    but the label 'bar' only if 'a' is part of a job's state point.
-
-    This enables the user to quickly write classification functions
-    and use them for labeling, for example in the classify() method.
-    """
-
-    def __init__(self, name=None):
-        self.name = name
-
-    def __call__(self, func):
-        func._label = True
-        if self.name is not None:
-            func._label_name = self.name
-        return func
-
-
-class staticlabel(label):
-    """A label decorator for staticmethods.
-
-    This decorator implies "staticmethod"!
-    """
-
-    def __call__(self, func):
-        return staticmethod(super(staticlabel, self).__call__(func))
-
-
-class classlabel(label):
-    """A label decorator for classmethods.
-
-    This decorator implies "classmethod"!
-    """
-
-    def __call__(self, func):
-        return classmethod(super(classlabel, self).__call__(func))
-
-
-def _is_label_func(func):
-    return getattr(getattr(func, '__func__', func), '_label', False)
 
 
 def make_bundles(operations, size=None):
@@ -341,6 +279,7 @@ class _FlowProjectClass(type):
     """
 
     def __new__(metacls, name, bases, namespace, **kwargs):
+        from .labels import _is_label_func
         cls = type.__new__(metacls, name, bases, dict(namespace))
         cls._labels = {func for func in namespace.values() if _is_label_func(func)}
         return cls
@@ -773,8 +712,8 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         "Print the project's status overview."
         progress = defaultdict(int)
         for status in stati:
-            for label in status['labels']:
-                progress[label] += 1
+            for _label in status['labels']:
+                progress[_label] += 1
         print("{} {}\n".format(self._tr("Total # of jobs:"), len(stati)), file=file)
         progress_sorted = list(islice(sorted(
             progress.items(), key=lambda x: (x[1], x[0]), reverse=True), max_lines))
@@ -1008,13 +947,13 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
             ``@classlabel()`` for *class methods*.
 
        """
-        for label in self._labels:
-            if hasattr(label, '__func__'):
-                label = getattr(self, label.__func__.__name__)
-                label_value = label(job)
+        for _label in self._labels:
+            if hasattr(_label, '__func__'):
+                _label = getattr(self, _label.__func__.__name__)
+                label_value = _label(job)
             else:
-                label_value = label(self, job)
-            label_name = getattr(label, '_label_name', label.__name__)
+                label_value = _label(self, job)
+            label_name = getattr(_label, '_label_name', _label.__name__)
             if isinstance(label_value, six.string_types):
                 yield label_value
             elif label_value is True:
@@ -1092,8 +1031,8 @@ class FlowProject(with_metaclass(_FlowProjectClass, signac.contrib.Project)):
         :yields: The labels to classify job.
         :yield type: str
         """
-        for label in self.labels(job):
-            yield label
+        for _label in self.labels(job):
+            yield _label
 
     def completed_operations(self, job):
         """Determine which operations have been completed for job.
@@ -1402,3 +1341,10 @@ def is_active(status):
         if s > JobStatus.inactive:
             return True
     return False
+
+
+__all__ = [
+    'FlowProject',
+    'FlowOperation',
+    'label', 'staticlabel', 'classlabel',
+]

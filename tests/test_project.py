@@ -167,8 +167,7 @@ class MockProject(FlowProject):
 class LegacyMockProject(MockProject):
 
     def write_script_header(self, script, **kwargs):
-        #script.writeline('echo legacy templating!')
-        super(MockProjectLegacyTemplating, self).write_script_header(self, script, **kwargs)
+        super(LegacyMockProject, self).write_script_header(script, **kwargs)
 
 
 class ProjectTest(unittest.TestCase):

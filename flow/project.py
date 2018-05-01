@@ -66,6 +66,15 @@ if not six.PY2:
 logger = logging.getLogger(__name__)
 
 
+_LEGACY_TEMPLATING_METHODS = set()
+
+
+def _part_of_legacy_template_system(method):
+    _LEGACY_TEMPLATING_METHODS.add(method.__name__)
+    method._legacy_intact = True
+    return method
+
+
 def _execute(cmd, timeout=None):
     if six.PY2:
         subprocess.call(cmd, shell=True)
@@ -297,6 +306,7 @@ class FlowProject(signac.contrib.Project):
         self._environment = environment
         self._label_functions = self._LABEL_FUNCTIONS.copy()
         self._register_legacy_labels()
+        self._check_legacy_templating()
 
     @classmethod
     def label(cls, label_name_or_func=None):
@@ -487,6 +497,24 @@ class FlowProject(signac.contrib.Project):
                 for _ in tqdm(cmds) if progress else cmds:
                     result.next(timeout)
 
+# BEGIN LEGACY TEMPLATING SYSTEM:
+    def _check_legacy_templating(self):
+        self._legacy_templating = False
+        legacy_methods = set()
+        for method in _LEGACY_TEMPLATING_METHODS:
+            if hasattr(self, method) and not hasattr(getattr(self, method), '_legacy_intact'):
+                warnings.warn(
+                    "The use of FlowProject method '{}' is deprecated!".format(method),
+                    DeprecationWarning)
+                legacy_methods.add(method)
+        if legacy_methods:
+            self._legacy_templating = True
+            warnings.warn(
+                "You are using the following deprecated templating methods: {}. Please remove "
+                "those methods from your project class implementation to use the jinja2 templating "
+                "system (version >= 0.6).".format(', '.join(legacy_methods)))
+
+    @_part_of_legacy_template_system
     def write_script_header(self, script, **kwargs):
         "Write the script header for the execution script."
         # Add some whitespace
@@ -499,26 +527,29 @@ class FlowProject(signac.contrib.Project):
         script.writeline('cd {}'.format(self.root_directory()))
         script.writeline()
 
+    @_part_of_legacy_template_system
     def write_script_operations(self, script, operations, background=False, **kwargs):
         "Write the commands for the execution of operations as part of a script."
         for op in operations:
-            self.write_human_readable_statepoint(script, op.job)
+            write_human_readable_statepoint(script, op.job)
             script.write_cmd(op.cmd.format(job=op.job), bg=background)
             script.writeline()
 
     @classmethod
-    def write_human_readable_statepoint(script, job):
+    def write_human_readable_statepoint(cls, script, job):
         "Write statepoint of job in human-readable format to script."
         warnings.warn(
             "The write_human_readable_statepoint() function is deprecated.",
             DeprecationWarning)
         return write_human_readable_statepoint(script, job)
 
+    @_part_of_legacy_template_system
     def write_script_footer(self, script, **kwargs):
         "Write the script footer for the execution script."
         # Wait until all processes have finished
         script.writeline('wait')
 
+    @_part_of_legacy_template_system
     def write_script(self, script, operations, background=False, **kwargs):
         """Write a script for the execution of operations.
 
@@ -543,6 +574,7 @@ class FlowProject(signac.contrib.Project):
         self.write_script_header(script, **kwargs)
         self.write_script_operations(script, operations, background=background, **kwargs)
         self.write_script_footer(script, **kwargs)
+# FUNCTIONS ABOVE ARE DEPRECATED!
 
     def _gather_operations(self, job_id=None, operation_name=None, num=None, bundle_size=1,
                            cmd=None, requires=None, pool=None, serial=False, force=False, **kwargs):
@@ -586,7 +618,7 @@ class FlowProject(signac.contrib.Project):
         # Check for legacy API:
         if isinstance(operations, ComputeEnvironment) and isinstance(env, list):
             warnings.warn(
-                "The FloewProject.submit_operations() signature has changed!", DeprecationWarning)
+                "The FlowProject.submit_operations() signature has changed!", DeprecationWarning)
             tmp = env
             env = operations
             operations = tmp
@@ -615,27 +647,31 @@ class FlowProject(signac.contrib.Project):
 
         operations = map(_msg, operations)
 
-        template_env = Environment(
-            loader=ChoiceLoader([
-                FileSystemLoader(self.fn('templates')),
-                PackageLoader('flow', 'templates'),
-                ]),
-            trim_blocks=True)
-        template_env.filters['timedelta'] = _format_timedelta
-        template = template_env.get_template('submit.sh')
+        if self._legacy_templating:
+            script = env.script(_id=_id, nn=nn, ppn=ppn, **kwargs)
+            self.write_script(script=script, operations=operations, background=not serial, **kwargs)
+            return env.submit(script=script, nn=nn, ppn=ppn, flags=flags, **kwargs)
+        else:
+            template_env = Environment(
+                loader=ChoiceLoader([
+                    FileSystemLoader(self.fn('templates')),
+                    PackageLoader('flow', 'templates'),
+                    ]),
+                trim_blocks=True)
+            template_env.filters['timedelta'] = _format_timedelta
+            template = template_env.get_template('submit.sh')
 
-        context = kwargs.copy()
-        context['base_submit'] = env.template
-        context['environment'] = env.__name__
-        context['project'] = self
-        context['id'] = _id
-        context['operations'] = operations
-        context['nn'] = nn
-        context['ppn'] = ppn
-        context['serial'] = serial
-
-        script = template.render(** context)
-        return env.submit(script=script, nn=nn, ppn=ppn, flags=flags, **kwargs)
+            context = kwargs.copy()
+            context['base_submit'] = env.template
+            context['environment'] = env.__name__
+            context['project'] = self
+            context['id'] = _id
+            context['operations'] = operations
+            context['nn'] = nn
+            context['ppn'] = ppn
+            context['serial'] = serial
+            script = template.render(** context)
+            return env.submit(script=script, nn=nn, ppn=ppn, flags=flags, **kwargs)
 
     def submit(self, env=None, bundle_size=1, serial=False, force=False,
                nn=None, ppn=None, walltime=None, **kwargs):

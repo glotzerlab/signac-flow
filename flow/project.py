@@ -53,6 +53,7 @@ from .util.misc import _positive_int
 from .util.misc import _mkdir_p
 from .util.misc import draw_progressbar
 from .util.misc import _format_timedelta
+from .util.misc import write_human_readable_statepoint
 from .util.translate import abbreviate
 from .util.translate import shorten
 from .labels import label
@@ -506,6 +507,14 @@ class FlowProject(signac.contrib.Project):
             script.write_cmd(op.cmd.format(job=op.job), bg=background)
             script.writeline()
 
+    @classmethod
+    def write_human_readable_statepoint(script, job):
+        "Write statepoint of job in human-readable format to script."
+        warnings.warn(
+            "The write_human_readable_statepoint() function is deprecated.",
+            DeprecationWarning)
+        return write_human_readable_statepoint(script, job)
+
     def write_script_footer(self, script, **kwargs):
         "Write the script footer for the execution script."
         # Wait until all processes have finished
@@ -738,14 +747,6 @@ class FlowProject(signac.contrib.Project):
             help="Manually specify all labels, that are required for a job to be "
                  "considered eligible for submission. This is especially useful "
                  "in combination with '--cmd'.")
-
-    def write_human_readable_statepoint(self, script, job):
-        "Write statepoint of job in human-readable format to script."
-        script.write('# Statepoint:\n#\n')
-        sp_dump = json.dumps(job.statepoint(), indent=2).replace(
-            '{', '{{').replace('}', '}}')
-        for line in sp_dump.splitlines():
-            script.write('# ' + line + '\n')
 
     def _print_overview(self, stati, max_lines=None, file=sys.stdout):
         "Print the project's status overview."

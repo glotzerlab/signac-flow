@@ -3,6 +3,7 @@
 # This software is licensed under the BSD 3-Clause License.
 import os
 import errno
+import json
 import argparse
 
 
@@ -37,3 +38,11 @@ def _format_timedelta(delta):
     minutes, seconds = divmod(r, 60)
     hours += delta.days * 24
     return "{:0>2}:{:0>2}:{:0>2}".format(hours, minutes, seconds)
+
+
+def write_human_readable_statepoint(script, job):
+    script.write('# Statepoint:\n#\n')
+    sp_dump = json.dumps(job.statepoint(), indent=2).replace(
+        '{', '{{').replace('}', '}}')
+    for line in sp_dump.splitlines():
+        script.write('# ' + line + '\n')

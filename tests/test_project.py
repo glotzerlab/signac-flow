@@ -6,6 +6,7 @@ import io
 import uuid
 import os
 import sys
+from contextlib import contextmanager
 
 from signac.common import six
 from flow import FlowProject
@@ -24,30 +25,30 @@ if six.PY2:
 else:
     from tempfile import TemporaryDirectory
 
-if six.PY2:
-    from contextlib import contextmanager
 
-    @contextmanager
-    def redirect_stdout(new_target):
-        old_target = sys.stdout
-        try:
-            sys.stdout = new_target
-            yield
-        finally:
-            sys.stdout = old_target
+# Need to implement context managers below while supporting
+# Python versions 2.7 and 3.4. These managers are both part
+# of the the standard library as of Python version 3.5.
 
-    @contextmanager
-    def redirect_stderr(new_target):
-        old_target = sys.stderr
-        try:
-            sys.stderr = new_target
-            yield
-        finally:
-            sys.stderr = old_target
-else:
-    from contextlib import redirect_stdout
-    from contextlib import redirect_stderr
+@contextmanager
+def redirect_stdout(new_target):
+    "Temporarily redirect all output to stdout to new_target."
+    old_target = sys.stdout
+    try:
+        sys.stdout = new_target
+        yield
+    finally:
+        sys.stdout = old_target
 
+@contextmanager
+def redirect_stderr(new_target):
+    "Temporarily redirect all output to stderr to new_target."
+    old_target = sys.stderr
+    try:
+        sys.stderr = new_target
+        yield
+    finally:
+        sys.stderr = old_target
 
 class StringIO(io.StringIO):
     "PY27 compatibility layer."

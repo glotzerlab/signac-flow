@@ -30,10 +30,6 @@ pipelines:
           - python setup.py build
           - python -m coverage run -m unittest discover tests/
           - source deactivate
-          - conda create -n py34 --yes python=3.4 coverage signac jinja2
-          - source activate py34
-          - python setup.py build
-          - python -m coverage run -m unittest discover tests/
           - python -m coverage report
   branches:
     master:
@@ -61,10 +57,6 @@ pipelines:
             - python setup.py build
             - python -m coverage run -m unittest discover tests/
             - source deactivate
-            - conda create -n py34 --yes python=3.4 coverage signac hoomd jupyter matplotlib jinja2
-            - source activate py34
-            - python setup.py build
-            - python -m coverage run -m unittest discover tests/
             - python -m coverage report
             - python setup.py install
             - git clone https://github.com/glotzerlab/signac-project-template.git template
@@ -100,10 +92,6 @@ pipelines:
             - python setup.py build
             - python -m coverage run -m unittest discover tests/
             - source deactivate
-            - conda create -n py34 --yes python=3.4 coverage signac hoomd jupyter matplotlib jinja2
-            - source activate py34
-            - python setup.py build
-            - python -m coverage run -m unittest discover tests/
             - python -m coverage report
             - python setup.py install
             - git clone https://github.com/glotzerlab/signac-project-template.git template
@@ -137,10 +125,6 @@ pipelines:
             - python setup.py build
             - python -m coverage run -m unittest discover tests/
             - source deactivate
-            - conda create -n py34 --yes python=3.4 coverage signac hoomd jupyter matplotlib jinja2
-            - source activate py34
-            - python setup.py build
-            - python -m coverage run -m unittest discover tests/
             - python -m coverage report
             - python setup.py install
             - git clone https://github.com/glotzerlab/signac-project-template.git template
@@ -177,10 +161,6 @@ pipelines:
             - python setup.py build
             - python -m coverage run -m unittest discover tests/
             - source deactivate
-            - conda create -n py34 --yes python=3.4 coverage signac hoomd jupyter matplotlib jinja2
-            - source activate py34
-            - python setup.py build
-            - python -m coverage run -m unittest discover tests/
             - python -m coverage report
             - python setup.py install
             - git clone https://github.com/glotzerlab/signac-project-template.git template

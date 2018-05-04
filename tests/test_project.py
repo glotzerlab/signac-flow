@@ -270,7 +270,7 @@ class ProjectTest(unittest.TestCase):
             operations.extend(project.next_operations(job))
         self.assertEqual(len(list(sched.jobs())), 0)
         cluster_job_id = project._store_bundled(operations)
-        with redirect_stdout(io.StringIO()):
+        with redirect_stdout(StringIO()):
             project.submit_operations(_id=cluster_job_id, env=env, operations=operations)
         self.assertEqual(len(list(sched.jobs())), 1)
         sched.reset()

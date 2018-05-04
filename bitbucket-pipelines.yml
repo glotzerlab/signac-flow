@@ -29,7 +29,6 @@ pipelines:
           - source activate py35
           - python setup.py build
           - python -m coverage run -m unittest discover tests/
-          - source deactivate
           - python -m coverage report
   branches:
     master:
@@ -56,7 +55,6 @@ pipelines:
             - source activate py35
             - python setup.py build
             - python -m coverage run -m unittest discover tests/
-            - source deactivate
             - python -m coverage report
             - python setup.py install
             - git clone https://github.com/glotzerlab/signac-project-template.git template
@@ -91,7 +89,6 @@ pipelines:
             - source activate py35
             - python setup.py build
             - python -m coverage run -m unittest discover tests/
-            - source deactivate
             - python -m coverage report
             - python setup.py install
             - git clone https://github.com/glotzerlab/signac-project-template.git template
@@ -124,7 +121,6 @@ pipelines:
             - source activate py35
             - python setup.py build
             - python -m coverage run -m unittest discover tests/
-            - source deactivate
             - python -m coverage report
             - python setup.py install
             - git clone https://github.com/glotzerlab/signac-project-template.git template
@@ -160,7 +156,6 @@ pipelines:
             - source activate py35
             - python setup.py build
             - python -m coverage run -m unittest discover tests/
-            - source deactivate
             - python -m coverage report
             - python setup.py install
             - git clone https://github.com/glotzerlab/signac-project-template.git template

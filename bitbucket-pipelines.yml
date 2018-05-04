@@ -15,22 +15,22 @@ pipelines:
           - python -m flake8 --show-source flow/
           - conda config --add channels glotzer
           - conda config --add channels conda-forge
-          - conda create -n py27 --yes python=2.7 coverage signac enum34
+          - conda create -n py27 --yes python=2.7 coverage signac enum34 jinja2
           - source activate py27
           - python setup.py build
           - python -m coverage run -m unittest discover tests/
           - source deactivate
-          - conda create -n py36 --yes python=3.6 coverage signac
+          - conda create -n py36 --yes python=3.6 coverage signac jinja2
           - source activate py36
           - python setup.py build
           - python -m coverage run -m unittest discover tests/
           - source deactivate
-          - conda create -n py35 --yes python=3.5 coverage signac
+          - conda create -n py35 --yes python=3.5 coverage signac jinja2
           - source activate py35
           - python setup.py build
           - python -m coverage run -m unittest discover tests/
           - source deactivate
-          - conda create -n py34 --yes python=3.4 coverage signac
+          - conda create -n py34 --yes python=3.4 coverage signac jinja2
           - source activate py34
           - python setup.py build
           - python -m coverage run -m unittest discover tests/
@@ -46,22 +46,22 @@ pipelines:
             - python -m flake8 --show-source flow/
             - conda config --add channels glotzer
             - conda config --add channels conda-forge
-            - conda create -n py27 --yes python=2.7 coverage signac enum34
+            - conda create -n py27 --yes python=2.7 coverage signac enum34 jinja2
             - source activate py27
             - python setup.py build
             - python -m coverage run -m unittest discover tests/
             - source deactivate
-            - conda create -n py36 --yes python=3.6 coverage signac
+            - conda create -n py36 --yes python=3.6 coverage signac jinja2
             - source activate py36
             - python setup.py build
             - python -m coverage run -m unittest discover tests/
             - source deactivate
-            - conda create -n py35 --yes python=3.5 coverage signac
+            - conda create -n py35 --yes python=3.5 coverage signac jinja2
             - source activate py35
             - python setup.py build
             - python -m coverage run -m unittest discover tests/
             - source deactivate
-            - conda create -n py34 --yes python=3.4 coverage signac hoomd jupyter matplotlib
+            - conda create -n py34 --yes python=3.4 coverage signac hoomd jupyter matplotlib jinja2
             - source activate py34
             - python setup.py build
             - python -m coverage run -m unittest discover tests/
@@ -85,22 +85,22 @@ pipelines:
             - python -m flake8 --show-source flow/
             - conda config --add channels glotzer
             - conda config --add channels conda-forge
-            - conda create -n py27 --yes python=2.7 coverage signac enum34
+            - conda create -n py27 --yes python=2.7 coverage signac enum34 jinja2
             - source activate py27
             - python setup.py build
             - python -m coverage run -m unittest discover tests/
             - source deactivate
-            - conda create -n py36 --yes python=3.6 coverage signac
+            - conda create -n py36 --yes python=3.6 coverage signac jinja2
             - source activate py36
             - python setup.py build
             - python -m coverage run -m unittest discover tests/
             - source deactivate
-            - conda create -n py35 --yes python=3.5 coverage signac
+            - conda create -n py35 --yes python=3.5 coverage signac jinja2
             - source activate py35
             - python setup.py build
             - python -m coverage run -m unittest discover tests/
             - source deactivate
-            - conda create -n py34 --yes python=3.4 coverage signac hoomd jupyter matplotlib
+            - conda create -n py34 --yes python=3.4 coverage signac hoomd jupyter matplotlib jinja2
             - source activate py34
             - python setup.py build
             - python -m coverage run -m unittest discover tests/
@@ -122,22 +122,22 @@ pipelines:
             - python --version
             - conda config --add channels glotzer
             - conda config --add channels conda-forge
-            - conda create -n py27 --yes python=2.7 coverage signac enum34
+            - conda create -n py27 --yes python=2.7 coverage signac enum34 jinja2
             - source activate py27
             - python setup.py build
             - python -m coverage run -m unittest discover tests/
             - source deactivate
-            - conda create -n py36 --yes python=3.6 coverage signac
+            - conda create -n py36 --yes python=3.6 coverage signac jinja2
             - source activate py36
             - python setup.py build
             - python -m coverage run -m unittest discover tests/
             - source deactivate
-            - conda create -n py35 --yes python=3.5 coverage signac
+            - conda create -n py35 --yes python=3.5 coverage signac jinja2
             - source activate py35
             - python setup.py build
             - python -m coverage run -m unittest discover tests/
             - source deactivate
-            - conda create -n py34 --yes python=3.4 coverage signac hoomd jupyter matplotlib
+            - conda create -n py34 --yes python=3.4 coverage signac hoomd jupyter matplotlib jinja2
             - source activate py34
             - python setup.py build
             - python -m coverage run -m unittest discover tests/
@@ -162,22 +162,22 @@ pipelines:
             - python -m flake8 --show-source flow/
             - conda config --add channels glotzer
             - conda config --add channels conda-forge
-            - conda create -n py27 --yes python=2.7 coverage signac enum34
+            - conda create -n py27 --yes python=2.7 coverage signac enum34 jinja2
             - source activate py27
             - python setup.py build
             - python -m coverage run -m unittest discover tests/
             - source deactivate
-            - conda create -n py36 --yes python=3.6 coverage signac
+            - conda create -n py36 --yes python=3.6 coverage signac jinja2
             - source activate py36
             - python setup.py build
             - python -m coverage run -m unittest discover tests/
             - source deactivate
-            - conda create -n py35 --yes python=3.5 coverage signac
+            - conda create -n py35 --yes python=3.5 coverage signac jinja2
             - source activate py35
             - python setup.py build
             - python -m coverage run -m unittest discover tests/
             - source deactivate
-            - conda create -n py34 --yes python=3.4 coverage signac hoomd jupyter matplotlib
+            - conda create -n py34 --yes python=3.4 coverage signac hoomd jupyter matplotlib jinja2
             - source activate py34
             - python setup.py build
             - python -m coverage run -m unittest discover tests/

@@ -1,9 +1,16 @@
+# Copyright (c) 2018 The Regents of the University of Michigan
+# All rights reserved.
+# This software is licensed under the BSD 3-Clause License.
+"""This module implements the run() function, which when called equips
+a regular Python module with a command line interface, which can be used
+to execute functions defined within the same module, that operate on a
+signac data space.
+"""
 from __future__ import print_function
 import sys
 import argparse
 import logging
 import inspect
-from contextlib import contextmanager
 from multiprocessing import Pool
 
 from signac import get_project
@@ -16,6 +23,13 @@ logger = logging.getLogger(__name__)
 
 
 def _get_operations(include_private=False):
+    """"Yields the name of all functions that qualify as an operation function.
+
+    The module is inspected and all functions that have only one argument
+    is yielded. Unless the 'include_private' argument is True, all private
+    functions, that means the name starts with one or more '_' characters
+    are ignored.
+    """
     module = inspect.getmodule(inspect.currentframe().f_back.f_back)
     for name, obj in inspect.getmembers(module):
         if not include_private and name.startswith('_'):
@@ -145,20 +159,3 @@ def run(parser=None):
             result = pool.imap_unordered(operation, jobs)
             for _ in tqdm(jobs) if args.progress else jobs:
                 result.next(args.timeout)
-
-
-@contextmanager
-def redirect_log(job, filename='run.log', formatter=None, logger=None):
-    if formatter is None:
-        formatter = logging.Formatter(
-            '%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
-    if logger is None:
-        logger = logging.getLogger()
-
-    filehandler = logging.FileHandler(filename=job.fn('run.log'))
-    filehandler.setFormatter(formatter)
-    logger.addHandler(filehandler)
-    try:
-        yield
-    finally:
-        logger.removeHandler(filehandler)

@@ -1,4 +1,4 @@
-# Copyright (c) 2017 The Regents of the University of Michigan
+# Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 """Detection of compute environments.
@@ -29,7 +29,7 @@ from signac.common.six import with_metaclass
 from .scheduling.slurm import SlurmScheduler
 from .scheduling.torque import TorqueScheduler
 from .scheduling.fakescheduler import FakeScheduler
-from .scheduling.models import JobStatus
+from .scheduling.base import JobStatus
 from .errors import SubmitError
 from .errors import NoSchedulerError
 
@@ -210,7 +210,8 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
         """Determine whether this specific compute environment is present.
 
         The default method for environment detection is trying to match a
-        hostname pattern.
+        hostname pattern or delegate the environment check to the associated
+        scheduler type.
         """
         if cls.hostname_pattern is None:
             if cls.scheduler_type is None:
@@ -258,6 +259,13 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
 
     @classmethod
     def add_args(cls, parser):
+        """Add arguments related to this compute environment to an argument parser.
+
+        :param parser:
+            The argument parser to add arguments to.
+        :type parser:
+            :class:`argparse.ArgumentParser`
+        """
         parser.add_argument(
             '--template',
             default=cls.template,
@@ -321,7 +329,7 @@ class TestEnvironment(ComputeEnvironment):
     The test environment will print a mocked submission script
     and submission commands to screen. This enables testing of
     the job submission script generation in environments without
-    an real scheduler.
+    a real scheduler.
     """
     scheduler_type = FakeScheduler
 
@@ -352,19 +360,20 @@ class MoabEnvironment(ComputeEnvironment):
     scheduler_type = TorqueScheduler
 
     def __init__(self, *args, **kwargs):
-        warnings.warn(
-            "The MoabEnvironment has been replaced by the TorqueEnvironment.",
-            DeprecationWarning)
-        super(MoabEnvironment, self).__init__(*args, **kwargs)
+        raise RuntimeError("The MoabEnvironment has been replaced by the TorqueEnvironment.")
 
 
 class SlurmEnvironment(ComputeEnvironment):
-    "An environment with slurm scheduler."
+    "An environment with SLURM scheduler."
     scheduler_type = SlurmScheduler
     template = 'slurm.sh'
 
 
 class NodesEnvironment(ComputeEnvironment):
+    """A compute environment consisting of multiple compute nodes.
+
+    Each compute node is assumed to have a specific number of compute units, e.g., CPUs.
+    """
 
     @classmethod
     def add_args(cls, parser):
@@ -442,7 +451,7 @@ class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
 
 
 class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
-    "A default environment for environments with slurm scheduler."
+    "A default environment for environments with SLURM scheduler."
 
     @classmethod
     def mpi_cmd(cls, cmd, np):
@@ -481,10 +490,12 @@ class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
 
 
 class CPUEnvironment(ComputeEnvironment):
+    "An environment with CPUs."
     pass
 
 
 class GPUEnvironment(ComputeEnvironment):
+    "An environment with GPUs."
     pass
 
 
@@ -527,9 +538,12 @@ def get_environment(test=False, import_configured=True):
     first EnvironmentClass where the is_present() method returns
     True.
 
-    :param test: Return the TestEnvironment
-    :type tets: bool
-    :returns: The detected environment class.
+    :param test:
+        Return the TestEnvironment
+    :type test:
+        bool
+    :returns:
+        The detected environment class.
     """
     if test:
         return TestEnvironment

@@ -10,9 +10,9 @@ import sys
 from signac.common import six
 from flow import FlowProject
 from flow import get_environment
-from flow.scheduling.models import Scheduler
-from flow.scheduling.models import ClusterJob
-from flow.scheduling.models import JobStatus
+from flow.scheduling.base import Scheduler
+from flow.scheduling.base import ClusterJob
+from flow.scheduling.base import JobStatus
 from flow.environment import ComputeEnvironment
 from flow import label
 from flow import classlabel
@@ -223,7 +223,7 @@ class ProjectTest(unittest.TestCase):
     def test_script(self):
         project = self.mock_project()
         for job in project:
-            script = project._generate_script(project.next_operations(job))
+            script = project._generate_run_script(project.next_operations(job))
             self.assertIn('echo "hello"', script)
             self.assertIn(str(job), script)
 
@@ -238,7 +238,7 @@ class ProjectTest(unittest.TestCase):
             file.write("THIS IS A CUSTOM SCRIPT!\n")
             file.write("{% endblock %}\n")
         for job in project:
-            script = project._generate_script(project.next_operations(job))
+            script = project._generate_run_script(project.next_operations(job))
             self.assertIn("THIS IS A CUSTOM SCRIPT", script)
             self.assertIn('echo "hello"', script)
             self.assertIn(str(job), script)
@@ -315,13 +315,13 @@ class ProjectTest(unittest.TestCase):
         sched.reset()
         project = self.mock_project()
         self.assertEqual(len(list(sched.jobs())), 0)
-        project.submit(env, bundle_size=2, num=2)
+        project.submit(bundle_size=2, num=2)
         self.assertEqual(len(list(sched.jobs())), 1)
-        project.submit(env, bundle_size=2, num=4)
+        project.submit(bundle_size=2, num=4)
         self.assertEqual(len(list(sched.jobs())), 3)
         sched.reset()
         project.fetch_status(file=StringIO())
-        project.submit(env, bundle_size=0)
+        project.submit(bundle_size=0)
         self.assertEqual(len(list(sched.jobs())), 1)
 
     def test_submit_status(self):

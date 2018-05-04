@@ -1,6 +1,12 @@
 # Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
+"""Implementation of decorators for label functions.
+
+This module implements the label, classlabel, and staticlabel decorator
+functions which can be used to decorate label functions which are part
+of a FlowProject class definition.
+"""
 
 
 class label(object):

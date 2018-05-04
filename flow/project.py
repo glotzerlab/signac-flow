@@ -41,9 +41,9 @@ from jinja2 import FileSystemLoader
 from .environment import get_environment
 from .environment import ComputeEnvironment
 from .environment import NodesEnvironment
-from .scheduling.models import Scheduler
-from .scheduling.models import ClusterJob
-from .scheduling.models import JobStatus
+from .scheduling.base import Scheduler
+from .scheduling.base import ClusterJob
+from .scheduling.base import JobStatus
 from .scheduling.status import update_status
 from .errors import SubmitError
 from .errors import NoSchedulerError
@@ -66,16 +66,22 @@ if not six.PY2:
 logger = logging.getLogger(__name__)
 
 
+# Global variable that is used internally to keep track of which
+# FlowProject methods belong to the legacy templating system. Such
+# a method is docorated with the _part_of_legacy_template_system()
+# decorator and then registered in this variable.
 _LEGACY_TEMPLATING_METHODS = set()
 
 
 def _part_of_legacy_template_system(method):
+    "Label a method to be part of the legacy templating system."
     _LEGACY_TEMPLATING_METHODS.add(method.__name__)
     method._legacy_intact = True
     return method
 
 
 def _execute(cmd, timeout=None):
+    "Helper function for py2/3 compatible execution of forked processes."
     if six.PY2:
         subprocess.call(cmd, shell=True)
     elif sys.version_info >= (3, 5):
@@ -87,9 +93,8 @@ def _execute(cmd, timeout=None):
 def make_bundles(operations, size=None):
     """Utility function for the generation of bundles.
 
-    This function splits a iterable of operations into
-    equally sized bundles and a possibly smaller final
-    bundle.
+    This function splits an iterable of operations into  equally
+    sized bundles and a possibly smaller final bundle.
     """
     n = None if size == 0 else size
     while True:
@@ -101,29 +106,28 @@ def make_bundles(operations, size=None):
 
 
 class JobOperation(object):
-    """Define operations to apply to a job.
+    """This class represents the information needed to execute one operation for one job.
 
-    An operation function in the context of signac is a function, with only
-    one job argument. This in principle ensures that operations are deterministic
-    in the sense that both input and output only depend on the job's metadata and
-    data.
-
-    This class is designed to define commands to be executed on the command
-    line that constitute an operation.
+    An operation function in this context is a shell command, which should be a function
+    of one and only one signac job.
 
     .. note::
 
-            The command arguments should only depend on the job metadata to
-            ensure deterministic operations.
+        Users should usually not instantiate this class themselves, but use the
+        :meth:`.FlowProject.add_operation` method.
 
-    :param name: The name of this JobOperation instance. The name is arbitrary,
+    :param name:
+        The name of this JobOperation instance. The name is arbitrary,
         but helps to concisely identify the operation in various contexts.
-    :type name: str
-    :param job: The job instance associated with this operation.
-    :type job: :py:class:`signac.Job`.
-    :type cmd: str
+    :type name:
+        str
+    :param job:
+        The job instance associated with this operation.
+    :type job:
+        :py:class:`signac.Job`.
+    :type cmd:
+        str
     """
-
     def __init__(self, name, job, cmd, np=None):
         if np is None:
             np = 1
@@ -147,6 +151,10 @@ class JobOperation(object):
         "Return a name, which identifies this job-operation."
         return '{}-{}'.format(self.job, self.name)
 
+    @classmethod
+    def expand_id(self, _id):
+        return {'job_id': _id[:32], 'operation-name': _id[33:]}
+
     def __hash__(self):
         return int(sha1(self.get_id().encode('utf-8')).hexdigest(), 16)
 
@@ -168,16 +176,17 @@ class JobOperation(object):
 
 
 class FlowCondition(object):
-    """A FlowCondition represents a condition as a function of a job handle.
+    """A FlowCondition represents a condition as a function of a signac job.
 
     The __call__() function of a FlowCondition object may return either True
-    or False, representing the whether the condition is met or not.
+    or False, representing whether the condition is met or not.
     This can be used to build a graph of conditions and operations.
 
-    :param callback: A function with one positional argument (the job)
-    :type callback: :py:class:`~signac.contrib.job.Job`
+    :param callback:
+        A function with one positional argument (the job)
+    :type callback:
+        :py:class:`~signac.contrib.job.Job`
     """
-
     def __init__(self, callback):
         self._callback = callback
 
@@ -194,7 +203,7 @@ class FlowCondition(object):
 
 
 class FlowOperation(object):
-    """A FlowOperation represents a data space operation.
+    """A FlowOperation represents a data space operation, operating on any job.
 
     Any FlowOperation is associated with a specific command, which should be
     a function of :py:class:`~signac.contrib.job.Job`. The command (cmd) can
@@ -228,17 +237,23 @@ class FlowOperation(object):
     Requirements are always met when the list of requirements is empty and
     post-conditions are never met when the list of post-conditions is empty.
 
-    :param cmd: The command to execute operation; should be a function of job.
-    :type cmd: str or callable
-    :param pre: required conditions
-    :type pre: sequence of callables
-    :param post: post-conditions to determine completion
-    :type pre: sequence of callables
-    :param np: Specify the number of processors this operation requires,
-        defaults to 1.
-    :type np: int
+    :param cmd:
+        The command to execute operation; should be a function of job.
+    :type cmd:
+        str or callable
+    :param pre:
+        required conditions
+    :type pre:
+        sequence of callables
+    :param post:
+        post-conditions to determine completion
+    :type pre:
+        sequence of callables
+    :param np:
+        Specify the number of processors this operation requires, defaults to 1.
+    :type np:
+        int
     """
-
     def __init__(self, cmd, pre=None, post=None, np=None):
         if pre is None:
             pre = []
@@ -286,18 +301,16 @@ class FlowOperation(object):
 
 
 class FlowProject(signac.contrib.Project):
-    """A signac project class assisting in workflow management.
+    """A signac project class specialized for workflow management.
 
-    :param config: A signac configuaration, defaults to
-        the configuration loaded from the environment.
-    :type config: A signac config object.
+    TODO: ADD BASIC DESCRIPTION ON HOW TO USE THIS CLASS HERE.
+
+    :param config:
+        A signac configuaration, defaults to the configuration loaded
+        from the environment.
+    :type config:
+        A signac config object.
     """
-    NAMES = {
-        'next_operation': 'next_op',
-    }
-
-    _LABEL_FUNCTIONS = dict()
-
     def __init__(self, config=None, environment=None):
         if environment is None:
             environment = get_environment()
@@ -312,8 +325,13 @@ class FlowProject(signac.contrib.Project):
             trim_blocks=True)
         self._template_environment.filters['time_delta'] = _format_timedelta
         self._label_functions = self._LABEL_FUNCTIONS.copy()
-        self._register_legacy_labels()
+        self._register_class_labels()
         self._setup_legacy_templating()
+
+    # All label functions are registered with the label() classmethod, which is intendeded
+    # to be used as decorator function. The _LABEL_FUNCTIONS dict contains the function as
+    # key and the label name as value, or None to use the default label name.
+    _LABEL_FUNCTIONS = dict()
 
     @classmethod
     def label(cls, label_name_or_func=None):
@@ -327,8 +345,12 @@ class FlowProject(signac.contrib.Project):
 
         return label_func
 
-    def _register_legacy_labels(self):
-        "Legacy support for old label decorators."
+    def _register_class_labels(self):
+        """This function registers all label functions, which are part of the class definition.
+
+        To register a class method or function as label function, use the generalized label()
+        function.
+        """
         import inspect
         from .labels import _is_label_func
 
@@ -339,11 +361,18 @@ class FlowProject(signac.contrib.Project):
             if _is_label_func(method):
                 self._label_functions[method] = None
 
+    # Simple translation table for output strings.
+    NAMES = {
+        'next_operation': 'next_op',
+    }
+
     @classmethod
     def _tr(cls, x):
         "Use name translation table for x."
         return cls.NAMES.get(x, x)
 
+    # These are default aliases used within the status output. You can add aliases
+    # with the update_aliases() classmethod.
     ALIASES = dict(
         status='S',
         unknown='U',
@@ -368,10 +397,11 @@ class FlowProject(signac.contrib.Project):
         cls.ALIASES.update(aliases)
 
     def _fn_bundle(self, bundle_id):
+        "Return the canonical name to store bundle information."
         return os.path.join(self.root_directory(), '.bundles', bundle_id)
 
     def _store_bundled(self, operations):
-        """Store operation-ids as part of a bundle and return bunndle id.
+        """Store operation-ids as part of a bundle and return bundle id.
 
         The operation identifiers are stored in a  text within a file
         determined by the _fn_bundle() method.
@@ -381,6 +411,15 @@ class FlowProject(signac.contrib.Project):
 
         A single operation will not be stored, but instead the operation's
         id is directly returned.
+
+        :param operations:
+            The operations to bundle.
+        :type operations:
+            A sequence of instances of :py:class:`.JobOperation`
+        :return:
+            The  bundle id
+        :rtype:
+            str
         """
         if len(operations) == 1:
             return operations[0].get_id()
@@ -413,10 +452,12 @@ class FlowProject(signac.contrib.Project):
         However, this function will not automatically filter scheduler
         jobs which are not associated with this project.
 
-        :param scheduler: The scheduler instance.
-        :type scheduler: :class:`~.flow.manage.Scheduler`
-        :yields: All scheduler jobs fetched from the scheduler
-            instance.
+        :param scheduler:
+            The scheduler instance.
+        :type scheduler:
+            :class:`~.flow.manage.Scheduler`
+        :yields:
+            All scheduler jobs fetched from the scheduler instance.
         """
         for sjob in self._expand_bundled_jobs(scheduler.jobs()):
             yield sjob
@@ -427,10 +468,11 @@ class FlowProject(signac.contrib.Project):
         for sjob in scheduler_jobs:
             name = sjob.name()
             if name[32] == '-':
-                yield name[:32], name[33:], sjob
+                expanded = JobOperation.expand_id(name)
+                yield expanded['job_id'], expanded['operation-name'], sjob
 
     def map_scheduler_jobs(self, scheduler_jobs):
-        """Map all scheduler jobs by job id.
+        """Map all scheduler jobs by job id and operation name.
 
         This function fetches all scheduled jobs from the scheduler
         and generates a nested dictionary, where the first key is
@@ -447,8 +489,10 @@ class FlowProject(signac.contrib.Project):
                 for sjob in sjobs_map[job.get_id()][operation]:
                     print(sjob._id(), sjob.status())
 
-        :param scheduler_jobs: An iterable of scheduler job instances.
-        :return: A nested dictionary (job_id, op_name, scheduler jobs)
+        :param scheduler_jobs:
+            An iterable of scheduler job instances.
+        :return:
+            A nested dictionary (job_id, op_name, scheduler jobs)
         """
         sjobs_map = defaultdict(dict)
         for job_id, op, sjob in self._map_scheduler_jobs(scheduler_jobs):
@@ -457,7 +501,7 @@ class FlowProject(signac.contrib.Project):
         return sjobs_map
 
     def get_job_status(self, job):
-        "Return the detailed status of a job."
+        "Return a dict with detailed information about the status of a job."
         result = dict()
         result['job_id'] = str(job)
         status = job.document.get('status', dict())
@@ -471,6 +515,27 @@ class FlowProject(signac.contrib.Project):
     def run(self, operations=None, pretend=False, np=None, timeout=None, progress=False):
         """Execute the next operations as specified by the project's workflow.
 
+        :param operations:
+            The operations to execute (optional).
+        :type operatons:
+            Sequence of instances of :class:`.JobOperation`
+        :param pretend:
+            Do not actually execute the operations, but show which command would have been used.
+        :type pretend:
+            bool
+        :param np:
+            The number of processors to use for each operation.
+        :type np:
+            int
+        :param timeout:
+            An optional timeout for each operation in seconds after which execution will
+            be cancelled. Use -1 to indicate not timeout (the default).
+        :type timeout:
+            int
+        :param progress:
+            Show a progress bar during execution.
+        :type progess:
+            bool
         """
         if operations is None:
             operations = (self.next_operation(job) for job in self)
@@ -504,8 +569,17 @@ class FlowProject(signac.contrib.Project):
                 for _ in tqdm(cmds) if progress else cmds:
                     result.next(timeout)
 
-# BEGIN LEGACY TEMPLATING SYSTEM:
     def _setup_legacy_templating(self):
+        """This function identifies whether a subclass has implemented deprecated template
+        functions.
+
+        The legacy templating system is used to generate run and cluster submission scripts
+        if that is the case. A warning is emitted to inform the user that they will not be
+        able to use the standard templating system.
+
+        The legacy templating functions are decorated with the _part_of_legacy_template_system()
+        decorator.
+        """
         self._legacy_templating = False
         legacy_methods = set()
         for method in _LEGACY_TEMPLATING_METHODS:
@@ -523,7 +597,11 @@ class FlowProject(signac.contrib.Project):
 
     @_part_of_legacy_template_system
     def write_script_header(self, script, **kwargs):
-        "Write the script header for the execution script."
+        """"Write the script header for the execution script.
+
+        This function is deprecated and will be removed in version 0.7! Users are
+        encouraged to migrate to the new templating system as of version 0.6.
+        """
         # Add some whitespace
         script.writeline()
         # Don't use uninitialized environment variables.
@@ -536,7 +614,11 @@ class FlowProject(signac.contrib.Project):
 
     @_part_of_legacy_template_system
     def write_script_operations(self, script, operations, background=False, **kwargs):
-        "Write the commands for the execution of operations as part of a script."
+        """"Write the commands for the execution of operations as part of a script.
+
+        This function is deprecated and will be removed in version 0.7! Users are
+        encouraged to migrate to the new templating system as of version 0.6.
+        """
         for op in operations:
             write_human_readable_statepoint(script, op.job)
             script.write_cmd(op.cmd.format(job=op.job), bg=background)
@@ -544,7 +626,11 @@ class FlowProject(signac.contrib.Project):
 
     @classmethod
     def write_human_readable_statepoint(cls, script, job):
-        "Write statepoint of job in human-readable format to script."
+        """Write statepoint of job in human-readable format to script.
+
+        This function is deprecated and will be removed in version 0.7! Users are
+        encouraged to migrate to the new templating system as of version 0.6.
+        """
         warnings.warn(
             "The write_human_readable_statepoint() function is deprecated.",
             DeprecationWarning)
@@ -552,13 +638,20 @@ class FlowProject(signac.contrib.Project):
 
     @_part_of_legacy_template_system
     def write_script_footer(self, script, **kwargs):
-        "Write the script footer for the execution script."
+        """"Write the script footer for the execution script.
+
+        This function is deprecated and will be removed in version 0.7! Users are
+        encouraged to migrate to the new templating system as of version 0.6.
+        """
         # Wait until all processes have finished
         script.writeline('wait')
 
     @_part_of_legacy_template_system
     def write_script(self, script, operations, background=False, **kwargs):
         """Write a script for the execution of operations.
+
+        This function is deprecated and will be removed in version 0.7! Users are
+        encouraged to migrate to the new templating system as of version 0.6.
 
         By default, this function will generate a script with the following components:
 
@@ -570,18 +663,21 @@ class FlowProject(signac.contrib.Project):
 
         Consider overloading any of the methods above, before overloading this method.
 
-        :param script: The script to write the commands to.
-        :param operations: The operations to be written to the script.
-        :type operations: sequence of JobOperation
-        :param background: Whether operations should be executed in the background;
-            useful to parallelize execution
-        :type background: bool
-
+        :param script:
+            The script to write the commands to.
+        :param operations:
+            The operations to be written to the script.
+        :type operations:
+            A sequence of JobOperation
+        :param background:
+            Whether operations should be executed in the background;
+            useful to parallelize execution.
+        :type background:
+            bool
         """
         self.write_script_header(script, **kwargs)
         self.write_script_operations(script, operations, background=background, **kwargs)
         self.write_script_footer(script, **kwargs)
-# FUNCTIONS ABOVE ARE DEPRECATED!
 
     def _gather_operations(self, job_id=None, operation_name=None, num=None, bundle_size=1,
                            cmd=None, requires=None, pool=None, serial=False, force=False, **kwargs):
@@ -620,13 +716,31 @@ class FlowProject(signac.contrib.Project):
         return islice((op for op in ops if eligible(op)), num)
 
     def _get_template_context(self):
+        "Return the standard templating context for run and submission scripts."
         context = dict()
         context['project'] = self
         return context
 
-    def _generate_script(self, operations, parallel=False, template='run.sh'):
+    def _generate_run_script(self, operations, parallel=False, template='run.sh'):
+        """Generate a run script to execute given operations (optional in parallel).
+
+        :param operations:
+            The operations to execute.
+        :type operatons:
+            Sequence of instances of :class:`.JobOperation`
+        :param parallel:
+            Execute all operations in parallel (default is False).
+        :param parallel:
+            bool
+        :param template:
+            The name of the template to use to generate the script.
+        :type template:
+            str
+        """
         if self._legacy_templating:
             from .environment import TestEnvironment
+            # We first check whether it appears that the user has provided a templating script
+            # in which case we raise an exception to avoid highly unexpected behavior.
             fn_template = os.path.join(self.root_directory(), 'templates', template)
             if os.path.isfile(fn_template):
                 raise RuntimeError(
@@ -636,6 +750,7 @@ class FlowProject(signac.contrib.Project):
             script.seek(0)
             return script.read()
         else:
+            # By default we use the jinja2 templating system to generate the script.
             template = self._template_environment.get_template(template)
             context = self._get_template_context()
             context['base_run'] = 'base_run.sh'
@@ -643,19 +758,41 @@ class FlowProject(signac.contrib.Project):
             context['parallel'] = parallel
             return template.render(** context)
 
-    def _generate_submit_script(self, operations, _id=None, env=None, template=None, **kwargs):
-        "Generate submission script to execute operation with scheduler."
+    def _generate_submit_script(self, _id, operations, parallel=False, template=None,
+                                env=None, **kwargs):
+        """Generate submission script to submit the execution of operations to a scheduler.
+        :param _id:
+            The name of the cluster job.
+        :type _id:
+            str
+        :param operations:
+            The operations to execute.
+        :type operatons:
+            Sequence of instances of :class:`.JobOperation`
+        :param parallel:
+            Execute all operations in parallel (default is False).
+        :param parallel:
+            bool
+        :param template:
+            The name of the template to use to generate the script.
+        :type template:
+            str
+        """
         if template is None:
             template = env.template
+        assert _id is not None
 
         if self._legacy_templating:
-            serial = kwargs.get('serial', False)
+            fn_template = os.path.join(self.root_directory(), 'templates', template)
+            if os.path.isfile(fn_template):
+                raise RuntimeError(
+                    "In legacy templating mode, unable to use template '{}'.".format(fn_template))
             script = env.script(_id=_id, **kwargs)
-            self.write_script(script=script, operations=operations, background=not serial, **kwargs)
+            self.write_script(script=script, operations=operations, background=parallel, **kwargs)
             script.seek(0)
             return script.read()
         else:
-            template = self._template_environment.get_template('submit.sh')
+            template = self._template_environment.get_template(template)
             context = self._get_template_context()
             context['base_submit'] = env.template
             context['environment'] = env.__name__
@@ -697,12 +834,15 @@ class FlowProject(signac.contrib.Project):
 
         operations = map(_msg, operations)
         script = self._generate_submit_script(
-            operations=operations, _id=_id, env=env, nn=nn, ppn=ppn, serial=serial,
-            force=force or flags)
+            # standard arguments:
+            _id=_id, operations=operations, parallel=not serial, env=env,
+            # legacy arguments:
+            nn=nn, ppn=ppn, force=force or flags
+            )
         return env.submit(script=script, nn=nn, ppn=ppn, flags=flags, **kwargs)
 
-    def submit(self, env=None, bundle_size=1, serial=False, force=False,
-               nn=None, ppn=None, walltime=None, **kwargs):
+    def submit(self, bundle_size=1, serial=False, force=False,
+               nn=None, ppn=None, walltime=None, env=None, **kwargs):
         """Submit function for the project's main submit interface.
 
         This method gather and optionally bundle all operations which are eligible for execution,
@@ -714,15 +854,22 @@ class FlowProject(signac.contrib.Project):
         and will automatically prevent the submission of the same operation multiple times if
         it is considered active (e.g. queued or running).
         """
-        # Backwards-compatilibity checks:
-        if isinstance(env, Scheduler):
+        # Handling of potential legacy API issues for backwards-compatibility:
+        from inspect import isclass
+        if isinstance(bundle_size, Scheduler):
             raise ValueError(
                 "The submit() API has changed with signac-flow version 0.4, "
-                "please update your project. ")
+                "please update your project.")
+        if isclass(bundle_size) and issubclass(bundle_size, ComputeEnvironment):
+            env, bundle_size = bundle_size, 1
+            warnings.warn(
+                "The submit() API has changed with signac-flow version 0.6, "
+                "please update your project.", DeprecationWarning)
         submit_user = getattr(self, 'submit_user', None)
         if submit_user is not None:
             warnings.warn("The submit_user() function is deprecated!", DeprecationWarning)
 
+        # Regular argument checks and expansion
         if env is None:
             env = self._environment
         if walltime is not None:
@@ -737,10 +884,10 @@ class FlowProject(signac.contrib.Project):
                 submit = self.submit_operations
 
             status = submit(
-                env=env, operations=bundle, nn=nn, ppn=ppn,
-                serial=serial, force=force, walltime=walltime, **kwargs)
+                operations=bundle, env=env, nn=nn, ppn=ppn, serial=serial,
+                force=force, walltime=walltime, **kwargs)
 
-            if status is not None:
+            if status is not None:  # operations were submitted, store status
                 for op in bundle:
                     op.set_status(status)
 
@@ -761,6 +908,10 @@ class FlowProject(signac.contrib.Project):
             action='store_true',
             help="Ignore all warnings and checks, just submit.")
         cls._add_script_args(parser)
+
+    def script(self):
+        "Generate the script for execution (currently not implemented)."
+        raise NotImplementedError()
 
     @classmethod
     def _add_script_args(cls, parser):
@@ -810,6 +961,65 @@ class FlowProject(signac.contrib.Project):
             help="Manually specify all labels, that are required for a job to be "
                  "considered eligible for submission. This is especially useful "
                  "in combination with '--cmd'.")
+
+    def fetch_status(self, jobs=None, file=sys.stderr,
+                     ignore_errors=False, scheduler=None, pool=None):
+        """Update the status cache for each job.
+
+        This function queries the scheduler to obtain the current status of each
+        submitted job-operation.
+
+        :param jobs:
+            The jobs to query, defaults to all jobs.
+        :type jobs:
+            A sequence of instances of :class:`signac.contrib.job.Job`
+        :param file:
+            A file to write logging output to, defaults to sys.stderr.
+        :type file:
+            A file-like object.
+        :param ignore_errors:
+            Ignore errors while querying the scheduler.
+        :type ignore_errors:
+            bool
+        :param scheduler:
+            The scheduler to use for querying (deprecated argument); defaults to
+            the scheduler provided by the project's associated environment.
+        :param pool:
+            A multiprocessing pool. If provided, will parallelize the status update.
+        :return:
+            A dictionary of jobs mapped to their status dicts.
+         """
+        if jobs is None:
+            jobs = list(self.find_jobs())
+        try:
+            scheduler = self._environment.get_scheduler()
+        except NoSchedulerError:
+            logger.debug("No scheduler available to update job status.")
+        else:
+            print(self._tr("Query scheduler..."), file=file)
+            sjobs_map = defaultdict(list)
+            try:
+                for sjob in self.scheduler_jobs(scheduler):
+                    sjobs_map[sjob.name()].append(sjob)
+            except RuntimeError as e:
+                if ignore_errors:
+                    logger.warning("WARNING: Error while querying scheduler: '{}'.".format(e))
+                else:
+                    raise RuntimeError("Error while querying scheduler: '{}'.".format(e))
+            if pool is None:
+                for job in tqdm(jobs, file=file):
+                    _update_job_status(job, sjobs_map)
+            else:
+                jobs_ = list((job, sjobs_map) for job in jobs)
+                pool.map(_update_status, tqdm(jobs_, total=len(jobs), file=file))
+        return {job: self.get_job_status(job) for job in jobs}
+
+    def update_stati(self, scheduler, jobs=None, file=sys.stderr, pool=None, ignore_errors=False):
+        "This function has been replaced with :meth:`.fetch_status`."
+        warnings.warn(
+            "The update_stati() method has been replaced by fetch_status() as of version 0.6.",
+            DeprecationWarning)
+        self.fetch_status(scheduler=scheduler, jobs=jobs, file=file, ignore_errors=ignore_errors)
 
     def _print_overview(self, stati, max_lines=None, file=sys.stdout):
         "Print the project's status overview."
@@ -879,67 +1089,47 @@ class FlowProject(signac.contrib.Project):
             for a in sorted(abbreviate.table):
                 print('{}: {}'.format(a, abbreviate.table[a]), file=file)
 
-    def fetch_status(self, jobs=None, file=sys.stderr,
-                     ignore_errors=False, scheduler=None, pool=None):
-        if jobs is None:
-            jobs = list(self.find_jobs())
-        try:
-            scheduler = self._environment.get_scheduler()
-        except NoSchedulerError:
-            logger.debug("No scheduler available to update job status.")
-        else:
-            print(self._tr("Query scheduler..."), file=file)
-            sjobs_map = defaultdict(list)
-            try:
-                for sjob in self.scheduler_jobs(scheduler):
-                    sjobs_map[sjob.name()].append(sjob)
-            except RuntimeError as e:
-                if ignore_errors:
-                    logger.warning("WARNING: Error while querying scheduler: '{}'.".format(e))
-                else:
-                    raise RuntimeError("Error while querying scheduler: '{}'.".format(e))
-            if pool is None:
-                for job in tqdm(jobs, file=file):
-                    _update_job_status(job, sjobs_map)
-            else:
-                jobs_ = list((job, sjobs_map) for job in jobs)
-                pool.map(_update_status, tqdm(jobs_, total=len(jobs), file=file))
-        return {job: self.get_job_status(job) for job in jobs}
-
-    def update_stati(self, scheduler, jobs=None, file=sys.stderr, pool=None, ignore_errors=False):
-        warnings.warn(
-            "The update_stati() method has been replaced by fetch_status() as of version 0.6.",
-            DeprecationWarning)
-        self.fetch_status(scheduler=scheduler, jobs=jobs, file=file, ignore_errors=ignore_errors)
-
     def print_status(self, job_filter=None, overview=True, overview_max_lines=None,
                      detailed=False, parameters=None, skip_active=False, param_max_width=None,
                      file=sys.stdout, err=sys.stderr, ignore_errors=False,
                      scheduler=None, pool=None):
         """Print the status of the project.
 
-        :param job_filter: A JSON encoded filter,
-            that all jobs to be submitted need to match.
-        :param overview: Aggregate an overview of the project' status.
-        :type overview: bool
-        :param overview_max_lines: Limit the number of overview lines.
-        :type overview_max_lines: int
-        :param detailed: Print a detailed status of each job.
-        :type detailed: bool
-        :param parameters: Print the value of the specified parameters.
-        :type parameters: list of str
-        :param skip_active: Only print jobs that are currently inactive.
-        :type skip_active: bool
-        :param param_max_width: Limit the number of characters of parameter
-            columns, see also: :py:meth:`~.update_aliases`.
-        :param file: Redirect all output to this file,
-            defaults to sys.stdout
-        :param err: Redirect all error output to this file,
-            defaults to sys.stderr
-        :param pool: A multiprocessing or threading pool. Providing a pool
-            parallelizes this method.
-        :param scheduler: The scheduler instance used to fetch the job stati.
-        :type scheduler: :class:`~.manage.Scheduler`
+        :param job_filter:
+            A JSON encoded filter, that all jobs to be submitted need to match.
+        :param overview:
+            Aggregate an overview of the project' status.
+        :type overview:
+            bool
+        :param overview_max_lines:
+            Limit the number of overview lines.
+        :type overview_max_lines:
+            int
+        :param detailed:
+            Print a detailed status of each job.
+        :type detailed:
+            bool
+        :param parameters:
+            Print the value of the specified parameters.
+        :type parameters:
+            list of str
+        :param skip_active:
+            Only print jobs that are currently inactive.
+        :type skip_active:
+            bool
+        :param param_max_width:
+            Limit the number of characters of parameter columns,
+            see also: :py:meth:`~.update_aliases`.
+        :param file:
+            Redirect all output to this file, defaults to sys.stdout.
+        :param err:
+            Redirect all error output to this file, defaults to sys.stderr.
+        :param pool:
+            A multiprocessing or threading pool. Providing a pool parallelizes this method.
+        :param scheduler:
+            The scheduler instance used to fetch the job stati.
+        :type scheduler:
+            :class:`~.manage.Scheduler`
         """
         if job_filter is not None and isinstance(job_filter, str):
             job_filter = json.loads(job_filter)
@@ -1113,17 +1303,27 @@ class FlowProject(signac.contrib.Project):
         and not to other contributing factors, such as whether the job-operation is currently
         running or queued.
 
-        :param name: A unique identifier for this operation, may be freely choosen.
-        :type name: str
-        :param cmd: The command to execute operation; should be a function of job.
-        :type cmd: str or callable
-        :param pre: required conditions
-        :type pre: sequence of callables
-        :param post: post-conditions to determine completion
-        :type pre: sequence of callables
-        :param np: Specify the number of processors this operation requires,
+        :param name:
+            A unique identifier for this operation, may be freely choosen.
+        :type name:
+            str
+        :param cmd:
+            The command to execute operation; should be a function of job.
+        :type cmd:
+            str or callable
+        :param pre:
+            required conditions
+        :type pre:
+            sequence of callables
+        :param post:
+            post-conditions to determine completion
+        :type pre:
+            sequence of callables
+        :param np:
+            Specify the number of processors this operation requires,
             defaults to 1.
-        :type np: int
+        :type np:
+            int
         """
         if name in self.operations:
             raise KeyError("An operation with this identifier is already added.")
@@ -1134,10 +1334,14 @@ class FlowProject(signac.contrib.Project):
 
         By default, this method yields from the project's labels() method.
 
-        :param job: The signac job handle.
-        :type job: :class:`~signac.contrib.job.Job`
-        :yields: The labels to classify job.
-        :yield type: str
+        :param job:
+            The signac job handle.
+        :type job:
+            :class:`~signac.contrib.job.Job`
+        :yields:
+            The labels to classify job.
+        :yield type:
+            str
         """
         for _label in self.labels(job):
             yield _label
@@ -1145,10 +1349,15 @@ class FlowProject(signac.contrib.Project):
     def completed_operations(self, job):
         """Determine which operations have been completed for job.
 
-        :param job: The signac job handle.
-        :type job: :class:`~signac.contrib.job.Job`
-        :return: The name of the operations that are complete.
-        :rtype: str"""
+        :param job:
+            The signac job handle.
+        :type job:
+            :class:`~signac.contrib.job.Job`
+        :return:
+            The name of the operations that are complete.
+        :rtype:
+            str
+        """
         for name, op in self._operations.items():
             if op.complete(job):
                 yield name
@@ -1161,9 +1370,12 @@ class FlowProject(signac.contrib.Project):
         operation that a job is eligible for, as defined by the
         :py:meth:`~.add_operation` method.
 
-        :param job: The signac job handle.
-        :type job: :class:`~signac.contrib.job.Job`
-        :yield: All instances of JobOperation a job is eligible for.
+        :param job:
+            The signac job handle.
+        :type job:
+            :class:`~signac.contrib.job.Job`
+        :yield:
+            All instances of JobOperation a job is eligible for.
         """
         for name, op in self.operations.items():
             if op.eligible(job):
@@ -1172,11 +1384,14 @@ class FlowProject(signac.contrib.Project):
     def next_operation(self, job):
         """Determine the next operation for this job.
 
-        :param job: The signac job handle.
-        :type job: :class:`~signac.contrib.job.Job`
-        :return: An instance of JobOperation to execute next or `None`, if no
-            operation is eligible.
-        :rtype: :py:class:`~.JobOperation` or `NoneType`
+        :param job:
+            The signac job handle.
+        :type job:
+            :class:`~signac.contrib.job.Job`
+        :return:
+            An instance of JobOperation to execute next or `None`, if no operation is eligible.
+        :rtype:
+            `:py:class:`~.JobOperation` or `NoneType`
         """
         for op in self.next_operations(job):
             return op
@@ -1301,7 +1516,7 @@ class FlowProject(signac.contrib.Project):
             if test:
                 env = get_environment(test=True)    # bad hack... ignoring the env argument here
             try:
-                self.submit(env, **kwargs)
+                self.submit(env=env, **kwargs)
             except NoSchedulerError as e:
                 print(
                     "Error:", e, "Consider using '--test', for testing purposes.", file=sys.stderr)
@@ -1401,8 +1616,6 @@ class FlowProject(signac.contrib.Project):
 
         sys.exit(args.func(self._environment, args))
 
-#####
-#   BEGIN LEGACY API
     @classmethod
     def add_submit_args(cls, parser):
         warnings.warn(
@@ -1427,7 +1640,8 @@ class FlowProject(signac.contrib.Project):
 
 
 ###
-# Status-related functions
+# Status-related helper functions
+
 def _update_status(args):
     "Wrapper-function, that is probably obsolete."
     return update_status(* args)

@@ -1,4 +1,11 @@
-"Example files that may be used for faster initialization."
+# Copyright (c) 2018 The Regents of the University of Michigan
+# All rights reserved.
+# This software is licensed under the BSD 3-Clause License.
+"""This module contains the FlowProject module templates.
+
+These templates can be initialized via the init() function defined
+in this module and the main 'flow' command line interface.
+"""
 from __future__ import print_function
 import os
 import sys
@@ -12,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 def init(alias=None, template=None, root=None, out=None):
-    "Initialize a templated FlowProject workflow module."
+    "Initialize a templated FlowProject module."
     if alias is None:
         alias = 'project'
     if template is None:

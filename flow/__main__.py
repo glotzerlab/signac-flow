@@ -1,6 +1,13 @@
-# Copyright (c) 2017 The Regents of the University of Michigan
+# Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
+"""This module defines the main command line interface for signac-flow.
+
+The interface is accessible via the `flow` command and allows users to
+initialize FlowProject class definitions directly from the command line.
+
+Execute `flow --help` for more information.
+"""
 from __future__ import print_function
 import argparse
 import logging
@@ -16,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 def main_init(args):
+    "Initialize a FlowProject from one of the templates defined in the template module."
     try:
         return template.init(alias=args.alias, template=args.template)
     except OSError as e:
@@ -24,6 +32,12 @@ def main_init(args):
 
 
 def main():
+    """Main entry function for the 'flow' command line tool.
+
+    This function defines the main 'flow' command line interface which can be used
+    to initialize FlowProject modules from different templates as well as print the
+    version of the installed signac-flow package.
+    """
     parser = argparse.ArgumentParser(
         description="Flow a program that aids workflow using signac")
     parser.add_argument(

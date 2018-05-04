@@ -3,7 +3,7 @@
 # This software is licensed under the BSD 3-Clause License.
 import logging
 
-from .models import JobStatus
+from .base import JobStatus
 
 logger = logging.getLogger(__name__)
 

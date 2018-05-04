@@ -17,6 +17,7 @@ setup(
     name='signac-flow',
     version='0.5.6',
     packages=find_packages(),
+    include_package_data=True,
     zip_safe=True,
 
     author='Carl Simon Adorf',

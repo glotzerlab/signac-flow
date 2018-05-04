@@ -319,7 +319,7 @@ class FlowProject(signac.contrib.Project):
         self._environment = environment
         self._template_environment = Environment(
             loader=ChoiceLoader([
-                FileSystemLoader(self.fn('templates')),
+                FileSystemLoader(os.path.join(self.root_directory(), 'templates')),
                 PackageLoader('flow', 'templates'),
                 ]),
             trim_blocks=True)

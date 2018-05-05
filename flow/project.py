@@ -80,6 +80,30 @@ def _part_of_legacy_template_system(method):
     return method
 
 
+def submit_legacy_layer(func):
+    import functools
+    from inspect import isclass
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+    #def wrapper(env, bundle_size=1, serial=False, force=False, nn=None, ppn=None, walltime=None, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except TypeError:
+            from .legacy import submit_05
+            return submit_05(*args, **kwargs)
+
+            if isclass(args[1]) and issubclass(args[1], ComputeEnvironment):
+                kwargs['env'] = args[1]
+                args = tuple([args[0]] + list(args[2:]))
+            print('args', args)
+            print('kwargs', kwargs)
+
+
+            return func(*args, **kwargs)
+    return wrapper
+
+
 def _execute(cmd, timeout=None):
     "Helper function for py2/3 compatible execution of forked processes."
     if six.PY2:
@@ -682,6 +706,8 @@ class FlowProject(signac.contrib.Project):
     def _gather_operations(self, job_id=None, operation_name=None, num=None, bundle_size=1,
                            cmd=None, requires=None, pool=None, serial=False, force=False, **kwargs):
         "Gather operations to be executed or submitted."
+        api_version= kwargs.get('_api_version', 6)
+
         if job_id:
             jobs = (self.open_job(id=_id) for _id in job_id)
         else:
@@ -841,6 +867,7 @@ class FlowProject(signac.contrib.Project):
             )
         return env.submit(script=script, nn=nn, ppn=ppn, flags=flags, **kwargs)
 
+    @submit_legacy_layer
     def submit(self, bundle_size=1, serial=False, force=False,
                nn=None, ppn=None, walltime=None, env=None, **kwargs):
         """Submit function for the project's main submit interface.
@@ -884,7 +911,7 @@ class FlowProject(signac.contrib.Project):
                 submit = self.submit_operations
 
             status = submit(
-                operations=bundle, env=env, nn=nn, ppn=ppn, serial=serial,
+                operations=bundle, env=env, ppn=ppn, serial=serial,
                 force=force, walltime=walltime, **kwargs)
 
             if status is not None:  # operations were submitted, store status

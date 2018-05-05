@@ -1,4 +1,4 @@
-# Copyright (c) 2017 The Regents of the University of Michigan
+# Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 """Detection of compute environments.
@@ -25,8 +25,11 @@ from collections import OrderedDict
 from signac.common import config
 from signac.common import six
 from signac.common.six import with_metaclass
-from . import scheduler
-from . import manage
+
+from .scheduling.slurm import SlurmScheduler
+from .scheduling.torque import TorqueScheduler
+from .scheduling.fakescheduler import FakeScheduler
+from .scheduling.base import JobStatus
 from .errors import SubmitError
 from .errors import NoSchedulerError
 
@@ -37,6 +40,10 @@ else:
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
+
+
+# Global variable can be used to override detected environment
+ENVIRONMENT = None
 
 
 NUM_NODES_WARNING = """Unable to determine the reqired number of nodes (nn) for this submission.
@@ -139,6 +146,9 @@ class JobScript(io.StringIO):
         self._env = env
         super(JobScript, self).__init__()
 
+    def __str__(self):
+        return self.read()
+
     def write(self, s):
         if six.PY2:
             super(JobScript, self).write(unicode(s))  # noqa
@@ -184,6 +194,7 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
     scheduler_type = None
     hostname_pattern = None
     submit_flags = None
+    template = 'base_submit.sh'
 
     @classmethod
     def script(cls, **kwargs):
@@ -199,7 +210,8 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
         """Determine whether this specific compute environment is present.
 
         The default method for environment detection is trying to match a
-        hostname pattern.
+        hostname pattern or delegate the environment check to the associated
+        scheduler type.
         """
         if cls.hostname_pattern is None:
             if cls.scheduler_type is None:
@@ -237,9 +249,8 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
             flags.extend(env_flags)
 
         # Hand off the actual submission to the scheduler
-        script.seek(0)
         if cls.get_scheduler().submit(script, flags=flags, *args, **kwargs):
-            return manage.JobStatus.submitted
+            return JobStatus.submitted
 
     @staticmethod
     def bg(cmd):
@@ -248,7 +259,18 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
 
     @classmethod
     def add_args(cls, parser):
-        return
+        """Add arguments related to this compute environment to an argument parser.
+
+        :param parser:
+            The argument parser to add arguments to.
+        :type parser:
+            :class:`argparse.ArgumentParser`
+        """
+        parser.add_argument(
+            '--template',
+            default=cls.template,
+            help="The template script to use for submission scripts. "
+                 "Default='templates/{}'.".format(cls.template))
 
     @classmethod
     def get_config_value(cls, key, default=_GET_CONFIG_VALUE_NONE):
@@ -307,9 +329,9 @@ class TestEnvironment(ComputeEnvironment):
     The test environment will print a mocked submission script
     and submission commands to screen. This enables testing of
     the job submission script generation in environments without
-    an real scheduler.
+    a real scheduler.
     """
-    scheduler_type = scheduler.FakeScheduler
+    scheduler_type = FakeScheduler
 
     @classmethod
     def mpi_cmd(cls, cmd, np):
@@ -325,7 +347,8 @@ class TestEnvironment(ComputeEnvironment):
 
 class TorqueEnvironment(ComputeEnvironment):
     "An environment with TORQUE scheduler."
-    scheduler_type = scheduler.TorqueScheduler
+    scheduler_type = TorqueScheduler
+    template = 'torque.sh'
 
 
 class MoabEnvironment(ComputeEnvironment):
@@ -334,21 +357,23 @@ class MoabEnvironment(ComputeEnvironment):
     This class is deprecated and only kept for backwards
     compatibility.
     """
-    scheduler_type = scheduler.TorqueScheduler
+    scheduler_type = TorqueScheduler
 
     def __init__(self, *args, **kwargs):
-        warnings.warn(
-            "The MoabEnvironment has been replaced by the TorqueEnvironment.",
-            DeprecationWarning)
-        super(MoabEnvironment, self).__init__(*args, **kwargs)
+        raise RuntimeError("The MoabEnvironment has been replaced by the TorqueEnvironment.")
 
 
 class SlurmEnvironment(ComputeEnvironment):
-    "An environment with slurm scheduler."
-    scheduler_type = scheduler.SlurmScheduler
+    "An environment with SLURM scheduler."
+    scheduler_type = SlurmScheduler
+    template = 'slurm.sh'
 
 
 class NodesEnvironment(ComputeEnvironment):
+    """A compute environment consisting of multiple compute nodes.
+
+    Each compute node is assumed to have a specific number of compute units, e.g., CPUs.
+    """
 
     @classmethod
     def add_args(cls, parser):
@@ -426,7 +451,7 @@ class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
 
 
 class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
-    "A default environment for environments with slurm scheduler."
+    "A default environment for environments with SLURM scheduler."
 
     @classmethod
     def mpi_cmd(cls, cmd, np):
@@ -465,10 +490,12 @@ class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
 
 
 class CPUEnvironment(ComputeEnvironment):
+    "An environment with CPUs."
     pass
 
 
 class GPUEnvironment(ComputeEnvironment):
+    "An environment with GPUs."
     pass
 
 
@@ -511,13 +538,18 @@ def get_environment(test=False, import_configured=True):
     first EnvironmentClass where the is_present() method returns
     True.
 
-    :param test: Return the TestEnvironment
-    :type tets: bool
-    :returns: The detected environment class.
+    :param test:
+        Return the TestEnvironment
+    :type test:
+        bool
+    :returns:
+        The detected environment class.
     """
     if test:
         return TestEnvironment
     else:
+        if ENVIRONMENT is not None:
+            return ENVIRONMENT
         env_types = registered_environments(import_configured=import_configured)
         logger.debug(
             "List of registered environments:\n\t{}".format(

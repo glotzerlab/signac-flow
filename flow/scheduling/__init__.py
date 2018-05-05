@@ -1,8 +1,7 @@
-# Copyright (c) 2017 The Regents of the University of Michigan
+# Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-import warnings
-
+"""Defines the API for the scheduling system."""
 from .fakescheduler import FakeScheduler
 from .torque import TorqueScheduler
 from .slurm import SlurmScheduler
@@ -11,10 +10,7 @@ from .slurm import SlurmScheduler
 class MoabScheduler(TorqueScheduler):
 
     def __init__(self, *args, **kwargs):
-        warnings.warn(
-            "The MoabScheduler has been renamed to TorqueScheduler.",
-            DeprecationWarning)
-        super(MoabScheduler, self).__init__(*args, **kwargs)
+        raise RuntimeError("The MoabScheduler has been renamed to TorqueScheduler.")
 
 
 __all__ = [

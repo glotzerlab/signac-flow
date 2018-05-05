@@ -1,4 +1,4 @@
-# Copyright (c) 2017 The Regents of the University of Michigan
+# Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 """Environments for the University of Michigan HPC environment."""
@@ -50,3 +50,6 @@ class FluxEnvironment(DefaultTorqueEnvironment):
             '--memory',
             default='4g',
             help="Specify how much memory to reserve per node. (default=4g)")
+
+
+__all__ = ['FluxEnvironment']

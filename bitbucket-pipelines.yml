@@ -56,6 +56,8 @@ pipelines:
             - python setup.py build
             - python -m coverage run -m unittest discover tests/
             - python -m coverage report
+            - source activate py36
+            - conda install --yes numpy
             - python setup.py install
             - git clone https://github.com/glotzerlab/signac-project-template.git template
             - cd template
@@ -90,6 +92,8 @@ pipelines:
             - python setup.py build
             - python -m coverage run -m unittest discover tests/
             - python -m coverage report
+            - source activate py36
+            - conda install --yes numpy
             - python setup.py install
             - git clone https://github.com/glotzerlab/signac-project-template.git template
             - cd template
@@ -122,6 +126,8 @@ pipelines:
             - python setup.py build
             - python -m coverage run -m unittest discover tests/
             - python -m coverage report
+            - source activate py36
+            - conda install --yes numpy
             - python setup.py install
             - git clone https://github.com/glotzerlab/signac-project-template.git template
             - cd template
@@ -157,6 +163,8 @@ pipelines:
             - python setup.py build
             - python -m coverage run -m unittest discover tests/
             - python -m coverage report
+            - source activate py36
+            - conda install --yes numpy
             - python setup.py install
             - git clone https://github.com/glotzerlab/signac-project-template.git template
             - cd template

@@ -1089,10 +1089,10 @@ class FlowProject(signac.contrib.Project):
             for a in sorted(abbreviate.table):
                 print('{}: {}'.format(a, abbreviate.table[a]), file=file)
 
-    def print_status(self, job_filter=None, overview=True, overview_max_lines=None,
+    def print_status(self, jobs=None, overview=True, overview_max_lines=None,
                      detailed=False, parameters=None, skip_active=False, param_max_width=None,
                      file=sys.stdout, err=sys.stderr, ignore_errors=False,
-                     scheduler=None, pool=None):
+                     scheduler=None, pool=None, job_filter=None):
         """Print the status of the project.
 
         :param job_filter:
@@ -1131,9 +1131,19 @@ class FlowProject(signac.contrib.Project):
         :type scheduler:
             :class:`~.manage.Scheduler`
         """
-        if job_filter is not None and isinstance(job_filter, str):
-            job_filter = json.loads(job_filter)
-        jobs = list(self.find_jobs(job_filter))
+        if jobs is None:
+            if job_filter is not None and isinstance(job_filter, str):
+                warnings.warn(
+                    "The 'job_filter' argument is deprecated, use the 'jobs' instead.",
+                    DeprecationWarning)
+                job_filter = json.loads(job_filter)
+            jobs = list(self.find_jobs(job_filter))
+        elif isinstance(jobs, Scheduler):
+            warnings.warn(
+                "The signature of the print_status() method has changed!", DeprecationWarning)
+            scheduler, jobs = jobs, None
+        elif job_filter is not None:
+            raise ValueError("Can't provide both the 'jobs' and 'job_filter' argument.")
 
         if scheduler is not None:
             warnings.warn(

@@ -22,8 +22,7 @@ def support_submit_legacy_api(func):
             if str(error) != "submit() got multiple values for argument 'bundle_size'":
                 raise
         except ValueError as error:
-            if str(error) != "Stop argument for islice() must be None or an integer: "\
-                             "0 <= x <= sys.maxsize.":
+            if not str(error).startswith("Stop argument for islice() must be None or an integer"):
                 raise
 
         env = args[0]

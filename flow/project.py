@@ -1490,12 +1490,20 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             raise ValueError(
                 "An operation with name '{}' is already registered.".format(name))
 
-        signature = inspect.signature(func)
-        for i, (k, v) in enumerate(signature.parameters.items()):
-            if i and v.default is inspect.Parameter.empty:
-                raise ValueError(
-                    "Only the first argument in an operation argument may not have "
-                    "a default value! ({})".format(name))
+        if six.PY2:
+            signature = inspect.getargspec(func)
+            if len(signature.args) > 1:
+                if signature.defaults is None or len(signature.defaults) + 1 < len(signature.args):
+                    raise ValueError(
+                        "Only the first argument in an operation argument may not have "
+                        "a default value! ({})".format(name))
+        else:
+            signature = inspect.signature(func)
+            for i, (k, v) in enumerate(signature.parameters.items()):
+                if i and v.default is inspect.Parameter.empty:
+                    raise ValueError(
+                        "Only the first argument in an operation argument may not have "
+                        "a default value! ({})".format(name))
 
         # Append the name and function to the class registry
         cls._OPERATION_FUNCTIONS.append((name, func))

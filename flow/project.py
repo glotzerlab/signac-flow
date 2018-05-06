@@ -23,6 +23,7 @@ import warnings
 import argparse
 import datetime
 import json
+import inspect
 import subprocess
 from collections import defaultdict
 from itertools import islice
@@ -326,6 +327,7 @@ class FlowProject(signac.contrib.Project):
         self._template_environment.filters['time_delta'] = _format_timedelta
         self._label_functions = self._LABEL_FUNCTIONS.copy()
         self._register_class_labels()
+        self._register_operations()
         self._setup_legacy_templating()
 
     # All label functions are registered with the label() classmethod, which is intendeded
@@ -1392,6 +1394,48 @@ class FlowProject(signac.contrib.Project):
     def operations(self):
         "The dictionary of operations that have been added to the workflow."
         return self._operations
+
+    # All operation functions are registered with the operation() classmethod, which is
+    # intended to be used as decorator function. The _OPERATION_FUNCTIONS dict maps the
+    # the operation name to the operation function.
+    _OPERATION_FUNCTIONS = dict()
+
+    @classmethod
+    def operation(cls, func, name=None):
+        "Add the function 'func' as operator function to the class definition."
+        if isinstance(func, six.string_types):
+            return lambda op: cls.operation(op, name=func)
+        if name is None:
+            name = func.__name__
+
+        if name in cls._OPERATION_FUNCTIONS:
+            raise ValueError(
+                "An operation with name '{}' is already registered.".format(name))
+
+        signature = inspect.signature(func)
+        for i, (k, v) in enumerate(signature.parameters.items()):
+            if i and v.default is inspect.Parameter.empty:
+                raise ValueError(
+                    "Only the first argument in an operation argument may not have "
+                    "a default value! ({})".format(name))
+        cls._OPERATION_FUNCTIONS[name] = func
+        return func
+
+    def _register_operations(self):
+        "Add all operation functions registered with this class to the class instance."
+
+        def _guess_cmd(func, name):
+            path = inspect.getsourcefile(func)
+            return 'python {} execute {} {{job._id}}'.format(path, name)
+
+        self._operations = {
+            name: FlowOperation(
+                cmd=func if func in self._CMD_FUNCTIONS else _guess_cmd(func, name),
+                pre=getattr(func, '_flow_pre', None),
+                post=getattr(func, '_flow_post', None),
+                submit=getattr(func, '_flow_submit', False),
+            ) for name, func in self._OPERATION_FUNCTIONS.items()
+        }
 
     def eligible(self, job_operation, **kwargs):
         """Determine if job is eligible for operation.

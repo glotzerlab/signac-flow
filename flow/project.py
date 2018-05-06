@@ -92,6 +92,11 @@ def _execute(cmd, timeout=None):
         subprocess.call(cmd, timeout=timeout, shell=True)
 
 
+def cmd(func):
+    setattr(func, '_flow_cmd', True)
+    return func
+
+
 class _condition(object):
 
     def __init__(self, condition):
@@ -1463,16 +1468,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         for op in self.next_operations(job):
             return op
 
-    # Command operation functions return the command to execute
-    # the operation instead of implementing the operation directly.
-    _CMD_OPERATION_FUNCTIONS = set()
-
-    @classmethod
-    def cmd(cls, func):
-        "Specify that func is a command function."
-        cls._CMD_OPERATION_FUNCTIONS.add(func)
-        return func
-
     # All operation functions are registered with the operation() classmethod, which is
     # intended to be used as decorator function. The _OPERATION_FUNCTIONS dict maps the
     # the operation name to the operation function.
@@ -1524,7 +1519,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 raise ValueError(
                     "Repeat definition of operation with name '{}'.".format(name))
             self._operations[name] = FlowOperation(
-                cmd=func if func in self._CMD_OPERATION_FUNCTIONS else _guess_cmd(func, name),
+                cmd=func if getattr(func, '_flow_cmd', False) else _guess_cmd(func, name),
                 pre=getattr(func, '_flow_pre', None),
                 post=getattr(func, '_flow_post', None))
 

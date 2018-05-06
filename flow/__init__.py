@@ -17,6 +17,7 @@ from .project import JobOperation
 from .project import label
 from .project import classlabel
 from .project import staticlabel
+from .project import cmd
 from .environment import get_environment
 from .operations import run
 from .template import init
@@ -33,6 +34,7 @@ __all__ = [
     'label',
     'classlabel',
     'staticlabel',
+    'cmd',
     'get_environment',
     'run',
     'init',

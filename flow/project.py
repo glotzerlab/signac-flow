@@ -1669,7 +1669,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             else:
                 jobs = self
             try:
-                operation = self._OPERATION_FUNCTIONS[args.operation]
+                operation = self._operations[args.operation]
             except KeyError:
                 raise KeyError("Unknown operation '{}'.".format(args.operation))
 

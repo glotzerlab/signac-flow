@@ -1468,11 +1468,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         for op in self.next_operations(job):
             return op
 
-    # All operation functions are registered with the operation() classmethod, which is
-    # intended to be used as decorator function. The _OPERATION_FUNCTIONS dict maps the
-    # the operation name to the operation function.
-    _OPERATION_FUNCTIONS = dict()
-
     @classmethod
     def operation(cls, func, name=None):
         "Add the function 'func' as operator function to the class definition."

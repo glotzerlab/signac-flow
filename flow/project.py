@@ -27,7 +27,6 @@ import subprocess
 from collections import defaultdict
 from itertools import islice
 from hashlib import sha1
-from functools import partial
 from multiprocessing import Pool
 from multiprocessing import TimeoutError
 
@@ -59,6 +58,7 @@ from .util.translate import shorten
 from .labels import label
 from .labels import staticlabel
 from .labels import classlabel
+from .legacy import support_submit_legacy_api
 
 if not six.PY2:
     from subprocess import TimeoutExpired
@@ -78,30 +78,6 @@ def _part_of_legacy_template_system(method):
     _LEGACY_TEMPLATING_METHODS.add(method.__name__)
     method._legacy_intact = True
     return method
-
-
-def submit_legacy_layer(func):
-    import functools
-    from inspect import isclass
-
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-    #def wrapper(env, bundle_size=1, serial=False, force=False, nn=None, ppn=None, walltime=None, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except TypeError:
-            from .legacy import submit_05
-            return submit_05(*args, **kwargs)
-
-            if isclass(args[1]) and issubclass(args[1], ComputeEnvironment):
-                kwargs['env'] = args[1]
-                args = tuple([args[0]] + list(args[2:]))
-            print('args', args)
-            print('kwargs', kwargs)
-
-
-            return func(*args, **kwargs)
-    return wrapper
 
 
 def _execute(cmd, timeout=None):
@@ -706,8 +682,6 @@ class FlowProject(signac.contrib.Project):
     def _gather_operations(self, job_id=None, operation_name=None, num=None, bundle_size=1,
                            cmd=None, requires=None, pool=None, serial=False, force=False, **kwargs):
         "Gather operations to be executed or submitted."
-        api_version= kwargs.get('_api_version', 6)
-
         if job_id:
             jobs = (self.open_job(id=_id) for _id in job_id)
         else:
@@ -867,7 +841,7 @@ class FlowProject(signac.contrib.Project):
             )
         return env.submit(script=script, nn=nn, ppn=ppn, flags=flags, **kwargs)
 
-    @submit_legacy_layer
+    @support_submit_legacy_api
     def submit(self, bundle_size=1, serial=False, force=False,
                nn=None, ppn=None, walltime=None, env=None, **kwargs):
         """Submit function for the project's main submit interface.
@@ -881,21 +855,6 @@ class FlowProject(signac.contrib.Project):
         and will automatically prevent the submission of the same operation multiple times if
         it is considered active (e.g. queued or running).
         """
-        # Handling of potential legacy API issues for backwards-compatibility:
-        from inspect import isclass
-        if isinstance(bundle_size, Scheduler):
-            raise ValueError(
-                "The submit() API has changed with signac-flow version 0.4, "
-                "please update your project.")
-        if isclass(bundle_size) and issubclass(bundle_size, ComputeEnvironment):
-            env, bundle_size = bundle_size, 1
-            warnings.warn(
-                "The submit() API has changed with signac-flow version 0.6, "
-                "please update your project.", DeprecationWarning)
-        submit_user = getattr(self, 'submit_user', None)
-        if submit_user is not None:
-            warnings.warn("The submit_user() function is deprecated!", DeprecationWarning)
-
         # Regular argument checks and expansion
         if env is None:
             env = self._environment
@@ -905,11 +864,7 @@ class FlowProject(signac.contrib.Project):
         operations = self._gather_operations(**kwargs)
 
         for bundle in make_bundles(operations, bundle_size):
-            if submit_user is not None:  # entering legacy mode
-                submit = partial(self.submit_user, _id=self._store_bundled(bundle))
-            else:
-                submit = self.submit_operations
-
+            submit = self.submit_operations
             status = submit(
                 operations=bundle, env=env, ppn=ppn, serial=serial,
                 force=force, walltime=walltime, **kwargs)

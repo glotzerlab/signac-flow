@@ -147,6 +147,7 @@ class JobScript(io.StringIO):
         super(JobScript, self).__init__()
 
     def __str__(self):
+        self.seek(0)
         return self.read()
 
     def write(self, s):
@@ -249,6 +250,9 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
             flags.extend(env_flags)
 
         # Hand off the actual submission to the scheduler
+        if isinstance(script, JobScript):  # api version < 6
+            script = str(script)
+
         if cls.get_scheduler().submit(script, flags=flags, *args, **kwargs):
             return JobStatus.submitted
 

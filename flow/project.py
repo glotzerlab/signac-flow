@@ -91,6 +91,56 @@ def _execute(cmd, timeout=None):
         subprocess.call(cmd, timeout=timeout, shell=True)
 
 
+class _condition(object):
+
+    def __init__(self, condition):
+        self.condition = condition
+
+    @classmethod
+    def isfile(cls, filename):
+        return cls(lambda job: job.isfile(filename))
+
+    @classmethod
+    def true(cls, key):
+        return cls(lambda job: job.document.get(key, False))
+
+    @classmethod
+    def always(cls, func):
+        return cls(lambda _: True)(func)
+
+    @classmethod
+    def never(cls, func):
+        return cls(lambda _: False)(func)
+
+    @classmethod
+    def after(cls, other_func):
+        def check_preconds(job):
+            post_conds = getattr(other_func, '_flow_post', list())
+            return all(c(job) for c in post_conds)
+        return cls(check_preconds)
+
+
+class _pre(_condition):
+
+    def __call__(self, func):
+        pre_conditions = getattr(func, '_flow_pre', list())
+        pre_conditions.append(self.condition)
+        func._flow_pre = pre_conditions
+        return func
+
+
+class _post(_condition):
+
+    def __init__(self, condition):
+        self.condition = condition
+
+    def __call__(self, func):
+        post_conditions = getattr(func, '_flow_post', list())
+        post_conditions.append(self.condition)
+        func._flow_post = post_conditions
+        return func
+
+
 def make_bundles(operations, size=None):
     """Utility function for the generation of bundles.
 
@@ -362,6 +412,9 @@ class FlowProject(signac.contrib.Project):
         for name, method in inspect.getmembers(type(self), predicate=predicate):
             if _is_label_func(method):
                 self._label_functions[method] = None
+
+    pre = _pre
+    post = _post
 
     # Simple translation table for output strings.
     NAMES = {
@@ -1390,10 +1443,15 @@ class FlowProject(signac.contrib.Project):
         for op in self.next_operations(job):
             return op
 
-    @property
-    def operations(self):
-        "The dictionary of operations that have been added to the workflow."
-        return self._operations
+    # Command operation functions return the command to execute
+    # the operation instead of implementing the operation directly.
+    _CMD_OPERATION_FUNCTIONS = set()
+
+    @classmethod
+    def cmd(cls, func):
+        "Specify that func is a command function."
+        cls._CMD_OPERATION_FUNCTIONS.add(func)
+        return func
 
     # All operation functions are registered with the operation() classmethod, which is
     # intended to be used as decorator function. The _OPERATION_FUNCTIONS dict maps the
@@ -1430,12 +1488,16 @@ class FlowProject(signac.contrib.Project):
 
         self._operations = {
             name: FlowOperation(
-                cmd=func if func in self._CMD_FUNCTIONS else _guess_cmd(func, name),
+                cmd=func if func in self._CMD_OPERATION_FUNCTIONS else _guess_cmd(func, name),
                 pre=getattr(func, '_flow_pre', None),
                 post=getattr(func, '_flow_post', None),
-                submit=getattr(func, '_flow_submit', False),
             ) for name, func in self._OPERATION_FUNCTIONS.items()
         }
+
+    @property
+    def operations(self):
+        "The dictionary of operations that have been added to the workflow."
+        return self._operations
 
     def eligible(self, job_operation, **kwargs):
         """Determine if job is eligible for operation.
@@ -1567,6 +1629,22 @@ class FlowProject(signac.contrib.Project):
             else:
                 return 0
 
+        def _execute(env, args):
+            if len(args.jobid):
+                jobs = [self.open_job(id=jid) for jid in args.jobid]
+            else:
+                jobs = self
+            try:
+                operation = self._OPERATION_FUNCTIONS[args.operation]
+            except KeyError:
+                raise KeyError("Unknown operation '{}'.".format(args.operation))
+
+            if getattr(operation, '_flow_aggregate', False):
+                operation(jobs)
+            else:
+                for job in jobs:
+                    operation(job)
+
         if parser is None:
             parser = argparse.ArgumentParser()
 
@@ -1640,6 +1718,20 @@ class FlowProject(signac.contrib.Project):
             '{} options'.format(self._environment.__name__))
         self._environment.add_args(env_group)
         parser_submit.set_defaults(func=_submit)
+
+        parser_execute = subparsers.add_parser('execute')
+        parser_execute.add_argument(
+            'operation',
+            type=str,
+            choices=list(sorted(self._operations)),
+            help="The operation to execute.")
+        parser_execute.add_argument(
+            'jobid',
+            type=str,
+            nargs='*',
+            help="The job ids, as registered in the signac project. "
+                 "Omit to default to all statepoints.")
+        parser_execute.set_defaults(func=_execute)
 
         args = parser.parse_args()
         if not hasattr(args, 'func'):

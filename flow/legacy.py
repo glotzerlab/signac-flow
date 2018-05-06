@@ -11,9 +11,9 @@ def support_submit_legacy_api(func):
     from .environment import ComputeEnvironment
 
     @functools.wraps(func)
-    def wrapper(self, env, *args, **kwargs):
+    def wrapper(self, *args, **kwargs):
         try:
-            return func(self, env, *args, **kwargs)
+            return func(self, *args, **kwargs)
         except TypeError as error:
             if str(error) != "submit() got multiple values for argument 'bundle_size'":
                 raise
@@ -22,6 +22,8 @@ def support_submit_legacy_api(func):
                              "0 <= x <= sys.maxsize.":
                 raise
 
+        env = args[0]
+        args = tuple(args[1:])
         api_version = None
         if isclass(env):
             if issubclass(env, Scheduler):

@@ -1,3 +1,4 @@
+import flow
 from flow import FlowProject
 
 
@@ -21,7 +22,7 @@ def b_is_even(job):
 
 
 @TestProject.operation
-@TestProject.cmd
+@flow.cmd
 @TestProject.pre(b_is_even)
 @TestProject.post.isfile('world.txt')
 def a_op(job):

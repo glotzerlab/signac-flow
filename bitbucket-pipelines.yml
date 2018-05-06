@@ -56,17 +56,6 @@ pipelines:
             - python setup.py build
             - python -m coverage run -m unittest discover tests/
             - python -m coverage report
-            - source activate py36
-            - conda install --yes numpy
-            - python setup.py install
-            - git clone https://github.com/glotzerlab/signac-project-template.git template
-            - cd template
-            - python -m my_project.init 0
-            - python -m my_project.status --detailed
-            - python -m my_project.submit --test --ppn 1
-            - python scripts/run.py auto
-            - python -m my_project.status --detailed
-            - python -m jupyter nbconvert --to html --execute analysis/notebook.ipynb
     develop:
       - step:
           script:
@@ -92,17 +81,6 @@ pipelines:
             - python setup.py build
             - python -m coverage run -m unittest discover tests/
             - python -m coverage report
-            - source activate py36
-            - conda install --yes numpy
-            - python setup.py install
-            - git clone https://github.com/glotzerlab/signac-project-template.git template
-            - cd template
-            - python -m my_project.init 0
-            - python -m my_project.status --detailed
-            - python -m my_project.submit --test --ppn 1
-            - python scripts/run.py auto
-            - python -m my_project.status --detailed
-            - python -m jupyter nbconvert --to html --execute analysis/notebook.ipynb
     release-*:
       - step:
           script:
@@ -126,17 +104,6 @@ pipelines:
             - python setup.py build
             - python -m coverage run -m unittest discover tests/
             - python -m coverage report
-            - source activate py36
-            - conda install --yes numpy
-            - python setup.py install
-            - git clone https://github.com/glotzerlab/signac-project-template.git template
-            - cd template
-            - python -m my_project.init 0
-            - python -m my_project.status --detailed
-            - python -m my_project.submit --test --ppn 1
-            - python scripts/run.py auto
-            - python -m my_project.status --detailed
-            - python -m jupyter nbconvert --to html --execute analysis/notebook.ipynb
   tags:
     v*:
       - step:
@@ -163,16 +130,4 @@ pipelines:
             - python setup.py build
             - python -m coverage run -m unittest discover tests/
             - python -m coverage report
-            - source activate py36
-            - conda install --yes numpy
-            - python setup.py install
-            - git clone https://github.com/glotzerlab/signac-project-template.git template
-            - cd template
-            - python -m my_project.init 0
-            - python -m my_project.status --detailed
-            - python -m my_project.submit --test --ppn 1
-            - python scripts/run.py auto
-            - python -m my_project.status --detailed
-            - python -m jupyter nbconvert --to html --execute analysis/notebook.ipynb
-            - cd ..
             - ./deploy.bash

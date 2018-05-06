@@ -59,6 +59,7 @@ from .util.translate import shorten
 from .labels import label
 from .labels import staticlabel
 from .labels import classlabel
+from .labels import _is_label_func
 from .legacy import support_submit_legacy_api
 
 if not six.PY2:
@@ -339,7 +340,7 @@ class FlowOperation(object):
 
     def __call__(self, job=None):
         if callable(self._cmd):
-            return self._cmd(job)
+            return self._cmd(job).format(job=job)
         else:
             return self._cmd.format(job=job)
 
@@ -351,7 +352,26 @@ class FlowOperation(object):
             return self._np
 
 
-class FlowProject(signac.contrib.Project):
+class _FlowProjectClass(type):
+    """Metaclass for the FlowProject class."""
+
+    def __new__(metacls, name, bases, namespace, **kwargs):
+        cls = type.__new__(metacls, name, bases, dict(namespace))
+
+        # All operation functions are registered with the operation() classmethod, which is
+        # intended to be used as decorator function. The _OPERATION_FUNCTIONS dict maps the
+        # the operation name to the operation function.
+        cls._OPERATION_FUNCTIONS = list()
+
+        # All label functions are registered with the label() classmethod, which is intendeded
+        # to be used as decorator function. The _LABEL_FUNCTIONS dict contains the function as
+        # key and the label name as value, or None to use the default label name.
+        cls._LABEL_FUNCTIONS = dict()
+
+        return cls
+
+
+class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project)):
     """A signac project class specialized for workflow management.
 
     TODO: ADD BASIC DESCRIPTION ON HOW TO USE THIS CLASS HERE.
@@ -366,6 +386,7 @@ class FlowProject(signac.contrib.Project):
         if environment is None:
             environment = get_environment()
         signac.contrib.Project.__init__(self, config)
+        self._label_functions = dict()
         self._operations = dict()
         self._environment = environment
         self._template_environment = Environment(
@@ -375,15 +396,9 @@ class FlowProject(signac.contrib.Project):
                 ]),
             trim_blocks=True)
         self._template_environment.filters['time_delta'] = _format_timedelta
-        self._label_functions = self._LABEL_FUNCTIONS.copy()
-        self._register_class_labels()
+        self._register_labels()
         self._register_operations()
         self._setup_legacy_templating()
-
-    # All label functions are registered with the label() classmethod, which is intendeded
-    # to be used as decorator function. The _LABEL_FUNCTIONS dict contains the function as
-    # key and the label name as value, or None to use the default label name.
-    _LABEL_FUNCTIONS = dict()
 
     @classmethod
     def label(cls, label_name_or_func=None):
@@ -403,15 +418,19 @@ class FlowProject(signac.contrib.Project):
         To register a class method or function as label function, use the generalized label()
         function.
         """
-        import inspect
-        from .labels import _is_label_func
-
         def predicate(m):
             return inspect.ismethod(m) or inspect.isfunction(m)
 
         for name, method in inspect.getmembers(type(self), predicate=predicate):
             if _is_label_func(method):
                 self._label_functions[method] = None
+
+    def _register_labels(self):
+        "Register all label functions registered with this class and its parent classes."
+        self._register_class_labels()
+
+        for cls in type(self).__mro__:
+            self._label_functions.update(getattr(cls, '_LABEL_FUNCTIONS', dict()))
 
     pre = _pre
     post = _post
@@ -867,7 +886,8 @@ class FlowProject(signac.contrib.Project):
 
         if _id is None:
             _id = self._store_bundled(operations)
-
+        if env is None:
+            env = self._environment
         if template is None:
             template = env.template
 
@@ -894,7 +914,7 @@ class FlowProject(signac.contrib.Project):
             # legacy arguments:
             nn=nn, ppn=ppn, force=force or flags
             )
-        return env.submit(script=script, nn=nn, ppn=ppn, flags=flags, **kwargs)
+        return env.submit(_id=_id, script=script, nn=nn, ppn=ppn, flags=flags, **kwargs)
 
     @support_submit_legacy_api
     def submit(self, bundle_size=1, serial=False, force=False,
@@ -1476,23 +1496,29 @@ class FlowProject(signac.contrib.Project):
                 raise ValueError(
                     "Only the first argument in an operation argument may not have "
                     "a default value! ({})".format(name))
-        cls._OPERATION_FUNCTIONS[name] = func
+
+        # Append the name and function to the class registry
+        cls._OPERATION_FUNCTIONS.append((name, func))
         return func
 
     def _register_operations(self):
-        "Add all operation functions registered with this class to the class instance."
+        "Register all operation functions registered with this class and its parent classes."
+        operations = []
+        for cls in type(self).__mro__:
+            operations.extend(getattr(cls, '_OPERATION_FUNCTIONS', []))
 
         def _guess_cmd(func, name):
             path = inspect.getsourcefile(func)
             return 'python {} execute {} {{job._id}}'.format(path, name)
 
-        self._operations = {
-            name: FlowOperation(
+        for name, func in operations:
+            if name in self._operations:
+                raise ValueError(
+                    "Repeat definition of operation with name '{}'.".format(name))
+            self._operations[name] = FlowOperation(
                 cmd=func if func in self._CMD_OPERATION_FUNCTIONS else _guess_cmd(func, name),
                 pre=getattr(func, '_flow_pre', None),
-                post=getattr(func, '_flow_post', None),
-            ) for name, func in self._OPERATION_FUNCTIONS.items()
-        }
+                post=getattr(func, '_flow_post', None))
 
     @property
     def operations(self):

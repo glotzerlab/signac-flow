@@ -1,43 +1,14 @@
 # Copyright (c) 2017 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-import sys
 import unittest
-import io
-from contextlib import contextmanager
 
-from signac.common import six
 from flow import get_environment
 from flow.environment import JobScript
 from flow.environment import ComputeEnvironment
 from flow.environment import TestEnvironment
 from flow.errors import SubmitError
-
-
-class StringIO(io.StringIO):
-    "PY27 compatibility layer."
-
-    def write(self, s):
-        if six.PY2:
-            super(StringIO, self).write(unicode(s))
-        else:
-            super(StringIO, self).write(s)
-
-    def read(self):
-        if six.PY2:
-            return str(super(StringIO, self).read())
-        else:
-            return super(StringIO, self).read()
-
-
-@contextmanager
-def redirect_stdout(file):
-    try:
-        stdout = sys.stdout
-        sys.stdout = file
-        yield
-    finally:
-        sys.stdout = stdout
+from test_project import StringIO, redirect_stdout
 
 
 class ProjectTest(unittest.TestCase):

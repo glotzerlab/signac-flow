@@ -1,3 +1,7 @@
+# Copyright (c) 2018 The Regents of the University of Michigan
+# All rights reserved.
+# This software is licensed under the BSD 3-Clause License.
+"""Wrapper functions to detect and support deprecated APIs from previous versions."""
 import logging
 import functools
 
@@ -55,7 +59,7 @@ def support_submit_legacy_api(func):
                     "for version 0.4.x!")
             return submit_04(self=self, env=env, *args, **kwargs)
         elif api_version == 5:
-            return func(self, env=env, *args, **kwargs)
+            return func(self, env=env, _api_version=5, *args, **kwargs)
         else:
             return func(self, env=env, *args, **kwargs)
 

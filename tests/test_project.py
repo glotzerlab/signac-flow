@@ -6,6 +6,8 @@ import io
 import uuid
 import os
 import sys
+import inspect
+import subprocess
 from contextlib import contextmanager
 
 import signac
@@ -116,6 +118,13 @@ class BaseProjectTest(unittest.TestCase):
             name='FlowTestProject',
             root=self._tmp_dir.name)
 
+    def mock_project(self):
+        project = self.project_class.get_project(root=self._tmp_dir.name)
+        for a in range(3):
+            for b in range(3):
+                project.open_job(dict(a=a, b=b)).init()
+        return project
+
 
 class ProjectClassTest(BaseProjectTest):
 
@@ -212,23 +221,8 @@ class ProjectClassTest(BaseProjectTest):
         self.assertEqual(len(c._label_functions), 1)
 
 
-class ProjectTest(unittest.TestCase):
+class ProjectTest(BaseProjectTest):
     project_class = TestProject
-
-    def setUp(self):
-        MockScheduler.reset()
-        self._tmp_dir = TemporaryDirectory(prefix='signac-flow_')
-        self.addCleanup(self._tmp_dir.cleanup)
-        self.project = FlowProject.init_project(
-            name='FlowTestProject',
-            root=self._tmp_dir.name)
-
-    def mock_project(self):
-        project = self.project_class.get_project(root=self._tmp_dir.name)
-        for a in range(3):
-            for b in range(3):
-                project.open_job(dict(a=a, b=b)).init()
-        return project
 
     def test_instance(self):
         self.assertTrue(isinstance(self.project, FlowProject))
@@ -247,11 +241,13 @@ class ProjectTest(unittest.TestCase):
         for job in project:
             script = project._generate_run_script(project.next_operations(job))
             if job.sp.b % 2 == 0:
-                self.assertIn('echo "hello"', script)
                 self.assertIn(str(job), script)
+                self.assertIn('echo "hello"', script)
+                self.assertIn('exec op2', script)
             else:
+                self.assertIn(str(job), script)
                 self.assertNotIn('echo "hello"', script)
-                self.assertNotIn(str(job), script)
+                self.assertIn('exec op2', script)
 
     def test_script_with_custom_script(self):
         project = self.mock_project()
@@ -266,8 +262,13 @@ class ProjectTest(unittest.TestCase):
             script = project._generate_run_script(project.next_operations(job))
             self.assertIn("THIS IS A CUSTOM SCRIPT", script)
             if job.sp.b % 2 == 0:
-                self.assertIn('echo "hello"', script)
                 self.assertIn(str(job), script)
+                self.assertIn('echo "hello"', script)
+                self.assertIn('exec op2', script)
+            else:
+                self.assertIn(str(job), script)
+                self.assertNotIn('echo "hello"', script)
+                self.assertIn('exec op2', script)
 
     def test_run(self):
         project = self.mock_project()
@@ -297,7 +298,8 @@ class ProjectTest(unittest.TestCase):
         with redirect_stdout(StringIO()):
             project.submit()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
-        self.assertEqual(len(list(MockScheduler.jobs())), len(even_jobs))
+        num_jobs_submitted = len(project) + len(even_jobs)
+        self.assertEqual(len(list(MockScheduler.jobs())), num_jobs_submitted)
         MockScheduler.reset()
 
     def test_submit_limited(self):
@@ -315,11 +317,12 @@ class ProjectTest(unittest.TestCase):
         MockScheduler.reset()
         project = self.mock_project()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
+        num_jobs_submitted = len(project) + len(even_jobs)
         self.assertEqual(len(list(MockScheduler.jobs())), 0)
         with redirect_stdout(StringIO()):
             project.submit()
             for i in range(5):  # push all jobs through the queue
-                self.assertEqual(len(list(MockScheduler.jobs())), len(even_jobs))
+                self.assertEqual(len(list(MockScheduler.jobs())), num_jobs_submitted)
                 project.submit()
                 MockScheduler.step()
         self.assertEqual(len(list(MockScheduler.jobs())), 0)
@@ -342,23 +345,21 @@ class ProjectTest(unittest.TestCase):
         MockScheduler.reset()
         project = self.mock_project()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
+        num_jobs_submitted = len(project) + len(even_jobs)
         for job in project:
             if job not in even_jobs:
                 continue
             list(project.classify(job))
-            self.assertEqual(project.next_operation(job).name, 'a_op')
+            self.assertEqual(project.next_operation(job).name, 'op1')
             self.assertEqual(project.next_operation(job).job, job)
         with redirect_stdout(StringIO()):
             project.submit()
-        self.assertEqual(len(list(MockScheduler.jobs())), len(even_jobs))
+        self.assertEqual(len(list(MockScheduler.jobs())), num_jobs_submitted)
 
         for job in project:
             next_op = project.next_operation(job)
-            if job in even_jobs:
-                self.assertIsNotNone(next_op)
-                self.assertEqual(next_op.get_status(), JobStatus.submitted)
-            else:
-                self.assertIsNone(next_op)
+            self.assertIsNotNone(next_op)
+            self.assertEqual(next_op.get_status(), JobStatus.submitted)
 
         MockScheduler.step()
         MockScheduler.step()
@@ -366,24 +367,84 @@ class ProjectTest(unittest.TestCase):
 
         for job in project:
             next_op = project.next_operation(job)
-            if job in even_jobs:
-                self.assertIsNotNone(next_op)
-                self.assertEqual(next_op.get_status(), JobStatus.queued)
-            else:
-                self.assertIsNone(next_op)
+            self.assertIsNotNone(next_op)
+            self.assertEqual(next_op.get_status(), JobStatus.queued)
 
     def test_init(self):
         with open(os.devnull, 'w') as out:
             for fn in init(root=self._tmp_dir.name, out=out):
                 self.assertTrue(os.path.isfile(fn))
 
-    @unittest.skipIf(__name__ != '__main__', 'can only be tested if __main__')
-    def test_main(self):
-        project = self.mock_project()
-        with redirect_stderr(StringIO()):
-            with redirect_stdout(StringIO()):
-                with self.assertRaises(SystemExit):
-                    project.main()
+
+class ProjectMainInterfaceTest(BaseProjectTest):
+    project_class = TestProject
+
+    def switch_to_cwd(self):
+        os.chdir(self.cwd)
+
+    def setUp(self):
+        super(ProjectMainInterfaceTest, self).setUp()
+        self.project = self.mock_project()
+        self.cwd = os.getcwd()
+        self.addCleanup(self.switch_to_cwd)
+        os.chdir(self._tmp_dir.name)
+
+    def call_subcmd(self, subcmd, check_output=True):
+        fn_script = inspect.getsourcefile(type(self.project))
+        cmd = 'python {} {}'.format(fn_script, subcmd)
+        if check_output:
+            return subprocess.check_output(
+                cmd.split(),
+                stderr=subprocess.STDOUT)
+        else:
+            subprocess.check_call(cmd.split())
+
+    def test_main_help(self):
+        # This unit test mainly checks if the test setup works properly.
+        self.call_subcmd('--help')
+
+    def test_main_exec(self):
+        self.assertTrue(len(self.project))
+        for job in self.project:
+            self.assertFalse(job.doc.get('test', False))
+        self.call_subcmd('exec op2')
+        for job in self.project:
+            self.assertTrue(job.doc.get('test', False))
+
+    def test_main_run(self):
+        self.assertTrue(len(self.project))
+        for job in self.project:
+            self.assertFalse(job.isfile('world.txt'))
+        self.call_subcmd('run op1')
+        even_jobs = [job for job in self.project if job.sp.b % 2 == 0]
+        for job in self.project:
+            if job in even_jobs:
+                self.assertTrue(job.isfile('world.txt'))
+            else:
+                self.assertFalse(job.isfile('world.txt'))
+
+    def test_main_next(self):
+        self.assertTrue(len(self.project))
+        jobids = set(self.call_subcmd('next op1').decode().split())
+        even_jobs = [job.get_id() for job in self.project if job.sp.b % 2 == 0]
+        self.assertEqual(jobids, set(even_jobs))
+
+    def test_main_status(self):
+        self.assertTrue(len(self.project))
+        status_output = self.call_subcmd('status --detailed').decode().splitlines()
+        for line in status_output:
+            for job in self.project:
+                if job.get_id() in line:
+                    self.assertIn(self.project.next_operation(job).name, line)
+                    self.assertIn(' ! ', line)
+
+    def test_main_script(self):
+        self.assertTrue(len(self.project))
+        for job in self.project:
+            script_output = self.call_subcmd('script -j {}'.format(job)).decode().splitlines()
+            self.assertIn(job.get_id(), '\n'.join(script_output))
+            self.assertIn('echo "hello"', '\n'.join(script_output))
+            break
 
 
 if __name__ == '__main__':

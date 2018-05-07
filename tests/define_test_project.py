@@ -25,8 +25,13 @@ def b_is_even(job):
 @flow.cmd
 @TestProject.pre(b_is_even)
 @TestProject.post.isfile('world.txt')
-def a_op(job):
+def op1(job):
     return 'echo "hello" > {job.ws}/world.txt'
+
+
+@TestProject.operation
+def op2(job):
+    job.document.test = True
 
 
 if __name__ == '__main__':

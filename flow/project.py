@@ -392,6 +392,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             environment = get_environment()
         signac.contrib.Project.__init__(self, config)
         self._label_functions = dict()
+        self._operation_functions = dict()
         self._operations = dict()
         self._environment = environment
         self._template_environment = Environment(
@@ -1513,10 +1514,18 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             if name in self._operations:
                 raise ValueError(
                     "Repeat definition of operation with name '{}'.".format(name))
-            self._operations[name] = FlowOperation(
-                cmd=func if getattr(func, '_flow_cmd', False) else _guess_cmd(func, name),
-                pre=getattr(func, '_flow_pre', None),
-                post=getattr(func, '_flow_post', None))
+            returns_cmd = getattr(func, '_flow_cmd', False)
+            if returns_cmd:
+                self._operations[name] = FlowOperation(
+                    cmd=func,
+                    pre=getattr(func, '_flow_pre', None),
+                    post=getattr(func, '_flow_post', None))
+            else:
+                self._operations[name] = FlowOperation(
+                    cmd=_guess_cmd(func, name),
+                    pre=getattr(func, '_flow_pre', None),
+                    post=getattr(func, '_flow_post', None))
+                self._operation_functions[name] = func
 
     @property
     def operations(self):
@@ -1659,7 +1668,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             else:
                 jobs = self
             try:
-                operation = self._operations[args.operation]
+                operation = self._operation_functions[args.operation]
             except KeyError:
                 raise KeyError("Unknown operation '{}'.".format(args.operation))
 

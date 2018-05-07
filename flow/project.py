@@ -39,7 +39,6 @@ from jinja2 import ChoiceLoader
 from jinja2 import FileSystemLoader
 
 from .environment import get_environment
-from .environment import ComputeEnvironment
 from .environment import NodesEnvironment
 from .scheduling.base import Scheduler
 from .scheduling.base import ClusterJob
@@ -62,6 +61,7 @@ from .labels import staticlabel
 from .labels import classlabel
 from .labels import _is_label_func
 from .legacy import support_submit_legacy_api
+from .legacy import support_submit_operations_legacy_api
 
 if not six.PY2:
     from subprocess import TimeoutExpired
@@ -884,15 +884,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             context.update(kwargs)
             return template.render(** context)
 
+    @support_submit_operations_legacy_api
     def submit_operations(self, operations, _id=None, env=None, nn=None, ppn=None, serial=False,
                           flags=None, force=False, template=None, pretend=False, **kwargs):
         "Submit a sequence of operations to the scheduler."
-        # Account for legacy API
-        if isinstance(operations, ComputeEnvironment) and isinstance(env, list):
-            warnings.warn(
-                "The FlowProject.submit_operations() signature has changed!", DeprecationWarning)
-            env, operations = operations, env
-
         if _id is None:
             _id = self._store_bundled(operations)
         if env is None:

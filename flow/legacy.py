@@ -4,6 +4,7 @@
 """Wrapper functions to detect and support deprecated APIs from previous versions."""
 import logging
 import functools
+import warnings
 
 
 logger = logging.getLogger(__name__)
@@ -143,3 +144,17 @@ def submit_04(self, env, job_ids=None, operation_name=None, walltime=None,
                 logger.info("Submitted job '{}' ({}).".format(_id, status.name))
                 for op in bundle:
                     op.set_status(status)
+
+
+def support_submit_operations_legacy_api(func):
+    from .environment import ComputeEnvironment
+
+    @functools.wraps(func)
+    def wrapper(self, operations, _id=None, env=None, *args, **kwargs):
+        if isinstance(operations, ComputeEnvironment) and isinstance(env, list):
+            warnings.warn(
+                "The FlowProject.submit_operations() signature has changed!", DeprecationWarning)
+            env, operations = operations, env
+        return func(self, operations=operations, _id=_id, env=env, *args, **kwargs)
+
+    return wrapper

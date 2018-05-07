@@ -1553,7 +1553,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         By default, an operation is eligible for submission when it
         is not considered active, that means already queued or running.
         """
-        warnings.warn("The eligible_for_submission method is deprecated.", DeprecationWarning)
         if job_operation is None:
             return False
         if job_operation.get_status() >= JobStatus.submitted:

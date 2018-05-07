@@ -167,9 +167,30 @@ class ProjectTest(unittest.TestCase):
             self.assertIn('echo "hello"', script)
             self.assertIn(str(job), script)
 
+    def test_run_operations_explicit_argument(self):
+        project = self.mock_project()
+        for job in project:
+            ops = project.next_operations(job)
+            with suspend_logging():
+                with redirect_stderr(StringIO()):
+                    project.run(operations=ops)
+        for job in project:
+            self.assertIn('said_hello', list(project.labels(job)))
+
+    def test_run_operations_implicit_argument(self):
+        project = self.mock_project()
+        for job in project:
+            ops = project.next_operations(job)
+            with suspend_logging():
+                with redirect_stderr(StringIO()):
+                    project.run(ops)
+        for job in project:
+            self.assertIn('said_hello', list(project.labels(job)))
+
     def test_run(self):
         project = self.mock_project()
-        project.run()
+        with redirect_stderr(StringIO()):
+            project.run()
         for job in project:
             self.assertIn('said_hello', list(project.labels(job)))
 

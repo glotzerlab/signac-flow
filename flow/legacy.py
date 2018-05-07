@@ -158,3 +158,27 @@ def support_submit_operations_legacy_api(func):
         return func(self, operations=operations, _id=_id, env=env, *args, **kwargs)
 
     return wrapper
+
+
+def support_run_legacy_api(func):
+
+    @functools.wraps(func)
+    def wrapper(self, jobs=None, names=None, *args, **kwargs):
+        from .project import JobOperation
+        legacy = 'operations' in kwargs
+        if not legacy and jobs is not None:
+            jobs = list(jobs)
+            for job in jobs:
+                if isinstance(job, JobOperation):
+                    legacy = True
+                break
+
+        if legacy:
+            logger.warning(
+                "The FlowProject.run() function has been renamed to run_operations() "
+                "as of version 0.6. Using legacy compatibility layer.")
+            return self.run_operations(*args, **kwargs)
+        else:
+            return func(self, jobs=jobs, names=names, *args, **kwargs)
+
+    return wrapper

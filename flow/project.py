@@ -27,9 +27,8 @@ import inspect
 import subprocess
 from collections import defaultdict
 from itertools import islice
+from itertools import count
 from hashlib import sha1
-from multiprocessing import Pool
-from multiprocessing import TimeoutError
 
 import signac
 from signac.common import six
@@ -62,6 +61,7 @@ from .labels import classlabel
 from .labels import _is_label_func
 from .legacy import support_submit_legacy_api
 from .legacy import support_submit_operations_legacy_api
+from .legacy import support_run_legacy_api
 
 if not six.PY2:
     from subprocess import TimeoutExpired
@@ -195,7 +195,7 @@ class JobOperation(object):
         self.np = np
 
     def __str__(self):
-        return self.name
+        return "{}({})".format(self.name, self.job)
 
     def __repr__(self):
         return "{type}(name='{name}', job='{job}', cmd={cmd}, np={np})".format(
@@ -593,13 +593,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         result['submission_status'] = [JobStatus(highest_status).name]
         return result
 
-    def run(self, operations=None, pretend=False, np=None, timeout=None, progress=False,
-            switch_to_project_root=True):
+    def run_operations(self, operations=None, pretend=False, np=None, timeout=None, progress=False,
+                       switch_to_project_root=True):
         """Execute the next operations as specified by the project's workflow.
 
         :param operations:
             The operations to execute (optional).
-        :type operatons:
+        :type operations:
             Sequence of instances of :class:`.JobOperation`
         :param pretend:
             Do not actually execute the operations, but show which command would have been used.
@@ -619,38 +619,65 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         :type progess:
             bool
         """
+        if six.PY2 and timeout is not None:
+            logger.warning(
+                "The timeout argument for run() is not supported for "
+                "Python 2.7 and will be ignored!")
+        if timeout is not None and timeout < 0:
+            timeout = None
         if operations is None:
-            operations = (self.next_operation(job) for job in self)
-            operations = [op for op in operations if op is not None]
+            operations = [op for job in self for op in self.next_operations(job) if op is not None]
+        if progress:
+            operations = tqdm(list(operations))
 
-        # Prepare commands for each operation
-        cmds = [op.cmd.format(job=op.job) for op in operations]
+        for operation in operations:
+            cmd = operation.cmd
+            if pretend:
+                print(cmd)
+            else:
+                with switch_to_directory(self.root_directory() if switch_to_project_root else None):
+                    logger.info("Execute operation '{}'...".format(operation))
+                    if not progress:
+                        print("Execute operation '{}'...".format(operation), file=sys.stderr)
+                    if six.PY2:
+                        subprocess.call(cmd, shell=True)
+                    else:
+                        subprocess.call(cmd, shell=True, timeout=timeout)
 
-        # Either actually execute or just show the commands
-        _run = print if pretend else _execute
+    @support_run_legacy_api
+    def run(self, jobs=None, names=None, pretend=False, timeout=None, num=None,
+            num_passes=1, progress=False, switch_to_project_root=True):
+            if jobs is None:
+                jobs = self
 
-        with switch_to_directory(self.root_directory() if switch_to_project_root else None):
-            if np == 1:      # serial execution
-                if six.PY2 and timeout is not None:
-                    raise RuntimeError(
-                        "Using a timeout with serial execution is "
-                        "not supported for Python version 2.7.")
-                for cmd in tqdm(cmds) if progress else cmds:
-                    _run(cmd, timeout=timeout)
-            elif six.PY2:   # parallel execution (py27)
-                # Due to Python 2.7 issue #8296 (http://bugs.python.org/issue8296) we
-                # always need to provide a timeout to avoid issues with "hanging"
-                # processing pools.
-                timeout = sys.maxint if timeout is None else timeout
-                pool = Pool(np)
-                result = pool.imap_unordered(_run, cmds)
-                for _ in tqdm(cmds) if progress else cmds:
-                    result.next(timeout)
-            else:           # parallel execution (py3+)
-                with Pool(np) as pool:
-                    result = pool.imap_unordered(_run, cmds)
-                    for _ in tqdm(cmds) if progress else cmds:
-                        result.next(timeout)
+            num_executions = defaultdict(int)
+
+            def select(op):
+                if op is None or (names and op.name not in names):
+                    return False
+                if num_passes > 0 and num_executions.get(op, 0) >= num_passes:
+                    print("Operation '{}' exceeds max. # of "
+                          "allowed passes ({}).".format(op, num_passes), file=sys.stderr)
+                    return False
+                return True
+
+            for i in count(1):
+                ops = [op for job in jobs for op in self.next_operations(job) if select(op)][:num]
+                if not ops:
+                    break   # No more pending operations.
+
+                print(
+                    "Executing {} operations (Pass # {:02d})...".format(len(ops), i),
+                    file=sys.stderr)
+                self.run_operations(ops, pretend=pretend, timeout=timeout, progress=progress,
+                                    switch_to_project_root=switch_to_project_root)
+                if num is not None:
+                    num = max(0, num - len(ops))
+                for op in ops:
+                    num_executions[op] += 1
+            else:                       # Else block triggered if there are remaining pending jobs,
+                logger.warning(         # but maximum number of passes is exhausted.
+                    "Reached maximum number of passes, but there are still operations pending.")
 
     def _setup_legacy_templating(self):
         """This function identifies whether a subclass has implemented deprecated template
@@ -770,6 +797,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         else:
             jobs = iter(self)
 
+        if operation_name is None:
+            names = None
+        elif isinstance(operation_name, six.string_types):
+            names = {operation_name}
+        else:
+            names = operation_name
+
         def get_ops(job):
             if cmd is None:
                 ops = set(self.next_operations(job))
@@ -785,7 +819,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             if force:
                 return True
             if cmd is None:
-                if operation_name is not None and op.name != operation_name:
+                if names and op.name not in names:
                     return False
             if requires is not None:
                 labels = set(self.classify(op.job))
@@ -1608,28 +1642,30 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
         def _run(env, args):
             "Run all (or select) job operations."
-            names = set(args.name)
-
-            def select(op):
-                if names:
-                    return op.name in names
-                else:
-                    return True
-
-            ops_to_run = {op for op in self._gather_operations(job_id=args.job_id) if select(op)}
-
-            exceptions = (TimeoutError, ) if six.PY2 else (TimeoutError, TimeoutExpired)
+            if args.np is not None:  # Remove beginning of version 0.7.
+                raise RuntimeError(
+                    "The run --np argument is deprecated as of version 0.6!")
+            if args.job_id:
+                jobs = [self.open_job(id=jid) for jid in args.job_id]
+            else:
+                jobs = None
             try:
-                self.run(operations=ops_to_run, pretend=args.pretend, np=args.np,
-                         timeout=args.timeout, progress=args.progress)
-            except exceptions:
-                print(
-                    "Error: Failed to complete due to timeout ({}s)!".format(args.timeout),
-                    file=sys.stderr)
+                self.run(
+                    jobs=jobs,
+                    names=set(args.name),
+                    pretend=args.pretend,
+                    timeout=args.timeout,
+                    progress=args.progress,
+                    num=args.num,
+                    num_passes=args.num_passes,
+                )
+            except TimeoutExpired:
+                print("Error: Failed to complete execution due to "
+                      "timeout ({}s).".format(args.timeout), file=sys.stderr)
                 if args.debug:
                     raise
-                return 1
-            return 0
+                else:
+                    return 1
 
         def _script(env, args):
             "Generate a script for the execution of operations."
@@ -1739,10 +1775,15 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             action='store_true',
             help="Do not actually execute commands, just show them.")
         parser_run.add_argument(
+            '-n', '--num',
+            type=int,
+            help="Limit the number of operations to be executed.")
+        parser_run.add_argument(    # Remove beginning of version 0.7.
             '--np',
             type=int,
-            help="Specify the number of cores to parallelize to. The "
-                 "default value of 0 means as many cores as are available.")
+            help="(deprecated) Specify the number of cores to parallelize to. "
+                 "This argument is deprecated as of version 0.6, please use the "
+                 "script command for parallel execution.")
         parser_run.add_argument(
             '-t', '--timeout',
             type=int,
@@ -1752,6 +1793,14 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             '--progress',
             action='store_true',
             help="Display a progress bar during execution.")
+        parser_run.add_argument(
+            '--num-passes',
+            type=int,
+            default=1,
+            help="Specify how many times a particular operation may be executed within one "
+                 "session (default=1). This is to prevent accidental infinite loops, "
+                 "where operations are executed indefinitely, because post conditions "
+                 "were not properly set. Use -1 to allow for an infinite number of passes.")
         parser_run.set_defaults(func=_run)
 
         parser_script = subparsers.add_parser('script')

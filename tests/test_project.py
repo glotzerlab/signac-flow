@@ -236,6 +236,18 @@ class ProjectTest(BaseProjectTest):
             self.assertIn('default_label', labels)
             self.assertNotIn('negative_default_label', labels)
 
+    def test_next_operations(self):
+        project = self.mock_project()
+        even_jobs = [job for job in project if job.sp.b % 2 == 0]
+        for job in project:
+            for i, op in enumerate(project.next_operations(job)):
+                self.assertEqual(op.job, job)
+                if job in even_jobs:
+                    self.assertEqual(op.name, ['op1', 'op2'][i])
+                else:
+                    self.assertEqual(op.name, 'op2')
+            self.assertEqual(i, int(job in even_jobs))
+
     def test_script(self):
         project = self.mock_project()
         for job in project:
@@ -272,11 +284,21 @@ class ProjectTest(BaseProjectTest):
 
     def test_run(self):
         project = self.mock_project()
-        project.run()
+        output = StringIO()
+        with redirect_stderr(output):
+            with redirect_stdout(output):
+                project.run()
+        output.seek(0)
+        run_output = output.read()
+        even_jobs = [job for job in project if job.sp.b % 2 == 0]
         for job in project:
-            if job.sp.b % 2 == 0:
+            if job in even_jobs:
+                self.assertIn('op1({})'.format(job), run_output)
+                self.assertIn('op2({})'.format(job), run_output)
                 self.assertTrue(job.isfile('world.txt'))
             else:
+                self.assertNotIn('op1({})'.format(job), run_output)
+                self.assertIn('op2({})'.format(job), run_output)
                 self.assertFalse(job.isfile('world.txt'))
 
     def test_submit_operations(self):

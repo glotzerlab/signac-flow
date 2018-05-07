@@ -9,7 +9,6 @@ cd {{ project._rd }}
 {% block body %}
 {% for operation in operations %}
 {% if parallel %}
-parallel
 {{ operation.cmd }} &
 {% else %}
 {{ operation.cmd }}

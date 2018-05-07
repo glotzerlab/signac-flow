@@ -1539,8 +1539,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             This function is deprecated, please use
             :py:meth:`~.eligible_for_submission` instead.
         """
-        warnings.warn("The eligible() method is deprecated.", DeprecationWarning)
-        return None
+        raise RuntimeError("The eligible() method is deprecated.")
 
     def eligible_for_submission(self, job_operation):
         """Determine if a job-operation is eligible for submission.

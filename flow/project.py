@@ -59,9 +59,7 @@ from .labels import label
 from .labels import staticlabel
 from .labels import classlabel
 from .labels import _is_label_func
-from .legacy import support_submit_legacy_api
-from .legacy import support_submit_operations_legacy_api
-from .legacy import support_run_legacy_api
+from . import legacy
 
 if not six.PY2:
     from subprocess import TimeoutExpired
@@ -81,6 +79,16 @@ def _part_of_legacy_template_system(method):
     _LEGACY_TEMPLATING_METHODS.add(method.__name__)
     method._legacy_intact = True
     return method
+
+
+def _support_legacy_api(method):
+    """Label a method to be wrapped with a legacy API compatibility layer.
+
+    This is a decorator function, that will wrap 'method' with a wrapper function
+    that attempts to detect and resolve legacy API use of said method.
+    All wrapper functions are implemented in the 'legacy' module.
+    """
+    return getattr(legacy, 'support_{}_legacy_api'.format(method.__name__))(method)
 
 
 def _execute(cmd, timeout=None):
@@ -644,7 +652,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                     else:
                         subprocess.call(cmd, shell=True, timeout=timeout)
 
-    @support_run_legacy_api
+    @_support_legacy_api
     def run(self, jobs=None, names=None, pretend=False, timeout=None, num=None,
             num_passes=1, progress=False, switch_to_project_root=True):
             if jobs is None:
@@ -918,7 +926,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             context.update(kwargs)
             return template.render(** context)
 
-    @support_submit_operations_legacy_api
+    @_support_legacy_api
     def submit_operations(self, operations, _id=None, env=None, nn=None, ppn=None, serial=False,
                           flags=None, force=False, template=None, pretend=False, **kwargs):
         "Submit a sequence of operations to the scheduler."
@@ -954,7 +962,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             )
         return env.submit(_id=_id, script=script, nn=nn, ppn=ppn, flags=flags, **kwargs)
 
-    @support_submit_legacy_api
+    @_support_legacy_api
     def submit(self, bundle_size=1, serial=False, force=False,
                nn=None, ppn=None, walltime=None, env=None, **kwargs):
         """Submit function for the project's main submit interface.

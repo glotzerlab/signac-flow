@@ -1450,7 +1450,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         :yield:
             All instances of JobOperation a job is eligible for.
         """
-        for name, op in self.operations.items():
+        for name in sorted(self.operations):
+            op = self.operations[name]
             if op.eligible(job):
                 yield JobOperation(name=name, job=job, cmd=op(job), np=op.np(job))
 

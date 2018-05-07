@@ -1509,7 +1509,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
         def _guess_cmd(func, name):
             path = inspect.getsourcefile(func)
-            return 'python {} execute {} {{job._id}}'.format(path, name)
+            return 'python {} exec {} {{job._id}}'.format(path, name)
 
         for name, func in operations:
             if name in self._operations:
@@ -1663,7 +1663,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             else:
                 return 0
 
-        def _execute(env, args):
+        def _exec(env, args):
             if len(args.jobid):
                 jobs = [self.open_job(id=jid) for jid in args.jobid]
             else:
@@ -1753,19 +1753,19 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         self._environment.add_args(env_group)
         parser_submit.set_defaults(func=_submit)
 
-        parser_execute = subparsers.add_parser('execute')
-        parser_execute.add_argument(
+        parser_exec = subparsers.add_parser('exec')
+        parser_exec.add_argument(
             'operation',
             type=str,
             choices=list(sorted(self._operations)),
             help="The operation to execute.")
-        parser_execute.add_argument(
+        parser_exec.add_argument(
             'jobid',
             type=str,
             nargs='*',
             help="The job ids, as registered in the signac project. "
                  "Omit to default to all statepoints.")
-        parser_execute.set_defaults(func=_execute)
+        parser_exec.set_defaults(func=_exec)
 
         args = parser.parse_args()
         if not hasattr(args, 'func'):

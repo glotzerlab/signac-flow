@@ -239,7 +239,7 @@ class ProjectTest(BaseProjectTest):
     def test_script(self):
         project = self.mock_project()
         for job in project:
-            script = project._generate_run_script(project.next_operations(job))
+            script = project.script(project.next_operations(job))
             if job.sp.b % 2 == 0:
                 self.assertIn(str(job), script)
                 self.assertIn('echo "hello"', script)
@@ -259,7 +259,7 @@ class ProjectTest(BaseProjectTest):
             file.write("THIS IS A CUSTOM SCRIPT!\n")
             file.write("{% endblock %}\n")
         for job in project:
-            script = project._generate_run_script(project.next_operations(job))
+            script = project.script(project.next_operations(job))
             self.assertIn("THIS IS A CUSTOM SCRIPT", script)
             if job.sp.b % 2 == 0:
                 self.assertIn(str(job), script)

@@ -762,8 +762,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         self.write_script_operations(script, operations, background=background, **kwargs)
         self.write_script_footer(script, **kwargs)
 
-    def _gather_operations(self, job_id=None, operation_name=None, num=None, bundle_size=1,
-                           cmd=None, requires=None, pool=None, serial=False, force=False, **kwargs):
+    def _gather_operations(self, job_id=None, operation_name=None, num=None,
+                           cmd=None, requires=None, pool=None, force=False, **kwargs):
         "Gather operations to be executed or submitted."
         if job_id:
             jobs = (self.open_job(id=_id) for _id in job_id)
@@ -804,7 +804,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         context['project'] = self
         return context
 
-    def _generate_run_script(self, operations, parallel=False, template='run.sh'):
+    def script(self, operations, parallel=False, template='run.sh'):
         """Generate a run script to execute given operations (optional in parallel).
 
         :param operations:
@@ -970,10 +970,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             help="Ignore all warnings and checks, just submit.")
         cls._add_script_args(parser)
 
-    def script(self):
-        "Generate the script for execution (currently not implemented)."
-        raise NotImplementedError()
-
     @classmethod
     def _add_script_args(cls, parser):
         "Add arguments to parser for the :meth:`~.script` method."
@@ -983,6 +979,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             nargs='+',
             help="The job id of the jobs to submit. "
             "Omit to automatically select all eligible jobs.")
+        parser.add_argument(
+            '--script-template',
+            type=str,
+            default='run.sh',
+            help="Specify the template to use the generate the script. "
+                 "Default: 'run.sh'")
         selection_group = parser.add_argument_group('job operation selection')
         selection_group.add_argument(
             '-o', '--operation',
@@ -992,7 +994,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         selection_group.add_argument(
             '-n', '--num',
             type=int,
-            help="Limit the number of operations to be submitted.")
+            help="Limit the number of operations to be executed.")
 
         bundling_group = parser.add_argument_group('bundling')
         bundling_group.add_argument(
@@ -1006,9 +1008,18 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                  "When no specific size is give, all eligible operations are "
                  "bundled into one submission.")
         bundling_group.add_argument(
-            '-s', '--serial',
+            '-p', '--parallel',
             action='store_true',
-            help="Schedule the operations to be executed in serial.")
+            help="Schedule the bundled operations to be executed in parallel.")
+        bundling_group.add_argument(
+            '-s', '--serial',
+            action='store_const',
+            const=True,
+            #  help=argparse.SUPPRESS)   Suppress argument starting with version 0.7!
+            help="(deprecated) Schedule the operations to be executed in serial. "
+                 "This argument is deprecated as of version 0.6, because operations "
+                 "are executed in serial by default. Please use the --parallel "
+                 "argument to switch the execution mode.")
 
         manual_cmd_group = parser.add_argument_group("manual cmd")
         manual_cmd_group.add_argument(
@@ -1622,18 +1633,30 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
         def _script(env, args):
             "Generate a script for the execution of operations."
-            kwargs = vars(args)
-            del kwargs['func']
-            del kwargs['debug']
-            env = get_environment(test=True)    # bad hack... ignoring the env argument here
-            ops = self._gather_operations(**kwargs)
+            if args.serial:             # Handle legacy API: The --serial argument is deprecated
+                if args.parallel:       # as of version 0.6. The default execution mode is 'serial'
+                    raise ValueError(   # and can be switched with the '--parallel' argument.
+                        "Cannot provide both --serial and --parallel arguments a the same time! "
+                        "The --serial argument is deprecated as of version 0.6!")
+                else:
+                    logger.warning(
+                        "The script --serial argument is deprecated as of version 0.6, because "
+                        "serial execution is now the default behavior. Please use the '--parallel' "
+                        "argument to execute bundled operations in parallel.")
+
+            ops = self._gather_operations(
+                job_id=args.job_id,
+                operation_name=args.operation_name,
+                num=args.num,
+                cmd=args.cmd,
+                requires=args.requires)
+
             for bundle in make_bundles(ops, args.bundle_size):
-                script = env.script()
-                self.write_script(script, bundle, background=not args.serial)
-                script.seek(0)
-                print("---- BEGIN SCRIPT ----", file=sys.stderr)
-                print(script.read())
-                print("---- END SCRIPT ----", file=sys.stderr)
+                script = self.script(
+                    operations=bundle,
+                    parallel=args.parallel,
+                    template=args.script_template)
+                print(script)
 
         def _submit(env, args):
             "Generate a script for the execution of operations, to be submitted to a scheduler."

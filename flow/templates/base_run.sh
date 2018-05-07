@@ -9,8 +9,12 @@ cd {{ project._rd }}
 {% block body %}
 {% for operation in operations %}
 {% if parallel %}
+
+# Operation '{{ operation.name }}' for job '{{ operation.job._id }}':
 {{ operation.cmd }} &
 {% else %}
+
+# Operation '{{ operation.name }}' for job '{{ operation.job._id }}':
 {{ operation.cmd }}
 {% endif %}
 {% endfor %}

@@ -146,7 +146,7 @@ class ProjectTest(unittest.TestCase):
     def test_script(self):
         project = self.mock_project()
         for job in project:
-            script = project._generate_run_script(project.next_operations(job))
+            script = project.script(project.next_operations(job))
             self.assertIn('echo "hello"', script)
             self.assertIn(str(job), script)
 
@@ -162,7 +162,7 @@ class ProjectTest(unittest.TestCase):
             file.write("THIS IS A CUSTOM SCRIPT!\n")
             file.write("{% endblock %}\n")
         for job in project:
-            script = project._generate_run_script(project.next_operations(job))
+            script = project.script(project.next_operations(job))
             self.assertIn("THIS IS A CUSTOM SCRIPT", script)
             self.assertIn('echo "hello"', script)
             self.assertIn(str(job), script)

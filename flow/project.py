@@ -54,6 +54,7 @@ from .util.misc import _mkdir_p
 from .util.misc import draw_progressbar
 from .util.misc import _format_timedelta
 from .util.misc import write_human_readable_statepoint
+from .util.misc import switch_to_directory
 from .util.translate import abbreviate
 from .util.translate import shorten
 from .labels import label
@@ -592,7 +593,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         result['submission_status'] = [JobStatus(highest_status).name]
         return result
 
-    def run(self, operations=None, pretend=False, np=None, timeout=None, progress=False):
+    def run(self, operations=None, pretend=False, np=None, timeout=None, progress=False,
+            switch_to_project_root=True):
         """Execute the next operations as specified by the project's workflow.
 
         :param operations:
@@ -627,27 +629,28 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         # Either actually execute or just show the commands
         _run = print if pretend else _execute
 
-        if np == 1:      # serial execution
-            if six.PY2 and timeout is not None:
-                raise RuntimeError(
-                    "Using a timeout with serial execution is "
-                    "not supported for Python version 2.7.")
-            for cmd in tqdm(cmds) if progress else cmds:
-                _run(cmd, timeout=timeout)
-        elif six.PY2:   # parallel execution (py27)
-            # Due to Python 2.7 issue #8296 (http://bugs.python.org/issue8296) we
-            # always need to provide a timeout to avoid issues with "hanging"
-            # processing pools.
-            timeout = sys.maxint if timeout is None else timeout
-            pool = Pool(np)
-            result = pool.imap_unordered(_run, cmds)
-            for _ in tqdm(cmds) if progress else cmds:
-                result.next(timeout)
-        else:           # parallel execution (py3+)
-            with Pool(np) as pool:
+        with switch_to_directory(self.root_directory() if switch_to_project_root else None):
+            if np == 1:      # serial execution
+                if six.PY2 and timeout is not None:
+                    raise RuntimeError(
+                        "Using a timeout with serial execution is "
+                        "not supported for Python version 2.7.")
+                for cmd in tqdm(cmds) if progress else cmds:
+                    _run(cmd, timeout=timeout)
+            elif six.PY2:   # parallel execution (py27)
+                # Due to Python 2.7 issue #8296 (http://bugs.python.org/issue8296) we
+                # always need to provide a timeout to avoid issues with "hanging"
+                # processing pools.
+                timeout = sys.maxint if timeout is None else timeout
+                pool = Pool(np)
                 result = pool.imap_unordered(_run, cmds)
                 for _ in tqdm(cmds) if progress else cmds:
                     result.next(timeout)
+            else:           # parallel execution (py3+)
+                with Pool(np) as pool:
+                    result = pool.imap_unordered(_run, cmds)
+                    for _ in tqdm(cmds) if progress else cmds:
+                        result.next(timeout)
 
     def _setup_legacy_templating(self):
         """This function identifies whether a subclass has implemented deprecated template

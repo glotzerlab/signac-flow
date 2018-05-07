@@ -114,3 +114,17 @@ def redirect_log(job, filename='run.log', formatter=None, logger=None):
         yield
     finally:
         logger.removeHandler(filehandler)
+
+
+@contextmanager
+def switch_to_directory(root=None):
+    "Temporarily switch into the given root directory (if not None)."
+    if root is None:
+        yield
+    else:
+        cwd = os.getcwd()
+        try:
+            os.chdir(root)
+            yield
+        finally:
+            os.chdir(cwd)

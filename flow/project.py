@@ -1102,8 +1102,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         if walltime is not None:
             try:
                 walltime = datetime.timedelta(hours=walltime)
-            except Exception:
-                raise   # TODO determine exception type for when walltime is already a timedelta
+            except TypeError as error:
+                if str(error) != 'unsupported type for timedelta ' \
+                                 'hours component: datetime.timedelta':
+                    raise
 
         # Gather all pending operations.
         operations = self._get_pending_operations(jobs, names)

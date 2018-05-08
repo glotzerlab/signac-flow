@@ -117,6 +117,39 @@ def redirect_log(job, filename='run.log', formatter=None, logger=None):
 
 
 @contextmanager
+def add_path_to_environment_pythonpath(path):
+    "Temporarily insert the current working directory into the environment PYTHONPATH variable."
+    path = os.path.realpath(path)
+    pythonpath = os.environ.get('PYTHONPATH')
+    if pythonpath:
+        for path_ in pythonpath:
+            if os.path.isabs(path_) and os.path.realpath(path_) == path:
+                yield   # Path is already in PYTHONPATH, nothing to do here.
+                return
+        try:
+            # Append the current working directory to the PYTHONPATH.
+            tmp_path = [path] + pythonpath.split(':')
+            os.environ['PYTHONPATH'] = ':'.join(tmp_path)
+            yield
+        finally:
+            os.environ['PYTHONPATH'] = pythonpath
+            pass
+    else:
+        try:
+            # The PYTHONPATH was previously not set, set to current working directory.
+            os.environ['PYTHONPATH'] = path
+            yield
+        finally:
+            del os.environ['PYTHONPATH']
+
+
+@contextmanager
+def add_cwd_to_environment_pythonpath():
+    with add_path_to_environment_pythonpath(os.getcwd()):
+        yield
+
+
+@contextmanager
 def switch_to_directory(root=None):
     "Temporarily switch into the given root directory (if not None)."
     if root is None:

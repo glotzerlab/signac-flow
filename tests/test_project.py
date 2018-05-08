@@ -1,6 +1,7 @@
 # Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
+from __future__ import print_function
 import unittest
 import io
 import uuid
@@ -17,6 +18,9 @@ from flow.scheduling.base import Scheduler
 from flow.scheduling.base import ClusterJob
 from flow.scheduling.base import JobStatus
 from flow.environment import ComputeEnvironment
+from flow.util.misc import add_path_to_environment_pythonpath
+from flow.util.misc import add_cwd_to_environment_pythonpath
+from flow.util.misc import switch_to_directory
 from flow import init
 
 from define_test_project import TestProject
@@ -285,9 +289,11 @@ class ProjectTest(BaseProjectTest):
     def test_run(self):
         project = self.mock_project()
         output = StringIO()
-        with redirect_stderr(output):
-            with redirect_stdout(output):
-                project.run()
+        with add_cwd_to_environment_pythonpath():
+            with switch_to_directory(project.root_directory()):
+                with redirect_stderr(output):
+                    with redirect_stdout(output):
+                        project.run()
         output.seek(0)
         run_output = output.read()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
@@ -411,15 +417,19 @@ class ProjectMainInterfaceTest(BaseProjectTest):
         self.addCleanup(self.switch_to_cwd)
         os.chdir(self._tmp_dir.name)
 
-    def call_subcmd(self, subcmd, check_output=True):
+    def call_subcmd(self, subcmd):
+        # Determine path to project module and construct command.
         fn_script = inspect.getsourcefile(type(self.project))
         cmd = 'python {} {}'.format(fn_script, subcmd)
-        if check_output:
-            return subprocess.check_output(
-                cmd.split(),
-                stderr=subprocess.STDOUT)
-        else:
-            subprocess.check_call(cmd.split())
+
+        try:
+            with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
+                with switch_to_directory(self.project.root_directory()):
+                    return subprocess.check_output(cmd.split(), stderr=subprocess.STDOUT)
+        except subprocess.CalledProcessError as error:
+            print(error, file=sys.stderr)
+            print(error.output, file=sys.stderr)
+            raise
 
     def test_main_help(self):
         # This unit test mainly checks if the test setup works properly.
@@ -437,7 +447,7 @@ class ProjectMainInterfaceTest(BaseProjectTest):
         self.assertTrue(len(self.project))
         for job in self.project:
             self.assertFalse(job.isfile('world.txt'))
-        self.call_subcmd('run op1')
+        self.call_subcmd('run -o op1')
         even_jobs = [job for job in self.project if job.sp.b % 2 == 0]
         for job in self.project:
             if job in even_jobs:

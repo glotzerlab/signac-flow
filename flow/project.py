@@ -25,6 +25,7 @@ import datetime
 import json
 import inspect
 import subprocess
+import functools
 from collections import defaultdict
 from itertools import islice
 from itertools import count
@@ -52,6 +53,7 @@ from .util.misc import _mkdir_p
 from .util.misc import draw_progressbar
 from .util.misc import _format_timedelta
 from .util.misc import write_human_readable_statepoint
+from .util.misc import add_cwd_to_environment_pythonpath
 from .util.misc import switch_to_directory
 from .util.translate import abbreviate
 from .util.translate import shorten
@@ -775,8 +777,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         result['submission_status'] = [JobStatus(highest_status).name]
         return result
 
-    def run_operations(self, operations=None, pretend=False, np=None, timeout=None, progress=False,
-                       switch_to_project_root=True):
+    def run_operations(self, operations=None, pretend=False, np=None, timeout=None, progress=False):
         """Execute the next operations as specified by the project's workflow.
 
         :param operations:
@@ -817,18 +818,17 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             if pretend:
                 print(cmd)
             else:
-                with switch_to_directory(self.root_directory() if switch_to_project_root else None):
-                    logger.info("Execute operation '{}'...".format(operation))
-                    if not progress:
-                        print("Execute operation '{}'...".format(operation), file=sys.stderr)
-                    if six.PY2:
-                        subprocess.call(cmd, shell=True)
-                    else:
-                        subprocess.call(cmd, shell=True, timeout=timeout)
+                logger.info("Execute operation '{}'...".format(operation))
+                if not progress:
+                    print("Execute operation '{}'...".format(operation), file=sys.stderr)
+                if six.PY2:
+                    subprocess.call(cmd, shell=True)
+                else:
+                    subprocess.call(cmd, shell=True, timeout=timeout)
 
     @_support_legacy_api
     def run(self, jobs=None, names=None, pretend=False, timeout=None, num=None,
-            num_passes=1, progress=False, switch_to_project_root=True):
+            num_passes=1, progress=False):
             if jobs is None:
                 jobs = self
 
@@ -851,8 +851,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 print(
                     "Executing {} operations (Pass # {:02d})...".format(len(ops), i),
                     file=sys.stderr)
-                self.run_operations(ops, pretend=pretend, timeout=timeout, progress=progress,
-                                    switch_to_project_root=switch_to_project_root)
+                self.run_operations(ops, pretend=pretend, timeout=timeout, progress=progress)
                 if num is not None:
                     num = max(0, num - len(ops))
                 for op in ops:
@@ -1825,11 +1824,22 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             ops = self._get_pending_operations(jobs, args.operation_name)
             ops = list(islice(ops, args.num))
 
-            self.run_operations(
+            # Setup partial run function, because we need to call this either
+            # inside some context managers or not based on whether we need
+            # to switch to the project root directory or not.
+            run = functools.partial(
+                self.run_operations,
                 operations=ops,
                 pretend=args.pretend,
                 timeout=args.timeout,
                 progress=args.progress)
+
+            if args.switch_to_project_root:
+                with add_cwd_to_environment_pythonpath():
+                    with switch_to_directory(self.root_directory()):
+                        run()
+            else:
+                run()
 
         def _script(args):
             "Generate a script for the execution of operations."
@@ -1955,6 +1965,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             '-t', '--timeout',
             type=int,
             help="A timeout in seconds after which the execution of one operation is canceled.")
+        execution_group.add_argument(
+            '--switch-to-project-root',
+            action='store_true',
+            help="Temporarily add the current working directory to the python search path and "
+                 "switch to the root directory prior to execution.")
         execution_group.add_argument(    # Remove beginning of version 0.7.
             '--np',
             type=int,
@@ -2018,6 +2033,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         except TimeoutExpired:
             print("Error: Failed to complete execution due to "
                   "timeout ({}s).".format(args.timeout), file=sys.stderr)
+            _exit_or_raise()
+        except Exception as error:
+            print("ERROR:", error, file=sys.stderr)
             _exit_or_raise()
 
     # All class methods below are wrappers for legacy API and should be removed as of version 0.7.

@@ -1145,7 +1145,16 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
     @classmethod
     def _add_template_arg_group(cls, parser, default='script.sh'):
         "Add argument group to parser for template handling."
-        template_group = parser.add_argument_group('templating')  # TODO: Add detailed description
+        template_group = parser.add_argument_group(
+            'templating',
+            "The execution and submission scripts are always generated from a script "
+            "which is by default called '{default}' and located within the default "
+            "template directory. The system uses a default template if none is provided. "
+            "The default template extends from a base template, which may be different "
+            "depending on the local compute environment, e.g., 'slurm.sh' for an environment "
+            "with SLURM scheduler. The name of the base template is provided with the "
+            "'base_script' template variable.".format(default=default),
+            )
         template_group.add_argument(
             '--template',
             type=str,

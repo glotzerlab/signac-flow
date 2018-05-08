@@ -1780,7 +1780,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             $ python my_project.py --help
         """
 
-        def _status(args):
+        def main_status(args):
             "Print status overview."
             args = vars(args)
             del args['func']
@@ -1790,13 +1790,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             except NoSchedulerError:
                 self.print_status(pool=pool, **args)
 
-        def _next(args):
+        def main_next(args):
             "Determine the jobs that are eligible for a specific operation."
             for job in self:
                 if args.name in {op.name for op in self.next_operations(job)}:
                     print(job)
 
-        def _run(args):
+        def main_run(args):
             "Run all (or select) job operations."
             if args.hidden_operation_name:
                 print(
@@ -1841,7 +1841,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             else:
                 run()
 
-        def _script(args):
+        def main_script(args):
             "Generate a script for the execution of operations."
             if args.serial:             # Handle legacy API: The --serial option is deprecated
                 if args.parallel:       # as of version 0.6. The default execution mode is 'serial'
@@ -1880,7 +1880,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                     operations=bundle, parallel=args.parallel,
                     template=args.template, show_template_help=args.show_template_help))
 
-        def _submit(args):
+        def main_submit(args):
             kwargs = vars(args)
 
             # Select jobs:
@@ -1897,7 +1897,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             for bundle in make_bundles(ops, args.bundle_size):
                 self.submit_operations(operations=bundle, **kwargs)
 
-        def _exec(args):
+        def main_exec(args):
             if len(args.jobid):
                 jobs = [self.open_job(id=jid) for jid in args.jobid]
             else:
@@ -1925,7 +1925,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
         parser_status = subparsers.add_parser('status')
         self._add_print_status_args(parser_status)
-        parser_status.set_defaults(func=_status)
+        parser_status.set_defaults(func=main_status)
 
         parser_next = subparsers.add_parser(
             'next',
@@ -1934,7 +1934,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             'name',
             type=str,
             help="The name of the operation.")
-        parser_next.set_defaults(func=_next)
+        parser_next.set_defaults(func=main_next)
 
         parser_run = subparsers.add_parser('run')
         parser_run.add_argument(          # Hidden positional arguments for backwards-compatibility.
@@ -1975,21 +1975,21 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             type=int,
             help="(deprecated) Specify the number of cores to parallelize to. "
                  "This option is deprecated as of version 0.6.")
-        parser_run.set_defaults(func=_run)
+        parser_run.set_defaults(func=main_run)
 
         parser_script = subparsers.add_parser('script')
         self._add_operation_selection_arg_group(parser_script)
         self._add_operation_bundling_arg_group(parser_script)
         self._add_direct_cmd_arg_group(parser_script)
         self._add_template_arg_group(parser_script)
-        parser_script.set_defaults(func=_script)
+        parser_script.set_defaults(func=main_script)
 
         parser_submit = subparsers.add_parser('submit')
         self._add_submit_args(parser_submit)
         env_group = parser_submit.add_argument_group(
             '{} options'.format(self._environment.__name__))
         self._environment.add_args(env_group)
-        parser_submit.set_defaults(func=_submit)
+        parser_submit.set_defaults(func=main_submit)
 
         parser_exec = subparsers.add_parser('exec')
         parser_exec.add_argument(
@@ -2003,7 +2003,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             nargs='*',
             help="The job ids, as registered in the signac project. "
                  "Omit to default to all statepoints.")
-        parser_exec.set_defaults(func=_exec)
+        parser_exec.set_defaults(func=main_exec)
 
         args = parser.parse_args()
         if not hasattr(args, 'func'):

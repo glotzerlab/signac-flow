@@ -67,6 +67,28 @@ if not six.PY2:
 logger = logging.getLogger(__name__)
 
 
+# The TEMPLATE_HELP can be shown with the --template-help option available to all
+# command line sub commands that use the templating system.
+TEMPLATE_HELP = """Execution and submission scripts are generated with the jinja2 template files.
+Standard files are shipped with the package, but maybe replaced or extended with
+custom templates provided within a project.
+
+The default template directory can be configured with the 'template_dir' configuration
+variable, for example in the project configuration file. The current template directory is:
+{template_dir}
+
+All template variables can be placed within a template using the standard jinja2
+syntax, e.g., the project root directory can be written like this: {{ project._rd }}.
+The available template variables are:
+{template_vars}
+
+Filter functions can be used to format template variables in a specific way.
+For example: {{ project.get_id() | captialize }}.
+
+The available filters are:
+{filters}"""
+
+
 # Global variable that is used internally to keep track of which
 # FlowProject methods belong to the legacy templating system. Such
 # a method is docorated with the _part_of_legacy_template_system()
@@ -163,6 +185,7 @@ def make_bundles(operations, size=None):
     sized bundles and a possibly smaller final bundle.
     """
     n = None if size == 0 else size
+    operations = iter(operations)
     while True:
         b = list(islice(operations, n))
         if b:
@@ -397,23 +420,174 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         A signac config object.
     """
     def __init__(self, config=None, environment=None):
-        if environment is None:
-            environment = get_environment()
-        signac.contrib.Project.__init__(self, config)
+        super(FlowProject, self).__init__(config=config)
+
+        # Associate this class with a compute environment.
+        self._environment = environment or get_environment()
+
+        # Setup the templating system for the generation of run and submission scripts.
+        self._setup_template_environment()
+        self._setup_legacy_templating()  # Disable in 0.8.
+
+        # Register all label functions with this project instance.
         self._label_functions = dict()
+        self._register_labels()
+
+        # Register all operation functions with this project instance.
         self._operation_functions = dict()
         self._operations = dict()
-        self._environment = environment
+        self._register_operations()
+
+    def _setup_template_environment(self):
+        """Setup the jinja2 template environemnt.
+
+        The templating system is used to generate templated scripts for the script()
+        and submit_operations() / submit() function and the corresponding command line
+        sub commands.
+        """
+        # The standard local template directory is a directory called 'templates' within
+        # the project root directory. This directory may be specified with the 'template_dir'
+        # configuration variable.
+        self._template_dir = os.path.join(
+            self.root_directory(), self._config.get('template_dir', 'templates'))
+
+        # Templates are searched in the local template directory first, then in the package
+        # 'templates' directory.
         self._template_environment = Environment(
             loader=ChoiceLoader([
-                FileSystemLoader(os.path.join(self.root_directory(), 'templates')),
+                FileSystemLoader(self._template_dir),
                 PackageLoader('flow', 'templates'),
                 ]),
             trim_blocks=True)
+
+        # Setup standard filters that can be used to format context variables.
         self._template_environment.filters['time_delta'] = _format_timedelta
-        self._register_labels()
-        self._register_operations()
-        self._setup_legacy_templating()
+
+    def _get_standard_template_context(self):
+        "Return the standard templating context for run and submission scripts."
+        context = dict()
+        context['project'] = self
+        return context
+
+    def _show_template_help_and_exit(self, context):
+        "Print all context variables and filters to screen and exit."
+        from textwrap import TextWrapper
+        wrapper = TextWrapper(width=90, break_long_words=False)
+        print(TEMPLATE_HELP.format(
+            template_dir=self._template_dir,
+            template_vars='\n'.join(wrapper.wrap(', '.join(sorted(context)))),
+            filters='\n'.join(wrapper.wrap(', '.join(sorted(self._template_environment.filters))))))
+        sys.exit(2)
+
+    def _setup_legacy_templating(self):
+        """This function identifies whether a subclass has implemented deprecated template
+        functions.
+
+        The legacy templating system is used to generate run and cluster submission scripts
+        if that is the case. A warning is emitted to inform the user that they will not be
+        able to use the standard templating system.
+
+        The legacy templating functions are decorated with the _part_of_legacy_template_system()
+        decorator.
+        """
+        self._legacy_templating = False
+        legacy_methods = set()
+        for method in _LEGACY_TEMPLATING_METHODS:
+            if hasattr(self, method) and not hasattr(getattr(self, method), '_legacy_intact'):
+                warnings.warn(
+                    "The use of FlowProject method '{}' is deprecated!".format(method),
+                    DeprecationWarning)
+                legacy_methods.add(method)
+        if legacy_methods:
+            self._legacy_templating = True
+            warnings.warn(
+                "You are using the following deprecated templating methods: {}. Please remove "
+                "those methods from your project class implementation to use the jinja2 templating "
+                "system (version >= 0.6).".format(', '.join(legacy_methods)))
+
+    @_part_of_legacy_template_system
+    def write_script_header(self, script, **kwargs):
+        """"Write the script header for the execution script.
+
+        This function is deprecated and will be removed in version 0.7! Users are
+        encouraged to migrate to the new templating system as of version 0.6.
+        """
+        # Add some whitespace
+        script.writeline()
+        # Don't use uninitialized environment variables.
+        script.writeline('set -u')
+        # Exit on errors.
+        script.writeline('set -e')
+        # Switch into the project root directory
+        script.writeline('cd {}'.format(self.root_directory()))
+        script.writeline()
+
+    @_part_of_legacy_template_system
+    def write_script_operations(self, script, operations, background=False, **kwargs):
+        """"Write the commands for the execution of operations as part of a script.
+
+        This function is deprecated and will be removed in version 0.7! Users are
+        encouraged to migrate to the new templating system as of version 0.6.
+        """
+        for op in operations:
+            write_human_readable_statepoint(script, op.job)
+            script.write_cmd(op.cmd.format(job=op.job), bg=background)
+            script.writeline()
+
+    @classmethod
+    def write_human_readable_statepoint(cls, script, job):
+        """Write statepoint of job in human-readable format to script.
+
+        This function is deprecated and will be removed in version 0.7! Users are
+        encouraged to migrate to the new templating system as of version 0.6.
+        """
+        warnings.warn(
+            "The write_human_readable_statepoint() function is deprecated.",
+            DeprecationWarning)
+        return write_human_readable_statepoint(script, job)
+
+    @_part_of_legacy_template_system
+    def write_script_footer(self, script, **kwargs):
+        """"Write the script footer for the execution script.
+
+        This function is deprecated and will be removed in version 0.7! Users are
+        encouraged to migrate to the new templating system as of version 0.6.
+        """
+        # Wait until all processes have finished
+        script.writeline('wait')
+
+    @_part_of_legacy_template_system
+    def write_script(self, script, operations, background=False, **kwargs):
+        """Write a script for the execution of operations.
+
+        This function is deprecated and will be removed in version 0.7! Users are
+        encouraged to migrate to the new templating system as of version 0.6.
+
+        By default, this function will generate a script with the following components:
+
+        .. code-block:: python
+
+            write_script_header(script)
+            write_script_operations(script, operations, background=background)
+            write_script_footer(script)
+
+        Consider overloading any of the methods above, before overloading this method.
+
+        :param script:
+            The script to write the commands to.
+        :param operations:
+            The operations to be written to the script.
+        :type operations:
+            A sequence of JobOperation
+        :param background:
+            Whether operations should be executed in the background;
+            useful to parallelize execution.
+        :type background:
+            bool
+        """
+        self.write_script_header(script, **kwargs)
+        self.write_script_operations(script, operations, background=background, **kwargs)
+        self.write_script_footer(script, **kwargs)
 
     @classmethod
     def label(cls, label_name_or_func=None):
@@ -687,167 +861,28 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 logger.warning(         # but maximum number of passes is exhausted.
                     "Reached maximum number of passes, but there are still operations pending.")
 
-    def _setup_legacy_templating(self):
-        """This function identifies whether a subclass has implemented deprecated template
-        functions.
+    def _generate_operations(self, cmd, jobs, requires=None):
+        "Generate job-operations for a given 'direct' command."
+        for job in jobs:
+            if requires and requires.difference(self.labels(job)):
+                continue
+            cmd_ = cmd.format(job=job)
+            yield JobOperation(name=cmd_.replace(' ', '-'), cmd=cmd_, job=job)
 
-        The legacy templating system is used to generate run and cluster submission scripts
-        if that is the case. A warning is emitted to inform the user that they will not be
-        able to use the standard templating system.
+    def _get_pending_operations(self, jobs, operation_names=None):
+        "Get all pending operations for the given selection."
+        operation_names = None if operation_names is None else set(operation_names)
 
-        The legacy templating functions are decorated with the _part_of_legacy_template_system()
-        decorator.
-        """
-        self._legacy_templating = False
-        legacy_methods = set()
-        for method in _LEGACY_TEMPLATING_METHODS:
-            if hasattr(self, method) and not hasattr(getattr(self, method), '_legacy_intact'):
-                warnings.warn(
-                    "The use of FlowProject method '{}' is deprecated!".format(method),
-                    DeprecationWarning)
-                legacy_methods.add(method)
-        if legacy_methods:
-            self._legacy_templating = True
-            warnings.warn(
-                "You are using the following deprecated templating methods: {}. Please remove "
-                "those methods from your project class implementation to use the jinja2 templating "
-                "system (version >= 0.6).".format(', '.join(legacy_methods)))
+        for job in jobs:
+            for op in self.next_operations(job):
+                if operation_names and op.name not in operation_names:
+                    continue
+                if not self.eligible_for_submission(op):
+                    continue
+                yield op
 
-    @_part_of_legacy_template_system
-    def write_script_header(self, script, **kwargs):
-        """"Write the script header for the execution script.
-
-        This function is deprecated and will be removed in version 0.7! Users are
-        encouraged to migrate to the new templating system as of version 0.6.
-        """
-        # Add some whitespace
-        script.writeline()
-        # Don't use uninitialized environment variables.
-        script.writeline('set -u')
-        # Exit on errors.
-        script.writeline('set -e')
-        # Switch into the project root directory
-        script.writeline('cd {}'.format(self.root_directory()))
-        script.writeline()
-
-    @_part_of_legacy_template_system
-    def write_script_operations(self, script, operations, background=False, **kwargs):
-        """"Write the commands for the execution of operations as part of a script.
-
-        This function is deprecated and will be removed in version 0.7! Users are
-        encouraged to migrate to the new templating system as of version 0.6.
-        """
-        for op in operations:
-            write_human_readable_statepoint(script, op.job)
-            script.write_cmd(op.cmd.format(job=op.job), bg=background)
-            script.writeline()
-
-    @classmethod
-    def write_human_readable_statepoint(cls, script, job):
-        """Write statepoint of job in human-readable format to script.
-
-        This function is deprecated and will be removed in version 0.7! Users are
-        encouraged to migrate to the new templating system as of version 0.6.
-        """
-        warnings.warn(
-            "The write_human_readable_statepoint() function is deprecated.",
-            DeprecationWarning)
-        return write_human_readable_statepoint(script, job)
-
-    @_part_of_legacy_template_system
-    def write_script_footer(self, script, **kwargs):
-        """"Write the script footer for the execution script.
-
-        This function is deprecated and will be removed in version 0.7! Users are
-        encouraged to migrate to the new templating system as of version 0.6.
-        """
-        # Wait until all processes have finished
-        script.writeline('wait')
-
-    @_part_of_legacy_template_system
-    def write_script(self, script, operations, background=False, **kwargs):
-        """Write a script for the execution of operations.
-
-        This function is deprecated and will be removed in version 0.7! Users are
-        encouraged to migrate to the new templating system as of version 0.6.
-
-        By default, this function will generate a script with the following components:
-
-        .. code-block:: python
-
-            write_script_header(script)
-            write_script_operations(script, operations, background=background)
-            write_script_footer(script)
-
-        Consider overloading any of the methods above, before overloading this method.
-
-        :param script:
-            The script to write the commands to.
-        :param operations:
-            The operations to be written to the script.
-        :type operations:
-            A sequence of JobOperation
-        :param background:
-            Whether operations should be executed in the background;
-            useful to parallelize execution.
-        :type background:
-            bool
-        """
-        self.write_script_header(script, **kwargs)
-        self.write_script_operations(script, operations, background=background, **kwargs)
-        self.write_script_footer(script, **kwargs)
-
-    def _gather_operations(self, job_id=None, operation_name=None, num=None,
-                           cmd=None, requires=None, pool=None, force=False, **kwargs):
-        "Gather operations to be executed or submitted."
-        if job_id:
-            jobs = (self.open_job(id=_id) for _id in job_id)
-        else:
-            jobs = iter(self)
-
-        if operation_name is None:
-            names = None
-        elif isinstance(operation_name, six.string_types):
-            names = {operation_name}
-        else:
-            names = operation_name
-
-        def get_ops(job):
-            if cmd is None:
-                ops = set(self.next_operations(job))
-                ops.add(self.next_operation(job))
-                for op in ops:
-                    yield op
-            else:
-                yield JobOperation(name='user-cmd', cmd=cmd.format(job=job), job=job)
-
-        def eligible(op):
-            if op is None:
-                return False
-            if force:
-                return True
-            if cmd is None:
-                if names and op.name not in names:
-                    return False
-            if requires is not None:
-                labels = set(self.classify(op.job))
-                if not all([req in labels for req in requires]):
-                    return False
-            return self.eligible_for_submission(op)
-
-        # Get the first num eligible operations
-        map_ = map if pool is None else pool.imap  # parallelization
-        ops = (op for ops in map_(get_ops, jobs) for op in ops)
-        return islice((op for op in ops if eligible(op)), num)
-
-    def _get_template_context(self):
-        "Return the standard templating context for run and submission scripts."
-        context = dict()
-        context['project'] = self
-        return context
-
-    def script(self, operations, parallel=False, template='run.sh'):
-        """Generate a run script to execute given operations (optional in parallel).
+    def script(self, operations, parallel=False, template='script.sh', show_template_help=False):
+        """Generate a run script to execute given operations.
 
         :param operations:
             The operations to execute.
@@ -861,6 +896,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             The name of the template to use to generate the script.
         :type template:
             str
+        :param show_template_help:
+            Show help related to the templating system and then exit.
+        :type show_template_help:
+            bool
         """
         if self._legacy_templating:
             from .environment import TestEnvironment
@@ -877,14 +916,16 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         else:
             # By default we use the jinja2 templating system to generate the script.
             template = self._template_environment.get_template(template)
-            context = self._get_template_context()
-            context['base_run'] = 'base_run.sh'
+            context = self._get_standard_template_context()
+            context['base_script'] = 'base_script.sh'
             context['operations'] = list(operations)
             context['parallel'] = parallel
+            if show_template_help:
+                self._show_template_help_and_exit(context)
             return template.render(** context)
 
     def _generate_submit_script(self, _id, operations, parallel=False, template=None,
-                                env=None, **kwargs):
+                                show_template_help=False, env=None, **kwargs):
         """Generate submission script to submit the execution of operations to a scheduler.
         :param _id:
             The name of the cluster job.
@@ -902,13 +943,17 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             The name of the template to use to generate the script.
         :type template:
             str
+        :param show_template_help:
+            Show help related to the templating system and then exit.
+        :type show_template_help:
+            bool
         """
         if template is None:
             template = env.template
         assert _id is not None
 
         if self._legacy_templating:
-            fn_template = os.path.join(self.root_directory(), 'templates', template)
+            fn_template = os.path.join(self._template_dir, template)
             if os.path.isfile(fn_template):
                 raise RuntimeError(
                     "In legacy templating mode, unable to use template '{}'.".format(fn_template))
@@ -918,24 +963,67 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             return script.read()
         else:
             template = self._template_environment.get_template(template)
-            context = self._get_template_context()
-            context['base_submit'] = env.template
+            context = self._get_standard_template_context()
+            context['base_script'] = env.template
             context['environment'] = env.__name__
             context['id'] = _id
             context['operations'] = operations
             context.update(kwargs)
+            if show_template_help:
+                self._show_template_help_and_exit(context)
             return template.render(** context)
 
     @_support_legacy_api
     def submit_operations(self, operations, _id=None, env=None, nn=None, ppn=None, serial=False,
-                          flags=None, force=False, template=None, pretend=False, **kwargs):
-        "Submit a sequence of operations to the scheduler."
+                          flags=None, force=False, template='script.sh', pretend=False, **kwargs):
+        """Submit a sequence of operations to the scheduler.
+
+        :param operations:
+            The operations to submit.
+        :type operations:
+            A sequence of instances of :py:class:`.JobOperation`
+        :param _id:
+            The _id to be used for this submission.
+        :type _id:
+            str
+        :param nn:
+            The number of nodes to submit do.
+        :type nn:
+            int
+        :param ppn:
+            The number of processors per node.
+        :type ppn:
+            int
+        :param serial:
+            Execute all bundled operations in serial.
+        :type serial:
+            bool
+        :param flags:
+            Additional options to be forwarded to the scheduler.
+        :type flags:
+            list
+        :param force:
+            Ignore all warnings or checks during submission, just submit.
+        :type force:
+            bool
+        :param template:
+            The name of the template file to be used to generate the submission script.
+        :type template:
+            str
+        :param pretend:
+            Do not actually submit, but only print the submission script to screen. Useful
+            for testing the submission workflow.
+        :type pretend:
+            bool
+        :param kwargs:
+            Additional keyword arguments to be forwarded to the scheduler.
+        :return:
+            Return the submission status after successful submission or None.
+        """
         if _id is None:
             _id = self._store_bundled(operations)
         if env is None:
             env = self._environment
-        if template is None:
-            template = env.template
 
         if issubclass(env, NodesEnvironment):
             if nn is None:
@@ -950,44 +1038,83 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                         raise e
 
         def _msg(op):
-            print("Submitting operation '{}' for job '{}'.".format(op.name, op.job))
+            print("Submitting operation '{}' for job '{}'...".format(op.name, op.job))
             return op
 
         operations = map(_msg, operations)
         script = self._generate_submit_script(
             # standard arguments:
             _id=_id, operations=operations, parallel=not serial, env=env,
+            # template arguments:
+            template=template, show_template_help=kwargs.get('show_template_help'),
             # legacy arguments:
             nn=nn, ppn=ppn, force=force or flags
             )
-        return env.submit(_id=_id, script=script, nn=nn, ppn=ppn, flags=flags, **kwargs)
+        if pretend:
+            print(script)
+        else:
+            return env.submit(_id=_id, script=script, nn=nn, ppn=ppn, flags=flags, **kwargs)
 
     @_support_legacy_api
-    def submit(self, bundle_size=1, serial=False, force=False,
-               nn=None, ppn=None, walltime=None, env=None, **kwargs):
+    def submit(self, bundle_size=1, jobs=None, names=None, num=None, parallel=False,
+               force=False, nn=None, ppn=None, walltime=None, env=None, **kwargs):
         """Submit function for the project's main submit interface.
 
-        This method gather and optionally bundle all operations which are eligible for execution,
-        prepare a submission script using the write_script() method, and finally attempting
-        to submit these to the scheduler.
-
-        The primary advantage of using this method over a manual submission process, is that
-        submit() will keep track of operation submit status (queued/running/completed/etc.)
-        and will automatically prevent the submission of the same operation multiple times if
-        it is considered active (e.g. queued or running).
+        :param bundle_size:
+            Specify the number of operations to be bundled into one submission, defaults to 1.
+        :type bundle_size:
+            int
+        :param jobs:
+            Only submit operations associated with the provided jobs. Defaults to all jobs.
+        :type jobs:
+            Sequence of instances :class:`.Job`.
+        :param names:
+            Only submit operations with any of the given names, defaults to all names.
+        :type names:
+            Sequence of :class:`str`
+        :param num:
+            Limit the total number of submitted operations, defaults to no limit.
+        :type num:
+            int
+        :param parallel:
+            Execute all bundled operations in parallel. Has no effect without bundling.
+        :type parallel:
+            bool
+        :param force:
+            Ignore all warnings or checks during submission, just submit.
+        :type force:
+            bool
+        :param nn:
+            The number of nodes to submit do.
+        :type nn:
+            int
+        :param ppn:
+            The number of processors per node.
+        :type ppn:
+            int
+        :param walltime:
+            Specify the walltime in hours or as instance of datetime.timedelta.
         """
         # Regular argument checks and expansion
+        if jobs is None:
+            jobs = self  # select all jobs
         if env is None:
             env = self._environment
         if walltime is not None:
-            walltime = datetime.timedelta(hours=walltime)
+            try:
+                walltime = datetime.timedelta(hours=walltime)
+            except Exception:
+                raise   # TODO determine exception type for when walltime is already a timedelta
 
-        operations = self._gather_operations(**kwargs)
+        # Gather all pending operations.
+        operations = self._get_pending_operations(jobs, names)
+        if num is not None:
+            operations = list(islice(operations, num))
 
+        # Bundle them up and submit.
         for bundle in make_bundles(operations, bundle_size):
-            submit = self.submit_operations
-            status = submit(
-                operations=bundle, env=env, ppn=ppn, serial=serial,
+            status = self.submit_operations(
+                operations=bundle, env=env, ppn=ppn, serial=not parallel,
                 force=force, walltime=walltime, **kwargs)
 
             if status is not None:  # operations were submitted, store status
@@ -996,7 +1123,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
     @classmethod
     def _add_submit_args(cls, parser):
-        "Add arguments to parser for the :meth:`~.submit` method."
+        "Add arguments to submit sub command to parser."
         parser.add_argument(
             'flags',
             type=str,
@@ -1005,76 +1132,100 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         parser.add_argument(
             '--pretend',
             action='store_true',
-            help="Do not really submit, but print the submittal script to screen.")
+            help="Do not really submit, but print the submission script to screen.")
         parser.add_argument(
             '--force',
             action='store_true',
             help="Ignore all warnings and checks, just submit.")
-        cls._add_script_args(parser)
+        cls._add_operation_selection_arg_group(parser)
+        cls._add_operation_bundling_arg_group(parser)
+        cls._add_template_arg_group(parser)
 
     @classmethod
-    def _add_script_args(cls, parser):
-        "Add arguments to parser for the :meth:`~.script` method."
-        parser.add_argument(
+    def _add_template_arg_group(cls, parser, default='script.sh'):
+        "Add argument group to parser for template handling."
+        template_group = parser.add_argument_group('templating')  # TODO: Add detailed description
+        template_group.add_argument(
+            '--template',
+            type=str,
+            default=default,
+            help="The name of the template file within the template directory. "
+                 "The standard template directory is '${{project_root}}/templates' and "
+                 "can be configured with the 'template_dir' configuration variable. "
+                 "Default: '{}'.".format(default))
+        template_group.add_argument(
+            '--template-help',
+            dest='show_template_help',
+            action='store_true',
+            help="Show information about the template context, including available variables "
+                 "and filter funtions; then exit.")
+
+    @classmethod
+    def _add_operation_selection_arg_group(cls, parser):
+        "Add argument group to parser for job-operation selection."
+        selection_group = parser.add_argument_group(
+            'job-operation selection',
+            "By default, all eligible operations for all jobs are selected. Use "
+            "the options in this group to reduce this selection.")
+        selection_group.add_argument(
             '-j', '--job-id',
             type=str,
             nargs='+',
-            help="The job id of the jobs to submit. "
-            "Omit to automatically select all eligible jobs.")
-        parser.add_argument(
-            '--script-template',
-            type=str,
-            default='run.sh',
-            help="Specify the template to use the generate the script. "
-                 "Default: 'run.sh'")
-        selection_group = parser.add_argument_group('job operation selection')
+            help="Only select operations for the given job ids.")
         selection_group.add_argument(
             '-o', '--operation',
             dest='operation_name',
-            type=str,
-            help="Only submit jobs eligible for the specified operation.")
+            nargs='+',
+            help="Only select operations that match the given operation name(s).")
         selection_group.add_argument(
             '-n', '--num',
             type=int,
-            help="Limit the number of operations to be executed.")
+            help="Limit the total number of operations to be selected.")
 
-        bundling_group = parser.add_argument_group('bundling')
+    @classmethod
+    def _add_operation_bundling_arg_group(cls, parser):
+        """Add argument group to parser for operation bundling."""
+
+        bundling_group = parser.add_argument_group(
+            'bundling',
+            "Bundle mutiple operations for execution, e.g., to submit them "
+            "all together to a cluster job, or execute them in parallel within "
+            "an execution script.")
         bundling_group.add_argument(
-            '--bundle',
+            '-b', '--bundle',
             type=int,
             nargs='?',
             const=0,
             default=1,
             dest='bundle_size',
-            help="Specify how many operations to bundle into one submission. "
-                 "When no specific size is give, all eligible operations are "
-                 "bundled into one submission.")
+            help="Bundle multiple operations for execution. When this "
+                 "option is provided without argument, all pending operations "
+                 "are aggregated into one bundle.")
         bundling_group.add_argument(
             '-p', '--parallel',
             action='store_true',
-            help="Schedule the bundled operations to be executed in parallel.")
+            help="Execute all (bundled) operations in parallel.")
         bundling_group.add_argument(
             '-s', '--serial',
             action='store_const',
             const=True,
-            #  help=argparse.SUPPRESS)   Suppress argument starting with version 0.7!
-            help="(deprecated) Schedule the operations to be executed in serial. "
-                 "This argument is deprecated as of version 0.6, because operations "
-                 "are executed in serial by default. Please use the --parallel "
-                 "argument to switch the execution mode.")
+            help="(deprecated) Execute all (bundled) operations in serial. This is the "
+                 "default mode as of version 0.6.")
 
-        manual_cmd_group = parser.add_argument_group("manual cmd")
-        manual_cmd_group.add_argument(
+    @classmethod
+    def _add_direct_cmd_arg_group(cls, parser):
+        direct_cmd_group = parser.add_argument_group("direct cmd")
+        direct_cmd_group.add_argument(
             '--cmd',
             type=str,
-            help="Directly specify the command that executes the desired operation.")
-        manual_cmd_group.add_argument(
+            help="Directly specify the command for an operation. "
+                 "For example: --cmd='echo {job._id}'.")
+        direct_cmd_group.add_argument(
             '--requires',
             type=str,
-            nargs='*',
-            help="Manually specify all labels, that are required for a job to be "
-                 "considered eligible for submission. This is especially useful "
-                 "in combination with '--cmd'.")
+            nargs='+',
+            help="Manually specify all labels that are required for the direct command "
+                 "to be considered eligible for execution.")
 
     def fetch_status(self, jobs=None, file=sys.stderr,
                      ignore_errors=False, scheduler=None, pool=None):
@@ -1630,7 +1781,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             $ python my_project.py --help
         """
 
-        def _status(env, args):
+        def _status(args):
             "Print status overview."
             args = vars(args)
             del args['func']
@@ -1639,94 +1790,104 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 self.print_status(pool=pool, **args)
             except NoSchedulerError:
                 self.print_status(pool=pool, **args)
-            return 0
 
-        def _next(env, args):
+        def _next(args):
             "Determine the jobs that are eligible for a specific operation."
             for job in self:
-                next_op = self.next_operation(job)
-                if next_op is not None and next_op.name == args.name:
+                if args.name in {op.name for op in self.next_operations(job)}:
                     print(job)
 
-        def _run(env, args):
+        def _run(args):
             "Run all (or select) job operations."
-            if args.np is not None:  # Remove beginning of version 0.7.
-                raise RuntimeError(
-                    "The run --np argument is deprecated as of version 0.6!")
-            if args.job_id:
-                jobs = [self.open_job(id=jid) for jid in args.job_id]
-            else:
-                jobs = None
-            try:
-                self.run(
-                    jobs=jobs,
-                    names=set(args.name),
-                    pretend=args.pretend,
-                    timeout=args.timeout,
-                    progress=args.progress,
-                    num=args.num,
-                    num_passes=args.num_passes,
-                )
-            except TimeoutExpired:
-                print("Error: Failed to complete execution due to "
-                      "timeout ({}s).".format(args.timeout), file=sys.stderr)
-                if args.debug:
-                    raise
+            if args.hidden_operation_name:
+                print(
+                    "WARNING: "
+                    "The run command expects operation names under the -o/--operation argument "
+                    "as of version 0.6.\n         Positional arguments will no longer be "
+                    "accepted beginning with version 0.7.",
+                    file=sys.stderr)
+                if args.operation_name:
+                    args.operation_name.extend(args.hidden_operation_name)
                 else:
-                    return 1
+                    args.operation_name = args.hidden_operation_name
 
-        def _script(env, args):
+            if args.np is not None:  # Remove completely beginning of version 0.7.
+                raise RuntimeError(
+                    "The run --np option is deprecated as of version 0.6!")
+
+            # Select jobs:
+            if args.job_id:
+                jobs = [self.open_job(id=job_id) for job_id in args.job_id]
+            else:
+                jobs = self
+
+            # Gather all pending operations ...
+            ops = self._get_pending_operations(jobs, args.operation_name)
+            ops = list(islice(ops, args.num))
+
+            self.run_operations(
+                operations=ops,
+                pretend=args.pretend,
+                timeout=args.timeout,
+                progress=args.progress)
+
+        def _script(args):
             "Generate a script for the execution of operations."
-            if args.serial:             # Handle legacy API: The --serial argument is deprecated
+            if args.serial:             # Handle legacy API: The --serial option is deprecated
                 if args.parallel:       # as of version 0.6. The default execution mode is 'serial'
                     raise ValueError(   # and can be switched with the '--parallel' argument.
                         "Cannot provide both --serial and --parallel arguments a the same time! "
-                        "The --serial argument is deprecated as of version 0.6!")
+                        "The --serial option is deprecated as of version 0.6!")
                 else:
                     logger.warning(
-                        "The script --serial argument is deprecated as of version 0.6, because "
+                        "The script --serial option is deprecated as of version 0.6, because "
                         "serial execution is now the default behavior. Please use the '--parallel' "
                         "argument to execute bundled operations in parallel.")
 
-            ops = self._gather_operations(
-                job_id=args.job_id,
-                operation_name=args.operation_name,
-                num=args.num,
-                cmd=args.cmd,
-                requires=args.requires)
+            if args.requires and not args.cmd:
+                raise ValueError(
+                    "The --requires option can only be used in combination with --cmd.")
+            if args.cmd and args.operation_name:
+                raise ValueError(
+                    "Cannot use the -o/--operation-name and the --cmd options in combination!")
 
-            for bundle in make_bundles(ops, args.bundle_size):
-                script = self.script(
-                    operations=bundle,
-                    parallel=args.parallel,
-                    template=args.script_template)
-                print(script)
-
-        def _submit(env, args):
-            "Generate a script for the execution of operations, to be submitted to a scheduler."
-            kwargs = vars(args)
-            del kwargs['func']
-            debug = kwargs.pop('debug')
-            test = kwargs.pop('test')
-            if test:
-                env = get_environment(test=True)    # bad hack... ignoring the env argument here
-            try:
-                self.submit(env=env, **kwargs)
-            except NoSchedulerError as e:
-                print(
-                    "Error:", e, "Consider using '--test', for testing purposes.", file=sys.stderr)
-                if debug:
-                    raise
-                return 1
-            except SubmitError as e:
-                print("Submission error:", e, file=sys.stderr)
-                if debug:
-                    raise
-                return 1
+            # Select jobs:
+            if args.job_id:
+                jobs = [self.open_job(id=job_id) for job_id in args.job_id]
             else:
-                return 0
+                jobs = self
 
-        def _exec(env, args):
+            # Gather all pending operations or generate them based on a direct command...
+            if args.cmd:
+                ops = self._generate_operations(args.cmd, jobs, args.requires)
+            else:
+                ops = self._get_pending_operations(jobs, args.operation_name)
+            ops = list(islice(ops, args.num))
+
+            # Bundle operations up, generate the script, and print it to screen.
+            for bundle in make_bundles(ops, args.bundle_size):
+                print(self.script(
+                    operations=bundle, parallel=args.parallel,
+                    template=args.template, show_template_help=args.show_template_help))
+
+        def _submit(args):
+            kwargs = vars(args)
+
+            # Select jobs:
+            if args.job_id:
+                jobs = [self.open_job(id=job_id) for job_id in args.job_id]
+            else:
+                jobs = self
+
+            # Gather all pending operations ...
+            ops = self._get_pending_operations(jobs, args.operation_name)
+            ops = list(islice(ops, args.num))
+
+            # Bundle operations up, generate the script, and submit to scheduler.
+            for bundle in make_bundles(ops, args.bundle_size):
+                self.submit_operations(operations=bundle, **kwargs)
+
+        def _exec(args):
             if len(args.jobid):
                 jobs = [self.open_job(id=jid) for jid in args.jobid]
             else:
@@ -1766,64 +1927,50 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         parser_next.set_defaults(func=_next)
 
         parser_run = subparsers.add_parser('run')
-        parser_run.add_argument(
-            'name',
+        parser_run.add_argument(          # Hidden positional arguments for backwards-compatibility.
+            'hidden_operation_name',
             type=str,
             nargs='*',
-            help="If provided, only run operations where the identifier "
-                 "matches the provided set of names.")
-        parser_run.add_argument(
-            '-j', '--job-id',
-            type=str,
-            nargs='+',
-            help="The job id of the jobs to run. "
-            "Omit to automatically select all jobs.")
-        parser_run.add_argument(
-            '-p', '--pretend',
+            help=argparse.SUPPRESS)
+        self._add_operation_selection_arg_group(parser_run)
+
+        execution_group = parser_run.add_argument_group('execution')
+        execution_group.add_argument(
+            '--pretend',
             action='store_true',
             help="Do not actually execute commands, just show them.")
-        parser_run.add_argument(
-            '-n', '--num',
-            type=int,
-            help="Limit the number of operations to be executed.")
-        parser_run.add_argument(    # Remove beginning of version 0.7.
-            '--np',
-            type=int,
-            help="(deprecated) Specify the number of cores to parallelize to. "
-                 "This argument is deprecated as of version 0.6, please use the "
-                 "script command for parallel execution.")
-        parser_run.add_argument(
-            '-t', '--timeout',
-            type=int,
-            help="A timeout in seconds after which the parallel execution "
-                 "of operations is canceled.")
-        parser_run.add_argument(
+        execution_group.add_argument(
             '--progress',
             action='store_true',
             help="Display a progress bar during execution.")
-        parser_run.add_argument(
+        execution_group.add_argument(
             '--num-passes',
             type=int,
             default=1,
-            help="Specify how many times a particular operation may be executed within one "
+            help="Specify how many times a particular job-operation may be executed within one "
                  "session (default=1). This is to prevent accidental infinite loops, "
                  "where operations are executed indefinitely, because post conditions "
                  "were not properly set. Use -1 to allow for an infinite number of passes.")
+        execution_group.add_argument(
+            '-t', '--timeout',
+            type=int,
+            help="A timeout in seconds after which the execution of one operation is canceled.")
+        execution_group.add_argument(    # Remove beginning of version 0.7.
+            '--np',
+            type=int,
+            help="(deprecated) Specify the number of cores to parallelize to. "
+                 "This option is deprecated as of version 0.6.")
         parser_run.set_defaults(func=_run)
 
         parser_script = subparsers.add_parser('script')
-        self._add_script_args(parser_script)
+        self._add_operation_selection_arg_group(parser_script)
+        self._add_operation_bundling_arg_group(parser_script)
+        self._add_direct_cmd_arg_group(parser_script)
+        self._add_template_arg_group(parser_script)
         parser_script.set_defaults(func=_script)
 
         parser_submit = subparsers.add_parser('submit')
         self._add_submit_args(parser_submit)
-        parser_submit.add_argument(
-            '-d', '--debug',
-            action="store_true",
-            help="Print debugging information.")
-        parser_submit.add_argument(
-            '-t', '--test',
-            action='store_true')
         env_group = parser_submit.add_argument_group(
             '{} options'.format(self._environment.__name__))
         self._environment.add_args(env_group)
@@ -1852,7 +1999,28 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         else:
             logging.basicConfig(level=logging.WARNING)
 
-        sys.exit(args.func(self._environment, args))
+        def _exit_or_raise():
+            if args.debug:
+                raise
+            else:
+                sys.exit(1)
+
+        try:
+            args.func(args)
+        except NoSchedulerError as error:
+            print("ERROR: {}".format(error),
+                  "Consider to use the 'script' command to generate an execution script instead.",
+                  file=sys.stderr)
+            _exit_or_raise()
+        except SubmitError as error:
+            print("Submission error:", error, file=sys.stderr)
+            _exit_or_raise()
+        except TimeoutExpired:
+            print("Error: Failed to complete execution due to "
+                  "timeout ({}s).".format(args.timeout), file=sys.stderr)
+            _exit_or_raise()
+
+    # All class methods below are wrappers for legacy API and should be removed as of version 0.7.
 
     @classmethod
     def add_submit_args(cls, parser):
@@ -1864,7 +2032,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
     def add_script_args(cls, parser):
         warnings.warn(
             "The add_script_args() method is private as of version 0.6.", DeprecationWarning)
-        return cls._add_script_args(parser=parser)
+        return cls._add_operation_selection_and_bundling_args(parser=parser)
 
     @classmethod
     def add_print_status_args(cls, parser):
@@ -1876,9 +2044,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         warnings.warn("The format_row() method is private as of version 0.6.", DeprecationWarning)
         return self._format_row(*args, **kwargs)
 
-
 ###
 # Status-related helper functions
+
 
 def _update_status(args):
     "Wrapper-function, that is probably obsolete."

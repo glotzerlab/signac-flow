@@ -59,6 +59,8 @@ def support_submit_legacy_api(func):
                     "for version 0.4.x!")
             return submit_04(self=self, env=env, *args, **kwargs)
         elif api_version == 5:
+            if 'serial' in kwargs and 'parallel' not in kwargs:
+                kwargs['parallel'] = not kwargs.pop('serial')
             return func(self, env=env, _api_version=5, *args, **kwargs)
         else:
             return func(self, env=env, *args, **kwargs)

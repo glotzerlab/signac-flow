@@ -26,41 +26,9 @@ class FakeScheduler(Scheduler):
         return
         yield
 
-    def submit(self, script, flags=None, *args, **kwargs):
-        """Pretend to submit a script for execution to the scheduler.
-
-        :param script:
-            The job script submitted for execution.
-        :type script:
-            str
-        :param flags:
-            Additional arguments to pass through to the scheduler submission command.
-        :type flags:
-            list
-        :returns:
-            The cluster job id if the script was successfully submitted, otherwise None.
-        """
-        if flags is None:
-            flags = []
-
-        def format_arg(k, v):
-            "Format a key-value pair for output such that it looks like a command line argument."
-            if v is True:
-                return '--{}'.format(k)
-            elif v is False or v is None:
-                return
-            else:
-                return '--{}={}'.format(k, v)
-
-        fake_cmd = ""
-        if kwargs:
-            fake_cmd += ' '.join(filter(None, (format_arg(k, v) for k, v in kwargs.items()))) + ' '
-        if flags:
-            fake_cmd += ' '.join(flags) + ' '
-        print("# Submit command: testsub {}".format(fake_cmd.strip()))
+    def submit(self, script, **kwargs):
+        "Just print the script to screen."
         print(script)
-        # return status is None, meaning, 'not actually submitted'
-        return None
 
     @classmethod
     def is_present(cls):

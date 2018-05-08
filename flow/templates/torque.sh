@@ -1,4 +1,4 @@
-{% extends "base_submit.sh" %}
+{% extends "base_script.sh" %}
 {% block header %}
 #PBS -N {{ id }}
 {% if walltime is not none %}

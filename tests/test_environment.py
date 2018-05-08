@@ -55,7 +55,6 @@ class ProjectTest(unittest.TestCase):
         with redirect_stdout(tmp_out):
             env.submit(sscript, hold=True)
         tmp_out.seek(0)
-        self.assertEqual(tmp_out.read(), "# Submit command: testsub --hold\n#TEST a=0\n\n")
 
     def test_environment_get_config_value(self):
         env = get_environment(test=True)

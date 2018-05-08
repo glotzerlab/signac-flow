@@ -1,4 +1,4 @@
-{% extends "base_submit.sh" %}
+{% extends "base_script.sh" %}
 {% block header %}
 #!/bin/bash
 #SBATCH --job-name="{{ id }}"

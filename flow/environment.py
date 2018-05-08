@@ -195,7 +195,7 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
     scheduler_type = None
     hostname_pattern = None
     submit_flags = None
-    template = 'base_submit.sh'
+    template = 'base_script.sh'
 
     @classmethod
     def script(cls, **kwargs):
@@ -270,11 +270,7 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
         :type parser:
             :class:`argparse.ArgumentParser`
         """
-        parser.add_argument(
-            '--template',
-            default=cls.template,
-            help="The template script to use for submission scripts. "
-                 "Default='templates/{}'.".format(cls.template))
+        return
 
     @classmethod
     def get_config_value(cls, key, default=_GET_CONFIG_VALUE_NONE):
@@ -311,7 +307,7 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
                 return default
 
 
-class UnknownEnvironment(ComputeEnvironment):
+class StandardEnvironment(ComputeEnvironment):
     "This is a default environment, which is always present."
 
     @classmethod
@@ -319,12 +315,18 @@ class UnknownEnvironment(ComputeEnvironment):
         return True
 
     @classmethod
-    def get_scheduler(cls):
-        raise NoSchedulerError("No scheduler defined for unknown environment.")
-
-    @classmethod
     def mpi_cmd(cls, cmd, np):
         return 'mpirun -np {np} {cmd}'.format(np=np, cmd=cmd)
+
+
+class UnknownEnvironment(StandardEnvironment):
+    "Deprecated 'standard' environment, replaced by 'StandardEnvironment.'"
+
+    def __init__(self, *args, **kwargs):
+        super(
+            "The 'UnknownEnvironment' class has been replaced by the "
+            "'StandardEnvironment' class.", DeprecationWarning)
+        super(UnknownEnvironment, self).__init__(*args, **kwargs)
 
 
 class TestEnvironment(ComputeEnvironment):
@@ -567,4 +569,4 @@ def get_environment(test=False, import_configured=True):
                 logger.debug("Select environment '{}'; is present.".format(env_type.__name__))
                 return env_type
         else:
-            return UnknownEnvironment
+            return StandardEnvironment

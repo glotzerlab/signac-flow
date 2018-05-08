@@ -154,10 +154,10 @@ class ProjectTest(unittest.TestCase):
         project = self.mock_project()
         if project._legacy_templating:
             return
-        template_dir = os.path.join(project.root_directory(), 'templates')
+        template_dir = project._template_dir
         os.mkdir(template_dir)
-        with open(os.path.join(template_dir, 'run.sh'), 'w') as file:
-            file.write("{% extends base_run %}\n")
+        with open(os.path.join(template_dir, 'script.sh'), 'w') as file:
+            file.write("{% extends base_script %}\n")
             file.write("{% block header %}\n")
             file.write("THIS IS A CUSTOM SCRIPT!\n")
             file.write("{% endblock %}\n")

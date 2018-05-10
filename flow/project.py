@@ -237,23 +237,29 @@ class JobOperation(object):
         The command that executes this operation.
     :type cmd:
         str
+    :param directives:
+        A dictionary of additional parameters that provide instructions on how
+        to execute this operation, e.g., specifically required resources.
+    :type directives:
+        :class:`dict`
     """
     def __init__(self, name, job, cmd, directives=None, np=None):
         if directives is None:
             directives = dict()
-        if np is not None:
-            warnings.warn(
-                "The np argument for the JobOperation constructor is deprecated.",
-                DeprecationWarning)
         self.name = name
         self.job = job
         self.cmd = cmd
 
         # Handle deprecated np argument:
+        if np is not None:
+            warnings.warn(
+                "The np argument for the JobOperation constructor is deprecated.",
+                DeprecationWarning)
         np = directives.get('np', 1) if np is None else np
         assert directives.setdefault('np', np) == np
         # Future: directives.setdefault('np', 1)
 
+        # Evaluate strings and callables for job:
         def evaluate(value):
             if value and callable(value):
                 return value(job)
@@ -261,21 +267,21 @@ class JobOperation(object):
                 return value.format(job=job)
             else:
                 return value
-
-        # Evaluate strings and callables for job:
         directives = {key: evaluate(value) for key, value in directives.items()}
+
+        # The directives dict is stored as SimpleNamespace for easier use in a template context.
         self.directives = SimpleNamespace(** directives)
 
     def __str__(self):
         return "{}({})".format(self.name, self.job)
 
     def __repr__(self):
-        return "{type}(name='{name}', job='{job}', cmd={cmd}, np={np})".format(
+        return "{type}(name='{name}', job='{job}', cmd={cmd}, directives={directives})".format(
             type=type(self).__name__,
             name=self.name,
             job=str(self.job),
             cmd=repr(self.cmd),
-            np=self.np)
+            directives=self.directives)
 
     def get_id(self):
         "Return a name, which identifies this job-operation."
@@ -379,10 +385,11 @@ class FlowOperation(object):
         post-conditions to determine completion
     :type pre:
         sequence of callables
-    :param np:
-        Specify the number of processors this operation requires, defaults to 1.
-    :type np:
-        int
+    :param directives:
+        A dictionary of additional parameters that provide instructions on how
+        to execute this operation, e.g., specifically required resources.
+    :type directives:
+        :class:`dict`
     """
     def __init__(self, cmd, pre=None, post=None, directives=None, np=None):
         if pre is None:
@@ -394,7 +401,9 @@ class FlowOperation(object):
 
         # Handle deprecated np argument.
         if np is not None:
-            warnings.warn("The np argument is deprecated.", DeprecationWarning)
+            warnings.warn(
+                "The np argument for the FlowOperation() constructor is deprecated.",
+                DeprecationWarning)
             if self._directives is None:
                 self._directives = dict(np=np)
             else:
@@ -1647,7 +1656,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             elif bool(label_value) is True:
                 yield label_name
 
-    def add_operation(self, name, cmd, pre=None, post=None, np=None, **kwargs):
+    def add_operation(self, name, cmd, pre=None, post=None, **kwargs):
         """
         Add an operation to the workflow.
 
@@ -1706,15 +1715,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             post-conditions to determine completion
         :type pre:
             sequence of callables
-        :param np:
-            Specify the number of processors this operation requires,
-            defaults to 1.
-        :type np:
-            int
         """
         if name in self.operations:
             raise KeyError("An operation with this identifier is already added.")
-        self.operations[name] = FlowOperation(cmd=cmd, pre=pre, post=post, np=np, **kwargs)
+        self.operations[name] = FlowOperation(cmd=cmd, pre=pre, post=post, directives=kwargs)
 
     def classify(self, job):
         """Generator function which yields labels for job.

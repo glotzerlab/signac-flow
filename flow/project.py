@@ -55,7 +55,6 @@ from .util.misc import _format_timedelta
 from .util.misc import write_human_readable_statepoint
 from .util.misc import add_cwd_to_environment_pythonpath
 from .util.misc import switch_to_directory
-from .util.misc import SimpleNamespace
 from .util.translate import abbreviate
 from .util.translate import shorten
 from .labels import label
@@ -267,10 +266,8 @@ class JobOperation(object):
                 return value.format(job=job)
             else:
                 return value
-        directives = {key: evaluate(value) for key, value in directives.items()}
 
-        # The directives dict is stored as SimpleNamespace for easier use in a template context.
-        self.directives = SimpleNamespace(** directives)
+        self.directives = {key: evaluate(value) for key, value in directives.items()}
 
     def __str__(self):
         return "{}({})".format(self.name, self.job)

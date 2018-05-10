@@ -18,6 +18,7 @@ from .project import label
 from .project import classlabel
 from .project import staticlabel
 from .project import cmd
+from .project import directives
 from .environment import get_environment
 from .operations import run
 from .template import init
@@ -35,6 +36,7 @@ __all__ = [
     'classlabel',
     'staticlabel',
     'cmd',
+    'directives',
     'get_environment',
     'run',
     'init',

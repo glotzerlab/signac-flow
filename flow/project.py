@@ -55,6 +55,7 @@ from .util.misc import _format_timedelta
 from .util.misc import write_human_readable_statepoint
 from .util.misc import add_cwd_to_environment_pythonpath
 from .util.misc import switch_to_directory
+from .util.misc import SimpleNamespace
 from .util.translate import abbreviate
 from .util.translate import shorten
 from .labels import label
@@ -126,8 +127,24 @@ def _execute(cmd, timeout=None):
 
 
 def cmd(func):
+    "Label this function to return a command."
     setattr(func, '_flow_cmd', True)
     return func
+
+
+class directives(object):
+    """Decorator for operation functions to provide additional execution directives.
+
+    These directives are passed on to the JobOperation instance and can for example
+    be used to get information about required resources, such as the number
+    of required processing units."""
+
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def __call__(self, func):
+        setattr(func, '_flow_directives', self.kwargs)
+        return func
 
 
 class _condition(object):
@@ -216,16 +233,38 @@ class JobOperation(object):
         The job instance associated with this operation.
     :type job:
         :py:class:`signac.Job`.
+    :param cmd:
+        The command that executes this operation.
     :type cmd:
         str
     """
-    def __init__(self, name, job, cmd, np=None):
-        if np is None:
-            np = 1
+    def __init__(self, name, job, cmd, directives=None, np=None):
+        if directives is None:
+            directives = dict()
+        if np is not None:
+            warnings.warn(
+                "The np argument for the JobOperation constructor is deprecated.",
+                DeprecationWarning)
         self.name = name
         self.job = job
         self.cmd = cmd
-        self.np = np
+
+        # Handle deprecated np argument:
+        np = directives.get('np', 1) if np is None else np
+        assert directives.setdefault('np', np) == np
+        # Future: directives.setdefault('np', 1)
+
+        def evaluate(value):
+            if value and callable(value):
+                return value(job)
+            elif isinstance(value, six.string_types):
+                return value.format(job=job)
+            else:
+                return value
+
+        # Evaluate strings and callables for job:
+        directives = {key: evaluate(value) for key, value in directives.items()}
+        self.directives = SimpleNamespace(** directives)
 
     def __str__(self):
         return "{}({})".format(self.name, self.job)
@@ -345,15 +384,21 @@ class FlowOperation(object):
     :type np:
         int
     """
-    def __init__(self, cmd, pre=None, post=None, np=None):
+    def __init__(self, cmd, pre=None, post=None, directives=None, np=None):
         if pre is None:
             pre = []
         if post is None:
             post = []
-        if np is None:
-            np = 1
         self._cmd = cmd
-        self._np = np
+        self.directives = directives
+
+        # Handle deprecated np argument.
+        if np is not None:
+            warnings.warn("The np argument is deprecated.", DeprecationWarning)
+            if self._directives is None:
+                self._directives = dict(np=np)
+            else:
+                assert self._directives.setdefault('np', np) == np
 
         self._prereqs = [FlowCondition(cond) for cond in pre]
         self._postconds = [FlowCondition(cond) for cond in post]
@@ -384,7 +429,7 @@ class FlowOperation(object):
             return self._cmd.format(job=job)
 
     def np(self, job):
-        "Return the number of processors this operation requires."
+        "(deprecated) Return the number of processors this operation requires."
         if callable(self._np):
             return self._np(job)
         else:
@@ -1722,7 +1767,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         for name in sorted(self.operations):
             op = self.operations[name]
             if op.eligible(job):
-                yield JobOperation(name=name, job=job, cmd=op(job), np=op.np(job))
+                yield JobOperation(name=name, job=job, cmd=op(job), directives=op.directives)
 
     def next_operation(self, job):
         """Determine the next operation for this job.
@@ -1789,12 +1834,14 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 self._operations[name] = FlowOperation(
                     cmd=func,
                     pre=getattr(func, '_flow_pre', None),
-                    post=getattr(func, '_flow_post', None))
+                    post=getattr(func, '_flow_post', None),
+                    directives=getattr(func, '_flow_directives', None))
             else:
                 self._operations[name] = FlowOperation(
                     cmd=_guess_cmd(func, name),
                     pre=getattr(func, '_flow_pre', None),
-                    post=getattr(func, '_flow_post', None))
+                    post=getattr(func, '_flow_post', None),
+                    directives=getattr(func, '_flow_directives', None))
                 self._operation_functions[name] = func
 
     @property

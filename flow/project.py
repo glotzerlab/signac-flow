@@ -829,36 +829,93 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
     @_support_legacy_api
     def run(self, jobs=None, names=None, pretend=False, timeout=None, num=None,
             num_passes=1, progress=False):
-            if jobs is None:
-                jobs = self
+        """Execute all pending operations for the given selection.
 
-            num_executions = defaultdict(int)
+        This function will run in an infinite loop until all pending operations
+        have been executed or the total number of passes per operation or the total
+        number of exeutions have been reached.
 
-            def select(op):
-                if op is None or (names and op.name not in names):
-                    return False
-                if num_passes > 0 and num_executions.get(op, 0) >= num_passes:
-                    print("Operation '{}' exceeds max. # of "
-                          "allowed passes ({}).".format(op, num_passes), file=sys.stderr)
-                    return False
-                return True
+        By default there is no limit on the total number of executions, but a specific
+        operation will only be executed once per job. This is to avoid accidental
+        infinite loops when no or faulty post conditions are provided.
 
-            for i in count(1):
-                ops = [op for job in jobs for op in self.next_operations(job) if select(op)][:num]
-                if not ops:
-                    break   # No more pending operations.
+        :param jobs:
+            Only execute operations for the given jobs, or all if the arugment is omitted.
+        :type jobs:
+            Sequence of instances :class:`.Job`.
+        :param names:
+            Only execute operations that are in the provided set of names, or all of the
+            argument is omitted.
+        :type names:
+            Sequence of :class:`str`
+        :param pretend:
+            Do not actually execute the operations, but show which command would have been used.
+        :type pretend:
+            bool
+        :param timeout:
+            An optional timeout for each operation in seconds after which execution will
+            be cancelled. Use -1 to indicate not timeout (the default).
+        :type timeout:
+            int
+        :param num:
+            The total number of operations that are executed will not exceed this argument
+            if provided.
+        :type num:
+            int
+        :param num_passes:
+            The total number of one specific job-operation pair will not exceed this argument.
+            The default is 1, there is no limit if this argumet is `None`.
+        :type num_passes:
+            int
+        :param progress:
+            Show a progress bar during execution.
+        :type progess:
+            bool
+        """
+        # If no jobs argument is provided, we run operations for all jobs.
+        if jobs is None:
+            jobs = self
+        jobs = list(jobs)   # Ensure that the list of jobs does not change during execution.
 
-                print(
-                    "Executing {} operations (Pass # {:02d})...".format(len(ops), i),
-                    file=sys.stderr)
-                self.run_operations(ops, pretend=pretend, timeout=timeout, progress=progress)
-                if num is not None:
-                    num = max(0, num - len(ops))
-                for op in ops:
-                    num_executions[op] += 1
-            else:                       # Else block triggered if there are remaining pending jobs,
-                logger.warning(         # but maximum number of passes is exhausted.
-                    "Reached maximum number of passes, but there are still operations pending.")
+        # Negative values for the execution limits, means 'no limit'.
+        if num_passes and num_passes < 0:
+            num_passes = None
+        if num and num < 0:
+            num = None
+
+        def select(operation):
+            if num is not None and select.total_execution_count >= num:
+                logger.warning(
+                    "Reached the maximum number of operations that can be executed, but "
+                    "there are still operations pending.")
+                return False    # Reached total number of executions
+
+            if num_passes is not None and select.num_executions.get(operation, 0) >= num_passes:
+                print("Operation '{}' exceeds max. # of "
+                      "allowed passes ({}).".format(operation, num_passes), file=sys.stderr)
+                return False    # Reached maximum number of passes for this operation.
+
+            # Increase execution counters for this operation.
+            select.num_executions[operation] += 1
+            select.total_execution_count += 1
+            return True
+
+        # Keep track of all executed job-operations; the number of executions
+        # of each individual job-operation cannot exceed num_passes.
+        select.num_executions = defaultdict(int)
+
+        # Keep track of the total execution count, it may not exceed the value given by
+        # num, if not None.
+        # Note: We are not using sum(select.num_execution.values()) for efficiency.
+        select.total_execution_count = 0
+
+        for i_pass in count(1):
+            operations = list(filter(select, self._get_pending_operations(jobs, names)))
+            if not operations:
+                break   # No more pending operations or execution limits reached.
+            logger.info(
+                "Executing {} operation(s) (Pass # {:02d})...".format(len(operations), i_pass))
+            self.run_operations(operations, pretend=pretend, timeout=timeout, progress=progress)
 
     def _generate_operations(self, cmd, jobs, requires=None):
         "Generate job-operations for a given 'direct' command."
@@ -885,7 +942,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
         :param operations:
             The operations to execute.
-        :type operatons:
+        :type operations:
             Sequence of instances of :class:`.JobOperation`
         :param parallel:
             Execute all operations in parallel (default is False).
@@ -1831,19 +1888,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             else:
                 jobs = self
 
-            # Gather all pending operations ...
-            ops = self._get_pending_operations(jobs, args.operation_name)
-            ops = list(islice(ops, args.num))
-
             # Setup partial run function, because we need to call this either
             # inside some context managers or not based on whether we need
             # to switch to the project root directory or not.
-            run = functools.partial(
-                self.run_operations,
-                operations=ops,
-                pretend=args.pretend,
-                timeout=args.timeout,
-                progress=args.progress)
+            run = functools.partial(self.run,
+                                    jobs=jobs, names=args.operation_name, pretend=args.pretend,
+                                    timeout=args.timeout, num=args.num, num_passes=args.num_passes,
+                                    progress=args.progress)
 
             if args.switch_to_project_root:
                 with add_cwd_to_environment_pythonpath():

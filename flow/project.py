@@ -772,7 +772,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         status = job.document.get('status', dict())
         result['active'] = is_active(status)
         result['labels'] = sorted(set(self.classify(job)))
-        result['operation'] = self.next_operation(job)
+        result['operation'] = self.next_operation(job).name
         highest_status = max(status.values()) if len(status) else 1
         result['submission_status'] = [JobStatus(highest_status).name]
         return result

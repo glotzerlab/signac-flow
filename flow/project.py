@@ -1851,7 +1851,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
         def main_status(tmp):
             "Print status overview."
-            args = {key: val for key, val in vars(tmp).items() if not key in ['func', 'debug']}
+            args = {key: val for key, val in vars(tmp).items()
+                    if key not in ['func', 'debug']}
             try:
                 self.print_status(pool=pool, **args)
             except NoSchedulerError:

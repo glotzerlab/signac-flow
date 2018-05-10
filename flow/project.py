@@ -826,7 +826,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         status = job.document.get('status', dict())
         result['active'] = is_active(status)
         result['labels'] = sorted(set(self.classify(job)))
-        result['operation'] = self.next_operation(job)
+        op = self.next_operation(job)
+        result['operation'] = op.name if op is not None else None
         highest_status = max(status.values()) if len(status) else 1
         result['submission_status'] = [JobStatus(highest_status).name]
         return result
@@ -1899,11 +1900,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             $ python my_project.py --help
         """
 
-        def main_status(args):
+        def main_status(tmp):
             "Print status overview."
-            args = vars(args)
-            del args['func']
-            del args['debug']
+            args = {key: val for key, val in vars(tmp).items()
+                    if key not in ['func', 'debug']}
             try:
                 self.print_status(pool=pool, **args)
             except NoSchedulerError:

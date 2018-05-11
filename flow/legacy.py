@@ -159,6 +159,11 @@ def support_submit_operations_legacy_api(func):
             warnings.warn(
                 "The FlowProject.submit_operations() signature has changed!", DeprecationWarning)
             env, operations = operations, env
+        if 'serial' in kwargs:
+            warnings.warn(
+                "The 'serial' argument for submit_operations() is deprecated and has been "
+                "replaced by the 'parallel' argument as of version 0.7.", DeprecationWarning)
+            kwargs['parallel'] = not kwargs.pop('serial')
         for key in 'nn', 'ppn':
             if key in kwargs:
                 warnings.warn(

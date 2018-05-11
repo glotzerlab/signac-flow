@@ -1177,7 +1177,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         # Bundle them up and submit.
         for bundle in make_bundles(operations, bundle_size):
             status = self.submit_operations(
-                operations=bundle, env=env, serial=not parallel,
+                operations=bundle, env=env, parallel=parallel,
                 force=force, walltime=walltime, **kwargs)
 
             if status is not None:  # operations were submitted, store status

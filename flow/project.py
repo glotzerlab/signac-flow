@@ -513,7 +513,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             trim_blocks=True)
 
         # Setup standard filters that can be used to format context variables.
-        self._template_environment.filters['time_delta'] = _format_timedelta
+        self._template_environment.filters['format_timedelta'] = _format_timedelta
 
     def _get_standard_template_context(self):
         "Return the standard templating context for run and submission scripts."

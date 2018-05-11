@@ -66,6 +66,9 @@ def draw_progressbar(value, total, width=40):
 
 def _format_timedelta(delta):
     "Format a time delta for interpretation by schedulers."
+    if isinstance(delta, int) or isinstance(delta, float):
+        import datetime
+        delta = datetime.timedelta(hours=delta)
     hours, r = divmod(delta.seconds, 3600)
     minutes, seconds = divmod(r, 60)
     hours += delta.days * 24

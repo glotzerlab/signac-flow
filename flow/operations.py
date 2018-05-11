@@ -92,7 +92,6 @@ def run(parser=None):
 
     .. note::
 
-        The execution of operations is automatically parallelized.
         You can control the degree of parallelization with the ``--np`` argument.
 
 
@@ -119,8 +118,9 @@ def run(parser=None):
     parser.add_argument(
         '--np',
         type=int,
-        help="Specify the number of cores to parallelize to. The "
-             "default value of 0 means as many cores as are available.")
+        default=1,
+        help="Specify the number of cores to parallelize to (default=1) or 0 "
+             "to parallelize on as many cores as there are available.")
     parser.add_argument(
         '-t', '--timeout',
         type=int,

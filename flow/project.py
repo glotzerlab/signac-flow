@@ -1794,6 +1794,132 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             return False
         return True
 
+    def _main_status(self, tmp, pool=None):
+        "Print status overview."
+        args = {key: val for key, val in vars(tmp).items()
+                if key not in ['func', 'debug']}
+        try:
+            self.print_status(pool=pool, **args)
+        except NoSchedulerError:
+            self.print_status(pool=pool, **args)
+
+    def _main_next(self, args):
+        "Determine the jobs that are eligible for a specific operation."
+        for job in self:
+            if args.name in {op.name for op in self.next_operations(job)}:
+                print(job)
+
+    def _main_run(self, args):
+        "Run all (or select) job operations."
+        if args.hidden_operation_name:
+            print(
+                "WARNING: "
+                "The run command expects operation names under the -o/--operation argument "
+                "as of version 0.6.\n         Positional arguments will no longer be "
+                "accepted beginning with version 0.7.",
+                file=sys.stderr)
+            if args.operation_name:
+                args.operation_name.extend(args.hidden_operation_name)
+            else:
+                args.operation_name = args.hidden_operation_name
+
+        if args.np is not None:  # Remove completely beginning of version 0.7.
+            raise RuntimeError(
+                "The run --np option is deprecated as of version 0.6!")
+
+        # Select jobs:
+        if args.job_id:
+            jobs = [self.open_job(id=job_id) for job_id in args.job_id]
+        else:
+            jobs = self
+
+        # Setup partial run function, because we need to call this either
+        # inside some context managers or not based on whether we need
+        # to switch to the project root directory or not.
+        run = functools.partial(self.run,
+                                jobs=jobs, names=args.operation_name, pretend=args.pretend,
+                                timeout=args.timeout, num=args.num, num_passes=args.num_passes,
+                                progress=args.progress)
+
+        if args.switch_to_project_root:
+            with add_cwd_to_environment_pythonpath():
+                with switch_to_directory(self.root_directory()):
+                    run()
+        else:
+            run()
+
+    def _main_script(self, args):
+        "Generate a script for the execution of operations."
+        if args.serial:             # Handle legacy API: The --serial option is deprecated
+            if args.parallel:       # as of version 0.6. The default execution mode is 'serial'
+                raise ValueError(   # and can be switched with the '--parallel' argument.
+                    "Cannot provide both --serial and --parallel arguments a the same time! "
+                    "The --serial option is deprecated as of version 0.6!")
+            else:
+                logger.warning(
+                    "The script --serial option is deprecated as of version 0.6, because "
+                    "serial execution is now the default behavior. Please use the '--parallel' "
+                    "argument to execute bundled operations in parallel.")
+
+        if args.requires and not args.cmd:
+            raise ValueError(
+                "The --requires option can only be used in combination with --cmd.")
+        if args.cmd and args.operation_name:
+            raise ValueError(
+                "Cannot use the -o/--operation-name and the --cmd options in combination!")
+
+        # Select jobs:
+        if args.job_id:
+            jobs = [self.open_job(id=job_id) for job_id in args.job_id]
+        else:
+            jobs = self
+
+        # Gather all pending operations or generate them based on a direct command...
+        if args.cmd:
+            ops = self._generate_operations(args.cmd, jobs, args.requires)
+        else:
+            ops = self._get_pending_operations(jobs, args.operation_name)
+        ops = list(islice(ops, args.num))
+
+        # Bundle operations up, generate the script, and print it to screen.
+        for bundle in make_bundles(ops, args.bundle_size):
+            print(self.script(
+                operations=bundle, parallel=args.parallel,
+                template=args.template, show_template_help=args.show_template_help))
+
+    def _main_submit(self, args):
+        kwargs = vars(args)
+
+        # Select jobs:
+        if args.job_id:
+            jobs = [self.open_job(id=job_id) for job_id in args.job_id]
+        else:
+            jobs = self
+
+        # Gather all pending operations ...
+        ops = self._get_pending_operations(jobs, args.operation_name)
+        ops = list(islice(ops, args.num))
+
+        # Bundle operations up, generate the script, and submit to scheduler.
+        for bundle in make_bundles(ops, args.bundle_size):
+            self.submit_operations(operations=bundle, **kwargs)
+
+    def _main_exec(self, args):
+        if len(args.jobid):
+            jobs = [self.open_job(id=jid) for jid in args.jobid]
+        else:
+            jobs = self
+        try:
+            operation = self._operation_functions[args.operation]
+        except KeyError:
+            raise KeyError("Unknown operation '{}'.".format(args.operation))
+
+        if getattr(operation, '_flow_aggregate', False):
+            operation(jobs)
+        else:
+            for job in jobs:
+                operation(job)
+
     def main(self, parser=None, pool=None):
         """Call this function to use the main command line interface.
 
@@ -1817,132 +1943,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
             $ python my_project.py --help
         """
-
-        def main_status(tmp):
-            "Print status overview."
-            args = {key: val for key, val in vars(tmp).items()
-                    if key not in ['func', 'debug']}
-            try:
-                self.print_status(pool=pool, **args)
-            except NoSchedulerError:
-                self.print_status(pool=pool, **args)
-
-        def main_next(args):
-            "Determine the jobs that are eligible for a specific operation."
-            for job in self:
-                if args.name in {op.name for op in self.next_operations(job)}:
-                    print(job)
-
-        def main_run(args):
-            "Run all (or select) job operations."
-            if args.hidden_operation_name:
-                print(
-                    "WARNING: "
-                    "The run command expects operation names under the -o/--operation argument "
-                    "as of version 0.6.\n         Positional arguments will no longer be "
-                    "accepted beginning with version 0.7.",
-                    file=sys.stderr)
-                if args.operation_name:
-                    args.operation_name.extend(args.hidden_operation_name)
-                else:
-                    args.operation_name = args.hidden_operation_name
-
-            if args.np is not None:  # Remove completely beginning of version 0.7.
-                raise RuntimeError(
-                    "The run --np option is deprecated as of version 0.6!")
-
-            # Select jobs:
-            if args.job_id:
-                jobs = [self.open_job(id=job_id) for job_id in args.job_id]
-            else:
-                jobs = self
-
-            # Setup partial run function, because we need to call this either
-            # inside some context managers or not based on whether we need
-            # to switch to the project root directory or not.
-            run = functools.partial(self.run,
-                                    jobs=jobs, names=args.operation_name, pretend=args.pretend,
-                                    timeout=args.timeout, num=args.num, num_passes=args.num_passes,
-                                    progress=args.progress)
-
-            if args.switch_to_project_root:
-                with add_cwd_to_environment_pythonpath():
-                    with switch_to_directory(self.root_directory()):
-                        run()
-            else:
-                run()
-
-        def main_script(args):
-            "Generate a script for the execution of operations."
-            if args.serial:             # Handle legacy API: The --serial option is deprecated
-                if args.parallel:       # as of version 0.6. The default execution mode is 'serial'
-                    raise ValueError(   # and can be switched with the '--parallel' argument.
-                        "Cannot provide both --serial and --parallel arguments a the same time! "
-                        "The --serial option is deprecated as of version 0.6!")
-                else:
-                    logger.warning(
-                        "The script --serial option is deprecated as of version 0.6, because "
-                        "serial execution is now the default behavior. Please use the '--parallel' "
-                        "argument to execute bundled operations in parallel.")
-
-            if args.requires and not args.cmd:
-                raise ValueError(
-                    "The --requires option can only be used in combination with --cmd.")
-            if args.cmd and args.operation_name:
-                raise ValueError(
-                    "Cannot use the -o/--operation-name and the --cmd options in combination!")
-
-            # Select jobs:
-            if args.job_id:
-                jobs = [self.open_job(id=job_id) for job_id in args.job_id]
-            else:
-                jobs = self
-
-            # Gather all pending operations or generate them based on a direct command...
-            if args.cmd:
-                ops = self._generate_operations(args.cmd, jobs, args.requires)
-            else:
-                ops = self._get_pending_operations(jobs, args.operation_name)
-            ops = list(islice(ops, args.num))
-
-            # Bundle operations up, generate the script, and print it to screen.
-            for bundle in make_bundles(ops, args.bundle_size):
-                print(self.script(
-                    operations=bundle, parallel=args.parallel,
-                    template=args.template, show_template_help=args.show_template_help))
-
-        def main_submit(args):
-            kwargs = vars(args)
-
-            # Select jobs:
-            if args.job_id:
-                jobs = [self.open_job(id=job_id) for job_id in args.job_id]
-            else:
-                jobs = self
-
-            # Gather all pending operations ...
-            ops = self._get_pending_operations(jobs, args.operation_name)
-            ops = list(islice(ops, args.num))
-
-            # Bundle operations up, generate the script, and submit to scheduler.
-            for bundle in make_bundles(ops, args.bundle_size):
-                self.submit_operations(operations=bundle, **kwargs)
-
-        def main_exec(args):
-            if len(args.jobid):
-                jobs = [self.open_job(id=jid) for jid in args.jobid]
-            else:
-                jobs = self
-            try:
-                operation = self._operation_functions[args.operation]
-            except KeyError:
-                raise KeyError("Unknown operation '{}'.".format(args.operation))
-
-            if getattr(operation, '_flow_aggregate', False):
-                operation(jobs)
-            else:
-                for job in jobs:
-                    operation(job)
+        if pool is not None:
+            logger.warning(
+                "The 'pool' argument for the FlowProject.main() function is deprecated!")
 
         if parser is None:
             parser = argparse.ArgumentParser()
@@ -1956,7 +1959,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
         parser_status = subparsers.add_parser('status')
         self._add_print_status_args(parser_status)
-        parser_status.set_defaults(func=main_status)
+        parser_status.set_defaults(func=self._main_status)
 
         parser_next = subparsers.add_parser(
             'next',
@@ -1965,7 +1968,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             'name',
             type=str,
             help="The name of the operation.")
-        parser_next.set_defaults(func=main_next)
+        parser_next.set_defaults(func=self._main_next)
 
         parser_run = subparsers.add_parser('run')
         parser_run.add_argument(          # Hidden positional arguments for backwards-compatibility.
@@ -2006,21 +2009,21 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             type=int,
             help="(deprecated) Specify the number of cores to parallelize to. "
                  "This option is deprecated as of version 0.6.")
-        parser_run.set_defaults(func=main_run)
+        parser_run.set_defaults(func=self._main_run)
 
         parser_script = subparsers.add_parser('script')
         self._add_operation_selection_arg_group(parser_script)
         self._add_operation_bundling_arg_group(parser_script)
         self._add_direct_cmd_arg_group(parser_script)
         self._add_template_arg_group(parser_script)
-        parser_script.set_defaults(func=main_script)
+        parser_script.set_defaults(func=self._main_script)
 
         parser_submit = subparsers.add_parser('submit')
         self._add_submit_args(parser_submit)
         env_group = parser_submit.add_argument_group(
             '{} options'.format(self._environment.__name__))
         self._environment.add_args(env_group)
-        parser_submit.set_defaults(func=main_submit)
+        parser_submit.set_defaults(func=self._main_submit)
 
         parser_exec = subparsers.add_parser('exec')
         parser_exec.add_argument(
@@ -2034,7 +2037,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             nargs='*',
             help="The job ids, as registered in the signac project. "
                  "Omit to default to all statepoints.")
-        parser_exec.set_defaults(func=main_exec)
+        parser_exec.set_defaults(func=self._main_exec)
 
         args = parser.parse_args()
         if not hasattr(args, 'func'):

@@ -554,19 +554,34 @@ def get_environment(test=False, import_configured=True):
     if test:
         return TestEnvironment
     else:
+        # Return a globally specified environment
         if ENVIRONMENT is not None:
             return ENVIRONMENT
+
+        # Obtain a list of all registered environments
         env_types = registered_environments(import_configured=import_configured)
         logger.debug(
             "List of registered environments:\n\t{}".format(
                 '\n\t'.join((str(env.__name__) for env in env_types))))
+
+        # Select environment based on environment variable if set.
+        env_from_env_var = os.environ.get('SIGNAC_FLOW_ENVIRONMENT')
+        if env_from_env_var:
+            for env_type in env_types:
+                if env_type.__name__ == env_from_env_var:
+                    return env_type
+
+        # Select based on DEBUG flag:
         for env_type in env_types:
             if getattr(env_type, 'DEBUG', False):
                 logger.debug("Select environment '{}'; DEBUG=True.".format(env_type.__name__))
                 return env_type
+
+        # Default selection:
         for env_type in reversed(env_types):
             if env_type.is_present():
                 logger.debug("Select environment '{}'; is present.".format(env_type.__name__))
                 return env_type
-        else:
-            return StandardEnvironment
+
+        # Otherwise, just return a standard environment
+        return StandardEnvironment

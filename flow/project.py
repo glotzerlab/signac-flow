@@ -1043,7 +1043,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 raise RuntimeError(
                     "In legacy templating mode, unable to use template '{}'.".format(fn_template))
             script = env.script(_id=_id, **kwargs)
-            self.write_script(script=script, operations=operations, background=parallel, **kwargs)
+            background = kwargs.pop('parallel', not kwargs.pop('serial', False))
+            self.write_script(script=script, operations=operations, background=background, **kwargs)
             script.seek(0)
             return script.read()
         else:

@@ -37,6 +37,8 @@ def support_submit_legacy_api(func):
                     api_version = 4
                 else:
                     api_version = 5
+        elif any(key in kwargs for key in ('nn', 'np', 'ppn')):
+            api_version = 5
 
         # Raise an exception or warn based on the detected API version.
         if api_version is None:
@@ -157,6 +159,13 @@ def support_submit_operations_legacy_api(func):
             warnings.warn(
                 "The FlowProject.submit_operations() signature has changed!", DeprecationWarning)
             env, operations = operations, env
+        for key in 'nn', 'ppn':
+            if key in kwargs:
+                warnings.warn(
+                    "The '{}' argument should be provided as part of the operation "
+                    "directives as of version 0.7.".format(key), DeprecationWarning)
+                for op in operations:
+                    assert op.directives.setdefault('key', kwargs[key]) == kwargs[key]
         return func(self, operations=operations, _id=_id, env=env, *args, **kwargs)
 
     return wrapper

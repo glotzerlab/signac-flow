@@ -39,7 +39,6 @@ from jinja2 import ChoiceLoader
 from jinja2 import FileSystemLoader
 
 from .environment import get_environment
-from .environment import NodesEnvironment
 from .scheduling.base import Scheduler
 from .scheduling.base import ClusterJob
 from .scheduling.base import JobStatus
@@ -1032,30 +1031,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 self._show_template_help_and_exit(context)
             return template.render(** context)
 
-    def _generate_submit_script(self, _id, operations, parallel=False, template=None,
-                                show_template_help=False, env=None, **kwargs):
-        """Generate submission script to submit the execution of operations to a scheduler.
-        :param _id:
-            The name of the cluster job.
-        :type _id:
-            str
-        :param operations:
-            The operations to execute.
-        :type operatons:
-            Sequence of instances of :class:`.JobOperation`
-        :param parallel:
-            Execute all operations in parallel (default is False).
-        :param parallel:
-            bool
-        :param template:
-            The name of the template to use to generate the script.
-        :type template:
-            str
-        :param show_template_help:
-            Show help related to the templating system and then exit.
-        :type show_template_help:
-            bool
-        """
+    def _generate_submit_script(self, _id, operations, template, show_template_help, env, **kwargs):
+        """Generate submission script to submit the execution of operations to a scheduler."""
         if template is None:
             template = env.template
         assert _id is not None
@@ -1082,8 +1059,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             return template.render(** context)
 
     @_support_legacy_api
-    def submit_operations(self, operations, _id=None, env=None, nn=None, ppn=None, serial=False,
-                          flags=None, force=False, template='script.sh', pretend=False, **kwargs):
+    def submit_operations(self, operations, _id=None, env=None, parallel=False, flags=None,
+                          force=False, template='script.sh', pretend=False,
+                          show_template_help=False, **kwargs):
         """Submit a sequence of operations to the scheduler.
 
         :param operations:
@@ -1094,14 +1072,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             The _id to be used for this submission.
         :type _id:
             str
-        :param nn:
-            The number of nodes to submit do.
-        :type nn:
-            int
-        :param ppn:
-            The number of processors per node.
-        :type ppn:
-            int
         :param serial:
             Execute all bundled operations in serial.
         :type serial:
@@ -1133,39 +1103,29 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         if env is None:
             env = self._environment
 
-        if issubclass(env, NodesEnvironment):
-            if nn is None:
-                if serial:
-                    np_total = max(op.np for op in operations)
-                else:
-                    np_total = sum(op.np for op in operations)
-                try:
-                    nn = env.calc_num_nodes(np_total, ppn, force, **kwargs)
-                except SubmitError as e:
-                    if not (flags or force):
-                        raise e
-
         def _msg(op):
             print("Submitting operation '{}' for job '{}'...".format(op.name, op.job))
             return op
 
         operations = map(_msg, operations)
         script = self._generate_submit_script(
-            # standard arguments:
-            _id=_id, operations=operations, parallel=not serial, env=env,
-            # template arguments:
-            template=template, show_template_help=kwargs.get('show_template_help'),
-            # legacy arguments:
-            nn=nn, ppn=ppn, force=force or flags
+            _id=_id,
+            operations=list(operations),
+            template=template,
+            show_template_help=show_template_help,
+            env=env,
+            parallel=parallel,
+            force=force,
+            **kwargs,
             )
         if pretend:
             print(script)
         else:
-            return env.submit(_id=_id, script=script, nn=nn, ppn=ppn, flags=flags, **kwargs)
+            return env.submit(_id=_id, script=script, flags=flags, **kwargs)
 
     @_support_legacy_api
     def submit(self, bundle_size=1, jobs=None, names=None, num=None, parallel=False,
-               force=False, nn=None, ppn=None, walltime=None, env=None, **kwargs):
+               force=False, walltime=None, env=None, **kwargs):
         """Submit function for the project's main submit interface.
 
         :param bundle_size:
@@ -1192,14 +1152,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             Ignore all warnings or checks during submission, just submit.
         :type force:
             bool
-        :param nn:
-            The number of nodes to submit do.
-        :type nn:
-            int
-        :param ppn:
-            The number of processors per node.
-        :type ppn:
-            int
         :param walltime:
             Specify the walltime in hours or as instance of datetime.timedelta.
         """
@@ -1224,7 +1176,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         # Bundle them up and submit.
         for bundle in make_bundles(operations, bundle_size):
             status = self.submit_operations(
-                operations=bundle, env=env, ppn=ppn, serial=not parallel,
+                operations=bundle, env=env, serial=not parallel,
                 force=force, walltime=walltime, **kwargs)
 
             if status is not None:  # operations were submitted, store status

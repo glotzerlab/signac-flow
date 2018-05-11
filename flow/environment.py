@@ -570,6 +570,8 @@ def get_environment(test=False, import_configured=True):
             for env_type in env_types:
                 if env_type.__name__ == env_from_env_var:
                     return env_type
+            else:
+                raise ValueError("Unknown environment '{}'.".format(env_from_env_var))
 
         # Select based on DEBUG flag:
         for env_type in env_types:

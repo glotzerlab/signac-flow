@@ -17,10 +17,10 @@ from .project import JobOperation
 from .project import label
 from .project import classlabel
 from .project import staticlabel
-from .project import cmd
-from .project import directives
-from .environment import get_environment
+from .operations import cmd
+from .operations import directives
 from .operations import run
+from .environment import get_environment
 from .template import init
 from .util.misc import redirect_log
 
@@ -37,8 +37,8 @@ __all__ = [
     'staticlabel',
     'cmd',
     'directives',
-    'get_environment',
     'run',
     'init',
     'redirect_log',
+    'get_environment',
     ]

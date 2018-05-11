@@ -124,27 +124,6 @@ def _execute(cmd, timeout=None):
         subprocess.call(cmd, timeout=timeout, shell=True)
 
 
-def cmd(func):
-    "Label this function to return a command."
-    setattr(func, '_flow_cmd', True)
-    return func
-
-
-class directives(object):
-    """Decorator for operation functions to provide additional execution directives.
-
-    These directives are passed on to the JobOperation instance and can for example
-    be used to get information about required resources, such as the number
-    of required processing units."""
-
-    def __init__(self, **kwargs):
-        self.kwargs = kwargs
-
-    def __call__(self, func):
-        setattr(func, '_flow_directives', self.kwargs)
-        return func
-
-
 class _condition(object):
 
     def __init__(self, condition):

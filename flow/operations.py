@@ -22,6 +22,27 @@ from .util.tqdm import tqdm
 logger = logging.getLogger(__name__)
 
 
+def cmd(func):
+    "Label an operation function to return a command for execution."
+    setattr(func, '_flow_cmd', True)
+    return func
+
+
+class directives(object):
+    """Decorator for operation functions to provide additional execution directives.
+
+    Directives can for example be used to provide information about required resources
+    such as the number of processes required for execution of parallelized operations.
+    """
+
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def __call__(self, func):
+        setattr(func, '_flow_directives', self.kwargs)
+        return func
+
+
 def _get_operations(include_private=False):
     """"Yields the name of all functions that qualify as an operation function.
 

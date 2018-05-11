@@ -24,7 +24,6 @@ import argparse
 import datetime
 import json
 import inspect
-import subprocess
 import functools
 from collections import defaultdict
 from itertools import islice
@@ -56,6 +55,7 @@ from .util.misc import add_cwd_to_environment_pythonpath
 from .util.misc import switch_to_directory
 from .util.translate import abbreviate
 from .util.translate import shorten
+from .util.execution import fork
 from .labels import label
 from .labels import staticlabel
 from .labels import classlabel
@@ -112,16 +112,6 @@ def _support_legacy_api(method):
     All wrapper functions are implemented in the 'legacy' module.
     """
     return getattr(legacy, 'support_{}_legacy_api'.format(method.__name__))(method)
-
-
-def _execute(cmd, timeout=None):
-    "Helper function for py2/3 compatible execution of forked processes."
-    if six.PY2:
-        subprocess.call(cmd, shell=True)
-    elif sys.version_info >= (3, 5):
-        subprocess.run(cmd, timeout=timeout, shell=True)
-    else:    # Older high-level API
-        subprocess.call(cmd, timeout=timeout, shell=True)
 
 
 class _condition(object):
@@ -851,10 +841,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 logger.info("Execute operation '{}'...".format(operation))
                 if not progress:
                     print("Execute operation '{}'...".format(operation), file=sys.stderr)
-                if six.PY2:
-                    subprocess.call(cmd, shell=True)
-                else:
-                    subprocess.call(cmd, shell=True, timeout=timeout)
+                fork(cmd=cmd, timeout=timeout)
 
     @_support_legacy_api
     def run(self, jobs=None, names=None, pretend=False, timeout=None, num=None,

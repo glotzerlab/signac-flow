@@ -17,6 +17,7 @@ from signac import get_project
 from signac.common import six
 
 from .util.tqdm import tqdm
+from .util.execution import fork
 
 
 logger = logging.getLogger(__name__)
@@ -154,9 +155,17 @@ def run(parser=None):
 
     module = inspect.getmodule(inspect.currentframe().f_back)
     try:
-        operation = getattr(module, args.operation)
+        operation_func = getattr(module, args.operation)
     except AttributeError:
         raise KeyError("Unknown operation '{}'.".format(args.operation))
+
+    if getattr(operation_func, '_flow_cmd', False):
+
+        def operation(job):
+            cmd = operation_func(job).format(job=job)
+            fork(cmd=cmd, timeout=args.timeout)
+    else:
+        operation = operation_func
 
     # Serial execution
     if args.np == 1 or len(jobs) < 2:
@@ -180,3 +189,6 @@ def run(parser=None):
             result = pool.imap_unordered(operation, jobs)
             for _ in tqdm(jobs) if args.progress else jobs:
                 result.next(args.timeout)
+
+
+__all__ = ['cmd', 'directives', 'run']

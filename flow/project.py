@@ -1117,7 +1117,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             env=env,
             parallel=parallel,
             force=force,
-            **kwargs,
+            **kwargs
             )
         if pretend:
             print(script)

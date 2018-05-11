@@ -19,6 +19,7 @@ import logging
 import warnings
 import io
 import importlib
+import argparse
 from math import ceil
 from collections import OrderedDict
 
@@ -387,11 +388,11 @@ class NodesEnvironment(ComputeEnvironment):
         parser.add_argument(
             '--nn',
             type=int,
-            help="Specify the number of nodes.")
+            help=argparse.SUPPRESS)
         parser.add_argument(
             '--ppn',
             type=int,
-            help="Specify the number of processors allocated to each node.")
+            help=argparse.SUPPRESS)
 
     @classmethod
     def calc_num_nodes(cls, np_total, ppn, force=False, **kwargs):

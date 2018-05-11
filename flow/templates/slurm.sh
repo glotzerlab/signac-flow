@@ -2,13 +2,13 @@
 {% block header %}
 #!/bin/bash
 #SBATCH --job-name="{{ id }}"
-{% if nn is not none %}
-#SBATCH --nodes={{ nn }}
+{% if parallel %}
+{% set num_tasks = operations|map(attribute='directives.np')|sum %}
+{% else %}
+{% set num_tasks = operations|map(attribute='directives.np')|max %}
 {% endif %}
-{% if ppn is not none %}
-#SBATCH --ntasks-per-node={{ ppn }}
-{% endif %}
-{% if walltime is not none %}
-#SBATCH -t {{ walltime|timedelta }}
+#SBATCH --ntasks={{ num_tasks }}
+{% if walltime %}
+#SBATCH -t {{ walltime|format_timedelta }}
 {% endif %}
 {% endblock %}

@@ -1917,15 +1917,23 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         else:
             jobs = self
         try:
-            operation = self._operation_functions[args.operation]
+            try:
+                operation_function = self._operation_functions[args.operation]
+            except KeyError:
+                operation = self._operations[args.operation]
+
+                def operation_function(job):
+                    cmd = operation(job).format(job=job)
+                    fork(cmd=cmd)
+
         except KeyError:
             raise KeyError("Unknown operation '{}'.".format(args.operation))
 
-        if getattr(operation, '_flow_aggregate', False):
-            operation(jobs)
+        if getattr(operation_function, '_flow_aggregate', False):
+            operation_function(jobs)
         else:
             for job in jobs:
-                operation(job)
+                operation_function(job)
 
     def main(self, parser=None, pool=None):
         """Call this function to use the main command line interface.

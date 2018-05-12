@@ -1173,6 +1173,22 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         cls._add_template_arg_group(parser)
 
     @classmethod
+    def _add_script_args(cls, parser):
+        cls._add_operation_selection_arg_group(parser)
+        execution_group = parser.add_argument_group('execution')
+        execution_group.add_argument(
+            '-p', '--parallel',
+            action='store_true',
+            help="Execute all operations in parallel.")
+        execution_group.add_argument(   # TODO: Remove with version 0.7.
+            '-s', '--serial',
+            action='store_const',
+            const=True,
+            help=argparse.SUPPRESS)
+        cls._add_direct_cmd_arg_group(parser)
+        cls._add_template_arg_group(parser)
+
+    @classmethod
     def _add_template_arg_group(cls, parser, default='script.sh'):
         "Add argument group to parser for template handling."
         template_group = parser.add_argument_group(
@@ -1868,16 +1884,15 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
         # Gather all pending operations or generate them based on a direct command...
         if args.cmd:
-            ops = self._generate_operations(args.cmd, jobs, args.requires)
+            operations = self._generate_operations(args.cmd, jobs, args.requires)
         else:
-            ops = self._get_pending_operations(jobs, args.operation_name)
-        ops = list(islice(ops, args.num))
+            operations = self._get_pending_operations(jobs, args.operation_name)
+        operations = list(islice(operations, args.num))
 
-        # Bundle operations up, generate the script, and print it to screen.
-        for bundle in make_bundles(ops, args.bundle_size):
-            print(self.script(
-                operations=bundle, parallel=args.parallel,
-                template=args.template, show_template_help=args.show_template_help))
+        # Generate the script and print to screen.
+        print(self.script(
+            operations=operations, parallel=args.parallel,
+            template=args.template, show_template_help=args.show_template_help))
 
     def _main_submit(self, args):
         kwargs = vars(args)
@@ -2004,10 +2019,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         parser_run.set_defaults(func=self._main_run)
 
         parser_script = subparsers.add_parser('script')
-        self._add_operation_selection_arg_group(parser_script)
-        self._add_operation_bundling_arg_group(parser_script)
-        self._add_direct_cmd_arg_group(parser_script)
-        self._add_template_arg_group(parser_script)
+        self._add_script_args(parser_script)
         parser_script.set_defaults(func=self._main_script)
 
         parser_submit = subparsers.add_parser('submit')
@@ -2081,7 +2093,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
     def add_script_args(cls, parser):
         warnings.warn(
             "The add_script_args() method is private as of version 0.6.", DeprecationWarning)
-        return cls._add_operation_selection_and_bundling_args(parser=parser)
+        return cls._add_script_args(parser=parser)
 
     @classmethod
     def add_print_status_args(cls, parser):

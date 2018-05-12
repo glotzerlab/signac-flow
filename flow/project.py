@@ -1673,19 +1673,14 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 yield name
 
     def next_operations(self, job):
-        """Determine the next operations for job.
-
-        You can, but don't have to use this function to simplify
-        the submission process. The default method returns yields all
-        operation that a job is eligible for, as defined by the
-        :py:meth:`~.add_operation` method.
+        """Determine the next eligible operations for job.
 
         :param job:
             The signac job handle.
         :type job:
             :class:`~signac.contrib.job.Job`
         :yield:
-            All instances of JobOperation a job is eligible for.
+            All instances of :class:`~.JobOperation` job is eligible for.
         """
         for name in sorted(self.operations):
             op = self.operations[name]

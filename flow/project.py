@@ -1070,10 +1070,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         if env is None:
             env = self._environment
 
-        print("Submitting cluster job '{}':".format(_id), file=sys.stderr)
+        print("Submitting cluster job '{}':".format(_id), file=sys.stdout)
 
         def _msg(op):
-            print(" - Operation: {}".format(op), file=sys.stderr)
+            print(" - Operation: {}".format(op), file=sys.stdout)
             return op
 
         operations = map(_msg, operations)

@@ -2068,6 +2068,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             print("Error: Failed to complete execution due to "
                   "timeout ({}s).".format(args.timeout), file=sys.stderr)
             _exit_or_raise()
+        except AssertionError as error:
+            if not args.debug:
+                print("ERROR: Encountered AssertionError during program execution. "
+                      "Run with '--debug' to get more information.", file=sys.stderr)
+            _exit_or_raise()
         except Exception as error:
             print("ERROR:", error, file=sys.stderr)
             _exit_or_raise()

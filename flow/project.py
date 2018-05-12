@@ -1217,7 +1217,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                  "and filter funtions; then exit.")
 
     @classmethod
-    def _add_operation_selection_arg_group(cls, parser):
+    def _add_operation_selection_arg_group(cls, parser, operations=None):
         "Add argument group to parser for job-operation selection."
         selection_group = parser.add_argument_group(
             'job-operation selection',
@@ -1232,6 +1232,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             '-o', '--operation',
             dest='operation_name',
             nargs='+',
+            choices=operations,
             help="Only select operations that match the given operation name(s).")
         selection_group.add_argument(
             '-n', '--num',
@@ -1991,7 +1992,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             type=str,
             nargs='*',
             help=argparse.SUPPRESS)
-        self._add_operation_selection_arg_group(parser_run)
+        self._add_operation_selection_arg_group(parser_run, list(sorted(self._operations)))
 
         execution_group = parser_run.add_argument_group('execution')
         execution_group.add_argument(

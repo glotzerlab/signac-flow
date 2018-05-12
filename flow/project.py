@@ -1752,19 +1752,16 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             if name in self._operations:
                 raise ValueError(
                     "Repeat definition of operation with name '{}'.".format(name))
-            returns_cmd = getattr(func, '_flow_cmd', False)
-            if returns_cmd:
-                self._operations[name] = FlowOperation(
-                    cmd=func,
-                    pre=getattr(func, '_flow_pre', None),
-                    post=getattr(func, '_flow_post', None),
-                    directives=getattr(func, '_flow_directives', None))
+
+            # Extract pre/post conditions and directives from function:
+            params = {key: getattr(func, '_flow_{}'.format(key), None)
+                      for key in ('pre', 'post', 'directives')}
+
+            # Construct FlowOperation:
+            if getattr(func, '_flow_cmd', False):
+                self._operations[name] = FlowOperation(cmd=func, **params)
             else:
-                self._operations[name] = FlowOperation(
-                    cmd=_guess_cmd(func, name),
-                    pre=getattr(func, '_flow_pre', None),
-                    post=getattr(func, '_flow_post', None),
-                    directives=getattr(func, '_flow_directives', None))
+                self._operations[name] = FlowOperation(cmd=_guess_cmd(func, name), **params)
                 self._operation_functions[name] = func
 
     @property

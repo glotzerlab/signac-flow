@@ -39,8 +39,14 @@ class directives(object):
     def __init__(self, **kwargs):
         self.kwargs = kwargs
 
+    @classmethod
+    def copy_from(cls, func):
+        return cls(** getattr(func, '_flow_directives', dict()))
+
     def __call__(self, func):
-        setattr(func, '_flow_directives', self.kwargs)
+        directives = getattr(func, '_flow_directives', dict())
+        directives.update(self.kwargs)
+        setattr(func, '_flow_directives', directives)
         return func
 
 

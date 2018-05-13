@@ -1721,13 +1721,14 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
     @classmethod
     def operation(cls, func, name=None):
-        "Add the function 'func' as operator function to the class definition."
+        "Add the function 'func' as operation function to the class definition."
         if isinstance(func, six.string_types):
             return lambda op: cls.operation(op, name=func)
+
         if name is None:
             name = func.__name__
 
-        if name in cls._OPERATION_FUNCTIONS:
+        if (name, func) in cls._OPERATION_FUNCTIONS:
             raise ValueError(
                 "An operation with name '{}' is already registered.".format(name))
 

@@ -169,13 +169,13 @@ class ProjectClassTest(BaseProjectTest):
         class A(FlowProject):
             pass
 
-        @A.operation
-        @A.operation
-        def op1(job):
-            pass
-
         with self.assertRaises(ValueError):
-            A.get_project(root=self._tmp_dir.name)
+            @A.operation
+            @A.operation
+            def op1(job):
+                pass
+
+        return
 
     def test_repeat_operation_definition_with_inheritance(self):
 

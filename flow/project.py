@@ -1758,7 +1758,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             operations.extend(getattr(cls, '_OPERATION_FUNCTIONS', []))
 
         def _guess_cmd(func, name):
-            path = inspect.getsourcefile(func)
+            path = getattr(func, '_flow_path', inspect.getsourcefile(func))
             return 'python {} exec {} {{job._id}}'.format(path, name)
 
         for name, func in operations:

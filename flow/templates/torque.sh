@@ -2,7 +2,7 @@
 {% block header %}
 #PBS -N {{ id }}
 {% if walltime is not none %}
-#PBS -l walltime={{ walltime|timedelta }}
+#PBS -l walltime={{ walltime|format_timedelta }}
 {% endif %}
 {% if nn is not none %}
 {% if ppn is none %}

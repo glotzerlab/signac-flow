@@ -4,11 +4,11 @@
 set -e
 set -u
 
-cd {{ project._rd }}
+cd {{ project.config.project_dir }}
 {% endblock %}
 {% block body %}
-{% for operation in operations %}
 
+{% for operation in operations %}
 # Operation '{{ operation.name }}' for job '{{ operation.job._id }}':
 {% if parallel %}
 {{ operation.cmd }} &

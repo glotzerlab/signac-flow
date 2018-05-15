@@ -489,7 +489,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         self._template_dir = os.path.join(
             self.root_directory(), self._config.get('template_dir', 'templates'))
 
-        envs = self._config['flow'].as_list('environment_modules')
+        if self._config.get('flow'):
+            envs = self._config['flow'].as_list('environment_modules')
+        else:
+            envs = []
         load_envs = ([FileSystemLoader(self._template_dir)] +
                      [PackageLoader(env, 'templates') for env in envs] +
                      [PackageLoader('flow', 'templates')])

@@ -73,6 +73,46 @@ class CometEnvironment(DefaultSlurmEnvironment):
                   '(slurm default is "slurm-%%j.out").'))
 
 
+class Stampede2Environment(DefaultSlurmEnvironment):
+    """Environment profile for the Stampede2 supercomputer.
+
+    https://www.tacc.utexas.edu/systems/stampede2
+    """
+    hostname_pattern = '.*stampede2'
+    template = 'stampede2.sh'
+    cores_per_node = 48
+
+    @classmethod
+    def script(cls, _id, tpn, ppn, partition, job_output=None, **kwargs):
+        raise NotImplementedError(
+                "The Stampede2 environment is only available for flow>=0.7")
+
+    @classmethod
+    def mpi_cmd(cls, cmd, np):
+        return "ibrun {cmd}".format(cmd=cmd)
+
+    @classmethod
+    def add_args(cls, parser):
+        super(Stampede2Environment, cls).add_args(parser)
+        # Remove ppn since the full node is always used
+        ppn_id = [i for i, action in enumerate(parser._actions)
+                  if "--ppn" in action.option_strings][0]
+        parser._handle_conflict_resolve(
+                None,
+                [('--ppn', parser._actions[ppn_id])])
+        parser.add_argument(
+            '--partition',
+            choices=['development', 'normal', 'large', 'flat-quadrant',
+                     'skx-dev', 'skx-normal', 'skx-large', 'long'],
+            default='skx-normal',
+            help="Specify the partition to submit to.")
+        parser.add_argument(
+            '--job-output',
+            help=('What to name the job output file. '
+                  'If omitted, uses the system default '
+                  '(slurm default is "slurm-%%j.out").'))
+
+
 class BridgesEnvironment(DefaultSlurmEnvironment):
     """Environment profile for the Bridges super computer.
 

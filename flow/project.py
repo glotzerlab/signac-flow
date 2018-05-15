@@ -51,6 +51,7 @@ from .util.misc import _positive_int
 from .util.misc import _mkdir_p
 from .util.misc import draw_progressbar
 from .util.misc import _format_timedelta
+from .util.misc import _identical
 from .util.misc import write_human_readable_statepoint
 from .util.misc import add_cwd_to_environment_pythonpath
 from .util.misc import switch_to_directory
@@ -490,7 +491,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         self._template_dir = os.path.join(
             self.root_directory(), self._config.get('template_dir', 'templates'))
 
-        if self._config.get('flow'):
+        if self._config.get('flow') and self._config['flow'].get('environment_modules'):
             envs = self._config['flow'].as_list('environment_modules')
         else:
             envs = []
@@ -507,6 +508,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
         # Setup standard filters that can be used to format context variables.
         self._template_environment.filters['format_timedelta'] = _format_timedelta
+        self._template_environment.filters['identical'] = _identical
         self._template_environment.filters['get_config_value'] = flow_config.get_config_value
 
     def _get_standard_template_context(self):

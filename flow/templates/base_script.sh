@@ -1,13 +1,14 @@
 {% block header %}
 {% endblock %}
+
 {% block project_header %}
 set -e
 set -u
 
 cd {{ project.config.project_dir }}
 {% endblock %}
-{% block body %}
 
+{% block body %}
 {% for operation in operations %}
 # Operation '{{ operation.name }}' for job '{{ operation.job._id }}':
 {% if parallel %}

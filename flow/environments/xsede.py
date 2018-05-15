@@ -19,7 +19,7 @@ class CometEnvironment(DefaultSlurmEnvironment):
     http://www.sdsc.edu/services/hpc/hpc_systems.html#comet
     """
     hostname_pattern = 'comet'
-    template = 'xsede.sh'
+    template = 'comet.sh'
     cores_per_node = 24
 
     @classmethod

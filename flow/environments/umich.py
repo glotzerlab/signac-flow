@@ -19,7 +19,7 @@ class FluxEnvironment(DefaultTorqueEnvironment):
         return "mpirun -np {np} {cmd}".format(cmd=cmd, np=np)
 
     @classmethod
-    def script(cls, _id, nn, ppn, mode, **kwargs):
+    def script(cls, _id, nn, ppn, mode, memory, **kwargs):
         if ppn is None:
             ppn = cls.cores_per_node
         js = super(FluxEnvironment, cls).script(_id=_id, **kwargs)

@@ -22,6 +22,7 @@ class TemplateError(Extension):
     """Indicates errors in jinja2 templates"""
     # ref:http://jinja.pocoo.org/docs/2.10/extensions/#jinja-extensions
     tags = set(['raise'])
+
     def parse(self, parser):
         lineno = next(parser.stream).lineno
         args = [parser.parse_expression()]

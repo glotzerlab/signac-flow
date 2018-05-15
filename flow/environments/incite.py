@@ -30,6 +30,7 @@ class EosEnvironment(DefaultTorqueEnvironment):
     https://www.olcf.ornl.gov/computing-resources/eos/
     """
     hostname_pattern = 'eos'
+    template = 'eos.sh'
     cores_per_node = 32
 
     @classmethod

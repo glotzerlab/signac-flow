@@ -851,14 +851,17 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             operations = tqdm(list(operations))
 
         for operation in operations:
-            cmd = operation.cmd
             if pretend:
-                print(cmd)
+                print(operation.cmd)
             else:
                 logger.info("Execute operation '{}'...".format(operation))
                 if not progress:
                     print("Execute operation '{}'...".format(operation), file=sys.stderr)
-                fork(cmd=cmd, timeout=timeout)
+                if timeout is None and operation.name in self._operation_functions:
+                    # Execute without forking if possible...
+                    self._operation_functions[operation.name](operation.job)
+                else:
+                    fork(cmd=operation.cmd, timeout=timeout)
 
     @_support_legacy_api
     def run(self, jobs=None, names=None, pretend=False, timeout=None, num=None,

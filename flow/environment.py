@@ -286,7 +286,7 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
         :raises SubmitError: If the key is not in the user's configuration
             and no default value is provided.
         """
-        return flow_config.get_config_value(key, ns=cls.__name__, default)
+        return flow_config.get_config_value(key, ns=cls.__name__, default=default)
 
 
 class StandardEnvironment(ComputeEnvironment):

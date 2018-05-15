@@ -44,6 +44,7 @@ from .scheduling.base import JobStatus
 from .scheduling.status import update_status
 from .errors import SubmitError
 from .errors import NoSchedulerError
+from .errors import TemplateError
 from .util import tabulate
 from .util.tqdm import tqdm
 from .util.misc import _positive_int
@@ -501,7 +502,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         # 'templates' directory.
         self._template_environment = Environment(
             loader=ChoiceLoader(load_envs),
-            trim_blocks=True)
+            trim_blocks=True,
+            extensions=[TemplateError])
 
         # Setup standard filters that can be used to format context variables.
         self._template_environment.filters['format_timedelta'] = _format_timedelta

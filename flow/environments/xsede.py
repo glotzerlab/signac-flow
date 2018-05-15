@@ -19,6 +19,7 @@ class CometEnvironment(DefaultSlurmEnvironment):
     http://www.sdsc.edu/services/hpc/hpc_systems.html#comet
     """
     hostname_pattern = 'comet'
+    template = 'xsede.sh'
     cores_per_node = 24
 
     @classmethod
@@ -55,7 +56,7 @@ class CometEnvironment(DefaultSlurmEnvironment):
         super(CometEnvironment, cls).add_args(parser)
 
         parser.add_argument(
-          '-p', '--partition',
+          '--partition',
           choices=['compute', 'gpu', 'gpu-shared', 'shared', 'large-shared', 'debug'],
           default='shared',
           help="Specify the partition to submit to.")

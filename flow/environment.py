@@ -31,6 +31,7 @@ from .scheduling.slurm import SlurmScheduler
 from .scheduling.torque import TorqueScheduler
 from .scheduling.fakescheduler import FakeScheduler
 from .scheduling.base import JobStatus
+from .util import config as flow_config
 from .errors import SubmitError
 from .errors import NoSchedulerError
 
@@ -61,19 +62,6 @@ or adjust the processors per node (--ppn).
 
 Alternatively, you can also use --force to ignore this warning.
 """
-
-MISSING_ENV_CONF_KEY_MSG = """Your environment is missing the following configuration key: '{key}'
-Please provide the missing information, for example by adding it to your global configuration:
-
-signac config --global set {key} <VALUE>
-"""
-
-
-class _GetConfigValueNoneType(object):
-    pass
-
-
-_GET_CONFIG_VALUE_NONE = _GetConfigValueNoneType()
 
 
 def setup(py_modules, **attrs):
@@ -274,7 +262,7 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
         return
 
     @classmethod
-    def get_config_value(cls, key, default=_GET_CONFIG_VALUE_NONE):
+    def get_config_value(cls, key, default=flow_config._GET_CONFIG_VALUE_NONE):
         """Request a value from the user's configuration.
 
         This method should be used whenever values need to be provided
@@ -293,19 +281,12 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
         :type key: str
         :param default: A default value in case the key cannot be found
             within the user's configuration.
+        :type key: str
         :return: The value or default value.
         :raises SubmitError: If the key is not in the user's configuration
             and no default value is provided.
         """
-        try:
-            return config.load_config()['flow'][cls.__name__][key]
-        except KeyError:
-            if default is _GET_CONFIG_VALUE_NONE:
-                k = '{}.{}'.format(cls.__name__, key)
-                print(MISSING_ENV_CONF_KEY_MSG.format(key='flow.' + k))
-                raise SubmitError("Missing environment configuration key: '{}'".format(k))
-            else:
-                return default
+        return flow_config.get_config_value(key, ns=cls.__name__)
 
 
 class StandardEnvironment(ComputeEnvironment):

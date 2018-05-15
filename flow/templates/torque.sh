@@ -8,10 +8,13 @@
 {% if ppn is none %}
 #PBS -l nodes={{ nn }}
 {% else %}
-#PBS -L nodes={{ nn }}:ppn={{ ppn }}
+#PBS -l nodes={{ nn }}:ppn={{ ppn }}
 {% endif %}
 {% endif %}
 {% if not no_copy_env %}
 #PBS -V
 {% endif %}
+{# Allows extensions of this script for added options #}
+{% block options %}
+{% endblock %}
 {% endblock %}

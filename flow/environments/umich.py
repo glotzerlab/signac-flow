@@ -25,6 +25,7 @@ class FluxEnvironment(DefaultTorqueEnvironment):
         js = super(FluxEnvironment, cls).script(_id=_id, **kwargs)
         js.writeline('#PBS -A {}'.format(cls.get_config_value('account')))
         js.writeline('#PBS -l qos={}'.format(cls.get_config_value('qos', 'flux')))
+        js.writeline('#PBS -l pmem={}'.format(memory))
         if mode == 'cpu':
             js.writeline('#PBS -q {}'.format(cls.get_config_value('cpu_queue', 'flux')))
             if nn is not None:

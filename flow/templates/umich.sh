@@ -19,6 +19,7 @@
 {% endif %}
 {% endif %}
 {% endif %}
+#PBS -l pmem={{ memory }}
 {% if not no_copy_env %}
 #PBS -V
 {% endif %}

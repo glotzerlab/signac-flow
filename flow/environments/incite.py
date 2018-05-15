@@ -11,6 +11,7 @@ class TitanEnvironment(DefaultTorqueEnvironment):
     https://www.olcf.ornl.gov/titan/
     """
     hostname_pattern = 'titan'
+    template = 'titan.sh'
     cores_per_node = 1
 
     @classmethod

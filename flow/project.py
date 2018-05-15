@@ -490,9 +490,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             self.root_directory(), self._config.get('template_dir', 'templates'))
 
         envs = self._config['flow'].as_list('environment_modules')
-        load_envs = ([FileSystemLoader(self._template_dir)] + 
-                [PackageLoader(env, 'templates') for env in envs] +
-                [PackageLoader('flow', 'templates')])
+        load_envs = ([FileSystemLoader(self._template_dir)] +
+                     [PackageLoader(env, 'templates') for env in envs] +
+                     [PackageLoader('flow', 'templates')])
 
         # Templates are searched in the local template directory first, then in the package
         # 'templates' directory.
@@ -1041,7 +1041,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             # The flow 'script.sh' file simply extends the base script
             # provided. The choice of base script is dependent on the
             # environment, but will default to the 'base_script.sh' provided
-            # with signac-flow unless additional environment information is 
+            # with signac-flow unless additional environment information is
             # detected.
             context['base_script'] = env.template
             context['environment'] = env.__name__

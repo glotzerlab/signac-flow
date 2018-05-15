@@ -61,6 +61,7 @@ from .labels import staticlabel
 from .labels import classlabel
 from .labels import _is_label_func
 from . import legacy
+from .util import config as flow_config
 
 if not six.PY2:
     from subprocess import TimeoutExpired
@@ -73,7 +74,6 @@ logger = logging.getLogger(__name__)
 TEMPLATE_HELP = """Execution and submission scripts are generated with the jinja2 template files.
 Standard files are shipped with the package, but maybe replaced or extended with
 custom templates provided within a project.
-
 The default template directory can be configured with the 'template_dir' configuration
 variable, for example in the project configuration file. The current template directory is:
 {template_dir}
@@ -489,17 +489,20 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         self._template_dir = os.path.join(
             self.root_directory(), self._config.get('template_dir', 'templates'))
 
+        envs = self._config['flow'].as_list('environment_modules')
+        load_envs = ([FileSystemLoader(self._template_dir)] + 
+                [PackageLoader(env, 'templates') for env in envs] +
+                [PackageLoader('flow', 'templates')])
+
         # Templates are searched in the local template directory first, then in the package
         # 'templates' directory.
         self._template_environment = Environment(
-            loader=ChoiceLoader([
-                FileSystemLoader(self._template_dir),
-                PackageLoader('flow', 'templates'),
-                ]),
+            loader=ChoiceLoader(load_envs),
             trim_blocks=True)
 
         # Setup standard filters that can be used to format context variables.
         self._template_environment.filters['format_timedelta'] = _format_timedelta
+        self._template_environment.filters['get_config_value'] = flow_config.get_config_value
 
     def _get_standard_template_context(self):
         "Return the standard templating context for run and submission scripts."
@@ -1007,6 +1010,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             # By default we use the jinja2 templating system to generate the script.
             template = self._template_environment.get_template(template)
             context = self._get_standard_template_context()
+            # For script generation we do not need the extra logic used for
+            # generating cluster job scripts.
             context['base_script'] = 'base_script.sh'
             context['operations'] = list(operations)
             context['parallel'] = parallel
@@ -1033,6 +1038,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         else:
             template = self._template_environment.get_template(template)
             context = self._get_standard_template_context()
+            # The flow 'script.sh' file simply extends the base script
+            # provided. The choice of base script is dependent on the
+            # environment, but will default to the 'base_script.sh' provided
+            # with signac-flow unless additional environment information is 
+            # detected.
             context['base_script'] = env.template
             context['environment'] = env.__name__
             context['id'] = _id

@@ -4,21 +4,9 @@
 {% if walltime is not none %}
 #PBS -l walltime={{ walltime|format_timedelta }}
 {% endif %}
-{% if nn is not none %}
-{% if ppn is none %}
-{% if mode == 'gpu' %}
-#PBS -l nodes={{ nn }}:gpus=1
-{% else %}
-#PBS -l nodes={{ nn }}
-{% endif %}
-{% else %}
-{% if mode == 'gpu' %}
-#PBS -l nodes={{ nn }}:ppn={{ ppn }}:gpus=1
-{% else %}
-#PBS -l nodes={{ nn }}:ppn={{ ppn }}
-{% endif %}
-{% endif %}
-{% endif %}
+{% set s_gpu = ':gpus=1' if mode == 'gpu' else ''  %}
+{% set s_ppn = ':ppn=' ~ ppn if ppn else ''  %}
+#PBS -l nodes={{ nn }}{{ s_ppn }}{{ s_gpu }}
 #PBS -l pmem={{ memory }}
 {% if not no_copy_env %}
 #PBS -V

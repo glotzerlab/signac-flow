@@ -4,11 +4,9 @@
 {% if walltime is not none %}
 #PBS -l walltime={{ walltime|format_timedelta }}
 {% endif %}
+{% set s_ppn = ':ppn=' ~ ppn if ppn else ''  %}
 {% if nn is not none %}
-{% if ppn is none %}
-#PBS -l nodes={{ nn }}
-{% else %}
-#PBS -l nodes={{ nn }}:ppn={{ ppn }}
+#PBS -l nodes={{ nn }}{{ s_ppn }}
 {% endif %}
 {% endif %}
 {% if not no_copy_env %}

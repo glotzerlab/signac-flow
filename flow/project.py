@@ -1044,8 +1044,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 np_total = sum(op.np for op in operations)
             else:
                 np_total = max(op.np for op in operations)
+
             try:
-                script = env.script(_id=_id, **kwargs)
+                script = env.script(_id=_id, np_total, **kwargs)
             except ConfigKeyError as e:
                 raise SubmitError("The following error was encountered during script generation: ",
                                   e.message)

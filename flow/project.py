@@ -389,10 +389,10 @@ class FlowOperation(object):
             warnings.warn(
                 "The np argument for the FlowOperation() constructor is deprecated.",
                 DeprecationWarning)
-            if self._directives is None:
-                self._directives = dict(np=np)
+            if self.directives is None:
+                self.directives = dict(np=np)
             else:
-                assert self._directives.setdefault('np', np) == np
+                assert self.directives.setdefault('np', np) == np
 
         self._prereqs = [FlowCondition(cond) for cond in pre]
         self._postconds = [FlowCondition(cond) for cond in post]
@@ -1039,11 +1039,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 raise RuntimeError(
                     "In legacy templating mode, unable to use template '{}'.".format(fn_template))
 
-            # As of Version 0.7 this breaks backwards compatibility
+            # For maintaining backwards compatibility for Versions<0.7
             if kwargs['parallel']:
-                np_total = sum(op.np for op in operations)
+                np_total = sum(op.directives['np'] for op in operations)
             else:
-                np_total = max(op.np for op in operations)
+                np_total = max(op.directives['np'] for op in operations)
 
             try:
                 script = env.script(_id=_id, np_total=np_total, **kwargs)

@@ -2,7 +2,7 @@
 {% block header %}
 #!/bin/bash
 #SBATCH --job-name="{{ id }}"
-{% set account = 'account'|get_config_value(ns=environment,default=none) %}
+{% set account = 'account'|get_config_value(ns=environment) %}
 {% if account is not none %}
 #SBATCH -A {{ account }}
 {% endif %}

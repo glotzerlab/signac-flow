@@ -24,7 +24,7 @@ class FluxEnvironment(DefaultTorqueEnvironment):
         if mode == 'cpu':
             js = js.writeline('#PBS -l nodes={}'.format(math.ceil(np_total/cls.cores_per_node)))
         elif mode == 'gpu':
-            js.writeline('#PBS -l nodes={np}:gpus=1'.format(np=math.ceil(np_total/cls.cores_per_node))))
+            js.writeline('#PBS -l nodes={np}:gpus=1'.format(np=math.ceil(np_total/cls.cores_per_node)))
         return js
 
     @classmethod

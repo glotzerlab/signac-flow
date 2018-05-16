@@ -8,6 +8,7 @@ from flow.environment import JobScript
 from flow.environment import ComputeEnvironment
 from flow.environment import TestEnvironment
 from flow.errors import SubmitError
+from flow.errors import ConfigKeyError
 from test_project import StringIO, redirect_stdout
 
 
@@ -60,8 +61,8 @@ class ProjectTest(unittest.TestCase):
         env = get_environment(test=True)
 
         with redirect_stdout(StringIO()):
-            with self.assertRaises(SubmitError):
-                a = env.require_config_value('a')
+            with self.assertRaises(ConfigKeyError):
+                a = env.get_config_value('a')
 
         a = env.get_config_value('a', None)
         self.assertIsNone(a)

@@ -8,7 +8,6 @@
 {% if nn is not none %}
 #PBS -l nodes={{ nn }}{{ s_ppn }}
 {% endif %}
-{% endif %}
 {% if not no_copy_env %}
 #PBS -V
 {% endif %}

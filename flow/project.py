@@ -829,6 +829,33 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         result['submission_status'] = [JobStatus(highest_status).name]
         return result
 
+    def _format_row(self, status, statepoint=None, max_width=None):
+        "Format each row in the detailed status output."
+        row = [
+            status['job_id'],
+            ', '.join((self._alias(s) for s in status['submission_status'])),
+            status['operation'],
+            ', '.join(status.get('labels', [])),
+        ]
+        if statepoint:
+            sps = self.open_job(id=status['job_id']).statepoint()
+
+            def get(k, m):
+                if m is None:
+                    return
+                t = k.split('.')
+                if len(t) > 1:
+                    return get('.'.join(t[1:]), m.get(t[0]))
+                else:
+                    return m.get(k)
+
+            for i, k in enumerate(statepoint):
+                v = self._alias(get(k, sps))
+                row.insert(i + 3, None if v is None else shorten(str(v), max_width))
+        if status['operation'] and not status['active']:
+            row[1] += ' ' + self._alias('requires_attention')
+        return row
+
     def print_status(self, jobs=None, overview=True, overview_max_lines=None,
                      detailed=False, parameters=None, skip_active=False, param_max_width=None,
                      file=sys.stdout, err=sys.stderr, ignore_errors=False,
@@ -912,49 +939,51 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             logger.info("Updated job status docs.")
 
         # Get status dict for all selected jobs  # TODO parallelize
-        stati = OrderedDict((job, self.get_job_status(job)) for job in jobs)
+        statuses = OrderedDict((job, self.get_job_status(job)) for job in jobs)
         # TODO: Rename to stauses
 
         # Generate status overview:
-        print("{} {}\n".format(self._tr("Total # of jobs:"), len(stati), file=file))
+        if overview:
+            print("{} {}\n".format(self._tr("Total # of jobs:"), len(statuses), file=file))
 
-        # Draw progress bars
-        progress = defaultdict(int)
-        for status in stati.values():
-            for label in status['labels']:
-                progress[label] += 1
-        progress_sorted = list(islice(
-            sorted(progress.items(), key=lambda x: (x[1], x[0]), reverse=True),
-            overview_max_lines))
-        rows = [[
-            label,
-            '{} {:0.2f}%'.format(draw_progressbar(num, len(stati)),
-                                 100 * num / len(stati))
-        ]
-            for label, num in progress_sorted]
+            # Draw progress bars
+            progress = defaultdict(int)
+            for status in statuses.values():
+                for label in status['labels']:
+                    progress[label] += 1
+            progress_sorted = list(islice(
+                sorted(progress.items(), key=lambda x: (x[1], x[0]), reverse=True),
+                overview_max_lines))
+            rows = [[
+                label,
+                '{} {:0.2f}%'.format(draw_progressbar(num, len(statuses)),
+                                     100 * num / len(statuses))
+            ]
+                for label, num in progress_sorted]
 
-        print(tabulate.tabulate(rows, headers=['label', 'progress']), file=file)
-        if not rows:
-            print("[no labels]", file=file)
-        if overview_max_lines is not None:
-            lines_skipped = len(progress) - overview_max_lines
-            if lines_skipped > 0:
-                print(self._tr("Lines omitted:"), lines_skipped, file=file)
+            print(tabulate.tabulate(rows, headers=['label', 'progress']), file=file)
+            if not rows:
+                print("[no labels]", file=file)
+            if overview_max_lines is not None:
+                lines_skipped = len(progress) - overview_max_lines
+                if lines_skipped > 0:
+                    print(self._tr("Lines omitted:"), lines_skipped, file=file)
 
         # Generate detailed view:
-        table_header = [self._tr(self._alias(s))
-                        for s in ('job_id', 'status', 'next_operations', 'labels')]
-        if parameters:
-            for i, value in enumerate(parameters):
-                table_header.insert(i + 3, shorten(self._alias(str(value)), param_max_width))
-        rows = [self._format_row(status, parameters, param_max_width)
-                for status in stati.values() if not (skip_active and status['active'])]
-        print(tabulate.tabulate(rows, headers=table_header), file=file)
-        if abbreviate.table:
-            print(file=file)
-            print(self._tr("Abbreviations used:"), file=file)
-            for a in sorted(abbreviate.table):
-                print('{}: {}'.format(a, abbreviate.table[a]), file=file)
+        if detailed:
+            table_header = [self._tr(self._alias(s))
+                            for s in ('job_id', 'status', 'next_operations', 'labels')]
+            if parameters:
+                for i, value in enumerate(parameters):
+                    table_header.insert(i + 3, shorten(self._alias(str(value)), param_max_width))
+            rows = [self._format_row(status, parameters, param_max_width)
+                    for status in statuses.values() if not (skip_active and status['active'])]
+            print(tabulate.tabulate(rows, headers=table_header), file=file)
+            if abbreviate.table:
+                print(file=file)
+                print(self._tr("Abbreviations used:"), file=file)
+                for a in sorted(abbreviate.table):
+                    print('{}: {}'.format(a, abbreviate.table[a]), file=file)
 
     def run_operations(self, operations=None, pretend=False, np=None, timeout=None, progress=False):
         """Execute the next operations as specified by the project's workflow.
@@ -1494,74 +1523,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
     def _get_status(self, jobs=None):
         status = self.fetch_status(jobs=jobs)
         return status
-
-    def _print_overview(self, stati, max_lines=None, file=sys.stdout):
-        "Print the project's status overview."
-        progress = defaultdict(int)
-        for status in stati:
-            for _label in status['labels']:
-                progress[_label] += 1
-        print("{} {}\n".format(self._tr("Total # of jobs:"), len(stati)), file=file)
-        progress_sorted = list(islice(sorted(
-            progress.items(), key=lambda x: (x[1], x[0]), reverse=True), max_lines))
-        table_header = ['label', 'progress']
-        if progress_sorted:
-            rows = ([label, '{} {:0.2f}%'.format(
-                draw_progressbar(num, len(stati)), 100 * num / len(stati))]
-                for label, num in progress_sorted)
-            print(tabulate.tabulate(rows, headers=table_header), file=file)
-            if max_lines is not None:
-                lines_skipped = len(progress) - max_lines
-                if lines_skipped > 0:
-                    print("{} {}".format(self._tr("Lines omitted:"), lines_skipped), file=file)
-        else:
-            print(tabulate.tabulate([], headers=table_header), file=file)
-            print("[no labels]", file=file)
-
-    def _format_row(self, status, statepoint=None, max_width=None):
-        "Format each row in the detailed status output."
-        row = [
-            status['job_id'],
-            ', '.join((self._alias(s) for s in status['submission_status'])),
-            status['operation'],
-            ', '.join(status.get('labels', [])),
-        ]
-        if statepoint:
-            sps = self.open_job(id=status['job_id']).statepoint()
-
-            def get(k, m):
-                if m is None:
-                    return
-                t = k.split('.')
-                if len(t) > 1:
-                    return get('.'.join(t[1:]), m.get(t[0]))
-                else:
-                    return m.get(k)
-
-            for i, k in enumerate(statepoint):
-                v = self._alias(get(k, sps))
-                row.insert(i + 3, None if v is None else shorten(str(v), max_width))
-        if status['operation'] and not status['active']:
-            row[1] += ' ' + self._alias('requires_attention')
-        return row
-
-    def _print_detailed(self, stati, parameters=None,
-                        skip_active=False, param_max_width=None,
-                        file=sys.stdout):
-        "Print the project's detailed status."
-        table_header = [self._tr(self._alias(s))
-                        for s in ('job_id', 'status', 'next_operation', 'labels')]
-        if parameters:
-            for i, value in enumerate(parameters):
-                table_header.insert(i + 3, shorten(self._alias(str(value)), param_max_width))
-        rows = (self._format_row(status, parameters, param_max_width)
-                for status in stati if not (skip_active and status['active']))
-        print(tabulate.tabulate(rows, headers=table_header), file=file)
-        if abbreviate.table:
-            print(file=file)
-            print(self._tr("Abbreviations used:"), file=file)
-            for a in sorted(abbreviate.table):
-                print('{}: {}'.format(a, abbreviate.table[a]), file=file)
 
     def export_job_stati(self, collection, stati):
         "Export the job stati to a database collection."

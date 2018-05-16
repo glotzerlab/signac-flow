@@ -1931,7 +1931,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
         # Bundle operations up, generate the script, and submit to scheduler.
         for bundle in make_bundles(ops, args.bundle_size):
-            self.submit_operations(operations=bundle, **kwargs)
+            status = self.submit_operations(operations=bundle, **kwargs)
+            if status is not None:
+                for op in bundle:
+                    op.set_status(status)
 
     def _main_exec(self, args):
         if len(args.jobid):

@@ -61,7 +61,7 @@ class ProjectTest(unittest.TestCase):
 
         with redirect_stdout(StringIO()):
             with self.assertRaises(SubmitError):
-                a = env.get_config_value('a')
+                a = env.require_config_value('a')
 
         a = env.get_config_value('a', None)
         self.assertIsNone(a)

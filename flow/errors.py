@@ -8,6 +8,11 @@ from jinja2.ext import Extension
 from jinja2.exceptions import TemplateRuntimeError
 
 
+class ConfigKeyError(KeyError):
+    "Indicates that a config key was not found."
+    pass
+
+
 class SubmitError(RuntimeError):
     "Indicates an error during cluster job submission."
     pass

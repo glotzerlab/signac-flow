@@ -43,6 +43,7 @@ from .scheduling.base import ClusterJob
 from .scheduling.base import JobStatus
 from .scheduling.status import update_status
 from .errors import SubmitError
+from .errors import ConfigKeyError
 from .errors import NoSchedulerError
 from .errors import TemplateError
 from .util import tabulate
@@ -1037,7 +1038,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             if os.path.isfile(fn_template):
                 raise RuntimeError(
                     "In legacy templating mode, unable to use template '{}'.".format(fn_template))
-            script = env.script(_id=_id, **kwargs)
+            try:
+                script = env.script(_id=_id, **kwargs)
+            except ConfigKeyError as e:
+                raise SubmitError("The following error was encountered during script generation: ",
+                                  e.message)
             background = kwargs.pop('parallel', not kwargs.pop('serial', False))
             self.write_script(script=script, operations=operations, background=background, **kwargs)
             script.seek(0)
@@ -1057,7 +1062,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             context.update(kwargs)
             if show_template_help:
                 self._show_template_help_and_exit(context)
-            return template.render(** context)
+            try:
+                return template.render(** context)
+            except ConfigKeyError as e:
+                raise SubmitError("The following error was encountered during script generation: ",
+                                  e.message)
 
     @_support_legacy_api
     def submit_operations(self, operations, _id=None, env=None, parallel=False, flags=None,

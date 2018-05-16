@@ -6,8 +6,7 @@ stored in the signac config"""
 
 from signac.common import config
 
-from ..errors import SubmitError
-
+from ..errors import ConfigKeyError
 
 class _GetConfigValueNoneType(object):
     pass
@@ -23,8 +22,8 @@ signac config --global set {key} <VALUE>
 """
 
 
-def get_config_value(key, ns=None, default=_GET_CONFIG_VALUE_NONE):
-    """Request a value from the user's configuration.
+def require_config_value(key, ns=None, default=_GET_CONFIG_VALUE_NONE):
+    """Request a value from the user's configuration, fail if not available.
 
     This method should be used whenever values need to be provided
     that are specific to a users's environment. A good example are
@@ -45,7 +44,7 @@ def get_config_value(key, ns=None, default=_GET_CONFIG_VALUE_NONE):
     :param default: A default value in case the key cannot be found
         within the user's configuration.
     :return: The value or default value.
-    :raises SubmitError: If the key is not in the user's configuration
+    :raises ConfigKeyError: If the key is not in the user's configuration
         and no default value is provided.
     """
     try:
@@ -57,6 +56,37 @@ def get_config_value(key, ns=None, default=_GET_CONFIG_VALUE_NONE):
         if default is _GET_CONFIG_VALUE_NONE:
             k = str(key) if ns is None else '{}.{}'.format(ns, key)
             print(MISSING_ENV_CONF_KEY_MSG.format(key='flow.' + k))
-            raise SubmitError("Missing environment configuration key: '{}'".format(k))
+            raise ConfigKeyError("Missing environment configuration key: '{}'".format(k))
         else:
             return default
+
+def get_config_value(key, ns=None):
+    """Request a value from the user's configuration.
+
+    This method should be used whenever values need to be provided
+    that are specific to a users's environment. A good example are
+    account names.
+
+    When a key is not configured and no default value is provided,
+    a :py:class:`~.errors.SubmitError` will be raised and the user will
+    be prompted to add the missing key to their configuration.
+
+    Please note, that the key will be automatically expanded to
+    be specific to this environment definition. For example, a
+    key should be 'account', not 'MyEnvironment.account`.
+
+    :param key: The environment specific configuration key.
+    :type key: str
+    :param ns: The namespace in which to look for the key
+    :type key: str
+    :param default: A default value in case the key cannot be found
+        within the user's configuration.
+    :return: The value if found, None if not found.
+    """
+    try:
+        if ns is None:
+            return config.load_config()['flow'][key]
+        else:
+            return config.load_config()['flow'][ns][key]
+    except KeyError:
+        return None

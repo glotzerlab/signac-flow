@@ -26,6 +26,7 @@ import json
 import inspect
 import functools
 from collections import defaultdict
+from collections import OrderedDict
 from itertools import islice
 from itertools import count
 from hashlib import sha1
@@ -228,6 +229,7 @@ class JobOperation(object):
     :type directives:
         :class:`dict`
     """
+
     def __init__(self, name, job, cmd, directives=None, np=None):
         if directives is None:
             directives = dict()
@@ -306,6 +308,7 @@ class FlowCondition(object):
     :type callback:
         :py:class:`~signac.contrib.job.Job`
     """
+
     def __init__(self, callback):
         self._callback = callback
 
@@ -374,6 +377,7 @@ class FlowOperation(object):
     :type directives:
         :class:`dict`
     """
+
     def __init__(self, cmd, pre=None, post=None, directives=None, np=None):
         if pre is None:
             pre = []
@@ -458,6 +462,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
     :type config:
         A signac config object.
     """
+
     def __init__(self, config=None, environment=None):
         super(FlowProject, self).__init__(config=config)
 
@@ -496,7 +501,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             loader=ChoiceLoader([
                 FileSystemLoader(self._template_dir),
                 PackageLoader('flow', 'templates'),
-                ]),
+            ]),
             trim_blocks=True)
 
         # Setup standard filters that can be used to format context variables.
@@ -807,13 +812,149 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         result = dict()
         result['job_id'] = str(job)
         status = job.document.get('status', dict())
-        result['active'] = is_active(status)
+        result['operations'] = {
+            name: status.get(JobOperation(name=name, job=job, cmd=op(job)).get_id())
+            for name, op in self.operations.items()}
         result['labels'] = sorted(set(self.classify(job)))
-        op = self.next_operation(job)
-        result['operation'] = op.name if op is not None else None
+
+        # Deprecated fields: (these assume only a single operation)
+        next_op = self.next_operation(job)
+        result['operation'] = None if next_op is None else next_op.name
+        job_statuses = [s for s in result['operations'].values() if s is not None]
+        if job_statuses:
+            result['active'] = max(job_statuses) > JobStatus.inactive
+        else:
+            result['active'] = False
         highest_status = max(status.values()) if len(status) else 1
         result['submission_status'] = [JobStatus(highest_status).name]
         return result
+
+    def print_status(self, jobs=None, overview=True, overview_max_lines=None,
+                     detailed=False, parameters=None, skip_active=False, param_max_width=None,
+                     file=sys.stdout, err=sys.stderr, ignore_errors=False,
+                     scheduler=None, pool=None, job_filter=None):
+        """Print the status of the project.
+
+        :param jobs:
+            Only execute operations for the given jobs, or all if the argument is omitted.
+        :type jobs:
+            Sequence of instances :class:`.Job`.
+        :param overview:
+            Aggregate an overview of the project' status.
+        :type overview:
+            bool
+        :param overview_max_lines:
+            Limit the number of overview lines.
+        :type overview_max_lines:
+            int
+        :param detailed:
+            Print a detailed status of each job.
+        :type detailed:
+            bool
+        :param parameters:
+            Print the value of the specified parameters.
+        :type parameters:
+            list of str
+        :param skip_active:
+            Only print jobs that are currently inactive.
+        :type skip_active:
+            bool
+        :param param_max_width:
+            Limit the number of characters of parameter columns,
+            see also: :py:meth:`~.update_aliases`.
+        :param file:
+            Redirect all output to this file, defaults to sys.stdout.
+        :param err:
+            Redirect all error output to this file, defaults to sys.stderr.
+        :param scheduler:
+            (deprecated) The scheduler instance used to fetch the job statuses.
+        :type scheduler:
+            :class:`~.manage.Scheduler`
+        :param pool:
+            (deprecated) A multiprocessing or threading pool. Providing a pool
+            parallelizes this method.
+        :param job_filter:
+            (deprecated) A JSON encoded filter, that all jobs to be submitted need to match.
+        """
+        # TODO: Replace legacy code below with this code beginning version 0.7:
+        # if jobs is None:
+        #     jobs = list(self)     # all jobs
+        # Handle legacy API:
+        if jobs is None:
+            if job_filter is not None and isinstance(job_filter, str):
+                warnings.warn(
+                    "The 'job_filter' argument is deprecated, use the 'jobs' instead.",
+                    DeprecationWarning)
+                job_filter = json.loads(job_filter)
+            jobs = list(self.find_jobs(job_filter))
+        elif isinstance(jobs, Scheduler):
+            warnings.warn(
+                "The signature of the print_status() method has changed!", DeprecationWarning)
+            scheduler, jobs = jobs, None
+        elif job_filter is not None:
+            raise ValueError("Can't provide both the 'jobs' and 'job_filter' argument.")
+        if scheduler is not None:
+            warnings.warn(
+                "print_status(): the scheduler argument is deprecated!", DeprecationWarning)
+
+        # Update the status docs of each job:
+        try:
+            if scheduler is None:
+                scheduler = self._environment.get_scheduler()
+            self.fetch_status(jobs=jobs, scheduler=scheduler, file=err, pool=pool)
+        except NoSchedulerError:
+            logger.debug("No scheduler available.")
+        except RuntimeError as error:
+            logger.warning("Error occurred while querying scheduler: '{}'.".format(error))
+            if not ignore_errors:
+                raise
+        else:
+            logger.info("Updated job status docs.")
+
+        # Get status dict for all selected jobs  # TODO parallelize
+        stati = OrderedDict((job, self.get_job_status(job)) for job in jobs)
+        # TODO: Rename to stauses
+
+        # Generate status overview:
+        print("{} {}\n".format(self._tr("Total # of jobs:"), len(stati), file=file))
+
+        # Draw progress bars
+        progress = defaultdict(int)
+        for status in stati.values():
+            for label in status['labels']:
+                progress[label] += 1
+        progress_sorted = list(islice(
+            sorted(progress.items(), key=lambda x: (x[1], x[0]), reverse=True),
+            overview_max_lines))
+        rows = [[
+            label,
+            '{} {:0.2f}%'.format(draw_progressbar(num, len(stati)),
+                                 100 * num / len(stati))
+        ]
+            for label, num in progress_sorted]
+
+        print(tabulate.tabulate(rows, headers=['label', 'progress']), file=file)
+        if not rows:
+            print("[no labels]", file=file)
+        if overview_max_lines is not None:
+            lines_skipped = len(progress) - overview_max_lines
+            if lines_skipped > 0:
+                print(self._tr("Lines omitted:"), lines_skipped, file=file)
+
+        # Generate detailed view:
+        table_header = [self._tr(self._alias(s))
+                        for s in ('job_id', 'status', 'next_operations', 'labels')]
+        if parameters:
+            for i, value in enumerate(parameters):
+                table_header.insert(i + 3, shorten(self._alias(str(value)), param_max_width))
+        rows = [self._format_row(status, parameters, param_max_width)
+                for status in stati.values() if not (skip_active and status['active'])]
+        print(tabulate.tabulate(rows, headers=table_header), file=file)
+        if abbreviate.table:
+            print(file=file)
+            print(self._tr("Abbreviations used:"), file=file)
+            for a in sorted(abbreviate.table):
+                print('{}: {}'.format(a, abbreviate.table[a]), file=file)
 
     def run_operations(self, operations=None, pretend=False, np=None, timeout=None, progress=False):
         """Execute the next operations as specified by the project's workflow.
@@ -878,7 +1019,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         infinite loops when no or faulty post conditions are provided.
 
         :param jobs:
-            Only execute operations for the given jobs, or all if the arugment is omitted.
+            Only execute operations for the given jobs, or all if the argument is omitted.
         :type jobs:
             Sequence of instances :class:`.Job`.
         :param names:
@@ -1107,7 +1248,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             parallel=parallel,
             force=force,
             **kwargs
-            )
+        )
         if pretend:
             print(script)
         else:
@@ -1221,7 +1362,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             "depending on the local compute environment, e.g., 'slurm.sh' for an environment "
             "with SLURM scheduler. The name of the base template is provided with the "
             "'base_script' template variable.".format(default=default),
-            )
+        )
         template_group.add_argument(
             '--template',
             type=str,
@@ -1305,8 +1446,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             help="Manually specify all labels that are required for the direct command "
                  "to be considered eligible for execution.")
 
-    def fetch_status(self, jobs=None, file=sys.stderr,
-                     ignore_errors=False, scheduler=None, pool=None):
+    def fetch_status(self, jobs=None, scheduler=None, file=sys.stderr, pool=None):
         """Update the status cache for each job.
 
         This function queries the scheduler to obtain the current status of each
@@ -1320,10 +1460,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             A file to write logging output to, defaults to sys.stderr.
         :type file:
             A file-like object.
-        :param ignore_errors:
-            Ignore errors while querying the scheduler.
-        :type ignore_errors:
-            bool
         :param scheduler:
             The scheduler to use for querying (deprecated argument); defaults to
             the scheduler provided by the project's associated environment.
@@ -1334,28 +1470,19 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
          """
         if jobs is None:
             jobs = list(self.find_jobs())
-        try:
+        if scheduler is None:
             scheduler = self._environment.get_scheduler()
-        except NoSchedulerError:
-            logger.debug("No scheduler available to update job status.")
+
+        print(self._tr("Query scheduler..."), file=file)
+        sjobs_map = defaultdict(list)
+        for sjob in self.scheduler_jobs(scheduler):
+            sjobs_map[sjob.name()].append(sjob)
+        if pool is None:
+            for job in tqdm(jobs, file=file):
+                _update_job_status(job, sjobs_map)
         else:
-            print(self._tr("Query scheduler..."), file=file)
-            sjobs_map = defaultdict(list)
-            try:
-                for sjob in self.scheduler_jobs(scheduler):
-                    sjobs_map[sjob.name()].append(sjob)
-            except RuntimeError as e:
-                if ignore_errors:
-                    logger.warning("WARNING: Error while querying scheduler: '{}'.".format(e))
-                else:
-                    raise RuntimeError("Error while querying scheduler: '{}'.".format(e))
-            if pool is None:
-                for job in tqdm(jobs, file=file):
-                    _update_job_status(job, sjobs_map)
-            else:
-                jobs_ = list((job, sjobs_map) for job in jobs)
-                pool.map(_update_status, tqdm(jobs_, total=len(jobs), file=file))
-        return {job: self.get_job_status(job) for job in jobs}
+            jobs_ = list((job, sjobs_map) for job in jobs)
+            pool.map(_update_status, tqdm(jobs_, total=len(jobs), file=file))
 
     def update_stati(self, scheduler, jobs=None, file=sys.stderr, pool=None, ignore_errors=False):
         "This function has been replaced with :meth:`.fetch_status`."
@@ -1363,6 +1490,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             "The update_stati() method has been replaced by fetch_status() as of version 0.6.",
             DeprecationWarning)
         self.fetch_status(scheduler=scheduler, jobs=jobs, file=file, ignore_errors=ignore_errors)
+
+    def _get_status(self, jobs=None):
+        status = self.fetch_status(jobs=jobs)
+        return status
 
     def _print_overview(self, stati, max_lines=None, file=sys.stdout):
         "Print the project's status overview."
@@ -1431,84 +1562,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             print(self._tr("Abbreviations used:"), file=file)
             for a in sorted(abbreviate.table):
                 print('{}: {}'.format(a, abbreviate.table[a]), file=file)
-
-    def print_status(self, jobs=None, overview=True, overview_max_lines=None,
-                     detailed=False, parameters=None, skip_active=False, param_max_width=None,
-                     file=sys.stdout, err=sys.stderr, ignore_errors=False,
-                     scheduler=None, pool=None, job_filter=None):
-        """Print the status of the project.
-
-        :param job_filter:
-            A JSON encoded filter, that all jobs to be submitted need to match.
-        :param overview:
-            Aggregate an overview of the project' status.
-        :type overview:
-            bool
-        :param overview_max_lines:
-            Limit the number of overview lines.
-        :type overview_max_lines:
-            int
-        :param detailed:
-            Print a detailed status of each job.
-        :type detailed:
-            bool
-        :param parameters:
-            Print the value of the specified parameters.
-        :type parameters:
-            list of str
-        :param skip_active:
-            Only print jobs that are currently inactive.
-        :type skip_active:
-            bool
-        :param param_max_width:
-            Limit the number of characters of parameter columns,
-            see also: :py:meth:`~.update_aliases`.
-        :param file:
-            Redirect all output to this file, defaults to sys.stdout.
-        :param err:
-            Redirect all error output to this file, defaults to sys.stderr.
-        :param pool:
-            A multiprocessing or threading pool. Providing a pool parallelizes this method.
-        :param scheduler:
-            The scheduler instance used to fetch the job stati.
-        :type scheduler:
-            :class:`~.manage.Scheduler`
-        """
-        if jobs is None:
-            if job_filter is not None and isinstance(job_filter, str):
-                warnings.warn(
-                    "The 'job_filter' argument is deprecated, use the 'jobs' instead.",
-                    DeprecationWarning)
-                job_filter = json.loads(job_filter)
-            jobs = list(self.find_jobs(job_filter))
-        elif isinstance(jobs, Scheduler):
-            warnings.warn(
-                "The signature of the print_status() method has changed!", DeprecationWarning)
-            scheduler, jobs = jobs, None
-        elif job_filter is not None:
-            raise ValueError("Can't provide both the 'jobs' and 'job_filter' argument.")
-
-        if scheduler is not None:
-            warnings.warn(
-                "print_status(): the scheduler argument is deprecated!", DeprecationWarning)
-
-        stati = self.fetch_status(
-            jobs=jobs, file=err, ignore_errors=ignore_errors,
-            scheduler=scheduler, pool=pool).values()
-
-        print(self._tr("Generate output..."), file=err)
-
-        title = "{} '{}':".format(self._tr("Status project"), self)
-        print('\n' + title, file=file)
-
-        if overview:
-            self._print_overview(stati, max_lines=overview_max_lines, file=file)
-
-        if detailed:
-            print(file=file)
-            print(self._tr("Detailed view:"), file=file)
-            self._print_detailed(stati, parameters, skip_active,
-                                 param_max_width, file)
 
     def export_job_stati(self, collection, stati):
         "Export the job stati to a database collection."
@@ -1710,6 +1763,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             if op.complete(job):
                 yield name
 
+    def _job_operations(self, job, only_eligible=False):
+        "Yield instances of JobOperation constructed for specific job."
+        for name, op in self.operations.items():
+            if only_eligible and not op.eligible(job):
+                continue
+            yield name, JobOperation(name=name, job=job, cmd=op(job), directives=op.directives)
+
     def next_operations(self, job):
         """Determine the next eligible operations for job.
 
@@ -1720,10 +1780,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         :yield:
             All instances of :class:`~.JobOperation` job is eligible for.
         """
-        for name in sorted(self.operations):
-            op = self.operations[name]
-            if op.eligible(job):
-                yield JobOperation(name=name, job=job, cmd=op(job), directives=op.directives)
+        next_ops = dict(self._job_operations(job, only_eligible=True))
+        for name in sorted(next_ops):
+            yield next_ops[name]
 
     def next_operation(self, job):
         """Determine the next operation for this job.
@@ -2154,19 +2213,6 @@ def _update_status(args):
 def _update_job_status(job, scheduler_jobs):
     "Update the status entry for job."
     update_status(job, scheduler_jobs)
-
-
-def is_active(status):
-    """True if a specific status is considered 'active'.
-
-    A active status usually means that no further operation should
-    be executed at the same time to prevent race conditions and other
-    related issues.
-    """
-    for gid, s in status.items():
-        if s > JobStatus.inactive:
-            return True
-    return False
 
 
 __all__ = [

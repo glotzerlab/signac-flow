@@ -36,7 +36,14 @@ class CometEnvironment(DefaultSlurmEnvironment):
                     raise error
 
     @classmethod
-    def script(cls, _id, ppn, partition, memory=None, job_output=None, **kwargs):
+    def gen_tasks(cls, js, np_total):
+        js.writeline('#SBATCH --nodes={}'.format(np_total/cls.cores_per_node))
+        js.writeline('#SBATCH --ntasks-per-node={}'.format(
+            cls.cores_per_node if np_total > cls.cores_per_node else np_total))
+        return js
+
+    @classmethod
+    def script(cls, _id, np_total, partition, memory=None, job_output=None, **kwargs):
         js = super(CometEnvironment, cls).script(_id=_id, ppn=ppn, **kwargs)
         js.writeline('#SBATCH -A {}'.format(cls.get_config_value('account')))
         js.writeline('#SBATCH --partition={}'.format(partition))

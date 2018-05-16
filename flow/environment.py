@@ -364,18 +364,6 @@ class NodesEnvironment(ComputeEnvironment):
     """
 
     @classmethod
-    def add_args(cls, parser):
-        super(NodesEnvironment, cls).add_args(parser)
-        parser.add_argument(
-            '--nn',
-            type=int,
-            help=argparse.SUPPRESS)
-        parser.add_argument(
-            '--ppn',
-            type=int,
-            help=argparse.SUPPRESS)
-
-    @classmethod
     def calc_num_nodes(cls, np_total, ppn, force=False, **kwargs):
         if ppn is None:
             try:
@@ -423,14 +411,16 @@ class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
             help="Do not copy current environment variables into compute node environment.")
 
     @classmethod
-    def script(cls, _id, nn=None, ppn=None, walltime=None, no_copy_env=False, **kwargs):
+    def gen_tasks(cls, js, np_total):
+        """Helper function to generate the number of tasks (for overriding)"""
+        js.writeline('#PBS -l nodes={}'.format(np_total))
+        return js
+
+    @classmethod
+    def script(cls, _id, np_total, walltime=None, no_copy_env=False, **kwargs):
         js = super(DefaultTorqueEnvironment, cls).script()
         js.writeline('#PBS -N {}'.format(_id))
-        if nn is not None:
-            if ppn is None:
-                js.writeline('#PBS -l nodes={}'.format(nn))
-            else:
-                js.writeline('#PBS -l nodes={}:ppn={}'.format(nn, ppn))
+        js = gen_tasks(js)
         if walltime is not None:
             js.writeline('#PBS -l walltime={}'.format(format_timedelta(walltime)))
         if not no_copy_env:
@@ -446,14 +436,17 @@ class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
         return 'mpirun -np {np} {cmd}'.format(np=np, cmd=cmd)
 
     @classmethod
-    def script(cls, _id, nn=None, ppn=None, walltime=None, **kwargs):
+    def gen_tasks(cls, js, np_total):
+        """Helper function to generate the number of tasks (for overriding)"""
+        js.writeline('#SBATCH --ntasks={}'.format(np_total))
+        return js
+
+    @classmethod
+    def script(cls, _id, np_total, walltime=None, **kwargs):
         js = super(DefaultSlurmEnvironment, cls).script()
         js.writeline('#!/bin/bash')
         js.writeline('#SBATCH --job-name="{}"'.format(_id))
-        if nn is not None:
-            js.writeline('#SBATCH --nodes={}'.format(nn))
-        if ppn is not None:
-            js.writeline('#SBATCH --ntasks-per-node={}'.format(ppn))
+        js = cls.gen_tasks(js, np_total)
         if walltime is not None:
             js.writeline('#SBATCH -t {}'.format(format_timedelta(walltime)))
         return js

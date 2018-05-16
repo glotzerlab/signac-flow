@@ -19,22 +19,27 @@ class FluxEnvironment(DefaultTorqueEnvironment):
         return "mpirun -np {np} {cmd}".format(cmd=cmd, np=np)
 
     @classmethod
-    def script(cls, _id, nn, ppn, mode, memory, **kwargs):
-        if ppn is None:
-            ppn = cls.cores_per_node
+    def gen_tasks(cls, js, np_total, mode):
+        """Helper function to generate the number of tasks (for overriding)"""
+        if mode == 'cpu':
+            js = js.writeline('#PBS -l nodes={}'.format(math.ceil(np_total/cls.cores_per_node)))
+        elif mode == 'gpu':
+            js.writeline('#PBS -l nodes={np}:gpus=1'.format(np=math.ceil(np_total/cls.cores_per_node))))
+        return js
+
+    @classmethod
+    def script(cls, _id, np_total, mode, memory, **kwargs):
         js = super(FluxEnvironment, cls).script(_id=_id, **kwargs)
         js.writeline('#PBS -A {}'.format(cls.get_config_value('account')))
         js.writeline('#PBS -l qos={}'.format(cls.get_config_value('qos', 'flux')))
         js.writeline('#PBS -l pmem={}'.format(memory))
         if mode == 'cpu':
             js.writeline('#PBS -q {}'.format(cls.get_config_value('cpu_queue', 'flux')))
-            if nn is not None:
-                js.writeline('#PBS -l nodes={nn}:ppn={ppn}'.format(nn=nn, ppn=ppn))
+            js = gen_tasks(js, np_total, mode)
         elif mode == 'gpu':
             q = cls.get_config_value('gpu_queue', cls.get_config_value('cpu_queue', 'flux') + 'g')
             js.writeline('#PBS -q {}'.format(q))
-            if nn is not None:
-                js.writeline('#PBS -l nodes={nn}:ppn={ppn}:gpus=1'.format(nn=nn, ppn=ppn))
+            js = gen_tasks(js, np_total, mode)
         else:
             raise ValueError("Unknown mode '{}'.".format(mode))
         return js

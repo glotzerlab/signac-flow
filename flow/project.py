@@ -1038,6 +1038,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             if os.path.isfile(fn_template):
                 raise RuntimeError(
                     "In legacy templating mode, unable to use template '{}'.".format(fn_template))
+
+            # As of Version 0.7 this breaks backwards compatibility
+            if kwargs['parallel']:
+                np_total = sum(op.np for op in operations)
+            else:
+                np_total = max(op.np for op in operations)
             try:
                 script = env.script(_id=_id, **kwargs)
             except ConfigKeyError as e:

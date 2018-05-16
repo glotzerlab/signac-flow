@@ -19,11 +19,6 @@
 {% else %}
 {% raise "Cannot submit operations requiring different tpn." %}
 {% endif %}
-{% if parallel %}
-{% set num_tasks = operations|map(attribute='directives.np')|sum %}
-{% else %}
-{% set num_tasks = operations|map(attribute='directives.np')|max %}
-{% endif %}
 #SBATCH --partition={{ partition }}
 {% cpn = 48 if 'skx' in partition else 68 %}
 {% set nn = (num_tasks/cpn)|round(method='ceil')|int %}

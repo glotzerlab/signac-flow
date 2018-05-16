@@ -1,3 +1,9 @@
+{# Number of tasks is the same for any script type #}
+{% if parallel %}
+{% set num_tasks = operations|map(attribute='directives.np')|sum %}
+{% else %}
+{% set num_tasks = operations|map(attribute='directives.np')|max %}
+{% endif %}
 {% block header %}
 {% endblock %}
 

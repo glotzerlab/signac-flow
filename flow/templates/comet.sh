@@ -16,11 +16,6 @@
 {% if walltime %}
 #SBATCH -t {{ walltime|format_timedelta }}
 {% endif %}
-{% if parallel %}
-{% set num_tasks = operations|map(attribute='directives.np')|sum %}
-{% else %}
-{% set num_tasks = operations|map(attribute='directives.np')|max %}
-{% endif %}
 #SBATCH --partition={{ partition }}
 {% if partition == 'shared' %}
 {% if num_tasks > 24 %}
@@ -31,8 +26,8 @@
 {% endif %}
 {% else %}
 {% set nn = (num_tasks/24)|round(method='ceil')|int %}
-{% set num_tasks = 24 if num_tasks > 24 else num_tasks %}
+{% set ntasks = 24 if num_tasks > 24 else num_tasks %}
 #SBATCH --nodes={{ nn }}
-#SBATCH --ntasks={{ num_tasks }}
+#SBATCH --ntasks={{ ntasks }}
 {% endif %}
 {% endblock %}

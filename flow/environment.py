@@ -27,10 +27,11 @@ from signac.common import config
 from signac.common import six
 from signac.common.six import with_metaclass
 
+from .scheduling.base import JobStatus
 from .scheduling.slurm import SlurmScheduler
 from .scheduling.torque import TorqueScheduler
+from .scheduling.simple_scheduler import SimpleScheduler
 from .scheduling.fakescheduler import FakeScheduler
-from .scheduling.base import JobStatus
 from .errors import SubmitError
 from .errors import NoSchedulerError
 
@@ -350,6 +351,12 @@ class TestEnvironment(ComputeEnvironment):
         for key in sorted(kwargs):
             js.writeline('#TEST {}={}'.format(key, kwargs[key]))
         return js
+
+
+class SimpleSchedulerEnvironment(ComputeEnvironment):
+    "An environment for the simple-scheduler scheduler."
+    scheduler_type = SimpleScheduler
+    template = 'simple_scheduler.sh'
 
 
 class TorqueEnvironment(ComputeEnvironment):

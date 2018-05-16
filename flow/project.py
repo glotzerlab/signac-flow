@@ -36,6 +36,7 @@ from jinja2 import Environment
 from jinja2 import PackageLoader
 from jinja2 import ChoiceLoader
 from jinja2 import FileSystemLoader
+from jinja2 import TemplateNotFound
 
 from .environment import get_environment
 from .scheduling.base import Scheduler
@@ -2104,6 +2105,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         except TimeoutExpired:
             print("Error: Failed to complete execution due to "
                   "timeout ({}s).".format(args.timeout), file=sys.stderr)
+            _exit_or_raise()
+        except TemplateNotFound as error:
+            print("Did not find template script '{}'.".format(error), file=sys.stderr)
             _exit_or_raise()
         except AssertionError as error:
             if not args.debug:

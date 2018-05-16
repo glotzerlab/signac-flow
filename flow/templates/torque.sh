@@ -8,8 +8,8 @@
 #PBS -V
 {% endif %}
 {% block tasks %}
-{% set s_ppn = ':ppn=' ~ ppn if ppn else ''  %}
-{% if nn is not none %}
+{% set s_ppn = ':ppn=' ~ ppn if ppn else '' %}
+{% set nn = (num_tasks/ppn)|round(method='ceil')|int if ppn else num_tasks %}
 #PBS -l nodes={{ nn }}{{ s_ppn }}
 {% endif %}
 {% endblock %}

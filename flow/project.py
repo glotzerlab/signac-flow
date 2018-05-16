@@ -479,7 +479,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
         # Register all operation functions with this project instance.
         self._operation_functions = dict()
-        self._operations = dict()
+        self._operations = OrderedDict()
         self._register_operations()
 
     def _setup_template_environment(self):
@@ -807,34 +807,33 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             sjobs.append(sjob)
         return sjobs_map
 
+    def _get_operations_status(self, job):
+        job_scheduler_status = job.document.get('status', dict())
+        for name, flow_op in self.operations.items():
+            job_op = JobOperation(
+                name=name, job=job, cmd=flow_op(job), directives=flow_op.directives)
+            completed = flow_op.complete(job)
+            eligible = False if completed else flow_op.eligible(job)
+            yield name, {
+                'scheduler_status': job_scheduler_status.get(job_op.get_id(), JobStatus.unknown),
+                'eligible': eligible,
+                'completed': completed,
+            }
+
     def get_job_status(self, job):
         "Return a dict with detailed information about the status of a job."
         result = dict()
         result['job_id'] = str(job)
-        status = job.document.get('status', dict())
-        result['operations'] = {
-            name: status.get(JobOperation(name=name, job=job, cmd=op(job)).get_id())
-            for name, op in self.operations.items()}
+        result['operations'] = OrderedDict(self._get_operations_status(job))
         result['labels'] = sorted(set(self.classify(job)))
-
-        # Deprecated fields: (these assume only a single operation)
-        next_op = self.next_operation(job)
-        result['operation'] = None if next_op is None else next_op.name
-        job_statuses = [s for s in result['operations'].values() if s is not None]
-        if job_statuses:
-            result['active'] = max(job_statuses) > JobStatus.inactive
-        else:
-            result['active'] = False
-        highest_status = max(status.values()) if len(status) else 1
-        result['submission_status'] = [JobStatus(highest_status).name]
         return result
 
     def _format_row(self, status, statepoint=None, max_width=None):
         "Format each row in the detailed status output."
         row = [
             status['job_id'],
-            ', '.join((self._alias(s) for s in status['submission_status'])),
             status['operation'],
+            ', '.join((self._alias(s) for s in status['submission_status'])),
             ', '.join(status.get('labels', [])),
         ]
         if statepoint:
@@ -853,11 +852,27 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 v = self._alias(get(k, sps))
                 row.insert(i + 3, None if v is None else shorten(str(v), max_width))
         if status['operation'] and not status['active']:
-            row[1] += ' ' + self._alias('requires_attention')
+            row[2] += ' ' + self._alias('requires_attention')
         return row
+
+    def _update_scheduler_status_cache(self, jobs, scheduler, file, pool, ignore_errors=False):
+        "Update the status docs."
+        try:
+            if scheduler is None:
+                scheduler = self._environment.get_scheduler()
+            self.fetch_status(jobs=jobs, scheduler=scheduler, file=file, pool=pool)
+        except NoSchedulerError:
+            logger.debug("No scheduler available.")
+        except RuntimeError as error:
+            logger.warning("Error occurred while querying scheduler: '{}'.".format(error))
+            if not ignore_errors:
+                raise
+        else:
+            logger.info("Updated job status docs.")
 
     def print_status(self, jobs=None, overview=True, overview_max_lines=None,
                      detailed=False, parameters=None, skip_active=False, param_max_width=None,
+                     expand=False, all_ops=False, dump_json=False,
                      file=sys.stdout, err=sys.stderr, ignore_errors=False,
                      scheduler=None, pool=None, job_filter=None):
         """Print the status of the project.
@@ -925,25 +940,17 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 "print_status(): the scheduler argument is deprecated!", DeprecationWarning)
 
         # Update the status docs of each job:
-        try:
-            if scheduler is None:
-                scheduler = self._environment.get_scheduler()
-            self.fetch_status(jobs=jobs, scheduler=scheduler, file=err, pool=pool)
-        except NoSchedulerError:
-            logger.debug("No scheduler available.")
-        except RuntimeError as error:
-            logger.warning("Error occurred while querying scheduler: '{}'.".format(error))
-            if not ignore_errors:
-                raise
-        else:
-            logger.info("Updated job status docs.")
+        self._update_scheduler_status_cache(jobs, scheduler, err, pool, ignore_errors)
 
         # Get status dict for all selected jobs  # TODO parallelize
-        statuses = OrderedDict((job, self.get_job_status(job)) for job in jobs)
-        # TODO: Rename to stauses
+        statuses = OrderedDict((job.get_id(), self.get_job_status(job)) for job in jobs)
+        if dump_json:
+            print(json.dumps(statuses, indent=4), file=file)
+            return
 
         # Generate status overview:
         if overview:
+            print("# Overview:", file=file)
             print("{} {}\n".format(self._tr("Total # of jobs:"), len(statuses), file=file))
 
             # Draw progress bars
@@ -961,9 +968,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             ]
                 for label, num in progress_sorted]
 
-            print(tabulate.tabulate(rows, headers=['label', 'progress']), file=file)
+            print(tabulate.tabulate(rows, headers=['label', 'ratio']), file=file)
             if not rows:
-                print("[no labels]", file=file)
+                print("[no labels to show]", file=file)
             if overview_max_lines is not None:
                 lines_skipped = len(progress) - overview_max_lines
                 if lines_skipped > 0:
@@ -971,19 +978,107 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
         # Generate detailed view:
         if detailed:
-            table_header = [self._tr(self._alias(s))
-                            for s in ('job_id', 'status', 'next_operations', 'labels')]
+            rows_labels = []
+            header_detailed = [self._tr(self._alias(s)) for s in ('job_id', 'labels')]
             if parameters:
                 for i, value in enumerate(parameters):
-                    table_header.insert(i + 3, shorten(self._alias(str(value)), param_max_width))
-            rows = [self._format_row(status, parameters, param_max_width)
-                    for status in statuses.values() if not (skip_active and status['active'])]
-            print(tabulate.tabulate(rows, headers=table_header), file=file)
-            if abbreviate.table:
-                print(file=file)
-                print(self._tr("Abbreviations used:"), file=file)
-                for a in sorted(abbreviate.table):
-                    print('{}: {}'.format(a, abbreviate.table[a]), file=file)
+                    header_detailed.insert(i + 1, shorten(self._alias(str(value)), param_max_width))
+
+            def _format_status_labels(status):
+                sp = self.open_job(id=status['job_id']).statepoint()
+
+                def get(k, m):
+                    if m is None:
+                        return
+                    t = k.split('.')
+                    if len(t) > 1:
+                        return get('.'.join(t[1:]), m.get(t[0]))
+                    else:
+                        return m.get(k)
+
+                row = [status['job_id']]
+                row.append(', '.join(status.get('labels', [])))
+                if parameters:
+                    for i, k in enumerate(parameters):
+                        v = self._alias(get(k, sp))
+                        row.insert(i + 1, None if v is None else shorten(str(v), param_max_width))
+                yield row
+
+            for status in statuses.values():
+                rows_labels.extend(_format_status_labels(status))
+
+            rows_operations = []
+            header_operations = [self._tr(self._alias(s))
+                                 for s in ('job_id', 'operation', 'eligible', 'cluster_status')]
+
+            def _fmt_status_operations(status):
+                for name, doc in status['operations'].items():
+                    active = JobStatus(doc['scheduler_status']) > JobStatus.unknown
+                    if skip_active and active:
+                        continue
+                    if not all_ops and not (active or doc['eligible']):
+                        continue
+
+                    yield [
+                        status['job_id'], name,
+                        'Y' if doc['eligible'] else 'N',
+                        _FMT_SCHEDULER_STATUS[doc['scheduler_status']]]
+
+            for status in statuses.values():
+                rows_operations.append(list(_fmt_status_operations(status)))
+
+        # Actually display information
+        if detailed:
+            print(('\n' if overview else '') + "# Detailed View:", file=file)
+            labels_table = tabulate.tabulate(rows_labels, headers=header_detailed)
+            if expand:  # Present labels and operations in two separate tables.
+                print("\n## Labels:", file=file)
+                print(labels_table, file=file)
+                print("\n## Operations:", file=file)
+                rows_operations = [row for rows in rows_operations for row in rows]  # flatten list
+                print(tabulate.tabulate(rows_operations, headers=header_operations), file=file)
+            else:       # Present labels and operations in a combined 'compact' view.
+                # We need to split the labels table into individual lines
+                # to combine them with the operations lines.
+                labels_table_lines = iter(labels_table.splitlines())
+
+                # The first two lines are the table header.
+                print(next(labels_table_lines), file=file)
+                print(next(labels_table_lines), file=file)
+
+                for line, status in zip(labels_table_lines, statuses.values()):
+                    print(line, file=file)
+                    if status['operations']:
+                        width = max(map(len, status['operations']))
+
+                        def select(op):
+                            name, doc = op
+                            active = JobStatus(doc['scheduler_status']) > JobStatus.unknown
+                            if skip_active and active:
+                                return False
+                            if not all_ops and not (active or doc['eligible']):
+                                return False
+                            return True
+
+                        selected_ops = list(filter(select, status['operations'].items()))
+                        for i, (name, doc) in enumerate(selected_ops):
+                            name = name.ljust(width)
+                            #       closing frame                               open frame
+                            frame = '\u2514' if (i+1) == len(selected_ops) else '\u251c'
+                            if doc['completed']:
+                                #        white square
+                                symbol = '\u25a1'
+                            else:
+                                #        black circle                     white circle
+                                symbol = '\u25cf' if doc['eligible'] else '\u25cb'
+                            sched_stat = _FMT_SCHEDULER_STATUS[doc['scheduler_status']]
+                            print("{}{} {} [{}]".format(frame, symbol, name, sched_stat), file=file)
+
+        # Show any abbreviations used
+        if abbreviate.table:
+            print('\n', self._tr("Abbreviations used:"), file=file)
+            for a in sorted(abbreviate.table):
+                print('{}: {}'.format(a, abbreviate.table[a]), file=file)
 
     def run_operations(self, operations=None, pretend=False, np=None, timeout=None, progress=False):
         """Execute the next operations as specified by the project's workflow.
@@ -1552,7 +1647,24 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         parser.add_argument(
             '-d', '--detailed',
             action='store_true',
-            help="Display a detailed view of the job stati.")
+            help="Show a detailed view of all jobs and their labels and operations.")
+        parser.add_argument(
+            '-a', '--all-operations',
+            dest='all_ops',
+            action='store_true',
+            help="Show information about all operations, not just active or eligible ones.")
+        parser.add_argument(
+            '-e', '--expand',
+            action='store_true',
+            help="Expand the detailed view.")
+        parser.add_argument(
+            '--full',
+            action='store_true',
+            help="Show all available information (implies -da).")
+        parser.add_argument(
+            '--json',
+            dest='dump_json',
+            action='store_true',)
         parser.add_argument(
             '-p', '--parameters',
             type=str,
@@ -1741,9 +1853,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         :yield:
             All instances of :class:`~.JobOperation` job is eligible for.
         """
-        next_ops = dict(self._job_operations(job, only_eligible=True))
-        for name in sorted(next_ops):
-            yield next_ops[name]
+        next_ops = OrderedDict(self._job_operations(job, only_eligible=True))
+        for op in next_ops.values():
+            yield op
 
     def next_operation(self, job):
         """Determine the next operation for this job.
@@ -1845,10 +1957,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             return False
         return True
 
-    def _main_status(self, tmp, pool=None):
+    def _main_status(self, args, pool=None):
         "Print status overview."
-        args = {key: val for key, val in vars(tmp).items()
+        args = {key: val for key, val in vars(args).items()
                 if key not in ['func', 'debug']}
+        if args.pop('full'):
+            args['detailed'] = args['all_ops'] = True
+
         try:
             self.print_status(pool=pool, **args)
         except NoSchedulerError:
@@ -2164,6 +2279,18 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
 ###
 # Status-related helper functions
+
+
+_FMT_SCHEDULER_STATUS = {
+    JobStatus.unknown: 'U',
+    JobStatus.registered: 'R',
+    JobStatus.inactive: 'I',
+    JobStatus.submitted: 'S',
+    JobStatus.held: 'H',
+    JobStatus.queued: 'Q',
+    JobStatus.active: 'A',
+    JobStatus.error: 'E',
+}
 
 
 def _update_status(args):

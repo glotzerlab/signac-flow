@@ -17,7 +17,7 @@
 {# Easy way to get the value #}
 {% set tpn = operations|map(attribute='directives.tpn')|max %}
 {% else %}
-{% raise "Cannot submit operations requiring different tpn" %}
+{% raise "Cannot submit operations requiring different tpn." %}
 {% endif %}
 {% if parallel %}
 {% set num_tasks = operations|map(attribute='directives.np')|sum %}
@@ -25,13 +25,8 @@
 {% set num_tasks = operations|map(attribute='directives.np')|max %}
 {% endif %}
 #SBATCH --partition={{ partition }}
-{% if 'skx' in partition %}
-{% set cpn = 48 %}
-{% else %}
-{% set cpn = 68 %}
-{% endif %}
+{% cpn = 48 if 'skx' in partition else 68 %}
 {% set nn = (num_tasks/cpn)|round(method='ceil')|int %}
-{% set num_tasks = cpn if num_tasks > cpn else num_tasks %}
 #SBATCH --nodes={{ nn }}
-#SBATCH --ntasks={{ tpn }}
+#SBATCH --ntasks-per-node={{ tpn }}
 {% endblock %}

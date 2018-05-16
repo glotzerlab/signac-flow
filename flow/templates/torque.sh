@@ -14,7 +14,4 @@
 {% if not no_copy_env %}
 #PBS -V
 {% endif %}
-{# Allows extensions of this script for added options #}
-{% block options %}
-{% endblock %}
 {% endblock %}

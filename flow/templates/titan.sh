@@ -1,6 +1,7 @@
 {% extends "slurm.sh" %}
-{% block options %}
-{% set account = 'account'|get_config_value(ns=environment) %}
+{% block header %}
+{{ super() }}
+{% set account = 'account'|get_config_value(ns=environment,default=none) %}
 {% if account is not none %}
 #SBATCH -A {{ account }}
 {% endif %}

@@ -11,6 +11,4 @@
 {% if walltime %}
 #SBATCH -t {{ walltime|format_timedelta }}
 {% endif %}
-{% block options %}
-{% endblock %}
 {% endblock %}

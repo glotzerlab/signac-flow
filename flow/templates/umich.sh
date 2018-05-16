@@ -23,7 +23,7 @@
 {% if not no_copy_env %}
 #PBS -V
 {% endif %}
-{% set account = 'account'|get_config_value(ns=environment) %}
+{% set account = 'account'|get_config_value(ns=environment,default=none) %}
 {% if account is not none %}
 #PBS -A {{ account }}
 {% endif %}

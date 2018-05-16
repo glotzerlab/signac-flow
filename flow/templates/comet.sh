@@ -1,22 +1,6 @@
-{% extends "base_script.sh" %}
-{% block header %}
-#!/bin/bash
-#SBATCH --job-name="{{ id }}"
-{% set account = 'account'|get_config_value(ns=environment) %}
-{% if account is not none %}
-#SBATCH -A {{ account }}
-{% endif %}
-{% if memory is not none %}
-#SBATCH --mem={{ memory }}G
-{% endif %}
-{% if job_output is not none %}
-#SBATCH --output={{ job_output }}
-#SBATCH --error={{ job_output }}
-{% endif %}
-{% if walltime %}
-#SBATCH -t {{ walltime|format_timedelta }}
-{% endif %}
-#SBATCH --partition={{ partition }}
+{% extends "slurm.sh" %}
+{# Must override this block before header block is created #}
+{% block tasks %}
 {% if partition == 'shared' %}
 {% if num_tasks > 24 %}
 {% raise "You cannot use more than 24 cores on the 'shared' partitions." %}
@@ -30,4 +14,16 @@
 #SBATCH --nodes={{ nn }}
 #SBATCH --ntasks={{ ntasks }}
 {% endif %}
+{% endblock %}
+
+{% block header %}
+{{ super () -}}
+{% set account = 'account'|get_config_value(ns=environment) %}
+{% if account is not none %}
+#SBATCH -A {{ account }}
+{% endif %}
+{% if memory is not none %}
+#SBATCH --mem={{ memory }}G
+{% endif %}
+#SBATCH --partition={{ partition }}
 {% endblock %}

@@ -1,16 +1,14 @@
-{% extends "base_script.sh" %}
-{% block header %}
-#PBS -N {{ id }}
-{% if walltime is not none %}
-#PBS -l walltime={{ walltime|format_timedelta }}
-{% endif %}
+{% extends "torque.sh" %}
+{# Must come before header is written #}
+{% block tasks %}
 {% set s_gpu = ':gpus=1' if mode == 'gpu' else ''  %}
 {% set s_ppn = ':ppn=' ~ ppn if ppn else ''  %}
 #PBS -l nodes={{ nn }}{{ s_ppn }}{{ s_gpu }}
+{% endblock %}
+
+{% block header %}
+{{ super() -}}
 #PBS -l pmem={{ memory }}
-{% if not no_copy_env %}
-#PBS -V
-{% endif %}
 {% set account = 'account'|get_config_value(ns=environment) %}
 {% if account is not none %}
 #PBS -A {{ account }}

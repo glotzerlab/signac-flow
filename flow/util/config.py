@@ -8,6 +8,7 @@ from signac.common import config
 
 from ..errors import ConfigKeyError
 
+
 class _GetConfigValueNoneType(object):
     pass
 
@@ -59,6 +60,7 @@ def require_config_value(key, ns=None, default=_GET_CONFIG_VALUE_NONE):
             raise ConfigKeyError("Missing environment configuration key: '{}'".format(k))
         else:
             return default
+
 
 def get_config_value(key, ns=None, default=None):
     """Request a value from the user's configuration.

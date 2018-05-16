@@ -44,7 +44,7 @@ class CometEnvironment(DefaultSlurmEnvironment):
 
     @classmethod
     def script(cls, _id, np_total, partition, memory=None, job_output=None, **kwargs):
-        js = super(CometEnvironment, cls).script(_id=_id, ppn=ppn, **kwargs)
+        js = super(CometEnvironment, cls).script(_id=_id, **kwargs)
         js.writeline('#SBATCH -A {}'.format(cls.get_config_value('account')))
         js.writeline('#SBATCH --partition={}'.format(partition))
         if memory is not None:

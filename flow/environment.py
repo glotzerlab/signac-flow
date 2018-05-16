@@ -19,7 +19,6 @@ import logging
 import warnings
 import io
 import importlib
-import argparse
 from math import ceil
 from collections import OrderedDict
 
@@ -420,7 +419,7 @@ class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
     def script(cls, _id, np_total, walltime=None, no_copy_env=False, **kwargs):
         js = super(DefaultTorqueEnvironment, cls).script()
         js.writeline('#PBS -N {}'.format(_id))
-        js = gen_tasks(js)
+        js = cls.gen_tasks(js)
         if walltime is not None:
             js.writeline('#PBS -l walltime={}'.format(format_timedelta(walltime)))
         if not no_copy_env:

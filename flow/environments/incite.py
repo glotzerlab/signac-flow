@@ -6,6 +6,7 @@ from ..environment import DefaultTorqueEnvironment
 
 import math
 
+
 class TitanEnvironment(DefaultTorqueEnvironment):
     """Environment profile for the titan super computer.
 

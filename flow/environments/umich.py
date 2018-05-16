@@ -4,6 +4,8 @@
 """Environments for the University of Michigan HPC environment."""
 from ..environment import DefaultTorqueEnvironment
 
+import math
+
 
 class FluxEnvironment(DefaultTorqueEnvironment):
     """Environment profile for the flux supercomputing environment.
@@ -22,9 +24,11 @@ class FluxEnvironment(DefaultTorqueEnvironment):
     def gen_tasks(cls, js, np_total, mode):
         """Helper function to generate the number of tasks (for overriding)"""
         if mode == 'cpu':
-            js = js.writeline('#PBS -l nodes={}'.format(math.ceil(np_total/cls.cores_per_node)))
+            js = js.writeline('#PBS -l nodes={}'.format(
+                math.ceil(np_total/cls.cores_per_node)))
         elif mode == 'gpu':
-            js.writeline('#PBS -l nodes={np}:gpus=1'.format(np=math.ceil(np_total/cls.cores_per_node)))
+            js.writeline('#PBS -l nodes={np}:gpus=1'.format(
+                np=math.ceil(np_total/cls.cores_per_node)))
         return js
 
     @classmethod
@@ -35,11 +39,11 @@ class FluxEnvironment(DefaultTorqueEnvironment):
         js.writeline('#PBS -l pmem={}'.format(memory))
         if mode == 'cpu':
             js.writeline('#PBS -q {}'.format(cls.get_config_value('cpu_queue', 'flux')))
-            js = gen_tasks(js, np_total, mode)
+            js = cls.gen_tasks(js, np_total, mode)
         elif mode == 'gpu':
             q = cls.get_config_value('gpu_queue', cls.get_config_value('cpu_queue', 'flux') + 'g')
             js.writeline('#PBS -q {}'.format(q))
-            js = gen_tasks(js, np_total, mode)
+            js = cls.gen_tasks(js, np_total, mode)
         else:
             raise ValueError("Unknown mode '{}'.".format(mode))
         return js

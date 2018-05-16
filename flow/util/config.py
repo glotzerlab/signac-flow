@@ -60,7 +60,7 @@ def require_config_value(key, ns=None, default=_GET_CONFIG_VALUE_NONE):
         else:
             return default
 
-def get_config_value(key, ns=None):
+def get_config_value(key, ns=None, default=None):
     """Request a value from the user's configuration.
 
     This method should be used whenever values need to be provided
@@ -89,4 +89,4 @@ def get_config_value(key, ns=None):
         else:
             return config.load_config()['flow'][ns][key]
     except KeyError:
-        return None
+        return default

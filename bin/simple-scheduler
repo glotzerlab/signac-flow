@@ -114,7 +114,10 @@ def _process_queue(args, db):
 
     cwd = os.getcwd()
     try:
-        os.chdir(doc.get('chdir', os.path.expanduser('~')))
+        try:
+            os.chdir(doc.get('chdir', os.path.expanduser('~')).strip('"'))
+        except FileNotFoundError as error:
+            logger.warning(error)
         for i in range(100):
             fn_out = '{}.out.{}'.format(doc['_id'], i)
             if not os.path.exists(fn_out):

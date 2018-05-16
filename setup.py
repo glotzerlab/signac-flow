@@ -39,5 +39,10 @@ setup(
             'flow = flow.__main__:main',
         ],
     },
+
+    scripts=[
+        'bin/simple-scheduler',
+    ],
+
     install_requires=requirements,
 )

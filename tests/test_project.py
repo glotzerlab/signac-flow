@@ -378,7 +378,7 @@ class ProjectTest(BaseProjectTest):
             project.submit(bundle_size=2, num=4)
             self.assertEqual(len(list(MockScheduler.jobs())), 3)
             MockScheduler.reset()
-            project.fetch_status(file=StringIO())
+            project._fetch_scheduler_status(file=StringIO())
             project.submit(bundle_size=0)
             self.assertEqual(len(list(MockScheduler.jobs())), 1)
 
@@ -404,7 +404,7 @@ class ProjectTest(BaseProjectTest):
 
         MockScheduler.step()
         MockScheduler.step()
-        project.fetch_status(file=StringIO())
+        project._fetch_scheduler_status(file=StringIO())
 
         for job in project:
             next_op = project.next_operation(job)

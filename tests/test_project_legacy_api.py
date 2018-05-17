@@ -276,7 +276,7 @@ class ProjectTest(unittest.TestCase):
                 project.submit(bundle_size=2, num=4)
                 self.assertEqual(len(list(sched.jobs())), 3)
                 sched.reset()
-                project.fetch_status(file=StringIO())
+                project._fetch_scheduler_status(file=StringIO())
                 project.submit(bundle_size=0)
                 self.assertEqual(len(list(sched.jobs())), 1)
 
@@ -299,7 +299,7 @@ class ProjectTest(unittest.TestCase):
 
         sched.step()
         sched.step()
-        project.fetch_status(file=StringIO())
+        project._fetch_scheduler_status(file=StringIO())
 
         for job in project:
             self.assertEqual(project.next_operation(job).get_status(), JobStatus.queued)

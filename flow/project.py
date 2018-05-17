@@ -33,6 +33,7 @@ from hashlib import sha1
 
 import signac
 from signac.common import six
+from signac.contrib.hashing import calc_id
 from jinja2 import Environment
 from jinja2 import PackageLoader
 from jinja2 import ChoiceLoader
@@ -228,6 +229,7 @@ class JobOperation(object):
     :type directives:
         :class:`dict`
     """
+    MAX_LEN_ID = 100
 
     def __init__(self, name, job, cmd, directives=None, np=None):
         if directives is None:
@@ -267,13 +269,40 @@ class JobOperation(object):
             cmd=repr(self.cmd),
             directives=self.directives)
 
-    def get_id(self):
+    def _get_legacy_id(self):
         "Return a name, which identifies this job-operation."
         return '{}-{}'.format(self.job, self.name)
 
+    def get_id(self, index=0):
+        "Return a name, which identifies this job-operation."
+        project = self.job._project
+
+        # The full name is designed to be truly unique for each job-operation.
+        full_name = '{}%{}%{}%{}'.format(
+            project.root_directory(), self.job.get_id(), self.name, index)
+
+        # The job_op_id is a hash computed from the unique full name.
+        job_op_id = calc_id(full_name)
+
+        # The actual job id is then constructed from a readable part and the job_op_id,
+        # ensuring that the job-op is still somewhat identifiable, but guarantueed to
+        # be unique. The readable name is based on the project id, job id, operation name,
+        # and the index number. All names and the id itself are restricted in length
+        # to guarantuee that the id does not get too long.
+        max_len = self.MAX_LEN_ID - len(job_op_id)
+        if max_len < len(job_op_id):
+            raise ValueError("Value for MAX_LEN_ID is too small ({}).".format(self.MAX_LEN_ID))
+
+        readable_name = '{}/{}/{}/{:04d}/'.format(
+            str(project)[:12], str(self.job)[:8], self.name[:12], index)[:max_len]
+
+        # By appending the unique job_op_id, we ensure that each id is truly unique.
+        return readable_name + job_op_id
+
     @classmethod
     def expand_id(self, _id):
-        return {'job_id': _id[:32], 'operation-name': _id[33:]}
+        # TODO: Remove beginning version 0.7.
+        raise RuntimeError("The expand_id() method has been removed as of version 0.6.")
 
     def __hash__(self):
         return int(sha1(self.get_id().encode('utf-8')).hexdigest(), 16)
@@ -283,14 +312,15 @@ class JobOperation(object):
 
     def set_status(self, value):
         "Store the operation's status."
-        status_doc = self.job.document.get('status', dict())
+        status_doc = self.job.document.get('_status', dict())
         status_doc[self.get_id()] = int(value)
-        self.job.document['status'] = status_doc
+        self.job.document['_status'] = status_doc
 
     def get_status(self):
         "Retrieve the operation's last known status."
         try:
-            return JobStatus(self.job.document['status'][self.get_id()])
+            status_cache = self.job.document['_status']
+            return JobStatus(status_cache[self.get_id()])
         except KeyError:
             return JobStatus.unknown
 
@@ -807,14 +837,15 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         return sjobs_map
 
     def _get_operations_status(self, job):
-        job_scheduler_status = job.document.get('status', dict())
-        for name, flow_op in self.operations.items():
-            job_op = JobOperation(
-                name=name, job=job, cmd=flow_op(job), directives=flow_op.directives)
+        "Return a dict with information about job-operations for this job."
+        cached_status = job.document.get('_status', dict())
+        for name, job_op in self._job_operations(job):
+            flow_op = self.operations[name]
             completed = flow_op.complete(job)
             eligible = False if completed else flow_op.eligible(job)
+            scheduler_status = cached_status.get(job_op.get_id(), JobStatus.unknown)
             yield name, {
-                'scheduler_status': job_scheduler_status.get(job_op.get_id(), JobStatus.unknown),
+                'scheduler_status': scheduler_status,
                 'eligible': eligible,
                 'completed': completed,
             }
@@ -854,12 +885,33 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             row[2] += ' ' + self._alias('requires_attention')
         return row
 
-    def _update_scheduler_status_cache(self, jobs, scheduler, file, pool, ignore_errors=False):
+    def _fetch_scheduler_status(self, jobs=None, scheduler=None, file=None, ignore_errors=False):
         "Update the status docs."
         try:
+            if jobs is None:
+                jobs = list(self)
             if scheduler is None:
                 scheduler = self._environment.get_scheduler()
-            self.fetch_status(jobs=jobs, scheduler=scheduler, file=file, pool=pool)
+
+            # Map all scheduler jobs by their name.
+            print(self._tr("Query scheduler..."), file=file)
+            sjobs_map = defaultdict(list)
+            for sjob in self.scheduler_jobs(scheduler):
+                sjobs_map[sjob.name()].append(sjob)
+
+            # Iterate through all jobs ...
+            for job in jobs:
+                job_status = dict()
+                # ... and all job-operations to attempt to map the job-operation id
+                # to scheduler names.
+                for name, op in self._job_operations(job):
+                    scheduler_jobs = sjobs_map.get(
+                        op.get_id(), sjobs_map.get(op._get_legacy_id(), []))
+                    from operator import methodcaller
+                    tmp = list(map(methodcaller('status'), scheduler_jobs))
+                    job_status[op.get_id()] = int(max(tmp) if tmp else JobStatus.unknown)
+                job.document['_status'] = job_status
+
         except NoSchedulerError:
             logger.debug("No scheduler available.")
         except RuntimeError as error:
@@ -867,7 +919,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             if not ignore_errors:
                 raise
         else:
-            logger.info("Updated job status docs.")
+            logger.info("Updated job status cache.")
 
     OPERATION_STATUS_SYMBOLS = OrderedDict([
         ('ineligible', '\u25cb'),   # open circle
@@ -947,7 +999,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 "print_status(): the scheduler argument is deprecated!", DeprecationWarning)
 
         # Update the status docs of each job:
-        self._update_scheduler_status_cache(jobs, scheduler, err, pool, ignore_errors)
+        self._fetch_scheduler_status(jobs, scheduler, err, ignore_errors)
 
         # Get status dict for all selected jobs  # TODO parallelize
         statuses = OrderedDict((job.get_id(), self.get_job_status(job)) for job in jobs)
@@ -1586,54 +1638,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             help="Manually specify all labels that are required for the direct command "
                  "to be considered eligible for execution.")
 
-    def fetch_status(self, jobs=None, scheduler=None, file=sys.stderr, pool=None):
-        """Update the status cache for each job.
-
-        This function queries the scheduler to obtain the current status of each
-        submitted job-operation.
-
-        :param jobs:
-            The jobs to query, defaults to all jobs.
-        :type jobs:
-            A sequence of instances of :class:`signac.contrib.job.Job`
-        :param file:
-            A file to write logging output to, defaults to sys.stderr.
-        :type file:
-            A file-like object.
-        :param scheduler:
-            The scheduler to use for querying (deprecated argument); defaults to
-            the scheduler provided by the project's associated environment.
-        :param pool:
-            A multiprocessing pool. If provided, will parallelize the status update.
-        :return:
-            A dictionary of jobs mapped to their status dicts.
-         """
-        if jobs is None:
-            jobs = list(self.find_jobs())
-        if scheduler is None:
-            scheduler = self._environment.get_scheduler()
-
-        print(self._tr("Query scheduler..."), file=file)
-        sjobs_map = defaultdict(list)
-        for sjob in self.scheduler_jobs(scheduler):
-            sjobs_map[sjob.name()].append(sjob)
-        if pool is None:
-            for job in tqdm(jobs, file=file):
-                _update_job_status(job, sjobs_map)
-        else:
-            jobs_ = list((job, sjobs_map) for job in jobs)
-            pool.map(_update_status, tqdm(jobs_, total=len(jobs), file=file))
-
     def update_stati(self, scheduler, jobs=None, file=sys.stderr, pool=None, ignore_errors=False):
-        "This function has been replaced with :meth:`.fetch_status`."
-        warnings.warn(
-            "The update_stati() method has been replaced by fetch_status() as of version 0.6.",
-            DeprecationWarning)
-        self.fetch_status(scheduler=scheduler, jobs=jobs, file=file, ignore_errors=ignore_errors)
-
-    def _get_status(self, jobs=None):
-        status = self.fetch_status(jobs=jobs)
-        return status
+        "This function has been removed as of version 0.6."
+        raise RuntimeError(
+            "The update_stati() method has been removed as of version 0.6.")
 
     def export_job_stati(self, collection, stati):
         "Export the job stati to a database collection."

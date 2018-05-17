@@ -19,10 +19,10 @@
 {% block header %}
 {{ super () -}}
 {% set account = 'account'|get_config_value(ns=environment) %}
-{% if account is not none %}
+{% if account %}
 #SBATCH -A {{ account }}
 {% endif %}
-{% if memory is not none %}
+{% if memory %}
 #SBATCH --mem={{ memory }}G
 {% endif %}
 #SBATCH --partition={{ partition }}

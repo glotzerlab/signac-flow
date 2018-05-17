@@ -8,6 +8,8 @@ import argparse
 import logging
 from contextlib import contextmanager
 
+from signac.common import six
+
 
 def _mkdir_p(path):
     """"Create a directory at 'path', ignore if the directory already exists.
@@ -164,3 +166,19 @@ def switch_to_directory(root=None):
             yield
         finally:
             os.chdir(cwd)
+
+
+def _is_identifier(name):
+    """Check if 'name' is a valid Python identifier.
+
+    Source: https://stackoverflow.com/a/2545164
+    """
+    if name:
+        if six.PY2:
+            import re
+            import keyword
+            return re.match(r'^[a-z_][a-z0-9_]*$', name, re.I) and not keyword.iskeyword(name)
+        else:
+            return name.isidentifier()
+    else:
+        return False    # empty string or None

@@ -546,6 +546,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
         # Setup standard filters that can be used to format context variables.
         self._template_environment_.filters['format_timedelta'] = _format_timedelta
+        if 'max' not in self._template_environment_.filters:    # for jinja2 < 2.10
+            self._template_environment_.filters['max'] = max
 
     @property
     def _template_environment(self):

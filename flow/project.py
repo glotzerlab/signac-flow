@@ -2085,6 +2085,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         else:
             jobs = self
 
+        # Fetch the scheduler status.
+        self._fetch_scheduler_status(jobs)
+
         # Gather all pending operations ...
         ops = self._get_pending_operations(jobs, args.operation_name)
         ops = list(islice(ops, args.num))

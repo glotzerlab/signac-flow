@@ -34,6 +34,7 @@ from hashlib import sha1
 import signac
 from signac.common import six
 from signac.contrib.hashing import calc_id
+from signac.contrib.filterparse import parse_filter_arg
 from jinja2 import Environment
 from jinja2 import PackageLoader
 from jinja2 import ChoiceLoader
@@ -1571,17 +1572,31 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                  "and filter funtions; then exit.")
 
     @classmethod
+    def _add_job_selection_args(cls, parser):
+        parser.add_argument(
+            '-j', '--job-id',
+            type=str,
+            nargs='+',
+            help="Only select jobs that match the given id(s).")
+        parser.add_argument(
+            '-f', '--filter',
+            type=str,
+            nargs='+',
+            help="Only select jobs that match the given state point filter.")
+        parser.add_argument(
+            '--doc-filter',
+            type=str,
+            nargs='+',
+            help="Only select jobs that match the given document filter.")
+
+    @classmethod
     def _add_operation_selection_arg_group(cls, parser, operations=None):
         "Add argument group to parser for job-operation selection."
         selection_group = parser.add_argument_group(
             'job-operation selection',
             "By default, all eligible operations for all jobs are selected. Use "
             "the options in this group to reduce this selection.")
-        selection_group.add_argument(
-            '-j', '--job-id',
-            type=str,
-            nargs='+',
-            help="Only select operations for the given job ids.")
+        cls._add_job_selection_args(selection_group)
         selection_group.add_argument(
             '-o', '--operation',
             dest='operation_name',
@@ -1654,55 +1669,55 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
     @classmethod
     def _add_print_status_args(cls, parser):
         "Add arguments to parser for the :meth:`~.print_status` method."
-        parser.add_argument(
-            '-f', '--filter',
-            dest='job_filter',
-            type=str,
-            help="Filter jobs.")
-        parser.add_argument(
-            '--no-overview',
-            action='store_false',
-            dest='overview',
-            help="Do not print an overview.")
-        parser.add_argument(
-            '-m', '--overview-max-lines',
-            type=_positive_int,
-            help="Limit the number of lines in the overview.")
-        parser.add_argument(
+        cls._add_job_selection_args(parser)
+        view_group = parser.add_argument_group(
+            'view',
+            "Specify how to format the status display.")
+        view_group.add_argument(
+            '--json',
+            dest='dump_json',
+            action='store_true',
+            help="Do not format the status display, but dump all data formatted in JSON.")
+        view_group.add_argument(
             '-d', '--detailed',
             action='store_true',
             help="Show a detailed view of all jobs and their labels and operations.")
-        parser.add_argument(
+        view_group.add_argument(
             '-a', '--all-operations',
             dest='all_ops',
             action='store_true',
             help="Show information about all operations, not just active or eligible ones.")
-        parser.add_argument(
+        view_group.add_argument(
+            '--skip-active',
+            action='store_true',
+            help=argparse.SUPPRESS)
+        view_group.add_argument(
             '-e', '--expand',
             action='store_true',
-            help="Expand the detailed view.")
-        parser.add_argument(
+            help="Display job labels and job operations in two separate tables.")
+        view_group.add_argument(
             '--full',
             action='store_true',
             help="Show all available information (implies -da).")
-        parser.add_argument(
-            '--json',
-            dest='dump_json',
-            action='store_true',)
-        parser.add_argument(
+        view_group.add_argument(
+            '--no-overview',
+            action='store_false',
+            dest='overview',
+            help="Do not print an overview.")
+        view_group.add_argument(
+            '-m', '--overview-max-lines',
+            type=_positive_int,
+            help="Limit the number of lines in the overview.")
+        view_group.add_argument(
             '-p', '--parameters',
             type=str,
             nargs='*',
             help="Display select parameters of the job's "
                  "statepoint with the detailed view.")
-        parser.add_argument(
+        view_group.add_argument(
             '--param-max-width',
             type=int,
             help="Limit the width of each parameter row.")
-        parser.add_argument(
-            '--skip-active',
-            action='store_true',
-            help="Display only jobs, which are currently not active.")
         parser.add_argument(
             '--ignore-errors',
             action='store_true',
@@ -1981,17 +1996,18 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             return False
         return True
 
-    def _main_status(self, args, pool=None):
+    def _main_status(self, args):
         "Print status overview."
+        jobs = self._select_jobs_from_args(args)
         args = {key: val for key, val in vars(args).items()
-                if key not in ['func', 'debug']}
+                if key not in ['func', 'debug', 'job_id', 'filter', 'doc_filter']}
         if args.pop('full'):
             args['detailed'] = args['all_ops'] = True
 
         try:
-            self.print_status(pool=pool, **args)
+            self.print_status(jobs=jobs, **args)
         except NoSchedulerError:
-            self.print_status(pool=pool, **args)
+            self.print_status(jobs=jobs, **args)
 
     def _main_next(self, args):
         "Determine the jobs that are eligible for a specific operation."
@@ -2018,10 +2034,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 "The run --np option is deprecated as of version 0.6!")
 
         # Select jobs:
-        if args.job_id:
-            jobs = [self.open_job(id=job_id) for job_id in args.job_id]
-        else:
-            jobs = self
+        jobs = self._select_jobs_from_args(args)
 
         # Setup partial run function, because we need to call this either
         # inside some context managers or not based on whether we need
@@ -2059,10 +2072,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 "Cannot use the -o/--operation-name and the --cmd options in combination!")
 
         # Select jobs:
-        if args.job_id:
-            jobs = [self.open_job(id=job_id) for job_id in args.job_id]
-        else:
-            jobs = self
+        jobs = self._select_jobs_from_args(args)
 
         # Gather all pending operations or generate them based on a direct command...
         if args.cmd:
@@ -2080,10 +2090,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         kwargs = vars(args)
 
         # Select jobs:
-        if args.job_id:
-            jobs = [self.open_job(id=job_id) for job_id in args.job_id]
-        else:
-            jobs = self
+        jobs = self._select_jobs_from_args(args)
 
         # Fetch the scheduler status.
         self._fetch_scheduler_status(jobs)
@@ -2122,6 +2129,19 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         else:
             for job in jobs:
                 operation_function(job)
+
+    def _select_jobs_from_args(self, args):
+        "Select jobs with the given command line arguments ('-j/-f/--doc-filter')."
+        if args.job_id and (args.filter or args.doc_filter):
+            raise ValueError(
+                "Cannot provide both -j/--job-id and -f/--filter or --doc-filter in combination.")
+
+        if args.job_id:
+            return [self.open_job(id=job_id) for job_id in args.job_id]
+        else:
+            filter_ = parse_filter_arg(args.filter)
+            doc_filter = parse_filter_arg(args.doc_filter)
+            return list(self.find_jobs(filter=filter_, doc_filter=doc_filter))
 
     def main(self, parser=None, pool=None):
         """Call this function to use the main command line interface.
@@ -2303,6 +2323,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
     def format_row(self, *args, **kwargs):
         warnings.warn("The format_row() method is private as of version 0.6.", DeprecationWarning)
         return self._format_row(*args, **kwargs)
+
 
 ###
 # Status-related helper functions

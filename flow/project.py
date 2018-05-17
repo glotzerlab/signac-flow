@@ -761,7 +761,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             return operations[0].get_id()
         else:
             h = '.'.join(op.get_id() for op in operations)
-            bid = '{}-bundle-{}'.format(self, sha1(h.encode('utf-8')).hexdigest())
+            bid = '{}/bundle/{}'.format(self, sha1(h.encode('utf-8')).hexdigest())
             fn_bundle = self._fn_bundle(bid)
             _mkdir_p(os.path.dirname(fn_bundle))
             with open(fn_bundle, 'w') as file:
@@ -772,7 +772,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
     def _expand_bundled_jobs(self, scheduler_jobs):
         "Expand jobs which were submitted as part of a bundle."
         for job in scheduler_jobs:
-            if job.name().startswith('{}-bundle-'.format(self)):
+            if job.name().startswith('{}/bundle/'.format(self)):
                 with open(self._fn_bundle(job.name())) as file:
                     for line in file:
                         yield ClusterJob(line.strip(), job.status())

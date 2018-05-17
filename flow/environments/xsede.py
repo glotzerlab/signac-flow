@@ -126,6 +126,7 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
     https://portal.xsede.org/psc-bridges
     """
     hostname_pattern = '.*\.bridges\.psc\.edu$'
+    template = 'bridges.sh'
     cores_per_node = 28
 
     @classmethod
@@ -151,7 +152,7 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
     def add_args(cls, parser):
         super(BridgesEnvironment, cls).add_args(parser)
         parser.add_argument(
-          '-p', '--partition',
+          '--partition',
           choices=['RM', 'RM-shared', 'RM-small', 'GPU', 'GPU-shared', 'LM'],
           default='RM-shared',
           help="Specify the partition to submit to.")

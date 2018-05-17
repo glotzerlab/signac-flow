@@ -18,9 +18,9 @@ cd {{ project.config.project_dir }}
 {% for operation in operations %}
 # Operation '{{ operation.name }}' for job '{{ operation.job._id }}':
 {% if parallel %}
-{{ operation.cmd }} &
+{{ prefix_cmd }}{{ operation.cmd }} &
 {% else %}
-{{ operation.cmd }}
+{{ prefix_cmd }}{{ operation.cmd }}
 {% endif %}
 {% endfor %}
 {% endblock %}

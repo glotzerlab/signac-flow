@@ -869,6 +869,14 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         else:
             logger.info("Updated job status docs.")
 
+    OPERATION_STATUS_SYMBOLS = OrderedDict([
+        ('ineligible', '\u25cb'),   # open circle
+        ('eligible', '\u25cf'),     # black circle
+        ('active', '\u25b9'),       # open triangel
+        ('running', '\u25b8'),      # black triangel
+        ('completed', '\u25a1'),    # open square
+    ])
+
     def print_status(self, jobs=None, overview=True, overview_max_lines=None,
                      detailed=False, parameters=None, skip_active=False, param_max_width=None,
                      expand=False, all_ops=False, dump_json=False,
@@ -1064,14 +1072,23 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                             name = name.ljust(width)
                             #       closing frame                               open frame
                             frame = '\u2514' if (i+1) == len(selected_ops) else '\u251c'
-                            if doc['completed']:
-                                #        white square
-                                symbol = '\u25a1'
+
+                            if doc['scheduler_status'] >= JobStatus.active:
+                                op_status = 'running'
+                            elif doc['scheduler_status'] > JobStatus.inactive:
+                                op_status = 'active'
+                            elif doc['completed']:
+                                op_status = 'completed'
+                            elif doc['eligible']:
+                                op_status = 'eligible'
                             else:
-                                #        black circle                     white circle
-                                symbol = '\u25cf' if doc['eligible'] else '\u25cb'
+                                op_status = 'ineligible'
+                            symbol = self.OPERATION_STATUS_SYMBOLS[op_status]
+
                             sched_stat = _FMT_SCHEDULER_STATUS[doc['scheduler_status']]
                             print("{}{} {} [{}]".format(frame, symbol, name, sched_stat), file=file)
+                print('Legend: ' + ' '.join('{}:{}'.format(v, k)
+                      for k, v in self.OPERATION_STATUS_SYMBOLS.items()), file=file)
 
         # Show any abbreviations used
         if abbreviate.table:

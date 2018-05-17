@@ -569,7 +569,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         self._template_environment_.filters['format_timedelta'] = _format_timedelta
         self._template_environment_.filters['identical'] = _identical
         self._template_environment_.filters['get_config_value'] = flow_config.get_config_value
-        self._template_environment_.filters['require_config_value'] = flow_config.require_config_value
+        self._template_environment_.filters['require_config_value'] = \
+            flow_config.require_config_value
         if 'max' not in self._template_environment_.filters:    # for jinja2 < 2.10
             self._template_environment_.filters['max'] = max
 

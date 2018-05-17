@@ -47,6 +47,6 @@ setup(
     install_requires=requirements,
 
     extras_require={
-        'templating': ['jinja2>=2.10'],
+        'templating': ['jinja2>=2.8'],
     },
 )

@@ -1440,8 +1440,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             try:
                 return template.render(** context)
             except ConfigKeyError as e:
-                raise SubmitError("The following error was encountered during script generation: ",
-                                  e.message)
+                raise SubmitError(
+                    "The following error was encountered during script generation: {}".format(e))
 
     @_support_legacy_api
     def submit_operations(self, operations, _id=None, env=None, parallel=False, flags=None,

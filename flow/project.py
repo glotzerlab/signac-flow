@@ -58,14 +58,13 @@ from .util.misc import switch_to_directory
 from .util.translate import abbreviate
 from .util.translate import shorten
 from .util.execution import fork
+from .util.execution import TimeoutExpired
 from .labels import label
 from .labels import staticlabel
 from .labels import classlabel
 from .labels import _is_label_func
 from . import legacy
 
-if not six.PY2:
-    from subprocess import TimeoutExpired
 
 logger = logging.getLogger(__name__)
 

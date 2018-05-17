@@ -41,7 +41,7 @@ if JINJA2:
                 self.call_method('err', args), [], [], []).set_lineno(lineno)
 
         def err(self, msg, caller):
-            raise jinja2.TemplateRuntimeError(msg)
+            raise jinja2.TemplateError(msg)
 
 else:
     class TemplateError(Exception):     # mock class, should never be used

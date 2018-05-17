@@ -2013,9 +2013,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         for cls in type(self).__mro__:
             operations.extend(getattr(cls, '_OPERATION_FUNCTIONS', []))
 
-        def _guess_cmd(func, name):
+        def _guess_cmd(func, name, **kwargs):
+            executable = kwargs.get('executable', sys.executable)
             path = getattr(func, '_flow_path', inspect.getsourcefile(func))
-            return 'python {} exec {} {{job._id}}'.format(path, name)
+            return '{} {} exec {} {{job._id}}'.format(executable, path, name)
 
         for name, func in operations:
             if name in self._operations:
@@ -2030,7 +2031,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             if getattr(func, '_flow_cmd', False):
                 self._operations[name] = FlowOperation(cmd=func, **params)
             else:
-                self._operations[name] = FlowOperation(cmd=_guess_cmd(func, name), **params)
+                self._operations[name] = FlowOperation(
+                    cmd=_guess_cmd(func, name, **params), **params)
                 self._operation_functions[name] = func
 
     @property

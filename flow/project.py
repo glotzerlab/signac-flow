@@ -82,6 +82,8 @@ from .util import config as flow_config
 
 
 logger = logging.getLogger(__name__)
+if six.PY2:
+    logger.addHandler(logging.NullHandler())
 
 
 # The TEMPLATE_HELP can be shown with the --template-help option available to all
@@ -551,7 +553,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             try:
                 extra_packages.append(jinja2.PackageLoader(env, 'templates'))
             except ImportError as error:
-                logger.warning("Unable to load template from package '{}'.".format(error.name))
+                name = str(error) if six.PY2 else error.name
+                logger.warning("Unable to load template from package '{}'.".format(name))
 
         load_envs = ([jinja2.FileSystemLoader(self._template_dir)] +
                      extra_packages +

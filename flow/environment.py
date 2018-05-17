@@ -41,7 +41,8 @@ else:
     import importlib.machinery
 
 logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
+if six.PY2:
+    logger.addHandler(logging.NullHandler())
 
 
 # Global variable can be used to override detected environment

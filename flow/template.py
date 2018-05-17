@@ -29,6 +29,9 @@ from .util.misc import _is_identifier
 
 
 logger = logging.getLogger(__name__)
+if six.PY2:
+    logger.addHandler(logging.NullHandler())
+
 
 TEMPLATES = {
     'minimal': [('{alias}.py', 'project_minimal.pyt'), ],

@@ -35,11 +35,19 @@ import signac
 from signac.common import six
 from signac.contrib.hashing import calc_id
 from signac.contrib.filterparse import parse_filter_arg
-from jinja2 import Environment
-from jinja2 import PackageLoader
-from jinja2 import ChoiceLoader
-from jinja2 import FileSystemLoader
-from jinja2 import TemplateNotFound
+
+# Try to import jinja2 for templating, used in script and submit functions.
+try:
+    import jinja2
+    from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
+except ImportError:
+    # Mock exception, which will never be raised.
+    class Jinja2TemplateNotFound(Exception):
+        pass
+
+    JINJA2 = False
+else:
+    JINJA2 = True
 
 from .environment import get_environment
 from .scheduling.base import Scheduler
@@ -61,6 +69,7 @@ from .util.translate import abbreviate
 from .util.translate import shorten
 from .util.execution import fork
 from .util.execution import TimeoutExpired
+from .util.dependencies import _requires_jinja2
 from .labels import label
 from .labels import staticlabel
 from .labels import classlabel
@@ -500,8 +509,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         self._environment = environment or get_environment()
 
         # Setup the templating system for the generation of run and submission scripts.
-        self._setup_template_environment()
-        self._setup_legacy_templating()  # Disable in 0.8.
+        if JINJA2:
+            self._setup_template_environment()
+        self._setup_legacy_templating()  # TODO: Disable in 0.8.
 
         # Register all label functions with this project instance.
         self._label_functions = dict()
@@ -527,15 +537,20 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
         # Templates are searched in the local template directory first, then in the package
         # 'templates' directory.
-        self._template_environment = Environment(
-            loader=ChoiceLoader([
-                FileSystemLoader(self._template_dir),
-                PackageLoader('flow', 'templates'),
+        self._template_environment_ = jinja2.Environment(
+            loader=jinja2.ChoiceLoader([
+                jinja2.FileSystemLoader(self._template_dir),
+                jinja2.PackageLoader('flow', 'templates'),
             ]),
             trim_blocks=True)
 
         # Setup standard filters that can be used to format context variables.
-        self._template_environment.filters['format_timedelta'] = _format_timedelta
+        self._template_environment_.filters['format_timedelta'] = _format_timedelta
+
+    @property
+    def _template_environment(self):
+        _requires_jinja2()
+        return self._template_environment_
 
     def _get_standard_template_context(self):
         "Return the standard templating context for run and submission scripts."
@@ -2053,6 +2068,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
     def _main_script(self, args):
         "Generate a script for the execution of operations."
+        _requires_jinja2('The signac-flow script function')
         if args.serial:             # Handle legacy API: The --serial option is deprecated
             if args.parallel:       # as of version 0.6. The default execution mode is 'serial'
                 raise ValueError(   # and can be switched with the '--parallel' argument.
@@ -2087,6 +2103,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             template=args.template, show_template_help=args.show_template_help))
 
     def _main_submit(self, args):
+        _requires_jinja2('The signac-flow submit function')
         kwargs = vars(args)
 
         # Select jobs:
@@ -2288,7 +2305,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             print("Error: Failed to complete execution due to "
                   "timeout ({}s).".format(args.timeout), file=sys.stderr)
             _exit_or_raise()
-        except TemplateNotFound as error:
+        except Jinja2TemplateNotFound as error:
             print("Did not find template script '{}'.".format(error), file=sys.stderr)
             _exit_or_raise()
         except AssertionError as error:

@@ -12,8 +12,18 @@ import sys
 import errno
 import logging
 
-from jinja2 import Environment, ChoiceLoader, FileSystemLoader, PackageLoader
 from signac.common import six
+try:
+    import jinja2
+    from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
+except ImportError:
+    # Mock exception, which will never be raised.
+    class Jinja2TemplateNotFound(Exception):
+        pass
+
+    JINJA2 = False
+else:
+    JINJA2 = True
 
 from .util.misc import _is_identifier
 
@@ -28,6 +38,9 @@ TEMPLATES = {
 
 def init(alias=None, template=None, root=None, out=None):
     "Initialize a templated FlowProject module."
+    if not JINJA2:
+        raise ValueError("The init() function requires the 'jinja2' package.")
+
     if alias is None:
         alias = 'project'
     elif not _is_identifier(alias):
@@ -46,10 +59,10 @@ def init(alias=None, template=None, root=None, out=None):
     if not project_class_name.endswith('Project'):
         project_class_name += 'Project'
 
-    template_environment = Environment(
-        loader=ChoiceLoader([
-            FileSystemLoader('templates'),
-            PackageLoader('flow', 'templates')]),
+    template_environment = jinja2.Environment(
+        loader=jinja2.ChoiceLoader([
+            jinja2.FileSystemLoader('templates'),
+            jinja2.PackageLoader('flow', 'templates')]),
         trim_blocks=True)
 
     context = dict()

@@ -546,8 +546,15 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         # Templates are searched in the local template directory first, then in additionally
         # installed packages, then in the main package 'templates' directory.
         # 'templates' directory.
+        extra_packages = []
+        for env in envs:
+            try:
+                extra_packages.append(jinja2.PackageLoader(env, 'templates'))
+            except ImportError as error:
+                logger.warning("Unable to load template from package '{}'.".format(error.name))
+
         load_envs = ([jinja2.FileSystemLoader(self._template_dir)] +
-                     [jinja2.PackageLoader(env, 'templates') for env in envs] +
+                     extra_packages +
                      [jinja2.PackageLoader('flow', 'templates')])
 
         self._template_environment_ = jinja2.Environment(

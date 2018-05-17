@@ -25,5 +25,4 @@
 {% if memory %}
 #SBATCH --mem={{ memory }}G
 {% endif %}
-#SBATCH --partition={{ partition }}
 {% endblock %}

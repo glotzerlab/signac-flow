@@ -4,6 +4,14 @@
 import subprocess
 from signac.common import six
 
+if six.PY2:
+    # Timeouts are not support for Python 2.7. The class defined below is
+    # a pure mock class.
+    class TimeoutExpired(RuntimeError):
+        pass
+else:
+    from subprocess import TimeoutExpired
+
 
 def fork(cmd, timeout=None):
     "Helper function for py2/3 compatible execution of forked processes."
@@ -16,4 +24,4 @@ def fork(cmd, timeout=None):
         subprocess.call(cmd, shell=True, timeout=timeout)
 
 
-__all__ = ['fork']
+__all__ = ['fork', 'TimeoutExpired']

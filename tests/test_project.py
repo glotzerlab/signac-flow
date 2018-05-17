@@ -252,6 +252,19 @@ class ProjectTest(BaseProjectTest):
                     self.assertEqual(op.name, 'op2')
             self.assertEqual(i, int(job in even_jobs))
 
+    def test_status(self):
+        project = self.mock_project()
+        for job in project:
+            status = project.get_job_status(job)
+            self.assertEqual(status['job_id'], job.get_id())
+            self.assertEqual(len(status['operations']), len(project.operations))
+            for op in project.next_operations(job):
+                self.assertIn(op.name, status['operations'])
+                op_status = status['operations'][op.name]
+                self.assertEqual(op_status['eligible'], project.operations[op.name].eligible(job))
+                self.assertEqual(op_status['completed'], project.operations[op.name].complete(job))
+                self.assertEqual(op_status['scheduler_status'], JobStatus.unknown)
+
     def test_script(self):
         project = self.mock_project()
         for job in project:
@@ -365,7 +378,7 @@ class ProjectTest(BaseProjectTest):
             project.submit(bundle_size=2, num=4)
             self.assertEqual(len(list(MockScheduler.jobs())), 3)
             MockScheduler.reset()
-            project.fetch_status(file=StringIO())
+            project._fetch_scheduler_status(file=StringIO())
             project.submit(bundle_size=0)
             self.assertEqual(len(list(MockScheduler.jobs())), 1)
 
@@ -391,7 +404,7 @@ class ProjectTest(BaseProjectTest):
 
         MockScheduler.step()
         MockScheduler.step()
-        project.fetch_status(file=StringIO())
+        project._fetch_scheduler_status(file=StringIO())
 
         for job in project:
             next_op = project.next_operation(job)
@@ -463,12 +476,13 @@ class ProjectMainInterfaceTest(BaseProjectTest):
 
     def test_main_status(self):
         self.assertTrue(len(self.project))
-        status_output = self.call_subcmd('status --detailed').decode().splitlines()
-        for line in status_output:
+        status_output = self.call_subcmd('--debug status --detailed').decode().splitlines()
+        lines = iter(status_output)
+        for line in lines:
             for job in self.project:
                 if job.get_id() in line:
-                    self.assertIn(self.project.next_operation(job).name, line)
-                    self.assertIn(' ! ', line)
+                    for op in self.project.next_operations(job):
+                        self.assertIn(op.name, next(lines))
 
     def test_main_script(self):
         self.assertTrue(len(self.project))

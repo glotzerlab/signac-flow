@@ -14,9 +14,13 @@ import logging
 import sys
 
 from signac.common import six
+from signac import init_project
+from signac import get_project
 
 from . import __version__
 from . import template
+from .util.misc import _is_identifier
+from .util.dependencies import _requires_jinja2
 
 
 logger = logging.getLogger(__name__)
@@ -24,6 +28,18 @@ logger = logging.getLogger(__name__)
 
 def main_init(args):
     "Initialize a FlowProject from one of the templates defined in the template module."
+    _requires_jinja2('The flow init function')
+
+    if not _is_identifier(args.alias):
+        raise ValueError(
+            "The alias '{}' is not a valid Python identifier and can therefore "
+            "not be used as a FlowProject alias.".format(args.alias))
+    try:
+        get_project()
+    except LookupError:
+        init_project(name=args.alias)
+        print("Initialized signac project with name '{}' in "
+              "current directory.".format(args.alias), file=sys.stderr)
     try:
         return template.init(alias=args.alias, template=args.template)
     except OSError as e:
@@ -58,15 +74,16 @@ def main():
         "alias",
         type=str,
         nargs='?',
-        help="Name of the flow project to initialize"
-    )
+        default='project',
+        help="Name of the flow project module to initialize. "
+             "This name will also be used to initialize a signac project in case that "
+             "no project was initialized prior to calling 'init'.")
     parser_init.add_argument(
         '-t', '--template',
         type=str,
         choices=tuple(sorted(template.TEMPLATES)),
         default='minimal',
-        help="Specify a specific to template to use."
-    )
+        help="Specify a specific to template to use.")
 
     if '--version' in sys.argv:
         print('signac-flow', __version__)

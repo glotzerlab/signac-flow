@@ -3,9 +3,13 @@
 # This software is licensed under the BSD 3-Clause License.
 """Definitions of Exception classes used in this package."""
 
-from jinja2 import nodes
-from jinja2.ext import Extension
-from jinja2.exceptions import TemplateRuntimeError
+try:
+    import jinja2
+    from jinja2.ext import Extension as Jinja2Extension
+except ImportError:
+    JINJA2 = False
+else:
+    JINJA2 = True
 
 
 class ConfigKeyError(KeyError):
@@ -23,16 +27,22 @@ class NoSchedulerError(AttributeError):
     pass
 
 
-class TemplateError(Extension):
-    """Indicates errors in jinja2 templates"""
-    # ref:http://jinja.pocoo.org/docs/2.10/extensions/#jinja-extensions
-    tags = set(['raise'])
+if JINJA2:
 
-    def parse(self, parser):
-        lineno = next(parser.stream).lineno
-        args = [parser.parse_expression()]
-        return nodes.CallBlock(
-            self.call_method('err', args), [], [], []).set_lineno(lineno)
+    class TemplateError(Jinja2Extension):
+        """Indicates errors in jinja2 templates"""
+        # ref:http://jinja.pocoo.org/docs/2.10/extensions/#jinja-extensions
+        tags = set(['raise'])
 
-    def err(self, msg, caller):
-        raise TemplateRuntimeError(msg)
+        def parse(self, parser):
+            lineno = next(parser.stream).lineno
+            args = [parser.parse_expression()]
+            return jinja2.nodes.CallBlock(
+                self.call_method('err', args), [], [], []).set_lineno(lineno)
+
+        def err(self, msg, caller):
+            raise jinja2.TemplateRuntimeError(msg)
+
+else:
+    class TemplateError(Exception):     # mock class, should never be used
+        pass

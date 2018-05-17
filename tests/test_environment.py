@@ -7,7 +7,6 @@ from flow import get_environment
 from flow.environment import JobScript
 from flow.environment import ComputeEnvironment
 from flow.environment import TestEnvironment
-from flow.errors import SubmitError
 from flow.errors import ConfigKeyError
 from test_project import StringIO, redirect_stdout
 

@@ -38,7 +38,7 @@ def _fetch(user=None):
     if user is None:
         user = getpass.getuser()
 
-    cmd = ['squeue', '-u', user, '-h', '-o "%2t %100j"']
+    cmd = ['squeue', '-u', user, '-h', "--format=%2t%100j"]
     try:
         result = subprocess.check_output(cmd).decode('utf-8')
     except subprocess.CalledProcessError as error:
@@ -52,7 +52,8 @@ def _fetch(user=None):
     lines = result.split('\n')
     for line in lines:
         if line:
-            status, name = line.strip()[1:-1].split()
+            status = line[:2]
+            name = line[2:].rstrip()
             yield ClusterJob(name, parse_status(status))
 
 

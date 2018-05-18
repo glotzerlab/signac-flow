@@ -25,6 +25,7 @@ import datetime
 import json
 import inspect
 import functools
+import contextlib
 from collections import defaultdict
 from collections import OrderedDict
 from itertools import islice
@@ -1046,7 +1047,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         self._fetch_scheduler_status(jobs, scheduler, err, ignore_errors)
 
         # Get status dict for all selected jobs
-        with ThreadPool() as pool:
+        with contextlib.closing(ThreadPool()) as pool:
             tmp = tqdm(
                 pool.imap(self.get_job_status, jobs),
                 desc="Collect job status info",

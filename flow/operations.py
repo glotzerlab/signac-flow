@@ -147,7 +147,7 @@ def run(parser=None):
         except KeyError:
             msg = "Did not find job corresponding to id '{}'.".format(_id)
             raise KeyError(msg)
-        except LookupError as error:
+        except LookupError:
             raise LookupError("Multiple matches for id '{}'.".format(_id))
 
     if len(args.jobid):

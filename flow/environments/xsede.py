@@ -19,6 +19,7 @@ class CometEnvironment(DefaultSlurmEnvironment):
     http://www.sdsc.edu/services/hpc/hpc_systems.html#comet
     """
     hostname_pattern = 'comet'
+    template = 'comet.sh'
     cores_per_node = 24
 
     @classmethod
@@ -35,8 +36,15 @@ class CometEnvironment(DefaultSlurmEnvironment):
                     raise error
 
     @classmethod
-    def script(cls, _id, ppn, partition, memory=None, job_output=None, **kwargs):
-        js = super(CometEnvironment, cls).script(_id=_id, ppn=ppn, **kwargs)
+    def gen_tasks(cls, js, np_total):
+        js.writeline('#SBATCH --nodes={}'.format(np_total/cls.cores_per_node))
+        js.writeline('#SBATCH --ntasks-per-node={}'.format(
+            cls.cores_per_node if np_total > cls.cores_per_node else np_total))
+        return js
+
+    @classmethod
+    def script(cls, _id, np_total, partition, memory=None, job_output=None, **kwargs):
+        js = super(CometEnvironment, cls).script(_id=_id, **kwargs)
         js.writeline('#SBATCH -A {}'.format(cls.get_config_value('account')))
         js.writeline('#SBATCH --partition={}'.format(partition))
         if memory is not None:
@@ -55,7 +63,7 @@ class CometEnvironment(DefaultSlurmEnvironment):
         super(CometEnvironment, cls).add_args(parser)
 
         parser.add_argument(
-          '-p', '--partition',
+          '--partition',
           choices=['compute', 'gpu', 'gpu-shared', 'shared', 'large-shared', 'debug'],
           default='shared',
           help="Specify the partition to submit to.")
@@ -72,12 +80,53 @@ class CometEnvironment(DefaultSlurmEnvironment):
                   '(slurm default is "slurm-%%j.out").'))
 
 
+class Stampede2Environment(DefaultSlurmEnvironment):
+    """Environment profile for the Stampede2 supercomputer.
+
+    https://www.tacc.utexas.edu/systems/stampede2
+    """
+    hostname_pattern = '.*stampede2'
+    template = 'stampede2.sh'
+    cores_per_node = 48
+
+    @classmethod
+    def script(cls, _id, tpn, ppn, partition, job_output=None, **kwargs):
+        raise NotImplementedError(
+                "The Stampede2 environment is only available for flow>=0.7")
+
+    @classmethod
+    def mpi_cmd(cls, cmd, np):
+        return "ibrun {cmd}".format(cmd=cmd)
+
+    @classmethod
+    def add_args(cls, parser):
+        super(Stampede2Environment, cls).add_args(parser)
+        # Remove ppn since the full node is always used
+        ppn_id = [i for i, action in enumerate(parser._actions)
+                  if "--ppn" in action.option_strings][0]
+        parser._handle_conflict_resolve(
+                None,
+                [('--ppn', parser._actions[ppn_id])])
+        parser.add_argument(
+            '--partition',
+            choices=['development', 'normal', 'large', 'flat-quadrant',
+                     'skx-dev', 'skx-normal', 'skx-large', 'long'],
+            default='skx-normal',
+            help="Specify the partition to submit to.")
+        parser.add_argument(
+            '--job-output',
+            help=('What to name the job output file. '
+                  'If omitted, uses the system default '
+                  '(slurm default is "slurm-%%j.out").'))
+
+
 class BridgesEnvironment(DefaultSlurmEnvironment):
     """Environment profile for the Bridges super computer.
 
     https://portal.xsede.org/psc-bridges
     """
     hostname_pattern = '.*\.bridges\.psc\.edu$'
+    template = 'bridges.sh'
     cores_per_node = 28
 
     @classmethod
@@ -103,10 +152,10 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
     def add_args(cls, parser):
         super(BridgesEnvironment, cls).add_args(parser)
         parser.add_argument(
-          '-p', '--partition',
+          '--partition',
           choices=['RM', 'RM-shared', 'RM-small', 'GPU', 'GPU-shared', 'LM'],
           default='RM-shared',
           help="Specify the partition to submit to.")
 
 
-__all__ = ['CometEnvironment', 'BridgesEnvironment']
+__all__ = ['CometEnvironment', 'BridgesEnvironment', 'Stampede2Environment']

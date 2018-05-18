@@ -55,13 +55,16 @@ from .scheduling.base import ClusterJob
 from .scheduling.base import JobStatus
 from .scheduling.status import update_status
 from .errors import SubmitError
+from .errors import ConfigKeyError
 from .errors import NoSchedulerError
+from .errors import TemplateError
 from .util import tabulate
 from .util.tqdm import tqdm
 from .util.misc import _positive_int
 from .util.misc import _mkdir_p
 from .util.misc import draw_progressbar
 from .util.misc import _format_timedelta
+from .util.misc import _identical
 from .util.misc import write_human_readable_statepoint
 from .util.misc import add_cwd_to_environment_pythonpath
 from .util.misc import switch_to_directory
@@ -75,9 +78,12 @@ from .labels import staticlabel
 from .labels import classlabel
 from .labels import _is_label_func
 from . import legacy
+from .util import config as flow_config
 
 
 logger = logging.getLogger(__name__)
+if six.PY2:
+    logger.addHandler(logging.NullHandler())
 
 
 # The TEMPLATE_HELP can be shown with the --template-help option available to all
@@ -85,7 +91,6 @@ logger = logging.getLogger(__name__)
 TEMPLATE_HELP = """Execution and submission scripts are generated with the jinja2 template files.
 Standard files are shipped with the package, but maybe replaced or extended with
 custom templates provided within a project.
-
 The default template directory can be configured with the 'template_dir' configuration
 variable, for example in the project configuration file. The current template directory is:
 {template_dir}
@@ -430,10 +435,10 @@ class FlowOperation(object):
             warnings.warn(
                 "The np argument for the FlowOperation() constructor is deprecated.",
                 DeprecationWarning)
-            if self._directives is None:
-                self._directives = dict(np=np)
+            if self.directives is None:
+                self.directives = dict(np=np)
             else:
-                assert self._directives.setdefault('np', np) == np
+                assert self.directives.setdefault('np', np) == np
 
         self._prereqs = [FlowCondition(cond) for cond in pre]
         self._postconds = [FlowCondition(cond) for cond in post]
@@ -535,17 +540,37 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         self._template_dir = os.path.join(
             self.root_directory(), self._config.get('template_dir', 'templates'))
 
-        # Templates are searched in the local template directory first, then in the package
+        if self._config.get('flow') and self._config['flow'].get('environment_modules'):
+            envs = self._config['flow'].as_list('environment_modules')
+        else:
+            envs = []
+
+        # Templates are searched in the local template directory first, then in additionally
+        # installed packages, then in the main package 'templates' directory.
         # 'templates' directory.
+        extra_packages = []
+        for env in envs:
+            try:
+                extra_packages.append(jinja2.PackageLoader(env, 'templates'))
+            except ImportError as error:
+                name = str(error) if six.PY2 else error.name
+                logger.warning("Unable to load template from package '{}'.".format(name))
+
+        load_envs = ([jinja2.FileSystemLoader(self._template_dir)] +
+                     extra_packages +
+                     [jinja2.PackageLoader('flow', 'templates')])
+
         self._template_environment_ = jinja2.Environment(
-            loader=jinja2.ChoiceLoader([
-                jinja2.FileSystemLoader(self._template_dir),
-                jinja2.PackageLoader('flow', 'templates'),
-            ]),
-            trim_blocks=True)
+            loader=jinja2.ChoiceLoader(load_envs),
+            trim_blocks=True,
+            extensions=[TemplateError])
 
         # Setup standard filters that can be used to format context variables.
         self._template_environment_.filters['format_timedelta'] = _format_timedelta
+        self._template_environment_.filters['identical'] = _identical
+        self._template_environment_.filters['get_config_value'] = flow_config.get_config_value
+        self._template_environment_.filters['require_config_value'] = \
+            flow_config.require_config_value
         if 'max' not in self._template_environment_.filters:    # for jinja2 < 2.10
             self._template_environment_.filters['max'] = max
 
@@ -1362,6 +1387,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             # By default we use the jinja2 templating system to generate the script.
             template = self._template_environment.get_template(template)
             context = self._get_standard_template_context()
+            # For script generation we do not need the extra logic used for
+            # generating cluster job scripts.
             context['base_script'] = 'base_script.sh'
             context['operations'] = list(operations)
             context['parallel'] = parallel
@@ -1380,7 +1407,18 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             if os.path.isfile(fn_template):
                 raise RuntimeError(
                     "In legacy templating mode, unable to use template '{}'.".format(fn_template))
-            script = env.script(_id=_id, **kwargs)
+
+            # For maintaining backwards compatibility for Versions<0.7
+            if kwargs['parallel']:
+                np_total = sum(op.directives['np'] for op in operations)
+            else:
+                np_total = max(op.directives['np'] for op in operations)
+
+            try:
+                script = env.script(_id=_id, np_total=np_total, **kwargs)
+            except ConfigKeyError as e:
+                raise SubmitError("The following error was encountered during script generation: ",
+                                  e.message)
             background = kwargs.pop('parallel', not kwargs.pop('serial', False))
             self.write_script(script=script, operations=operations, background=background, **kwargs)
             script.seek(0)
@@ -1388,6 +1426,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         else:
             template = self._template_environment.get_template(template)
             context = self._get_standard_template_context()
+            # The flow 'script.sh' file simply extends the base script
+            # provided. The choice of base script is dependent on the
+            # environment, but will default to the 'base_script.sh' provided
+            # with signac-flow unless additional environment information is
+            # detected.
             context['base_script'] = env.template
             context['environment'] = env.__name__
             context['id'] = _id
@@ -1395,7 +1438,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             context.update(kwargs)
             if show_template_help:
                 self._show_template_help_and_exit(context)
-            return template.render(** context)
+            try:
+                return template.render(** context)
+            except ConfigKeyError as e:
+                raise SubmitError(
+                    "The following error was encountered during script generation: {}".format(e))
 
     @_support_legacy_api
     def submit_operations(self, operations, _id=None, env=None, parallel=False, flags=None,
@@ -1966,9 +2013,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         for cls in type(self).__mro__:
             operations.extend(getattr(cls, '_OPERATION_FUNCTIONS', []))
 
-        def _guess_cmd(func, name):
+        def _guess_cmd(func, name, **kwargs):
+            executable = kwargs.get('executable', sys.executable)
             path = getattr(func, '_flow_path', inspect.getsourcefile(func))
-            return 'python {} exec {} {{job._id}}'.format(path, name)
+            return '{} {} exec {} {{job._id}}'.format(executable, path, name)
 
         for name, func in operations:
             if name in self._operations:
@@ -1983,7 +2031,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             if getattr(func, '_flow_cmd', False):
                 self._operations[name] = FlowOperation(cmd=func, **params)
             else:
-                self._operations[name] = FlowOperation(cmd=_guess_cmd(func, name), **params)
+                self._operations[name] = FlowOperation(
+                    cmd=_guess_cmd(func, name, **params), **params)
                 self._operation_functions[name] = func
 
     @property

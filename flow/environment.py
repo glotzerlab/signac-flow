@@ -19,7 +19,6 @@ import logging
 import warnings
 import io
 import importlib
-import argparse
 from math import ceil
 from collections import OrderedDict
 
@@ -32,6 +31,7 @@ from .scheduling.slurm import SlurmScheduler
 from .scheduling.torque import TorqueScheduler
 from .scheduling.simple_scheduler import SimpleScheduler
 from .scheduling.fakescheduler import FakeScheduler
+from .util import config as flow_config
 from .errors import SubmitError
 from .errors import NoSchedulerError
 
@@ -41,7 +41,8 @@ else:
     import importlib.machinery
 
 logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
+if six.PY2:
+    logger.addHandler(logging.NullHandler())
 
 
 # Global variable can be used to override detected environment
@@ -62,19 +63,6 @@ or adjust the processors per node (--ppn).
 
 Alternatively, you can also use --force to ignore this warning.
 """
-
-MISSING_ENV_CONF_KEY_MSG = """Your environment is missing the following configuration key: '{key}'
-Please provide the missing information, for example by adding it to your global configuration:
-
-signac config --global set {key} <VALUE>
-"""
-
-
-class _GetConfigValueNoneType(object):
-    pass
-
-
-_GET_CONFIG_VALUE_NONE = _GetConfigValueNoneType()
 
 
 def setup(py_modules, **attrs):
@@ -275,7 +263,7 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
         return
 
     @classmethod
-    def get_config_value(cls, key, default=_GET_CONFIG_VALUE_NONE):
+    def get_config_value(cls, key, default=flow_config._GET_CONFIG_VALUE_NONE):
         """Request a value from the user's configuration.
 
         This method should be used whenever values need to be provided
@@ -294,19 +282,12 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
         :type key: str
         :param default: A default value in case the key cannot be found
             within the user's configuration.
+        :type key: str
         :return: The value or default value.
         :raises SubmitError: If the key is not in the user's configuration
             and no default value is provided.
         """
-        try:
-            return config.load_config()['flow'][cls.__name__][key]
-        except KeyError:
-            if default is _GET_CONFIG_VALUE_NONE:
-                k = '{}.{}'.format(cls.__name__, key)
-                print(MISSING_ENV_CONF_KEY_MSG.format(key='flow.' + k))
-                raise SubmitError("Missing environment configuration key: '{}'".format(k))
-            else:
-                return default
+        return flow_config.require_config_value(key, ns=cls.__name__, default=default)
 
 
 class StandardEnvironment(ComputeEnvironment):
@@ -390,18 +371,6 @@ class NodesEnvironment(ComputeEnvironment):
     """
 
     @classmethod
-    def add_args(cls, parser):
-        super(NodesEnvironment, cls).add_args(parser)
-        parser.add_argument(
-            '--nn',
-            type=int,
-            help=argparse.SUPPRESS)
-        parser.add_argument(
-            '--ppn',
-            type=int,
-            help=argparse.SUPPRESS)
-
-    @classmethod
     def calc_num_nodes(cls, np_total, ppn, force=False, **kwargs):
         if ppn is None:
             try:
@@ -449,14 +418,16 @@ class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
             help="Do not copy current environment variables into compute node environment.")
 
     @classmethod
-    def script(cls, _id, nn=None, ppn=None, walltime=None, no_copy_env=False, **kwargs):
+    def gen_tasks(cls, js, np_total):
+        """Helper function to generate the number of tasks (for overriding)"""
+        js.writeline('#PBS -l nodes={}'.format(np_total))
+        return js
+
+    @classmethod
+    def script(cls, _id, np_total, walltime=None, no_copy_env=False, **kwargs):
         js = super(DefaultTorqueEnvironment, cls).script()
         js.writeline('#PBS -N {}'.format(_id))
-        if nn is not None:
-            if ppn is None:
-                js.writeline('#PBS -l nodes={}'.format(nn))
-            else:
-                js.writeline('#PBS -l nodes={}:ppn={}'.format(nn, ppn))
+        js = cls.gen_tasks(js)
         if walltime is not None:
             js.writeline('#PBS -l walltime={}'.format(format_timedelta(walltime)))
         if not no_copy_env:
@@ -472,14 +443,17 @@ class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
         return 'mpirun -np {np} {cmd}'.format(np=np, cmd=cmd)
 
     @classmethod
-    def script(cls, _id, nn=None, ppn=None, walltime=None, **kwargs):
+    def gen_tasks(cls, js, np_total):
+        """Helper function to generate the number of tasks (for overriding)"""
+        js.writeline('#SBATCH --ntasks={}'.format(np_total))
+        return js
+
+    @classmethod
+    def script(cls, _id, np_total, walltime=None, **kwargs):
         js = super(DefaultSlurmEnvironment, cls).script()
         js.writeline('#!/bin/bash')
         js.writeline('#SBATCH --job-name="{}"'.format(_id))
-        if nn is not None:
-            js.writeline('#SBATCH --nodes={}'.format(nn))
-        if ppn is not None:
-            js.writeline('#SBATCH --ntasks-per-node={}'.format(ppn))
+        js = cls.gen_tasks(js, np_total)
         if walltime is not None:
             js.writeline('#SBATCH -t {}'.format(format_timedelta(walltime)))
         return js

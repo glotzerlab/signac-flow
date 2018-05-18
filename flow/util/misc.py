@@ -66,6 +66,11 @@ def draw_progressbar(value, total, width=40):
     return '|' + ''.join(['#'] * n) + ''.join(['-'] * (width - n)) + '|'
 
 
+def _identical(iterable):
+    """Check that all elements of an iterator are identical"""
+    return len(set(iterable)) <= 1
+
+
 def _format_timedelta(delta):
     "Format a time delta for interpretation by schedulers."
     if isinstance(delta, int) or isinstance(delta, float):

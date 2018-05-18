@@ -2,13 +2,17 @@
 {% block header %}
 #!/bin/bash
 #SBATCH --job-name="{{ id }}"
-{% if parallel %}
-{% set num_tasks = operations|map(attribute='directives.np')|sum %}
-{% else %}
-{% set num_tasks = operations|map(attribute='directives.np')|max %}
+{% if partition %}
+#SBATCH --partition={{ partition }}
 {% endif %}
-#SBATCH --ntasks={{ num_tasks }}
 {% if walltime %}
 #SBATCH -t {{ walltime|format_timedelta }}
 {% endif %}
+{% if job_output %}
+#SBATCH --output={{ job_output }}
+#SBATCH --error={{ job_output }}
+{% endif %}
+{% block tasks %}
+#SBATCH --ntasks={{ num_tasks }}
+{% endblock %}
 {% endblock %}

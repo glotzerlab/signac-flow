@@ -170,7 +170,7 @@ def support_submit_operations_legacy_api(func):
                     "The '{}' argument should be provided as part of the operation "
                     "directives as of version 0.7.".format(key), DeprecationWarning)
                 for op in operations:
-                    assert op.directives.setdefault('key', kwargs[key]) == kwargs[key]
+                    assert op.directives.setdefault(key, kwargs[key]) == kwargs[key]
         return func(self, operations=operations, _id=_id, env=env, *args, **kwargs)
 
     return wrapper

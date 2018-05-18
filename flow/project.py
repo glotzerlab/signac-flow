@@ -30,6 +30,7 @@ from collections import OrderedDict
 from itertools import islice
 from itertools import count
 from hashlib import sha1
+from multiprocessing.pool import ThreadPool
 
 import signac
 from signac.common import six
@@ -1044,8 +1045,16 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         # Update the status docs of each job:
         self._fetch_scheduler_status(jobs, scheduler, err, ignore_errors)
 
-        # Get status dict for all selected jobs  # TODO parallelize
-        statuses = OrderedDict((job.get_id(), self.get_job_status(job)) for job in jobs)
+        # Get status dict for all selected jobs
+        with ThreadPool() as pool:
+            tmp = tqdm(
+                pool.imap(self.get_job_status, jobs),
+                desc="Collect job status info",
+                total=len(jobs))
+            statuses = OrderedDict([(s['job_id'], s) for s in tmp])
+
+        # If the dump_json variable is set, just dump all status info
+        # formatted in JSON to screen.
         if dump_json:
             print(json.dumps(statuses, indent=4), file=file)
             return

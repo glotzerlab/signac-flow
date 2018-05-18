@@ -158,4 +158,4 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
           help="Specify the partition to submit to.")
 
 
-__all__ = ['CometEnvironment', 'BridgesEnvironment']
+__all__ = ['CometEnvironment', 'BridgesEnvironment', 'Stampede2Environment']

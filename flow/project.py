@@ -978,7 +978,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                      detailed=False, parameters=None, skip_active=False, param_max_width=None,
                      expand=False, all_ops=False, dump_json=False,
                      file=sys.stdout, err=sys.stderr, ignore_errors=False,
-                     scheduler=None, pool=None, job_filter=None):
+                     scheduler=None, pool=None, job_filter=None, no_parallelize=False):
         """Print the status of the project.
 
         :param jobs:
@@ -1048,8 +1048,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
         # Get status dict for all selected jobs
         with contextlib.closing(ThreadPool()) as pool:
+            _map = map if no_parallelize else pool.imap
             tmp = tqdm(
-                pool.imap(self.get_job_status, jobs),
+                _map(self.get_job_status, jobs),
                 desc="Collect job status info",
                 total=len(jobs))
             statuses = OrderedDict([(s['job_id'], s) for s in tmp])
@@ -1796,6 +1797,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             '--ignore-errors',
             action='store_true',
             help="Ignore errors that might occur when querying the scheduler.")
+        parser.add_argument(
+            '--no-parallelize',
+            action='store_true',
+            help="Do not parallelize the status determination.")
 
     def labels(self, job):
         """Auto-generate labels from label-functions.

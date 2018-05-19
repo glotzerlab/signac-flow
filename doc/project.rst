@@ -18,11 +18,11 @@ To implement a more automated workflow, we can subclass a :py:class:`~.FlowProje
     # project.py
     from flow import FlowProject
 
-    class MyProject(FlowProject):
+    class Project(FlowProject):
         pass
 
     if __name__ == '__main__':
-        MyProject().main()
+        Project().main()
 
 .. tip::
 
@@ -33,8 +33,8 @@ Executing this script on the command line will give us access to this project's 
 
 .. code-block:: bash
 
-    $ python project.py
-    usage: project.py [-h] {status,next,run,script,submit} ...
+     ~/my_project $ python project.py
+     usage: project.py [-h] [-d] {status,next,run,script,submit,exec} ...
 
 .. raw:: html
 
@@ -49,250 +49,176 @@ Executing this script on the command line will give us access to this project's 
     Simply put those in different modules, *e.g.*, ``project_a.py`` and ``project_b.py``.
 
 
-.. _classification:
+Defining a workflow
+===================
 
-Classification
-==============
-
-The :py:class:`~.FlowProject` uses a :py:meth:`~.FlowProject.classify` method to generate *labels* for a job.
-A label is a short text string, that essentially represents a condition.
-Following last chapter's example, we could implement a ``greeted`` label like this:
+We will reproduce the simple workflow introduced in the previous section by first copying both the ``greeted()`` condition function and the ``hello()`` *operation* function into the ``project.py`` module.
+We then use the :py:func:`~.flow.FlowProject.operation` and the :py:func:`~.flow.FlowProject.post` decorator functions to specify that the ``hello()`` operation function is part of our workflow and that it should only be executed if the ``greeted()`` condition is not met.
 
 .. code-block:: python
 
     # project.py
     from flow import FlowProject
-    from flow import staticlabel
 
-    class MyProject(FlowProject):
 
-        @staticlabel()
-        def greeted(job):
-            return job.isfile('hello.txt')
-    # ...
+    class Project(FlowProject):
+        pass
 
-Using the :py:class:`~.project.staticlabel` decorator turns the ``greeted()`` function into a function, which will be evaluated for our classification.
-We can check that by executing the ``hello`` operation for a few job and then looking at the project's status:
 
-.. code-block:: bash
+    def greeted(job)
+        return job.isfile('hello.txt')
 
-    $ python operations.py hello 0d32 2e6
-    hello 0d32543f785d3459f27b8746f2053824
-    hello 2e6ba580a9975cf0c01cb3c3f373a412
-    $ python project.py status --detailed
-    Status project 'MyProject':
-    Total # of jobs: 10
 
-    label    progress
-    -------  ----------
-    greeted  |########--------------------------------| 20.00%
+    @Project.operation
+    @Project.post(greeted)
+    def hello(job):
+        with job:
+            with open('hello.txt', 'w') as file:
+                file.write('world!\n')
 
-    Detailed view:
-    job_id                            S      next_op  labels
-    --------------------------------  ---  ---------  --------
-    0d32543f785d3459f27b8746f2053824  U               greeted
-    14fb5d016557165019abaac200785048  U
-    2af7905ebe91ada597a8d4bb91a1c0fc  U
-    2e6ba580a9975cf0c01cb3c3f373a412  U               greeted
-    42b7b4f2921788ea14dac5566e6f06d0  U
-    751c7156cca734e22d1c70e5d3c5a27f  U
-    81ee11f5f9eb97a84b6fc934d4335d3d  U
-    9bfd29df07674bc4aa960cf661b5acd2  U
-    9f8a8e5ba8c70c774d410a9107e2a32b  U
-    b1d43cd340a6b095b41ad645446b6800  U
 
-    Abbreviations used:
-    S: status
-    U: unknown
+    if __name__ == '__main__':
+        Project().main()
 
-.. raw:: html
+We can define both *pre* and *post* conditions, which allow us to define arbitrary workflows as an acyclic graph.
+A operation is only executed if **all** pre-conditions are met, and at *at least one* post-condition is not met.
 
-    <div align="center">
-      <script type="text/javascript" src="https://asciinema.org/a/48bs64h7cdo7mncnkk88ilrzm.js" id="asciicast-48bs64h7cdo7mncnkk88ilrzm" async></script>
-    </div>
-
-.. _next-operation:
-
-Determine the **next-operation**
-================================
-
-Next, we should tell the project, that the ``hello()`` operation is to be executed, whenever the ``greeted`` condition is **not met**.
-We achieve this by adding the operation to the project:
-
-.. code-block:: python
-
-      class MyProject(FlowProject):
-
-        def __init__(self, *args, **kwargs):
-            super(MyProject, self).__init__(*args, **kwargs)
-
-            self.add_operation(
-              name='hello',
-              cmd='python operations.py hello {job._id}',
-              post=[MyProject.greeted])
-
-Let's go through the individual arguments of the :py:meth:`~.FlowProject.add_operation` method:
-
-The ``name`` argument is arbitrary, but must be unique for all operations part of the project's workflow.
-It simply helps us to identify the operation without needing to look at the full command.
-
-The ``cmd`` argument actually determines how to execute the particular operation, ideally it should be a function of job.
-We can construct the ``cmd`` either by using formatting fields, as shown above.
-We can use any attribute of our job instance, that includes state points (e.g. ``job.sp.a``) or the workspace directory (``job.ws``).
-The command is later evaluated like this: ``cmd.format(job=job)``.
-
-Alternatively, we can define a function that returns a command or script, e.g.:
-
-.. code-block:: python
-
-    # ...
-        self.add_operation(
-            name='hello',
-            cmd=lambda job: "python operations.py hello {}".format(job),
-            post=[MyProject.greeted])
-
-Finally, the ``post`` argument is a list of unary condition functions.
-
-.. admonition:: Definition:
-    :class: note
-
-    A specific operation is **eligible for execution**, whenever all pre-conditions (``pre``) are met and at least one of the post-conditions (``post``) is not met.
-
-In this case, the ``hello`` operation will only be executed, when ``greeted()`` returns ``False``; we can check that again by looking at the status:
+We can then execute this workflow with:
 
 .. code-block:: bash
 
-    $ python project.py status --detailed
-    Status project 'MyProject':
+    ~/my_project $ python project.py run
+    Execute operation 'hello(15e548a2d943845b33030e68801bd125)'...
+    hello 15e548a2d943845b33030e68801bd125
+    Execute operation 'hello(288f97857257baee75d9d84bf0e9dfa8)'...
+    hello 288f97857257baee75d9d84bf0e9dfa8
+    Execute operation 'hello(2b985fa90138327bef586f9ad87fc310)'...
+    hello 2b985fa90138327bef586f9ad87fc310
+    # ...
+
+If we implemented and integrated the operation and condition functions correctly, calling the ``run`` command twice should produce no output the second time, since the ``greeted()`` condition is met for all jobs and the ``hello()`` operation should therefore not be executed.
+
+.. note::
+    
+    You can reset your workflow by deleting all ``hello.txt`` files with ``rm workspace/**/hello.txt``.
+    This will also be necessary if you followed along in section 1.
+
+The Project Status
+==================
+
+The :py:class:`~.FlowProject` class allows us to generate a **status** view of our project.
+The status view provides information about which conditions are met and what operations are pending execution.
+
+A condition function which is supposed to be shown in the **status** view is called a *label-function*.
+We can convert any condition function into a label function by adding the :py:func:`~.flow.FlowProject.label` decorator:
+
+.. code-block:: python
+
+    # project.py
+    # ...
+
+    @Project.label
+    def greeted(job):
+        return job.isfile('hello.txt')
+
+    # ...
+
+We will reset the workflow for only a few jobs to get a more interesting *status* view:
+
+.. code-block:: bash
+
+    ~/my_project $ signac find a.\$lt 5 | xargs -I{} rm workspace/{}/hello.txt
+
+We then generate a *detailed* status view with:
+
+.. code-block:: bash
+
+    ~/my_project.py status --detailed
+    Collect job status info: 100%|█████████████████████████████████████████████| 10/10
+    # Overview:
     Total # of jobs: 10
 
-    label    progress
+    label    ratio
     -------  -------------------------------------------------
-    greeted  |########--------------------------------| 20.00%
+    greeted  |####################--------------------| 50.00%
 
-    Detailed view:
-    job_id                            S    next_op    labels
-    --------------------------------  ---  ---------  --------
-    0d32543f785d3459f27b8746f2053824  U               greeted
-    14fb5d016557165019abaac200785048  U !  hello
-    2af7905ebe91ada597a8d4bb91a1c0fc  U !  hello
-    2e6ba580a9975cf0c01cb3c3f373a412  U               greeted
-    42b7b4f2921788ea14dac5566e6f06d0  U !  hello
-    751c7156cca734e22d1c70e5d3c5a27f  U !  hello
-    81ee11f5f9eb97a84b6fc934d4335d3d  U !  hello
-    9bfd29df07674bc4aa960cf661b5acd2  U !  hello
-    9f8a8e5ba8c70c774d410a9107e2a32b  U !  hello
-    b1d43cd340a6b095b41ad645446b6800  U !  hello
+    # Detailed View:
+    job_id                            labels
+    --------------------------------  --------
+    0d32543f785d3459f27b8746f2053824  greeted
+    14fb5d016557165019abaac200785048
+    └● hello [U]
+    2af7905ebe91ada597a8d4bb91a1c0fc
+    └● hello [U]
+    2e6ba580a9975cf0c01cb3c3f373a412  greeted
+    42b7b4f2921788ea14dac5566e6f06d0
+    └● hello [U]
+    751c7156cca734e22d1c70e5d3c5a27f  greeted
+    81ee11f5f9eb97a84b6fc934d4335d3d  greeted
+    9bfd29df07674bc4aa960cf661b5acd2
+    └● hello [U]
+    9f8a8e5ba8c70c774d410a9107e2a32b
+    └● hello [U]
+    b1d43cd340a6b095b41ad645446b6800  greeted
+    Legend: ○:ineligible ●:eligible ▹:active ▸:running □:completed
 
-    Abbreviations used:
-    !: requires_attention
-    S: status
-    U: unknown
+This view provides information about what labels are met for each job and what operations are eligible for execution.
+If we did things right, then only those jobs without the ``greeted`` label should have the ``hello`` operation pending.
 
-.. raw:: html
-
-    <div align="center">
-      <script type="text/javascript" src="https://asciinema.org/a/cfx50fgliekgzu8xt7r79s5n7.js" id="asciicast-cfx50fgliekgzu8xt7r79s5n7" async></script>
-    </div>
-
-.. _project-run:
-
-Running project operations
-==========================
-
-Similar to the :py:func:`~.run` interface earlier, we can execute all pending operations with the ``python project.py run`` command:
+As shown before, all *eligible* operations can then be executed with:
 
 .. code-block:: bash
 
-     $ python project.py run
-     hello 42b7b4f2921788ea14dac5566e6f06d0
-     hello 2af7905ebe91ada597a8d4bb91a1c0fc
-     hello 14fb5d016557165019abaac200785048
-     hello 751c7156cca734e22d1c70e5d3c5a27f
-     hello 9bfd29df07674bc4aa960cf661b5acd2
-     hello 81ee11f5f9eb97a84b6fc934d4335d3d
-     hello 9f8a8e5ba8c70c774d410a9107e2a32b
-     hello b1d43cd340a6b095b41ad645446b6800
-
-Again, the execution is automatically parallelized.
-
-Let's remove a few random ``hello.txt`` files to regain pending operations:
-
-.. code-block:: bash
-
-    $ rm workspace/2af7905ebe91ada597a8d4bb91a1c0fc/hello.txt
-    $ rm workspace/9bfd29df07674bc4aa960cf661b5acd2/hello.txt
-
-.. raw:: html
-
-    <div align="center">
-      <script type="text/javascript" src="https://asciinema.org/a/2gfl9hfbveyu7583j338x6day.js" id="asciicast-2gfl9hfbveyu7583j338x6day" async></script>
-    </div>
+    ~/my_project $ python project.py run
 
 .. _project-script:
 
 Generating Execution Scripts:
 =============================
 
-Using the ``script`` command, we can generate an **operation** execution script based on the pending operations, which might look like this:
+Instead of executing operations directly we can also create a script for execution.
+If we have any pending operations, a script might look like this:
 
 .. code-block:: bash
 
-    $ python project.py script
-    ---- BEGIN SCRIPT ----
+    ~/my_project $ python project.py script
 
-    set -u
     set -e
-    cd /Users/johndoe/my_project
-
-    # Statepoint:
-    #
-    # {{
-    #   "a": 4
-    # }}
-    python operations.py hello 2af7905ebe91ada597a8d4bb91a1c0fc &
-
-    wait
-    ---- END SCRIPT ----
-
-
-    ---- BEGIN SCRIPT ----
-
     set -u
-    set -e
-    cd /Users/johndoe/my_project
 
-    # Statepoint:
-    #
-    # {{
-    #   "a": 0
-    # }}
-    python operations.py hello 9bfd29df07674bc4aa960cf661b5acd2 &
+    cd /Users/csadorf/my_project
 
-    wait
-    ---- END SCRIPT ----
+    # Operation 'hello' for job '14fb5d016557165019abaac200785048':
+    /Users/csadorf/miniconda3/bin/python project.py exec hello 14fb5d016557165019abaac200785048
+    # Operation 'hello' for job '2af7905ebe91ada597a8d4bb91a1c0fc':
+    /Users/csadorf/miniconda3/bin/python project.py exec hello 2af7905ebe91ada597a8d4bb91a1c0fc
+    # Operation 'hello' for job '42b7b4f2921788ea14dac5566e6f06d0':
+    /Users/csadorf/miniconda3/bin/python project.py exec hello 42b7b4f2921788ea14dac5566e6f06d0
+    # Operation 'hello' for job '9bfd29df07674bc4aa960cf661b5acd2':
+    /Users/csadorf/miniconda3/bin/python project.py exec hello 9bfd29df07674bc4aa960cf661b5acd2
+    # Operation 'hello' for job '9f8a8e5ba8c70c774d410a9107e2a32b':
+    /Users/csadorf/miniconda3/bin/python project.py exec hello 9f8a8e5ba8c70c774d410a9107e2a32b
 
 These scripts can be used for the execution of operations directly, or they could be submitted to a cluster environment for remote execution.
 For more information about how to submit operations for execution to a cluster environment, see the :ref:`cluster-submission` chapter.
 
-.. raw:: html
+This script is generated from a default jinja2_ template, which is shipped with the package.
+We can extend this default template or write our own to cutomize the script generation process.
 
-    <div align="center">
-      <script type="text/javascript" src="https://asciinema.org/a/4jwqh0azk01rkterytxvzvr7g.js" id="asciicast-4jwqh0azk01rkterytxvzvr7g" async></script>
-    </div>
+.. _jinja2: http://jinja.pocoo.org/
 
+Here is an example for such a template, that would essentially generate the same output:
 
-.. _flow-project-demo:
+.. code-block:: bash
 
-Full Demonstration
-==================
+    cd {{ project.config.project_dir }}
 
-The screencast below is a complete demonstration of all steps:
+    {% for operation in operations %}
+    operation.cmd
+    {% endfor %}
 
-.. raw:: html
+.. note:: 
 
-    <div align="center">
-      <script type="text/javascript" src="https://asciinema.org/a/6uyqoqk87w1r5y0k09zj43ibp.js" id="asciicast-6uyqoqk87w1r5y0k09zj43ibp" async></script>
-    </div>
+    The template above does not respect the ``parallel`` variable.
 
-Checkout the :ref:`next chapter <cluster-submission>` for a guide on how to submit operations to a cluster environment.
+Checkout the :ref:`next section <cluster-submission>` for a guide on how to submit operations to a cluster environment.

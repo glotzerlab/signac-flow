@@ -17,17 +17,8 @@ Concept
 It is highly recommended to divide individual modifications of your project's data space into distinct functions.
 In this context, a *data space operation* is defined as a unary function with an instance of :py:class:`~.Project.Job` as its only argument.
 
-This is an example for a simple *operation*, which creates a file called ``hello.txt`` within the job's workspace directory:
-
-.. code-block:: python
-
-    def hello(job):
-        print('hello', job)
-        with job:
-            with open('hello.txt', 'w') as file:
-                file.write('world!\n')
-
-Let's initialize a few jobs, by executing the following script:
+We will demonstrate this concept with a simple example.
+Let's initialize a project with a few jobs, by executing the following script within a ``~/my_project`` directory:
 
 .. code-block:: python
 
@@ -38,10 +29,24 @@ Let's initialize a few jobs, by executing the following script:
     for i in range(10):
         project.open_job({'a': i}).init()
 
+A very simple *operation*, which creates a file called ``hello.txt`` within a job's workspace directory could then be implemented like this:
+
+.. code-block:: python
+
+    # operations.py
+
+    def hello(job):
+        print('hello', job)
+        with job:
+            with open('hello.txt', 'w') as file:
+                file.write('world!\n')
+
+
 We could execute this *operation* for the complete data space, for example in the following manner:
 
 .. code-block:: python
 
+   ~/my_project $ python
    >>> import signac
    >>> from operations import hello
    >>> project = signac.get_project()
@@ -56,7 +61,7 @@ We could execute this *operation* for the complete data space, for example in th
 The *flow.run()*-interface
 --------------------------
 
-However, we can simplify this.
+However, we can do better.
 The flow package provides a command line interface for modules that contain *operations*.
 We can access this interface by calling the :py:func:`~.run` function:
 
@@ -78,12 +83,12 @@ We can access this interface by calling the :py:func:`~.run` function:
         import flow
         flow.run()
 
-Since the ``hello()`` function is a top-level function with only one argument, it is interpreted as a dataspace-operation.
+Since the ``hello()`` function is a public, top-level function within the module with only one argument, it is interpreted as a dataspace-operation.
 That means we can execute it directly from the command line:
 
 .. code-block:: bash
 
-      $ python operations.py hello
+      ~/my_project $ python operations.py hello
       hello 0d32543f785d3459f27b8746f2053824
       hello 14fb5d016557165019abaac200785048
       hello 2af7905ebe91ada597a8d4bb91a1c0fc
@@ -141,7 +146,7 @@ Following the example from above, we define a ``greeted`` condition that determi
     def greeted(job):
         return job.isfile('hello.txt')
 
-Our workflow would then be completely determined like this:
+Executing this workflow in an ad-hoc manner could be accomplished like this:
 
 .. code-block:: python
 
@@ -149,5 +154,5 @@ Our workflow would then be completely determined like this:
         if not greeted(job):
             hello(job)
 
-This is fine for simple workflows, however in the next chapter, we will see how to automate things further.
-
+This approach is fine for simple workflows, but would become very cumbersome for even slightly more complex workflows and is not very flexible.
+In the next chapter, we will demonstrate how to integrate operations and conditions into a well-defined workflow using the :py:class:`~.flow.FlowProject` class.

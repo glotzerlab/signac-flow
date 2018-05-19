@@ -16,6 +16,7 @@ In addition, the package provides specialized submission profiles for the follow
 
   * `Titan (Incite) <https://www.olcf.ornl.gov/titan/>`_
   * `Comet (XSEDE) <http://www.sdsc.edu/services/hpc/hpc_systems.html#comet>`_
+  * `Stampede2 (XSEDE) <https://portal.tacc.utexas.edu/user-guides/stampede2>`_
   * `Bridges (XSEDE) <https://www.psc.edu/bridges>`_
   * `flux (University of Michigan) <http://arc-ts.umich.edu/systems-services/flux/>`_
 

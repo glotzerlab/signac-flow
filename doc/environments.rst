@@ -61,23 +61,12 @@ This is an example for a typical environment class definition:
       class MyUniversityCluster(flow.DefaultTorqueEnvironment):
 
           hostname_pattern = 'mycluster.*.university.edu'
-          cores_per_node = 32
+          template = 'mycluster.myuniversity.sh'
 
-          @classmethod
-          def mpi_cmd(cls, cmd, np):
-              return 'mpirun -np {np} {cmd}'.format(n=np, cmd=cmd)
-
-          @classmethod
-          def script(cls, _id, **kwargs):
-              js = super(MyUniversityCluster, cls).script(_id=_id, **kwargs)
-              js.writeline("$PBS -A {}".format(cls.get_config_value('account'))
-              return js
-
-The :py:meth:`~.ComputeEnvironment.get_config_value` method allows us to get information from **signac**'s configuration which would be different for different users.
-Unless you provide a default value as the second argument, the user will be prompted to add the requested value to their configuration when using this specific profile for the first time.
+At the ``mycluster.myuniversity.sh`` template script to the templates directory within your project root directory.
 
 Contributing Environments to the Package
 ========================================
 
 Users are **highly encouraged** to contribute environment profiles that they developed for their local environments.
-In order to contribute an environment, either simply email them to the package maintainers (see the README for contact information), or add your environment directly to the ``flow.environments/__init__.py`` module and create a pull request!
+In order to contribute an environment, either simply email them to the package maintainers (see the README for contact information) or create a pull request.

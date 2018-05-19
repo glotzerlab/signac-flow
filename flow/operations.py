@@ -24,7 +24,20 @@ logger = logging.getLogger(__name__)
 
 
 def cmd(func):
-    "Label an operation function to return a command for execution."
+    """Specifies that ``func`` returns a shell command.
+
+    If this function is an operation function defined by :class:`~.FlowProject`, it will
+    be interpreted to return a shell command, instead of executing the function itself.
+
+    For example:
+
+    .. code-block:: python
+
+        @FlowProject.operation
+        @flow.cmd
+        def hello(job):
+            return "echo {job._id}"
+    """
     setattr(func, '_flow_cmd', True)
     return func
 

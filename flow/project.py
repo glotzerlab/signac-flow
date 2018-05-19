@@ -224,8 +224,8 @@ class JobOperation(object):
 
     .. note::
 
-        Users should usually not instantiate this class themselves, but use the
-        :meth:`.FlowProject.add_operation` method.
+        This class is used by the :class:`~.FlowProject` class for the execution and
+        submission process and should not be instantiated by users themselves.
 
     :param name:
         The name of this JobOperation instance. The name is arbitrary,
@@ -500,7 +500,18 @@ class _FlowProjectClass(type):
 class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project)):
     """A signac project class specialized for workflow management.
 
-    TODO: ADD BASIC DESCRIPTION ON HOW TO USE THIS CLASS HERE.
+    This class provides a command line interface for the definition, execution, and
+    submission of workflows based on condition and operation functions.
+
+    This is a typical example on how to use this class:
+
+    .. code-block:: python
+
+        @FlowProject.operation
+        def hello(job):
+            print('hello', job)
+
+        FlowProject().main()
 
     :param config:
         A signac configuaration, defaults to the configuration loaded
@@ -627,8 +638,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
     def write_script_header(self, script, **kwargs):
         """"Write the script header for the execution script.
 
-        This function is deprecated and will be removed in version 0.7! Users are
-        encouraged to migrate to the new templating system as of version 0.6.
+        .. deprecated:: 0.6
+           Users should migrate to the new templating system.
         """
         # Add some whitespace
         script.writeline()
@@ -642,10 +653,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
     @_part_of_legacy_template_system
     def write_script_operations(self, script, operations, background=False, **kwargs):
-        """"Write the commands for the execution of operations as part of a script.
+        """Write the commands for the execution of operations as part of a script.
 
-        This function is deprecated and will be removed in version 0.7! Users are
-        encouraged to migrate to the new templating system as of version 0.6.
+        .. deprecated:: 0.6
+           Users should migrate to the new templating system.
         """
         for op in operations:
             write_human_readable_statepoint(script, op.job)
@@ -656,8 +667,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
     def write_human_readable_statepoint(cls, script, job):
         """Write statepoint of job in human-readable format to script.
 
-        This function is deprecated and will be removed in version 0.7! Users are
-        encouraged to migrate to the new templating system as of version 0.6.
+        .. deprecated:: 0.6
+           Users should migrate to the new templating system.
         """
         warnings.warn(
             "The write_human_readable_statepoint() function is deprecated.",
@@ -668,8 +679,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
     def write_script_footer(self, script, **kwargs):
         """"Write the script footer for the execution script.
 
-        This function is deprecated and will be removed in version 0.7! Users are
-        encouraged to migrate to the new templating system as of version 0.6.
+        .. deprecated:: 0.6
+           Users should migrate to the new templating system.
         """
         # Wait until all processes have finished
         script.writeline('wait')
@@ -678,8 +689,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
     def write_script(self, script, operations, background=False, **kwargs):
         """Write a script for the execution of operations.
 
-        This function is deprecated and will be removed in version 0.7! Users are
-        encouraged to migrate to the new templating system as of version 0.6.
+        .. deprecated:: 0.6
+           Users should migrate to the new templating system.
 
         By default, this function will generate a script with the following components:
 
@@ -688,8 +699,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             write_script_header(script)
             write_script_operations(script, operations, background=background)
             write_script_footer(script)
-
-        Consider overloading any of the methods above, before overloading this method.
 
         :param script:
             The script to write the commands to.
@@ -709,6 +718,35 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
     @classmethod
     def label(cls, label_name_or_func=None):
+        """Designate a function to be a label function of this class.
+
+        For example, we can define a label function like this:
+
+        .. code-block:: python
+
+            @FlowProject.label
+            def foo_label(job):
+                if job.document.get('foo', False):
+                    return 'foo-label-text'
+
+        The ``foo-label-text`` label will now show up in the status view for each job,
+        where the ``foo`` key evaluates true.
+
+        If instead of a ``str``, the label functions returns any other type, the label
+        name will be the name of the function if and only if the return value evaluates
+        to ``True``, for example:
+
+        .. code-block:: python
+
+            @FlowProject.label
+            def foo_label(job):
+                return job.document.get('foo', False)
+
+        Finally, you can specify a different default label name by providing it as the first
+        argument to the ``label()`` decorator.
+
+        .. versionadded:: 0.6
+        """
         if callable(label_name_or_func):
             cls._LABEL_FUNCTIONS[label_name_or_func] = None
             return label_name_or_func
@@ -1209,6 +1247,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
     def run_operations(self, operations=None, pretend=False, np=None, timeout=None, progress=False):
         """Execute the next operations as specified by the project's workflow.
 
+        See also: :meth:`~.run`
+
+        .. versionadded:: 0.6
+
         :param operations:
             The operations to execute (optional).
         :type operations:
@@ -1267,6 +1309,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         By default there is no limit on the total number of executions, but a specific
         operation will only be executed once per job. This is to avoid accidental
         infinite loops when no or faulty post conditions are provided.
+
+        See also: :meth:`~.run_operations`
+
+        .. versionchanged:: 0.6
 
         :param jobs:
             Only execute operations for the given jobs, or all if the argument is omitted.
@@ -1464,6 +1510,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                           force=False, template='script.sh', pretend=False,
                           show_template_help=False, **kwargs):
         """Submit a sequence of operations to the scheduler.
+
+        .. versionchanged:: 0.6
 
         :param operations:
             The operations to submit.
@@ -1807,39 +1855,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             help="Do not parallelize the status determination.")
 
     def labels(self, job):
-        """Auto-generate labels from label-functions.
+        """Yields all labels for the given ``job``.
 
-        This generator function will automatically yield labels,
-        from project methods decorated with the ``@label`` decorator.
-
-        For example, we can define a function like this:
-
-        .. code-block:: python
-
-            class MyProject(FlowProject):
-
-                @label()
-                def foo_label(self, job):
-                    if job.document.get('foo', False):
-                        return 'foo-label-text'
-
-        The ``labels()`` generator method will now yield a label with message
-        ``foo-label-text`` whenever the job document has a field ``foo`` which
-        evaluates to True.
-
-        If the label function returns ``True``, the label message is the
-        argument of the ``@label('label_text')`` decorator, or the function
-        name if no decorator argument is provided. A label function that
-        returns ``False`` or ``None`` will not show a label.
-
-        .. tip::
-
-            In this particular case it may make sense to define the
-            ``foo_label()`` method as a *staticmethod*, since it does not
-            actually depend on the project instance. We can do this by
-            using the ``@staticlabel()`` decorator, equivalently the
-            ``@classlabel()`` for *class methods*.
-
+        See also: :meth:`~.label`
         """
         for label_func, label_name in self._label_functions.items():
             if label_name is None:
@@ -1867,6 +1885,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
         This method will add an instance of :py:class:`~.FlowOperation` to the
         operations-dict of this project.
+
+        .. seealso::
+
+            A Python function may be defined as an operation function directly using
+            the :meth:`~.operation` decorator.
 
         Any FlowOperation is associated with a specific command, which should be
         a function of :py:class:`~signac.contrib.job.Job`. The command (cmd) can
@@ -1996,7 +2019,20 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
     @classmethod
     def operation(cls, func, name=None):
-        "Add the function 'func' as operation function to the class definition."
+        """Add the function `func` as operation function to the class workflow definition.
+
+        This function is designed to be used as a decorator function, for example:
+
+        .. code-block:: python
+
+            @FlowProject.operation
+            def hello(job):
+                print('Hello', job)
+
+        See also: :meth:`~.flow.FlowProject.add_operation`.
+
+        .. versionadded:: 0.6
+        """
         if isinstance(func, six.string_types):
             return lambda op: cls.operation(op, name=func)
 
@@ -2062,10 +2098,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
     def eligible(self, job_operation, **kwargs):
         """Determine if job is eligible for operation.
 
-        .. warning::
-
-            This function is deprecated, please use
-            :py:meth:`~.eligible_for_submission` instead.
+        .. deprecated:: 0.5
+           Please use :py:meth:`~.eligible_for_submission` instead.
         """
         raise RuntimeError("The eligible() method is deprecated.")
 

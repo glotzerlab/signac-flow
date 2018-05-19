@@ -10,34 +10,17 @@ of a FlowProject class definition.
 
 
 class label(object):
-    """Decorate a function to be a label function.
-
-    The label() method as part of FlowProject iterates over all
-    methods decorated with this label and yields the method's name
-    or the provided name.
-
+    """Decorate a :class:`~.FlowProject` class function as a label function.
     For example:
 
-    .. code::
+    .. code-block:: python
+
 
         class MyProject(FlowProject):
 
             @label()
             def foo(self, job):
                 return True
-
-            @label()
-            def bar(self, job):
-                return 'a' in job.statepoint()
-
-        >>> for label in MyProject().labels(job):
-        ...     print(label)
-
-    The code segment above will always print the label 'foo',
-    but the label 'bar' only if 'a' is part of a job's state point.
-
-    This enables the user to quickly write classification functions
-    and use them for labeling, for example in the classify() method.
     """
 
     def __init__(self, name=None):

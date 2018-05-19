@@ -15,7 +15,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='signac-flow',
-    version='0.5.6',
+    version='0.6.0-dev0',
     packages=find_packages(),
     include_package_data=True,
     zip_safe=True,
@@ -26,7 +26,7 @@ setup(
     keywords='workflow management signac framework database',
 
     classifiers=[
-        "Development Status :: 3 - Alpha",
+        "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: BSD License",
         "Topic :: Scientific/Engineering :: Physics",

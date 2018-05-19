@@ -492,7 +492,7 @@ class _FlowProjectClass(type):
         # All label functions are registered with the label() classmethod, which is intendeded
         # to be used as decorator function. The _LABEL_FUNCTIONS dict contains the function as
         # key and the label name as value, or None to use the default label name.
-        cls._LABEL_FUNCTIONS = dict()
+        cls._LABEL_FUNCTIONS = OrderedDict()
 
         return cls
 
@@ -521,7 +521,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         self._setup_legacy_templating()  # TODO: Disable in 0.8.
 
         # Register all label functions with this project instance.
-        self._label_functions = dict()
+        self._label_functions = OrderedDict()
         self._register_labels()
 
         # Register all operation functions with this project instance.
@@ -728,9 +728,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         def predicate(m):
             return inspect.ismethod(m) or inspect.isfunction(m)
 
-        for name, method in inspect.getmembers(type(self), predicate=predicate):
-            if _is_label_func(method):
-                self._label_functions[method] = None
+        class_label_functions = dict()
+        for name, function in inspect.getmembers(type(self), predicate=predicate):
+            if _is_label_func(function):
+                class_label_functions[name] = function
+
+        for name in sorted(class_label_functions):
+            self._label_functions[class_label_functions[name]] = None
 
     def _register_labels(self):
         "Register all label functions registered with this class and its parent classes."

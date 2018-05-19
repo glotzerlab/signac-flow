@@ -19,15 +19,6 @@ The implementation is in pure Python, requires signac_ and is tested for Python 
 
 .. _signac: https://glotzerlab.engin.umich.edu/signac
 
-The screencast below demonstrates the general concept of setting up a workflow with **signac-flow**.
-For a detailed introduction, please checkout the :ref:`reference` documentation!
-
-.. raw:: html
-
-    <div align="center">
-      <script type="text/javascript" src="https://asciinema.org/a/6uyqoqk87w1r5y0k09zj43ibp.js" id="asciicast-6uyqoqk87w1r5y0k09zj43ibp" async></script>
-    </div>
-
 .. toctree::
    :maxdepth: 2
    :hidden:

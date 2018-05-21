@@ -1009,11 +1009,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             logger.info("Updated job status cache.")
 
     OPERATION_STATUS_SYMBOLS = OrderedDict([
-        ('ineligible', u'\u25cb'),   # open circle
-        ('eligible', u'\u25cf'),     # black circle
-        ('active', u'\u25b9'),       # open triangel
-        ('running', u'\u25b8'),      # black triangel
-        ('completed', u'\u25a1'),    # open square
+        ('ineligible', '\u25cb'),   # open circle
+        ('eligible', '\u25cf'),     # black circle
+        ('active', '\u25b9'),       # open triangel
+        ('running', '\u25b8'),      # black triangel
+        ('completed', '\u25a1'),    # open square
     ])
 
     def print_status(self, jobs=None, overview=True, overview_max_lines=None,
@@ -1218,31 +1218,25 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                         selected_ops = list(filter(select, status['operations'].items()))
                         for i, (name, doc) in enumerate(selected_ops):
                             name = name.ljust(width)
-                            if six.PY2:
-                                name = name.decode('utf-8')
-                            #       closing frame                                open frame
-                            frame = u'\u2514' if (i+1) == len(selected_ops) else u'\u251c'
+                            #       closing frame                               open frame
+                            frame = '\u2514' if (i+1) == len(selected_ops) else '\u251c'
 
                             if doc['scheduler_status'] >= JobStatus.active:
-                                op_status = u'running'
+                                op_status = 'running'
                             elif doc['scheduler_status'] > JobStatus.inactive:
-                                op_status = u'active'
+                                op_status = 'active'
                             elif doc['completed']:
-                                op_status = u'completed'
+                                op_status = 'completed'
                             elif doc['eligible']:
-                                op_status = u'eligible'
+                                op_status = 'eligible'
                             else:
-                                op_status = u'ineligible'
+                                op_status = 'ineligible'
                             symbol = self.OPERATION_STATUS_SYMBOLS[op_status]
 
                             sched_stat = _FMT_SCHEDULER_STATUS[doc['scheduler_status']]
-                            if six.PY2:
-                                sched_stat = sched_stat.decode('utf-8')
-                            msg = u"{}{} {} [{}]".format(frame, symbol, name, sched_stat)
-                            print(msg.encode('utf-8'), file=file)
-                legend = u'Legend:' + u' '.join(u'{}:{}'.format(v, k)
-                                                for k, v in self.OPERATION_STATUS_SYMBOLS.items())
-                print(legend.encode('utf-8'), file=file)
+                            print("{}{} {} [{}]".format(frame, symbol, name, sched_stat), file=file)
+                print('Legend: ' + ' '.join('{}:{}'.format(v, k)
+                      for k, v in self.OPERATION_STATUS_SYMBOLS.items()), file=file)
 
         # Show any abbreviations used
         if abbreviate.table:

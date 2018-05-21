@@ -85,7 +85,7 @@ def init(alias=None, template=None, root=None, out=None):
     for fn, code in codes.items():
         try:
             if root is not None:
-                fn = os.path.join(fn)
+                fn = os.path.join(root, fn)
             if six.PY2:
                 # Adapted from: http://stackoverflow.com/questions/10978869/
                 flags = os.O_CREAT | os.O_WRONLY | os.O_EXCL
@@ -93,7 +93,7 @@ def init(alias=None, template=None, root=None, out=None):
                 with os.fdopen(fd, 'w') as file:
                     file.write(code + '\n')
             else:
-                with open(fn_, 'x') as fw:
+                with open(fn, 'x') as fw:
                     fw.write(code + '\n')
         except OSError as e:
             if e.errno == errno.EEXIST:

@@ -414,7 +414,8 @@ class ProjectTest(BaseProjectTest):
     def test_init(self):
         with open(os.devnull, 'w') as out:
             for fn in init(root=self._tmp_dir.name, out=out):
-                self.assertTrue(os.path.isfile(fn))
+                fn_ = os.path.join(self._tmp_dir.name, fn)
+                self.assertTrue(os.path.isfile(fn_))
 
 
 class ProjectMainInterfaceTest(BaseProjectTest):

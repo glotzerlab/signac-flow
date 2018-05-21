@@ -307,7 +307,8 @@ class ProjectTest(unittest.TestCase):
     def test_init(self):
         with open(os.devnull, 'w') as out:
             for fn in init(root=self._tmp_dir.name, out=out):
-                self.assertTrue(os.path.isfile(fn))
+                fn_ = os.path.join(self._tmp_dir.name, fn)
+                self.assertTrue(os.path.isfile(fn_))
 
     @unittest.skipIf(__name__ != '__main__', 'can only be tested if __main__')
     def test_main(self):

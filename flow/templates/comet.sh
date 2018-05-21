@@ -10,7 +10,7 @@
 #SBATCH --ntasks-per-node={{ num_tasks }}
 {% endif %}
 {% else %}
-{% set nn = (num_tasks/cpn)|round(method='ceil')|int %}
+{% set nn = nn|default((num_tasks/cpn)|round(method='ceil')|int) %}
 {% set ntasks = cpn if num_tasks > cpn else num_tasks %}
 {% set node_util = num_tasks / (cpn * nn) %}
 {% if not force and node_util < 0.9 %}

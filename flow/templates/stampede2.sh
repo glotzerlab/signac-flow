@@ -9,7 +9,7 @@
 {% endfor %}
 {% set tasks = tpo|sum if parallel else tpo|max %}
 {% set cpn = 48 if 'skx' in partition else 68 %}
-{% set nn = (num_tasks/cpn)|round(method='ceil')|int %}
+{% set nn = nn|default((num_tasks/cpn)|round(method='ceil')|int) %}
 {% set node_util = num_tasks / (nn * cpn) %}
 {% if not force and node_util < 0.9 %}
 {% raise "Bad node utilization!! nn=%d, cores_per_node=%d, num_tasks=%d"|format(nn, cpn, num_tasks) %}

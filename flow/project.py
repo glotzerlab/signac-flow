@@ -65,8 +65,9 @@ from .util.tqdm import tqdm
 from .util.misc import _positive_int
 from .util.misc import _mkdir_p
 from .util.misc import draw_progressbar
-from .util.misc import _format_timedelta
-from .util.misc import _identical
+from .util.template_filters import _format_timedelta
+from .util.template_filters import _identical
+from .util.template_filters import _with_np_offset
 from .util.misc import write_human_readable_statepoint
 from .util.misc import add_cwd_to_environment_pythonpath
 from .util.misc import switch_to_directory
@@ -2465,15 +2466,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
     def format_row(self, *args, **kwargs):
         warnings.warn("The format_row() method is private as of version 0.6.", DeprecationWarning)
         return self._format_row(*args, **kwargs)
-
-
-def _with_np_offset(operations):
-    """Add the np_offset variable to the operations' directives."""
-    offset = 0
-    for operation in operations:
-        operation.directives.setdefault('np_offset', offset)
-        offset += operation.directives['np']
-    return operations
 
 
 ###

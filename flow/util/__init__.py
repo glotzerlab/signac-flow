@@ -2,6 +2,6 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 "Defines the API for the util sub package."
-from . import tabulate, tqdm, misc, translate
+from . import tabulate, tqdm, misc, translate, template_filters
 
-__all__ = ['tabulate', 'tqdm', 'misc', 'translate']
+__all__ = ['tabulate', 'tqdm', 'misc', 'translate', 'template_filters']

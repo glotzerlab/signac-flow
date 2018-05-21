@@ -388,6 +388,15 @@ class NodesEnvironment(ComputeEnvironment):
                 raise SubmitError("Bad node utilization!")
         return nn
 
+    @classmethod
+    def add_args(cls, parser):
+        super(NodesEnvironment, cls).add_args(parser)
+        parser.add_argument(
+            '--nn',
+            type=int,
+            help="Specify the total number of nodes. This value is computed automatically "
+                 "from the 'np' directive otherwise.")
+
 
 class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
     "A default environment for environments with TORQUE scheduler."

@@ -2420,7 +2420,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             _exit_or_raise()
         except AssertionError as error:
             if not args.debug:
-                print("ERROR: Encountered AssertionError during program execution. "
+                print("ERROR: Encountered internal error during program execution. "
                       "Run with '--debug' to get more information.", file=sys.stderr)
             _exit_or_raise()
         except Exception as error:

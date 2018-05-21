@@ -101,12 +101,6 @@ class Stampede2Environment(DefaultSlurmEnvironment):
     @classmethod
     def add_args(cls, parser):
         super(Stampede2Environment, cls).add_args(parser)
-        # Remove ppn since the full node is always used
-        ppn_id = [i for i, action in enumerate(parser._actions)
-                  if "--ppn" in action.option_strings][0]
-        parser._handle_conflict_resolve(
-                None,
-                [('--ppn', parser._actions[ppn_id])])
         parser.add_argument(
             '--partition',
             choices=['development', 'normal', 'large', 'flat-quadrant',

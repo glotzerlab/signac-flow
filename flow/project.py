@@ -588,6 +588,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             flow_config.require_config_value
         if 'max' not in self._template_environment_.filters:    # for jinja2 < 2.10
             self._template_environment_.filters['max'] = max
+        self._template_environment_.filters['with_np_offset'] = _with_np_offset
 
     @property
     def _template_environment(self):
@@ -1496,10 +1497,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             # environment, but will default to the 'base_script.sh' provided
             # with signac-flow unless additional environment information is
             # detected.
+
             context['base_script'] = env.template
             context['environment'] = env.__name__
             context['id'] = _id
-            context['operations'] = operations
+            context['operations'] = list(operations)
             context.update(kwargs)
             if show_template_help:
                 self._show_template_help_and_exit(context)
@@ -2450,6 +2452,15 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
     def format_row(self, *args, **kwargs):
         warnings.warn("The format_row() method is private as of version 0.6.", DeprecationWarning)
         return self._format_row(*args, **kwargs)
+
+
+def _with_np_offset(operations):
+    """Add the np_offset variable to the operations' directives."""
+    offset = 0
+    for operation in operations:
+        operation.directives.setdefault('np_offset', offset)
+        offset += operation.directives['np']
+    return operations
 
 
 ###

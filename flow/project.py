@@ -1022,7 +1022,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
     def print_status(self, jobs=None, overview=True, overview_max_lines=None,
                      detailed=False, parameters=None, skip_active=False, param_max_width=None,
-                     expand=False, all_ops=False, dump_json=False,
+                     expand=False, all_ops=False, only_incomplete=False, dump_json=False,
                      file=sys.stdout, err=sys.stderr, ignore_errors=False,
                      scheduler=None, pool=None, job_filter=None, no_parallelize=False):
         """Print the status of the project.
@@ -1101,7 +1101,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 _map(self.get_job_status, jobs),
                 desc="Collect job status info",
                 total=len(jobs))
-            statuses = OrderedDict([(s['job_id'], s) for s in tmp])
+
+        if only_incomplete:
+            def _incomplete(s):
+                return any(not op['completed'] for op in s['operations'].values())
+            tmp = filter(_incomplete, tmp)
+
+        statuses = OrderedDict([(s['job_id'], s) for s in tmp])
 
         # If the dump_json variable is set, just dump all status info
         # formatted in JSON to screen.
@@ -1836,6 +1842,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             dest='all_ops',
             action='store_true',
             help="Show information about all operations, not just active or eligible ones.")
+        view_group.add_argument(
+            '--only-incomplete-operations',
+            dest='only_incomplete',
+            action='store_true',
+            help="Only show information for jobs with incomplete operations.")
         view_group.add_argument(
             '--skip-active',
             action='store_true',

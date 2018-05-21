@@ -483,7 +483,11 @@ class ProjectMainInterfaceTest(BaseProjectTest):
             for job in self.project:
                 if job.get_id() in line:
                     for op in self.project.next_operations(job):
-                        self.assertIn(op.name, next(lines))
+                        self.assertIn(op.name, line)
+                        try:
+                            line = next(lines)
+                        except StopIteration:
+                            continue
 
     def test_main_script(self):
         self.assertTrue(len(self.project))

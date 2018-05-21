@@ -30,6 +30,7 @@ from collections import defaultdict
 from collections import OrderedDict
 from itertools import islice
 from itertools import count
+from copy import copy
 from hashlib import sha1
 from multiprocessing.pool import ThreadPool
 
@@ -1013,16 +1014,26 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             logger.info("Updated job status cache.")
 
     OPERATION_STATUS_SYMBOLS = OrderedDict([
+        ('ineligible', u'-'),
+        ('eligible', u'+'),
+        ('active', u'*'),
+        ('running', u'>'),
+        ('completed', u'X')
+    ])
+
+    PRETTY_OPERATION_STATUS_SYMBOLS = OrderedDict([
         ('ineligible', u'\u25cb'),   # open circle
         ('eligible', u'\u25cf'),     # black circle
         ('active', u'\u25b9'),       # open triangel
         ('running', u'\u25b8'),      # black triangel
-        ('completed', u'\u25a1'),    # open square
+        ('completed', u'\u2714'),    # open square
+        #('completed', u'\u25a1'),    # open square
     ])
 
     def print_status(self, jobs=None, overview=True, overview_max_lines=None,
                      detailed=False, parameters=None, skip_active=False, param_max_width=None,
                      expand=False, all_ops=False, only_incomplete=False, dump_json=False,
+                     unroll=True, compact=False, pretty=False,
                      file=sys.stdout, err=sys.stderr, ignore_errors=False,
                      scheduler=None, pool=None, job_filter=None, no_parallelize=False):
         """Print the status of the project.
@@ -1144,14 +1155,25 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                     print(self._tr("Lines omitted:"), lines_skipped, file=file)
 
         # Generate detailed view:
+        def _select_op(doc):
+            active = JobStatus(doc['scheduler_status']) > JobStatus.unknown
+            if skip_active and active:
+                return False
+            if not all_ops and not (active or doc['eligible']):
+                return False
+            return True
+
         if detailed:
-            rows_labels = []
-            header_detailed = [self._tr(self._alias(s)) for s in ('job_id', 'labels')]
+            rows_status = []
+            columns = ['job_id', 'labels']
+            if unroll:
+                columns.insert(1, 'operation')
+            header_detailed = [self._tr(self._alias(c)) for c in columns]
             if parameters:
                 for i, value in enumerate(parameters):
                     header_detailed.insert(i + 1, shorten(self._alias(str(value)), param_max_width))
 
-            def _format_status_labels(status):
+            def _format_status(status):
                 sp = self.open_job(id=status['job_id']).statepoint()
 
                 def get(k, m):
@@ -1169,10 +1191,37 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                     for i, k in enumerate(parameters):
                         v = self._alias(get(k, sp))
                         row.insert(i + 1, None if v is None else shorten(str(v), param_max_width))
-                yield row
+                if unroll:
+                    selected_ops = [name for name, op in status['operations'].items()
+                                    if _select_op(op)]
+                    if compact:
+                        if len(selected_ops) == 1:
+                            row.insert(1, selected_ops[0])
+                            yield row
+                        elif len(selected_ops) >= 1:
+                            row.insert(1, '{} (+{})'.format(selected_ops[0], len(selected_ops)-1))
+                            yield row
+                    elif selected_ops:
+                        row.insert(1, None)
+                        max_len = max(len(header_detailed[1])-4, max(map(len, selected_ops)))
+                        for i, name in enumerate(selected_ops):
+                            if i:
+                                row[0] = None
+                            row[1] = name.ljust(max_len)
+                            sched_stat = status['operations'][name]['scheduler_status']
+                            row[1] += " [{}]".format(_FMT_SCHEDULER_STATUS[sched_stat])
+                            if six.PY2:
+                                yield copy(row)
+                            else:
+                                yield row.copy()
+                    else:
+                        row.insert(1, None)
+                        yield row.copy()
+                else:
+                    yield row
 
             for status in statuses.values():
-                rows_labels.extend(_format_status_labels(status))
+                rows_status.extend(_format_status(status))
 
             rows_operations = []
             header_operations = [self._tr(self._alias(s))
@@ -1180,10 +1229,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
             def _fmt_status_operations(status):
                 for name, doc in status['operations'].items():
-                    active = JobStatus(doc['scheduler_status']) > JobStatus.unknown
-                    if skip_active and active:
-                        continue
-                    if not all_ops and not (active or doc['eligible']):
+                    if not _select_op(doc):
                         continue
 
                     yield [
@@ -1197,21 +1243,23 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         # Actually display information
         if detailed:
             print(('\n' if overview else '') + "# Detailed View:", file=file)
-            labels_table = tabulate.tabulate(rows_labels, headers=header_detailed)
+            status_table = tabulate.tabulate(rows_status, headers=header_detailed)
             if expand:  # Present labels and operations in two separate tables.
                 print("\n## Labels:", file=file)
-                print(labels_table, file=file)
+                print(status_table, file=file)
                 print("\n## Operations:", file=file)
                 rows_operations = [row for rows in rows_operations for row in rows]  # flatten list
                 print(tabulate.tabulate(rows_operations, headers=header_operations), file=file)
+            elif unroll:
+                print(status_table, file=file)
             else:       # Present labels and operations in a combined 'compact' view.
                 # We need to split the labels table into individual lines
                 # to combine them with the operations lines.
-                labels_table_lines = iter(labels_table.splitlines())
+                status_table_lines = iter(status_table.splitlines())
 
                 # The first two lines are the table header.
-                print(next(labels_table_lines), file=file)
-                print(next(labels_table_lines), file=file)
+                print(next(status_table_lines), file=file)
+                print(next(status_table_lines), file=file)
 
                 def _print_unicode(value):
                     "Python 2/3 compatibility layer."
@@ -1220,7 +1268,15 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                     else:
                         print(value, file=file)
 
-                for line, status in zip(labels_table_lines, statuses.values()):
+                if pretty:
+                    open_frame = u'\u2514'      # open frame
+                    closing_frame = u'\u251c'   # closing frame
+                    symbols = self.PRETTY_OPERATION_STATUS_SYMBOLS
+                else:
+                    open_frame, closing_frame = '', ''
+                    symbols = self.OPERATION_STATUS_SYMBOLS
+
+                for line, status in zip(status_table_lines, statuses.values()):
                     _print_unicode(line)
                     if status['operations']:
                         width = max(map(len, status['operations']))
@@ -1239,8 +1295,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                             name = name.ljust(width)
                             if six.PY2:
                                 name = name.decode('utf-8')
-                            #       closing frame                                open frame
-                            frame = u'\u2514' if (i+1) == len(selected_ops) else u'\u251c'
+                            frame = closing_frame if (i+1) == len(selected_ops) else open_frame
 
                             if doc['scheduler_status'] >= JobStatus.active:
                                 op_status = u'running'
@@ -1252,15 +1307,15 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                                 op_status = u'eligible'
                             else:
                                 op_status = u'ineligible'
-                            symbol = self.OPERATION_STATUS_SYMBOLS[op_status]
+
+                            frame += symbols[op_status]
 
                             sched_stat = _FMT_SCHEDULER_STATUS[doc['scheduler_status']]
                             if six.PY2:
                                 sched_stat = sched_stat.decode('utf-8')
-                            msg = u"{}{} {} [{}]".format(frame, symbol, name, sched_stat)
+                            msg = u"{} {} [{}]".format(frame, name, sched_stat)
                             _print_unicode(msg)
-                legend = u'Legend:' + u' '.join(u'{}:{}'.format(v, k)
-                                                for k, v in self.OPERATION_STATUS_SYMBOLS.items())
+                legend = u'Legend: ' + u' '.join(u'{}:{}'.format(v, k) for k, v in symbols.items())
                 _print_unicode(legend)
 
         # Show any abbreviations used
@@ -1852,13 +1907,26 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             action='store_true',
             help=argparse.SUPPRESS)
         view_group.add_argument(
+            '--stack',
+            action='store_false',
+            dest='unroll',
+            help="Show labels and operations in separate rows.")
+        view_group.add_argument(
+            '-1', '--one-line',
+            dest='compact',
+            action='store_true',
+            help="Show only one line per job.")
+        view_group.add_argument(
             '-e', '--expand',
             action='store_true',
             help="Display job labels and job operations in two separate tables.")
         view_group.add_argument(
+            '--pretty',
+            action='store_true')
+        view_group.add_argument(
             '--full',
             action='store_true',
-            help="Show all available information (implies -da).")
+            help="Show all available information (implies --detailed --all-operations).")
         view_group.add_argument(
             '--no-overview',
             action='store_false',
@@ -2151,6 +2219,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
     def _main_status(self, args):
         "Print status overview."
         jobs = self._select_jobs_from_args(args)
+        if args.compact and not args.unroll:
+            logger.warn("The -1/--one-line argument is incompatible with "
+                        "'--stack' and will be ignored.")
         args = {key: val for key, val in vars(args).items()
                 if key not in ['func', 'debug', 'job_id', 'filter', 'doc_filter']}
         if args.pop('full'):

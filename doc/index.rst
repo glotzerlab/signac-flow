@@ -35,6 +35,7 @@ The implementation is in pure Python, requires signac_ and is tested for Python 
    reference
    supported_environments
    acknowledge
+   changes
    flow
 
 Indices and tables

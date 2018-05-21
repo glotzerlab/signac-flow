@@ -476,7 +476,7 @@ class ProjectMainInterfaceTest(BaseProjectTest):
 
     def test_main_status(self):
         self.assertTrue(len(self.project))
-        status_output = self.call_subcmd('--debug status --detailed').decode().splitlines()
+        status_output = self.call_subcmd('--debug status --detailed').decode('utf-8').splitlines()
         lines = iter(status_output)
         for line in lines:
             for job in self.project:

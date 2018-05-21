@@ -29,8 +29,6 @@ The package comes with a few *default environments* which are **always available
 That includes the :py:class:`~.DefaultTorqueEnvironment` and the :py:class:`~.DefaultSlurmEnvironment`.
 This means that if you are within an environment with a *torque* or *slurm scheduler* you should be immediately able to submit to the cluster.
 
-There is also a :py:class:`~.environment.TestEnvironment`, which you can use by calling the :py:func:`.get_environment` function with ``test=True`` or by using the ``--test`` argument on the command line.
-
 Packaged Environments
 =====================
 
@@ -50,9 +48,7 @@ Those are the steps usually required to define a new environment:
 
   1. Subclass from :py:class:`.ComputeEnvironment`.
   2. Determine a host name pattern that would match the output of :py:func:`socket.gethostname()`.
-  3. Optionally specify the ``cores_per_node`` for environments with compute nodes.
-  4. Optionally overload the ``mpi_cmd()`` classmethod.
-  5. Overload the ``script()`` method to add specific options to the header of the submission script.
+  3. Create a template and specify the template name as ``template`` class variable.
 
 This is an example for a typical environment class definition:
 
@@ -63,7 +59,18 @@ This is an example for a typical environment class definition:
           hostname_pattern = 'mycluster.*.university.edu'
           template = 'mycluster.myuniversity.sh'
 
-At the ``mycluster.myuniversity.sh`` template script to the templates directory within your project root directory.
+Then, add the ``mycluster.myuniversity.sh`` template script to the *templates/* directory within your project root directory.
+
+.. important::
+
+    The new environment will be automatically registered and used as long as it is either defined within the same module as your :py:class:`~.flow.FlowProject` class or imported into the same module.
+
+As an example on how to write a submission script template, this is the default ``slurm.sh`` template for environments with SLURM scheduler included with the flow package:
+
+.. literalinclude:: ../flow/templates/slurm.sh
+
+All templates, which are shipped with the package, are within the *flow/templates/* directory within the package source code.
+
 
 Contributing Environments to the Package
 ========================================

@@ -227,6 +227,8 @@ class JobOperation(object):
         This class is used by the :class:`~.FlowProject` class for the execution and
         submission process and should not be instantiated by users themselves.
 
+    .. versionchanged:: 0.6
+
     :param name:
         The name of this JobOperation instance. The name is arbitrary,
         but helps to concisely identify the operation in various contexts.
@@ -1023,6 +1025,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                      scheduler=None, pool=None, job_filter=None, no_parallelize=False):
         """Print the status of the project.
 
+        .. versionchanged:: 0.6
+
         :param jobs:
             Only execute operations for the given jobs, or all if the argument is omitted.
         :type jobs:
@@ -1578,6 +1582,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
     def submit(self, bundle_size=1, jobs=None, names=None, num=None, parallel=False,
                force=False, walltime=None, env=None, **kwargs):
         """Submit function for the project's main submit interface.
+
+        .. versionchanged:: 0.6
 
         :param bundle_size:
             Specify the number of operations to be bundled into one submission, defaults to 1.

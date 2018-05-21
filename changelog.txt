@@ -1,3 +1,37 @@
+0.6.0:
+
+	- Major updates and new features:
+
+		- Use jinja2 as templating engine for the generation of execution and submission scripts.
+		- Add decorator API for the definition of FlowProject operations and label functions.
+		- Revise the status view to render on a per job-operation basis, not on a per job basis.
+		- The <project> run function executes all pending operations, not just the next pending ones.
+		- The <project> script function no longer supports explicit bundling, all operations are bundled by default.
+		- The default execution mode for script and submission script bundling is serial, not parallel.
+		- Add the operations directive parameter, which provides a more generalized interface to specify required resources or other execution related metadata.
+		- Add support for XSEDE Stampede2.
+		- Add simple-scheduler, for local testing of scheduled workflows.
+		- Allow the override of the detected environment with the `SIGNAC_FLOW_ENVIRONMENT` variable.
+		- The `$ flow init` commad initializes the signac project if not project is found.
+
+	- API changes (breaking):
+
+		- The FlowProject.run() method arguments were changed [1]; the old API is better supported by the new FlowProject.run_operations() function.
+		- The FlowProject.submit() and .submit_operations() method arguments were changed [1].
+		- The JobOperation constructor arguments were changed; the old API  ist still supported.
+
+	- API changes (non-breaking):
+
+		- Unify the job and operation selection API for the run/script/submit commands.
+		- Add FlowProject.operation() decorator function.
+		- Add FlowProject.label() docorator function.
+		- The FlowProject.write_human_readable_statepoints() method is deprecated.
+		- All FlowProject methods relating to the old templating system are deprecated, that includes all write_script*() methods.
+		- Add flow.cmd decorator function.
+		- Add flow.directives decorator function.
+
+[1] A reasonable attempt to support legacy API use is made, but may fail under some circumstances.
+
 0.5.6:
 
 	- Fix issue, where operations with spaces in their name would not be

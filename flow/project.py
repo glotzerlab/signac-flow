@@ -1026,8 +1026,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         ('eligible', u'\u25cf'),     # black circle
         ('active', u'\u25b9'),       # open triangel
         ('running', u'\u25b8'),      # black triangel
-        ('completed', u'\u2714'),    # open square
-        #('completed', u'\u25a1'),    # open square
+        ('completed', u'\u2714'),    # check mark
     ])
 
     def print_status(self, jobs=None, overview=True, overview_max_lines=None,
@@ -1163,6 +1162,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 return False
             return True
 
+        def _bold(x):
+            "Bold markup."
+            if pretty:
+                return '\033[1m' + x + '\033[0m'
+            else:
+                return x
+
         if detailed:
             rows_status = []
             columns = ['job_id', 'labels']
@@ -1195,12 +1201,16 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                     selected_ops = [name for name, op in status['operations'].items()
                                     if _select_op(op)]
                     if compact:
-                        if len(selected_ops) == 1:
-                            row.insert(1, selected_ops[0])
-                            yield row
-                        elif len(selected_ops) >= 1:
-                            row.insert(1, '{} (+{})'.format(selected_ops[0], len(selected_ops)-1))
-                            yield row
+                        if len(selected_ops):
+                            next_name = selected_ops[0]
+                            sched_stat = status['operations'][next_name]['scheduler_status']
+                            cell = '{} [{}]'.format(next_name, _FMT_SCHEDULER_STATUS[sched_stat])
+                            if len(selected_ops) > 1:
+                                cell += ' (+{})'.format(len(selected_ops) - 1)
+                        else:
+                            cell = ''
+                        row.insert(1, cell)
+                        yield row
                     elif selected_ops:
                         row.insert(1, None)
                         max_len = max(len(header_detailed[1])-4, max(map(len, selected_ops)))
@@ -1208,8 +1218,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                             if i:
                                 row[0] = None
                             row[1] = name.ljust(max_len)
-                            sched_stat = status['operations'][name]['scheduler_status']
-                            row[1] += " [{}]".format(_FMT_SCHEDULER_STATUS[sched_stat])
+
+                            op = status['operations'][name]
+                            if pretty and op['eligible']:
+                                row[1] = _bold(row[1])
+                            row[1] += " [{}]".format(_FMT_SCHEDULER_STATUS[op['scheduler_status']])
                             if six.PY2:
                                 yield copy(row)
                             else:
@@ -1233,7 +1246,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                         continue
 
                     yield [
-                        status['job_id'], name,
+                        status['job_id'],
+                        _bold(name) if (pretty and doc['eligible']) else name,
                         'Y' if doc['eligible'] else 'N',
                         _FMT_SCHEDULER_STATUS[doc['scheduler_status']]]
 
@@ -1293,6 +1307,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                         selected_ops = list(filter(select, status['operations'].items()))
                         for i, (name, doc) in enumerate(selected_ops):
                             name = name.ljust(width)
+                            if pretty and doc['eligible']:
+                                name = _bold(name)
                             if six.PY2:
                                 name = name.decode('utf-8')
                             frame = closing_frame if (i+1) == len(selected_ops) else open_frame

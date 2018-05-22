@@ -29,6 +29,7 @@ def _get_submit_parser(parser_submit=None):
         parser_submit = argparse.ArgumentParser()
     parser_submit.add_argument(
         '--job-name',
+        required=True,
         help="The name of the job.")
     parser_submit.add_argument(
         '-D', '--chdir',
@@ -44,6 +45,9 @@ def _get_args(script):
 
 
 def main_submit(args):
+    # Try to parse args, should raise error if anytyhing is wrong or missing
+    with open(args.filename) as script:
+        _get_submit_parser().parse_args(list(_get_args(script)))
     dst = os.path.join(args.inbox, str(uuid.uuid4()) + '.sh')
     shutil.copyfile(args.filename, dst)
 
@@ -114,8 +118,10 @@ def _process_queue(args, db):
 
     cwd = os.getcwd()
     try:
+        logger.info("Executing job '{}' ({})...".format(doc['job_name'], doc['_id']))
         try:
-            os.chdir(doc.get('chdir', os.path.expanduser('~')).strip('"'))
+            chdir = doc.get('chdir', '').strip('"') or os.path.expanduser('~')
+            os.chdir(chdir)
         except FileNotFoundError as error:
             logger.warning(error)
         for i in range(100):
@@ -123,7 +129,7 @@ def _process_queue(args, db):
             if not os.path.exists(fn_out):
                 break
         else:
-            assert 0
+            assert False    # This point should not be reached.
         for i in range(100):
             fn_err = '{}.err.{}'.format(doc['_id'], i)
             if not os.path.exists(fn_err):

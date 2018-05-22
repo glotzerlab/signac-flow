@@ -1,4 +1,4 @@
-.. _supported_environments:
+.. _supported-environments:
 
 ======================
 Supported Environments

@@ -11,7 +11,7 @@ The basic options will always be the same, however there might be some subtle di
 .. tip::
 
     If you are running on a high-performance super computer, add the following line to your ``project.py`` module to import packaged profiles: ``import flow.environments``
-    Please see :ref:`supported_environments` for more information.
+    Please see :ref:`supported-environments` for more information.
 
 How to Use Environments
 =======================
@@ -36,7 +36,7 @@ In addition, **signac-flow** comes with some additional *packaged environments*.
 These environments are defined within the :py:mod:`flow.environments` module.
 These environments are not automatically available, instead you need to *explictly import* the :py:mod:`flow.environments` module.
 
-For a full list of all packaged environments, please see :ref:`packaged-environments`.
+For a full list of all packaged environments, please see :ref:`supported-environments`.
 
 Defining New Environments
 =========================

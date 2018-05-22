@@ -46,7 +46,6 @@ We could execute this *operation* for the complete data space, for example in th
 
 .. code-block:: python
 
-   ~/my_project $ python
    >>> import signac
    >>> from operations import hello
    >>> project = signac.get_project()

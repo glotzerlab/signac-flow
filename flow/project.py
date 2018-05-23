@@ -72,6 +72,7 @@ from .util.template_filters import _with_np_offset
 from .util.misc import write_human_readable_statepoint
 from .util.misc import add_cwd_to_environment_pythonpath
 from .util.misc import switch_to_directory
+from .util.progressbar import with_progressbar
 from .util.translate import abbreviate
 from .util.translate import shorten
 from .util.execution import fork
@@ -1132,7 +1133,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                     # this time with fall-back progress indicator, that does not
                     # require to launch additional threads.
                     logger.debug("Unable to use tqdm, using fall back progress indicator.")
-                    tmp = list(_print_progress(_map(self.get_job_status, jobs)))
+                    tmp = list(with_progressbar(
+                        map(self.get_job_status, jobs),
+                        total=len(jobs), desc='Collect job status info:'))
         except RuntimeError as error:
             # The parallelized status determination has failed both times, we fall
             # back to a serialized approach.
@@ -1142,7 +1145,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 "serial mode with fallback progress indicator. The status update "
                 "may take longer than usual.")
 
-            tmp = list(_print_progress(map(self.get_job_status, jobs)))
+            tmp = list(with_progressbar(
+                map(self.get_job_status, jobs),
+                total=len(jobs), desc='Collect job status info:'))
 
         if only_incomplete:
 

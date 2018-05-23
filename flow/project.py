@@ -265,8 +265,11 @@ class JobOperation(object):
             warnings.warn(
                 "The np argument for the JobOperation constructor is deprecated.",
                 DeprecationWarning)
-        np = directives.get('np', 1) if np is None else np
-        assert directives.setdefault('np', np) == np
+            assert directives.setdefault('np', np) == np
+        else:
+            directives.setdefault(
+                'np', directives.get('nranks', 1) * directives.get('omp_num_threads', 1))
+        directives.setdefault('ngpu', 0)
         # Future: directives.setdefault('np', 1)
 
         # Evaluate strings and callables for job:
@@ -1621,6 +1624,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             # with signac-flow unless additional environment information is
             # detected.
 
+            logger.info("Use environment '{}'.".format(env))
+            logger.info("Set 'base_script={}'.".format(env.template))
             context['base_script'] = env.template
             context['environment'] = env.__name__
             context['id'] = _id
@@ -1781,6 +1786,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             '--force',
             action='store_true',
             help="Ignore all warnings and checks, just submit.")
+        parser.add_argument(
+            '--test',
+            action='store_true',
+            help="Do not interact with the scheduler, implies --pretend.")
         cls._add_operation_selection_arg_group(parser)
         cls._add_operation_bundling_arg_group(parser)
         cls._add_template_arg_group(parser)
@@ -2360,13 +2369,16 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
     def _main_submit(self, args):
         _requires_jinja2('The signac-flow submit function')
+        if args.test:
+            args.pretend = True
         kwargs = vars(args)
 
         # Select jobs:
         jobs = self._select_jobs_from_args(args)
 
         # Fetch the scheduler status.
-        self._fetch_scheduler_status(jobs)
+        if not args.test:
+            self._fetch_scheduler_status(jobs)
 
         # Gather all pending operations ...
         ops = self._get_pending_operations(jobs, args.operation_name)

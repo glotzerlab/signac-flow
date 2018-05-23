@@ -9,7 +9,7 @@
 {% endif %}
 {% block tasks %}
 {% set s_ppn = ':ppn=' ~ ppn if ppn else '' %}
-{% set nn = nn|default((num_tasks/ppn)|round(method='ceil')|int if ppn else num_tasks, true) %}
+{% set nn = nn|default((np_global/ppn)|round(method='ceil')|int if ppn else np_global, true) %}
 #PBS -l nodes={{ nn }}{{ s_ppn }}
 {% endblock %}
 {% endblock %}

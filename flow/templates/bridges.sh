@@ -1,24 +1,43 @@
+{% set mpiexec = "mpirun" %}
 {% extends "slurm.sh" %}
 {% block tasks %}
 {% set cpn = 28 %}
 {% if 'shared' in partition %}
 {% set nn = nn|default(1, true) %}
-{% set tpn = num_tasks %}
+{% set tpn = np_global %}
 {% if tpn > cpn %}
 {% raise "Cannot put more than %d tasks into one submission in 'shared' partition."|format(cpn) %}
 {% endif %}
 {% else %}
-{% set nn = nn|default((num_tasks/cpn)|round(method='ceil')|int, true) %}
-{% set node_util = num_tasks / (cpn * nn) %}
+{% set nn = nn|default((np_global/cpn)|round(method='ceil')|int, true) %}
+{% set node_util = np_global / (cpn * nn) %}
 {% if not force and node_util < 0.9 %}
-{% raise "Bad node utilization!! nn=%d, cores_per_node=%d, num_tasks=%d"|format(nn, cpn, num_tasks) %}
+{% raise "Bad node utilization!! nn=%d, cores_per_node=%d, np_global=%d"|format(nn, cpn, np_global) %}
 {% endif %}
+{% set tpn = cpn if np_global > cpn else np_global %}
 {% endif %}
-{% if partition == 'GPU-shared' %}
-{% if tpn > 2 %}
-{% raise "Max. of two tasks per submission for GPU-shared partition." %}
+#SBATCH -N {{ nn }}
+#SBATCH --ntasks-per-node {{ tpn }}
+{% endblock %}
+{% block gpu %}
+{% set gpus = operations|map(attribute='directives.ngpu')|sum %}
+{% if gpus %}
+{% if operations|map(attribute='directives.ngpu')|identical %}
+{% set ngpu = operations[0].directives.ngpu %}
+{% else %}
+{% raise "The gpu directive must be identical for all operations." %}
 {% endif %}
-#SBATCH --gres=gpu:p100:{{ tpn }}
+{% if partition == 'GPU' %}
+{% if ngpu > 2 %}
+{% raise "Max. of two P100 GPUs per node." %}
+{% endif %}
+#SBATCH --gres=gpu:p100:{{ ngpu }}
+{% elif partition == 'GPU-shared' %}
+{% if ngpu > 1 %}{% raise "The gpu directive must be 1 for the shared partition." %}{% endif %}
+#SBATCH --gres=gpu:p100:1
+{% else %}
+{% raise "Submitting operations with the gpu directive requires a GPU partition." %}
+{% endif %}
 {% endif %}
 {% endblock %}
 

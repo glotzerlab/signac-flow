@@ -7,18 +7,21 @@ Supported Environments
 The **signac-flow** package streamlines the :ref:`submission <cluster-submission>` of job-operations to a supercomputer scheduling system.
 The package currently ships with drivers for:
 
-  * `SLURM schedulers <https://slurm.schedmd.com/>`_
-  * `PBS (Torque) schedulers <http://www.adaptivecomputing.com/products/open-source/torque/>`_
+.. toctree::
+
+   supported_environments/slurm
+   supported_environments/torque
 
 Any supercomputing system utilizing these schedulers is supported out of the box.
-
 In addition, the package provides specialized submission profiles for the following environments:
 
-  * `Titan (Incite) <https://www.olcf.ornl.gov/titan/>`_
-  * `Comet (XSEDE) <http://www.sdsc.edu/services/hpc/hpc_systems.html#comet>`_
-  * `Stampede2 (XSEDE) <https://portal.tacc.utexas.edu/user-guides/stampede2>`_
-  * `Bridges (XSEDE) <https://www.psc.edu/bridges>`_
-  * `flux (University of Michigan) <http://arc-ts.umich.edu/systems-services/flux/>`_
+.. toctree::
+   supported_environments/titan
+   supported_environments/eos
+   supported_environments/stampede2
+   supported_environments/comet
+   supported_environments/bridges
+   supported_environments/umich
 
 To use these environment profiles, make sure to add the following line to your ``project.py`` file:
 

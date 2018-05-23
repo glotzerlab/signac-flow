@@ -13,6 +13,6 @@
 #SBATCH --error={{ job_output }}
 {% endif %}
 {% block tasks %}
-#SBATCH --ntasks={{ num_tasks }}
+#SBATCH --ntasks={{ np_global }}
 {% endblock %}
 {% endblock %}

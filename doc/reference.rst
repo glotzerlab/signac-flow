@@ -19,3 +19,4 @@ Contents:
    project
    cluster_submission
    environments
+   templates

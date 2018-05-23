@@ -1,8 +1,8 @@
 {# Number of tasks is the same for any script type #}
 {% if parallel %}
-{% set num_tasks = operations|map(attribute='directives.np')|sum %}
+{% set np_global = operations|map(attribute='directives.np')|sum %}
 {% else %}
-{% set num_tasks = operations|map(attribute='directives.np')|max %}
+{% set np_global = operations|map(attribute='directives.np')|max %}
 {% endif %}
 {% block header %}
 {% endblock %}
@@ -13,15 +13,18 @@ set -u
 
 cd {{ project.config.project_dir }}
 {% endblock %}
-
 {% block body %}
+{% set cmd_suffix = cmd_suffix|default('') ~ (' &' if parallel else '') %}
 {% for operation in operations %}
-# Operation '{{ operation.name }}' for job '{{ operation.job._id }}':
-{% if parallel %}
-{{ prefix_cmd }}{{ operation.cmd }} &
-{% else %}
-{{ prefix_cmd }}{{ operation.cmd }}
+{% if operation.directives.nranks and not mpi_prefix %}
+{% set mpi_prefix = "%s -n %d "|format(mpiexec|default("mpiexec"), operation.directives.nranks) %}
 {% endif %}
+
+# {{ "%s"|format(operation) }}
+{% if operation.directives.omp_num_threads %}
+export OMP_NUM_THREADS={{ operation.directives.omp_num_threads }}
+{% endif %}
+{{ mpi_prefix }}{{ cmd_prefix }}{{ operation.cmd }}{{ cmd_suffix }}
 {% endfor %}
 {% endblock %}
 {% block footer %}

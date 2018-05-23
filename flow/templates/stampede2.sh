@@ -2,17 +2,17 @@
 {% block tasks %}
 {% set tpo = [] %}
 {% for op in operations %}
-{% if op.directives.tasks and op.directives.tasks > op.directives.np %}
-{% raise "Cannot request more threads (%d) than total processes (%d) for %s(%s)"|format(op.directives.tasks, op.directives.np, op.name, op.job._id) %}
+{% if op.directives.nranks and op.directives.nranks > op.directives.np %}
+{% raise "Cannot request more threads (%d) than total processes (%d) for %s(%s)"|format(op.directives.nranks, op.directives.np, op.name, op.job._id) %}
 {% endif %}
-{%if tpo.append(op.directives.tasks|default(op.directives.np)) %}{% endif %}
+{%if tpo.append(op.directives.nranks|default(op.directives.np)) %}{% endif %}
 {% endfor %}
 {% set tasks = tpo|sum if parallel else tpo|max %}
 {% set cpn = 48 if 'skx' in partition else 68 %}
-{% set nn = nn|default((num_tasks/cpn)|round(method='ceil')|int, true) %}
-{% set node_util = num_tasks / (nn * cpn) %}
+{% set nn = nn|default((np_global/cpn)|round(method='ceil')|int, true) %}
+{% set node_util = np_global / (nn * cpn) %}
 {% if not force and node_util < 0.9 %}
-{% raise "Bad node utilization!! nn=%d, cores_per_node=%d, num_tasks=%d"|format(nn, cpn, num_tasks) %}
+{% raise "Bad node utilization!! nn=%d, cores_per_node=%d, np_global=%d"|format(nn, cpn, np_global) %}
 {% endif %}
 #SBATCH --nodes={{ nn }}
 #SBATCH --ntasks={{ tasks }}
@@ -27,21 +27,21 @@
 #SBATCH --partition={{ partition }}
 {% endblock %}
 
-{# On stampede we default to using ibrun; extend and override the template if needed #}
 {% block body %}
-{% if parallel %}
+{% set cmd_suffix = cmd_suffix|default('') ~ (' &' if parallel else '') %}
 {% for operation in (operations|with_np_offset) %}
-# Operation '{{ operation.name }}' for job '{{ operation.job._id }}':
-{{ "ibrun -n %d -o %d %s &"|format(operation.directives.np, operation.directives.np_offset, operation.cmd) }}
-{% endfor %}
-{% else %}
-{% for operation in operations %}
-{{ "ibrun -n %d %s"|format(operation.directives.np, operation.cmd) }}
-{% endfor %}
+
+# {{ "%s"|format(operation) }}
+{% if operation.directives.omp_num_threads %}
+export OMP_NUM_THREADS={{ operation.directives.omp_num_threads }}
 {% endif %}
-{% endblock %}
-{% block footer %}
+{% if operation.directives.nranks %}
 {% if parallel %}
-wait
+{% set mpi_prefix = "ibrun -n %d -o %d task_affinity "|format(operation.directives.nranks, operation.directives.np_offset) %}
+{% else %}
+{% set mpi_prefix = "ibrun -n %d "|format(operation.directives.nranks) %}
 {% endif %}
+{% endif %}
+{{ mpi_prefix }}{{ cmd_prefix }}{{ operation.cmd }}{{ cmd_suffix }}
+{% endfor %}
 {% endblock %}

@@ -6,7 +6,7 @@ Manage Environments
 
 The **signac-flow** package uses environment profiles to adjust the submission process to local environments.
 That is because different environments provide different resources and options for the submission of operations to those resources.
-The basic options will always be the same, however there might be some subtle differences depending on where you want to submit your operations.
+Although the basic options will always be the same, there might be some subtle differences depending on where you want to submit your operations.
 
 .. tip::
 
@@ -17,24 +17,20 @@ How to Use Environments
 =======================
 
 Environments are defined by subclassing from the :py:class:`~.ComputeEnvironment` class.
-The :py:class:`~.ComputeEnvironment` class is a *meta-class* that is automatically globally registered whenever you define one.
-
+The :py:class:`~.ComputeEnvironment` class is a *meta-class* that ensures that all subclasses are automatically globally registered when they are defined.
 This enables us to use environments simply by defining them or importing them from a different module.
-The :py:func:`.get_environment` function will go through all defined :py:class:`~.ComputeEnvironment` classes and return the one, where the :py:meth:`~.ComputeEnvironment.is_present` class method returns ``True``.
-
-Default Environments
-====================
-
-The package comes with a few *default environments* which are **always available**.
-That includes the :py:class:`~.DefaultTorqueEnvironment` and the :py:class:`~.DefaultSlurmEnvironment`.
-This means that if you are within an environment with a *torque* or *slurm scheduler* you should be immediately able to submit to the cluster.
+The :py:func:`.get_environment` function will go through all defined :py:class:`~.ComputeEnvironment` classes and return the one where the :py:meth:`~.ComputeEnvironment.is_present` class method returns ``True``.
 
 Packaged Environments
 =====================
 
-In addition, **signac-flow** comes with some additional *packaged environments*.
-These environments are defined within the :py:mod:`flow.environments` module.
-These environments are not automatically available, instead you need to *explictly import* the :py:mod:`flow.environments` module.
+The package comes with a few *default environments* which are **always available** and designed for specific schedulers.
+That includes the :py:class:`~.DefaultTorqueEnvironment` and the :py:class:`~.DefaultSlurmEnvironment`.
+This means that if you are within an environment with a *torque* or *slurm scheduler* you should be immediately able to submit to the cluster.
+
+In addition, **signac-flow** comes with some environments tailored to specific compute clusters that are defined in the :py:mod:`flow.environments` module.
+These environments are not automatically available.
+Instead, you need to *explictly import* the :py:mod:`flow.environments` module.
 
 For a full list of all packaged environments, please see :ref:`supported-environments`.
 

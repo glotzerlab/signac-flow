@@ -1152,7 +1152,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         if only_incomplete:
 
             def _incomplete(s):
-                return any(not op['completed'] for op in s['operations'].values())
+                return any(op['eligible'] for op in s['operations'].values())
 
             tmp = list(filter(_incomplete, tmp))
 

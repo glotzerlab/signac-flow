@@ -2422,7 +2422,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 "Cannot provide both -j/--job-id and -f/--filter or --doc-filter in combination.")
 
         if args.job_id:
-            return [self.open_job(id=job_id) for job_id in args.job_id]
+            try:
+                return [self.open_job(id=job_id) for job_id in args.job_id]
+            except KeyError as error:
+                raise LookupError("Did not find job with id {}.".format(error))
         else:
             filter_ = parse_filter_arg(args.filter)
             doc_filter = parse_filter_arg(args.doc_filter)

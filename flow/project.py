@@ -1119,37 +1119,28 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         try:
             with contextlib.closing(ThreadPool()) as pool:
                 _map = map if no_parallelize else pool.imap
-
-                try:
-                    # First attempt at parallelized status determination.
-                    # This may fail on some systems that don't like the additional
-                    # thread required by the tqdm progress bar.
-                    tmp = list(tqdm(
-                        _map(self.get_job_status, jobs),
-                        desc="Collect job status info",
-                        total=len(jobs)))
-                except RuntimeError:
-                    # This is a second attempt at parallelized status determination,
-                    # this time with fall-back progress indicator, that does not
-                    # require to launch additional threads.
-                    logger.debug("Unable to use tqdm, using fall back progress indicator.")
-                    tmp = list(with_progressbar(
-                        map(self.get_job_status, jobs),
-                        total=len(jobs), desc='Collect job status info:'))
+                # First attempt at parallelized status determination.
+                # This may fail on systems that don't allow threads.
+                tmp = list(tqdm(
+                    _map(self.get_job_status, jobs),
+                    desc="Collect job status info",
+                    total=len(jobs)))
         except RuntimeError as error:
-            # The parallelized status determination has failed both times, we fall
-            # back to a serialized approach.
-            logger.debug("Unable to launch threads for status update, error: '{}'.".format(error))
+            if "can't start new thread" not in error.args:
+                raise   # unrelated error
+            # The parallelized status determination has failed and we fall
+            # back to a serial approach.
             logger.warning(
-                "Unable to launch threads for parallelized status update, entering "
-                "serial mode with fallback progress indicator. The status update "
-                "may take longer than usual.")
-
+                "A parallelized status update failed due to error ('{}'). "
+                "Entering serial mode with fallback progress indicator. The "
+                "status update may take longer than ususal.".format(error))
             tmp = list(with_progressbar(
                 map(self.get_job_status, jobs),
                 total=len(jobs), desc='Collect job status info:'))
 
         if only_incomplete:
+            # Remove all jobs from the status info, that have not a single
+            # eligible operation.
 
             def _incomplete(s):
                 return any(op['eligible'] for op in s['operations'].values())

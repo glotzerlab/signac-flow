@@ -1215,8 +1215,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 columns.insert(1, 'operation')
             header_detailed = [self._tr(self._alias(c)) for c in columns]
             if parameters:
+                offset = 2 if unroll else 1
                 for i, value in enumerate(parameters):
-                    header_detailed.insert(i + 1, shorten(self._alias(str(value)), param_max_width))
+                    header_detailed.insert(
+                        i + offset, shorten(self._alias(str(value)), param_max_width))
 
             def _format_status(status):
                 sp = self.open_job(id=status['job_id']).statepoint()

@@ -48,6 +48,7 @@ Executing this script on the command line will give us access to this project's 
     This may be useful, for example, if you want to implement two very distinct workflows that operate on the same data space.
     Simply put those in different modules, *e.g.*, ``project_a.py`` and ``project_b.py``.
 
+.. _workflow-definition:
 
 Defining a workflow
 ===================

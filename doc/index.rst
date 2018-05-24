@@ -17,10 +17,15 @@ That includes the definition of data pipelines, execution of data space operatio
 
 The implementation is in pure Python, requires signac_ and is tested for Python versions 2.7 and 3.4+.
 
-.. note::
+.. important::
 
     This the documentation for the **signac-flow** package, which is part of the signac_ framework.
     See the signac-docs_ for comprehensive introduction to **signac**.
+
+
+.. note::
+
+    If you previously used **signac-flow** version 0.5, please see the :ref:`changes` section for information on on what's new with version 0.6.
 
 
 .. _signac: https://glotzerlab.engin.umich.edu/signac

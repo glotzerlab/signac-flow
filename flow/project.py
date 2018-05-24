@@ -990,13 +990,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 scheduler = self._environment.get_scheduler()
 
             # Map all scheduler jobs by their name.
-            print(self._tr("Query scheduler..."), file=file)
+            print(self._tr("Query scheduler..."), file=sys.stderr)
             sjobs_map = defaultdict(list)
             for sjob in self.scheduler_jobs(scheduler):
                 sjobs_map[sjob.name()].append(sjob)
 
             # Iterate through all jobs ...
-            for job in jobs:
+            for job in with_progressbar(jobs, desc='Update status cache:', file=sys.stderr):
                 job_status = dict()
                 # ... and all job-operations to attempt to map the job-operation id
                 # to scheduler names.
@@ -1686,10 +1686,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         if env is None:
             env = self._environment
 
-        print("Submitting cluster job '{}':".format(_id), file=sys.stdout)
+        print("Submitting cluster job '{}':".format(_id), file=sys.stderr)
 
         def _msg(op):
-            print(" - Operation: {}".format(op), file=sys.stdout)
+            print(" - Operation: {}".format(op), file=sys.stderr)
             return op
 
         operations = map(_msg, operations)

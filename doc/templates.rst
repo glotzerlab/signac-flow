@@ -116,6 +116,10 @@ The following directives are respected by all base templates shipped with **sign
 
 .. glossary::
 
+    executable
+      Specify which Python executable should be used to execute this operation.
+      Defaults to the one used to generate the script (``sys.executable``).
+
     np
       The total number of processing units required for this operation.
 

@@ -13,6 +13,11 @@ if sys.version_info < (3, 4, 0):
 
 from setuptools import setup, find_packages
 
+
+with open("README.md", "r") as fh:
+    long_description = fh.read()
+
+
 setup(
     name='signac-flow',
     version='0.6.0-dev0',
@@ -23,6 +28,9 @@ setup(
     author='Carl Simon Adorf',
     author_email='csadorf@umich.edu',
     description="Simple workflow management based on signac.",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
+    url="https://bitbucket.org/glotzer/signac-flow",
     keywords='workflow management signac framework database',
 
     classifiers=[

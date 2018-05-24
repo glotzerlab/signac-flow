@@ -19,8 +19,8 @@ The implementation is in pure Python, requires signac_ and is tested for Python 
 
 .. important::
 
-    This the documentation for the **signac-flow** package, which is part of the signac_ framework.
-    See the signac-docs_ for comprehensive introduction to **signac**.
+    This documentation for the **signac-flow** *package*, which is part of the signac_ framework.
+    See the signac-docs_ for a comprehensive introduction to the **signac** *framework*.
 
 
 .. note::

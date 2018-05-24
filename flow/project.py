@@ -983,6 +983,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
     def _fetch_scheduler_status(self, jobs=None, scheduler=None, file=None, ignore_errors=False):
         "Update the status docs."
+        if file is None:
+            file = sys.stderr
         try:
             if jobs is None:
                 jobs = list(self)
@@ -990,13 +992,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 scheduler = self._environment.get_scheduler()
 
             # Map all scheduler jobs by their name.
-            print(self._tr("Query scheduler..."), file=sys.stderr)
+            print(self._tr("Query scheduler..."), file=file)
             sjobs_map = defaultdict(list)
             for sjob in self.scheduler_jobs(scheduler):
                 sjobs_map[sjob.name()].append(sjob)
 
             # Iterate through all jobs ...
-            for job in with_progressbar(jobs, desc='Update status cache:', file=sys.stderr):
+            for job in with_progressbar(jobs, desc='Update status cache:', file=file):
                 job_status = dict()
                 # ... and all job-operations to attempt to map the job-operation id
                 # to scheduler names.

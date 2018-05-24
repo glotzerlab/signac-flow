@@ -328,7 +328,7 @@ class ProjectTest(BaseProjectTest):
             operations.extend(project.next_operations(job))
         self.assertEqual(len(list(MockScheduler.jobs())), 0)
         cluster_job_id = project._store_bundled(operations)
-        with redirect_stdout(StringIO()):
+        with redirect_stderr(StringIO()):
             project.submit_operations(_id=cluster_job_id, operations=operations)
         self.assertEqual(len(list(MockScheduler.jobs())), 1)
 
@@ -336,7 +336,7 @@ class ProjectTest(BaseProjectTest):
         MockScheduler.reset()
         project = self.mock_project()
         self.assertEqual(len(list(MockScheduler.jobs())), 0)
-        with redirect_stdout(StringIO()):
+        with redirect_stderr(StringIO()):
             project.submit()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
         num_jobs_submitted = len(project) + len(even_jobs)
@@ -347,10 +347,10 @@ class ProjectTest(BaseProjectTest):
         MockScheduler.reset()
         project = self.mock_project()
         self.assertEqual(len(list(MockScheduler.jobs())), 0)
-        with redirect_stdout(StringIO()):
+        with redirect_stderr(StringIO()):
             project.submit(num=1)
         self.assertEqual(len(list(MockScheduler.jobs())), 1)
-        with redirect_stdout(StringIO()):
+        with redirect_stderr(StringIO()):
             project.submit(num=1)
         self.assertEqual(len(list(MockScheduler.jobs())), 2)
 
@@ -360,7 +360,7 @@ class ProjectTest(BaseProjectTest):
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
         num_jobs_submitted = len(project) + len(even_jobs)
         self.assertEqual(len(list(MockScheduler.jobs())), 0)
-        with redirect_stdout(StringIO()):
+        with redirect_stderr(StringIO()):
             project.submit()
             for i in range(5):  # push all jobs through the queue
                 self.assertEqual(len(list(MockScheduler.jobs())), num_jobs_submitted)
@@ -372,7 +372,7 @@ class ProjectTest(BaseProjectTest):
         MockScheduler.reset()
         project = self.mock_project()
         self.assertEqual(len(list(MockScheduler.jobs())), 0)
-        with redirect_stdout(StringIO()):
+        with redirect_stderr(StringIO()):
             project.submit(bundle_size=2, num=2)
             self.assertEqual(len(list(MockScheduler.jobs())), 1)
             project.submit(bundle_size=2, num=4)
@@ -393,7 +393,7 @@ class ProjectTest(BaseProjectTest):
             list(project.classify(job))
             self.assertEqual(project.next_operation(job).name, 'op1')
             self.assertEqual(project.next_operation(job).job, job)
-        with redirect_stdout(StringIO()):
+        with redirect_stderr(StringIO()):
             project.submit()
         self.assertEqual(len(list(MockScheduler.jobs())), num_jobs_submitted)
 

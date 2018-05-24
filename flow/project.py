@@ -2227,7 +2227,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             operations.extend(getattr(cls, '_OPERATION_FUNCTIONS', []))
 
         def _guess_cmd(func, name, **kwargs):
-            executable = kwargs.get('executable', sys.executable)
+            try:
+                executable = kwargs['directives']['executable']
+            except (KeyError, TypeError):
+                executable = sys.executable
             path = getattr(func, '_flow_path', inspect.getsourcefile(func))
             return '{} {} exec {} {{job._id}}'.format(executable, path, name)
 

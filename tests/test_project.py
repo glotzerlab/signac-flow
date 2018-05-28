@@ -312,12 +312,8 @@ class ProjectTest(BaseProjectTest):
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
         for job in project:
             if job in even_jobs:
-                self.assertIn('op1({})'.format(job), run_output)
-                self.assertIn('op2({})'.format(job), run_output)
                 self.assertTrue(job.isfile('world.txt'))
             else:
-                self.assertNotIn('op1({})'.format(job), run_output)
-                self.assertIn('op2({})'.format(job), run_output)
                 self.assertFalse(job.isfile('world.txt'))
 
     def test_submit_operations(self):

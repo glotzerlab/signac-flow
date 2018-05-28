@@ -1513,6 +1513,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             num = None
 
         def select(operation):
+            if operation.job not in self:
+                logger.info("Job '{}' is no longer part of the project.".format(operation.job))
+                return False
             if num is not None and select.total_execution_count >= num:
                 logger.warning(
                     "Reached the maximum number of operations that can be executed, but "

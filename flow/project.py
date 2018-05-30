@@ -1422,7 +1422,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 operations = tqdm(list(operations))
             for operation in operations:
                 if pretend:
-                    print(operation)
+                    print(operation.cmd)
                 else:
                     self._fork(operation, timeout)
         else:

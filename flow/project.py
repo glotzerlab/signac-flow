@@ -1416,21 +1416,22 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             timeout = None
         if operations is None:
             operations = [op for job in self for op in self.next_operations(job) if op is not None]
+        else:
+            operations = list(operations)   # ensure list
 
         if np is None or pretend:
             if progress:
-                operations = tqdm(list(operations))
+                operations = tqdm(operations)
             for operation in operations:
                 if pretend:
                     print(operation.cmd)
                 else:
                     self._fork(operation, timeout)
         else:
-            if np < 0:
-                np = os.cpu_count()
-            with Pool(processes=np) as pool:
+            logger.debug("Parallelized execution of {} operation(s).".format(len(operations)))
+            with Pool(processes=os.cpu_count() if np < 0 else np) as pool:
                 results = [pool.apply_async(self._fork, (op,)) for op in operations]
-                if progress:
+                if progress:  # show progress bar
                     results = tqdm(results)
                 for result in results:
                     result.get(timeout=timeout)
@@ -1441,7 +1442,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         # Execute without forking if possible...
         if timeout is None and operation.name in self._operation_functions and \
                 operation.directives.get('executable', sys.executable) == sys.executable:
-            logger.debug("Able to optimized execution of operation '{}'.".format(operation))
+            logger.debug("Able to optimize execution of operation '{}'.".format(operation))
             self._operation_functions[operation.name](operation.job)
         else:   # need to fork
             fork(cmd=operation.cmd, timeout=timeout)

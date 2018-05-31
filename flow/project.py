@@ -1095,7 +1095,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         if jobs is None:
             if job_filter is not None and isinstance(job_filter, str):
                 warnings.warn(
-                    "The 'job_filter' argument is deprecated, use the 'jobs' instead.",
+                    "The 'job_filter' argument is deprecated, use the 'jobs' argument instead.",
                     DeprecationWarning)
                 job_filter = json.loads(job_filter)
             jobs = list(self.find_jobs(job_filter))

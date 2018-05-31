@@ -1563,6 +1563,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         "Get all pending operations for the given selection."
         operation_names = None if operation_names is None else set(operation_names)
 
+        if len(jobs) > 1:
+            jobs = with_progressbar(jobs, desc='Gather pending operations:')
         for job in jobs:
             for op in self.next_operations(job):
                 if operation_names and op.name not in operation_names:

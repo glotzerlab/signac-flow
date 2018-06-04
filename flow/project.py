@@ -948,12 +948,31 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 'completed': completed,
             }
 
-    def get_job_status(self, job):
+    def get_job_status(self, job, ignore_errors=False):
         "Return a dict with detailed information about the status of a job."
         result = dict()
         result['job_id'] = str(job)
-        result['operations'] = OrderedDict(self._get_operations_status(job))
-        result['labels'] = sorted(set(self.classify(job)))
+        try:
+            result['operations'] = OrderedDict(self._get_operations_status(job))
+            result['_operations_error'] = None
+        except Exception as error:
+            msg = "Error while getting operations status for job '{}': '{}'.".format(job, error)
+            logger.debug(msg)
+            if ignore_errors:
+                result['operations'] = None
+                result['_operations_error'] = str(error)
+            else:
+                raise
+        try:
+            result['labels'] = sorted(set(self.classify(job)))
+            result['_labels_error'] = None
+        except Exception as error:
+            logger.debug("Error while classifying job '{}': '{}'.".format(job, error))
+            if ignore_errors:
+                result['labels'] = None
+                result['_labels_error'] = str(error)
+            else:
+                raise
         return result
 
     def _format_row(self, status, statepoint=None, max_width=None):
@@ -1123,13 +1142,15 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                     err.flush()
                 yield _
 
+        _get_job_status = functools.partial(self.get_job_status, ignore_errors=ignore_errors)
+
         try:
             with contextlib.closing(ThreadPool()) as pool:
                 _map = map if no_parallelize else pool.imap
                 # First attempt at parallelized status determination.
                 # This may fail on systems that don't allow threads.
                 tmp = list(tqdm(
-                    _map(self.get_job_status, jobs),
+                    _map(_get_job_status, jobs),
                     desc="Collect job status info",
                     total=len(jobs)))
         except RuntimeError as error:
@@ -1142,8 +1163,19 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 "Entering serial mode with fallback progress indicator. The "
                 "status update may take longer than ususal.".format(error))
             tmp = list(with_progressbar(
-                map(self.get_job_status, jobs),
+                map(_get_job_status, jobs),
                 total=len(jobs), desc='Collect job status info:'))
+
+        operations_errors = {s['_operations_error'] for s in tmp}
+        labels_errors = {s['_labels_error'] for s in tmp}
+        errors = list(filter(None, operations_errors.union(labels_errors)))
+
+        if errors:
+            logger.warning(
+                "Some job status updates did not succeed due to errors. "
+                "Number of unique errors: {}. Use --debug to list all errors.".format(len(errors)))
+            for i, error in enumerate(errors):
+                logger.debug("Status update error #{}: '{}'".format(i+1, error))
 
         if only_incomplete:
             # Remove all jobs from the status info, that have not a single
@@ -2312,6 +2344,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         if args.compact and not args.unroll:
             logger.warn("The -1/--one-line argument is incompatible with "
                         "'--stack' and will be ignored.")
+        debug = args.debug
         args = {key: val for key, val in vars(args).items()
                 if key not in ['func', 'debug', 'job_id', 'filter', 'doc_filter']}
         if args.pop('full'):
@@ -2321,6 +2354,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             self.print_status(jobs=jobs, **args)
         except NoSchedulerError:
             self.print_status(jobs=jobs, **args)
+        except Exception as error:
+            logger.error(
+                "Error occured during status update. Use '--ignore-errors' "
+                "to complete the update anyways or '--debug' to show the full "
+                "traceback.")
+            if debug:
+                raise
 
     def _main_next(self, args):
         "Determine the jobs that are eligible for a specific operation."

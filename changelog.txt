@@ -1,127 +1,182 @@
+=======
+Changes
+=======
+
+The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
+
 Version 0.6
 ===========
 
-0.6.0
------
+Major changes
+---------------------------------------------
 
-	- Major updates and new features:
-		- Use jinja2 as templating engine for the generation of execution and submission scripts.
-		- Add decorator API for the definition of FlowProject operations and label functions.
-		- Revise the status view to render on a per job-operation basis, not on a per job basis.
-		- The <project> run function executes all pending operations, not just the next pending ones.
-		- The <project> script function no longer supports explicit bundling, all operations are bundled by default.
-		- The default execution mode for script and submission script bundling is serial, not parallel.
-		- Add the operations directive parameter, which provides a more generalized interface to specify required resources or other execution related metadata.
-		- Add support for XSEDE Stampede2.
-		- Add simple-scheduler, for local testing of scheduled workflows.
-		- Allow the override of the detected environment with the `SIGNAC_FLOW_ENVIRONMENT` variable.
-		- The `$ flow init` commad initializes the signac project if not project is found.
+ 1. The generation of execution and submission scripts is now based on the jinja2_ templating system.
+ 2. The new :ref:`decorator API <workflow-definition>` for the definition of a :class:`~.flow.FlowProject` class largely reduces the amount of boiler plate code needed to implement FlowProjects.
+    It also removes the necessity to have at least two modules, *e.g.*, one ``project.py`` and one ``operations.py`` module.
+ 3. Serial execution is now the default for all project sub commands, that includes ``run``, ``script``, and ``submit``.
+    Parallel execution must be explicitly enabled with the ``--parallel`` option.
+ 4. The ``run`` command executes **all eligible** operations, that means you don't have to run the command multiple times to "cycle" through all pending operations. Accidental infinite loops are automatically avoided.
+ 5. Execution scripts generated with the `script` option are always bundled.
+    The previous behavior, where the script command would print multiple scripts to screen unless the ``--bundle`` option was provided did not make much sense.
 
-	- API changes (breaking):
-		- The FlowProject.run() method arguments were changed [1]; the old API is better supported by the new FlowProject.run_operations() function.
-		- The FlowProject.submit() and .submit_operations() method arguments were changed [1].
-		- The JobOperation constructor arguments were changed; the old API  ist still supported.
+See the full :ref:`changelog <0.6.0>` below for detailed information on all changes.
 
-	- API changes (non-breaking):
-		- Unify the job and operation selection API for the run/script/submit commands.
-		- Add FlowProject.operation() decorator function.
-		- Add FlowProject.label() docorator function.
-		- The FlowProject.write_human_readable_statepoints() method is deprecated.
-		- All FlowProject methods relating to the old templating system are deprecated, that includes all write_script*() methods.
-		- Add flow.cmd decorator function.
-		- Add flow.directives decorator function.
+.. _jinja2: http://jinja.pocoo.org/
+
+How to migrate existing projects
+--------------------------------------------------------------------------------------------------------------------------------
+
+If your project runs with flow 0.5 without any DeprecationWarnings (that means no messages when running Python with the -W flag), then you don't *have* to do anything. Version 0.6 is mostly backwards compatible to 0.5, with the execption of custom script templating.
+
+Since 0.6 uses jinja2_ to generate execution and submission scripts, the previous method of generating custom scripts by overloading the ``FlowProject.write_script*()`` methods is now deprecated.
+That means that if you overloaded any of these functions, the new templating system is disabled, and **flow** will fallback to the old templating system and you won't be able to use jinja2 templates.
+
+If you decide to migrate to the new API, those are the steps you most likely have to take:
+
+ 1. Replace all ``write_script*()`` methods and replace them with a :ref:`custom template script <templates>`, *e.g.*, `templates/script.sh` within your project root directory.
+ 2. Optionally, use the new decorator API instead of ``FlowProject.add_operation`` to add operations to your FlowProject.
+ 3. Optionally, use the new decorator API to define label functions for your FlowProject.
+ 4. Execute your project with the Python ``-w`` option to make DeprecationWarnings visible and address all issues.
+
+We recommend to go through the tutorial on signac-docs_ to learn how to best take advantage of **flow** 0.6.
+
+.. _signac-docs: https://signac-docs.readthedocs.io/en/latest
+
+.. _0.6.0:
+
+[0.6.0] -- 2018-05-24
+---------------------
+
+Major updates and new features
+++++++++++++++++++++++++++++++
+
+- Use jinja2 as templating engine for the generation of execution and submission scripts.
+- Add decorator API for the definition of FlowProject operations and label functions.
+- Revise the status view to render on a per job-operation basis, not on a per job basis.
+- The <project> run function executes all pending operations, not just the next pending ones.
+- The <project> script function no longer supports explicit bundling, all operations are bundled by default.
+- The default execution mode for script and submission script bundling is serial, not parallel.
+- Add the operations directive parameter, which provides a more generalized interface to specify required resources or other execution related metadata.
+- Add support for XSEDE Stampede2.
+- Add simple-scheduler, for local testing of scheduled workflows.
+- Allow the override of the detected environment with the `SIGNAC_FLOW_ENVIRONMENT` variable.
+- The `$ flow init` commad initializes the signac project if not project is found.
+
+API changes (breaking)
+++++++++++++++++++++++
+
+- The FlowProject.run() method arguments were changed [1]; the old API is better supported by the new FlowProject.run_operations() function.
+- The FlowProject.submit() and .submit_operations() method arguments were changed [1].
+- The JobOperation constructor arguments were changed; the old API  ist still supported.
+
+
+API changes (non-breaking)
+++++++++++++++++++++++++++
+
+- Unify the job and operation selection API for the run/script/submit commands.
+- Add FlowProject.operation() decorator function.
+- Add FlowProject.label() docorator function.
+- The FlowProject.write_human_readable_statepoints() method is deprecated.
+- All FlowProject methods relating to the old templating system are deprecated, that includes all write_script*() methods.
+- Add flow.cmd decorator function.
+- Add flow.directives decorator function.
 
 [1] A reasonable attempt to support legacy API use is made, but may fail under some circumstances.
 
 Version 0.5
 ===========
 
-0.5.6
------
+[0.5.6] -- 2018-02-22
+---------------------
 
-	- Fix issue, where operations with spaces in their name would not be accepted by the SLURM scheduler.
-	- Add environment profile for XSEDE Bridges.
-	- Update the environment profile for XSEDE comet to use the shared queue by default and provide options to specify the memory allocation.
-	- Improve performance of the project update status function.
+- Fix issue, where operations with spaces in their name would not be accepted by the SLURM scheduler.
+- Add environment profile for XSEDE Bridges.
+- Update the environment profile for XSEDE comet to use the shared queue by default and provide options to specify the memory allocation.
+- Improve performance of the project update status function.
 
-0.5.5
------
+[0.5.5] -- 2017-10-05
+---------------------
 
-	- Fix issue with the SLURM scheduler, where the queue status could not be parsed.
+- Fix issue with the SLURM scheduler, where the queue status could not be parsed.
 
-0.5.4
------
+[0.5.4] -- 2017-08-01
+---------------------
 
-	- Fix issue with <project> run, where operation commands consist of multiple shell commands.
-	- Fix issue where the <project> status output showed negative values for the number of lines omitted (issue #12).
-	- Raise error when trying to provide a timeout for <project> run in serial execution in combination with Python 2.7; this mode of execution is not supported for Python versions 2.7.x.
-	- Enfore that the <project> status --overview-max-lines (-m) argument is positive.
+- Fix issue with <project> run, where operation commands consist of multiple shell commands.
+- Fix issue where the <project> status output showed negative values for the number of lines omitted (issue #12).
+- Raise error when trying to provide a timeout for <project> run in serial execution in combination with Python 2.7; this mode of execution is not supported for Python versions 2.7.x.
+- Enforce that the <project> status --overview-max-lines (-m) argument is positive.
 
-0.5.3
------
+[0.5.3] -- 2017-07-18
+---------------------
 
-	- Fix issue where the return value of `FlowProject.next_operation()` is ignored in combination with the <project> submit / run / script interface.
+- Fix issue where the return value of `FlowProject.next_operation()` is ignored in combination with the <project> submit / run / script interface.
 
-0.5.2
------
+[0.5.2] -- 2017-07-12
+---------------------
 
-	- Fix bug in detailed status output in combination with unhashable types.
-	- Do not fork when executing only a single operation with `flow.run()`.
-	- Run all next operations for each job with `flow.run()` instead of only one of the next operations.
-	- Gather all next operations when submitting, instead of only one of the nex operations for each job.
+- Fix bug in detailed status output in combination with unhashable types.
+- Do not fork when executing only a single operation with `flow.run()`.
+- Run all next operations for each job with `flow.run()` instead of only one of the next operations.
+- Gather all next operations when submitting, instead of only one of the nex operations for each job.
 
-0.5.1
------
+[0.5.1] -- 2017-06-08
+---------------------
 
-	- Exclude private functions, that means functions with a name that start with an underscore, from the operations listing when using flow.run().
-	- Forward all extra submit arguments into the write_script() methods.
-	- Fix an issue with `$flow init`/`flow.init()` in combination with Python 2.7.
+- Exclude private functions, that means functions with a name that start with an underscore, from the operations listing when using flow.run().
+- Forward all extra submit arguments into the write_script() methods.
+- Fix an issue with `$flow init`/`flow.init()` in combination with Python 2.7.
 
-0.5.0
------
+[0.5.0] -- 2017-05-24
+---------------------
 
-	- Major updates and new features:
-		- The documentation has been completely revised; most components are now covered by a reference documentation; the reference documentation serves also as basic tutorial.
-		- The signac-flow package now officially supports Python version 2.7 in addition to versions 3.4+; the support for version 3.3 has been dropped.
-		- Add comand line interface for instances of `FlowProject`, to be accessed via the `FlowProject.main()` function. This makes it easier to interact with specific workflow implementations on the command line, for example to view the project's status, execute operations or submit them to a scheduler.
-		- The `$ flow init` command initializes a new very lean workflow module that replaces the need to use project templates. Setting up a workflow with signac-flow is now much easier; template projects are no longer needed. The `$ flow init` command can be invoked with an optional `-t/--template` argument to initialize project modules with example code.
-		- Add the `flow.run()` function to turn python modules that implement functions to be used as data space operations into executables. Executing the `flow.run()` function opens a command line interface that can be used to execute operations defined within the same module directly from the command line in serial and parallel.
-		- The definition of operations on the project level is now possible via the `FlowProject.operations` dictionary; operations can either be added directly or via the `FlowProject.add_operation()` function.
-		- Environment with torque or slurm scheduler are now immediately supported via a default environment profile.
-		- The submission process is generally streamlined and it is easier to forward arguments to the underlying scheduler; this is is supposed to enable the user to directly submit scripts and operations without the need to setup a custom environment profile.
-		- Some environment profiles for large cluster environments are bundled with the package; it is no longer needed to install external packages to be able to use profiles on some HPC resources.
+Major updates and new features
+++++++++++++++++++++++++++++++
 
-	- API changes (breaking):
-		- The use of `JobScript.write_cmd()` with an `np` argument is pending deprecation, the adjustment of commands to the local environment is moved to an earlier stage (for instance, during project instance construction).
-		- The official project template is still functional via a legacy API layer, however it is recommended that users update projects to use with this version; the update process is described in the README document.
-		- Most of the environment specific command line arguments are now directly provided by the environment profile via profile specific `add_parser_args()` functions; that means that existing environment might be require some tweaking to work with this version.
+- The documentation has been completely revised; most components are now covered by a reference documentation; the reference documentation serves also as basic tutorial.
+- The signac-flow package now officially supports Python version 2.7 in addition to versions 3.4+; the support for version 3.3 has been dropped.
+- Add comand line interface for instances of `FlowProject`, to be accessed via the `FlowProject.main()` function. This makes it easier to interact with specific workflow implementations on the command line, for example to view the project's status, execute operations or submit them to a scheduler.
+- The `$ flow init` command initializes a new very lean workflow module that replaces the need to use project templates. Setting up a workflow with signac-flow is now much easier; template projects are no longer needed. The `$ flow init` command can be invoked with an optional `-t/--template` argument to initialize project modules with example code.
+- Add the `flow.run()` function to turn python modules that implement functions to be used as data space operations into executables. Executing the `flow.run()` function opens a command line interface that can be used to execute operations defined within the same module directly from the command line in serial and parallel.
+- The definition of operations on the project level is now possible via the `FlowProject.operations` dictionary; operations can either be added directly or via the `FlowProject.add_operation()` function.
+- Environment with torque or slurm scheduler are now immediately supported via a default environment profile.
+- The submission process is generally streamlined and it is easier to forward arguments to the underlying scheduler; this is is supposed to enable the user to directly submit scripts and operations without the need to setup a custom environment profile.
+- Some environment profiles for large cluster environments are bundled with the package; it is no longer needed to install external packages to be able to use profiles on some HPC resources.
+
+API changes (breaking)
+++++++++++++++++++++++
+
+- The use of `JobScript.write_cmd()` with an `np` argument is pending deprecation, the adjustment of commands to the local environment is moved to an earlier stage (for instance, during project instance construction).
+- The official project template is still functional via a legacy API layer, however it is recommended that users update projects to use with this version; the update process is described in the README document.
+- Most of the environment specific command line arguments are now directly provided by the environment profile via profile specific `add_parser_args()` functions; that means that existing environment might be require some tweaking to work with this version.
 
 Version 0.4
 ===========
-	
-0.4.2
------
 
-	- Fix issue in the submit legacy mode, the write_header() method was previously ignored.
+[0.4.2] -- 2017-02-28
+---------------------
 
-0.4.1
------
+- Fix issue in the submit legacy mode, the write_header() method was previously ignored.
 
-	- Fix ppn issue when submitting in legacy mode.
-	- Enable optional parallelization during submit.
+[0.4.1] -- 2017-02-24
+---------------------
 
-0.4.0
------
+- Fix ppn issue when submitting in legacy mode.
+- Enable optional parallelization during submit.
 
-	- The submission logic has been refactored:
-		- The write_user() function has been replaced by submit_user() with slightly adjusted API.
-		- The header and environment module have been merged into a single environment module.
-		- All submit logic has been removed from the scheduler drivers.
-		- Any submit logic implemented as part of the environment module has been reduced to the bare minimum.
-		- The submission flow has been refactored to be based on JobOperations.
-		- An attempt is made to detect the use of the deprecated API which will trigger the use of a legacy code path and the emission of warnings.
-		- Improved testing capabilities for unknown environments.
-		- The determination of present environments is deterministic and based on reversed definition order.
-	- Add the label decorators, allowing a more concise definition of methods which are to be used for classification.
-	- Add the FlowGraph, which allows the user to implement workflows in form of a graph.
-	- Implement unit tests for all core functionalities.
+[0.4.0] -- 2017-02-23
+---------------------
+
+Major revision to the job-operation submission function.
+
+- The write_user() function has been replaced by submit_user() with slightly adjusted API.
+- The header and environment module have been merged into a single environment module.
+- All submit logic has been removed from the scheduler drivers.
+- Any submit logic implemented as part of the environment module has been reduced to the bare minimum.
+- The submission flow has been refactored to be based on JobOperations.
+- An attempt is made to detect the use of the deprecated API which will trigger the use of a legacy code path and the emission of warnings.
+- Improved testing capabilities for unknown environments.
+- The determination of present environments is deterministic and based on reversed definition order.
+- Add the label decorators, allowing a more concise definition of methods which are to be used for classification.
+- Add the FlowGraph, which allows the user to implement workflows in form of a graph.
+- Implement unit tests for all core functionalities.

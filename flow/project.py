@@ -32,6 +32,8 @@ from itertools import islice
 from itertools import count
 from copy import copy
 from hashlib import sha1
+from multiprocessing import Pool
+from multiprocessing import TimeoutError
 from multiprocessing.pool import ThreadPool
 
 import signac
@@ -946,12 +948,31 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 'completed': completed,
             }
 
-    def get_job_status(self, job):
+    def get_job_status(self, job, ignore_errors=False):
         "Return a dict with detailed information about the status of a job."
         result = dict()
         result['job_id'] = str(job)
-        result['operations'] = OrderedDict(self._get_operations_status(job))
-        result['labels'] = sorted(set(self.classify(job)))
+        try:
+            result['operations'] = OrderedDict(self._get_operations_status(job))
+            result['_operations_error'] = None
+        except Exception as error:
+            msg = "Error while getting operations status for job '{}': '{}'.".format(job, error)
+            logger.debug(msg)
+            if ignore_errors:
+                result['operations'] = None
+                result['_operations_error'] = str(error)
+            else:
+                raise
+        try:
+            result['labels'] = sorted(set(self.classify(job)))
+            result['_labels_error'] = None
+        except Exception as error:
+            logger.debug("Error while classifying job '{}': '{}'.".format(job, error))
+            if ignore_errors:
+                result['labels'] = None
+                result['_labels_error'] = str(error)
+            else:
+                raise
         return result
 
     def _format_row(self, status, statepoint=None, max_width=None):
@@ -1093,7 +1114,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         if jobs is None:
             if job_filter is not None and isinstance(job_filter, str):
                 warnings.warn(
-                    "The 'job_filter' argument is deprecated, use the 'jobs' instead.",
+                    "The 'job_filter' argument is deprecated, use the 'jobs' argument instead.",
                     DeprecationWarning)
                 job_filter = json.loads(job_filter)
             jobs = list(self.find_jobs(job_filter))
@@ -1121,13 +1142,15 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                     err.flush()
                 yield _
 
+        _get_job_status = functools.partial(self.get_job_status, ignore_errors=ignore_errors)
+
         try:
             with contextlib.closing(ThreadPool()) as pool:
                 _map = map if no_parallelize else pool.imap
                 # First attempt at parallelized status determination.
                 # This may fail on systems that don't allow threads.
                 tmp = list(tqdm(
-                    _map(self.get_job_status, jobs),
+                    _map(_get_job_status, jobs),
                     desc="Collect job status info",
                     total=len(jobs)))
         except RuntimeError as error:
@@ -1140,8 +1163,19 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 "Entering serial mode with fallback progress indicator. The "
                 "status update may take longer than ususal.".format(error))
             tmp = list(with_progressbar(
-                map(self.get_job_status, jobs),
+                map(_get_job_status, jobs),
                 total=len(jobs), desc='Collect job status info:'))
+
+        operations_errors = {s['_operations_error'] for s in tmp}
+        labels_errors = {s['_labels_error'] for s in tmp}
+        errors = list(filter(None, operations_errors.union(labels_errors)))
+
+        if errors:
+            logger.warning(
+                "Some job status updates did not succeed due to errors. "
+                "Number of unique errors: {}. Use --debug to list all errors.".format(len(errors)))
+            for i, error in enumerate(errors):
+                logger.debug("Status update error #{}: '{}'".format(i+1, error))
 
         if only_incomplete:
             # Remove all jobs from the status info, that have not a single
@@ -1414,24 +1448,39 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             timeout = None
         if operations is None:
             operations = [op for job in self for op in self.next_operations(job) if op is not None]
-        if progress:
-            operations = tqdm(list(operations))
+        else:
+            operations = list(operations)   # ensure list
 
-        for operation in operations:
-            if pretend:
-                print(operation.cmd)
-            else:
-                logger.info("Execute operation '{}'...".format(operation))
-                if not progress:
-                    print("Execute operation '{}'...".format(operation), file=sys.stderr)
-                if timeout is None and operation.name in self._operation_functions:
-                    # Execute without forking if possible...
-                    self._operation_functions[operation.name](operation.job)
+        if np is None or pretend:
+            if progress:
+                operations = tqdm(operations)
+            for operation in operations:
+                if pretend:
+                    print(operation.cmd)
                 else:
-                    fork(cmd=operation.cmd, timeout=timeout)
+                    self._fork(operation, timeout)
+        else:
+            logger.debug("Parallelized execution of {} operation(s).".format(len(operations)))
+            with Pool(processes=os.cpu_count() if np < 0 else np) as pool:
+                results = [pool.apply_async(self._fork, (op,)) for op in operations]
+                if progress:  # show progress bar
+                    results = tqdm(results)
+                for result in results:
+                    result.get(timeout=timeout)
+
+    def _fork(self, operation, timeout=None):
+        logger.info("Execute operation '{}'...".format(operation))
+
+        # Execute without forking if possible...
+        if timeout is None and operation.name in self._operation_functions and \
+                operation.directives.get('executable', sys.executable) == sys.executable:
+            logger.debug("Able to optimize execution of operation '{}'.".format(operation))
+            self._operation_functions[operation.name](operation.job)
+        else:   # need to fork
+            fork(cmd=operation.cmd, timeout=timeout)
 
     @_support_legacy_api
-    def run(self, jobs=None, names=None, pretend=False, timeout=None, num=None,
+    def run(self, jobs=None, names=None, pretend=False, np=None, timeout=None, num=None,
             num_passes=1, progress=False):
         """Execute all pending operations for the given selection.
 
@@ -1460,6 +1509,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             Do not actually execute the operations, but show which command would have been used.
         :type pretend:
             bool
+        :param np:
+            Parallelize to the specified number of processors. Use -1 to parallelize to all
+            available processing units.
+        :type np:
+            int
         :param timeout:
             An optional timeout for each operation in seconds after which execution will
             be cancelled. Use -1 to indicate not timeout (the default).
@@ -1492,6 +1546,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             num = None
 
         def select(operation):
+            if operation.job not in self:
+                logger.info("Job '{}' is no longer part of the project.".format(operation.job))
+                return False
             if num is not None and select.total_execution_count >= num:
                 logger.warning(
                     "Reached the maximum number of operations that can be executed, but "
@@ -1523,7 +1580,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 break   # No more pending operations or execution limits reached.
             logger.info(
                 "Executing {} operation(s) (Pass # {:02d})...".format(len(operations), i_pass))
-            self.run_operations(operations, pretend=pretend, timeout=timeout, progress=progress)
+            self.run_operations(operations, pretend=pretend,
+                                np=np, timeout=timeout, progress=progress)
 
     def _generate_operations(self, cmd, jobs, requires=None):
         "Generate job-operations for a given 'direct' command."
@@ -1537,6 +1595,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         "Get all pending operations for the given selection."
         operation_names = None if operation_names is None else set(operation_names)
 
+        if len(jobs) > 1:
+            jobs = with_progressbar(jobs, desc='Gather pending operations:')
         for job in jobs:
             for op in self.next_operations(job):
                 if operation_names and op.name not in operation_names:
@@ -2284,6 +2344,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         if args.compact and not args.unroll:
             logger.warn("The -1/--one-line argument is incompatible with "
                         "'--stack' and will be ignored.")
+        debug = args.debug
         args = {key: val for key, val in vars(args).items()
                 if key not in ['func', 'debug', 'job_id', 'filter', 'doc_filter']}
         if args.pop('full'):
@@ -2293,6 +2354,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             self.print_status(jobs=jobs, **args)
         except NoSchedulerError:
             self.print_status(jobs=jobs, **args)
+        except Exception as error:
+            logger.error(
+                "Error occured during status update. Use '--ignore-errors' "
+                "to complete the update anyways or '--debug' to show the full "
+                "traceback.")
+            if debug:
+                raise
 
     def _main_next(self, args):
         "Determine the jobs that are eligible for a specific operation."
@@ -2315,8 +2383,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 args.operation_name = args.hidden_operation_name
 
         if args.np is not None:  # Remove completely beginning of version 0.7.
-            raise RuntimeError(
-                "The run --np option is deprecated as of version 0.6!")
+            logger.warning(
+                "The run --np option is deprecated as of version 0.6, use '-p/--parallel' instead.")
+            if args.parallel is None:
+                args.parallel = args.np
+            else:
+                raise ValueError("Conflicting arguments for '--np' and '-p/--parallel'!")
 
         # Select jobs:
         jobs = self._select_jobs_from_args(args)
@@ -2326,8 +2398,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         # to switch to the project root directory or not.
         run = functools.partial(self.run,
                                 jobs=jobs, names=args.operation_name, pretend=args.pretend,
-                                timeout=args.timeout, num=args.num, num_passes=args.num_passes,
-                                progress=args.progress)
+                                np=args.parallel, timeout=args.timeout, num=args.num,
+                                num_passes=args.num_passes, progress=args.progress)
 
         if args.switch_to_project_root:
             with add_cwd_to_environment_pythonpath():
@@ -2520,11 +2592,18 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             action='store_true',
             help="Temporarily add the current working directory to the python search path and "
                  "switch to the root directory prior to execution.")
+        execution_group.add_argument(
+            '-p', '--parallel',
+            type=int,
+            nargs='?',
+            const='-1',
+            help="Specify the number of cores to parallelize to. Defaults to all available "
+                 "processing units if argument is ommitted.")
         execution_group.add_argument(    # Remove beginning of version 0.7.
             '--np',
             type=int,
             help="(deprecated) Specify the number of cores to parallelize to. "
-                 "This option is deprecated as of version 0.6.")
+                 "This option is deprecated as of version 0.6, use '-p/--parallel' instead.")
         parser_run.set_defaults(func=self._main_run)
 
         parser_script = subparsers.add_parser('script')
@@ -2577,7 +2656,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         except SubmitError as error:
             print("Submission error:", error, file=sys.stderr)
             _exit_or_raise()
-        except TimeoutExpired:
+        except (TimeoutError, TimeoutExpired):
             print("Error: Failed to complete execution due to "
                   "timeout ({}s).".format(args.timeout), file=sys.stderr)
             _exit_or_raise()

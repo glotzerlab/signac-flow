@@ -69,6 +69,7 @@ from .labels import classlabel
 from .labels import _is_label_func
 from . import legacy
 from .util import config as flow_config
+from .hooks import Hooks
 from .version import __version__
 
 
@@ -147,6 +148,28 @@ class _condition(object):
         "Returns ``not condition(job)`` for the provided condition function."
         return cls(lambda job: not condition(job),
                    'not_'.encode() + condition.__code__.co_code)
+
+
+class _HooksDecorator(object):
+
+    def __init__(self):
+        self._operation_hooks = defaultdict(lambda: defaultdict(list))
+
+    def __getitem__(self, func):
+        return self._operation_hooks[func]
+
+    def __getattr__(self, name):
+
+        class install_hook(object):
+
+            def __init__(install_self, hook_func):
+                install_self.hook_func = hook_func
+
+            def __call__(install_self, func):
+                self._operation_hooks[func][name].append(install_self.hook_func)
+                return func
+
+        return install_hook
 
 
 def make_bundles(operations, size=None):
@@ -468,6 +491,9 @@ class _FlowProjectClass(type):
         # are in.
         cls.pre = cls._setup_pre_conditions_class(parent_class=cls)
         cls.post = cls._setup_post_conditions_class(parent_class=cls)
+
+        cls.hook = _HooksDecorator()
+
         return cls
 
     @staticmethod
@@ -593,6 +619,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         self._template_dir = os.path.join(
             self.root_directory(), self._config.get('template_dir', 'templates'))
         self._template_environment_ = dict()
+
+        # Setup execution hooks
+        self._hooks = Hooks()
+        self._operation_hooks = defaultdict(Hooks)
+        self._install_config_hooks()
 
         # Register all label functions with this project instance.
         self._label_functions = OrderedDict()
@@ -1654,6 +1685,27 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _execute_operation(self, operation, timeout=None):
         logger.info("Execute operation '{}'...".format(operation))
 
+        # Determine operation hooks
+        op_hooks = self._operation_hooks.get(operation.name, Hooks())
+
+        try:
+            self.hooks.on_start(operation)
+            op_hooks.on_start(operation)
+
+            self._execute_operation_(operation, timeout=timeout)
+        except Exception as error:
+            self.hooks.on_fail(operation, error)
+            op_hooks.on_fail(operation, error)
+            raise error
+        else:
+            self.hooks.on_success(operation)
+            op_hooks.on_success(operation)
+        finally:
+            self.hooks.on_finish(operation)
+            op_hooks.on_finish(operation)
+
+    def _execute_operation_(self, operation, timeout=None):
+
         # Check if we need to fork for operation execution...
         if (
             # The 'fork' directive was provided and evaluates to True:
@@ -2356,7 +2408,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             elif bool(label_value) is True:
                 yield label_name
 
-    def add_operation(self, name, cmd, pre=None, post=None, **kwargs):
+    def add_operation(self, name, cmd, pre=None, post=None, hooks=None, **kwargs):
         """
         Add an operation to the workflow.
 
@@ -2423,6 +2475,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         if name in self.operations:
             raise KeyError("An operation with this identifier is already added.")
+        self._operation_hooks[name].update(Hooks.from_dict(hooks))
         self.operations[name] = FlowOperation(cmd=cmd, pre=pre, post=post, directives=kwargs)
 
     @deprecated(
@@ -2537,6 +2590,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Append the name and function to the class registry
         cls._OPERATION_FUNCTIONS.append((name, func))
+
         return func
 
     @classmethod
@@ -2604,6 +2658,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 self._operations[name] = FlowOperation(
                     cmd=_guess_cmd(func, name, **params), **params)
                 self._operation_functions[name] = func
+
+            # Update operation hooks
+            self._operation_hooks[name].update(Hooks.from_dict(self.hook[func]))
 
     @property
     def operations(self):

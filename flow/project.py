@@ -2475,7 +2475,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         if name in self.operations:
             raise KeyError("An operation with this identifier is already added.")
-        self._operation_hooks[name].update(Hooks.from_dict(hooks))
+        if hooks:
+            self._operation_hooks[name].update(Hooks.from_dict(hooks))
         self.operations[name] = FlowOperation(cmd=cmd, pre=pre, post=post, directives=kwargs)
 
     @deprecated(

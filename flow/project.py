@@ -1688,10 +1688,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Determine operation hooks
         op_hooks = self._operation_hooks.get(operation.name, Hooks())
 
+        self.hooks.on_start(operation)
+        op_hooks.on_start(operation)
         try:
-            self.hooks.on_start(operation)
-            op_hooks.on_start(operation)
-
             self._execute_operation_(operation, timeout=timeout)
         except Exception as error:
             self.hooks.on_fail(operation, error)

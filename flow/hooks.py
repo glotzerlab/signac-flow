@@ -15,7 +15,7 @@ class _HooksList(list):
             try:
                 hook(*args, **kwargs)
             except Exception as error:
-                logger.error("Error occurred during execution of "
+                logger.debug("Error occurred during execution of "
                              "hook '{}': {}.".format(hook, error))
                 raise
 

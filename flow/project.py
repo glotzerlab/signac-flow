@@ -538,7 +538,15 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         self._environment = environment or get_environment()
 
         # Setup the templating system for the generation of run and submission scripts.
+
         self._template_environment_ = None
+
+        # The standard local template directory is a directory called 'templates' within
+        # the project root directory. This directory may be specified with the 'template_dir'
+        # configuration variable.
+        self._template_dir = os.path.join(
+            self.root_directory(), self._config.get('template_dir', 'templates'))
+
         self._setup_legacy_templating()  # TODO: Disable in 0.8.
 
         # Register all label functions with this project instance.
@@ -559,11 +567,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         sub commands.
         """
         _requires_jinja2()
-        # The standard local template directory is a directory called 'templates' within
-        # the project root directory. This directory may be specified with the 'template_dir'
-        # configuration variable.
-        self._template_dir = os.path.join(
-            self.root_directory(), self._config.get('template_dir', 'templates'))
 
         if self._config.get('flow') and self._config['flow'].get('environment_modules'):
             envs = self._config['flow'].as_list('environment_modules')
@@ -604,7 +607,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
     def _template_environment(self):
         if self._template_environment_ is None:
             self._setup_template_environment()
-        _requires_jinja2()
         return self._template_environment_
 
     def _get_standard_template_context(self):

@@ -2346,7 +2346,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                         "'--stack' and will be ignored.")
         debug = args.debug
         args = {key: val for key, val in vars(args).items()
-                if key not in ['func', 'debug', 'job_id', 'filter', 'doc_filter']}
+                if key not in ['func', 'verbose', 'debug', 'show_traceback',
+                               'job_id', 'filter', 'doc_filter']}
         if args.pop('full'):
             args['detailed'] = args['all_ops'] = True
 
@@ -2354,7 +2355,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             self.print_status(jobs=jobs, **args)
         except NoSchedulerError:
             self.print_status(jobs=jobs, **args)
-        except Exception as error:
+        except Exception:
             logger.error(
                 "Error occured during status update. Use '--ignore-errors' "
                 "to complete the update anyways or '--debug' to show the full "
@@ -2538,19 +2539,34 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         if parser is None:
             parser = argparse.ArgumentParser()
 
-        parser.add_argument(
-            '-d', '--debug',
-            action='store_true',
-            help="Increase output verbosity for debugging.")
+        base_parser = argparse.ArgumentParser(add_help=False)
+
+        for _parser in (parser, base_parser):
+            _parser.add_argument(
+                '-v', '--verbose',
+                action='count',
+                default=0,
+                help="Increase output verbosity.")
+            _parser.add_argument(
+                '--show-traceback',
+                action='store_true',
+                help="Show the full traceback on error.")
+            _parser.add_argument(
+                '--debug',
+                action='store_true',
+                help="This option implies `-vvv --show-traceback`.")
 
         subparsers = parser.add_subparsers()
 
-        parser_status = subparsers.add_parser('status')
+        parser_status = subparsers.add_parser(
+            'status',
+            parents=[base_parser])
         self._add_print_status_args(parser_status)
         parser_status.set_defaults(func=self._main_status)
 
         parser_next = subparsers.add_parser(
             'next',
+            parents=[base_parser],
             description="Determine jobs that are eligible for a specific operation.")
         parser_next.add_argument(
             'name',
@@ -2558,7 +2574,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             help="The name of the operation.")
         parser_next.set_defaults(func=self._main_next)
 
-        parser_run = subparsers.add_parser('run')
+        parser_run = subparsers.add_parser(
+            'run',
+            parents=[base_parser],
+            )
         parser_run.add_argument(          # Hidden positional arguments for backwards-compatibility.
             'hidden_operation_name',
             type=str,
@@ -2606,18 +2625,27 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                  "This option is deprecated as of version 0.6, use '-p/--parallel' instead.")
         parser_run.set_defaults(func=self._main_run)
 
-        parser_script = subparsers.add_parser('script')
+        parser_script = subparsers.add_parser(
+            'script',
+            parents=[base_parser],
+        )
         self._add_script_args(parser_script)
         parser_script.set_defaults(func=self._main_script)
 
-        parser_submit = subparsers.add_parser('submit')
+        parser_submit = subparsers.add_parser(
+            'submit',
+            parents=[base_parser],
+        )
         self._add_submit_args(parser_submit)
         env_group = parser_submit.add_argument_group(
             '{} options'.format(self._environment.__name__))
         self._environment.add_args(env_group)
         parser_submit.set_defaults(func=self._main_submit)
 
-        parser_exec = subparsers.add_parser('exec')
+        parser_exec = subparsers.add_parser(
+            'exec',
+            parents=[base_parser],
+        )
         parser_exec.add_argument(
             'operation',
             type=str,
@@ -2635,13 +2663,16 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         if not hasattr(args, 'func'):
             parser.print_usage()
             sys.exit(2)
-        if args.debug:
-            logging.basicConfig(level=logging.DEBUG)
-        else:
-            logging.basicConfig(level=logging.WARNING)
+
+        if args.debug:  # Implies '-vvv' and '--show-traceback'
+            args.verbose = max(3, args.verbose)
+            args.show_traceback = True
+
+        # Set verbosity level according to the `-v` argument.
+        logging.basicConfig(level=max(0, logging.ERROR - 10 * args.verbose))
 
         def _exit_or_raise():
-            if args.debug:
+            if args.show_traceback:
                 raise
             else:
                 sys.exit(1)
@@ -2663,10 +2694,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         except Jinja2TemplateNotFound as error:
             print("Did not find template script '{}'.".format(error), file=sys.stderr)
             _exit_or_raise()
-        except AssertionError as error:
-            if not args.debug:
+        except AssertionError:
+            if not args.show_traceback:
                 print("ERROR: Encountered internal error during program execution. "
-                      "Run with '--debug' to get more information.", file=sys.stderr)
+                      "Run with '--show-traceback' or '--debug' to get more "
+                      "information.", file=sys.stderr)
             _exit_or_raise()
         except Exception as error:
             if not args.debug:

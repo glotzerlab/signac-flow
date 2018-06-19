@@ -2,12 +2,13 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 "Simple progressbar formatting."
-from __future__ import print_function
 import sys
 
 
 def with_progressbar(iterable, total=None, width=120, desc='',
-                     percentage=True, file=sys.stderr):
+                     percentage=True, file=None):
+    if file is None:
+        file = sys.stderr
     if total is None:
         total = len(iterable)
     n = max(1, total // width)
@@ -20,15 +21,20 @@ def with_progressbar(iterable, total=None, width=120, desc='',
         f = int(p*w)
         n = w-f
         if p:
-            print('\r' * width, end='', file=file)
+            file.write('\r' * width)
         bar = left + '#' * f + '-' * n + right
-        print(bar.format(p=p), end='\n' if p >= 1 else '', file=file)
+        file.write(bar.format(p=p))
+        file.flush()
 
-    for i, item in enumerate(iterable):
-        if i % n == 0:
-            _draw(i/total)
-        yield item
-    _draw(1.0)
+    try:
+        for i, item in enumerate(iterable):
+            if i % n == 0:
+                _draw(i/total)
+            yield item
+        _draw(1.0)
+    finally:
+        file.write('\n')
+        file.flush()
 
 
 __all__ = ['with_progressbar']

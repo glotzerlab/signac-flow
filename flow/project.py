@@ -35,6 +35,7 @@ from hashlib import sha1
 from multiprocessing import Pool
 from multiprocessing import TimeoutError
 from multiprocessing.pool import ThreadPool
+from multiprocessing import Event
 
 import signac
 from signac.common import six
@@ -549,6 +550,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         self._operation_functions = dict()
         self._operations = OrderedDict()
         self._register_operations()
+        self._warn_about_missing_post_conditions()
 
     def _setup_template_environment(self):
         """Setup the jinja2 template environemnt.
@@ -1060,7 +1062,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                      detailed=False, parameters=None, skip_active=False, param_max_width=None,
                      expand=False, all_ops=False, only_incomplete=False, dump_json=False,
                      unroll=True, compact=False, pretty=False,
-                     file=sys.stdout, err=sys.stderr, ignore_errors=False,
+                     file=None, err=None, ignore_errors=False,
                      scheduler=None, pool=None, job_filter=None, no_parallelize=False):
         """Print the status of the project.
 
@@ -1107,6 +1109,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         :param job_filter:
             (deprecated) A JSON encoded filter, that all jobs to be submitted need to match.
         """
+        if file is None:
+            file = sys.stdout
+        if err is None:
+            err = sys.stderr
         # TODO: Replace legacy code below with this code beginning version 0.7:
         # if jobs is None:
         #     jobs = list(self)     # all jobs
@@ -1150,9 +1156,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 # First attempt at parallelized status determination.
                 # This may fail on systems that don't allow threads.
                 tmp = list(tqdm(
-                    _map(_get_job_status, jobs),
-                    desc="Collect job status info",
-                    total=len(jobs)))
+                    iterable=_map(_get_job_status, jobs),
+                    desc="Collect job status info", total=len(jobs), file=err))
         except RuntimeError as error:
             if "can't start new thread" not in error.args:
                 raise   # unrelated error
@@ -1163,8 +1168,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 "Entering serial mode with fallback progress indicator. The "
                 "status update may take longer than ususal.".format(error))
             tmp = list(with_progressbar(
-                map(_get_job_status, jobs),
-                total=len(jobs), desc='Collect job status info:'))
+                iterable=map(_get_job_status, jobs),
+                total=len(jobs), desc='Collect job status info:', file=err))
 
         operations_errors = {s['_operations_error'] for s in tmp}
         labels_errors = {s['_labels_error'] for s in tmp}
@@ -1545,19 +1550,24 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         if num and num < 0:
             num = None
 
+        messages = list()
+
+        def log(msg, lvl=logging.INFO):
+            messages.append((msg, lvl))
+
+        reached_execution_limit = Event()
+
         def select(operation):
             if operation.job not in self:
-                logger.info("Job '{}' is no longer part of the project.".format(operation.job))
+                log("Job '{}' is no longer part of the project.".format(operation.job))
                 return False
             if num is not None and select.total_execution_count >= num:
-                logger.warning(
-                    "Reached the maximum number of operations that can be executed, but "
-                    "there are still operations pending.")
-                return False    # Reached total number of executions
+                reached_execution_limit.set()
+                raise StopIteration  # Reached total number of executions
 
             if num_passes is not None and select.num_executions.get(operation, 0) >= num_passes:
-                print("Operation '{}' exceeds max. # of "
-                      "allowed passes ({}).".format(operation, num_passes), file=sys.stderr)
+                log("Operation '{}' exceeds max. # of "
+                    "allowed passes ({}).".format(operation, num_passes))
                 return False    # Reached maximum number of passes for this operation.
 
             # Increase execution counters for this operation.
@@ -1575,7 +1585,17 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         select.total_execution_count = 0
 
         for i_pass in count(1):
-            operations = list(filter(select, self._get_pending_operations(jobs, names)))
+            if reached_execution_limit.is_set():
+                logger.warning("Reached the maximum number of operations that can be executed, but "
+                               "there are still operations pending.")
+                break
+            try:
+                operations = list(filter(select, self._get_pending_operations(jobs, names)))
+            finally:
+                if messages:
+                    for msg, level in set(messages):
+                        logger.log(level, msg)
+                    del messages[:]     # clear
             if not operations:
                 break   # No more pending operations or execution limits reached.
             logger.info(
@@ -2312,6 +2332,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 self._operations[name] = FlowOperation(
                     cmd=_guess_cmd(func, name, **params), **params)
                 self._operation_functions[name] = func
+
+    def _warn_about_missing_post_conditions(self):
+        for name, operation in self._operations.items():
+            if not len(operation._postconds):
+                logger.warning("No post-conditions set for operation '{}'.".format(name))
 
     @property
     def operations(self):

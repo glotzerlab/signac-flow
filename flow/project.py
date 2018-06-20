@@ -2693,7 +2693,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             sys.exit(2)
 
         if args.debug:  # Implies '-vv' and '--show-traceback'
-            args.verbose = max(3, args.verbose)
+            args.verbose = max(2, args.verbose)
             args.show_traceback = True
 
         # Set verbosity level according to the `-v` argument.

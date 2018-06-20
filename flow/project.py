@@ -550,7 +550,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         self._operation_functions = dict()
         self._operations = OrderedDict()
         self._register_operations()
-        self._warn_about_missing_post_conditions()
 
     def _setup_template_environment(self):
         """Setup the jinja2 template environemnt.
@@ -1565,9 +1564,18 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 reached_execution_limit.set()
                 raise StopIteration  # Reached total number of executions
 
+            # Check whether the operation was executed more than the total number of allowed
+            # passes *per operation* (default=1).
             if num_passes is not None and select.num_executions.get(operation, 0) >= num_passes:
-                log("Operation '{}' exceeds max. # of "
-                    "allowed passes ({}).".format(operation, num_passes))
+                log("Operation '{}' exceeds max. # of allowed "
+                    "passes ({}).".format(operation, num_passes))
+
+                # Warn if an operation has no post-conditions set.
+                has_post_conditions = len(self.operations[operation.name]._postconds)
+                if not has_post_conditions:
+                    log("Operation '{}' has no post-conditions!".format(operation.name),
+                        logging.WARNING)
+
                 return False    # Reached maximum number of passes for this operation.
 
             # Increase execution counters for this operation.
@@ -2333,11 +2341,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                     cmd=_guess_cmd(func, name, **params), **params)
                 self._operation_functions[name] = func
 
-    def _warn_about_missing_post_conditions(self):
-        for name, operation in self._operations.items():
-            if not len(operation._postconds):
-                logger.warning("No post-conditions set for operation '{}'.".format(name))
-
     @property
     def operations(self):
         "The dictionary of operations that have been added to the workflow."
@@ -2579,7 +2582,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             _parser.add_argument(
                 '--debug',
                 action='store_true',
-                help="This option implies `-vvv --show-traceback`.")
+                help="This option implies `-vv --show-traceback`.")
 
         subparsers = parser.add_subparsers()
 
@@ -2689,12 +2692,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             parser.print_usage()
             sys.exit(2)
 
-        if args.debug:  # Implies '-vvv' and '--show-traceback'
-            args.verbose = max(3, args.verbose)
+        if args.debug:  # Implies '-vv' and '--show-traceback'
+            args.verbose = max(2, args.verbose)
             args.show_traceback = True
 
         # Set verbosity level according to the `-v` argument.
-        logging.basicConfig(level=max(0, logging.ERROR - 10 * args.verbose))
+        logging.basicConfig(level=max(0, logging.WARNING - 10 * args.verbose))
 
         def _exit_or_raise():
             if args.show_traceback:

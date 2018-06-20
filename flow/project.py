@@ -1477,8 +1477,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                     from six.moves import cPickle as pickle
                     self._run_operations_in_parallel(pool, pickle, operations, progress, timeout)
                     logger.debug("Used cPickle module for serialization.")
-                except (TypeError, AttributeError, pickle.PickleError) as error:
-                    if not isinstance(error, pickle.PickleError) and\
+                except Exception as error:
+                    if not isinstance(error, (pickle.PickleError, self._PickleError)) and\
                             'pickle' not in str(error).lower():
                         raise    # most likely not a pickle related error...
 
@@ -1490,8 +1490,16 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                                      "'pip install cloudpickle'!\n")
                         raise error
                     else:
-                        self._run_operations_in_parallel(
-                            pool, cloudpickle, operations, progress, timeout)
+                        try:
+                            self._run_operations_in_parallel(
+                                pool, cloudpickle, operations, progress, timeout)
+                        except self._PickleError as error:
+                            raise RuntimeError("Unable to parallelize execution due to a pickling "
+                                               "error: {}.".format(error))
+
+    class _PickleError(Exception):
+        "Indicates a pickling error while trying to parallelize the execution of operations."
+        pass
 
     def _run_operations_in_parallel(self, pool, pickle, operations, progress, timeout):
         """Execute operations in parallel.
@@ -1502,9 +1510,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         project instance and the operations before submitting them to the process pool to
         enable us to try different pool and pickle module combinations.
         """
-        s_project = pickle.dumps(self)
-        s_tasks = [(pickle.loads, s_project, pickle.dumps(op))
-                   for op in with_progressbar(operations, desc='Serialize tasks')]
+        try:
+            s_project = pickle.dumps(self)
+            s_tasks = [(pickle.loads, s_project, pickle.dumps(op))
+                       for op in with_progressbar(operations, desc='Serialize tasks')]
+        except Exception as error:  # Masking all errors since they must be pickling related.
+            raise self._PickleError(error)
 
         results = [pool.apply_async(_fork_with_serialization, task) for task in s_tasks]
 

@@ -33,6 +33,7 @@ from itertools import count
 from copy import copy
 from hashlib import sha1
 from multiprocessing import Pool
+from multiprocessing import cpu_count
 from multiprocessing import TimeoutError
 from multiprocessing.pool import ThreadPool
 from multiprocessing import Event
@@ -1470,7 +1471,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                     self._fork(operation, timeout)
         else:
             logger.debug("Parallelized execution of {} operation(s).".format(len(operations)))
-            with contextlib.closing(Pool(processes=os.cpu_count() if np < 0 else np)) as pool:
+            with contextlib.closing(Pool(processes=cpu_count() if np < 0 else np)) as pool:
                 logger.debug("Parallelized execution of {} operation(s).".format(len(operations)))
                 try:
                     from six.moves import cPickle as pickle

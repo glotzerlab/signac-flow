@@ -2582,7 +2582,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             _parser.add_argument(
                 '--debug',
                 action='store_true',
-                help="This option implies `-vvv --show-traceback`.")
+                help="This option implies `-vv --show-traceback`.")
 
         subparsers = parser.add_subparsers()
 
@@ -2692,12 +2692,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             parser.print_usage()
             sys.exit(2)
 
-        if args.debug:  # Implies '-vvv' and '--show-traceback'
+        if args.debug:  # Implies '-vv' and '--show-traceback'
             args.verbose = max(3, args.verbose)
             args.show_traceback = True
 
         # Set verbosity level according to the `-v` argument.
-        logging.basicConfig(level=max(0, logging.ERROR - 10 * args.verbose))
+        logging.basicConfig(level=max(0, logging.WARNING - 10 * args.verbose))
 
         def _exit_or_raise():
             if args.show_traceback:

@@ -1470,21 +1470,17 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                     self._fork(operation, timeout)
         else:
             logger.debug("Parallelized execution of {} operation(s).".format(len(operations)))
-            with Pool(processes=os.cpu_count() if np < 0 else np) as pool:
-                # Since pickling of the project is likely to fail, we manually pickle the project
-                # instance and the operations before distributing them to the different processes.
+            with contextlib.closing(Pool(processes=os.cpu_count() if np < 0 else np)) as pool:
+                logger.debug("Parallelized execution of {} operation(s).".format(len(operations)))
                 try:
                     from six.moves import cPickle as pickle
-                    s_project = pickle.dumps(self)
-                    s_tasks = [(pickle.loads, s_project, pickle.dumps(op))
-                               for op in with_progressbar(operations, desc='Serialize tasks')]
+                    self._run_operations_in_parallel(pool, pickle, operations, progress, timeout)
                     logger.debug("Used cPickle module for serialization.")
-                except (AttributeError, pickle.PickleError) as error:
-                    logger.debug("Using cPickle module for serialization failed.")
-                    if isinstance(error, AttributeError) and 'pickle' not in str(error).lower():
+                except (TypeError, AttributeError, pickle.PickleError) as error:
+                    if not isinstance(error, pickle.PickleError) and\
+                            'pickle' not in str(error).lower():
                         raise    # most likely not a pickle related error...
 
-                    # We use cloudpickle for a second attempt.
                     try:
                         import cloudpickle
                     except ImportError:  # The cloudpickle package is not available.
@@ -1492,17 +1488,27 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                                      "\n\n - Try to install the 'cloudpickle' package, e.g., with "
                                      "'pip install cloudpickle'!\n")
                         raise error
-                    else:   # Attempt to fork serializing with cloudpickle.
-                        s_project = cloudpickle.dumps(self)
-                        s_tasks = [(cloudpickle.loads, s_project, cloudpickle.dumps(op))
-                                   for op in with_progressbar(operations, desc='Serialize tasks')]
-                        logger.debug("Used cloudpickle module for serialization.")
+                    else:
+                        self._run_operations_in_parallel(
+                            pool, cloudpickle, operations, progress, timeout)
 
-                results = [pool.apply_async(self._fork_with_serialization, task)
-                           for task in s_tasks]
+    def _run_operations_in_parallel(self, pool, pickle, operations, progress, timeout):
+        """Execute operations in parallel.
 
-                for result in tqdm(results) if progress else results:
-                    result.get(timeout=timeout)
+        This function executes the given list of operations with the provided process pool.
+
+        Since pickling of the project instance is likely to fail, we manually pickle the
+        project instance and the operations before submitting them to the process pool to
+        enable us to try different pool and pickle module combinations.
+        """
+        s_project = pickle.dumps(self)
+        s_tasks = [(pickle.loads, s_project, pickle.dumps(op))
+                   for op in with_progressbar(operations, desc='Serialize tasks')]
+
+        results = [pool.apply_async(_fork_with_serialization, task) for task in s_tasks]
+
+        for result in tqdm(results) if progress else results:
+            result.get(timeout=timeout)
 
     def _fork(self, operation, timeout=None):
         logger.info("Execute operation '{}'...".format(operation))
@@ -1514,11 +1520,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             self._operation_functions[operation.name](operation.job)
         else:   # need to fork
             fork(cmd=operation.cmd, timeout=timeout)
-
-    @staticmethod
-    def _fork_with_serialization(loads, project, operation):
-        "This is a _fork wrapper that uses cloudpickle for serializiation."
-        loads(project)._fork(loads(operation))
 
     @_support_legacy_api
     def run(self, jobs=None, names=None, pretend=False, np=None, timeout=None, num=None,
@@ -2795,6 +2796,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
     def format_row(self, *args, **kwargs):
         warnings.warn("The format_row() method is private as of version 0.6.", DeprecationWarning)
         return self._format_row(*args, **kwargs)
+
+
+def _fork_with_serialization(loads, project, operation):
+    """Invoke the _fork() method on a serialized project instance."""
+    loads(project)._fork(loads(operation))
 
 
 ###

@@ -33,6 +33,7 @@ from itertools import count
 from copy import copy
 from hashlib import sha1
 from multiprocessing import Pool
+from multiprocessing import cpu_count
 from multiprocessing import TimeoutError
 from multiprocessing.pool import ThreadPool
 from multiprocessing import Event
@@ -538,8 +539,15 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         self._environment = environment or get_environment()
 
         # Setup the templating system for the generation of run and submission scripts.
-        if JINJA2:
-            self._setup_template_environment()
+
+        self._template_environment_ = None
+
+        # The standard local template directory is a directory called 'templates' within
+        # the project root directory. This directory may be specified with the 'template_dir'
+        # configuration variable.
+        self._template_dir = os.path.join(
+            self.root_directory(), self._config.get('template_dir', 'templates'))
+
         self._setup_legacy_templating()  # TODO: Disable in 0.8.
 
         # Register all label functions with this project instance.
@@ -558,11 +566,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         and submit_operations() / submit() function and the corresponding command line
         sub commands.
         """
-        # The standard local template directory is a directory called 'templates' within
-        # the project root directory. This directory may be specified with the 'template_dir'
-        # configuration variable.
-        self._template_dir = os.path.join(
-            self.root_directory(), self._config.get('template_dir', 'templates'))
+        _requires_jinja2()
 
         if self._config.get('flow') and self._config['flow'].get('environment_modules'):
             envs = self._config['flow'].as_list('environment_modules')
@@ -601,7 +605,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
     @property
     def _template_environment(self):
-        _requires_jinja2()
+        if self._template_environment_ is None:
+            self._setup_template_environment()
         return self._template_environment_
 
     def _get_standard_template_context(self):
@@ -1455,7 +1460,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         else:
             operations = list(operations)   # ensure list
 
-        if np is None or pretend:
+        if np is None or np == 1 or pretend:
             if progress:
                 operations = tqdm(operations)
             for operation in operations:
@@ -1465,12 +1470,56 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                     self._fork(operation, timeout)
         else:
             logger.debug("Parallelized execution of {} operation(s).".format(len(operations)))
-            with Pool(processes=os.cpu_count() if np < 0 else np) as pool:
-                results = [pool.apply_async(self._fork, (op,)) for op in operations]
-                if progress:  # show progress bar
-                    results = tqdm(results)
-                for result in results:
-                    result.get(timeout=timeout)
+            with contextlib.closing(Pool(processes=cpu_count() if np < 0 else np)) as pool:
+                logger.debug("Parallelized execution of {} operation(s).".format(len(operations)))
+                try:
+                    from six.moves import cPickle as pickle
+                    self._run_operations_in_parallel(pool, pickle, operations, progress, timeout)
+                    logger.debug("Used cPickle module for serialization.")
+                except Exception as error:
+                    if not isinstance(error, (pickle.PickleError, self._PickleError)) and\
+                            'pickle' not in str(error).lower():
+                        raise    # most likely not a pickle related error...
+
+                    try:
+                        import cloudpickle
+                    except ImportError:  # The cloudpickle package is not available.
+                        logger.error("Unable to parallelize execution due to a pickling error. "
+                                     "\n\n - Try to install the 'cloudpickle' package, e.g., with "
+                                     "'pip install cloudpickle'!\n")
+                        raise error
+                    else:
+                        try:
+                            self._run_operations_in_parallel(
+                                pool, cloudpickle, operations, progress, timeout)
+                        except self._PickleError as error:
+                            raise RuntimeError("Unable to parallelize execution due to a pickling "
+                                               "error: {}.".format(error))
+
+    class _PickleError(Exception):
+        "Indicates a pickling error while trying to parallelize the execution of operations."
+        pass
+
+    def _run_operations_in_parallel(self, pool, pickle, operations, progress, timeout):
+        """Execute operations in parallel.
+
+        This function executes the given list of operations with the provided process pool.
+
+        Since pickling of the project instance is likely to fail, we manually pickle the
+        project instance and the operations before submitting them to the process pool to
+        enable us to try different pool and pickle module combinations.
+        """
+        try:
+            s_project = pickle.dumps(self)
+            s_tasks = [(pickle.loads, s_project, pickle.dumps(op))
+                       for op in with_progressbar(operations, desc='Serialize tasks')]
+        except Exception as error:  # Masking all errors since they must be pickling related.
+            raise self._PickleError(error)
+
+        results = [pool.apply_async(_fork_with_serialization, task) for task in s_tasks]
+
+        for result in tqdm(results) if progress else results:
+            result.get(timeout=timeout)
 
     def _fork(self, operation, timeout=None):
         logger.info("Execute operation '{}'...".format(operation))
@@ -2762,6 +2811,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
     def format_row(self, *args, **kwargs):
         warnings.warn("The format_row() method is private as of version 0.6.", DeprecationWarning)
         return self._format_row(*args, **kwargs)
+
+
+def _fork_with_serialization(loads, project, operation):
+    """Invoke the _fork() method on a serialized project instance."""
+    loads(project)._fork(loads(operation))
 
 
 ###

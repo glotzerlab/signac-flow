@@ -1554,7 +1554,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         :type jobs:
             Sequence of instances :class:`.Job`.
         :param names:
-            Only execute operations that are in the provided set of names, or all of the
+            Only execute operations that are in the provided set of names, or all, if the
             argument is omitted.
         :type names:
             Sequence of :class:`str`

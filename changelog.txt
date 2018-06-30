@@ -43,6 +43,7 @@ We recommend to go through the tutorial on signac-docs_ to learn how to best tak
 .. _signac-docs: https://signac-docs.readthedocs.io/en/latest
 
 [0.6.1] -- 2018-07-01
+---------------------
 
 - Add the ``-v/--verbosity`` and ``--show-traceback`` option to the project interface,  which allows for more fine-grained control over the message verbosity. The ``--debug`` option is now equivalent to ``-vv --show-traceback``.
 - The message verbosity of the project class was overall reduced.

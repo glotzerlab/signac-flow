@@ -48,7 +48,7 @@ We have prepared examples on how to do that [here](http://signac-docs.readthedoc
 
 ## Testing
 
-You can test this package either by executing
+You can test this package by executing
 
     $ python -m unittest discover tests/
 

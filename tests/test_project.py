@@ -3,6 +3,7 @@
 # This software is licensed under the BSD 3-Clause License.
 from __future__ import print_function
 import unittest
+import logging
 import io
 import uuid
 import os
@@ -55,6 +56,15 @@ def redirect_stderr(new_target):
         yield
     finally:
         sys.stderr = old_target
+
+
+@contextmanager
+def suspend_logging():
+    try:
+        logging.disable(logging.WARNING)
+        yield
+    finally:
+        logging.disable(logging.NOTSET)
 
 
 class StringIO(io.StringIO):
@@ -156,9 +166,10 @@ class ProjectClassTest(BaseProjectTest):
         def baz(job):
             pass
 
-        a = A.get_project(root=self._tmp_dir.name)
-        b = B.get_project(root=self._tmp_dir.name)
-        c = C.get_project(root=self._tmp_dir.name)
+        with suspend_logging():
+            a = A.get_project(root=self._tmp_dir.name)
+            b = B.get_project(root=self._tmp_dir.name)
+            c = C.get_project(root=self._tmp_dir.name)
 
         self.assertEqual(len(a.operations), 2)
         self.assertEqual(len(b.operations), 3)
@@ -191,7 +202,8 @@ class ProjectClassTest(BaseProjectTest):
             pass
 
         # Should raise no error
-        A.get_project(root=self._tmp_dir.name)
+        with suspend_logging():
+            A.get_project(root=self._tmp_dir.name)
 
         with self.assertRaises(ValueError):
             B.get_project(root=self._tmp_dir.name)
@@ -305,19 +317,30 @@ class ProjectTest(BaseProjectTest):
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
                 with redirect_stderr(output):
-                    with redirect_stdout(output):
-                        project.run()
+                    project.run()
         output.seek(0)
         run_output = output.read()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
         for job in project:
             if job in even_jobs:
-                self.assertIn('op1({})'.format(job), run_output)
-                self.assertIn('op2({})'.format(job), run_output)
                 self.assertTrue(job.isfile('world.txt'))
             else:
-                self.assertNotIn('op1({})'.format(job), run_output)
-                self.assertIn('op2({})'.format(job), run_output)
+                self.assertFalse(job.isfile('world.txt'))
+
+    def test_run_parallel(self):
+        project = self.mock_project()
+        output = StringIO()
+        with add_cwd_to_environment_pythonpath():
+            with switch_to_directory(project.root_directory()):
+                with redirect_stderr(output):
+                    project.run(np=2)
+        output.seek(0)
+        run_output = output.read()
+        even_jobs = [job for job in project if job.sp.b % 2 == 0]
+        for job in project:
+            if job in even_jobs:
+                self.assertTrue(job.isfile('world.txt'))
+            else:
                 self.assertFalse(job.isfile('world.txt'))
 
     def test_submit_operations(self):

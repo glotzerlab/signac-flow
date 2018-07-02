@@ -25,4 +25,4 @@ password: ${PYPI_PASSWORD}
 EOF
 
 python setup.py bdist_wheel
-python -m twine upload dist/*
+python -m twine upload --skip-existing --repository testpypi dist/*

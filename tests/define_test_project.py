@@ -30,6 +30,7 @@ def op1(job):
 
 
 @TestProject.operation
+@TestProject.post.true('test')
 def op2(job):
     job.document.test = True
 

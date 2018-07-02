@@ -42,6 +42,19 @@ We recommend to go through the tutorial on signac-docs_ to learn how to best tak
 
 .. _signac-docs: https://signac-docs.readthedocs.io/en/latest
 
+[0.6.1] -- 2018-07-01
+---------------------
+
+- Add the ``-v/--verbosity`` and ``--show-traceback`` option to the project interface,  which allows for more fine-grained control over the message verbosity. The ``--debug`` option is now equivalent to ``-vv --show-traceback``.
+- The message verbosity of the project class was overall reduced.
+- Global options including (``--debug`` and ``--verbose``) can be used at any place within the project command and must no longer be placed before the sub command, *e.g.*, the following commands are equivalent: ``$ python project.py run --debug`` and ``$ python project.py --debug run``.
+- Implement the ``-p/--parallel`` option for the project run command.
+- Use cloudpickle when encountering pickling issues during parallel execution (when installed).
+- Implement the status ``--ignore-errors`` option.
+- Handle changes to the project data space during running execution, *e.g.*, removed jobs.
+- Print the ``operation.cmd`` attribute to screen in ``run --pretend`` mode, not ``repr(operation)``.
+- Show progressbar while gathering pending operations.
+
 .. _0.6.0:
 
 [0.6.0] -- 2018-05-24

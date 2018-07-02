@@ -3,7 +3,7 @@
 # This software is licensed under the BSD 3-Clause License.
 import unittest
 import os
-import logging
+import warnings
 from contextlib import contextmanager
 
 from signac.common import six
@@ -14,22 +14,13 @@ from flow import label
 from flow import classlabel
 from flow import staticlabel
 from flow import init
-from test_project import redirect_stdout, redirect_stderr, \
+from test_project import redirect_stdout, redirect_stderr, suspend_logging, \
                          MockEnvironment, MockScheduler, StringIO
 
 if six.PY2:
     from tempdir import TemporaryDirectory
 else:
     from tempfile import TemporaryDirectory
-
-
-@contextmanager
-def suspend_logging():
-    try:
-        logging.disable(logging.WARNING)
-        yield
-    finally:
-        logging.disable(logging.NOTSET)
 
 
 class MockProject(FlowProject):
@@ -105,7 +96,10 @@ class ProjectTest(unittest.TestCase):
             root=self._tmp_dir.name)
 
     def mock_project(self):
-        project = self.project_class.get_project(root=self._tmp_dir.name)
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', module='flow', category=DeprecationWarning)
+            warnings.filterwarnings('ignore', module='flow', category=UserWarning)
+            project = self.project_class.get_project(root=self._tmp_dir.name)
         for a in range(3):
             for b in range(3):
                 project.open_job(dict(a=a, b=b)).init()
@@ -141,7 +135,9 @@ class ProjectTest(unittest.TestCase):
             self.assertEqual(project.next_operation(job).name, 'a_op')
             self.assertEqual(project.next_operation(job).job, job)
         fd = StringIO()
-        project.print_status(file=fd, err=fd)
+        with redirect_stderr(StringIO()):
+            with redirect_stdout(StringIO()):
+                project.print_status(file=fd, err=fd)
 
     def test_script(self):
         project = self.mock_project()
@@ -242,7 +238,7 @@ class ProjectTest(unittest.TestCase):
         project = self.mock_project()
         self.assertEqual(len(list(sched.jobs())), 0)
         with suspend_logging():
-            with redirect_stdout(StringIO()):
+            with redirect_stderr(StringIO()):
                 project.submit(env, num=1)
                 self.assertEqual(len(list(sched.jobs())), 1)
                 project.submit(env, num=1)

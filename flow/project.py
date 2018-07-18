@@ -2781,11 +2781,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             if not args.debug:
                 if str(error):
                     print("ERROR: Encountered error during program execution: '{}'\n"
-                          "Execute with '--debug' to get more information.".format(error),
-                          file=sys.stderr)
+                          "Execute with '--show-traceback' or '--debug' to get "
+                          "more information.".format(error), file=sys.stderr)
                 else:
                     print("ERROR: Encountered error during program execution.\n"
-                          "Run with '--debug' to get more information.", file=sys.stderr)
+                          "Run with '--show-traceback' or '--debug' to get "
+                          "more information.", file=sys.stderr)
             _exit_or_raise()
 
     # All class methods below are wrappers for legacy API and should be removed as of version 0.7.

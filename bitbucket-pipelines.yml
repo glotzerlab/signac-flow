@@ -9,7 +9,7 @@ pipelines:
     - step:
         name: 'build and test'
         script:
-          - conda update -n base conda
+          - conda update --yes -n base conda
           - conda --version
           - python --version
           - conda install --yes flake8
@@ -36,7 +36,7 @@ pipelines:
       - step:
           name: 'build and test'
           script:
-            - conda update -n base conda
+            - conda update --yes -n base conda
             - conda --version
             - python --version
             - conda install --yes flake8
@@ -62,7 +62,7 @@ pipelines:
       - step:
           name: 'build and test'
           script:
-            - conda update -n base conda
+            - conda update --yes -n base conda
             - conda --version
             - python --version
             - conda install --yes flake8
@@ -88,7 +88,7 @@ pipelines:
       - step:
           name: 'build and test'
           script:
-            - conda update -n base conda
+            - conda update --yes -n base conda
             - conda --version
             - python --version
             - conda config --add channels glotzer
@@ -124,7 +124,7 @@ pipelines:
       - step:
           name: 'build and test'
           script:
-            - conda update -n base conda
+            - conda update --yes -n base conda
             - conda --version
             - python --version
             - conda install --yes flake8

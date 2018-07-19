@@ -2774,7 +2774,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         except AssertionError:
             if not args.show_traceback:
                 print("ERROR: Encountered internal error during program execution. "
-                      "Run with '--show-traceback' or '--debug' to get more "
+                      "Execute with '--show-traceback' or '--debug' to get more "
                       "information.", file=sys.stderr)
             _exit_or_raise()
         except Exception as error:
@@ -2785,7 +2785,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                           "more information.".format(error), file=sys.stderr)
                 else:
                     print("ERROR: Encountered error during program execution.\n"
-                          "Run with '--show-traceback' or '--debug' to get "
+                          "Execute with '--show-traceback' or '--debug' to get "
                           "more information.", file=sys.stderr)
             _exit_or_raise()
 

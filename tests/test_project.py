@@ -15,6 +15,7 @@ from distutils.version import StrictVersion
 from io import StringIO
 from itertools import groupby
 from tempfile import TemporaryDirectory
+from collections import defaultdict
 
 import signac
 import flow
@@ -1094,6 +1095,43 @@ class ProjectDagDetectionTest(BaseProjectTest):
 
         self.assertEqual(adj, adj_correct)
 
+class ProjectHooksTest(BaseProjectTest):
+
+    def test_run_hooks(self):
+
+        ran = defaultdict(set)
+        raise_exception = False
+
+        class FooProject(FlowProject):
+            pass
+
+        @FooProject.operation
+        @FooProject.hook.on_start(lambda op: ran['start'].add(op.job))
+        @FooProject.hook.on_finish(lambda op: ran['finish'].add(op.job))
+        @FooProject.hook.on_success(lambda op: ran['success'].add(op.job))
+        @FooProject.hook.on_fail(lambda op, error: ran['fail'].add(op.job))
+        def foo(job):
+            if raise_exception:
+                raise RuntimeError
+
+        project = self.mock_project()
+        output = StringIO()
+        with redirect_stderr(output):
+            FooProject(config=project.config).run()
+            for job in project:
+                self.assertIn(job, ran['start'])
+                self.assertIn(job, ran['finish'])
+                self.assertIn(job, ran['success'])
+                self.assertNotIn(job, ran['fail'])
+            ran.clear()
+            raise_exception = True
+            for job in project:
+                with self.assertRaises(RuntimeError):
+                    FooProject(config=project.config).run(jobs=[job])
+                    self.assertIn(job, ran['start'])
+                    self.assertIn(job, ran['finish'])
+                    self.assertNotIn(job, ran['success'])
+                    self.assertIn(job, ran['fail'])
 
 if __name__ == '__main__':
     unittest.main()

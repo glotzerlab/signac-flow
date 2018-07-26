@@ -11,6 +11,7 @@ configure and implement a workflow to operate on a signac_ data space.
 from __future__ import absolute_import
 from . import environment
 from . import scheduling
+from . import hooks
 from . import errors
 from . import testing
 from .project import FlowProject
@@ -36,6 +37,7 @@ if get_config_value('import_packaged_environments', default=True):
 __all__ = [
     'environment',
     'scheduling',
+    'hooks',
     'errors',
     'FlowProject',
     'JobOperation',

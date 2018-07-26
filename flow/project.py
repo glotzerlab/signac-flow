@@ -9,6 +9,7 @@ from __future__ import print_function
 import sys
 import os
 import re
+import ast
 import logging
 import argparse
 import time
@@ -18,6 +19,7 @@ import inspect
 import functools
 import contextlib
 import random
+import importlib
 import subprocess
 import traceback
 from deprecation import deprecated
@@ -716,6 +718,30 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             template_vars='\n'.join(wrapper.wrap(', '.join(sorted(context)))),
             filters='\n'.join(wrapper.wrap(', '.join(sorted(template_environment.filters))))))
         sys.exit(2)
+
+    @property
+    def hooks(self):
+        "Return a reference to the instance of :class:`.hooks.Hook` of this project."
+        return self._hooks
+
+    def _install_config_hooks(self):
+        try:
+            hooks_config = self._config['flow'].as_list('hooks')
+        except KeyError:
+            return  # no hooks configured
+        for entry in hooks_config:
+            try:
+                m = re.match('^(?P<class_path>[\w.]+?)(\((?P<constructor>.*)\))?$', entry)
+                if m:
+                    name_module, name_class = m.groupdict()['class_path'].rsplit('.', 1)
+                    nodes = [c.rpartition('=') for c in m.groupdict('')['constructor'].split(',')]
+                    kwargs = {k: ast.literal_eval(v) for k, _, v in nodes if k}
+                    hook_class = getattr(importlib.import_module(name_module), name_class)
+                    hook_class(** kwargs).install_hooks(self)
+                else:
+                    raise ValueError("The hook configuration entry '{}' is invalid.".format(entry))
+            except (ImportError, AttributeError, ValueError, TypeError) as error:
+                raise RuntimeError("Unable to install hook '{}': {}".format(entry, error))
 
     @classmethod
     def label(cls, label_name_or_func=None):
@@ -3053,7 +3079,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 args.parameters = self.PRINT_STATUS_ALL_VARYING_PARAMETERS
 
         # Set verbosity level according to the `-v` argument.
-        logging.basicConfig(level=max(0, logging.WARNING - 10 * args.verbose))
+        #
+        # We cannot use `logging.basicConfig`, because of issues in combination with the
+        # installation of individual filehanders for operation logging as implemented in
+        # the hooks.log_operation module.
+        logger = logging.getLogger()
+        logger.setLevel(logging.DEBUG)
+        ch = logging.StreamHandler()
+        ch.setFormatter(logging.Formatter(logging.BASIC_FORMAT))
+        ch.setLevel(level=max(0, logging.WARNING - 10 * args.verbose))
+        logger.addHandler(ch)
 
         def _show_traceback_and_exit(error):
             if args.show_traceback:

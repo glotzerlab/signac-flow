@@ -58,6 +58,7 @@ setup(
     entry_points={
         'console_scripts': [
             'flow = flow.__main__:main',
+            'track-operations = flow.hooks.track_operations.__main__:main',
         ],
     },
 

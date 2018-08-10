@@ -7,6 +7,7 @@ import logging
 import tempfile
 import shutil
 import json
+import re
 from datetime import datetime
 from contextlib import contextmanager
 from tempfile import NamedTemporaryFile
@@ -26,7 +27,7 @@ logger = logging.getLogger('snapshot')
 
 @contextmanager
 def _archive_project(project, compress=False,
-                     exclude_workspace=False, exclude_hidden=True):
+                     exclude_workspace=False, exclude_hidden=True, exclude=None):
     logger.info("Archiving '{}'...".format(project))
 
     wd = os.path.relpath(project.workspace(), project.root_directory())
@@ -36,7 +37,10 @@ def _archive_project(project, compress=False,
             return
         if exclude_workspace and info.isdir():
             if os.path.relpath(info.name, 'project').startswith(wd):
-                return None
+                return
+        if exclude is not None:
+            if re.match(exclude, info.name):
+                return
         return info
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -57,18 +61,22 @@ class SnapshotProject(object):
         Do not copy the workspace into the snapshot archive (default=True).
     :param exclude_hidden:
         Ignore all hidden files from the snapshot.
+    :param exclude:
+        Exclude all files that match the provided regular expression.
     :param directory:
         Specify the name of the directory where the snapshots will be stored.
     :param time_format:
         Specify the name of the snapshot archive file, which is based on the time
         when the snapshot was taken.
     """
-    def __init__(self, compress=False, exclude_workspace=True, exclude_hidden=True,
+    def __init__(self, compress=False,
+                 exclude_workspace=True, exclude_hidden=True, exclude=None,
                  directory=DEFAULT_SNAPSHOTS_DIRECTORY, time_format=DEFAULT_TIME_FORMAT,
                  filename_operation_metadata=DEFAULT_FILENAME_OPERATION_METADATA):
         self.compress = compress
         self.exclude_workspace = exclude_workspace
         self.exclude_hidden = exclude_hidden
+        self.exclude = exclude
 
         self._directory = directory
         self._time_format = time_format
@@ -84,7 +92,8 @@ class SnapshotProject(object):
             os.makedirs(operation.job.fn(self._directory), exist_ok=True)
             with _archive_project(project=project, compress=self.compress,
                                   exclude_workspace=self.exclude_workspace,
-                                  exclude_hidden=self.exclude_hidden) as (fn_tmp, tarball):
+                                  exclude_hidden=self.exclude_hidden,
+                                  exclude=self.exclude) as (fn_tmp, tarball):
                 tarball.add(metadatafile.name, self._fn_operation_metadata)
                 shutil.move(fn_tmp, operation.job.fn(fn_archive))
 

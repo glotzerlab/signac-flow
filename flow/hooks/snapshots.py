@@ -54,11 +54,11 @@ class SnapshotProject(object):
     :param compress:
         Compress the archive containing the snapshot.
     :param exclude_workspace:
-        Do not copy the workspace into the snapshot archive (default=true).
+        Do not copy the workspace into the snapshot archive (default=True).
     :param exclude_hidden:
         Ignore all hidden files from the snapshot.
     :param directory:
-        Specify the name of the directory to store the snapshots in.
+        Specify the name of the directory where the snapshots will be stored.
     :param time_format:
         Specify the name of the snapshot archive file, which is based on the time
         when the snapshot was taken.

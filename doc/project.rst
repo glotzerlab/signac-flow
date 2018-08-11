@@ -84,6 +84,23 @@ We then use the :py:func:`~.flow.FlowProject.operation` and the :py:func:`~.flow
 We can define both *pre* and *post* conditions, which allow us to define arbitrary workflows as an acyclic graph.
 A operation is only executed if **all** pre-conditions are met, and at *at least one* post-condition is not met.
 
+.. tip::
+
+    **Cheap conditions should be placed before expensive conditions** as they are evaluated `lazily`_!
+    That means for example, that given two pre-conditions, the following order of definition would be preferable:
+
+    .. code-block:: python
+
+        @Project.operation
+        @Project.pre(cheap_condition)
+        @Project.pre(expensive_condition)
+        def hello(job):
+            pass
+
+    The same holds for *post*-conditions.
+
+.. _lazily: https://en.wikipedia.org/wiki/Lazy_evaluation
+
 We can then execute this workflow with:
 
 .. code-block:: bash

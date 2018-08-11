@@ -42,6 +42,14 @@ We recommend to go through the tutorial on signac-docs_ to learn how to best tak
 
 .. _signac-docs: https://signac-docs.readthedocs.io/en/latest
 
+[0.6.2] -- 2018-08-11
+---------------------
+
+- Increase performance of condition evaluation (switch from eager to lazy evaluation). Speeds up detailed status update and run/script/submit sub commands.
+- Fix issue with the detailed status update failing on older Python versions (#29).
+- Fix issue with the XSEDE Bridges template in combination with GPU operations.
+
+
 [0.6.1] -- 2018-07-01
 ---------------------
 

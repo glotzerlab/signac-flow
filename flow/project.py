@@ -30,7 +30,6 @@ from collections import defaultdict
 from collections import OrderedDict
 from itertools import islice
 from itertools import count
-from copy import copy
 from hashlib import sha1
 from multiprocessing import Pool
 from multiprocessing import cpu_count
@@ -166,7 +165,7 @@ class _pre(_condition):
 
     def __call__(self, func):
         pre_conditions = getattr(func, '_flow_pre', list())
-        pre_conditions.append(self.condition)
+        pre_conditions.insert(0, self.condition)
         func._flow_pre = pre_conditions
         return func
 
@@ -194,7 +193,7 @@ class _post(_condition):
 
     def __call__(self, func):
         post_conditions = getattr(func, '_flow_post', list())
-        post_conditions.append(self.condition)
+        post_conditions.insert(0, self.condition)
         func._flow_post = post_conditions
         return func
 
@@ -462,9 +461,9 @@ class FlowOperation(object):
 
     def eligible(self, job):
         "Eligible, when all pre-conditions are true and at least one post-condition is false."
-        pre = all([cond(job) for cond in self._prereqs])
+        pre = all(cond(job) for cond in self._prereqs)
         if len(self._postconds):
-            post = any([not cond(job) for cond in self._postconds])
+            post = any(not cond(job) for cond in self._postconds)
         else:
             post = True
         return pre and post
@@ -472,7 +471,7 @@ class FlowOperation(object):
     def complete(self, job):
         "True when all post-conditions are met."
         if len(self._postconds):
-            return all([cond(job) for cond in self._postconds])
+            return all(cond(job) for cond in self._postconds)
         else:
             return False
 
@@ -1303,13 +1302,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                             if pretty and op['eligible']:
                                 row[1] = _bold(row[1])
                             row[1] += " [{}]".format(_FMT_SCHEDULER_STATUS[op['scheduler_status']])
-                            if six.PY2:
-                                yield copy(row)
-                            else:
-                                yield row.copy()
+                            yield list(row)
                     else:
                         row.insert(1, None)
-                        yield row.copy()
+                        yield list(row)
                 else:
                     yield row
 

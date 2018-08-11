@@ -18,8 +18,6 @@
 {% endif %}
 #SBATCH -N {{ nn }}
 #SBATCH --ntasks-per-node {{ tpn }}
-{% endblock %}
-{% block gpu %}
 {% set gpus = operations|map(attribute='directives.ngpu')|sum %}
 {% if gpus %}
 {% if operations|map(attribute='directives.ngpu')|identical %}

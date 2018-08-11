@@ -165,7 +165,7 @@ class _pre(_condition):
 
     def __call__(self, func):
         pre_conditions = getattr(func, '_flow_pre', list())
-        pre_conditions.append(self.condition)
+        pre_conditions.insert(0, self.condition)
         func._flow_pre = pre_conditions
         return func
 
@@ -193,7 +193,7 @@ class _post(_condition):
 
     def __call__(self, func):
         post_conditions = getattr(func, '_flow_post', list())
-        post_conditions.append(self.condition)
+        post_conditions.insert(0, self.condition)
         func._flow_post = post_conditions
         return func
 

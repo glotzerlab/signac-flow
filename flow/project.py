@@ -30,7 +30,6 @@ from collections import defaultdict
 from collections import OrderedDict
 from itertools import islice
 from itertools import count
-from copy import copy
 from hashlib import sha1
 from multiprocessing import Pool
 from multiprocessing import cpu_count
@@ -1303,13 +1302,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                             if pretty and op['eligible']:
                                 row[1] = _bold(row[1])
                             row[1] += " [{}]".format(_FMT_SCHEDULER_STATUS[op['scheduler_status']])
-                            if six.PY2:
-                                yield copy(row)
-                            else:
-                                yield row.copy()
+                            yield list(row)
                     else:
                         row.insert(1, None)
-                        yield row.copy()
+                        yield list(row)
                 else:
                     yield row
 

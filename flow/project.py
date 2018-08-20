@@ -2747,6 +2747,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         # and the parent parser that are shared by all subparsers:
         for dest in ('verbose', 'show_traceback', 'debug'):
             setattr(args, dest, getattr(args, 'main_' + dest) or getattr(args, dest))
+            delattr(args, 'main_' + dest)
 
         if args.debug:  # Implies '-vv' and '--show-traceback'
             args.verbose = max(2, args.verbose)

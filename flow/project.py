@@ -1056,8 +1056,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
     PRETTY_OPERATION_STATUS_SYMBOLS = OrderedDict([
         ('ineligible', u'\u25cb'),   # open circle
         ('eligible', u'\u25cf'),     # black circle
-        ('active', u'\u25b9'),       # open triangel
-        ('running', u'\u25b8'),      # black triangel
+        ('active', u'\u25b9'),       # open triangle
+        ('running', u'\u25b8'),      # black triangle
         ('completed', u'\u2714'),    # check mark
     ])
 
@@ -1359,8 +1359,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                         print(value, file=file)
 
                 if pretty:
-                    open_frame = u'\u2514'      # open frame
-                    closing_frame = u'\u251c'   # closing frame
+                    open_frame = u'\u251c'      # open frame
+                    closing_frame = u'\u2514'   # closing frame
                     symbols = self.PRETTY_OPERATION_STATUS_SYMBOLS
                 else:
                     open_frame, closing_frame = '', ''

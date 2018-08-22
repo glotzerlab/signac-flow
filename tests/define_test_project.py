@@ -35,5 +35,15 @@ def op2(job):
     job.document.test = True
 
 
+class TestDynamicProject(TestProject):
+    pass
+
+@TestDynamicProject.operation
+@TestDynamicProject.pre.after(op1)
+@TestDynamicProject.post.true('dynamic')
+def op3(job):
+    job.sp.dynamic = True   # migration during execution
+
+
 if __name__ == '__main__':
     TestProject().main()

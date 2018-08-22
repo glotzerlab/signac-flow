@@ -2614,18 +2614,24 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
         base_parser = argparse.ArgumentParser(add_help=False)
 
-        for _parser in (parser, base_parser):
+        # The argparse module does not automatically merge options shared between the main
+        # parser and the subparsers. We therefore assign different destinations for each
+        # option and then merge them manually below.
+        for prefix, _parser in (('main_', parser), ('', base_parser)):
             _parser.add_argument(
                 '-v', '--verbose',
+                dest=prefix + 'verbose',
                 action='count',
                 default=0,
                 help="Increase output verbosity.")
             _parser.add_argument(
                 '--show-traceback',
+                dest=prefix + 'show_traceback',
                 action='store_true',
                 help="Show the full traceback on error.")
             _parser.add_argument(
                 '--debug',
+                dest=prefix + 'debug',
                 action='store_true',
                 help="This option implies `-vv --show-traceback`.")
 
@@ -2736,6 +2742,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         if not hasattr(args, 'func'):
             parser.print_usage()
             sys.exit(2)
+
+        # Manually 'merge' the various global options defined for both the main parser
+        # and the parent parser that are shared by all subparsers:
+        for dest in ('verbose', 'show_traceback', 'debug'):
+            setattr(args, dest, getattr(args, 'main_' + dest) or getattr(args, dest))
+            delattr(args, 'main_' + dest)
 
         if args.debug:  # Implies '-vv' and '--show-traceback'
             args.verbose = max(2, args.verbose)

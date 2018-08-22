@@ -24,7 +24,7 @@ from .environment import get_environment
 from .template import init
 from .util.misc import redirect_log
 
-__version__ = '0.6.2'
+__version__ = '0.6.3'
 
 __all__ = [
     'environment',

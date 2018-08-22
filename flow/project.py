@@ -1116,9 +1116,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             file = sys.stdout
         if err is None:
             err = sys.stderr
-        # TODO: Replace legacy code below with this code beginning version 0.7:
+        # TODO: Replace legacy code below with this code in future:
         # if jobs is None:
-        #     jobs = list(self)     # all jobs
+        #     jobs = self     # all jobs
         # Handle legacy API:
         if jobs is None:
             if job_filter is not None and isinstance(job_filter, str):
@@ -1126,7 +1126,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                     "The 'job_filter' argument is deprecated, use the 'jobs' argument instead.",
                     DeprecationWarning)
                 job_filter = json.loads(job_filter)
-            jobs = list(self.find_jobs(job_filter))
+            jobs = legacy.JobsCursorWrapper(self, job_filter)
         elif isinstance(jobs, Scheduler):
             warnings.warn(
                 "The signature of the print_status() method has changed!", DeprecationWarning)
@@ -1586,7 +1586,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         # If no jobs argument is provided, we run operations for all jobs.
         if jobs is None:
             jobs = self
-        jobs = list(jobs)   # Ensure that the list of jobs does not change during execution.
 
         # Negative values for the execution limits, means 'no limit'.
         if num_passes and num_passes < 0:
@@ -2580,7 +2579,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         else:
             filter_ = parse_filter_arg(args.filter)
             doc_filter = parse_filter_arg(args.doc_filter)
-            return list(self.find_jobs(filter=filter_, doc_filter=doc_filter))
+            return legacy.JobsCursorWrapper(self, filter_, doc_filter)
 
     def main(self, parser=None, pool=None):
         """Call this function to use the main command line interface.

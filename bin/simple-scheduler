@@ -125,13 +125,13 @@ def _process_queue(args, db):
         except FileNotFoundError as error:
             logger.warning(error)
         for i in range(100):
-            fn_out = '{}.out.{}'.format(doc['_id'], i)
+            fn_out = '{:05x}.out.{}'.format(int(doc['_id'], 16), i)
             if not os.path.exists(fn_out):
                 break
         else:
             assert False    # This point should not be reached.
         for i in range(100):
-            fn_err = '{}.err.{}'.format(doc['_id'], i)
+            fn_err = '{:05x}.err.{}'.format(int(doc['_id'], 16), i)
             if not os.path.exists(fn_err):
                 break
         else:

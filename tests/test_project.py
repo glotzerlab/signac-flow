@@ -445,6 +445,56 @@ class ExecutionProjectTest(BaseProjectTest):
             self.assertIsNotNone(next_op)
             self.assertEqual(next_op.get_status(), JobStatus.queued)
 
+    def test_condition_evaluation(self):
+        project = self.mock_project()
+
+        evaluated = 0
+        state = None
+
+        def make_cond(cond):
+            def cond_func(job):
+                nonlocal evaluated
+                evaluated |= cond
+                return cond & state
+            return cond_func
+
+        class Project(FlowProject):
+            pass
+
+        @Project.operation
+        @Project.pre(make_cond(0b1000))
+        @Project.pre(make_cond(0b0100))
+        @Project.post(make_cond(0b0010))
+        @Project.post(make_cond(0b0001))
+        def op1(job):
+            pass
+
+        project = Project(project.config)
+        self.assertTrue(len(project))
+        with redirect_stderr(StringIO()):
+            for state, expected_evaluation in [
+                    (0b0000, 0b1000),  # First pre-condition is not met
+                    (0b0001, 0b1000),  # means only the first pre-cond.
+                    (0b0010, 0b1000),  # should be evaluated.
+                    (0b0011, 0b1000),
+                    (0b0100, 0b1000),
+                    (0b0101, 0b1000),
+                    (0b0110, 0b1000),
+                    (0b0111, 0b1000),
+                    (0b1000, 0b1100),  # The first, but not the second
+                    (0b1001, 0b1100),  # pre-condition is met, need to evaluate
+                    (0b1010, 0b1100),  # both pre-conditions, but not post-conditions.
+                    (0b1011, 0b1100),
+                    (0b1100, 0b1110),  # Both pre-conditions met, evaluate
+                    (0b1101, 0b1110),  # first post-condition.
+                    (0b1110, 0b1111),  # All pre-conditions and 1st post-condition
+                                       # are met, need to evaluate all.
+                    (0b1111, 0b1111),  # All conditions met, need to evaluate all.
+                ]:
+                evaluated = 0
+                project.run()
+                self.assertEqual(evaluated, expected_evaluation)
+
 
 class ExecutionDynamicProjectTest(ExecutionProjectTest):
     project_class = TestDynamicProject

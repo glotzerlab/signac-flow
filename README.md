@@ -7,7 +7,7 @@
 
 ## About
 
-The **signac-flow** tool provides the basic components to setup simple to complex workflows for projects as part of the [signac framework](http://www.signac.io).
+The **signac-flow** tool provides the basic components to set up simple to complex workflows for projects as part of the [signac framework](http://www.signac.io).
 That includes the definition of data pipelines, execution of data space operations and the submission of operations to high-performance super computers.
 
 ## Maintainers

@@ -1056,8 +1056,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
     PRETTY_OPERATION_STATUS_SYMBOLS = OrderedDict([
         ('ineligible', u'\u25cb'),   # open circle
         ('eligible', u'\u25cf'),     # black circle
-        ('active', u'\u25b9'),       # open triangel
-        ('running', u'\u25b8'),      # black triangel
+        ('active', u'\u25b9'),       # open triangle
+        ('running', u'\u25b8'),      # black triangle
         ('completed', u'\u2714'),    # check mark
     ])
 
@@ -1116,9 +1116,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             file = sys.stdout
         if err is None:
             err = sys.stderr
-        # TODO: Replace legacy code below with this code beginning version 0.7:
+        # TODO: Replace legacy code below with this code in future:
         # if jobs is None:
-        #     jobs = list(self)     # all jobs
+        #     jobs = self     # all jobs
         # Handle legacy API:
         if jobs is None:
             if job_filter is not None and isinstance(job_filter, str):
@@ -1126,7 +1126,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                     "The 'job_filter' argument is deprecated, use the 'jobs' argument instead.",
                     DeprecationWarning)
                 job_filter = json.loads(job_filter)
-            jobs = list(self.find_jobs(job_filter))
+            jobs = legacy.JobsCursorWrapper(self, job_filter)
         elif isinstance(jobs, Scheduler):
             warnings.warn(
                 "The signature of the print_status() method has changed!", DeprecationWarning)
@@ -1359,8 +1359,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                         print(value, file=file)
 
                 if pretty:
-                    open_frame = u'\u2514'      # open frame
-                    closing_frame = u'\u251c'   # closing frame
+                    open_frame = u'\u251c'      # open frame
+                    closing_frame = u'\u2514'   # closing frame
                     symbols = self.PRETTY_OPERATION_STATUS_SYMBOLS
                 else:
                     open_frame, closing_frame = '', ''
@@ -1586,7 +1586,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         # If no jobs argument is provided, we run operations for all jobs.
         if jobs is None:
             jobs = self
-        jobs = list(jobs)   # Ensure that the list of jobs does not change during execution.
 
         # Negative values for the execution limits, means 'no limit'.
         if num_passes and num_passes < 0:
@@ -2580,7 +2579,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         else:
             filter_ = parse_filter_arg(args.filter)
             doc_filter = parse_filter_arg(args.doc_filter)
-            return list(self.find_jobs(filter=filter_, doc_filter=doc_filter))
+            return legacy.JobsCursorWrapper(self, filter_, doc_filter)
 
     def main(self, parser=None, pool=None):
         """Call this function to use the main command line interface.
@@ -2614,18 +2613,24 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
         base_parser = argparse.ArgumentParser(add_help=False)
 
-        for _parser in (parser, base_parser):
+        # The argparse module does not automatically merge options shared between the main
+        # parser and the subparsers. We therefore assign different destinations for each
+        # option and then merge them manually below.
+        for prefix, _parser in (('main_', parser), ('', base_parser)):
             _parser.add_argument(
                 '-v', '--verbose',
+                dest=prefix + 'verbose',
                 action='count',
                 default=0,
                 help="Increase output verbosity.")
             _parser.add_argument(
                 '--show-traceback',
+                dest=prefix + 'show_traceback',
                 action='store_true',
                 help="Show the full traceback on error.")
             _parser.add_argument(
                 '--debug',
+                dest=prefix + 'debug',
                 action='store_true',
                 help="This option implies `-vv --show-traceback`.")
 
@@ -2736,6 +2741,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         if not hasattr(args, 'func'):
             parser.print_usage()
             sys.exit(2)
+
+        # Manually 'merge' the various global options defined for both the main parser
+        # and the parent parser that are shared by all subparsers:
+        for dest in ('verbose', 'show_traceback', 'debug'):
+            setattr(args, dest, getattr(args, 'main_' + dest) or getattr(args, dest))
+            delattr(args, 'main_' + dest)
 
         if args.debug:  # Implies '-vv' and '--show-traceback'
             args.verbose = max(2, args.verbose)

@@ -42,6 +42,14 @@ We recommend to go through the tutorial on signac-docs_ to learn how to best tak
 
 .. _signac-docs: https://signac-docs.readthedocs.io/en/latest
 
+[0.6.3] -- 2018-08-22
+---------------------
+
+- Fix issue related to dynamic data spaces, that means data spaces where jobs are either added, removed, or changed during the execution of the workflow. Specifically, flow will now execute operations also for jobs that were added during execution.
+- Fix issue where command line options would be ignored when provided before the sub-command.
+- Fix issue where the table symbols in the `--stack --pretty` view were swapped.
+
+
 [0.6.2] -- 2018-08-11
 ---------------------
 

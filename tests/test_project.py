@@ -25,6 +25,7 @@ from flow.util.misc import switch_to_directory
 from flow import init
 
 from define_test_project import TestProject
+from define_test_project import TestDynamicProject
 
 if six.PY2:
     from tempdir import TemporaryDirectory
@@ -311,6 +312,16 @@ class ProjectTest(BaseProjectTest):
                 self.assertNotIn('echo "hello"', script)
                 self.assertIn('exec op2', script)
 
+    def test_init(self):
+        with open(os.devnull, 'w') as out:
+            for fn in init(root=self._tmp_dir.name, out=out):
+                fn_ = os.path.join(self._tmp_dir.name, fn)
+                self.assertTrue(os.path.isfile(fn_))
+
+
+class ExecutionProjectTest(BaseProjectTest):
+    project_class = TestProject
+
     def test_run(self):
         project = self.mock_project()
         output = StringIO()
@@ -319,7 +330,7 @@ class ProjectTest(BaseProjectTest):
                 with redirect_stderr(output):
                     project.run()
         output.seek(0)
-        run_output = output.read()
+        output.read()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
         for job in project:
             if job in even_jobs:
@@ -335,7 +346,7 @@ class ProjectTest(BaseProjectTest):
                 with redirect_stderr(output):
                     project.run(np=2)
         output.seek(0)
-        run_output = output.read()
+        output.read()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
         for job in project:
             if job in even_jobs:
@@ -434,11 +445,9 @@ class ProjectTest(BaseProjectTest):
             self.assertIsNotNone(next_op)
             self.assertEqual(next_op.get_status(), JobStatus.queued)
 
-    def test_init(self):
-        with open(os.devnull, 'w') as out:
-            for fn in init(root=self._tmp_dir.name, out=out):
-                fn_ = os.path.join(self._tmp_dir.name, fn)
-                self.assertTrue(os.path.isfile(fn_))
+
+class ExecutionDynamicProjectTest(ExecutionProjectTest):
+    project_class = TestDynamicProject
 
 
 class ProjectMainInterfaceTest(BaseProjectTest):
@@ -522,6 +531,10 @@ class ProjectMainInterfaceTest(BaseProjectTest):
                 self.assertIn('echo "hello"', '\n'.join(script_output))
             else:
                 self.assertNotIn('echo "hello"', '\n'.join(script_output))
+
+
+class DynamicProjectMainInterfaceTest(ProjectMainInterfaceTest):
+    project_class = TestDynamicProject
 
 
 if __name__ == '__main__':

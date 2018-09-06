@@ -448,13 +448,14 @@ class ExecutionProjectTest(BaseProjectTest):
     def test_condition_evaluation(self):
         project = self.mock_project()
 
-        evaluated = 0
+        # Can't use the 'nonlocal' keyword with Python 2.7.
+        nonlocal_ = dict(evaluated=0)
         state = None
 
         def make_cond(cond):
             def cond_func(job):
-                nonlocal evaluated
-                evaluated |= cond
+                # Would prefer to use 'nonlocal' keyword, but not available for Python 2.7.
+                nonlocal_['evaluated'] |= cond
                 return cond & state
             return cond_func
 
@@ -491,9 +492,9 @@ class ExecutionProjectTest(BaseProjectTest):
                                        # are met, need to evaluate all.
                     (0b1111, 0b1111),  # All conditions met, need to evaluate all.
                 ]:
-                evaluated = 0
+                nonlocal_['evaluated'] = 0
                 project.run()
-                self.assertEqual(evaluated, expected_evaluation)
+                self.assertEqual(nonlocal_['evaluated'], expected_evaluation)
 
 
 class ExecutionDynamicProjectTest(ExecutionProjectTest):

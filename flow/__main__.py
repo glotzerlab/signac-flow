@@ -44,7 +44,7 @@ def main_init(args):
         return template.init(alias=args.alias, template=args.template)
     except OSError as e:
         raise RuntimeError(
-            "Error occured while trying to initialize a fow project: {}".format(e))
+            "Error occured while trying to initialize a flow project: {}".format(e))
 
 
 def main():
@@ -55,7 +55,8 @@ def main():
     version of the installed signac-flow package.
     """
     parser = argparse.ArgumentParser(
-        description="Flow a program that aids workflow using signac")
+        description="flow provides the basic components to set up workflows for "
+                    "projects as part of the signac framework.")
     parser.add_argument(
         '--debug',
         action='store_true',

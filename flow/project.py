@@ -558,6 +558,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         self._operations = OrderedDict()
         self._register_operations()
 
+        # Enable buffered mode for gathering of pending operations (if available).
+        self._buffer_get_pending_operations = self.config.get(
+            'buffer_get_pending_operations', False)
+
     def _setup_template_environment(self):
         """Setup the jinja2 template environemnt.
 
@@ -1651,7 +1655,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                                "there are still operations pending.")
                 break
             try:
-                operations = list(filter(select, self._get_pending_operations(jobs, names)))
+                if hasattr(signac, 'buffered') and self._buffer_get_pending_operations:
+                    with signac.buffered():
+                        operations = list(filter(select, self._get_pending_operations(jobs, names)))
+                else:
+                    operations = list(filter(select, self._get_pending_operations(jobs, names)))
             finally:
                 if messages:
                     for msg, level in set(messages):

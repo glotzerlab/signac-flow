@@ -497,6 +497,14 @@ class ExecutionProjectTest(BaseProjectTest):
                 self.assertEqual(nonlocal_['evaluated'], expected_evaluation)
 
 
+class BufferedExecutionProjectTest(ExecutionProjectTest):
+
+    def mock_project(self):
+        project = super(BufferedExecutionProjectTest, self).mock_project()
+        project._buffer_get_pending_operations = True
+        return project
+
+
 class ExecutionDynamicProjectTest(ExecutionProjectTest):
     project_class = TestDynamicProject
 

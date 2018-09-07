@@ -160,6 +160,10 @@ class _condition(object):
     def never(cls, func):
         return cls(lambda _: False)(func)
 
+    @classmethod
+    def not_(cls, condition):
+        return cls(lambda job: not condition(job))
+
 
 class _pre(_condition):
 

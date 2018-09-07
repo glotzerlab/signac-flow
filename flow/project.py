@@ -1496,6 +1496,14 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         "Indicates a pickling error while trying to parallelize the execution of operations."
         pass
 
+    @staticmethod
+    def _dumps_op(op):
+        return (op.name, op.job._id, op.cmd, op.directives)
+
+    def _loads_op(self, blob):
+        name, job_id, cmd, directives = blob
+        return JobOperation(name, self.open_job(id=job_id), cmd, directives)
+
     def _run_operations_in_parallel(self, pool, pickle, operations, progress, timeout):
         """Execute operations in parallel.
 
@@ -1505,9 +1513,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         project instance and the operations before submitting them to the process pool to
         enable us to try different pool and pickle module combinations.
         """
+
         try:
             s_project = pickle.dumps(self)
-            s_tasks = [(pickle.loads, s_project, pickle.dumps(op))
+            s_tasks = [(pickle.loads, s_project, self._dumps_op(op))
                        for op in with_progressbar(operations, desc='Serialize tasks')]
         except Exception as error:  # Masking all errors since they must be pickling related.
             raise self._PickleError(error)
@@ -2823,7 +2832,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
 def _fork_with_serialization(loads, project, operation):
     """Invoke the _fork() method on a serialized project instance."""
-    loads(project)._fork(loads(operation))
+    project = loads(project)
+    project._fork(project._loads_op(operation))
 
 
 ###

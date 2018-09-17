@@ -972,7 +972,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             msg = "Error while getting operations status for job '{}': '{}'.".format(job, error)
             logger.debug(msg)
             if ignore_errors:
-                result['operations'] = None
+                result['operations'] = dict()
                 result['_operations_error'] = str(error)
             else:
                 raise
@@ -982,7 +982,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         except Exception as error:
             logger.debug("Error while classifying job '{}': '{}'.".format(job, error))
             if ignore_errors:
-                result['labels'] = None
+                result['labels'] = list()
                 result['_labels_error'] = str(error)
             else:
                 raise
@@ -2437,7 +2437,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         if args.compact and not args.unroll:
             logger.warn("The -1/--one-line argument is incompatible with "
                         "'--stack' and will be ignored.")
-        debug = args.debug
+        show_traceback = args.debug or args.show_traceback
         args = {key: val for key, val in vars(args).items()
                 if key not in ['func', 'verbose', 'debug', 'show_traceback',
                                'job_id', 'filter', 'doc_filter']}
@@ -2450,10 +2450,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             self.print_status(jobs=jobs, **args)
         except Exception:
             logger.error(
-                "Error occured during status update. Use '--ignore-errors' "
-                "to complete the update anyways or '--debug' to show the full "
-                "traceback.")
-            if debug:
+                "Error occured during status update. Use '--show-traceback' to "
+                "show the full traceback or '--ignore-errors' to complete the "
+                "update anyways.")
+            if show_traceback:
                 raise
 
     def _main_next(self, args):

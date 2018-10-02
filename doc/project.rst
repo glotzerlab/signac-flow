@@ -53,6 +53,9 @@ Executing this script on the command line will give us access to this project's 
 Defining a workflow
 ===================
 
+Defining condition functions
+----------------------------
+
 We will reproduce the simple workflow introduced in the previous section by first copying both the ``greeted()`` condition function and the ``hello()`` *operation* function into the ``project.py`` module.
 We then use the :py:func:`~.flow.FlowProject.operation` and the :py:func:`~.flow.FlowProject.post` decorator functions to specify that the ``hello()`` operation function is part of our workflow and that it should only be executed if the ``greeted()`` condition is not met.
 
@@ -120,6 +123,55 @@ If we implemented and integrated the operation and condition functions correctly
     
     You can reset your workflow by deleting all ``hello.txt`` files with ``rm workspace/**/hello.txt``.
     This will also be necessary if you followed along in section 1.
+
+
+Short-cut conditions
+--------------------
+
+One of the simplest and most robust ways to define conditions is to check for the existence of files.
+Such conditions can be checked with a short-cut:
+
+.. code-block:: python
+
+    @Project.post.isfile('hello.txt'):  # equivalent to `job.isfile('hello.txt')`
+    @Project.operation
+    def hello(job):
+        pass
+
+Another good way to define conditions is to set flags in the job document.
+Note that both post-condition functions in the following example are equivalent for illustration purposes:
+
+.. code-block:: python
+
+    # project.py
+    # ...
+
+    def updated(job):
+        return job.doc.get('updated', False)
+
+    @Project.post(updated)
+    @Project.post.true('updated')  # The opposite would be `post.false(..)`.
+    @Project.operation
+    def analyze(job):
+        # perform some analysis on the workspace
+        # ...
+        job.doc.updated = True
+
+    # ...
+
+We can use the `true` and `false` short-cuts to conveniently evaluate the value for a given key.
+
+There are two *special* short-cuts `always` and `never` which always evaluate to `True` and `False` respectively.
+Their main use case is to temporarily switch a specific operation *on* or *off*.
+
+Finally, you can use the `not_` short-cut to negate a given condition function, *e.g.*:
+
+.. code-block:: python
+
+     @Project.pre.not_(updated)
+     def analyze(job):
+         pass
+
 
 The Project Status
 ==================

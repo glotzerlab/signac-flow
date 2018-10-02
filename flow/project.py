@@ -153,6 +153,10 @@ class _condition(object):
         return cls(lambda job: job.document.get(key, False))
 
     @classmethod
+    def false(cls, key):
+        return cls(lambda job: not job.document.get(key, False))
+
+    @classmethod
     def always(cls, func):
         return cls(lambda _: True)(func)
 

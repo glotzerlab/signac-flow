@@ -798,20 +798,21 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             self._label_functions.update(getattr(cls, '_LABEL_FUNCTIONS', dict()))
 
     pre = _pre
-    post = _post
+    "Decorator to add a pre-condition function for an operation function."
 
-    # Simple translation table for output strings.
+    post = _post
+    "Decorator to add a post-condition function for an operation function."
+
     NAMES = {
         'next_operation': 'next_op',
     }
+    "Simple translation table for output strings."
 
     @classmethod
     def _tr(cls, x):
         "Use name translation table for x."
         return cls.NAMES.get(x, x)
 
-    # These are default aliases used within the status output. You can add aliases
-    # with the update_aliases() classmethod.
     ALIASES = dict(
         status='S',
         unknown='U',
@@ -821,6 +822,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         inactive='I',
         requires_attention='!'
     )
+    "These are default aliases used within the status output."
 
     @classmethod
     def _alias(cls, x):
@@ -1052,6 +1054,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         ('running', u'>'),
         ('completed', u'X')
     ])
+    "Symbols denoting the execution status of operations."
 
     PRETTY_OPERATION_STATUS_SYMBOLS = OrderedDict([
         ('ineligible', u'\u25cb'),   # open circle
@@ -1060,6 +1063,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         ('running', u'\u25b8'),      # black triangle
         ('completed', u'\u2714'),    # check mark
     ])
+    "Pretty (unicode) symbols denoting the execution status of operations."
 
     def print_status(self, jobs=None, overview=True, overview_max_lines=None,
                      detailed=False, parameters=None, skip_active=False, param_max_width=None,

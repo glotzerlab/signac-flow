@@ -92,7 +92,7 @@ def redirect_log(job, filename='run.log', formatter=None, logger=None):
         The instance of logger to which the new file log handler is added. Defaults
         to the default logger returned by `logging.getLogger()` if this argument is
         not provided.
-    type logger:
+    :type logger:
         :class:`logging.Logger`
     """
     if formatter is None:

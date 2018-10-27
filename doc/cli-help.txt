@@ -1,0 +1,13 @@
+usage: flow [-h] [--debug] [--version] {init} ...
+
+flow provides the basic components to set up workflows for projects as part of
+the signac framework.
+
+positional arguments:
+  {init}
+    init      Initialize a signac-flow project.
+
+optional arguments:
+  -h, --help  show this help message and exit
+  --debug     Show traceback on error for debugging.
+  --version   Display the version number and exit.

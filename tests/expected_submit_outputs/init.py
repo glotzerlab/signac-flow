@@ -10,12 +10,13 @@ def cartesian(**kwargs):
 def main():
     project = signac.init_project('SubmissionTest')
     environments = [
-        'xsede.CometEnvironment',
-        'xsede.Stampede2Environment',
-        'xsede.BridgesEnvironment',
-        'umich.FluxEnvironment',
-        'incite.TitanEnvironment',
-        'incite.EosEnvironment'
+        'environment.UnknownEnvironment',
+        'environments.xsede.CometEnvironment',
+        'environments.xsede.Stampede2Environment',
+        'environments.xsede.BridgesEnvironment',
+        'environments.umich.FluxEnvironment',
+        'environments.incite.TitanEnvironment',
+        'environments.incite.EosEnvironment'
         ]
     sps = cartesian(environment=environments)
 

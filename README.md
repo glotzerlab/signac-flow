@@ -21,7 +21,7 @@ That includes the definition of data pipelines, execution of data space operatio
 The recommendend installation method for **signac-flow** is through **conda** or **pip**.
 The software is tested for Python versions 2.7 and 3.5+ and is built for all major platforms.
 
-This package is available via the [conda-forge](https://conda-forge.github.io/) conda channel:
+This package is available via the [conda-forge](https://conda-forge.org/) conda channel:
 
 `conda install -c conda-forge signac-flow`
 
@@ -31,19 +31,14 @@ or pip:
 
 ## Documentation
 
-**If you are new to signac, check out the framework documentation at: [https://signac-docs.readthedocs.io](https://signac-docs.readthedocs.io)**
+The framework documentation is hosted at [https://docs.signac.io](https://docs.signac.io).
 
-The documentation for this package can be found online at [signac-flow.readthedocs.io](https://signac-flow.readthedocs.io/) or built manually using sphinx:
-```
-#!bash
-cd doc
-make html
-```
+The API reference for this package is hosted at [https://docs.signac.io/projects/flow/](https://docs.signac.io/projects/flow/).
 
 ## Acknowledgment
 
 When using **signac** as part of your work towards a publication, we would really appreciate that you acknowledge **signac** appropriately.
-We have prepared examples on how to do that [here](http://signac-docs.readthedocs.io/en/latest/acknowledge.html).
+We have prepared examples on how to do that [here](https://docs.signac.io/en/latest/acknowledge.html).
 **Thank you very much!**
 
 ## Testing

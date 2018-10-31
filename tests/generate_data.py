@@ -3,7 +3,8 @@
 # This software is licensed under the BSD 3-Clause License.
 
 import sys
-from project import TestProject
+import os
+from expected_submit_outputs.project import TestProject
 import flow.environments
 from flow import FlowProject
 
@@ -22,14 +23,18 @@ def get_nested_attr(obj, attr, default=None):
     return obj
 
 if __name__ == "__main__":
-    project = TestProject()
+    project = TestProject.get_project(
+        root=os.path.join(
+            os.path.dirname(__file__),
+            './expected_submit_outputs')
+        )
 
     for job in project:
         with job:
             kwargs = job.statepoint()
             env = get_nested_attr(flow, kwargs['environment'])
             parameters = kwargs['parameters']
-            if 'bundle' not in parameters.keys():
+            if 'bundle' not in parameters:
                 for op in project.operations:
                     if 'partition' in parameters:
                         # Don't try to submit GPU operations to CPU partitions

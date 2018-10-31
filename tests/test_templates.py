@@ -8,7 +8,7 @@ import six
 import flow.environments
 import flow.environment
 from expected_submit_outputs.project import TestProject
-from expected_submit_outputs.generate_data import get_nested_attr
+from generate_data import get_nested_attr
 import sys
 import os
 from io import TextIOWrapper, BytesIO
@@ -31,25 +31,44 @@ class BaseTemplateTest(unittest.TestCase):
             )
 
         orig_stdout = sys.stdout
+        env=get_nested_attr(flow, self.env)
         for job in reference_project.find_jobs(dict(environment=self.env)):
-            sp = job.statepoint()
-            del sp['environment']
-
-            for op in reference_project.operations:
-                new_out = TextIOWrapper(BytesIO(), sys.stdout.encoding)
-                sys.stdout = new_out
+            parameters = job.sp.parameters
+            new_out = TextIOWrapper(BytesIO(), sys.stdout.encoding)
+            sys.stdout = new_out
+            if 'bundle' not in parameters:
+                for op in reference_project.operations:
+                    if 'partition' in parameters:
+                        # Don't try to submit GPU operations to CPU partitions
+                        # and vice versa.  We should be able to relax this
+                        # requirement if we make our error checking more
+                        # consistent.
+                        if (('gpu' not in parameters['partition'].lower() and
+                             'gpu' in op.lower()) or
+                            ('gpu' in parameters['partition'].lower() and
+                             'gpu' not in op.lower())):
+                                continue
+                    reference_project.submit(
+                        env=env, jobs=[job],
+                        names=[op], pretend=True, force=True, **parameters)
+                    new_out.seek(0)
+                    generated = new_out.read()
+                    fn = 'script_{}.sh'.format(op)
+                    with open(job.fn(fn)) as f:
+                        reference = f.read()
+                    self.assertTrue(generated, reference)
+            else:
+                bundle = parameters.pop('bundle')
                 reference_project.submit(
-                    env=get_nested_attr(flow, self.env), jobs=[job],
-                    names=[op], pretend=True, force=True, **sp)
-                sys.stdout.seek(0)
-                sys.stdout = orig_stdout
+                    env=env, jobs=[job], names=bundle, pretend=True,
+                    force=True, bundle_size=len(bundle), **parameters)
+                new_out.seek(0)
                 generated = new_out.read()
-                fn = 'script_{}.sh'.format(op)
+
+                fn = 'script_{}.sh'.format('_'.join(bundle))
                 with open(job.fn(fn)) as f:
                     reference = f.read()
                 self.assertTrue(generated, reference)
-                break
-            break
 
         sys.stdout = orig_stdout
 
@@ -57,20 +76,26 @@ class BaseTemplateTest(unittest.TestCase):
 class CometTemplateTest(BaseTemplateTest):
     env = 'environments.xsede.CometEnvironment'
 
+
 class Stampede2TemplateTest(BaseTemplateTest):
     env = 'environments.xsede.Stampede2Environment'
+
 
 class BridgesTemplateTest(BaseTemplateTest):
     env = 'environments.xsede.BridgesEnvironment'
 
+
 class FluxTemplateTest(BaseTemplateTest):
     env = 'environments.umich.FluxEnvironment'
+
 
 class TitanTemplateTest(BaseTemplateTest):
     env = 'environments.incite.TitanEnvironment'
 
+
 class EosTemplateTest(BaseTemplateTest):
     env = 'environments.incite.EosEnvironment'
+
 
 if __name__ == '__main__':
     unittest.main()

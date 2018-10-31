@@ -1,0 +1,6 @@
+{
+  "environment": "environments.incite.EosEnvironment",
+  "parameters": {
+    "parallel": true
+  }
+}

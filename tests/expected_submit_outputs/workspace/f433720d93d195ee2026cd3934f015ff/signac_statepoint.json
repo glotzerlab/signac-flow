@@ -1,0 +1,7 @@
+{
+  "environment": "environments.xsede.Stampede2Environment",
+  "parameters": {
+    "partition": "skx-normal",
+    "parallel": false
+  }
+}

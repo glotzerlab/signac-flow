@@ -1,0 +1,11 @@
+{
+  "environment": "environments.xsede.BridgesEnvironment",
+  "parameters": {
+    "partition": "RM",
+    "parallel": true,
+    "bundle": [
+      "mpi_op",
+      "omp_op"
+    ]
+  }
+}

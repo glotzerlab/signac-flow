@@ -1,0 +1,10 @@
+{
+  "environment": "environments.incite.TitanEnvironment",
+  "parameters": {
+    "parallel": true,
+    "bundle": [
+      "mpi_op",
+      "omp_op"
+    ]
+  }
+}

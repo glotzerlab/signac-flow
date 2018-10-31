@@ -1,0 +1,10 @@
+{
+  "environment": "environments.incite.EosEnvironment",
+  "parameters": {
+    "parallel": false,
+    "bundle": [
+      "mpi_op",
+      "omp_op"
+    ]
+  }
+}

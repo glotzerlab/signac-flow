@@ -1,0 +1,10 @@
+{
+  "environment": "environments.umich.FluxEnvironment",
+  "parameters": {
+    "parallel": true,
+    "bundle": [
+      "mpi_op",
+      "omp_op"
+    ]
+  }
+}

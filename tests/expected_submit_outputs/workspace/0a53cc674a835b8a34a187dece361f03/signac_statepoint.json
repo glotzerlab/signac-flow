@@ -1,0 +1,11 @@
+{
+  "environment": "environments.xsede.Stampede2Environment",
+  "parameters": {
+    "partition": "skx-normal",
+    "parallel": false,
+    "bundle": [
+      "mpi_op",
+      "omp_op"
+    ]
+  }
+}

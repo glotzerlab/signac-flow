@@ -10,28 +10,7 @@ from flow import FlowProject
 from contextlib import contextmanager
 from io import TextIOWrapper, BytesIO
 import re
-
-
-@contextmanager
-def redirect_stdout(new_target):
-    "Temporarily redirect all output to stdout to new_target."
-    old_target = sys.stdout
-    try:
-        sys.stdout = new_target
-        yield
-    finally:
-        sys.stdout = old_target
-
-
-@contextmanager
-def redirect_stderr(new_target):
-    "Temporarily redirect all output to stderr to new_target."
-    old_target = sys.stderr
-    try:
-        sys.stderr = new_target
-        yield
-    finally:
-        sys.stderr = old_target
+from test_project import redirect_stdout
 
 
 def get_nested_attr(obj, attr, default=None):

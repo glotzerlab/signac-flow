@@ -8,10 +8,11 @@ import six
 import flow.environments
 import flow.environment
 from expected_submit_outputs.project import TestProject
-from generate_data import get_nested_attr
+from generate_data import get_nested_attr, redirect_stdout, redirect_stderr
 import sys
 import os
 from io import TextIOWrapper, BytesIO
+import re
 
 if six.PY2:
     from tempdir import TemporaryDirectory
@@ -19,28 +20,46 @@ else:
     from tempfile import TemporaryDirectory
 
 
+
 class BaseTemplateTest(unittest.TestCase):
     project_class = signac.Project
     env = 'environment.UnknownEnvironment'
 
     def test_get_TestEnvironment(self):
+        self.maxDiff = None
+
+        # This regex will be used to filter out the final hash in the job name.
+        name_regex = r'(.*)\/[a-z0-9]*'
+
         reference_project = TestProject.get_project(
             root=os.path.join(
                 os.path.dirname(__file__),
                 './expected_submit_outputs')
             )
 
-        orig_stdout = sys.stdout
         env = get_nested_attr(flow, self.env)
+        orig_stdout = sys.stdout
         for job in reference_project.find_jobs(dict(environment=self.env)):
             parameters = job.sp.parameters
-            new_out = TextIOWrapper(BytesIO(), sys.stdout.encoding)
-            sys.stdout = new_out
             if 'bundle' in parameters:
                 bundle = parameters.pop('bundle')
-                reference_project.submit(
-                    env=env, jobs=[job], names=bundle, pretend=True,
-                    force=True, bundle_size=len(bundle), **parameters)
+                tmp_out = TextIOWrapper(BytesIO(), sys.stdout.encoding)
+                new_out = TextIOWrapper(BytesIO(), sys.stdout.encoding)
+                with redirect_stdout(tmp_out):
+                    reference_project.submit(
+                        env=env, jobs=[job], names=bundle, pretend=True,
+                        force=True, bundle_size=len(bundle), **parameters)
+                tmp_out.seek(0)
+
+                with redirect_stdout(new_out):
+                    for line in tmp_out:
+                        if '#PBS' in line or '#SBATCH' in line or 'OMP_NUM_THREADS' in line:
+                            if '#PBS -N' in line or '#SBATCH --job-name' in line:
+                                match = re.match(name_regex, line)
+                                print(match.group(1) + '\n', end='')
+                            else:
+                                print(line, end='')
+
                 new_out.seek(0)
                 generated = new_out.read()
 
@@ -59,16 +78,33 @@ class BaseTemplateTest(unittest.TestCase):
                             ('gpu' in parameters['partition'].lower() and
                              'gpu' not in op.lower())):
                                 continue
-                    reference_project.submit(
-                        env=env, jobs=[job],
-                        names=[op], pretend=True, force=True, **parameters)
+                    tmp_out = TextIOWrapper(BytesIO(), sys.stdout.encoding)
+                    new_out = TextIOWrapper(BytesIO(), sys.stdout.encoding)
+                    with redirect_stdout(tmp_out):
+                        reference_project.submit(
+                            env=env, jobs=[job],
+                            names=[op], pretend=True, force=True, **parameters)
+                    tmp_out.seek(0)
+
+                    with redirect_stdout(new_out):
+                        for line in tmp_out:
+                            if '#PBS' in line or '#SBATCH' in line or 'OMP_NUM_THREADS' in line:
+                                if '#PBS -N' in line or '#SBATCH --job-name' in line:
+                                    match = re.match(name_regex, line)
+                                    print(match.group(1) + '\n', end='')
+                                else:
+                                    print(line, end='')
+
                     new_out.seek(0)
                     generated = new_out.read()
                     fn = 'script_{}.sh'.format(op)
+                    # print("Generated", file=orig_stdout)
+                    # print(generated, file=orig_stdout)
+                    # print("Original", file=orig_stdout)
                     with open(job.fn(fn)) as f:
+                        # print(f.read(), file=orig_stdout)
                         self.assertEqual(generated, f.read())
-
-        sys.stdout = orig_stdout
+            break
 
 
 class CometTemplateTest(BaseTemplateTest):

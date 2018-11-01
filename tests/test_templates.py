@@ -31,12 +31,23 @@ class BaseTemplateTest(unittest.TestCase):
             )
 
         orig_stdout = sys.stdout
-        env=get_nested_attr(flow, self.env)
+        env = get_nested_attr(flow, self.env)
         for job in reference_project.find_jobs(dict(environment=self.env)):
             parameters = job.sp.parameters
             new_out = TextIOWrapper(BytesIO(), sys.stdout.encoding)
             sys.stdout = new_out
-            if 'bundle' not in parameters:
+            if 'bundle' in parameters:
+                bundle = parameters.pop('bundle')
+                reference_project.submit(
+                    env=env, jobs=[job], names=bundle, pretend=True,
+                    force=True, bundle_size=len(bundle), **parameters)
+                new_out.seek(0)
+                generated = new_out.read()
+
+                fn = 'script_{}.sh'.format('_'.join(bundle))
+                with open(job.fn(fn)) as f:
+                    self.assertEqual(generated, f.read())
+            else:
                 for op in reference_project.operations:
                     if 'partition' in parameters:
                         # Don't try to submit GPU operations to CPU partitions
@@ -55,20 +66,7 @@ class BaseTemplateTest(unittest.TestCase):
                     generated = new_out.read()
                     fn = 'script_{}.sh'.format(op)
                     with open(job.fn(fn)) as f:
-                        reference = f.read()
-                    self.assertTrue(generated, reference)
-            else:
-                bundle = parameters.pop('bundle')
-                reference_project.submit(
-                    env=env, jobs=[job], names=bundle, pretend=True,
-                    force=True, bundle_size=len(bundle), **parameters)
-                new_out.seek(0)
-                generated = new_out.read()
-
-                fn = 'script_{}.sh'.format('_'.join(bundle))
-                with open(job.fn(fn)) as f:
-                    reference = f.read()
-                self.assertTrue(generated, reference)
+                        self.assertEqual(generated, f.read())
 
         sys.stdout = orig_stdout
 

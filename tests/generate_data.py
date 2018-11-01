@@ -34,7 +34,13 @@ if __name__ == "__main__":
             kwargs = job.statepoint()
             env = get_nested_attr(flow, kwargs['environment'])
             parameters = kwargs['parameters']
-            if 'bundle' not in parameters:
+            if 'bundle' in parameters:
+                bundle = parameters.pop('bundle')
+                fn = 'script_{}.sh'.format('_'.join(bundle))
+                with open(fn, 'w') as f:
+                    sys.stdout = f
+                    project.submit(env=env, jobs=[job], names=bundle, pretend=True, force=True, bundle_size=len(bundle), **parameters)
+            else:
                 for op in project.operations:
                     if 'partition' in parameters:
                         # Don't try to submit GPU operations to CPU partitions
@@ -50,9 +56,3 @@ if __name__ == "__main__":
                     with open(fn, 'w') as f:
                         sys.stdout = f
                         project.submit(env=env, jobs=[job], names=[op], pretend=True, force=True, **parameters)
-            else:
-                bundle = parameters.pop('bundle')
-                fn = 'script_{}.sh'.format('_'.join(bundle))
-                with open(fn, 'w') as f:
-                    sys.stdout = f
-                    project.submit(env=env, jobs=[job], names=bundle, pretend=True, force=True, bundle_size=len(bundle), **parameters)

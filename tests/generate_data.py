@@ -49,6 +49,11 @@ def get_nested_attr(obj, attr, default=None):
     return obj
 
 
+def in_line(patterns, line):
+    """Check if any of the strings in the list patterns are in the line"""
+    return any([p in line for p in patterns])
+
+
 def init(project):
     """Initialize the data space for the given project."""
     # This object is a dictionary whose keys are environments. Each environment
@@ -157,30 +162,36 @@ class TestProject(flow.FlowProject):
 def serial_op(job):
     pass
 
+
 @TestProject.operation
 @flow.directives(np=TestProject.N)
 def parallel_op(job):
     pass
+
 
 @TestProject.operation
 @flow.directives(nranks=TestProject.N)
 def mpi_op(job):
     pass
 
+
 @TestProject.operation
 @flow.directives(omp_num_threads=TestProject.N)
 def omp_op(job):
     pass
+
 
 @TestProject.operation
 @flow.directives(nranks=TestProject.N, omp_num_threads=TestProject.N)
 def hybrid_op(job):
     pass
 
+
 @TestProject.operation
 @flow.directives(ngpu=TestProject.N)
 def gpu_op(job):
     pass
+
 
 @TestProject.operation
 @flow.directives(ngpu=TestProject.N, nranks=TestProject.N)
@@ -213,15 +224,17 @@ def main(args):
                     fn = 'script_{}.sh'.format('_'.join(bundle))
                     tmp_out = io.TextIOWrapper(io.BytesIO(), sys.stdout.encoding)
                     with redirect_stdout(tmp_out):
-                        fp.submit(env=env, jobs=[job], names=bundle, pretend=True, force=True, bundle_size=len(bundle), **parameters)
+                        fp.submit(
+                            env=env, jobs=[job], names=bundle, pretend=True,
+                            force=True, bundle_size=len(bundle), **parameters)
 
                     # Filter out non-header lines
                     tmp_out.seek(0)
                     with open(fn, 'w') as f:
                         with redirect_stdout(f):
                             for line in tmp_out:
-                                if '#PBS' in line or '#SBATCH' in line or 'OMP_NUM_THREADS' in line:
-                                    if '#PBS -N' in line or '#SBATCH --job-name' in line:
+                                if in_line(['#PBS', '#SBATCH', 'OMP_NUM_THREADS'], line):
+                                    if in_line(['#PBS -N', '#SBATCH --job-name'], line):
                                         match = re.match(NAME_REGEX, line)
                                         print(match.group(1) + '\n', end='')
                                     else:
@@ -233,20 +246,23 @@ def main(args):
                             # and vice versa.  We should be able to relax this
                             # requirement if we make our error checking more
                             # consistent.
-                            if operator.xor('gpu' in parameters['partition'].lower(), 'gpu' in op.lower()):
+                            if operator.xor('gpu' in parameters['partition'].lower(),
+                                            'gpu' in op.lower()):
                                     continue
                         fn = 'script_{}.sh'.format(op)
                         tmp_out = io.TextIOWrapper(io.BytesIO(), sys.stdout.encoding)
                         with redirect_stdout(tmp_out):
-                            fp.submit(env=env, jobs=[job], names=[op], pretend=True, force=True, **parameters)
+                            fp.submit(
+                                env=env, jobs=[job], names=[op], pretend=True,
+                                force=True, **parameters)
 
                         # Filter out non-header lines and the job-name line
                         tmp_out.seek(0)
                         with open(fn, 'w') as f:
                             with redirect_stdout(f):
                                 for line in tmp_out:
-                                    if '#PBS' in line or '#SBATCH' in line or 'OMP_NUM_THREADS' in line:
-                                        if '#PBS -N' in line or '#SBATCH --job-name' in line:
+                                    if in_line(['#PBS', '#SBATCH', 'OMP_NUM_THREADS'], line):
+                                        if in_line(['#PBS -N', '#SBATCH --job-name'], line):
                                             match = re.match(NAME_REGEX, line)
                                             print(match.group(1) + '\n', end='')
                                         else:
@@ -256,12 +272,13 @@ def main(args):
         project.export_to(
             target=ARCHIVE_DIR)
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Generate reference submission scripts for various environments")
     parser.add_argument(
         '-f', '--force',
         action='store_true',
-        help = "Recreate the data space even if the ARCHIVE_DIR already exists"
+        help="Recreate the data space even if the ARCHIVE_DIR already exists"
     )
     main(parser.parse_args())

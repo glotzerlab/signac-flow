@@ -6,7 +6,6 @@ from __future__ import print_function
 import unittest
 
 import sys
-import os
 import re
 import io
 import operator
@@ -16,7 +15,7 @@ import flow
 import flow.environments
 
 from generate_data import (
-    get_nested_attr, redirect_stdout, TestProject,
+    get_nested_attr, redirect_stdout, TestProject, in_line,
     PROJECT_NAME, ARCHIVE_DIR, NAME_REGEX)
 
 
@@ -51,8 +50,8 @@ class BaseTemplateTest(unittest.TestCase):
                     tmp_out.seek(0)
 
                     for line in tmp_out:
-                        if '#PBS' in line or '#SBATCH' in line or 'OMP_NUM_THREADS' in line:
-                            if '#PBS -N' in line or '#SBATCH --job-name' in line:
+                        if in_line(['#PBS', '#SBATCH', 'OMP_NUM_THREADS'], line):
+                            if in_line(['#PBS -N', '#SBATCH --job-name'], line):
                                 match = re.match(NAME_REGEX, line)
                                 new_out.write(match.group(1) + '\n')
                             else:
@@ -71,7 +70,8 @@ class BaseTemplateTest(unittest.TestCase):
                             # and vice versa.  We should be able to relax this
                             # requirement if we make our error checking more
                             # consistent.
-                            if operator.xor('gpu' in parameters['partition'].lower(), 'gpu' in op.lower()):
+                            if operator.xor('gpu' in parameters['partition'].lower(),
+                                            'gpu' in op.lower()):
                                     continue
                         tmp_out = io.TextIOWrapper(io.BytesIO(), sys.stdout.encoding)
                         new_out = io.TextIOWrapper(io.BytesIO(), sys.stdout.encoding)
@@ -82,8 +82,8 @@ class BaseTemplateTest(unittest.TestCase):
                         tmp_out.seek(0)
 
                         for line in tmp_out:
-                            if '#PBS' in line or '#SBATCH' in line or 'OMP_NUM_THREADS' in line:
-                                if '#PBS -N' in line or '#SBATCH --job-name' in line:
+                            if in_line(['#PBS', '#SBATCH', 'OMP_NUM_THREADS'], line):
+                                if in_line(['#PBS -N', '#SBATCH --job-name'], line):
                                     match = re.match(NAME_REGEX, line)
                                     new_out.write(match.group(1) + '\n')
                                 else:

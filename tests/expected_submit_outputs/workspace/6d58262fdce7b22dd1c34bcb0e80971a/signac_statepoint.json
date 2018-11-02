@@ -1,7 +1,0 @@
-{
-  "environment": "environments.xsede.CometEnvironment",
-  "parameters": {
-    "partition": "compute",
-    "parallel": true
-  }
-}

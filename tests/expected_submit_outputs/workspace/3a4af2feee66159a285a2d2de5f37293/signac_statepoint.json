@@ -1,6 +1,0 @@
-{
-  "environment": "environments.incite.TitanEnvironment",
-  "parameters": {
-    "nn": 2
-  }
-}

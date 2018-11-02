@@ -1,6 +1,0 @@
-{
-  "environment": "environments.umich.FluxEnvironment",
-  "parameters": {
-    "nn": null
-  }
-}

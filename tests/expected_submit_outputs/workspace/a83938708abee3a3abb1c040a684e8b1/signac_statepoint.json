@@ -1,7 +1,0 @@
-{
-  "environment": "environments.xsede.BridgesEnvironment",
-  "parameters": {
-    "partition": "RM",
-    "walltime": 1
-  }
-}

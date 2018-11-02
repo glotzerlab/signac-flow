@@ -1,6 +1,0 @@
-#SBATCH --job-name="SubmissionTe/f90e4a81/hybrid_op/0000
-#SBATCH --partition=shared
-#SBATCH -t 01:00:00
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=4
-export OMP_NUM_THREADS=2

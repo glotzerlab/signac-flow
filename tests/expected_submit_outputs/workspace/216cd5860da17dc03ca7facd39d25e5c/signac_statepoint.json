@@ -1,7 +1,0 @@
-{
-  "environment": "environments.xsede.CometEnvironment",
-  "parameters": {
-    "partition": "shared",
-    "walltime": null
-  }
-}

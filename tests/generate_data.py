@@ -12,6 +12,7 @@ from contextlib import contextmanager
 from io import TextIOWrapper, BytesIO
 import re
 from test_project import redirect_stdout
+from operator import xor
 
 
 def get_nested_attr(obj, attr, default=None):
@@ -68,10 +69,7 @@ if __name__ == "__main__":
                         # and vice versa.  We should be able to relax this
                         # requirement if we make our error checking more
                         # consistent.
-                        if (('gpu' not in parameters['partition'].lower() and
-                             'gpu' in op.lower()) or
-                            ('gpu' in parameters['partition'].lower() and
-                             'gpu' not in op.lower())):
+                        if ('gpu' in parameters['partition'].lower() xor 'gpu' in op.lower()):
                                 continue
                     fn = 'script_{}.sh'.format(op)
                     tmp_out = TextIOWrapper(BytesIO(), sys.stdout.encoding)

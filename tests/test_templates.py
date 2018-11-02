@@ -15,6 +15,7 @@ import sys
 import os
 from io import TextIOWrapper, BytesIO
 import re
+from operator import xor
 
 if six.PY2:
     from tempdir import TemporaryDirectory
@@ -73,10 +74,7 @@ class BaseTemplateTest(unittest.TestCase):
                         # and vice versa.  We should be able to relax this
                         # requirement if we make our error checking more
                         # consistent.
-                        if (('gpu' not in parameters['partition'].lower() and
-                             'gpu' in op.lower()) or
-                            ('gpu' in parameters['partition'].lower() and
-                             'gpu' not in op.lower())):
+                        if ('gpu' in parameters['partition'].lower() xor 'gpu' in op.lower()):
                                 continue
                     tmp_out = TextIOWrapper(BytesIO(), sys.stdout.encoding)
                     new_out = TextIOWrapper(BytesIO(), sys.stdout.encoding)

@@ -9,19 +9,12 @@ import signac
 import six
 import flow.environments
 import flow.environment
-from expected_submit_outputs.project import TestProject
-from generate_data import get_nested_attr, redirect_stdout
+from generate_data import get_nested_attr, redirect_stdout, TestProject, PROJECT_NAME
 import sys
 import os
 from io import TextIOWrapper, BytesIO
 import re
 from operator import xor
-
-if six.PY2:
-    from tempdir import TemporaryDirectory
-else:
-    from tempfile import TemporaryDirectory
-
 
 
 class BaseTemplateTest(unittest.TestCase):
@@ -29,59 +22,34 @@ class BaseTemplateTest(unittest.TestCase):
     env = 'environment.UnknownEnvironment'
 
     def test_get_TestEnvironment(self):
+        # Force asserts to show the full file when failures occur.
+        # Useful to debug errors that arise.
         self.maxDiff = None
 
         # This regex will be used to filter out the final hash in the job name.
         name_regex = r'(.*)\/[a-z0-9]*'
 
-        reference_project = TestProject.get_project(
-            root=os.path.join(
-                os.path.dirname(__file__),
-                './expected_submit_outputs')
-            )
+        # Must import the data into the project.
+        archive = os.path.join(
+            os.path.dirname(__file__), './expected_submit_outputs.tar.gz')
+        with signac.contrib.TemporaryProject(name=PROJECT_NAME) as reference_project:
+            reference_project.import_from(
+                origin=archive)
+            fp = TestProject.get_project(
+                root=reference_project.root_directory())
 
-        env = get_nested_attr(flow, self.env)
-        for job in reference_project.find_jobs(dict(environment=self.env)):
-            parameters = job.sp.parameters
-            if 'bundle' in parameters:
-                bundle = parameters.pop('bundle')
-                tmp_out = TextIOWrapper(BytesIO(), sys.stdout.encoding)
-                new_out = TextIOWrapper(BytesIO(), sys.stdout.encoding)
-                with redirect_stdout(tmp_out):
-                    reference_project.submit(
-                        env=env, jobs=[job], names=bundle, pretend=True,
-                        force=True, bundle_size=len(bundle), **parameters)
-                tmp_out.seek(0)
+            env = get_nested_attr(flow, self.env)
 
-                for line in tmp_out:
-                    if '#PBS' in line or '#SBATCH' in line or 'OMP_NUM_THREADS' in line:
-                        if '#PBS -N' in line or '#SBATCH --job-name' in line:
-                            match = re.match(name_regex, line)
-                            new_out.write(match.group(1) + '\n')
-                        else:
-                            new_out.write(line)
-
-                new_out.seek(0)
-                generated = new_out.read()
-
-                fn = 'script_{}.sh'.format('_'.join(bundle))
-                with open(job.fn(fn)) as f:
-                    self.assertEqual(generated, f.read())
-            else:
-                for op in reference_project.operations:
-                    if 'partition' in parameters:
-                        # Don't try to submit GPU operations to CPU partitions
-                        # and vice versa.  We should be able to relax this
-                        # requirement if we make our error checking more
-                        # consistent.
-                        if ('gpu' in parameters['partition'].lower() xor 'gpu' in op.lower()):
-                                continue
+            for job in fp.find_jobs(dict(environment=self.env)):
+                parameters = job.sp.parameters
+                if 'bundle' in parameters:
+                    bundle = parameters.pop('bundle')
                     tmp_out = TextIOWrapper(BytesIO(), sys.stdout.encoding)
                     new_out = TextIOWrapper(BytesIO(), sys.stdout.encoding)
                     with redirect_stdout(tmp_out):
-                        reference_project.submit(
-                            env=env, jobs=[job],
-                            names=[op], pretend=True, force=True, **parameters)
+                        fp.submit(
+                            env=env, jobs=[job], names=bundle, pretend=True,
+                            force=True, bundle_size=len(bundle), **parameters)
                     tmp_out.seek(0)
 
                     for line in tmp_out:
@@ -94,10 +62,40 @@ class BaseTemplateTest(unittest.TestCase):
 
                     new_out.seek(0)
                     generated = new_out.read()
-                    fn = 'script_{}.sh'.format(op)
+
+                    fn = 'script_{}.sh'.format('_'.join(bundle))
                     with open(job.fn(fn)) as f:
                         self.assertEqual(generated, f.read())
-            break
+                else:
+                    for op in fp.operations:
+                        if 'partition' in parameters:
+                            # Don't try to submit GPU operations to CPU partitions
+                            # and vice versa.  We should be able to relax this
+                            # requirement if we make our error checking more
+                            # consistent.
+                            if xor('gpu' in parameters['partition'].lower(), 'gpu' in op.lower()):
+                                    continue
+                        tmp_out = TextIOWrapper(BytesIO(), sys.stdout.encoding)
+                        new_out = TextIOWrapper(BytesIO(), sys.stdout.encoding)
+                        with redirect_stdout(tmp_out):
+                            fp.submit(
+                                env=env, jobs=[job],
+                                names=[op], pretend=True, force=True, **parameters)
+                        tmp_out.seek(0)
+
+                        for line in tmp_out:
+                            if '#PBS' in line or '#SBATCH' in line or 'OMP_NUM_THREADS' in line:
+                                if '#PBS -N' in line or '#SBATCH --job-name' in line:
+                                    match = re.match(name_regex, line)
+                                    new_out.write(match.group(1) + '\n')
+                                else:
+                                    new_out.write(line)
+
+                        new_out.seek(0)
+                        generated = new_out.read()
+                        fn = 'script_{}.sh'.format(op)
+                        with open(job.fn(fn)) as f:
+                            self.assertEqual(generated, f.read())
 
 
 class CometTemplateTest(BaseTemplateTest):

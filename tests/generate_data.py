@@ -5,24 +5,28 @@ from __future__ import print_function
 
 import sys
 import os
-import errno
 import re
 import io
 import operator
 import itertools
 import argparse
 
+import signac
 import flow
 import flow.environments
-from flow import directives
-import signac
-from flow import FlowProject
+
 from test_project import redirect_stdout
 
 
 # Define a consistent submission name so that we can test that job names are
 # being correctly generated.
 PROJECT_NAME = "SubmissionTest"
+ARCHIVE_DIR = os.path.join(
+    os.path.dirname(__file__), './expected_submit_outputs.tar.gz')
+
+# This regex will be used to filter out the final hash in the job name.
+NAME_REGEX = r'(.*)\/[a-z0-9]*'
+
 
 def cartesian(**kwargs):
     """Generate a set of statepoint dictionaries from a dictionary of the form
@@ -32,7 +36,7 @@ def cartesian(**kwargs):
 
 
 def get_nested_attr(obj, attr, default=None):
-    """Get nested attributes"""
+    """Get nested attributes of an object."""
     attrs = attr.split('.')
     for a in attrs:
         try:
@@ -145,7 +149,7 @@ def init(project):
                 project.open_job(sp).init()
 
 
-class TestProject(FlowProject):
+class TestProject(flow.FlowProject):
     N = 2
 
 
@@ -154,49 +158,43 @@ def serial_op(job):
     pass
 
 @TestProject.operation
-@directives(np=TestProject.N)
+@flow.directives(np=TestProject.N)
 def parallel_op(job):
     pass
 
 @TestProject.operation
-@directives(nranks=TestProject.N)
+@flow.directives(nranks=TestProject.N)
 def mpi_op(job):
     pass
 
 @TestProject.operation
-@directives(omp_num_threads=TestProject.N)
+@flow.directives(omp_num_threads=TestProject.N)
 def omp_op(job):
     pass
 
 @TestProject.operation
-@directives(nranks=TestProject.N, omp_num_threads=TestProject.N)
+@flow.directives(nranks=TestProject.N, omp_num_threads=TestProject.N)
 def hybrid_op(job):
     pass
 
 @TestProject.operation
-@directives(ngpu=TestProject.N)
+@flow.directives(ngpu=TestProject.N)
 def gpu_op(job):
     pass
 
 @TestProject.operation
-@directives(ngpu=TestProject.N, nranks=TestProject.N)
+@flow.directives(ngpu=TestProject.N, nranks=TestProject.N)
 def mpi_gpu_op(job):
     pass
 
 
 def main(args):
-    archive = os.path.join(
-        os.path.dirname(__file__), './expected_submit_outputs.tar.gz')
-
-    # If the archive already exists, only recreate if forced.
-    if os.path.exists(archive):
+    # If the ARCHIVE_DIR already exists, only recreate if forced.
+    if os.path.exists(ARCHIVE_DIR):
         if args.force:
-            os.unlink(archive)
+            os.unlink(ARCHIVE_DIR)
         else:
             return
-
-    # This regex will be used to filter out the final hash in the job name.
-    name_regex = r'(.*)\/[a-z0-9]*'
 
     with signac.contrib.TemporaryProject(name=PROJECT_NAME) as project:
         init(project)
@@ -224,7 +222,7 @@ def main(args):
                             for line in tmp_out:
                                 if '#PBS' in line or '#SBATCH' in line or 'OMP_NUM_THREADS' in line:
                                     if '#PBS -N' in line or '#SBATCH --job-name' in line:
-                                        match = re.match(name_regex, line)
+                                        match = re.match(NAME_REGEX, line)
                                         print(match.group(1) + '\n', end='')
                                     else:
                                         print(line, end='')
@@ -249,14 +247,14 @@ def main(args):
                                 for line in tmp_out:
                                     if '#PBS' in line or '#SBATCH' in line or 'OMP_NUM_THREADS' in line:
                                         if '#PBS -N' in line or '#SBATCH --job-name' in line:
-                                            match = re.match(name_regex, line)
+                                            match = re.match(NAME_REGEX, line)
                                             print(match.group(1) + '\n', end='')
                                         else:
                                             print(line, end='')
 
-        # For compactness, we move the output into an archive then delete the original data.
+        # For compactness, we move the output into an ARCHIVE_DIR then delete the original data.
         project.export_to(
-            target=archive)
+            target=ARCHIVE_DIR)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -264,6 +262,6 @@ if __name__ == "__main__":
     parser.add_argument(
         '-f', '--force',
         action='store_true',
-        help = "Recreate the data space even if the archive already exists"
+        help = "Recreate the data space even if the ARCHIVE_DIR already exists"
     )
     main(parser.parse_args())

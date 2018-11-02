@@ -5,16 +5,19 @@ from __future__ import print_function
 
 import unittest
 
-import signac
-import six
-import flow.environments
-import flow.environment
-from generate_data import get_nested_attr, redirect_stdout, TestProject, PROJECT_NAME
 import sys
 import os
-from io import TextIOWrapper, BytesIO
 import re
-from operator import xor
+import io
+import operator
+
+import signac
+import flow
+import flow.environments
+
+from generate_data import (
+    get_nested_attr, redirect_stdout, TestProject,
+    PROJECT_NAME, ARCHIVE_DIR, NAME_REGEX)
 
 
 class BaseTemplateTest(unittest.TestCase):
@@ -26,15 +29,10 @@ class BaseTemplateTest(unittest.TestCase):
         # Useful to debug errors that arise.
         self.maxDiff = None
 
-        # This regex will be used to filter out the final hash in the job name.
-        name_regex = r'(.*)\/[a-z0-9]*'
-
         # Must import the data into the project.
-        archive = os.path.join(
-            os.path.dirname(__file__), './expected_submit_outputs.tar.gz')
         with signac.contrib.TemporaryProject(name=PROJECT_NAME) as reference_project:
             reference_project.import_from(
-                origin=archive)
+                origin=ARCHIVE_DIR)
             fp = TestProject.get_project(
                 root=reference_project.root_directory())
 
@@ -44,8 +42,8 @@ class BaseTemplateTest(unittest.TestCase):
                 parameters = job.sp.parameters
                 if 'bundle' in parameters:
                     bundle = parameters.pop('bundle')
-                    tmp_out = TextIOWrapper(BytesIO(), sys.stdout.encoding)
-                    new_out = TextIOWrapper(BytesIO(), sys.stdout.encoding)
+                    tmp_out = io.TextIOWrapper(io.BytesIO(), sys.stdout.encoding)
+                    new_out = io.TextIOWrapper(io.BytesIO(), sys.stdout.encoding)
                     with redirect_stdout(tmp_out):
                         fp.submit(
                             env=env, jobs=[job], names=bundle, pretend=True,
@@ -55,7 +53,7 @@ class BaseTemplateTest(unittest.TestCase):
                     for line in tmp_out:
                         if '#PBS' in line or '#SBATCH' in line or 'OMP_NUM_THREADS' in line:
                             if '#PBS -N' in line or '#SBATCH --job-name' in line:
-                                match = re.match(name_regex, line)
+                                match = re.match(NAME_REGEX, line)
                                 new_out.write(match.group(1) + '\n')
                             else:
                                 new_out.write(line)
@@ -73,10 +71,10 @@ class BaseTemplateTest(unittest.TestCase):
                             # and vice versa.  We should be able to relax this
                             # requirement if we make our error checking more
                             # consistent.
-                            if xor('gpu' in parameters['partition'].lower(), 'gpu' in op.lower()):
+                            if operator.xor('gpu' in parameters['partition'].lower(), 'gpu' in op.lower()):
                                     continue
-                        tmp_out = TextIOWrapper(BytesIO(), sys.stdout.encoding)
-                        new_out = TextIOWrapper(BytesIO(), sys.stdout.encoding)
+                        tmp_out = io.TextIOWrapper(io.BytesIO(), sys.stdout.encoding)
+                        new_out = io.TextIOWrapper(io.BytesIO(), sys.stdout.encoding)
                         with redirect_stdout(tmp_out):
                             fp.submit(
                                 env=env, jobs=[job],
@@ -86,7 +84,7 @@ class BaseTemplateTest(unittest.TestCase):
                         for line in tmp_out:
                             if '#PBS' in line or '#SBATCH' in line or 'OMP_NUM_THREADS' in line:
                                 if '#PBS -N' in line or '#SBATCH --job-name' in line:
-                                    match = re.match(name_regex, line)
+                                    match = re.match(NAME_REGEX, line)
                                     new_out.write(match.group(1) + '\n')
                                 else:
                                     new_out.write(line)

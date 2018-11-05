@@ -18,7 +18,7 @@ class CometEnvironment(DefaultSlurmEnvironment):
 
     http://www.sdsc.edu/services/hpc/hpc_systems.html#comet
     """
-    hostname_pattern = 'comet'
+    hostname_pattern = r'comet'
     template = 'comet.sh'
     cores_per_node = 24
 
@@ -85,7 +85,7 @@ class Stampede2Environment(DefaultSlurmEnvironment):
 
     https://www.tacc.utexas.edu/systems/stampede2
     """
-    hostname_pattern = '.*stampede2'
+    hostname_pattern = r'.*stampede2'
     template = 'stampede2.sh'
     cores_per_node = 48
 
@@ -119,7 +119,7 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
 
     https://portal.xsede.org/psc-bridges
     """
-    hostname_pattern = '.*\.bridges\.psc\.edu$'
+    hostname_pattern = r'.*\.bridges\.psc\.edu$'
     template = 'bridges.sh'
     cores_per_node = 28
 

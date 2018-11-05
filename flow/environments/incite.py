@@ -12,7 +12,7 @@ class TitanEnvironment(DefaultTorqueEnvironment):
 
     https://www.olcf.ornl.gov/titan/
     """
-    hostname_pattern = 'titan'
+    hostname_pattern = r'titan'
     template = 'titan.sh'
     cores_per_node = 16
 
@@ -38,7 +38,7 @@ class EosEnvironment(DefaultTorqueEnvironment):
 
     https://www.olcf.ornl.gov/computing-resources/eos/
     """
-    hostname_pattern = 'eos'
+    hostname_pattern = r'eos'
     template = 'eos.sh'
     cores_per_node = 32
 

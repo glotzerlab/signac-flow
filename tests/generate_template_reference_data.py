@@ -208,7 +208,7 @@ def mask_script(script):
     ]
 
     def mask(line):
-        """Perform substitutions on the input line according to the global subs variable."""
+        """Perform substitutions on the input line according to the subs variable."""
         for pattern, repl in subs:
             masked, n = re.subn(pattern, repl, line)
             if n:

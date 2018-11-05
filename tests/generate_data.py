@@ -207,12 +207,8 @@ def main(args):
         else:
             return
 
-    with signac.contrib.TemporaryProject(name=PROJECT_NAME) as project:
-        init(project)
-
-        # We need a FlowProject instance based in the new data space.
-        fp = TestProject.get_project(
-            root=project.root_directory())
+    with signac.TemporaryProject(name=PROJECT_NAME, cls=TestProject) as fp:
+        init(fp)
 
         for job in fp:
             with job:
@@ -269,7 +265,7 @@ def main(args):
                                             print(line, end='')
 
         # For compactness, we move the output into an ARCHIVE_DIR then delete the original data.
-        project.export_to(
+        fp.export_to(
             target=ARCHIVE_DIR)
 
 

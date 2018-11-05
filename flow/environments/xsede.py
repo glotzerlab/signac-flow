@@ -18,7 +18,7 @@ class CometEnvironment(DefaultSlurmEnvironment):
 
     http://www.sdsc.edu/services/hpc/hpc_systems.html#comet
     """
-    hostname_pattern = r'comet'
+    hostname_pattern = 'comet'
     template = 'comet.sh'
     cores_per_node = 24
 
@@ -85,7 +85,7 @@ class Stampede2Environment(DefaultSlurmEnvironment):
 
     https://www.tacc.utexas.edu/systems/stampede2
     """
-    hostname_pattern = r'.*stampede2'
+    hostname_pattern = '.*stampede2'
     template = 'stampede2.sh'
     cores_per_node = 48
 

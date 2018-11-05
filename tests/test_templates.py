@@ -14,9 +14,7 @@ import signac
 import flow
 import flow.environments
 
-from generate_data import (
-    get_nested_attr, redirect_stdout, TestProject, in_line, mask_script,
-    PROJECT_NAME, ARCHIVE_DIR)
+import generate_data
 
 
 class BaseTemplateTest(unittest.TestCase):
@@ -29,20 +27,21 @@ class BaseTemplateTest(unittest.TestCase):
         self.maxDiff = None
 
         # Must import the data into the project.
-        with signac.contrib.TemporaryProject(name=PROJECT_NAME) as reference_project:
-            reference_project.import_from(
-                origin=ARCHIVE_DIR)
-            fp = TestProject.get_project(
-                root=reference_project.root_directory())
+        with signac.TemporaryProject(
+            name=generate_data.PROJECT_NAME,
+            cls=generate_data.TestProject) as fp:
+            fp.import_from(
+                origin=generate_data.ARCHIVE_DIR)
 
-            env = get_nested_attr(flow, self.env)
+            env = generate_data.get_nested_attr(flow, self.env)
 
             for job in fp.find_jobs(dict(environment=self.env)):
                 parameters = job.sp.parameters
                 if 'bundle' in parameters:
                     bundle = parameters.pop('bundle')
-                    tmp_out = io.TextIOWrapper(io.BytesIO(), sys.stdout.encoding)
-                    with redirect_stdout(tmp_out):
+                    tmp_out = io.TextIOWrapper(
+                        io.BytesIO(), sys.stdout.encoding)
+                    with generate_data.redirect_stdout(tmp_out):
                         fp.submit(
                             env=env, jobs=[job], names=bundle, pretend=True,
                             force=True, bundle_size=len(bundle), **parameters)
@@ -51,8 +50,11 @@ class BaseTemplateTest(unittest.TestCase):
 
                     fn = 'script_{}.sh'.format('_'.join(bundle))
                     with open(job.fn(fn)) as f:
-                        self.assertEqual(mask_script(generated), f.read(),
-                            msg="Failed for job {}".format(job.get_id()))
+                        self.assertEqual(
+                            generate_data.mask_script(generated),
+                            f.read(),
+                            msg="Failed for bundle submission of job {}".format(
+                                job.get_id()))
                 else:
                     for op in fp.operations:
                         if 'partition' in parameters:
@@ -60,11 +62,13 @@ class BaseTemplateTest(unittest.TestCase):
                             # and vice versa.  We should be able to relax this
                             # requirement if we make our error checking more
                             # consistent.
-                            if operator.xor('gpu' in parameters['partition'].lower(),
-                                            'gpu' in op.lower()):
+                            if operator.xor(
+                                'gpu' in parameters['partition'].lower(),
+                                'gpu' in op.lower()):
                                     continue
-                        tmp_out = io.TextIOWrapper(io.BytesIO(), sys.stdout.encoding)
-                        with redirect_stdout(tmp_out):
+                        tmp_out = io.TextIOWrapper(
+                            io.BytesIO(), sys.stdout.encoding)
+                        with generate_data.redirect_stdout(tmp_out):
                             fp.submit(
                                 env=env, jobs=[job],
                                 names=[op], pretend=True, force=True, **parameters)
@@ -73,8 +77,11 @@ class BaseTemplateTest(unittest.TestCase):
 
                         fn = 'script_{}.sh'.format(op)
                         with open(job.fn(fn)) as f:
-                            self.assertEqual(mask_script(generated), f.read(),
-                                msg="Failed for job {}, operation {}".format(job.get_id(), op))
+                            self.assertEqual(
+                                generate_data.mask_script(generated),
+                                f.read(),
+                                msg="Failed for job {}, operation {}".format(
+                                    job.get_id(), op))
 
 
 class CometTemplateTest(BaseTemplateTest):

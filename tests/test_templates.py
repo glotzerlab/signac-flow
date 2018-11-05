@@ -14,7 +14,7 @@ import signac
 import flow
 import flow.environments
 
-import generate_data
+import generate_template_reference_data as gen
 
 
 class BaseTemplateTest(unittest.TestCase):
@@ -27,13 +27,19 @@ class BaseTemplateTest(unittest.TestCase):
         self.maxDiff = None
 
         # Must import the data into the project.
+        # NOTE: We should replace the below line with 
+        # with signac.TemporaryProject(name=PROJECT_NAME,
+        #                              cls=gen.TestProject) as fp:
+        # once the next version of signac is released, and we can then remove
+        # the additional FlowProject instantiation below
         with signac.TemporaryProject(
-            name=generate_data.PROJECT_NAME,
-            cls=generate_data.TestProject) as fp:
-            fp.import_from(
-                origin=generate_data.ARCHIVE_DIR)
+            name=gen.PROJECT_NAME) as p:
+            fp=gen.TestProject.get_project(root=p.root_directory())
 
-            env = generate_data.get_nested_attr(flow, self.env)
+            fp.import_from(
+                origin=gen.ARCHIVE_DIR)
+
+            env = gen.get_nested_attr(flow, self.env)
 
             for job in fp.find_jobs(dict(environment=self.env)):
                 parameters = job.sp.parameters
@@ -41,7 +47,7 @@ class BaseTemplateTest(unittest.TestCase):
                     bundle = parameters.pop('bundle')
                     tmp_out = io.TextIOWrapper(
                         io.BytesIO(), sys.stdout.encoding)
-                    with generate_data.redirect_stdout(tmp_out):
+                    with gen.redirect_stdout(tmp_out):
                         fp.submit(
                             env=env, jobs=[job], names=bundle, pretend=True,
                             force=True, bundle_size=len(bundle), **parameters)
@@ -51,7 +57,7 @@ class BaseTemplateTest(unittest.TestCase):
                     fn = 'script_{}.sh'.format('_'.join(bundle))
                     with open(job.fn(fn)) as f:
                         self.assertEqual(
-                            generate_data.mask_script(generated),
+                            gen.mask_script(generated),
                             f.read(),
                             msg="Failed for bundle submission of job {}".format(
                                 job.get_id()))
@@ -68,7 +74,7 @@ class BaseTemplateTest(unittest.TestCase):
                                     continue
                         tmp_out = io.TextIOWrapper(
                             io.BytesIO(), sys.stdout.encoding)
-                        with generate_data.redirect_stdout(tmp_out):
+                        with gen.redirect_stdout(tmp_out):
                             fp.submit(
                                 env=env, jobs=[job],
                                 names=[op], pretend=True, force=True, **parameters)
@@ -78,7 +84,7 @@ class BaseTemplateTest(unittest.TestCase):
                         fn = 'script_{}.sh'.format(op)
                         with open(job.fn(fn)) as f:
                             self.assertEqual(
-                                generate_data.mask_script(generated),
+                                gen.mask_script(generated),
                                 f.read(),
                                 msg="Failed for job {}, operation {}".format(
                                     job.get_id(), op))

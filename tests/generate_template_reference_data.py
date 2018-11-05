@@ -231,8 +231,14 @@ def main(args):
         else:
             return
 
-    with signac.TemporaryProject(name=PROJECT_NAME, cls=TestProject) as fp:
-        init(fp)
+    # NOTE: We should replace the below line with 
+    # with signac.TemporaryProject(name=PROJECT_NAME, cls=TestProject) as fp:
+    # once the next version of signac is released, and we can then remove
+    # the additional FlowProject instantiation below
+    with signac.TemporaryProject(name=PROJECT_NAME) as p:
+        init(p)
+
+        fp = TestProject.get_project(root=p.root_directory())
 
         for job in fp:
             with job:

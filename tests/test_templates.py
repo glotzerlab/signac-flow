@@ -15,8 +15,8 @@ import flow
 import flow.environments
 
 from generate_data import (
-    get_nested_attr, redirect_stdout, TestProject, in_line,
-    PROJECT_NAME, ARCHIVE_DIR, NAME_REGEX)
+    get_nested_attr, redirect_stdout, TestProject, in_line, mask_script,
+    PROJECT_NAME, ARCHIVE_DIR)
 
 
 class BaseTemplateTest(unittest.TestCase):
@@ -42,27 +42,17 @@ class BaseTemplateTest(unittest.TestCase):
                 if 'bundle' in parameters:
                     bundle = parameters.pop('bundle')
                     tmp_out = io.TextIOWrapper(io.BytesIO(), sys.stdout.encoding)
-                    new_out = io.TextIOWrapper(io.BytesIO(), sys.stdout.encoding)
                     with redirect_stdout(tmp_out):
                         fp.submit(
                             env=env, jobs=[job], names=bundle, pretend=True,
                             force=True, bundle_size=len(bundle), **parameters)
                     tmp_out.seek(0)
-
-                    for line in tmp_out:
-                        if in_line(['#PBS', '#SBATCH', 'OMP_NUM_THREADS'], line):
-                            if in_line(['#PBS -N', '#SBATCH --job-name'], line):
-                                match = re.match(NAME_REGEX, line)
-                                new_out.write(match.group(1) + '\n')
-                            else:
-                                new_out.write(line)
-
-                    new_out.seek(0)
-                    generated = new_out.read()
+                    generated = tmp_out.read()
 
                     fn = 'script_{}.sh'.format('_'.join(bundle))
                     with open(job.fn(fn)) as f:
-                        self.assertEqual(generated, f.read())
+                        self.assertEqual(mask_script(generated), f.read(),
+                            msg="Failed for job {}".format(job.get_id()))
                 else:
                     for op in fp.operations:
                         if 'partition' in parameters:
@@ -74,26 +64,17 @@ class BaseTemplateTest(unittest.TestCase):
                                             'gpu' in op.lower()):
                                     continue
                         tmp_out = io.TextIOWrapper(io.BytesIO(), sys.stdout.encoding)
-                        new_out = io.TextIOWrapper(io.BytesIO(), sys.stdout.encoding)
                         with redirect_stdout(tmp_out):
                             fp.submit(
                                 env=env, jobs=[job],
                                 names=[op], pretend=True, force=True, **parameters)
                         tmp_out.seek(0)
+                        generated = tmp_out.read()
 
-                        for line in tmp_out:
-                            if in_line(['#PBS', '#SBATCH', 'OMP_NUM_THREADS'], line):
-                                if in_line(['#PBS -N', '#SBATCH --job-name'], line):
-                                    match = re.match(NAME_REGEX, line)
-                                    new_out.write(match.group(1) + '\n')
-                                else:
-                                    new_out.write(line)
-
-                        new_out.seek(0)
-                        generated = new_out.read()
                         fn = 'script_{}.sh'.format(op)
                         with open(job.fn(fn)) as f:
-                            self.assertEqual(generated, f.read())
+                            self.assertEqual(mask_script(generated), f.read(),
+                                msg="Failed for job {}, operation {}".format(job.get_id(), op))
 
 
 class CometTemplateTest(BaseTemplateTest):

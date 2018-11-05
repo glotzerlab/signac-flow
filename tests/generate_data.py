@@ -199,6 +199,30 @@ def mpi_gpu_op(job):
     pass
 
 
+def mask_script(script):
+    """Go through the specified subsitutions and perform them on the provided script"""
+
+    # Define the desired subsitution patterns here.
+    subs = [
+            [r'(#(?:SBATCH --job-name="|PBS -N ).+\/)+([a-f0-9]+)', r'\1'],
+    ]
+
+    def mask(line):
+        """Perform substitutions on the input line according to the global subs variable."""
+        for pattern, repl in subs:
+            masked, n = re.subn(pattern, repl, line)
+            if n:
+                return masked
+        return line
+
+    s_masked = []
+    for line in script.split('\n'):
+        # For now, only testing these lines.
+        if in_line(['#PBS', '#SBATCH', 'OMP_NUM_THREADS'], line):
+            s_masked.append(mask(line))
+    return '\n'.join(s_masked)
+
+
 def main(args):
     # If the ARCHIVE_DIR already exists, only recreate if forced.
     if os.path.exists(ARCHIVE_DIR):
@@ -228,13 +252,7 @@ def main(args):
                     tmp_out.seek(0)
                     with open(fn, 'w') as f:
                         with redirect_stdout(f):
-                            for line in tmp_out:
-                                if in_line(['#PBS', '#SBATCH', 'OMP_NUM_THREADS'], line):
-                                    if in_line(['#PBS -N', '#SBATCH --job-name'], line):
-                                        match = re.match(NAME_REGEX, line)
-                                        print(match.group(1) + '\n', end='')
-                                    else:
-                                        print(line, end='')
+                            print(mask_script(tmp_out.read()), end='')
                 else:
                     for op in fp.operations:
                         if 'partition' in parameters:
@@ -256,13 +274,7 @@ def main(args):
                         tmp_out.seek(0)
                         with open(fn, 'w') as f:
                             with redirect_stdout(f):
-                                for line in tmp_out:
-                                    if in_line(['#PBS', '#SBATCH', 'OMP_NUM_THREADS'], line):
-                                        if in_line(['#PBS -N', '#SBATCH --job-name'], line):
-                                            match = re.match(NAME_REGEX, line)
-                                            print(match.group(1) + '\n', end='')
-                                        else:
-                                            print(line, end='')
+                                print(mask_script(tmp_out.read()), end='')
 
         # For compactness, we move the output into an ARCHIVE_DIR then delete the original data.
         fp.export_to(

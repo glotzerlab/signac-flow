@@ -22,10 +22,7 @@ from test_project import redirect_stdout
 # being correctly generated.
 PROJECT_NAME = "SubmissionTest"
 ARCHIVE_DIR = os.path.join(
-    os.path.dirname(__file__), './expected_submit_outputs.tar.gz')
-
-# This regex will be used to filter out the final hash in the job name.
-NAME_REGEX = r'(.*)\/[a-z0-9]*'
+    os.path.dirname(__file__), './template_reference_data.tar.gz')
 
 
 def cartesian(**kwargs):
@@ -52,6 +49,30 @@ def get_nested_attr(obj, attr, default=None):
 def in_line(patterns, line):
     """Check if any of the strings in the list patterns are in the line"""
     return any([p in line for p in patterns])
+
+
+def mask_script(script):
+    """Go through the specified subsitutions and perform them on the provided script"""
+
+    # Define the desired subsitution patterns here.
+    subs = [
+            [r'(#(?:SBATCH --job-name="|PBS -N ).+\/)+([a-f0-9]+)', r'\1'],
+    ]
+
+    def mask(line):
+        """Perform substitutions on the input line according to the subs variable."""
+        for pattern, repl in subs:
+            masked, n = re.subn(pattern, repl, line)
+            if n:
+                return masked
+        return line
+
+    s_masked = []
+    for line in script.split('\n'):
+        # For now, only testing these lines.
+        if in_line(['#PBS', '#SBATCH', 'OMP_NUM_THREADS'], line):
+            s_masked.append(mask(line))
+    return '\n'.join(s_masked)
 
 
 def init(project):
@@ -197,30 +218,6 @@ def gpu_op(job):
 @flow.directives(ngpu=TestProject.N, nranks=TestProject.N)
 def mpi_gpu_op(job):
     pass
-
-
-def mask_script(script):
-    """Go through the specified subsitutions and perform them on the provided script"""
-
-    # Define the desired subsitution patterns here.
-    subs = [
-            [r'(#(?:SBATCH --job-name="|PBS -N ).+\/)+([a-f0-9]+)', r'\1'],
-    ]
-
-    def mask(line):
-        """Perform substitutions on the input line according to the subs variable."""
-        for pattern, repl in subs:
-            masked, n = re.subn(pattern, repl, line)
-            if n:
-                return masked
-        return line
-
-    s_masked = []
-    for line in script.split('\n'):
-        # For now, only testing these lines.
-        if in_line(['#PBS', '#SBATCH', 'OMP_NUM_THREADS'], line):
-            s_masked.append(mask(line))
-    return '\n'.join(s_masked)
 
 
 def main(args):

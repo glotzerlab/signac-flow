@@ -10,6 +10,7 @@ import io
 import operator
 import itertools
 import argparse
+from hashlib import sha1
 
 import signac
 import flow
@@ -17,12 +18,12 @@ import flow.environments
 
 from test_project import redirect_stdout
 
-
 # Define a consistent submission name so that we can test that job names are
 # being correctly generated.
 PROJECT_NAME = "SubmissionTest"
 ARCHIVE_DIR = os.path.join(
     os.path.dirname(__file__), './template_reference_data.tar.gz')
+PROJECT_DIRECTORY = "/home/johndoe/project/"
 
 
 def cartesian(**kwargs):
@@ -49,30 +50,6 @@ def get_nested_attr(obj, attr, default=None):
 def in_line(patterns, line):
     """Check if any of the strings in the list patterns are in the line"""
     return any([p in line for p in patterns])
-
-
-def mask_script(script):
-    """Go through the specified subsitutions and perform them on the provided script"""
-
-    # Define the desired subsitution patterns here.
-    subs = [
-            [r'(#(?:SBATCH --job-name="|PBS -N ).+\/)+([a-f0-9]+)', r'\1'],
-    ]
-
-    def mask(line):
-        """Perform substitutions on the input line according to the subs variable."""
-        for pattern, repl in subs:
-            masked, n = re.subn(pattern, repl, line)
-            if n:
-                return masked
-        return line
-
-    s_masked = []
-    for line in script.split('\n'):
-        # For now, only testing these lines.
-        if in_line(['#PBS', '#SBATCH', 'OMP_NUM_THREADS'], line):
-            s_masked.append(mask(line))
-    return '\n'.join(s_masked)
 
 
 def init(project):
@@ -175,6 +152,18 @@ def init(project):
                 project.open_job(sp).init()
 
 
+# Mock the bundle storing to avoid needing to make a file
+def _store_bundled(self, operations):
+    if len(operations) == 1:
+        return operations[0].get_id()
+    else:
+        h = '.'.join(op.get_id() for op in operations)
+        bid = '{}/bundle/{}'.format(self, sha1(h.encode('utf-8')).hexdigest())
+        return bid
+
+flow.FlowProject._store_bundled = _store_bundled
+
+
 class TestProject(flow.FlowProject):
     N = 2
 
@@ -220,6 +209,18 @@ def mpi_gpu_op(job):
     pass
 
 
+def get_masked_flowproject(p):
+    """Mock environment-dependent attributes and functions. Need to mock
+    sys.executable before the FlowProject is instantiated, and then modify the
+    root_directory and project_dir elements after creation."""
+    sys.executable = '/usr/local/bin/python'
+    fp = TestProject.get_project(root=p.root_directory())
+    fp.root_directory = lambda: PROJECT_DIRECTORY
+    fp.config.project_dir = PROJECT_DIRECTORY
+    for _, op in fp._OPERATION_FUNCTIONS:
+        op._flow_path = 'generate_template_reference_data.py'
+    return fp
+
 def main(args):
     # If the ARCHIVE_DIR already exists, only recreate if forced.
     if os.path.exists(ARCHIVE_DIR):
@@ -234,8 +235,7 @@ def main(args):
     # the additional FlowProject instantiation below
     with signac.TemporaryProject(name=PROJECT_NAME) as p:
         init(p)
-
-        fp = TestProject.get_project(root=p.root_directory())
+        fp = get_masked_flowproject(p)
 
         for job in fp:
             with job:
@@ -255,7 +255,7 @@ def main(args):
                     tmp_out.seek(0)
                     with open(fn, 'w') as f:
                         with redirect_stdout(f):
-                            print(mask_script(tmp_out.read()), end='')
+                            print(tmp_out.read(), end='')
                 else:
                     for op in fp.operations:
                         if 'partition' in parameters:
@@ -277,7 +277,7 @@ def main(args):
                         tmp_out.seek(0)
                         with open(fn, 'w') as f:
                             with redirect_stdout(f):
-                                print(mask_script(tmp_out.read()), end='')
+                                print(tmp_out.read(), end='')
 
         # For compactness, we move the output into an ARCHIVE_DIR then delete the original data.
         fp.export_to(

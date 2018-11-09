@@ -34,15 +34,15 @@ class BaseTemplateTest(unittest.TestCase):
         # the additional FlowProject instantiation below
         with signac.TemporaryProject(
             name=gen.PROJECT_NAME) as p:
-            fp=gen.TestProject.get_project(root=p.root_directory())
 
+            fp = gen.get_masked_flowproject(p)
             fp.import_from(
                 origin=gen.ARCHIVE_DIR)
 
             env = gen.get_nested_attr(flow, self.env)
 
             for job in fp.find_jobs(dict(environment=self.env)):
-                parameters = job.sp.parameters
+                parameters = job.sp.parameters()
                 if 'bundle' in parameters:
                     bundle = parameters.pop('bundle')
                     tmp_out = io.TextIOWrapper(
@@ -57,7 +57,7 @@ class BaseTemplateTest(unittest.TestCase):
                     fn = 'script_{}.sh'.format('_'.join(bundle))
                     with open(job.fn(fn)) as f:
                         self.assertEqual(
-                            gen.mask_script(generated),
+                            generated,
                             f.read(),
                             msg="Failed for bundle submission of job {}".format(
                                 job.get_id()))
@@ -84,7 +84,7 @@ class BaseTemplateTest(unittest.TestCase):
                         fn = 'script_{}.sh'.format(op)
                         with open(job.fn(fn)) as f:
                             self.assertEqual(
-                                gen.mask_script(generated),
+                                generated,
                                 f.read(),
                                 msg="Failed for job {}, operation {}".format(
                                     job.get_id(), op))

@@ -104,20 +104,54 @@ The available filters are:
 
 class _condition(object):
 
+    # All condition functions created using the _condition class are stored in this
+    # global registry variable, allowing direct equivalence comparison between
+    # condition objects.
+    _CONDITION_FUNCTIONS = dict()
+
     def __init__(self, condition):
+        l = type(self)._CONDITION_FUNCTIONS.setdefault('conditions', list())
+        if not condition in l:
+            l.append(condition)
         self.condition = condition
 
     @classmethod
+    def _get_func(cls, typ, key, func):
+        R"""Pull function from registry if exists, otherwise assign the provided one.
+
+        :param typ:
+            The type of condition (e.g. 'isfile', 'true', etc).
+        :type typ:
+            str
+        :param key:
+            The key to associate the function with (e.g. for type 'isfile', the
+            key could be a file 'intput.txt').
+        :type key:
+            str
+        :param func:
+            The function to associate with this key if an equivalent does not
+            already exist in the registry.
+        :type func:
+            callable
+        """
+        d = cls._CONDITION_FUNCTIONS.setdefault(typ, dict())
+        try:
+            func = d[key]
+        except:
+            d[key] = func
+        return cls(func)
+
+    @classmethod
     def isfile(cls, filename):
-        return cls(lambda job: job.isfile(filename))
+        return cls._get_func('isfile', filename, lambda job: job.isfile(filename))
 
     @classmethod
     def true(cls, key):
-        return cls(lambda job: job.document.get(key, False))
+        return cls._get_func('true', key, lambda job: job.document.get(key, False))
 
     @classmethod
     def false(cls, key):
-        return cls(lambda job: not job.document.get(key, False))
+        return cls._get_func('false', key, lambda job: not job.document.get(key, False))
 
     @classmethod
     def always(cls, func):
@@ -129,7 +163,19 @@ class _condition(object):
 
     @classmethod
     def not_(cls, condition):
-        return cls(lambda job: not condition(job))
+        return cls._get_func('not', condition, lambda job: not condition(job))
+
+    @classmethod
+    def _multi(cls, funcs):
+        R"""Generate a sequence of conditions from a sequence of conditions
+        functions.
+
+        We need to actually add all the conditions explicitly if we want to
+        be able to take advantage of the workflow network detection. We
+        arbitrarily choose to return the last condition, since the actual
+        ordering of conditions is enforced by the __call__ logic anyway and
+        the primary purpose of the return is to allow chaining of decorators."""
+        return [cls(f) for f in funcs][-1]
 
 
 class _pre(_condition):
@@ -143,24 +189,15 @@ class _pre(_condition):
     @classmethod
     def copy_from(cls, other_func):
         "True if and only if all pre conditions of other function are met."
-        def metacondition(job):
-            pre_conditions = getattr(other_func, '_flow_pre', list())
-            return all(c(job) for c in pre_conditions)
-        return cls(metacondition)
+        return cls._multi(getattr(other_func, '_flow_pre', list()))
 
     @classmethod
     def after(cls, other_func):
         "True if and only if all post conditions of other function are met."
-        def metacondition(job):
-            post_conditions = getattr(other_func, '_flow_post', list())
-            return all(c(job) for c in post_conditions)
-        return cls(metacondition)
+        return cls._multi(getattr(other_func, '_flow_post', list()))
 
 
 class _post(_condition):
-
-    def __init__(self, condition):
-        self.condition = condition
 
     def __call__(self, func):
         post_conditions = getattr(func, '_flow_post', list())
@@ -171,10 +208,7 @@ class _post(_condition):
     @classmethod
     def copy_from(cls, other_func):
         "True if and only if all post conditions of other function are met."
-        def metacondition(job):
-            post_conditions = getattr(other_func, '_flow_post', list())
-            return all(c(job) for c in post_conditions)
-        return cls(metacondition)
+        return cls._multi(getattr(other_func, '_flow_post', list()))
 
 
 def make_bundles(operations, size=None):
@@ -654,6 +688,20 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
         for cls in type(self).__mro__:
             self._label_functions.update(getattr(cls, '_LABEL_FUNCTIONS', dict()))
+
+    def detect_operation_graph(self):
+        R"""Determine the directed acyclic graph defined by operation pre- and
+        post- conditions."""
+        num_ops = len(self._operations)
+        mat = [[0 for _ in range(num_ops)] for _ in range(num_ops)]
+        ops = list(self._operations.items())
+        for i, (name1, op1) in enumerate(ops):
+            for j, (name2, op2) in enumerate(ops[i:]):
+                if set(op1._postconds).intersection(set(op2._prereqs)):
+                    mat[i][j+i] = 1
+                elif set(op1._prereqs).intersection(set(op2._postconds)):
+                    mat[j+i][i] = 1
+        return ops, mat
 
     pre = _pre
     """Decorator to add a pre-condition function for an operation function.

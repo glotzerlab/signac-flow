@@ -783,6 +783,78 @@ class BufferedExecutionDynamicProjectTest(BufferedExecutionProjectTest,
     pass
 
 
+class GraphDetectionProjectTest(BaseProjectTest):
+    class GraphProject(FlowProject):
+        pass
+
+    def first_complete(job):
+        return job.doc.get('first') is not None
+
+    @GraphProject.operation
+    @GraphProject.post(first_complete)
+    def first(job):
+        job.doc.first = True
+
+    @GraphProject.operation
+    @GraphProject.pre(first_complete)
+    @GraphProject.post.true('second')
+    @GraphProject.post.false('other_condition')
+    def second(job):
+        job.doc.second = True
+
+    @GraphProject.operation
+    @GraphProject.pre.after(first)
+    @GraphProject.post.true('third')
+    def third(job):
+        job.doc.third = True
+
+    @GraphProject.operation
+    @GraphProject.pre.true('second')
+    @GraphProject.pre.after(third)
+    @GraphProject.post.true('fourth')
+    def fourth(job):
+        job.doc.fourth = True
+
+    @GraphProject.operation
+    @GraphProject.pre.copy_from(third)
+    @GraphProject.post.isfile('fifth.txt')
+    def fifth(job):
+        import os
+        def touch(fname, times=None):
+            with open(fname, 'a'):
+                os.utime(fname, times)
+        with job:
+            touch('fifth.txt')
+
+    @GraphProject.operation
+    @GraphProject.pre.after(third)
+    @GraphProject.pre.isfile('fifth.txt')
+    @GraphProject.post.true('sixth')
+    def sixth(job):
+        job.doc.sixth = True
+
+    @GraphProject.operation
+    @GraphProject.pre.after(third)
+    @GraphProject.pre.after(fourth)
+    @GraphProject.post.true('seventh')
+    def seventh(job):
+        job.doc.seventh = True
+
+    project_class = GraphProject
+
+    def test_graph(self):
+        R"""Test generation of a graph"""
+        adj = self.project.detect_operation_graph()
+        true_adj = [[0, 1, 1, 0, 1, 0, 0],
+                    [0, 0, 0, 1, 0, 0, 0],
+                    [0, 0, 0, 1, 0, 1, 1],
+                    [0, 0, 0, 0, 0, 0, 1],
+                    [0, 0, 0, 0, 0, 1, 0],
+                    [0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0]]
+        self.assertTrue(adj == true_adj)
+
+
 class ProjectMainInterfaceTest(BaseProjectTest):
     project_class = TestProject
 

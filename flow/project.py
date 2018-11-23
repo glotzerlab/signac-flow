@@ -692,16 +692,16 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
     def detect_operation_graph(self):
         R"""Determine the directed acyclic graph defined by operation pre- and
         post- conditions."""
-        num_ops = len(self._operations)
+        num_ops = len(self.operations)
         mat = [[0 for _ in range(num_ops)] for _ in range(num_ops)]
-        ops = list(self._operations.items())
+        ops = list(self.operations.items())
         for i, (name1, op1) in enumerate(ops):
             for j, (name2, op2) in enumerate(ops[i:]):
                 if set(op1._postconds).intersection(set(op2._prereqs)):
                     mat[i][j+i] = 1
                 elif set(op1._prereqs).intersection(set(op2._postconds)):
                     mat[j+i][i] = 1
-        return ops, mat
+        return mat
 
     pre = _pre
     """Decorator to add a pre-condition function for an operation function.

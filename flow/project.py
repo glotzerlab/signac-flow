@@ -110,9 +110,10 @@ class _condition(object):
     _CONDITION_FUNCTIONS = dict()
 
     def __init__(self, condition):
-        l = type(self)._CONDITION_FUNCTIONS.setdefault('conditions', list())
-        if not condition in l:
-            l.append(condition)
+        conditions = type(self)._CONDITION_FUNCTIONS.setdefault(
+            'conditions', list())
+        if condition not in conditions:
+            conditions.append(condition)
         self.condition = condition
 
     @classmethod
@@ -134,11 +135,11 @@ class _condition(object):
         :type func:
             callable
         """
-        d = cls._CONDITION_FUNCTIONS.setdefault(typ, dict())
+        conditions = cls._CONDITION_FUNCTIONS.setdefault(typ, dict())
         try:
-            func = d[key]
-        except:
-            d[key] = func
+            func = conditions[key]
+        except KeyError:
+            conditions[key] = func
         return cls(func)
 
     @classmethod

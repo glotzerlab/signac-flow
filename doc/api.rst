@@ -16,8 +16,8 @@ For more information, please see ``$ flow --help``.
 .. literalinclude:: cli-help.txt
 
 
-Th FlowProject
---------------
+The FlowProject
+---------------
 
 .. currentmodule:: flow
 

@@ -810,10 +810,70 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             self._label_functions.update(getattr(cls, '_LABEL_FUNCTIONS', dict()))
 
     pre = _pre
-    "Decorator to add a pre-condition function for an operation function."
+    """Decorator to add a pre-condition function for an operation function.
+
+    Use a label function (or any function of :code:`job`) as a condition:
+
+    .. code-block:: python
+
+        @FlowProject.label
+        def some_label(job):
+            return job.doc.ready == True
+
+        @FlowProject.operation
+        @FlowProject.pre(some_label)
+        def some_operation(job):
+            pass
+
+    Use a :code:`lambda` function of :code:`job` to create custom conditions:
+
+    .. code-block:: python
+
+        @FlowProject.operation
+        @FlowProject.pre(lambda job: job.doc.ready == True)
+        def some_operation(job):
+            pass
+
+    Use the post-conditions of an operation as a pre-condition for another operation:
+
+    .. code-block:: python
+
+        @FlowProject.operation
+        @FlowProject.post(lambda job: job.isfile('output.txt'))
+        def previous_operation(job):
+            pass
+
+        @FlowProject.operation
+        @FlowProject.pre.after(previous_operation)
+        def some_operation(job):
+            pass
+    """
 
     post = _post
-    "Decorator to add a post-condition function for an operation function."
+    """Decorator to add a post-condition function for an operation function.
+
+    Use a label function (or any function of :code:`job`) as a condition:
+
+    .. code-block:: python
+
+        @FlowProject.label
+        def some_label(job):
+            return job.doc.finished == True
+
+        @FlowProject.operation
+        @FlowProject.post(some_label)
+        def some_operation(job):
+            pass
+
+    Use a :code:`lambda` function of :code:`job` to create custom conditions:
+
+    .. code-block:: python
+
+        @FlowProject.operation
+        @FlowProject.post(lambda job: job.doc.finished == True)
+        def some_operation(job):
+            pass
+    """
 
     NAMES = {
         'next_operation': 'next_op',

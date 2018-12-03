@@ -3,8 +3,7 @@
 # This software is licensed under the BSD 3-Clause License.
 """Implementation of the scheduling system for SLURM schedulers.
 
-This module implements the Scheduler class, and the JobCluster class
-for SLURM schedulers.
+This module implements the Scheduler and ClusterJob classes for SLURM.
 """
 from __future__ import print_function
 import getpass
@@ -48,24 +47,24 @@ def _fetch(user=None):
         if error.errno != errno.ENOENT:
             raise
         else:
-            raise RuntimeError("Slurm not available.")
+            raise RuntimeError("SLURM not available.")
     lines = result.split('\n')
     for line in lines:
         if line:
             status = line[:2]
             name = line[2:].rstrip()
-            yield ClusterJob(name, parse_status(status))
+            yield SlurmJob(name, parse_status(status))
 
 
 class SlurmJob(ClusterJob):
-    "A Slurm is a ClusterJob managed by a SLURM scheduler."
+    "A SlurmJob is a ClusterJob managed by a SLURM scheduler."
     pass
 
 
 class SlurmScheduler(Scheduler):
-    """Implementation of the abstract Scheduler class for TORQUE schedulers.
+    """Implementation of the abstract Scheduler class for SLURM schedulers.
 
-    This class allows us to submit cluster jobs to a TORQUE scheduler and query
+    This class allows us to submit cluster jobs to a SLURM scheduler and query
     their current status.
 
     :param user:
@@ -100,7 +99,7 @@ class SlurmScheduler(Scheduler):
         :param pretend:
             If True, do not actually submit the script, but only simulate the submission.
             Can be used to test whether the submission would be successful.
-            Please note: A successful "pretend" submission is not guaranteed to succeeed.
+            Please note: A successful "pretend" submission is not guaranteed to succeed.
         :type pretend:
             bool
         :param flags:

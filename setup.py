@@ -62,6 +62,8 @@ setup(
 
     install_requires=requirements,
 
+    tests_require=['cloudpickle'],
+
     python_requires='>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, <4',
 
     extras_require={

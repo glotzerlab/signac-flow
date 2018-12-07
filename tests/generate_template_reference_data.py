@@ -214,11 +214,11 @@ def get_masked_flowproject(p):
     sys.executable before the FlowProject is instantiated, and then modify the
     root_directory and project_dir elements after creation."""
     sys.executable = '/usr/local/bin/python'
+    for _, op in TestProject._OPERATION_FUNCTIONS:
+        op._flow_path = 'generate_template_reference_data.py'
     fp = TestProject.get_project(root=p.root_directory())
     fp.root_directory = lambda: PROJECT_DIRECTORY
     fp.config.project_dir = PROJECT_DIRECTORY
-    for _, op in fp._OPERATION_FUNCTIONS:
-        op._flow_path = 'generate_template_reference_data.py'
     return fp
 
 def main(args):

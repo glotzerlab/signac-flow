@@ -67,6 +67,11 @@ The FlowProject
 
 .. autofunction:: cmd
 
+@flow.with_job
+--------------
+
+.. autofunction:: with_job
+
 @flow.directives
 ----------------
 

@@ -12,6 +12,7 @@ import argparse
 import logging
 import inspect
 from multiprocessing import Pool
+from functools import wraps
 
 from signac import get_project
 from signac.common import six
@@ -38,8 +39,67 @@ def cmd(func):
         def hello(job):
             return "echo {job._id}"
     """
+    if getattr(func, "_flow_with_job", False):
+        raise RuntimeError("@cmd should appear below the @with_job decorator in your script")
     setattr(func, '_flow_cmd', True)
     return func
+
+
+def with_job(func):
+    """Specifies that ``func(arg)`` will use ``arg`` as a context manager.
+
+    If this function is an operation function defined by :class:`~.FlowProject`, it will
+    be the same as using ``with job:``.
+
+    For example:
+
+    .. code-block:: python
+
+        @FlowProject.operation
+        @flow.with_job
+        def hello(job):
+            print("hello {}".format(job))
+
+    Is equivalent to:
+
+    .. code-block:: python
+
+        @FlowProject.operation
+        def hello(job):
+            with job:
+                print("hello {}".format(job))
+
+    This also works with the `@cmd` decorator:
+
+    .. code-block:: python
+
+        @FlowProject.operation
+        @with_job
+        @cmd
+        def hello(job):
+            return "echo 'hello {}'".format(job)
+
+    Is equivalent to:
+
+    .. code-block:: python
+
+        @FlowProject.operation
+        @cmd
+        def hello_cmd(job):
+            return 'trap "cd `pwd`" EXIT && cd {} && echo "hello {job}"'.format(job.ws)
+    """
+    @wraps(func)
+    def decorated(job):
+        with job:
+            if getattr(func, "_flow_cmd", False):
+                return 'trap "cd $(pwd)" EXIT && cd {} && {}  && pwd'.format(
+                    job.ws, func(job)
+                )
+            else:
+                return func(job)
+
+    setattr(decorated, '_flow_with_job', True)
+    return decorated
 
 
 class directives(object):

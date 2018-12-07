@@ -14,7 +14,7 @@ from contextlib import contextmanager
 
 import signac
 from signac.common import six
-from flow import FlowProject
+from flow import FlowProject, cmd, with_job
 from flow.scheduling.base import Scheduler
 from flow.scheduling.base import ClusterJob
 from flow.scheduling.base import JobStatus
@@ -236,6 +236,91 @@ class ProjectClassTest(BaseProjectTest):
         self.assertEqual(len(a._label_functions), 1)
         self.assertEqual(len(b._label_functions), 2)
         self.assertEqual(len(c._label_functions), 1)
+
+    def test_with_job_decorator(self):
+
+        class A(FlowProject):
+            pass
+
+        @A.operation
+        @with_job
+        def test_context(job):
+            self.assertEqual(os.getcwd(), job.ws)
+
+        project = self.mock_project()
+        with add_cwd_to_environment_pythonpath():
+            with switch_to_directory(project.root_directory()):
+                starting_dir = os.getcwd()
+                A().run()
+                self.assertTrue(os.getcwd(), starting_dir)
+
+    def test_cmd_with_job_wrong_order(self):
+
+        class A(FlowProject):
+            pass
+
+        with self.assertRaises(RuntimeError):
+            @A.operation
+            @cmd
+            @with_job
+            def test_cmd(job):
+                pass
+
+    def test_with_job_works_with_cmd(self):
+
+        class A(FlowProject):
+            pass
+
+        @A.operation
+        @with_job
+        @cmd
+        def test_context(job):
+            return "echo 'hello' > world.txt"
+
+        project = self.mock_project()
+        with add_cwd_to_environment_pythonpath():
+            with switch_to_directory(project.root_directory()):
+                starting_dir = os.getcwd()
+                A().run()
+                self.assertEqual(os.getcwd(), starting_dir)
+                for job in project:
+                    self.assertTrue(os.path.isfile(job.fn("world.txt")))
+
+    def test_with_job_error_handling(self):
+
+        class A(FlowProject):
+            pass
+
+        @A.operation
+        @with_job
+        def test_context(job):
+            raise Exception
+
+        project = self.mock_project()
+        with add_cwd_to_environment_pythonpath():
+            with switch_to_directory(project.root_directory()):
+                starting_dir = os.getcwd()
+                with self.assertRaises(Exception):
+                    A().run()
+                self.assertEqual(os.getcwd(), starting_dir)
+
+    def test_cmd_with_job_error_handling(self):
+
+        class A(FlowProject):
+            pass
+
+        @A.operation
+        @with_job
+        @cmd
+        def test_context(job):
+            return "exit 1"
+
+        project = self.mock_project()
+        with add_cwd_to_environment_pythonpath():
+            with switch_to_directory(project.root_directory()):
+                starting_dir = os.getcwd()
+                A().run()
+                self.assertEqual(os.getcwd(), starting_dir)
 
 
 class ProjectTest(BaseProjectTest):
@@ -491,7 +576,7 @@ class ExecutionProjectTest(BaseProjectTest):
                     (0b1110, 0b1111),  # All pre-conditions and 1st post-condition
                                        # are met, need to evaluate all.
                     (0b1111, 0b1111),  # All conditions met, need to evaluate all.
-                ]:
+            ]:
                 nonlocal_['evaluated'] = 0
                 project.run()
                 self.assertEqual(nonlocal_['evaluated'], expected_evaluation)
@@ -525,12 +610,12 @@ class ProjectMainInterfaceTest(BaseProjectTest):
     def call_subcmd(self, subcmd):
         # Determine path to project module and construct command.
         fn_script = inspect.getsourcefile(type(self.project))
-        cmd = 'python {} {}'.format(fn_script, subcmd)
+        _cmd = 'python {} {}'.format(fn_script, subcmd)
 
         try:
             with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
                 with switch_to_directory(self.project.root_directory()):
-                    return subprocess.check_output(cmd.split(), stderr=subprocess.STDOUT)
+                    return subprocess.check_output(_cmd.split(), stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as error:
             print(error, file=sys.stderr)
             print(error.output, file=sys.stderr)

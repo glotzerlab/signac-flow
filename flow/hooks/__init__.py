@@ -78,3 +78,6 @@ class Hooks(object):
         return "{}({})".format(
             type(self).__name__,
             ', '.join(['{}={}'.format(key, getattr(self, key)) for key in self._keys]))
+
+    def __bool__(self):
+        return any(getattr(self, key, None) for key in self._keys)

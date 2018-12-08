@@ -37,6 +37,7 @@ from multiprocessing import cpu_count
 from multiprocessing import TimeoutError
 from multiprocessing.pool import ThreadPool
 from multiprocessing import Event
+from contextlib import contextmanager
 
 import signac
 from signac.contrib.hashing import calc_id
@@ -1708,16 +1709,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for result in tqdm(results) if progress else results:
             result.get(timeout=timeout)
 
-    def _execute_operation(self, operation, timeout=None):
-        logger.info("Execute operation '{}'...".format(operation))
-
+    @contextmanager
+    def _run_with_hooks(self, operation):
         # Determine operation hooks
         op_hooks = self._operation_hooks.get(operation.name, Hooks())
 
         self.hooks.on_start(operation)
         op_hooks.on_start(operation)
         try:
-            self._execute_operation_(operation, timeout=timeout)
+            yield
         except Exception as error:
             self.hooks.on_fail(operation, error)
             op_hooks.on_fail(operation, error)
@@ -1729,7 +1729,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             self.hooks.on_finish(operation)
             op_hooks.on_finish(operation)
 
-    def _execute_operation_(self, operation, timeout=None):
+    def _execute_operation(self, operation, timeout=None):
+        logger.info("Execute operation '{}'...".format(operation))
 
         # Check if we need to fork for operation execution...
         if (
@@ -1746,14 +1747,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             logger.debug(
                 "Forking to execute operation '{}' with "
                 "cmd '{}'.".format(operation, operation.cmd))
-            subprocess.run(operation.cmd, shell=True, timeout=timeout, check=True)
+            with _run_with_hooks(operation):
+                subprocess.run(operation.cmd, shell=True, timeout=timeout, check=True)
         else:
             # ... executing operation in interpreter process as function:
             logger.debug(
                 "Executing operation '{}' with current interpreter "
                 "process ({}).".format(operation, os.getpid()))
             try:
-                self._operation_functions[operation.name](operation.job)
+                with _run_with_hooks(operation):
+                    self._operation_functions[operation.name](operation.job)
             except Exception as e:
                 raise UserOperationError(
                     'An exception was raised during operation {operation.name} '
@@ -2502,7 +2505,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             raise KeyError("An operation with this identifier is already added.")
         if hooks:
             self._operation_hooks[name].update(Hooks.from_dict(hooks))
-        self.operations[name] = FlowOperation(cmd=cmd, pre=pre, post=post, directives=kwargs)
+            if not kwargs.get('fork', False):
+                raise RuntimeError("Hooks require forking!")
+        if kwargs.get('fork', False):
+            raise NotImplementedError()
+        else:
+            self.operations[name] = FlowOperation(cmd=cmd, pre=pre, post=post, directives=kwargs)
 
     @deprecated(
         deprecated_in="0.8", removed_in="1.0",
@@ -2677,9 +2685,37 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 'post': post_conditions.get(func, None),
                 'directives': getattr(func, '_flow_directives', None)}
 
+            # Add default executable to directives.
+            params['directives'] = params['directives'] or dict()
+            params['directives'].setdefault('executable', sys.executable)
+            params['directives'].setdefault('fork', False)
+
+            # Update operation hooks
+            self._operation_hooks[name].update(Hooks.from_dict(self.hook[func]))
+
             # Construct FlowOperation:
-            if getattr(func, '_flow_cmd', False):
-                self._operations[name] = FlowOperation(cmd=func, **params)
+            cmd = getattr(func, '_flow_cmd', False)
+            _fork = params['directives']['fork']
+
+            if cmd:
+                if _fork:
+                    self._operations[name] = FlowOperation(
+                        cmd=_guess_cmd(func, name, **params), **params)
+
+                    def operation_function(job):
+                        # TODO: Instead of defining a function here, we should rather check the
+                        #       directives during execution; not sure.
+                        cmd = func(job).format(job=job)
+                        job_op = JobOperation(name=name, cmd=cmd, job=job)
+                        with self._run_with_hooks(job_op):
+                            fork(cmd)
+
+                    self._operation_functions[name] = operation_function
+
+                else:
+                    if self._operation_hooks[name] or self.hooks:
+                        raise RuntimeError("Hooks require forking!")
+                    self._operations[name] = FlowOperation(cmd=func, **params)
             else:
                 self._operations[name] = FlowOperation(
                     cmd=_guess_cmd(func, name, **params), **params)

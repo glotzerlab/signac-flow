@@ -2,16 +2,21 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 import os
-import sys
 from setuptools import setup, find_packages
 
 
-requirements = []
-if sys.version_info < (3, 4, 0):
-    requirements.append('enum34')
+requirements = [
+    # The core package.
+    'signac>=0.6',
+    # For the templated generation of (submission) scripts.
+    'jinja2',
+    # To enable the parallelized execution of operations across processes.
+    'cloudpickle',
+    # To define IntEnum in flow/scheduling/base.py.
+    'enum34;python_version<"3.4"',
+]
 
-
-description="Simple workflow management for signac projects."
+description = "Simple workflow management for signac projects."
 
 try:
     this_path = os.path.dirname(os.path.abspath(__file__))
@@ -63,8 +68,6 @@ setup(
     ],
 
     install_requires=requirements,
-
-    tests_require=['cloudpickle'],
 
     python_requires='>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, <4',
 

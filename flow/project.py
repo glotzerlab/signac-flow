@@ -109,10 +109,18 @@ class _condition(object):
     # condition objects.
     _CONDITION_FUNCTIONS = dict()
 
-    def __init__(self, condition):
+    def __init__(self, condition, _internal_lambda=False):
+        """The _internal_lambda argument is used to indicate that a condition
+        function is part of the built-in registry of lambdas and can be
+        identified as such during graph detection."""
         conditions = type(self)._CONDITION_FUNCTIONS.setdefault(
             'conditions', list())
         if condition not in conditions:
+            # Mark non-internally provided lambda functions as such.
+            if not _internal_lambda and condition.__name__ == "<lambda>":
+                setattr(condition, '_is_lambda', True)
+            else:
+                setattr(condition, '_is_lambda', False)
             conditions.append(condition)
         self.condition = condition
 
@@ -140,7 +148,7 @@ class _condition(object):
             func = conditions[key]
         except KeyError:
             conditions[key] = func
-        return cls(func)
+        return cls(func, _internal_lambda=True)
 
     @classmethod
     def isfile(cls, filename):
@@ -698,6 +706,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         ops = list(self.operations.items())
         for i, (name1, op1) in enumerate(ops):
             for j, (name2, op2) in enumerate(ops[i:]):
+                conds = (op1._postconds + op1._prereqs + op2._postconds +
+                         op2._prereqs)
+                if any(getattr(cond._callback, '_is_lambda', False) for cond in conds):
+                       raise ValueError("The graph detection will not work with provided lambda functions")
                 if set(op1._postconds).intersection(set(op2._prereqs)):
                     mat[i][j+i] = 1
                 elif set(op1._prereqs).intersection(set(op2._postconds)):

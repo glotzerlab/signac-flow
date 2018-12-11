@@ -786,13 +786,16 @@ class BufferedExecutionDynamicProjectTest(BufferedExecutionProjectTest,
 class GraphProject(FlowProject):
     pass
 
+
 def first_complete(job):
     return job.doc.get('first') is not None
+
 
 @GraphProject.operation
 @GraphProject.post(first_complete)
 def first(job):
     job.doc.first = True
+
 
 @GraphProject.operation
 @GraphProject.pre(first_complete)
@@ -801,11 +804,13 @@ def first(job):
 def second(job):
     job.doc.second = True
 
+
 @GraphProject.operation
 @GraphProject.pre.after(first)
 @GraphProject.post.true('third')
 def third(job):
     job.doc.third = True
+
 
 @GraphProject.operation
 @GraphProject.pre.true('second')
@@ -813,6 +818,7 @@ def third(job):
 @GraphProject.post.true('fourth')
 def fourth(job):
     job.doc.fourth = True
+
 
 @GraphProject.operation
 @GraphProject.pre.copy_from(third)
@@ -826,12 +832,14 @@ def fifth(job):
     with job:
         touch('fifth.txt')
 
+
 @GraphProject.operation
 @GraphProject.pre.after(third)
 @GraphProject.pre.isfile('fifth.txt')
 @GraphProject.post.true('sixth')
 def sixth(job):
     job.doc.sixth = True
+
 
 @GraphProject.operation
 @GraphProject.pre.after(third)
@@ -850,6 +858,7 @@ class LambdaGraphProject(GraphProject):
 @LambdaGraphProject.post(lambda job: job.doc.get('eighth', False))
 def eighth(job):
     job.doc.eighth = True
+
 
 @LambdaGraphProject.operation
 @LambdaGraphProject.pre(lambda job: job.doc.get('eighth', False))
@@ -881,7 +890,7 @@ class LambdaGraphDetectionProjectTest(BaseProjectTest):
     def test_graph_lambda(self):
         R"""Check that lambda functions result in a failure."""
         with self.assertRaises(ValueError):
-            adj = self.project.detect_operation_graph()
+            self.project.detect_operation_graph()
 
 
 class ProjectMainInterfaceTest(BaseProjectTest):

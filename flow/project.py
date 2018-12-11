@@ -709,7 +709,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 conds = (op1._postconds + op1._prereqs + op2._postconds +
                          op2._prereqs)
                 if any(getattr(cond._callback, '_is_lambda', False) for cond in conds):
-                       raise ValueError("The graph detection will not work with provided lambda functions")
+                        raise ValueError("The graph detection will not work"
+                                         "with provided lambda functions")
                 if set(op1._postconds).intersection(set(op2._prereqs)):
                     mat[i][j+i] = 1
                 elif set(op1._prereqs).intersection(set(op2._postconds)):

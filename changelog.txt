@@ -46,6 +46,7 @@ next
 ----
 
 - Added `@with_job` decorator that allows us to define operations to take place within the `job` context. Works with `@cmd`.
+- Fix SLURM scheduler driver to show full error message in case that submission with `squeue` failed.
 
 
 [0.6.3] -- 2018-08-22

@@ -14,6 +14,7 @@ import errno
 
 from .base import Scheduler
 from .base import ClusterJob, JobStatus
+from ..errors import SubmitError
 
 
 logger = logging.getLogger(__name__)
@@ -131,7 +132,12 @@ class SlurmScheduler(Scheduler):
             with tempfile.NamedTemporaryFile() as tmp_submit_script:
                 tmp_submit_script.write(str(script).encode('utf-8'))
                 tmp_submit_script.flush()
-                subprocess.check_output(submit_cmd + [tmp_submit_script.name])
+                try:
+                    subprocess.check_output(submit_cmd + [tmp_submit_script.name],
+                                            universal_newlines=True)
+                except subprocess.CalledProcessError as e:
+                    raise SubmitError("sbatch error: {}".format(e.output))
+
                 return True
 
     @classmethod

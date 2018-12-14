@@ -895,7 +895,7 @@ class LambdaGraphDetectionProjectTest(BaseProjectTest):
     project_class = LambdaGraphProject
 
     def test_graph_lambda(self):
-        R"""Check that lambda functions result in a failure."""
+        R"""Check that anonymous lambda functions result in a failure."""
         with self.assertRaises(ValueError):
             self.project.detect_operation_graph()
 

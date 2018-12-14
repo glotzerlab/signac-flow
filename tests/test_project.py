@@ -825,12 +825,9 @@ def fourth(job):
 @GraphProject.post.isfile('fifth.txt')
 def fifth(job):
     import os
-
-    def touch(fname, times=None):
-        with open(fname, 'a'):
-            os.utime(fname, times)
     with job:
-        touch('fifth.txt')
+        with open('fifth.txt', 'a'):
+            os.utime('fifth.txt', None)
 
 
 @GraphProject.operation
@@ -849,22 +846,31 @@ def seventh(job):
     job.doc.seventh = True
 
 
+@GraphProject.operation
+@GraphProject.pre.copy_from(fourth)
+def eighth(job):
+    import os
+    with job:
+        with open('eighth.txt', 'a'):
+            os.utime('eighth.txt', None)
+
+
 class LambdaGraphProject(GraphProject):
     pass
 
 
 @LambdaGraphProject.operation
 @LambdaGraphProject.pre.after(seventh)
-@LambdaGraphProject.post(lambda job: job.doc.get('eighth', False))
-def eighth(job):
-    job.doc.eighth = True
-
-
-@LambdaGraphProject.operation
-@LambdaGraphProject.pre(lambda job: job.doc.get('eighth', False))
 @LambdaGraphProject.post(lambda job: job.doc.get('ninth', False))
 def ninth(job):
     job.doc.ninth = True
+
+
+@LambdaGraphProject.operation
+@LambdaGraphProject.pre(lambda job: job.doc.get('ninth', False))
+@LambdaGraphProject.post(lambda job: job.doc.get('tenth', False))
+def tenth(job):
+    job.doc.tenth = True
 
 
 class GraphDetectionProjectTest(BaseProjectTest):
@@ -873,13 +879,14 @@ class GraphDetectionProjectTest(BaseProjectTest):
     def test_graph(self):
         R"""Test generation of a graph."""
         adj = self.project.detect_operation_graph()
-        true_adj = [[0, 1, 1, 0, 1, 0, 0],
-                    [0, 0, 0, 1, 0, 0, 0],
-                    [0, 0, 0, 1, 0, 1, 1],
-                    [0, 0, 0, 0, 0, 0, 1],
-                    [0, 0, 0, 0, 0, 1, 0],
-                    [0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0]]
+        true_adj = [[0, 1, 1, 0, 1, 0, 0, 0],
+                    [0, 0, 0, 1, 0, 0, 0, 1],
+                    [0, 0, 0, 1, 0, 1, 1, 1],
+                    [0, 0, 0, 0, 0, 0, 1, 0],
+                    [0, 0, 0, 0, 0, 1, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0]]
         self.assertTrue(adj == true_adj)
 
 

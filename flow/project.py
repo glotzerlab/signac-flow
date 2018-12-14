@@ -180,6 +180,7 @@ class _condition(object):
         conditions functions. In order to make it identifiable to the graph
         building algorithm, we need to tag this function with all the
         conditions it is composed of."""
+
         def metacondition(job):
             return all(c(job) for c in funcs)
         setattr(metacondition, 'composed_of', funcs)
@@ -704,36 +705,37 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         mat = [[0 for _ in range(num_ops)] for _ in range(num_ops)]
         ops = list(self.operations.items())
 
-        def conditions_to_callbacks(conditions):
+        def to_callbacks(conditions):
             return [condition._callback for condition in conditions]
 
-        def unpack_conds(conditions, all_conditions=None):
+        def unpack_conds(conds, all_conds=None):
             """Identify any metaconditions in the list and reduce them to the
-            functions they're composed of."""
-            if all_conditions is None:
-                all_conditions = []
-            for condition in conditions:
+            functions they're composed of. The all_conds argument is used
+            in recursive calls to the function and appended to directly, but
+            only returned at the end."""
+            if all_conds is None:
+                all_conds = set()
+            for condition in conds:
                 if hasattr(condition, 'composed_of'):
-                    unpack_conds(getattr(condition, 'composed_of'), all_conditions)
+                    unpack_conds(getattr(condition, 'composed_of'), all_conds)
                 else:
-                    all_conditions.append(condition)
+                    all_conds.add(condition)
 
-            return all_conditions
-
+            return all_conds
 
         for i, (name1, op1) in enumerate(ops):
             for j, (name2, op2) in enumerate(ops[i:]):
-                postconds1 = conditions_to_callbacks(op1._postconds)
-                postconds2 = conditions_to_callbacks(op2._postconds)
-                prereqs1 = conditions_to_callbacks(op1._prereqs)
-                prereqs2 = conditions_to_callbacks(op2._prereqs)
-                conds = (postconds1 + prereqs1 + postconds2 + prereqs2)
+                postconds1 = unpack_conds(to_callbacks(op1._postconds))
+                postconds2 = unpack_conds(to_callbacks(op2._postconds))
+                prereqs1 = unpack_conds(to_callbacks(op1._prereqs))
+                prereqs2 = unpack_conds(to_callbacks(op2._prereqs))
+                conds = postconds1 | prereqs1 | postconds2 | prereqs2
                 if any(getattr(cond, '_is_lambda', False) for cond in conds):
                         raise ValueError("The graph detection will not work"
                                          "with provided lambda functions")
-                if set(unpack_conds(postconds1)).intersection(set(unpack_conds(prereqs2))):
+                if postconds1.intersection(prereqs2):
                     mat[i][j+i] = 1
-                elif set(unpack_conds(prereqs1)).intersection(set(unpack_conds(postconds2))):
+                elif prereqs1.intersection(postconds2):
                     mat[j+i][i] = 1
         return mat
 

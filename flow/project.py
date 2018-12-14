@@ -176,15 +176,14 @@ class _condition(object):
 
     @classmethod
     def _multi(cls, funcs):
-        R"""Generate a sequence of conditions from a sequence of conditions
-        functions.
-
-        We need to actually add all the conditions explicitly if we want to
-        be able to take advantage of the workflow network detection. We
-        arbitrarily choose to return the last condition, since the actual
-        ordering of conditions is enforced by the __call__ logic anyway and
-        the primary purpose of the return is to allow chaining of decorators."""
-        return [cls(f) for f in funcs][-1]
+        R"""Generate a condition function equivalent to a sequence of
+        conditions functions. In order to make it identifiable to the graph
+        building algorithm, we need to tag this function with all the
+        conditions it is composed of."""
+        def metacondition(job):
+            return all(c(job) for c in funcs)
+        setattr(metacondition, 'composed_of', funcs)
+        return cls(metacondition)
 
 
 class _pre(_condition):
@@ -699,21 +698,42 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             self._label_functions.update(getattr(cls, '_LABEL_FUNCTIONS', dict()))
 
     def detect_operation_graph(self):
-        R"""Determine the directed acyclic graph defined by operation pre- and
+        """Determine the directed acyclic graph defined by operation pre- and
         post- conditions."""
         num_ops = len(self.operations)
         mat = [[0 for _ in range(num_ops)] for _ in range(num_ops)]
         ops = list(self.operations.items())
+
+        def conditions_to_callbacks(conditions):
+            return [condition._callback for condition in conditions]
+
+        def unpack_conds(conditions, all_conditions=None):
+            """Identify any metaconditions in the list and reduce them to the
+            functions they're composed of."""
+            if all_conditions is None:
+                all_conditions = []
+            for condition in conditions:
+                if hasattr(condition, 'composed_of'):
+                    unpack_conds(getattr(condition, 'composed_of'), all_conditions)
+                else:
+                    all_conditions.append(condition)
+
+            return all_conditions
+
+
         for i, (name1, op1) in enumerate(ops):
             for j, (name2, op2) in enumerate(ops[i:]):
-                conds = (op1._postconds + op1._prereqs + op2._postconds +
-                         op2._prereqs)
-                if any(getattr(cond._callback, '_is_lambda', False) for cond in conds):
+                postconds1 = conditions_to_callbacks(op1._postconds)
+                postconds2 = conditions_to_callbacks(op2._postconds)
+                prereqs1 = conditions_to_callbacks(op1._prereqs)
+                prereqs2 = conditions_to_callbacks(op2._prereqs)
+                conds = (postconds1 + prereqs1 + postconds2 + prereqs2)
+                if any(getattr(cond, '_is_lambda', False) for cond in conds):
                         raise ValueError("The graph detection will not work"
                                          "with provided lambda functions")
-                if set(op1._postconds).intersection(set(op2._prereqs)):
+                if set(unpack_conds(postconds1)).intersection(set(unpack_conds(prereqs2))):
                     mat[i][j+i] = 1
-                elif set(op1._prereqs).intersection(set(op2._postconds)):
+                elif set(unpack_conds(prereqs1)).intersection(set(unpack_conds(postconds2))):
                     mat[j+i][i] = 1
         return mat
 

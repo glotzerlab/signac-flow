@@ -125,16 +125,16 @@ class _condition(object):
         self.condition = condition
 
     @classmethod
-    def _get_func(cls, typ, key, func):
+    def _get_func(cls, condition_type, key, func):
         R"""Pull function from registry if exists, otherwise assign the provided one.
 
-        :param typ:
+        :param condition_type:
             The type of condition (e.g. 'isfile', 'true', etc).
-        :type typ:
+        :type condition_type:
             str
         :param key:
             The key to associate the function with (e.g. for type 'isfile', the
-            key could be a file 'intput.txt').
+            key could be a file 'input.txt').
         :type key:
             str
         :param func:
@@ -143,7 +143,7 @@ class _condition(object):
         :type func:
             callable
         """
-        conditions = cls._CONDITION_FUNCTIONS.setdefault(typ, dict())
+        conditions = cls._CONDITION_FUNCTIONS.setdefault(condition_type, dict())
         try:
             func = conditions[key]
         except KeyError:

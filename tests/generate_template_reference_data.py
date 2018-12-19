@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
@@ -5,7 +6,6 @@ from __future__ import print_function
 
 import sys
 import os
-import re
 import io
 import operator
 import itertools
@@ -15,14 +15,17 @@ from hashlib import sha1
 import signac
 import flow
 import flow.environments
+import jinja2
 
+from define_template_test_project import TestProject
 from test_project import redirect_stdout
+
 
 # Define a consistent submission name so that we can test that job names are
 # being correctly generated.
 PROJECT_NAME = "SubmissionTest"
-ARCHIVE_DIR = os.path.join(
-    os.path.dirname(__file__), './template_reference_data.tar.gz')
+ARCHIVE_DIR = os.path.normpath(os.path.join(
+    os.path.dirname(__file__), './template_reference_data.tar.gz'))
 PROJECT_DIRECTORY = "/home/johndoe/project/"
 
 
@@ -68,10 +71,6 @@ def init(project):
                 },
                 {
                     'partition': ['compute'],
-                    'nn': [None, 1, 2],
-                },
-                {
-                    'partition': ['compute'],
                     'parallel': [False, True],
                     'bundle': [['mpi_op', 'omp_op']],
                 }
@@ -83,22 +82,15 @@ def init(project):
                 },
                 {
                     'partition': ['skx-normal'],
-                    'nn': [None, 1, 2],
-                },
-                {
-                    'partition': ['skx-normal'],
                     'parallel': [False, True],
-                    'bundle': [['mpi_op', 'omp_op']]
+                    'bundle': [['mpi_op', 'mpi_op'],
+                               ['omp_op', 'omp_op']],
                 }
             ],
             'environments.xsede.BridgesEnvironment': [
                 {
                     'partition': ['RM', 'RM-Shared', 'GPU'],
                     'walltime': [None, 1],
-                },
-                {
-                    'partition': ['RM'],
-                    'nn': [None, 1, 2],
                 },
                 {
                     'partition': ['RM'],
@@ -111,9 +103,6 @@ def init(project):
                     'walltime': [None, 1],
                 },
                 {
-                    'nn': [None, 1, 2],
-                },
-                {
                     'parallel': [False, True],
                     'bundle': [['mpi_op', 'omp_op']],
                 }
@@ -123,9 +112,6 @@ def init(project):
                     'walltime': [None, 1],
                 },
                 {
-                    'nn': [None, 1, 2],
-                },
-                {
                     'parallel': [False, True],
                     'bundle': [['mpi_op', 'omp_op']],
                 }
@@ -133,9 +119,6 @@ def init(project):
             'environments.incite.EosEnvironment': [
                 {
                     'walltime': [None, 1],
-                },
-                {
-                    'nn': [None, 1, 2],
                 },
                 {
                     'parallel': [False, True],
@@ -161,52 +144,8 @@ def _store_bundled(self, operations):
         bid = '{}/bundle/{}'.format(self, sha1(h.encode('utf-8')).hexdigest())
         return bid
 
+
 flow.FlowProject._store_bundled = _store_bundled
-
-
-class TestProject(flow.FlowProject):
-    N = 2
-
-
-@TestProject.operation
-def serial_op(job):
-    pass
-
-
-@TestProject.operation
-@flow.directives(np=TestProject.N)
-def parallel_op(job):
-    pass
-
-
-@TestProject.operation
-@flow.directives(nranks=TestProject.N)
-def mpi_op(job):
-    pass
-
-
-@TestProject.operation
-@flow.directives(omp_num_threads=TestProject.N)
-def omp_op(job):
-    pass
-
-
-@TestProject.operation
-@flow.directives(nranks=TestProject.N, omp_num_threads=TestProject.N)
-def hybrid_op(job):
-    pass
-
-
-@TestProject.operation
-@flow.directives(ngpu=TestProject.N)
-def gpu_op(job):
-    pass
-
-
-@TestProject.operation
-@flow.directives(ngpu=TestProject.N, nranks=TestProject.N)
-def mpi_gpu_op(job):
-    pass
 
 
 def get_masked_flowproject(p):
@@ -221,15 +160,19 @@ def get_masked_flowproject(p):
     fp.config.project_dir = PROJECT_DIRECTORY
     return fp
 
+
 def main(args):
     # If the ARCHIVE_DIR already exists, only recreate if forced.
     if os.path.exists(ARCHIVE_DIR):
         if args.force:
+            print("Removing existing archive '{}'.".format(ARCHIVE_DIR))
             os.unlink(ARCHIVE_DIR)
         else:
+            print("Archive '{}' already exists, exiting. "
+                  "Use `-f/--force` to overwrite.".format(ARCHIVE_DIR))
             return
 
-    # NOTE: We should replace the below line with 
+    # NOTE: We should replace the below line with
     # with signac.TemporaryProject(name=PROJECT_NAME, cls=TestProject) as fp:
     # once the next version of signac is released, and we can then remove
     # the additional FlowProject instantiation below
@@ -247,9 +190,12 @@ def main(args):
                     fn = 'script_{}.sh'.format('_'.join(bundle))
                     tmp_out = io.TextIOWrapper(io.BytesIO(), sys.stdout.encoding)
                     with redirect_stdout(tmp_out):
-                        fp.submit(
-                            env=env, jobs=[job], names=bundle, pretend=True,
-                            force=True, bundle_size=len(bundle), **parameters)
+                        try:
+                            fp.submit(
+                                env=env, jobs=[job], names=bundle, pretend=True,
+                                force=True, bundle_size=len(bundle), **parameters)
+                        except jinja2.TemplateError as e:
+                            print('ERROR:', e)  # Shows template error in output script
 
                     # Filter out non-header lines
                     tmp_out.seek(0)
@@ -269,9 +215,12 @@ def main(args):
                         fn = 'script_{}.sh'.format(op)
                         tmp_out = io.TextIOWrapper(io.BytesIO(), sys.stdout.encoding)
                         with redirect_stdout(tmp_out):
-                            fp.submit(
-                                env=env, jobs=[job], names=[op], pretend=True,
-                                force=True, **parameters)
+                            try:
+                                fp.submit(
+                                    env=env, jobs=[job], names=[op],
+                                    pretend=True, force=True, **parameters)
+                            except jinja2.TemplateError as e:
+                                print('ERROR:', e)  # Shows template error in output script
 
                         # Filter out non-header lines and the job-name line
                         tmp_out.seek(0)

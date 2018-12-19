@@ -1,16 +1,18 @@
+{# Templated in accordance with: https://www.olcf.ornl.gov/for-users/system-user-guides/eos/running-jobs/ #}
+{% set mpiexec = "aprun" %}
 {% extends "torque.sh" %}
 {% block tasks %}
-{% set cpn = 24 %}
-{% set nn = nn|default((np_global/cpn)|round(method='ceil')|int, true) %}
-{% set node_util = np_global / (cpn * nn) %}
-{% if not force and node_util < 0.9 %}
-{% raise "Bad node utilization!! nn=%d, cores_per_node=%d, np_global=%d"|format(nn, cpn, np_global) %}
+{% set threshold = 0 if force else 0.9 %}
+{% set cpu_tasks = operations|calc_tasks('np', parallel, force) %}
+{% if operations|calc_tasks('ngpu', true, true) and not force %}
+{% raise "GPUs were requested but are unsupported by Eos!" %}
 {% endif %}
-#PBS -l nodes={{ nn }}
+{% set nn = nn|default(cpu_tasks|calc_num_nodes(24), true) %}
+#PBS -l nodes={{ nn|check_utilization(cpu_tasks, 24, threshold, 'CPU') }}
 {% endblock %}
 {% block header %}
 {{ super() -}}
-{% set account = 'account'|get_config_value(ns=environment) %}
+{% set account = account|default(environment|get_account_name, true) %}
 {% if account %}
 #PBS -A {{ account }}
 {% endif %}

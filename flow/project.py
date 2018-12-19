@@ -69,9 +69,7 @@ from .util.tqdm import tqdm
 from .util.misc import _positive_int
 from .util.misc import _mkdir_p
 from .util.misc import draw_progressbar
-from .util.template_filters import _format_timedelta
-from .util.template_filters import _identical
-from .util.template_filters import _with_np_offset
+from .util import template_filters as tf
 from .util.misc import write_human_readable_statepoint
 from .util.misc import add_cwd_to_environment_pythonpath
 from .util.misc import switch_to_directory
@@ -288,10 +286,12 @@ class JobOperation(object):
                 DeprecationWarning)
             assert directives.setdefault('np', np) == np
         else:
+            # Future: We can remove everything but the else: clause.
             directives.setdefault(
                 'np', directives.get('nranks', 1) * directives.get('omp_num_threads', 1))
         directives.setdefault('ngpu', 0)
-        # Future: directives.setdefault('np', 1)
+        directives.setdefault('nranks', 0)
+        directives.setdefault('omp_num_threads', 0)
 
         # Evaluate strings and callables for job:
         def evaluate(value):
@@ -620,14 +620,20 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             extensions=[TemplateError])
 
         # Setup standard filters that can be used to format context variables.
-        self._template_environment_.filters['format_timedelta'] = _format_timedelta
-        self._template_environment_.filters['identical'] = _identical
+        self._template_environment_.filters['format_timedelta'] = tf.format_timedelta
+        self._template_environment_.filters['identical'] = tf.identical
+        self._template_environment_.filters['with_np_offset'] = tf.with_np_offset
+        self._template_environment_.filters['calc_tasks'] = tf.calc_tasks
+        self._template_environment_.filters['calc_num_nodes'] = tf.calc_num_nodes
+        self._template_environment_.filters['check_utilization'] = tf.check_utilization
+        self._template_environment_.filters['homogeneous_openmp_mpi_config'] = \
+            tf.homogeneous_openmp_mpi_config
         self._template_environment_.filters['get_config_value'] = flow_config.get_config_value
         self._template_environment_.filters['require_config_value'] = \
             flow_config.require_config_value
+        self._template_environment_.filters['get_account_name'] = tf.get_account_name
         if 'max' not in self._template_environment_.filters:    # for jinja2 < 2.10
             self._template_environment_.filters['max'] = max
-        self._template_environment_.filters['with_np_offset'] = _with_np_offset
 
     @property
     def _template_environment(self):
@@ -1844,11 +1850,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             else:
                 np_total = max(op.directives['np'] for op in operations)
 
-            try:
-                script = env.script(_id=_id, np_total=np_total, **kwargs)
-            except ConfigKeyError as e:
-                raise SubmitError("The following error was encountered during script generation: ",
-                                  e.message)
+            script = env.script(_id=_id, np_total=np_total, **kwargs)
             background = kwargs.pop('parallel', not kwargs.pop('serial', False))
             self.write_script(script=script, operations=operations, background=background, **kwargs)
             script.seek(0)
@@ -1871,11 +1873,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             context.update(kwargs)
             if show_template_help:
                 self._show_template_help_and_exit(context)
-            try:
-                return template.render(** context)
-            except ConfigKeyError as e:
-                raise SubmitError(
-                    "The following error was encountered during script generation: {}".format(e))
+            return template.render(** context)
 
     @_support_legacy_api
     def submit_operations(self, operations, _id=None, env=None, parallel=False, flags=None,
@@ -1930,35 +1928,41 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             print(" - Operation: {}".format(op), file=sys.stderr)
             return op
 
-        script = self._generate_submit_script(
-            _id=_id,
-            operations=map(_msg, operations),
-            template=template,
-            show_template_help=show_template_help,
-            env=env,
-            parallel=parallel,
-            force=force,
-            **kwargs
-        )
-
-        # Keys which were explicitly set by the user, but are not evaluated by the
-        # template engine are cause for concern and might hint at a bug in the template
-        # script or ill-defined directives. Here we check whether all directive keys that
-        # have been explicitly set by the user were actually evaluated by the template
-        # engine and warn about those that have not been.
-        keys_unused = {
-            key for op in operations for key in
-            op.directives._keys_set_by_user.difference(op.directives.keys_used)}
-        if keys_unused:
-            logger.warning(
-                "Some of the keys provided as part of the directives were not used by "
-                "the template script, including: {}".format(
-                    ', '.join(sorted(keys_unused))))
-
-        if pretend:
-            print(script)
+        try:
+            script = self._generate_submit_script(
+                _id=_id,
+                operations=map(_msg, operations),
+                template=template,
+                show_template_help=show_template_help,
+                env=env,
+                parallel=parallel,
+                force=force,
+                **kwargs
+            )
+        except ConfigKeyError as error:
+            raise SubmitError(
+                "Unable to submit, because of a configuration error.\n"
+                "The following key is missing: {key}.\n"
+                "You can add the key to the configuration for example with:\n\n"
+                "  $ signac config --global set {key} VALUE\n".format(key=str(error)))
         else:
-            return env.submit(_id=_id, script=script, flags=flags, **kwargs)
+            # Keys which were explicitly set by the user, but are not evaluated by the
+            # template engine are cause for concern and might hint at a bug in the template
+            # script or ill-defined directives. Here we check whether all directive keys that
+            # have been explicitly set by the user were actually evaluated by the template
+            # engine and warn about those that have not been.
+            keys_unused = {
+                key for op in operations for key in
+                op.directives._keys_set_by_user.difference(op.directives.keys_used)}
+            if keys_unused:
+                logger.warning(
+                    "Some of the keys provided as part of the directives were not used by "
+                    "the template script, including: {}".format(
+                        ', '.join(sorted(keys_unused))))
+            if pretend:
+                print(script)
+            else:
+                return env.submit(_id=_id, script=script, flags=flags, **kwargs)
 
     @_support_legacy_api
     def submit(self, bundle_size=1, jobs=None, names=None, num=None, parallel=False,

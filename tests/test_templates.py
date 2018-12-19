@@ -47,6 +47,8 @@ class BaseTemplateTest(object):
             if not len(jobs):
                 raise unittest.SkipTest("No reference data!")
 
+            reference = []
+            generated = []
             for job in jobs:
                 parameters = job.sp.parameters()
                 if 'bundle' in parameters:
@@ -60,15 +62,11 @@ class BaseTemplateTest(object):
                                     env=self.env, jobs=[job], names=bundle, pretend=True,
                                     force=True, bundle_size=len(bundle), **parameters)
                     tmp_out.seek(0)
-                    generated = tmp_out.read()
+                    msg = "---------- Bundled submission of job {}".format(job)
+                    generated.extend([msg] + tmp_out.read().splitlines())
 
-                    fn = 'script_{}.sh'.format('_'.join(bundle))
-                    with open(job.fn(fn)) as f:
-                        self.assertEqual(
-                            generated,
-                            f.read(),
-                            msg="Failed for bundle submission of job {}".format(
-                                job.get_id()))
+                    with open(job.fn('script_{}.sh'.format('_'.join(bundle)))) as file:
+                        reference.extend([msg] + file.read().splitlines())
                 else:
                     for op in fp.operations:
                         if 'partition' in parameters:
@@ -89,15 +87,13 @@ class BaseTemplateTest(object):
                                         env=self.env, jobs=[job],
                                         names=[op], pretend=True, force=True, **parameters)
                         tmp_out.seek(0)
-                        generated = tmp_out.read()
+                        msg = "---------- Submission of operation {} for job {}.".format(op, job)
+                        generated.extend([msg] + tmp_out.read().splitlines())
 
-                        fn = 'script_{}.sh'.format(op)
-                        with open(job.fn(fn)) as f:
-                            self.assertEqual(
-                                generated,
-                                f.read(),
-                                msg="Failed for job {}, operation {}".format(
-                                    job.get_id(), op))
+                        with open(job.fn('script_{}.sh'.format(op))) as file:
+                            reference.extend([msg] + file.read().splitlines())
+
+            self.assertEqual('\n'.join(reference), '\n'.join(generated))
 
 
 # TestCase factory

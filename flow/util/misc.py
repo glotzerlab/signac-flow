@@ -171,3 +171,20 @@ def _is_identifier(name):
             return name.isidentifier()
     else:
         return False    # empty string or None
+
+
+class TrackGetItemDict(dict):
+    "A dict that keeps track of which keys were accessed via __getitem__."
+
+    def __init__(self, *args, **kwargs):
+        self._keys_used = set()
+        super(TrackGetItemDict, self).__init__(*args, **kwargs)
+
+    def __getitem__(self, key):
+        self._keys_used.add(key)
+        return super(TrackGetItemDict, self).__getitem__(key)
+
+    @property
+    def keys_used(self):
+        "Return all keys that were accessed via the __getitem__ method."
+        return self._keys_used.copy()

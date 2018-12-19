@@ -75,6 +75,7 @@ from .util.template_filters import _with_np_offset
 from .util.misc import write_human_readable_statepoint
 from .util.misc import add_cwd_to_environment_pythonpath
 from .util.misc import switch_to_directory
+from .util.misc import TrackGetItemDict
 from .util.progressbar import with_progressbar
 from .util.translate import abbreviate
 from .util.translate import shorten
@@ -265,11 +266,20 @@ class JobOperation(object):
     MAX_LEN_ID = 100
 
     def __init__(self, name, job, cmd, directives=None, np=None):
-        if directives is None:
-            directives = dict()
         self.name = name
         self.job = job
         self.cmd = cmd
+        if directives is None:
+            directives = dict()  # default argument
+        else:
+            directives = dict(directives)  # explicit copy
+
+        # Keys which were explicitly set by the user, but are not evaluated by the
+        # template engine are cause for concern and might hint at a bug in the template
+        # script or ill-defined directives. We are therefore keeping track of all
+        # keys set by the user and check whether they have been evaluated by the template
+        # script engine later.
+        keys_set_by_user = set(directives.keys())
 
         # Handle deprecated np argument:
         if np is not None:
@@ -292,7 +302,12 @@ class JobOperation(object):
             else:
                 return value
 
-        self.directives = {key: evaluate(value) for key, value in directives.items()}
+        # We use a special dictionary that allows us to track all keys that have been
+        # evaluated by the template engine and compare them to those explicitly set
+        # by the user. See also comment above.
+        self.directives = TrackGetItemDict(
+            {key: evaluate(value) for key, value in directives.items()})
+        self.directives._keys_set_by_user = keys_set_by_user
 
     def __str__(self):
         return "{}({})".format(self.name, self.job)
@@ -1915,10 +1930,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             print(" - Operation: {}".format(op), file=sys.stderr)
             return op
 
-        operations = map(_msg, operations)
         script = self._generate_submit_script(
             _id=_id,
-            operations=list(operations),
+            operations=map(_msg, operations),
             template=template,
             show_template_help=show_template_help,
             env=env,
@@ -1926,6 +1940,21 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             force=force,
             **kwargs
         )
+
+        # Keys which were explicitly set by the user, but are not evaluated by the
+        # template engine are cause for concern and might hint at a bug in the template
+        # script or ill-defined directives. Here we check whether all directive keys that
+        # have been explicitly set by the user were actually evaluated by the template
+        # engine and warn about those that have not been.
+        keys_unused = {
+            key for op in operations for key in
+            op.directives._keys_set_by_user.difference(op.directives.keys_used)}
+        if keys_unused:
+            logger.warning(
+                "Some of the keys provided as part of the directives were not used by "
+                "the template script, including: {}".format(
+                    ', '.join(sorted(keys_unused))))
+
         if pretend:
             print(script)
         else:

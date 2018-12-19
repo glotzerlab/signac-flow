@@ -530,6 +530,23 @@ class ExecutionProjectTest(BaseProjectTest):
             self.assertIsNotNone(next_op)
             self.assertEqual(next_op.get_status(), JobStatus.queued)
 
+    @unittest.skipIf(six.PY2, 'logger output not caught for Python 2.7')
+    def test_submit_operations_bad_directive(self):
+        MockScheduler.reset()
+        project = self.mock_project()
+        operations = []
+        for job in project:
+            operations.extend(project.next_operations(job))
+        self.assertEqual(len(list(MockScheduler.jobs())), 0)
+        cluster_job_id = project._store_bundled(operations)
+        stderr = StringIO()
+        with redirect_stderr(stderr):
+            project.submit_operations(_id=cluster_job_id, operations=operations)
+        self.assertEqual(len(list(MockScheduler.jobs())), 1)
+        self.assertIn('Some of the keys provided as part of the directives were not '
+                      'used by the template script, including: bad_directive\n',
+                      stderr.getvalue())
+
     def test_condition_evaluation(self):
         project = self.mock_project()
 

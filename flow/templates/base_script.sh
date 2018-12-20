@@ -1,10 +1,8 @@
 {# The following variables are available to all scripts. #}
 {% if parallel %}
 {% set np_global = operations|map(attribute='directives.np')|sum %}
-{% set ngpu_global = operations|map(attribute='directives.ngpu')|sum %}
 {% else %}
 {% set np_global = operations|map(attribute='directives.np')|max %}
-{% set ngpu_global = operations|map(attribute='directives.ngpu')|max %}
 {% endif %}
 {% block header %}
 {% endblock %}

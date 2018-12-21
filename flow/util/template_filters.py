@@ -16,7 +16,7 @@ def identical(iterable):
     return len(set(iterable)) <= 1
 
 
-def format_timedelta(delta):
+def format_timedelta(delta, style='HH:MM:SS'):
     "Format a time delta for interpretation by schedulers."
     if isinstance(delta, int) or isinstance(delta, float):
         import datetime
@@ -24,7 +24,12 @@ def format_timedelta(delta):
     hours, r = divmod(delta.seconds, 3600)
     minutes, seconds = divmod(r, 60)
     hours += delta.days * 24
-    return "{:0>2}:{:0>2}:{:0>2}".format(hours, minutes, seconds)
+    if style == 'HH:MM:SS':
+        return "{:0>2}:{:0>2}:{:0>2}".format(hours, minutes, seconds)
+    elif style == 'HH:MM':
+        return "{:0>2}:{:0>2}".format(hours, minutes)
+    else:
+        raise ValueError('Unsupported style in format_timedelta.')
 
 
 def homogeneous_openmp_mpi_config(operations):

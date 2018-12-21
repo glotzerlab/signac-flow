@@ -47,6 +47,8 @@ next
 
 - Added `@with_job` decorator that allows us to define operations to take place within the `job` context. Works with `@cmd`.
 - Fix SLURM scheduler driver to show full error message in case that submission with `squeue` failed.
+- Added support for the Summit supercomputer (U.S. DOE, Oak Ridge National Laboratory) and Ascent testing cluster
+- Added support for the IBM LSF scheduler
 
 
 [0.6.3] -- 2018-08-22

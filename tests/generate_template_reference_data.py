@@ -26,7 +26,7 @@ from test_project import redirect_stdout
 PROJECT_NAME = "SubmissionTest"
 ARCHIVE_DIR = os.path.normpath(os.path.join(
     os.path.dirname(__file__), './template_reference_data.tar.gz'))
-PROJECT_DIRECTORY = "/home/johndoe/project/"
+PROJECT_DIRECTORY = "/home/user/project/"
 
 
 def cartesian(**kwargs):
@@ -124,7 +124,25 @@ def init(project):
                     'parallel': [False, True],
                     'bundle': [['mpi_op', 'omp_op']],
                 }
-            ]
+            ],
+            'environments.incite.SummitEnvironment': [
+                {
+                    'walltime': [None, 1],
+                },
+                {
+                    'parallel': [False, True],
+                    'bundle': [['mpi_op', 'omp_op']],
+                }
+            ],
+            'environments.incite.AscentEnvironment': [
+                {
+                    'walltime': [None, 1],
+                },
+                {
+                    'parallel': [False, True],
+                    'bundle': [['mpi_op', 'omp_op']],
+                }
+            ],
         }
 
     for environment, parameter_combinations in environments.items():

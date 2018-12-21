@@ -20,11 +20,13 @@ The package currently ships with drivers for:
 
    supported_environments/slurm
    supported_environments/torque
+   supported_environments/lsf
 
 Any supercomputing system utilizing these schedulers is supported out of the box.
 In addition, the package provides specialized submission profiles for the following environments:
 
 .. toctree::
+   supported_environments/summit
    supported_environments/titan
    supported_environments/eos
    supported_environments/stampede2

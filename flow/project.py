@@ -560,15 +560,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         # Associate this class with a compute environment.
         self._environment = environment or get_environment()
 
-        # Setup the templating system for the generation of run and submission scripts.
-
-        self._template_environment_ = None
-
         # The standard local template directory is a directory called 'templates' within
         # the project root directory. This directory may be specified with the 'template_dir'
         # configuration variable.
         self._template_dir = os.path.join(
             self.root_directory(), self._config.get('template_dir', 'templates'))
+        self._template_environment_ = dict()
 
         self._setup_legacy_templating()  # TODO: Disable in 0.8.
 
@@ -601,7 +598,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
         # Templates are searched in the local template directory first, then in additionally
         # installed packages, then in the main package 'templates' directory.
-        # 'templates' directory.
         extra_packages = []
         for env in envs:
             try:
@@ -614,32 +610,38 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                      extra_packages +
                      [jinja2.PackageLoader('flow', 'templates')])
 
-        self._template_environment_ = jinja2.Environment(
+        template_environment = jinja2.Environment(
             loader=jinja2.ChoiceLoader(load_envs),
             trim_blocks=True,
             extensions=[TemplateError])
 
         # Setup standard filters that can be used to format context variables.
-        self._template_environment_.filters['format_timedelta'] = tf.format_timedelta
-        self._template_environment_.filters['identical'] = tf.identical
-        self._template_environment_.filters['with_np_offset'] = tf.with_np_offset
-        self._template_environment_.filters['calc_tasks'] = tf.calc_tasks
-        self._template_environment_.filters['calc_num_nodes'] = tf.calc_num_nodes
-        self._template_environment_.filters['check_utilization'] = tf.check_utilization
-        self._template_environment_.filters['homogeneous_openmp_mpi_config'] = \
+        template_environment.filters['format_timedelta'] = tf.format_timedelta
+        template_environment.filters['identical'] = tf.identical
+        template_environment.filters['with_np_offset'] = tf.with_np_offset
+        template_environment.filters['calc_tasks'] = tf.calc_tasks
+        template_environment.filters['calc_num_nodes'] = tf.calc_num_nodes
+        template_environment.filters['check_utilization'] = tf.check_utilization
+        template_environment.filters['homogeneous_openmp_mpi_config'] = \
             tf.homogeneous_openmp_mpi_config
-        self._template_environment_.filters['get_config_value'] = flow_config.get_config_value
-        self._template_environment_.filters['require_config_value'] = \
+        template_environment.filters['get_config_value'] = flow_config.get_config_value
+        template_environment.filters['require_config_value'] = \
             flow_config.require_config_value
-        self._template_environment_.filters['get_account_name'] = tf.get_account_name
-        if 'max' not in self._template_environment_.filters:    # for jinja2 < 2.10
-            self._template_environment_.filters['max'] = max
+        template_environment.filters['get_account_name'] = tf.get_account_name
+        if 'max' not in template_environment.filters:    # for jinja2 < 2.10
+            template_environment.filters['max'] = max
+        return template_environment
 
-    @property
-    def _template_environment(self):
-        if self._template_environment_ is None:
-            self._setup_template_environment()
-        return self._template_environment_
+    def _template_environment(self, environment=None):
+        if environment is None:
+            environment = self._environment
+        if environment not in self._template_environment_:
+            template_environment = self._setup_template_environment()
+            # Add environment-specific custom filters:
+            for filter_name, filter_function in getattr(environment, 'filters', {}).items():
+                template_environment.filters[filter_name] = filter_function
+            self._template_environment_[environment] = template_environment
+        return self._template_environment_[environment]
 
     def _get_standard_template_context(self):
         "Return the standard templating context for run and submission scripts."
@@ -647,14 +649,14 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         context['project'] = self
         return context
 
-    def _show_template_help_and_exit(self, context):
+    def _show_template_help_and_exit(self, template_environment, context):
         "Print all context variables and filters to screen and exit."
         from textwrap import TextWrapper
         wrapper = TextWrapper(width=90, break_long_words=False)
         print(TEMPLATE_HELP.format(
             template_dir=self._template_dir,
             template_vars='\n'.join(wrapper.wrap(', '.join(sorted(context)))),
-            filters='\n'.join(wrapper.wrap(', '.join(sorted(self._template_environment.filters))))))
+            filters='\n'.join(wrapper.wrap(', '.join(sorted(template_environment.filters))))))
         sys.exit(2)
 
     def _setup_legacy_templating(self):
@@ -1821,7 +1823,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             return script.read()
         else:
             # By default we use the jinja2 templating system to generate the script.
-            template = self._template_environment.get_template(template)
+            template_environment = self._template_environment()
+            template = template_environment.get_template(template)
             context = self._get_standard_template_context()
             # For script generation we do not need the extra logic used for
             # generating cluster job scripts.
@@ -1829,7 +1832,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             context['operations'] = list(operations)
             context['parallel'] = parallel
             if show_template_help:
-                self._show_template_help_and_exit(context)
+                self._show_template_help_and_exit(template_environment, context)
             return template.render(** context)
 
     def _generate_submit_script(self, _id, operations, template, show_template_help, env, **kwargs):
@@ -1856,7 +1859,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             script.seek(0)
             return script.read()
         else:
-            template = self._template_environment.get_template(template)
+            template_environment = self._template_environment(env)
+            template = template_environment.get_template(template)
             context = self._get_standard_template_context()
             # The flow 'script.sh' file simply extends the base script
             # provided. The choice of base script is dependent on the
@@ -1872,7 +1876,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             context['operations'] = list(operations)
             context.update(kwargs)
             if show_template_help:
-                self._show_template_help_and_exit(context)
+                self._show_template_help_and_exit(template_environment, context)
             return template.render(** context)
 
     @_support_legacy_api

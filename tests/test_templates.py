@@ -45,7 +45,7 @@ class BaseTemplateTest(object):
 
             jobs = fp.find_jobs(dict(environment=self.env_name()))
             if not len(jobs):
-                raise unittest.SkipTest("No reference data!")
+                raise RuntimeError("No reference data for environment {}!".format(self.env_name()))
 
             reference = []
             generated = []

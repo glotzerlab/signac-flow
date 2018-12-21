@@ -38,8 +38,10 @@ else:
 # of the the standard library as of Python version 3.5.
 
 @contextmanager
-def redirect_stdout(new_target):
+def redirect_stdout(new_target=None):
     "Temporarily redirect all output to stdout to new_target."
+    if new_target is None:
+        new_target = StringIO()
     old_target = sys.stdout
     try:
         sys.stdout = new_target
@@ -49,8 +51,10 @@ def redirect_stdout(new_target):
 
 
 @contextmanager
-def redirect_stderr(new_target):
+def redirect_stderr(new_target=None):
     "Temporarily redirect all output to stderr to new_target."
+    if new_target is None:
+        new_target = StringIO()
     old_target = sys.stderr
     try:
         sys.stderr = new_target
@@ -251,7 +255,8 @@ class ProjectClassTest(BaseProjectTest):
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
                 starting_dir = os.getcwd()
-                A().run()
+                with redirect_stderr():
+                    A().run()
                 self.assertTrue(os.getcwd(), starting_dir)
 
     def test_cmd_with_job_wrong_order(self):
@@ -281,7 +286,8 @@ class ProjectClassTest(BaseProjectTest):
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
                 starting_dir = os.getcwd()
-                A().run()
+                with redirect_stderr():
+                    A().run()
                 self.assertEqual(os.getcwd(), starting_dir)
                 for job in project:
                     self.assertTrue(os.path.isfile(job.fn("world.txt")))
@@ -301,7 +307,8 @@ class ProjectClassTest(BaseProjectTest):
             with switch_to_directory(project.root_directory()):
                 starting_dir = os.getcwd()
                 with self.assertRaises(Exception):
-                    A().run()
+                    with redirect_stderr():
+                        A().run()
                 self.assertEqual(os.getcwd(), starting_dir)
 
     def test_cmd_with_job_error_handling(self):
@@ -319,7 +326,8 @@ class ProjectClassTest(BaseProjectTest):
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
                 starting_dir = os.getcwd()
-                A().run()
+                with redirect_stderr():
+                    A().run()
                 self.assertEqual(os.getcwd(), starting_dir)
 
 

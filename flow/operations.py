@@ -92,9 +92,7 @@ def with_job(func):
     def decorated(job):
         with job:
             if getattr(func, "_flow_cmd", False):
-                return 'trap "cd $(pwd)" EXIT && cd {} && {}  && pwd'.format(
-                    job.ws, func(job)
-                )
+                return 'trap "cd $(pwd)" EXIT && cd {} && {}'.format(job.ws, func(job))
             else:
                 return func(job)
 

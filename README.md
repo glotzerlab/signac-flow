@@ -7,19 +7,19 @@
 
 ## About
 
-The **signac-flow** tool provides the basic components to set up simple to complex workflows for projects as part of the [signac framework](http://www.signac.io).
+The **signac-flow** tool provides the basic components to set up simple to complex workflows for projects as part of the [signac framework](https://www.signac.io).
 That includes the definition of data pipelines, execution of data space operations and the submission of operations to high-performance super computers.
 
 ## Maintainers
 
   * Carl Simon Adorf (csadorf@umich.edu)
   * Vyas Ramasubramani (vramasub@umich.edu)
-  * Paul Dodd (pdodd@umich.edu)
+  * Bradley D. Dice (bdice@umich.edu)
 
 ## Installation
 
 The recommendend installation method for **signac-flow** is through **conda** or **pip**.
-The software is tested for Python versions 2.7 and 3.5+ and is built for all major platforms.
+The software is tested for Python versions 2.7 and 3.4+ and is built for all major platforms.
 
 This package is available via the [conda-forge](https://conda-forge.org/) conda channel:
 

@@ -42,13 +42,18 @@ We recommend to go through the tutorial on signac-docs_ to learn how to best tak
 
 .. _signac-docs: https://signac-docs.readthedocs.io/en/latest
 
-next
-----
+[0.6.4] -- 2018-12-28
+---------------------
 
 - Added `@with_job` decorator that allows us to define operations to take place within the `job` context. Works with `@cmd`.
-- Fix SLURM scheduler driver to show full error message in case that submission with `squeue` failed.
-- Added support for the Summit supercomputer (U.S. DOE, Oak Ridge National Laboratory) and Ascent testing cluster
+- Added support for the Summit supercomputer (U.S. DOE, Oak Ridge National Laboratory) and Ascent testing cluster.
 - Added support for the IBM LSF scheduler
+- Added warning about explicitly set, but unused directives during submission.
+- Overall revision of all cluster submission templates; improved structure and abstraction of logic.
+- Fix SLURM scheduler driver to show full error message in case that submission with `squeue` failed.
+- Improved documenation for developers and contributors.
+- Added official support for Python version 3.7.
+- Better specification of (optional) dependencies in setup.py and requirements.txt.
 
 
 [0.6.3] -- 2018-08-22

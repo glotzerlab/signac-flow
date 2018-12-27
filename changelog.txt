@@ -49,7 +49,7 @@ We recommend to go through the tutorial on signac-docs_ to learn how to best tak
 - Add the `not_` condition prefix to negate condition functions.
 - Add the `false` condition prefix as analogue to the `true` condition prefix.
 - Add support for the Summit supercomputer (U.S. DOE, Oak Ridge National Laboratory) and Ascent testing cluster.
-- Add support for the IBM LSF scheduler
+- Add support for the IBM LSF scheduler.
 - Add warning about explicitly set, but unused directives during submission.
 - Add official support for Python version 3.7.
 - Fix issue where the status sub-command ignored the `--show-traceback` option.
@@ -58,7 +58,7 @@ We recommend to go through the tutorial on signac-docs_ to learn how to best tak
 - Overall revision of all cluster submission templates; improved structure and abstraction of logic.
 - The serialization of operations was improved to optimize execution speed for local runs.
 - The evaluation of pre- and post-conditions was optimized for optimally lazy evaluation: cheaper conditions should be placed above more expensive conditions for maximal performance.
-- Automatically use buffered-mode for during the gathering of pending operations.
+- When gathering operations, signac will automatically use the buffered mode (requires signac >= 0.9.3).
 - Improved documentation for developers and contributors.
 
 [0.6.3] -- 2018-08-22

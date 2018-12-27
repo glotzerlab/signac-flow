@@ -2,17 +2,17 @@
 # Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
+"""Extract generated templates into a signac project for simplified inspection."""
 
-"""This is a helper script to extract the generated templates into a signac project for easier viewing."""
 import os
 import argparse
 
 import signac
-import flow
 import generate_template_reference_data as gen
 
 PROJECT_DIR = os.path.join(
     os.path.dirname(__file__), './template_reference_data')
+
 
 def main(args):
     if not os.path.exists(PROJECT_DIR):
@@ -26,6 +26,7 @@ def main(args):
 
     p = signac.init_project(name=gen.PROJECT_NAME, root=PROJECT_DIR)
     p.import_from(origin=gen.ARCHIVE_DIR)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(

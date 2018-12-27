@@ -44,6 +44,7 @@ def op2(job):
 class TestDynamicProject(TestProject):
     pass
 
+
 @TestDynamicProject.operation
 @TestDynamicProject.pre.after(op1)
 @TestDynamicProject.post.true('dynamic')

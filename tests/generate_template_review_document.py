@@ -30,14 +30,14 @@ def process_job(document, job):
 
     from collections import OrderedDict
     name_map = OrderedDict([
-            ('script_serial_op.sh',  'Serial operation'),
-            ('script_parallel_op.sh',  'Generic parallel operation'),
-            ('script_mpi_op.sh',  'MPI operation'),
-            ('script_omp_op.sh',  'OpenMP operation'),
-            ('script_hybrid_op.sh',  'MPI-OpenMP Hybrid operation'),
-            ('script_gpu_op.sh',  'GPU operation'),
-            ('script_mpi_gpu_op.sh',  'MPI-GPU operation'),
-            ])
+        ('script_serial_op.sh',  'Serial operation'),
+        ('script_parallel_op.sh',  'Generic parallel operation'),
+        ('script_mpi_op.sh',  'MPI operation'),
+        ('script_omp_op.sh',  'OpenMP operation'),
+        ('script_hybrid_op.sh',  'MPI-OpenMP Hybrid operation'),
+        ('script_gpu_op.sh',  'GPU operation'),
+        ('script_mpi_gpu_op.sh',  'MPI-GPU operation'),
+    ])
 
     if job.sp.parameters.get('bundle', False):
         h = 'Bundled MPI and OpenMP jobs'

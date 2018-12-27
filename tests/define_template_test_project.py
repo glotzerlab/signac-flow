@@ -1,10 +1,11 @@
 import flow
 
+
 class TestProject(flow.FlowProject):
-    ngpu=2
-    np=3
-    omp_num_threads=4
-    nranks=5
+    ngpu = 2
+    np = 3
+    omp_num_threads = 4
+    nranks = 5
 
 
 @TestProject.operation

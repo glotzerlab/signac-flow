@@ -75,9 +75,9 @@ class BaseTemplateTest(object):
                             # requirement if we make our error checking more
                             # consistent.
                             if operator.xor(
-                                        'gpu' in parameters['partition'].lower(),
-                                        'gpu' in op.lower()):
-                                    continue
+                                'gpu' in parameters['partition'].lower(),
+                                    'gpu' in op.lower()):
+                                continue
                         tmp_out = io.TextIOWrapper(
                             io.BytesIO(), sys.stdout.encoding)
                         with open(os.devnull, 'w') as devnull:

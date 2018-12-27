@@ -63,87 +63,87 @@ def init(project):
     # bundling and parallelism must exist in the same test. The goal is to
     # construct a minimal covering set of all test cases.
     environments = {
-            'environment.UnknownEnvironment': [],
-            'environments.xsede.CometEnvironment': [
-                {
-                    'partition': ['compute', 'shared', 'gpu'],
-                    'walltime': [None, 1],
-                },
-                {
-                    'partition': ['compute'],
-                    'parallel': [False, True],
-                    'bundle': [['mpi_op', 'omp_op']],
-                }
-            ],
-            'environments.xsede.Stampede2Environment': [
-                {
-                    'partition': ['skx-normal'],
-                    'walltime': [None, 1],
-                },
-                {
-                    'partition': ['skx-normal'],
-                    'parallel': [False, True],
-                    'bundle': [['mpi_op', 'mpi_op'],
-                               ['omp_op', 'omp_op']],
-                }
-            ],
-            'environments.xsede.BridgesEnvironment': [
-                {
-                    'partition': ['RM', 'RM-Shared', 'GPU'],
-                    'walltime': [None, 1],
-                },
-                {
-                    'partition': ['RM'],
-                    'parallel': [False, True],
-                    'bundle': [['mpi_op', 'omp_op']],
-                }
-            ],
-            'environments.umich.FluxEnvironment': [
-                {
-                    'walltime': [None, 1],
-                },
-                {
-                    'parallel': [False, True],
-                    'bundle': [['mpi_op', 'omp_op']],
-                }
-            ],
-            'environments.incite.TitanEnvironment': [
-                {
-                    'walltime': [None, 1],
-                },
-                {
-                    'parallel': [False, True],
-                    'bundle': [['mpi_op', 'omp_op']],
-                }
-            ],
-            'environments.incite.EosEnvironment': [
-                {
-                    'walltime': [None, 1],
-                },
-                {
-                    'parallel': [False, True],
-                    'bundle': [['mpi_op', 'omp_op']],
-                }
-            ],
-            'environments.incite.SummitEnvironment': [
-                {
-                    'walltime': [None, 1],
-                },
-                {
-                    'parallel': [False, True],
-                    'bundle': [['mpi_op', 'omp_op']],
-                }
-            ],
-            'environments.incite.AscentEnvironment': [
-                {
-                    'walltime': [None, 1],
-                },
-                {
-                    'parallel': [False, True],
-                    'bundle': [['mpi_op', 'omp_op']],
-                }
-            ],
-        }
+        'environment.UnknownEnvironment': [],
+        'environments.xsede.CometEnvironment': [
+            {
+                'partition': ['compute', 'shared', 'gpu'],
+                'walltime': [None, 1],
+            },
+            {
+                'partition': ['compute'],
+                'parallel': [False, True],
+                'bundle': [['mpi_op', 'omp_op']],
+            }
+        ],
+        'environments.xsede.Stampede2Environment': [
+            {
+                'partition': ['skx-normal'],
+                'walltime': [None, 1],
+            },
+            {
+                'partition': ['skx-normal'],
+                'parallel': [False, True],
+                'bundle': [['mpi_op', 'mpi_op'],
+                           ['omp_op', 'omp_op']],
+            }
+        ],
+        'environments.xsede.BridgesEnvironment': [
+            {
+                'partition': ['RM', 'RM-Shared', 'GPU'],
+                'walltime': [None, 1],
+            },
+            {
+                'partition': ['RM'],
+                'parallel': [False, True],
+                'bundle': [['mpi_op', 'omp_op']],
+            }
+        ],
+        'environments.umich.FluxEnvironment': [
+            {
+                'walltime': [None, 1],
+            },
+            {
+                'parallel': [False, True],
+                'bundle': [['mpi_op', 'omp_op']],
+            }
+        ],
+        'environments.incite.TitanEnvironment': [
+            {
+                'walltime': [None, 1],
+            },
+            {
+                'parallel': [False, True],
+                'bundle': [['mpi_op', 'omp_op']],
+            }
+        ],
+        'environments.incite.EosEnvironment': [
+            {
+                'walltime': [None, 1],
+            },
+            {
+                'parallel': [False, True],
+                'bundle': [['mpi_op', 'omp_op']],
+            }
+        ],
+        'environments.incite.SummitEnvironment': [
+            {
+                'walltime': [None, 1],
+            },
+            {
+                'parallel': [False, True],
+                'bundle': [['mpi_op', 'omp_op']],
+            }
+        ],
+        'environments.incite.AscentEnvironment': [
+            {
+                'walltime': [None, 1],
+            },
+            {
+                'parallel': [False, True],
+                'bundle': [['mpi_op', 'omp_op']],
+            }
+        ],
+    }
 
     for environment, parameter_combinations in environments.items():
         for parameter_sets in parameter_combinations:
@@ -229,7 +229,7 @@ def main(args):
                             # consistent.
                             if operator.xor('gpu' in parameters['partition'].lower(),
                                             'gpu' in op.lower()):
-                                    continue
+                                continue
                         fn = 'script_{}.sh'.format(op)
                         tmp_out = io.TextIOWrapper(io.BytesIO(), sys.stdout.encoding)
                         with redirect_stdout(tmp_out):

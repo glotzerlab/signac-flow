@@ -69,12 +69,11 @@ from .util.tqdm import tqdm
 from .util.misc import _positive_int
 from .util.misc import _mkdir_p
 from .util.misc import draw_progressbar
-from .util.template_filters import _format_timedelta
-from .util.template_filters import _identical
-from .util.template_filters import _with_np_offset
+from .util import template_filters as tf
 from .util.misc import write_human_readable_statepoint
 from .util.misc import add_cwd_to_environment_pythonpath
 from .util.misc import switch_to_directory
+from .util.misc import TrackGetItemDict
 from .util.progressbar import with_progressbar
 from .util.translate import abbreviate
 from .util.translate import shorten
@@ -153,12 +152,20 @@ class _condition(object):
         return cls(lambda job: job.document.get(key, False))
 
     @classmethod
+    def false(cls, key):
+        return cls(lambda job: not job.document.get(key, False))
+
+    @classmethod
     def always(cls, func):
         return cls(lambda _: True)(func)
 
     @classmethod
     def never(cls, func):
         return cls(lambda _: False)(func)
+
+    @classmethod
+    def not_(cls, condition):
+        return cls(lambda job: not condition(job))
 
 
 class _pre(_condition):
@@ -257,11 +264,20 @@ class JobOperation(object):
     MAX_LEN_ID = 100
 
     def __init__(self, name, job, cmd, directives=None, np=None):
-        if directives is None:
-            directives = dict()
         self.name = name
         self.job = job
         self.cmd = cmd
+        if directives is None:
+            directives = dict()  # default argument
+        else:
+            directives = dict(directives)  # explicit copy
+
+        # Keys which were explicitly set by the user, but are not evaluated by the
+        # template engine are cause for concern and might hint at a bug in the template
+        # script or ill-defined directives. We are therefore keeping track of all
+        # keys set by the user and check whether they have been evaluated by the template
+        # script engine later.
+        keys_set_by_user = set(directives.keys())
 
         # Handle deprecated np argument:
         if np is not None:
@@ -270,10 +286,12 @@ class JobOperation(object):
                 DeprecationWarning)
             assert directives.setdefault('np', np) == np
         else:
+            # Future: We can remove everything but the else: clause.
             directives.setdefault(
                 'np', directives.get('nranks', 1) * directives.get('omp_num_threads', 1))
         directives.setdefault('ngpu', 0)
-        # Future: directives.setdefault('np', 1)
+        directives.setdefault('nranks', 0)
+        directives.setdefault('omp_num_threads', 0)
 
         # Evaluate strings and callables for job:
         def evaluate(value):
@@ -284,7 +302,12 @@ class JobOperation(object):
             else:
                 return value
 
-        self.directives = {key: evaluate(value) for key, value in directives.items()}
+        # We use a special dictionary that allows us to track all keys that have been
+        # evaluated by the template engine and compare them to those explicitly set
+        # by the user. See also comment above.
+        self.directives = TrackGetItemDict(
+            {key: evaluate(value) for key, value in directives.items()})
+        self.directives._keys_set_by_user = keys_set_by_user
 
     def __str__(self):
         return "{}({})".format(self.name, self.job)
@@ -462,7 +485,7 @@ class FlowOperation(object):
     def eligible(self, job):
         "Eligible, when all pre-conditions are true and at least one post-condition is false."
         pre = all(cond(job) for cond in self._prereqs)
-        if len(self._postconds):
+        if pre and len(self._postconds):
             post = any(not cond(job) for cond in self._postconds)
         else:
             post = True
@@ -537,15 +560,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         # Associate this class with a compute environment.
         self._environment = environment or get_environment()
 
-        # Setup the templating system for the generation of run and submission scripts.
-
-        self._template_environment_ = None
-
         # The standard local template directory is a directory called 'templates' within
         # the project root directory. This directory may be specified with the 'template_dir'
         # configuration variable.
         self._template_dir = os.path.join(
             self.root_directory(), self._config.get('template_dir', 'templates'))
+        self._template_environment_ = dict()
 
         self._setup_legacy_templating()  # TODO: Disable in 0.8.
 
@@ -557,6 +577,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         self._operation_functions = dict()
         self._operations = OrderedDict()
         self._register_operations()
+
+        # Enable the use of buffered mode for certain functions
+        try:
+            self._use_buffered_mode = self.config['flow'].as_bool('use_buffered_mode')
+        except KeyError:
+            self._use_buffered_mode = False
 
     def _setup_template_environment(self):
         """Setup the jinja2 template environemnt.
@@ -574,7 +600,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
         # Templates are searched in the local template directory first, then in additionally
         # installed packages, then in the main package 'templates' directory.
-        # 'templates' directory.
         extra_packages = []
         for env in envs:
             try:
@@ -587,26 +612,38 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                      extra_packages +
                      [jinja2.PackageLoader('flow', 'templates')])
 
-        self._template_environment_ = jinja2.Environment(
+        template_environment = jinja2.Environment(
             loader=jinja2.ChoiceLoader(load_envs),
             trim_blocks=True,
             extensions=[TemplateError])
 
         # Setup standard filters that can be used to format context variables.
-        self._template_environment_.filters['format_timedelta'] = _format_timedelta
-        self._template_environment_.filters['identical'] = _identical
-        self._template_environment_.filters['get_config_value'] = flow_config.get_config_value
-        self._template_environment_.filters['require_config_value'] = \
+        template_environment.filters['format_timedelta'] = tf.format_timedelta
+        template_environment.filters['identical'] = tf.identical
+        template_environment.filters['with_np_offset'] = tf.with_np_offset
+        template_environment.filters['calc_tasks'] = tf.calc_tasks
+        template_environment.filters['calc_num_nodes'] = tf.calc_num_nodes
+        template_environment.filters['check_utilization'] = tf.check_utilization
+        template_environment.filters['homogeneous_openmp_mpi_config'] = \
+            tf.homogeneous_openmp_mpi_config
+        template_environment.filters['get_config_value'] = flow_config.get_config_value
+        template_environment.filters['require_config_value'] = \
             flow_config.require_config_value
-        if 'max' not in self._template_environment_.filters:    # for jinja2 < 2.10
-            self._template_environment_.filters['max'] = max
-        self._template_environment_.filters['with_np_offset'] = _with_np_offset
+        template_environment.filters['get_account_name'] = tf.get_account_name
+        if 'max' not in template_environment.filters:    # for jinja2 < 2.10
+            template_environment.filters['max'] = max
+        return template_environment
 
-    @property
-    def _template_environment(self):
-        if self._template_environment_ is None:
-            self._setup_template_environment()
-        return self._template_environment_
+    def _template_environment(self, environment=None):
+        if environment is None:
+            environment = self._environment
+        if environment not in self._template_environment_:
+            template_environment = self._setup_template_environment()
+            # Add environment-specific custom filters:
+            for filter_name, filter_function in getattr(environment, 'filters', {}).items():
+                template_environment.filters[filter_name] = filter_function
+            self._template_environment_[environment] = template_environment
+        return self._template_environment_[environment]
 
     def _get_standard_template_context(self):
         "Return the standard templating context for run and submission scripts."
@@ -614,14 +651,14 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         context['project'] = self
         return context
 
-    def _show_template_help_and_exit(self, context):
+    def _show_template_help_and_exit(self, template_environment, context):
         "Print all context variables and filters to screen and exit."
         from textwrap import TextWrapper
         wrapper = TextWrapper(width=90, break_long_words=False)
         print(TEMPLATE_HELP.format(
             template_dir=self._template_dir,
             template_vars='\n'.join(wrapper.wrap(', '.join(sorted(context)))),
-            filters='\n'.join(wrapper.wrap(', '.join(sorted(self._template_environment.filters))))))
+            filters='\n'.join(wrapper.wrap(', '.join(sorted(template_environment.filters))))))
         sys.exit(2)
 
     def _setup_legacy_templating(self):
@@ -798,10 +835,70 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             self._label_functions.update(getattr(cls, '_LABEL_FUNCTIONS', dict()))
 
     pre = _pre
-    "Decorator to add a pre-condition function for an operation function."
+    """Decorator to add a pre-condition function for an operation function.
+
+    Use a label function (or any function of :code:`job`) as a condition:
+
+    .. code-block:: python
+
+        @FlowProject.label
+        def some_label(job):
+            return job.doc.ready == True
+
+        @FlowProject.operation
+        @FlowProject.pre(some_label)
+        def some_operation(job):
+            pass
+
+    Use a :code:`lambda` function of :code:`job` to create custom conditions:
+
+    .. code-block:: python
+
+        @FlowProject.operation
+        @FlowProject.pre(lambda job: job.doc.ready == True)
+        def some_operation(job):
+            pass
+
+    Use the post-conditions of an operation as a pre-condition for another operation:
+
+    .. code-block:: python
+
+        @FlowProject.operation
+        @FlowProject.post(lambda job: job.isfile('output.txt'))
+        def previous_operation(job):
+            pass
+
+        @FlowProject.operation
+        @FlowProject.pre.after(previous_operation)
+        def some_operation(job):
+            pass
+    """
 
     post = _post
-    "Decorator to add a post-condition function for an operation function."
+    """Decorator to add a post-condition function for an operation function.
+
+    Use a label function (or any function of :code:`job`) as a condition:
+
+    .. code-block:: python
+
+        @FlowProject.label
+        def some_label(job):
+            return job.doc.finished == True
+
+        @FlowProject.operation
+        @FlowProject.post(some_label)
+        def some_operation(job):
+            pass
+
+    Use a :code:`lambda` function of :code:`job` to create custom conditions:
+
+    .. code-block:: python
+
+        @FlowProject.operation
+        @FlowProject.post(lambda job: job.doc.finished == True)
+        def some_operation(job):
+            pass
+    """
 
     NAMES = {
         'next_operation': 'next_op',
@@ -966,7 +1063,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             msg = "Error while getting operations status for job '{}': '{}'.".format(job, error)
             logger.debug(msg)
             if ignore_errors:
-                result['operations'] = None
+                result['operations'] = dict()
                 result['_operations_error'] = str(error)
             else:
                 raise
@@ -976,7 +1073,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         except Exception as error:
             logger.debug("Error while classifying job '{}': '{}'.".format(job, error))
             if ignore_errors:
-                result['labels'] = None
+                result['labels'] = list()
                 result['_labels_error'] = str(error)
             else:
                 raise
@@ -1157,26 +1254,27 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
         _get_job_status = functools.partial(self.get_job_status, ignore_errors=ignore_errors)
 
-        try:
-            with contextlib.closing(ThreadPool()) as pool:
-                _map = map if no_parallelize else pool.imap
-                # First attempt at parallelized status determination.
-                # This may fail on systems that don't allow threads.
-                tmp = list(tqdm(
-                    iterable=_map(_get_job_status, jobs),
-                    desc="Collect job status info", total=len(jobs), file=err))
-        except RuntimeError as error:
-            if "can't start new thread" not in error.args:
-                raise   # unrelated error
-            # The parallelized status determination has failed and we fall
-            # back to a serial approach.
-            logger.warning(
-                "A parallelized status update failed due to error ('{}'). "
-                "Entering serial mode with fallback progress indicator. The "
-                "status update may take longer than ususal.".format(error))
-            tmp = list(with_progressbar(
-                iterable=map(_get_job_status, jobs),
-                total=len(jobs), desc='Collect job status info:', file=err))
+        with self._potentially_buffered():
+            try:
+                with contextlib.closing(ThreadPool()) as pool:
+                    _map = map if no_parallelize else pool.imap
+                    # First attempt at parallelized status determination.
+                    # This may fail on systems that don't allow threads.
+                    tmp = list(tqdm(
+                        iterable=_map(_get_job_status, jobs),
+                        desc="Collect job status info", total=len(jobs), file=err))
+            except RuntimeError as error:
+                if "can't start new thread" not in error.args:
+                    raise   # unrelated error
+                # The parallelized status determination has failed and we fall
+                # back to a serial approach.
+                logger.warning(
+                    "A parallelized status update failed due to error ('{}'). "
+                    "Entering serial mode with fallback progress indicator. The "
+                    "status update may take longer than ususal.".format(error))
+                tmp = list(with_progressbar(
+                    iterable=map(_get_job_status, jobs),
+                    total=len(jobs), desc='Collect job status info:', file=err))
 
         operations_errors = {s['_operations_error'] for s in tmp}
         labels_errors = {s['_labels_error'] for s in tmp}
@@ -1500,6 +1598,14 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         "Indicates a pickling error while trying to parallelize the execution of operations."
         pass
 
+    @staticmethod
+    def _dumps_op(op):
+        return (op.name, op.job._id, op.cmd, op.directives)
+
+    def _loads_op(self, blob):
+        name, job_id, cmd, directives = blob
+        return JobOperation(name, self.open_job(id=job_id), cmd, directives)
+
     def _run_operations_in_parallel(self, pool, pickle, operations, progress, timeout):
         """Execute operations in parallel.
 
@@ -1509,9 +1615,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         project instance and the operations before submitting them to the process pool to
         enable us to try different pool and pickle module combinations.
         """
+
         try:
             s_project = pickle.dumps(self)
-            s_tasks = [(pickle.loads, s_project, pickle.dumps(op))
+            s_tasks = [(pickle.loads, s_project, self._dumps_op(op))
                        for op in with_progressbar(operations, desc='Serialize tasks')]
         except Exception as error:  # Masking all errors since they must be pickling related.
             raise self._PickleError(error)
@@ -1646,7 +1753,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                                "there are still operations pending.")
                 break
             try:
-                operations = list(filter(select, self._get_pending_operations(jobs, names)))
+                with self._potentially_buffered():
+                    operations = list(filter(select, self._get_pending_operations(jobs, names)))
             finally:
                 if messages:
                     for msg, level in set(messages):
@@ -1680,6 +1788,23 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 if not self.eligible_for_submission(op):
                     continue
                 yield op
+
+    @contextlib.contextmanager
+    def _potentially_buffered(self):
+        if self._use_buffered_mode:
+            try:
+                logger.debug("Entering buffered mode...")
+                with signac.buffered():
+                    yield
+                logger.debug("Exiting buffered mode.")
+            except AttributeError:
+                warnings.warn(
+                    "Configuration specifies to use buffered mode, but the buffered "
+                    "mode is not supported by the installed version of signac. "
+                    "Required version: >= 0.9.3, your version: {}".format(signac.__version__))
+                yield
+        else:
+            yield
 
     def script(self, operations, parallel=False, template='script.sh', show_template_help=False):
         """Generate a run script to execute given operations.
@@ -1715,7 +1840,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             return script.read()
         else:
             # By default we use the jinja2 templating system to generate the script.
-            template = self._template_environment.get_template(template)
+            template_environment = self._template_environment()
+            template = template_environment.get_template(template)
             context = self._get_standard_template_context()
             # For script generation we do not need the extra logic used for
             # generating cluster job scripts.
@@ -1723,7 +1849,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             context['operations'] = list(operations)
             context['parallel'] = parallel
             if show_template_help:
-                self._show_template_help_and_exit(context)
+                self._show_template_help_and_exit(template_environment, context)
             return template.render(** context)
 
     def _generate_submit_script(self, _id, operations, template, show_template_help, env, **kwargs):
@@ -1744,17 +1870,14 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             else:
                 np_total = max(op.directives['np'] for op in operations)
 
-            try:
-                script = env.script(_id=_id, np_total=np_total, **kwargs)
-            except ConfigKeyError as e:
-                raise SubmitError("The following error was encountered during script generation: ",
-                                  e.message)
+            script = env.script(_id=_id, np_total=np_total, **kwargs)
             background = kwargs.pop('parallel', not kwargs.pop('serial', False))
             self.write_script(script=script, operations=operations, background=background, **kwargs)
             script.seek(0)
             return script.read()
         else:
-            template = self._template_environment.get_template(template)
+            template_environment = self._template_environment(env)
+            template = template_environment.get_template(template)
             context = self._get_standard_template_context()
             # The flow 'script.sh' file simply extends the base script
             # provided. The choice of base script is dependent on the
@@ -1770,12 +1893,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             context['operations'] = list(operations)
             context.update(kwargs)
             if show_template_help:
-                self._show_template_help_and_exit(context)
-            try:
-                return template.render(** context)
-            except ConfigKeyError as e:
-                raise SubmitError(
-                    "The following error was encountered during script generation: {}".format(e))
+                self._show_template_help_and_exit(template_environment, context)
+            return template.render(** context)
 
     @_support_legacy_api
     def submit_operations(self, operations, _id=None, env=None, parallel=False, flags=None,
@@ -1830,21 +1949,41 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             print(" - Operation: {}".format(op), file=sys.stderr)
             return op
 
-        operations = map(_msg, operations)
-        script = self._generate_submit_script(
-            _id=_id,
-            operations=list(operations),
-            template=template,
-            show_template_help=show_template_help,
-            env=env,
-            parallel=parallel,
-            force=force,
-            **kwargs
-        )
-        if pretend:
-            print(script)
+        try:
+            script = self._generate_submit_script(
+                _id=_id,
+                operations=map(_msg, operations),
+                template=template,
+                show_template_help=show_template_help,
+                env=env,
+                parallel=parallel,
+                force=force,
+                **kwargs
+            )
+        except ConfigKeyError as error:
+            raise SubmitError(
+                "Unable to submit, because of a configuration error.\n"
+                "The following key is missing: {key}.\n"
+                "You can add the key to the configuration for example with:\n\n"
+                "  $ signac config --global set {key} VALUE\n".format(key=str(error)))
         else:
-            return env.submit(_id=_id, script=script, flags=flags, **kwargs)
+            # Keys which were explicitly set by the user, but are not evaluated by the
+            # template engine are cause for concern and might hint at a bug in the template
+            # script or ill-defined directives. Here we check whether all directive keys that
+            # have been explicitly set by the user were actually evaluated by the template
+            # engine and warn about those that have not been.
+            keys_unused = {
+                key for op in operations for key in
+                op.directives._keys_set_by_user.difference(op.directives.keys_used)}
+            if keys_unused:
+                logger.warning(
+                    "Some of the keys provided as part of the directives were not used by "
+                    "the template script, including: {}".format(
+                        ', '.join(sorted(keys_unused))))
+            if pretend:
+                print(script)
+            else:
+                return env.submit(_id=_id, script=script, flags=flags, **kwargs)
 
     @_support_legacy_api
     def submit(self, bundle_size=1, jobs=None, names=None, num=None, parallel=False,
@@ -1894,9 +2033,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                     raise
 
         # Gather all pending operations.
-        operations = self._get_pending_operations(jobs, names)
-        if num is not None:
-            operations = list(islice(operations, num))
+        with self._potentially_buffered():
+            operations = self._get_pending_operations(jobs, names)
+            if num is not None:
+                operations = list(islice(operations, num))
 
         # Bundle them up and submit.
         for bundle in make_bundles(operations, bundle_size):
@@ -2420,7 +2560,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         if args.compact and not args.unroll:
             logger.warn("The -1/--one-line argument is incompatible with "
                         "'--stack' and will be ignored.")
-        debug = args.debug
+        show_traceback = args.debug or args.show_traceback
         args = {key: val for key, val in vars(args).items()
                 if key not in ['func', 'verbose', 'debug', 'show_traceback',
                                'job_id', 'filter', 'doc_filter']}
@@ -2433,10 +2573,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             self.print_status(jobs=jobs, **args)
         except Exception:
             logger.error(
-                "Error occured during status update. Use '--ignore-errors' "
-                "to complete the update anyways or '--debug' to show the full "
-                "traceback.")
-            if debug:
+                "Error occured during status update. Use '--show-traceback' to "
+                "show the full traceback or '--ignore-errors' to complete the "
+                "update anyways.")
+            if show_traceback:
                 raise
 
     def _main_next(self, args):
@@ -2510,11 +2650,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         jobs = self._select_jobs_from_args(args)
 
         # Gather all pending operations or generate them based on a direct command...
-        if args.cmd:
-            operations = self._generate_operations(args.cmd, jobs, args.requires)
-        else:
-            operations = self._get_pending_operations(jobs, args.operation_name)
-        operations = list(islice(operations, args.num))
+        with self._potentially_buffered():
+            if args.cmd:
+                operations = self._generate_operations(args.cmd, jobs, args.requires)
+            else:
+                operations = self._get_pending_operations(jobs, args.operation_name)
+            operations = list(islice(operations, args.num))
 
         # Generate the script and print to screen.
         print(self.script(
@@ -2535,8 +2676,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             self._fetch_scheduler_status(jobs)
 
         # Gather all pending operations ...
-        ops = self._get_pending_operations(jobs, args.operation_name)
-        ops = list(islice(ops, args.num))
+        with self._potentially_buffered():
+            ops = self._get_pending_operations(jobs, args.operation_name)
+            ops = list(islice(ops, args.num))
 
         # Bundle operations up, generate the script, and submit to scheduler.
         for bundle in make_bundles(ops, args.bundle_size):
@@ -2785,18 +2927,19 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         except AssertionError:
             if not args.show_traceback:
                 print("ERROR: Encountered internal error during program execution. "
-                      "Run with '--show-traceback' or '--debug' to get more "
+                      "Execute with '--show-traceback' or '--debug' to get more "
                       "information.", file=sys.stderr)
             _exit_or_raise()
         except Exception as error:
             if not args.debug:
                 if str(error):
                     print("ERROR: Encountered error during program execution: '{}'\n"
-                          "Execute with '--debug' to get more information.".format(error),
-                          file=sys.stderr)
+                          "Execute with '--show-traceback' or '--debug' to get "
+                          "more information.".format(error), file=sys.stderr)
                 else:
                     print("ERROR: Encountered error during program execution.\n"
-                          "Run with '--debug' to get more information.", file=sys.stderr)
+                          "Execute with '--show-traceback' or '--debug' to get "
+                          "more information.", file=sys.stderr)
             _exit_or_raise()
 
     # All class methods below are wrappers for legacy API and should be removed as of version 0.7.
@@ -2826,7 +2969,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
 def _fork_with_serialization(loads, project, operation):
     """Invoke the _fork() method on a serialized project instance."""
-    loads(project)._fork(loads(operation))
+    project = loads(project)
+    project._fork(project._loads_op(operation))
 
 
 ###

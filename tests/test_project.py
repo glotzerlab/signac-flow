@@ -14,7 +14,7 @@ from contextlib import contextmanager
 
 import signac
 from signac.common import six
-from flow import FlowProject
+from flow import FlowProject, cmd, with_job
 from flow.scheduling.base import Scheduler
 from flow.scheduling.base import ClusterJob
 from flow.scheduling.base import JobStatus
@@ -38,8 +38,10 @@ else:
 # of the the standard library as of Python version 3.5.
 
 @contextmanager
-def redirect_stdout(new_target):
+def redirect_stdout(new_target=None):
     "Temporarily redirect all output to stdout to new_target."
+    if new_target is None:
+        new_target = StringIO()
     old_target = sys.stdout
     try:
         sys.stdout = new_target
@@ -49,8 +51,10 @@ def redirect_stdout(new_target):
 
 
 @contextmanager
-def redirect_stderr(new_target):
+def redirect_stderr(new_target=None):
     "Temporarily redirect all output to stderr to new_target."
+    if new_target is None:
+        new_target = StringIO()
     old_target = sys.stderr
     try:
         sys.stderr = new_target
@@ -236,6 +240,95 @@ class ProjectClassTest(BaseProjectTest):
         self.assertEqual(len(a._label_functions), 1)
         self.assertEqual(len(b._label_functions), 2)
         self.assertEqual(len(c._label_functions), 1)
+
+    def test_with_job_decorator(self):
+
+        class A(FlowProject):
+            pass
+
+        @A.operation
+        @with_job
+        def test_context(job):
+            self.assertEqual(os.getcwd(), job.ws)
+
+        project = self.mock_project()
+        with add_cwd_to_environment_pythonpath():
+            with switch_to_directory(project.root_directory()):
+                starting_dir = os.getcwd()
+                with redirect_stderr():
+                    A().run()
+                self.assertTrue(os.getcwd(), starting_dir)
+
+    def test_cmd_with_job_wrong_order(self):
+
+        class A(FlowProject):
+            pass
+
+        with self.assertRaises(RuntimeError):
+            @A.operation
+            @cmd
+            @with_job
+            def test_cmd(job):
+                pass
+
+    def test_with_job_works_with_cmd(self):
+
+        class A(FlowProject):
+            pass
+
+        @A.operation
+        @with_job
+        @cmd
+        def test_context(job):
+            return "echo 'hello' > world.txt"
+
+        project = self.mock_project()
+        with add_cwd_to_environment_pythonpath():
+            with switch_to_directory(project.root_directory()):
+                starting_dir = os.getcwd()
+                with redirect_stderr():
+                    A().run()
+                self.assertEqual(os.getcwd(), starting_dir)
+                for job in project:
+                    self.assertTrue(os.path.isfile(job.fn("world.txt")))
+
+    def test_with_job_error_handling(self):
+
+        class A(FlowProject):
+            pass
+
+        @A.operation
+        @with_job
+        def test_context(job):
+            raise Exception
+
+        project = self.mock_project()
+        with add_cwd_to_environment_pythonpath():
+            with switch_to_directory(project.root_directory()):
+                starting_dir = os.getcwd()
+                with self.assertRaises(Exception):
+                    with redirect_stderr():
+                        A().run()
+                self.assertEqual(os.getcwd(), starting_dir)
+
+    def test_cmd_with_job_error_handling(self):
+
+        class A(FlowProject):
+            pass
+
+        @A.operation
+        @with_job
+        @cmd
+        def test_context(job):
+            return "exit 1"
+
+        project = self.mock_project()
+        with add_cwd_to_environment_pythonpath():
+            with switch_to_directory(project.root_directory()):
+                starting_dir = os.getcwd()
+                with redirect_stderr():
+                    A().run()
+                self.assertEqual(os.getcwd(), starting_dir)
 
 
 class ProjectTest(BaseProjectTest):
@@ -445,9 +538,89 @@ class ExecutionProjectTest(BaseProjectTest):
             self.assertIsNotNone(next_op)
             self.assertEqual(next_op.get_status(), JobStatus.queued)
 
+    @unittest.skipIf(six.PY2, 'logger output not caught for Python 2.7')
+    def test_submit_operations_bad_directive(self):
+        MockScheduler.reset()
+        project = self.mock_project()
+        operations = []
+        for job in project:
+            operations.extend(project.next_operations(job))
+        self.assertEqual(len(list(MockScheduler.jobs())), 0)
+        cluster_job_id = project._store_bundled(operations)
+        stderr = StringIO()
+        with redirect_stderr(stderr):
+            project.submit_operations(_id=cluster_job_id, operations=operations)
+        self.assertEqual(len(list(MockScheduler.jobs())), 1)
+        self.assertIn('Some of the keys provided as part of the directives were not '
+                      'used by the template script, including: bad_directive\n',
+                      stderr.getvalue())
+
+    def test_condition_evaluation(self):
+        project = self.mock_project()
+
+        # Can't use the 'nonlocal' keyword with Python 2.7.
+        nonlocal_ = dict(evaluated=0)
+        state = None
+
+        def make_cond(cond):
+            def cond_func(job):
+                # Would prefer to use 'nonlocal' keyword, but not available for Python 2.7.
+                nonlocal_['evaluated'] |= cond
+                return cond & state
+            return cond_func
+
+        class Project(FlowProject):
+            pass
+
+        @Project.operation
+        @Project.pre(make_cond(0b1000))
+        @Project.pre(make_cond(0b0100))
+        @Project.post(make_cond(0b0010))
+        @Project.post(make_cond(0b0001))
+        def op1(job):
+            pass
+
+        project = Project(project.config)
+        self.assertTrue(len(project))
+        with redirect_stderr(StringIO()):
+            for state, expected_evaluation in [
+                    (0b0000, 0b1000),  # First pre-condition is not met
+                    (0b0001, 0b1000),  # means only the first pre-cond.
+                    (0b0010, 0b1000),  # should be evaluated.
+                    (0b0011, 0b1000),
+                    (0b0100, 0b1000),
+                    (0b0101, 0b1000),
+                    (0b0110, 0b1000),
+                    (0b0111, 0b1000),
+                    (0b1000, 0b1100),  # The first, but not the second
+                    (0b1001, 0b1100),  # pre-condition is met, need to evaluate
+                    (0b1010, 0b1100),  # both pre-conditions, but not post-conditions.
+                    (0b1011, 0b1100),
+                    (0b1100, 0b1110),  # Both pre-conditions met, evaluate
+                    (0b1101, 0b1110),  # first post-condition.
+                    (0b1110, 0b1111),  # All pre-conditions and 1st post-condition
+                                       # are met, need to evaluate all.
+                    (0b1111, 0b1111),  # All conditions met, need to evaluate all.
+            ]:
+                nonlocal_['evaluated'] = 0
+                project.run()
+                self.assertEqual(nonlocal_['evaluated'], expected_evaluation)
+
+
+class BufferedExecutionProjectTest(ExecutionProjectTest):
+
+    def mock_project(self):
+        project = super(BufferedExecutionProjectTest, self).mock_project()
+        project._use_buffered_mode = True
+        return project
+
 
 class ExecutionDynamicProjectTest(ExecutionProjectTest):
     project_class = TestDynamicProject
+
+
+class BufferedExecutionDynamicProjectTest(BufferedExecutionProjectTest, ExecutionDynamicProjectTest):
+    pass
 
 
 class ProjectMainInterfaceTest(BaseProjectTest):
@@ -466,12 +639,12 @@ class ProjectMainInterfaceTest(BaseProjectTest):
     def call_subcmd(self, subcmd):
         # Determine path to project module and construct command.
         fn_script = inspect.getsourcefile(type(self.project))
-        cmd = 'python {} {}'.format(fn_script, subcmd)
+        _cmd = 'python {} {}'.format(fn_script, subcmd)
 
         try:
             with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
                 with switch_to_directory(self.project.root_directory()):
-                    return subprocess.check_output(cmd.split(), stderr=subprocess.STDOUT)
+                    return subprocess.check_output(_cmd.split(), stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as error:
             print(error, file=sys.stderr)
             print(error.output, file=sys.stderr)

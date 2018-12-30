@@ -1,51 +1,35 @@
 {# Templated in accordance with: http://www.sdsc.edu/support/user_guides/comet.html#running #}
-{# Last updated on: 2018-05-22 #}
+{# This template can only be used with P100 GPUs! #}
 {% set mpiexec = "ibrun" %}
 {% extends "slurm.sh" %}
-{# Must override this block before header block is created #}
 {% block tasks %}
-{% set cpn = 24 %}
-{% set gpn = 4 %}
-{% set gpus = operations|map(attribute='directives.ngpu')|sum %}
-{% if gpus %}
-{% set ngpus = gpus if parallel else operations|map(attribute='directives.ngpu')|max %}
+{% set threshold = 0 if force else 0.9 %}
+{% set cpu_tasks = operations|calc_tasks('np', parallel, force) %}
+{% set gpu_tasks = operations|calc_tasks('ngpu', parallel, force) %}
+{% if gpu_tasks and 'gpu' not in partition and not force %}
+{% raise "Requesting GPUs requires a gpu partition!" %}
+{% endif %}
+{% set nn_cpu = cpu_tasks|calc_num_nodes(24) %}
+{% set nn_gpu = gpu_tasks|calc_num_nodes(4) if 'gpu' in partition else 0 %}
+{% set nn = nn|default((nn_cpu, nn_gpu)|max, true) %}
 {% if partition == 'gpu' %}
-{% set nn = nn|default((np_global/cpn)|round(method='ceil')|int, true) %}
-{% set nn_gpu = (ngpus/gpn)|round(method='ceil')|int %}
-{% set nn = nn if nn > nn_gpu else nn_gpu %}
-{% set node_util = ngpus / (gpn * nn) %}
-{% if not force and node_util < 0.9 %}
-{% raise "Bad node utilization!! nn=%d, gpus_per_node=%d, ngpus=%d"|format(nn, gpn, ngpus) %}
-{% endif %}
-{% set ngpupn = gpn if ngpus > gpn else ngpus %}
-#SBATCH --nodes={{ nn }}
-#SBATCH --gres=gpu:p100:{{ ngpupn }}
+#SBATCH --nodes={{ nn|check_utilization(gpu_tasks, 4, threshold, 'GPU') }}
+#SBATCH --gres=gpu:p100:{{ (gpu_tasks, 4)|min }}
 {% elif partition == 'gpu-shared' %}
+#SBATCH --nodes={{ nn|default(1, true)|check_utilization(gpu_tasks, 1, threshold, 'GPU') }}
+#SBATCH --ntasks-per-node={{ (gpu_tasks * 7, cpu_tasks)|max }}
+#SBATCH --gres=gpu:p100:{{ gpu_tasks }}
+{% elif 'shared' in partition %}{# standard shared partition #}
 #SBATCH --nodes={{ nn|default(1, true) }}
-#SBATCH --ntasks-per-node={{ 7 * ngpus }}
-#SBATCH --gres=gpu:p100:{{ ngpus }}
-{% else %}
-{% raise "Submitting operations with the gpu directive requires a GPU partition." %}
+#SBATCH --ntasks-per-node={{ cpu_tasks }}
+{% else %}{# standard compute partition #}
+#SBATCH --nodes={{ nn|check_utilization(cpu_tasks, 24, threshold, 'CPU') }}
+#SBATCH --ntasks-per-node={{ (24, cpu_tasks)|min }}
 {% endif %}
-{% else %}
-{% if 'shared' in partition %}
-#SBATCH --nodes={{ nn|default(1, true) }}
-#SBATCH --ntasks-per-node={{ np_global }}
-{% else %}
-{% set nn = nn|default((np_global/cpn)|round(method='ceil')|int, true) %}
-{% set node_util = np_global / (cpn * nn) %}
-{% if not force and node_util < 0.9 %}
-{% raise "Bad node utilization!! nn=%d, cores_per_node=%d, np_global=%d"|format(nn, cpn, np_global) %}
-{% endif %}
-{% set tpn = cpn if np_global > cpn else np_global %}
-#SBATCH --nodes={{ nn }}
-#SBATCH --ntasks-per-node={{ tpn }}
-{% endif %}
-{% endif %}
-{% endblock %}
+{% endblock tasks %}
 {% block header %}
 {{ super () -}}
-{% set account = 'account'|get_config_value(ns=environment) %}
+{% set account = account|default(environment|get_account_name, true) %}
 {% if account %}
 #SBATCH -A {{ account }}
 {% endif %}

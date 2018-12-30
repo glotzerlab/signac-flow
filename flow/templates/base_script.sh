@@ -1,4 +1,4 @@
-{# Number of tasks is the same for any script type #}
+{# The following variables are available to all scripts. #}
 {% if parallel %}
 {% set np_global = operations|map(attribute='directives.np')|sum %}
 {% else %}

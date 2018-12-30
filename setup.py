@@ -2,16 +2,21 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 import os
-import sys
 from setuptools import setup, find_packages
 
 
-requirements = []
-if sys.version_info < (3, 4, 0):
-    requirements.append('enum34')
+requirements = [
+    # The core package.
+    'signac>=0.6',
+    # For the templated generation of (submission) scripts.
+    'jinja2',
+    # To enable the parallelized execution of operations across processes.
+    'cloudpickle',
+    # To define IntEnum in flow/scheduling/base.py.
+    'enum34;python_version<"3.4"',
+]
 
-
-description="Simple workflow management for signac projects."
+description = "Simple workflow management for signac projects."
 
 try:
     this_path = os.path.dirname(os.path.abspath(__file__))
@@ -28,7 +33,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name='signac-flow',
-    version='0.6.3',
+    version='0.6.4',
     packages=find_packages(),
     include_package_data=True,
     zip_safe=True,
@@ -47,8 +52,10 @@ setup(
         "License :: OSI Approved :: BSD License",
         "Topic :: Scientific/Engineering :: Physics",
         "Programming Language :: Python :: 2.7",
+        "Programming Language :: Python :: 3.4",
         "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
     ],
     entry_points={
         'console_scripts': [

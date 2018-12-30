@@ -1,70 +1,78 @@
 # Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-"""Implementation of the scheduling system for SLURM schedulers.
+"""Implementation of the scheduling system for LSF schedulers.
 
-This module implements the Scheduler and ClusterJob classes for SLURM.
+This module implements the Scheduler and ClusterJob classes for LSF.
 """
 from __future__ import print_function
 import getpass
 import subprocess
 import tempfile
+import json
 import logging
 import errno
 
 from .base import Scheduler
 from .base import ClusterJob, JobStatus
-from ..errors import SubmitError
 
 
 logger = logging.getLogger(__name__)
 
 
-def _fetch(user=None):
-    "Fetch the cluster job status information from the SLURM scheduler."
+def _parse_status(s):
+    if s in ['PEND', 'WAIT']:
+        return JobStatus.queued
+    elif s == 'RUN':
+        return JobStatus.active
+    elif s in ['SSUSP', 'USUSP', 'PSUSP']:
+        return JobStatus.held
+    elif s == 'DONE':
+        return JobStatus.inactive
+    elif s == 'EXIT':
+        return JobStatus.error
+    return JobStatus.registered
 
-    def parse_status(s):
-        s = s.strip()
-        if s == 'PD':
-            return JobStatus.queued
-        elif s == 'R':
-            return JobStatus.active
-        elif s in ['CG', 'CD', 'CA', 'TO']:
-            return JobStatus.inactive
-        elif s in ['F', 'NF']:
-            return JobStatus.error
-        return JobStatus.registered
+
+def _fetch(user=None):
+    "Fetch the cluster job status information from the LSF scheduler."
 
     if user is None:
         user = getpass.getuser()
 
-    cmd = ['squeue', '-u', user, '-h', "--format=%2t%100j"]
+    cmd = ['bjobs', '-json', '-u', user]
     try:
-        result = subprocess.check_output(cmd).decode('utf-8', errors='backslashreplace')
+        result = json.loads(subprocess.check_output(cmd).decode('utf-8'))
     except subprocess.CalledProcessError:
         raise
     except IOError as error:
         if error.errno != errno.ENOENT:
             raise
         else:
-            raise RuntimeError("SLURM not available.")
-    lines = result.split('\n')
-    for line in lines:
-        if line:
-            status = line[:2]
-            name = line[2:].rstrip()
-            yield SlurmJob(name, parse_status(status))
+            raise RuntimeError("LSF not available.")
+    except json.decoder.JSONDecodeError:
+        raise RuntimeError("Could not parse LSF JSON output.")
+
+    for record in result['RECORDS']:
+        yield LSFJob(record)
 
 
-class SlurmJob(ClusterJob):
-    "A SlurmJob is a ClusterJob managed by a SLURM scheduler."
-    pass
+class LSFJob(ClusterJob):
+    "An LSFJob is a ClusterJob managed by an LSF scheduler."
+
+    def __init__(self, record):
+        self.record = record
+        self._job_id = record['JOBID']
+        self._status = _parse_status(record['STAT'])
+
+    def name(self):
+        return self.record['JOB_NAME']
 
 
-class SlurmScheduler(Scheduler):
-    """Implementation of the abstract Scheduler class for SLURM schedulers.
+class LSFScheduler(Scheduler):
+    """Implementation of the abstract Scheduler class for LSF schedulers.
 
-    This class allows us to submit cluster jobs to a SLURM scheduler and query
+    This class allows us to submit cluster jobs to a LSF scheduler and query
     their current status.
 
     :param user:
@@ -72,11 +80,11 @@ class SlurmScheduler(Scheduler):
     :type user:
         str
     """
-    # The standard command used to submit jobs to the SLURM scheduler.
-    submit_cmd = ['sbatch']
+    # The standard command used to submit jobs to the LSF scheduler.
+    submit_cmd = ['bsub']
 
     def __init__(self, user=None, **kwargs):
-        super(SlurmScheduler, self).__init__(**kwargs)
+        super(LSFScheduler, self).__init__(**kwargs)
         self.user = user
 
     def jobs(self):
@@ -118,10 +126,10 @@ class SlurmScheduler(Scheduler):
 
         if after is not None:
             submit_cmd.extend(
-                ['-W', 'depend="afterany:{}"'.format(after.split('.')[0])])
+                ['-w', '"done({})"'.format(after.split('.')[0])])
 
         if hold:
-            submit_cmd += ['--hold']
+            submit_cmd += ['-H']
 
         if pretend:
             print("# Submit command: {}".format('  '.join(submit_cmd)))
@@ -131,19 +139,14 @@ class SlurmScheduler(Scheduler):
             with tempfile.NamedTemporaryFile() as tmp_submit_script:
                 tmp_submit_script.write(str(script).encode('utf-8'))
                 tmp_submit_script.flush()
-                try:
-                    subprocess.check_output(submit_cmd + [tmp_submit_script.name],
-                                            universal_newlines=True)
-                except subprocess.CalledProcessError as e:
-                    raise SubmitError("sbatch error: {}".format(e.output))
-
+                subprocess.check_output(submit_cmd + [tmp_submit_script.name])
                 return True
 
     @classmethod
     def is_present(cls):
-        "Return True if it appears that a SLURM scheduler is available within the environment."
+        "Return True if it appears that an LSF scheduler is available within the environment."
         try:
-            subprocess.check_output(['sbatch', '--version'], stderr=subprocess.STDOUT)
+            subprocess.check_output(['bjobs', '-V'], stderr=subprocess.STDOUT)
         except (IOError, OSError):
             return False
         else:

@@ -119,7 +119,7 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
 
     https://portal.xsede.org/psc-bridges
     """
-    hostname_pattern = '.*\.bridges\.psc\.edu$'
+    hostname_pattern = r'.*\.bridges\.psc\.edu$'
     template = 'bridges.sh'
     cores_per_node = 28
 

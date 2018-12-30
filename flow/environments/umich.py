@@ -13,7 +13,7 @@ class FluxEnvironment(DefaultTorqueEnvironment):
     http://arc-ts.umich.edu/systems-and-services/flux/
     """
     hostname_pattern = '(nyx|flux).*.umich.edu'
-    template = 'umich.sh'
+    template = 'umich-flux.sh'
     cores_per_node = 1
 
     @classmethod

@@ -16,8 +16,8 @@ For more information, please see ``$ flow --help``.
 .. literalinclude:: cli-help.txt
 
 
-Th FlowProject
---------------
+The FlowProject
+---------------
 
 .. currentmodule:: flow
 
@@ -66,6 +66,11 @@ Th FlowProject
 ---------
 
 .. autofunction:: cmd
+
+@flow.with_job
+--------------
+
+.. autofunction:: with_job
 
 @flow.directives
 ----------------

@@ -4,7 +4,6 @@
 import unittest
 import os
 import warnings
-from contextlib import contextmanager
 
 from signac.common import six
 from flow import FlowProject
@@ -15,7 +14,7 @@ from flow import classlabel
 from flow import staticlabel
 from flow import init
 from test_project import redirect_stdout, redirect_stderr, suspend_logging, \
-                         MockEnvironment, MockScheduler, StringIO
+    MockEnvironment, MockScheduler, StringIO
 
 if six.PY2:
     from tempdir import TemporaryDirectory

@@ -27,11 +27,13 @@ from signac.common import six
 from signac.common.six import with_metaclass
 
 from .scheduling.base import JobStatus
+from .scheduling.lsf import LSFScheduler
 from .scheduling.slurm import SlurmScheduler
 from .scheduling.torque import TorqueScheduler
 from .scheduling.simple_scheduler import SimpleScheduler
 from .scheduling.fakescheduler import FakeScheduler
 from .util import config as flow_config
+from .util.template_filters import format_timedelta
 from .errors import SubmitError
 from .errors import NoSchedulerError
 
@@ -99,14 +101,6 @@ def setup(py_modules, **attrs):
         py_modules=py_modules,
         cmdclass={'install': InstallAndConfig},
         **attrs)
-
-
-def format_timedelta(delta):
-    "Format a time delta for interpretation by schedulers."
-    hours, r = divmod(delta.seconds, 3600)
-    minutes, seconds = divmod(r, 60)
-    hours += delta.days * 24
-    return "{:0>2}:{:0>2}:{:0>2}".format(hours, minutes, seconds)
 
 
 class ComputeEnvironmentType(type):
@@ -211,7 +205,7 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
                 return cls.scheduler_type.is_present()
         else:
             return re.match(
-                cls.hostname_pattern, socket.gethostname()) is not None
+                cls.hostname_pattern, socket.getfqdn()) is not None
 
     @classmethod
     def get_scheduler(cls):
@@ -364,6 +358,12 @@ class SlurmEnvironment(ComputeEnvironment):
     template = 'slurm.sh'
 
 
+class LSFEnvironment(ComputeEnvironment):
+    "An environment with LSF scheduler."
+    scheduler_type = LSFScheduler
+    template = 'lsf.sh'
+
+
 class NodesEnvironment(ComputeEnvironment):
     """A compute environment consisting of multiple compute nodes.
 
@@ -470,6 +470,43 @@ class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
     @classmethod
     def add_args(cls, parser):
         super(DefaultSlurmEnvironment, cls).add_args(parser)
+        parser.add_argument(
+            '-w', '--walltime',
+            type=float,
+            default=12,
+            help="The wallclock time in hours.")
+        parser.add_argument(
+            '--hold',
+            action='store_true',
+            help="Submit jobs, but put them on hold.")
+        parser.add_argument(
+            '--after',
+            type=str,
+            help="Schedule this job to be executed after "
+                 "completion of a cluster job with this id.")
+
+
+class DefaultLSFEnvironment(NodesEnvironment, LSFEnvironment):
+    "A default environment for environments with LSF scheduler."
+
+    @classmethod
+    def mpi_cmd(cls, cmd, np):
+        raise NotImplementedError("LSF environments are not supported by the "
+                                  "legacy templating system.")
+
+    @classmethod
+    def gen_tasks(cls, js, np_total):
+        raise NotImplementedError("LSF environments are not supported by the "
+                                  "legacy templating system.")
+
+    @classmethod
+    def script(cls, _id, np_total, walltime=None, **kwargs):
+        raise NotImplementedError("LSF environments are not supported by the "
+                                  "legacy templating system.")
+
+    @classmethod
+    def add_args(cls, parser):
+        super(DefaultLSFEnvironment, cls).add_args(parser)
         parser.add_argument(
             '-w', '--walltime',
             type=float,

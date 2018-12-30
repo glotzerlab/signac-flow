@@ -3,8 +3,7 @@
 # This software is licensed under the BSD 3-Clause License.
 """Implementation of the scheduling system for TORQUE schedulers.
 
-This module implements the Scheduler class, and the JobCluster class
-for TORQUE schedulers.
+This module implements the Scheduler and ClusterJob classes for TORQUE.
 """
 from __future__ import print_function
 import io
@@ -101,7 +100,7 @@ class TorqueScheduler(Scheduler):
         :param pretend:
             If True, do not actually submit the script, but only simulate the submission.
             Can be used to test whether the submission would be successful.
-            Please note: A successful "pretend" submission is not guaranteed to succeeed.
+            Please note: A successful "pretend" submission is not guaranteed to succeed.
         :type pretend:
             bool
         :param flags:

@@ -1,17 +1,18 @@
+{# Templated in accordance with: https://www.olcf.ornl.gov/for-users/system-user-guides/titan/running-jobs/ #}
+{% set mpiexec = "aprun" %}
 {% extends "torque.sh" %}
-{# Must come before header is written #}
 {% block tasks %}
-{% set cpn = 16 %}
-{% set nn = nn|default((np_global/cpn)|round(method='ceil')|int, true) %}
-{% set node_util = np_global / (cpn * nn) %}
-{% if not force and node_util < 0.9 %}
-{% raise "Bad node utilization!! nn=%d, cores_per_node=%d, np_global=%d"|format(nn, cpn, np_global) %}
-{% endif %}
-#PBS -l nodes={{ nn }}
+{% set threshold = 0 if force else 0.9 %}
+{% set cpu_tasks = operations|calc_tasks('np', parallel, force) %}
+{% set gpu_tasks = operations|calc_tasks('ngpu', parallel, force) %}
+{% set nn_cpu = cpu_tasks|calc_num_nodes(16) %}
+{% set nn_gpu = gpu_tasks|calc_num_nodes(1) %}
+{% set nn = nn|default((nn_cpu, nn_gpu)|max, true) %}
+#PBS -l nodes={{ nn|check_utilization(gpu_tasks, 1, threshold, 'GPU') }}
 {% endblock %}
 {% block header %}
 {{ super() -}}
-{% set account = 'account'|get_config_value(ns=environment) %}
+{% set account = account|default(environment|get_account_name, true) %}
 {% if account %}
 #PBS -A {{ account }}
 {% endif %}

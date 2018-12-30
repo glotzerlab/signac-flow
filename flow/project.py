@@ -578,9 +578,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         self._operations = OrderedDict()
         self._register_operations()
 
-        # Enable buffered mode for gathering of pending operations (if available).
-        self._buffer_get_pending_operations = self.config.get(
-            'buffer_get_pending_operations', False)
+        # Enable the use of buffered mode for certain functions
+        try:
+            self._use_buffered_mode = self.config['flow'].as_bool('use_buffered_mode')
+        except KeyError:
+            self._use_buffered_mode = False
 
     def _setup_template_environment(self):
         """Setup the jinja2 template environemnt.
@@ -1252,26 +1254,27 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
         _get_job_status = functools.partial(self.get_job_status, ignore_errors=ignore_errors)
 
-        try:
-            with contextlib.closing(ThreadPool()) as pool:
-                _map = map if no_parallelize else pool.imap
-                # First attempt at parallelized status determination.
-                # This may fail on systems that don't allow threads.
-                tmp = list(tqdm(
-                    iterable=_map(_get_job_status, jobs),
-                    desc="Collect job status info", total=len(jobs), file=err))
-        except RuntimeError as error:
-            if "can't start new thread" not in error.args:
-                raise   # unrelated error
-            # The parallelized status determination has failed and we fall
-            # back to a serial approach.
-            logger.warning(
-                "A parallelized status update failed due to error ('{}'). "
-                "Entering serial mode with fallback progress indicator. The "
-                "status update may take longer than ususal.".format(error))
-            tmp = list(with_progressbar(
-                iterable=map(_get_job_status, jobs),
-                total=len(jobs), desc='Collect job status info:', file=err))
+        with self._potentially_buffered():
+            try:
+                with contextlib.closing(ThreadPool()) as pool:
+                    _map = map if no_parallelize else pool.imap
+                    # First attempt at parallelized status determination.
+                    # This may fail on systems that don't allow threads.
+                    tmp = list(tqdm(
+                        iterable=_map(_get_job_status, jobs),
+                        desc="Collect job status info", total=len(jobs), file=err))
+            except RuntimeError as error:
+                if "can't start new thread" not in error.args:
+                    raise   # unrelated error
+                # The parallelized status determination has failed and we fall
+                # back to a serial approach.
+                logger.warning(
+                    "A parallelized status update failed due to error ('{}'). "
+                    "Entering serial mode with fallback progress indicator. The "
+                    "status update may take longer than ususal.".format(error))
+                tmp = list(with_progressbar(
+                    iterable=map(_get_job_status, jobs),
+                    total=len(jobs), desc='Collect job status info:', file=err))
 
         operations_errors = {s['_operations_error'] for s in tmp}
         labels_errors = {s['_labels_error'] for s in tmp}
@@ -1750,10 +1753,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                                "there are still operations pending.")
                 break
             try:
-                if hasattr(signac, 'buffered') and self._buffer_get_pending_operations:
-                    with signac.buffered():
-                        operations = list(filter(select, self._get_pending_operations(jobs, names)))
-                else:
+                with self._potentially_buffered():
                     operations = list(filter(select, self._get_pending_operations(jobs, names)))
             finally:
                 if messages:
@@ -1788,6 +1788,23 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 if not self.eligible_for_submission(op):
                     continue
                 yield op
+
+    @contextlib.contextmanager
+    def _potentially_buffered(self):
+        if self._use_buffered_mode:
+            try:
+                logger.debug("Entering buffered mode...")
+                with signac.buffered():
+                    yield
+                logger.debug("Exiting buffered mode.")
+            except AttributeError:
+                warnings.warn(
+                    "Configuration specifies to use buffered mode, but the buffered "
+                    "mode is not supported by the installed version of signac. "
+                    "Required version: >= 0.9.3, your version: {}".format(signac.__version__))
+                yield
+        else:
+            yield
 
     def script(self, operations, parallel=False, template='script.sh', show_template_help=False):
         """Generate a run script to execute given operations.
@@ -2016,9 +2033,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                     raise
 
         # Gather all pending operations.
-        operations = self._get_pending_operations(jobs, names)
-        if num is not None:
-            operations = list(islice(operations, num))
+        with self._potentially_buffered():
+            operations = self._get_pending_operations(jobs, names)
+            if num is not None:
+                operations = list(islice(operations, num))
 
         # Bundle them up and submit.
         for bundle in make_bundles(operations, bundle_size):
@@ -2632,11 +2650,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         jobs = self._select_jobs_from_args(args)
 
         # Gather all pending operations or generate them based on a direct command...
-        if args.cmd:
-            operations = self._generate_operations(args.cmd, jobs, args.requires)
-        else:
-            operations = self._get_pending_operations(jobs, args.operation_name)
-        operations = list(islice(operations, args.num))
+        with self._potentially_buffered():
+            if args.cmd:
+                operations = self._generate_operations(args.cmd, jobs, args.requires)
+            else:
+                operations = self._get_pending_operations(jobs, args.operation_name)
+            operations = list(islice(operations, args.num))
 
         # Generate the script and print to screen.
         print(self.script(
@@ -2657,8 +2676,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             self._fetch_scheduler_status(jobs)
 
         # Gather all pending operations ...
-        ops = self._get_pending_operations(jobs, args.operation_name)
-        ops = list(islice(ops, args.num))
+        with self._potentially_buffered():
+            ops = self._get_pending_operations(jobs, args.operation_name)
+            ops = list(islice(ops, args.num))
 
         # Bundle operations up, generate the script, and submit to scheduler.
         for bundle in make_bundles(ops, args.bundle_size):

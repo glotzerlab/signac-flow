@@ -611,12 +611,16 @@ class BufferedExecutionProjectTest(ExecutionProjectTest):
 
     def mock_project(self):
         project = super(BufferedExecutionProjectTest, self).mock_project()
-        project._buffer_get_pending_operations = True
+        project._use_buffered_mode = True
         return project
 
 
 class ExecutionDynamicProjectTest(ExecutionProjectTest):
     project_class = TestDynamicProject
+
+
+class BufferedExecutionDynamicProjectTest(BufferedExecutionProjectTest, ExecutionDynamicProjectTest):
+    pass
 
 
 class ProjectMainInterfaceTest(BaseProjectTest):

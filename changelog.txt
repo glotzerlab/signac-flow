@@ -58,7 +58,7 @@ We recommend to go through the tutorial on signac-docs_ to learn how to best tak
 - Overall revision of all cluster submission templates; improved structure and abstraction of logic.
 - The serialization of operations was improved to optimize execution speed for local runs.
 - The evaluation of pre- and post-conditions was optimized for optimally lazy evaluation: cheaper conditions should be placed above more expensive conditions for maximal performance.
-- When gathering operations, signac will automatically use the buffered mode (requires signac >= 0.9.3).
+- When gathering operations, signac will automatically use the buffered mode when config value 'flow.use_buffered_mode' is set to True (requires signac >= 0.9.3).
 - Improved documentation for developers and contributors.
 
 [0.6.3] -- 2018-08-22

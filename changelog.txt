@@ -42,6 +42,11 @@ We recommend to go through the tutorial on signac-docs_ to learn how to best tak
 
 .. _signac-docs: https://signac-docs.readthedocs.io/en/latest
 
+[next]
+------
+
+- Allow the specification of the number of tasks per resource set and additional jsrun arguments for Summit scripts.
+
 [0.6.4] -- 2018-12-28
 ---------------------
 

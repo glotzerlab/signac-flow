@@ -14,6 +14,17 @@ from fractions import gcd
 class SummitEnvironment(DefaultLSFEnvironment):
     """Environment profile for the Summit supercomputer.
 
+    Example::
+
+        @Project.operation
+        @directives(nranks=3) # 3 MPI ranks per operation
+        @directives(ngpu=3) # 3 GPUs
+        @directives(np=3) # 3 CPU cores
+        @directives(rs_tasks=3) # 3 tasks per resource set
+        @directives(extra_jsrun_args='-smpiargs="-gpu"') # extra jsrun arguments
+        def my_operation(job):
+            ...
+
     https://www.olcf.ornl.gov/summit/
     """
     hostname_pattern = r'.*\.summit\.olcf\.ornl\.gov'
@@ -39,26 +50,34 @@ class SummitEnvironment(DefaultLSFEnvironment):
         ntasks = max(operation.directives.get('nranks', 1), 1)
         cpus_per_task = operation.directives.get('omp_num_threads', 0)
         np = operation.directives.get('np', ntasks * max(cpus_per_task, 1))
-        cpus_per_task = np // ntasks
         ngpu = operation.directives.get('ngpu', 0)
         nsets = max(math.ceil(np / cores_per_node),
                     math.ceil(ngpu / gpus_per_node), 1)
+        cpus_per_set = max(np // nsets, 1)
         gpus_per_set = ngpu // nsets
         tasks_per_set = max(ntasks // nsets, 1)  # Require at least one task per set
-        factor = gcd(tasks_per_set, gpus_per_set)
+        factor = gcd(tasks_per_set, gcd(gpus_per_set, cpus_per_set))
+        min_tasks_per_set = operation.directives.get('rs_tasks', 1)
+        factor = max(1, factor//min_tasks_per_set)
         nsets *= factor
         tasks_per_set //= factor
+        cpus_per_set //= factor
         gpus_per_set //= factor
-        return nsets, tasks_per_set, cpus_per_task, gpus_per_set
+        return nsets, tasks_per_set, cpus_per_set, gpus_per_set
 
     @staticmethod
     def jsrun_options(resource_set):
         nsets, tasks, cpus, gpus = resource_set
         return '-n {} -a {} -c {} -g {}'.format(nsets, tasks, cpus, gpus)
 
+    @staticmethod
+    def jsrun_extra_args(operation):
+        return str(operation.directives.get('extra_jsrun_args', ''))
+
     filters = {'calc_num_nodes': calc_num_nodes.__func__,
                'guess_resource_sets': guess_resource_sets.__func__,
-               'jsrun_options': jsrun_options.__func__}
+               'jsrun_options': jsrun_options.__func__,
+               'jsrun_extra_args': jsrun_extra_args.__func__}
 
 
 class AscentEnvironment(SummitEnvironment):

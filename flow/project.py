@@ -175,7 +175,7 @@ class _condition(object):
         return cls._get_func('not', condition, lambda job: not condition(job))
 
     @classmethod
-    def _multi(cls, funcs):
+    def all_(cls, funcs):
         R"""Generate a condition function equivalent to a sequence of
         conditions functions. In order to make it identifiable to the graph
         building algorithm, we need to tag this function with all the
@@ -198,12 +198,12 @@ class _pre(_condition):
     @classmethod
     def copy_from(cls, other_func):
         "True if and only if all pre conditions of other function are met."
-        return cls._multi(getattr(other_func, '_flow_pre', list()))
+        return cls.all_(getattr(other_func, '_flow_pre', list()))
 
     @classmethod
     def after(cls, other_func):
         "True if and only if all post conditions of other function are met."
-        return cls._multi(getattr(other_func, '_flow_post', list()))
+        return cls.all_(getattr(other_func, '_flow_post', list()))
 
 
 class _post(_condition):
@@ -217,7 +217,7 @@ class _post(_condition):
     @classmethod
     def copy_from(cls, other_func):
         "True if and only if all post conditions of other function are met."
-        return cls._multi(getattr(other_func, '_flow_post', list()))
+        return cls.all_(getattr(other_func, '_flow_post', list()))
 
 
 def make_bundles(operations, size=None):
@@ -700,12 +700,57 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
     def detect_operation_graph(self):
         """Determine the directed acyclic graph defined by operation pre- and
-        post- conditions."""
-        num_ops = len(self.operations)
-        mat = [[0 for _ in range(num_ops)] for _ in range(num_ops)]
+        post- conditions.
+
+        In general, executing a given operation registered with a FlowProject
+        just involves checking the operation's pre- and post-conditions to
+        determine eligibility. More generally, however, the pre- and
+        post-conditions define a directed acyclic graph that governs the
+        execution of all operations. Visualizing this graph can be useful for
+        finding logic errors in the specified conditions, and having this graph
+        computed also enables additional execution modes. For example, using
+        this graph it is possible to determine exactly what operations need to
+        be executed in order to make the operation eligible so that the task of
+        executing all necessary operations can be automated.
+
+        The graph is determined by iterating over all pairs of operations and
+        checking for equality of pre- and post-conditions. The algorithm builds
+        an adjacency matrix based on whether the pre-conditions for one
+        operation match the post-conditions for another. To ensure robustness,
+        the comparison is relatively strict, requiring that the conditions be
+        the same callable. This means that, for instance, two equivalent (but
+        distinct) lambda functions will not match under this criterion.
+
+        Given a FlowProject subclass defined in a module `project.py`, the
+        output graph could be visualized using Matplotlib and NetworkX with the
+        following code:
+
+        .. code-block:: python
+
+            import numpy as np
+            from matplotlib import pyplot as plt
+            import networkx as nx
+
+            from project import Project
+
+            p = Project()
+            ops = p.operations.keys()
+            adj = np.asarray(p.detect_operation_graph())
+
+            plt.figure()
+            g = nx.DiGraph(adj)
+            pos = nx.spring_layout(g)
+            nx.draw(g, pos)
+            nx.draw_networkx_labels(g, pos,
+                labels={key: name for (key, name) in zip(range(len(ops)), [o for o in ops])})
+
+            plt.show()
+        """
         ops = list(self.operations.items())
+        mat = [[0 for _ in range(len(ops))] for _ in range(len(ops))]
 
         def to_callbacks(conditions):
+            """Get the actual callables associated with FlowConditions."""
             return [condition._callback for condition in conditions]
 
         def unpack_conds(conds, all_conds=None):
@@ -731,8 +776,14 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 prereqs2 = unpack_conds(to_callbacks(op2._prereqs))
                 conds = postconds1 | prereqs1 | postconds2 | prereqs2
                 if any(getattr(cond, '_is_lambda', False) for cond in conds):
-                        raise ValueError("The graph detection will not work"
-                                         "with anonymous lambda functions.")
+                    raise ValueError("The graph detection algorithm depends on "
+                                     "exactly equality of callables to determine whether "
+                                     "or not the pre- and post-conditions for two "
+                                     "operations are equal. As a result, the algorithm "
+                                     "will not work with anonymous lambda functions. To "
+                                     "use this feature, define your conditions as "
+                                     "functions and use those functions as your "
+                                     "conditions.")
                 if postconds1.intersection(prereqs2):
                     mat[i][j+i] = 1
                 elif prereqs1.intersection(postconds2):

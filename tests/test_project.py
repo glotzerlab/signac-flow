@@ -14,7 +14,7 @@ from contextlib import contextmanager
 
 import signac
 from signac.common import six
-from flow import FlowProject, cmd, with_job
+from flow import FlowProject, cmd, with_job, directives
 from flow.scheduling.base import Scheduler
 from flow.scheduling.base import ClusterJob
 from flow.scheduling.base import JobStatus
@@ -330,6 +330,23 @@ class ProjectClassTest(BaseProjectTest):
                     A().run()
                 self.assertEqual(os.getcwd(), starting_dir)
 
+    def test_function_in_directives(self):
+
+        class A(FlowProject):
+            pass
+
+        @A.operation
+        @directives(executable=lambda job: 'mpirun -np {} python'.format(job.doc.np))
+        def test_context(job):
+            return 'exit 1'
+
+        project = A(self.mock_project().config)
+        for job in project:
+            job.doc.np = 3
+            next_op = project.next_operation(job)
+            self.assertIn('mpirun -np 3 python', next_op.cmd)
+            break
+
 
 class ProjectTest(BaseProjectTest):
     project_class = TestProject
@@ -619,7 +636,8 @@ class ExecutionDynamicProjectTest(ExecutionProjectTest):
     project_class = TestDynamicProject
 
 
-class BufferedExecutionDynamicProjectTest(BufferedExecutionProjectTest, ExecutionDynamicProjectTest):
+class BufferedExecutionDynamicProjectTest(BufferedExecutionProjectTest,
+                                          ExecutionDynamicProjectTest):
     pass
 
 

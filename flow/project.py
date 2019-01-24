@@ -2509,8 +2509,14 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 executable = kwargs['directives']['executable']
             except (KeyError, TypeError):
                 executable = sys.executable
+
             path = getattr(func, '_flow_path', inspect.getsourcefile(func))
-            return '{} {} exec {} {{job._id}}'.format(executable, path, name)
+            cmd_str = "{} {} exec {} {{job._id}}"
+
+            if callable(executable):
+                return lambda job: cmd_str.format(executable(job), path, name)
+            else:
+                return cmd_str.format(executable, path, name)
 
         for name, func in operations:
             if name in self._operations:

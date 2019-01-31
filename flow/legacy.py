@@ -72,82 +72,82 @@ def support_submit_legacy_api(func):
 
 def submit_04(self, env, job_ids=None, operation_name=None, walltime=None,
               num=None, force=False, bundle_size=1, cmd=None, requires=None, **kwargs):
-        """Submit job-operations to the scheduler.
+    """Submit job-operations to the scheduler.
 
-        This method will submit an operation for each job to the environment's scheduler,
-        unless the job is considered active, e.g., because an operation associated with
-        the same job has alreay been submitted.
+    This method will submit an operation for each job to the environment's scheduler,
+    unless the job is considered active, e.g., because an operation associated with
+    the same job has alreay been submitted.
 
-        The actual execution of operations is controlled in the :py:meth:`~.submit_user`
-        method which must be implemented by the user.
+    The actual execution of operations is controlled in the :py:meth:`~.submit_user`
+    method which must be implemented by the user.
 
-        :param env: The env instance.
-        :type env: :class:`~.flow.manage.ComputeEnvironment`
-        :param job_ids: A list of job_id's, whose next operation shall be executed.
-            Defaults to all jobs found in the workspace.
-        :param operation_name: If not None, only execute operations with this name.
-        :param walltime: The maximum wallclock time in hours.
-        :type walltime: float
-        :param num: If not None, limit number of submitted operations to `num`.
-        :type num: int
-        :param force: Ignore warnings and checks during submission, just submit.
-        :type force: bool
-        :param bundle_size: Bundle up to 'bundle_size' number of operations during submission.
-        :type bundle_size: int
-        :param cmd: Construct and submit an operation "on-the-fly" instead of submitting
-            the "next operation".
-        :type cmd: str
-        :param requires: A job's set of classification labels must fully intersect with
-            the labels provided as part of this argument to be considered for submission.
-        :type requires: Iterable of str
-        :param kwargs: Other keyword arguments which are forwarded to down-stream methods.
-        """
-        from .project import JobOperation, make_bundles
-        from itertools import islice
-        import datetime
-        if walltime is not None:
-            walltime = datetime.timedelta(hours=walltime)
+    :param env: The env instance.
+    :type env: :class:`~.flow.manage.ComputeEnvironment`
+    :param job_ids: A list of job_id's, whose next operation shall be executed.
+        Defaults to all jobs found in the workspace.
+    :param operation_name: If not None, only execute operations with this name.
+    :param walltime: The maximum wallclock time in hours.
+    :type walltime: float
+    :param num: If not None, limit number of submitted operations to `num`.
+    :type num: int
+    :param force: Ignore warnings and checks during submission, just submit.
+    :type force: bool
+    :param bundle_size: Bundle up to 'bundle_size' number of operations during submission.
+    :type bundle_size: int
+    :param cmd: Construct and submit an operation "on-the-fly" instead of submitting
+        the "next operation".
+    :type cmd: str
+    :param requires: A job's set of classification labels must fully intersect with
+        the labels provided as part of this argument to be considered for submission.
+    :type requires: Iterable of str
+    :param kwargs: Other keyword arguments which are forwarded to down-stream methods.
+    """
+    from .project import JobOperation, make_bundles
+    from itertools import islice
+    import datetime
+    if walltime is not None:
+        walltime = datetime.timedelta(hours=walltime)
 
-        if job_ids:
-            jobs = (self.open_job(id=_id) for _id in job_ids)
+    if job_ids:
+        jobs = (self.open_job(id=_id) for _id in job_ids)
+    else:
+        jobs = iter(self)
+
+    def get_op(job):
+        if cmd is None:
+            return self.next_operation(job)
         else:
-            jobs = iter(self)
+            return JobOperation(name='user-cmd', cmd=cmd.format(job=job), job=job)
 
-        def get_op(job):
-            if cmd is None:
-                return self.next_operation(job)
-            else:
-                return JobOperation(name='user-cmd', cmd=cmd.format(job=job), job=job)
+    def eligible(op):
+        if force:
+            return True
+        if cmd is None:
+            if operation_name is not None and op.name != operation_name:
+                return False
+        if requires is not None:
+            labels = set(self.classify(op.job))
+            if not all([req in labels for req in requires]):
+                return False
+        return self.eligible_for_submission(op)
 
-        def eligible(op):
-            if force:
-                return True
-            if cmd is None:
-                if operation_name is not None and op.name != operation_name:
-                    return False
-            if requires is not None:
-                labels = set(self.classify(op.job))
-                if not all([req in labels for req in requires]):
-                    return False
-            return self.eligible_for_submission(op)
+    # Get the first num eligible operations
+    operations = islice((op for op in map(get_op, jobs) if eligible(op)), num)
 
-        # Get the first num eligible operations
-        operations = islice((op for op in map(get_op, jobs) if eligible(op)), num)
-
-        # Bundle all eligible operations and submit the bundles
-        for bundle in make_bundles(operations, bundle_size):
-            _id = self._store_bundled(bundle)
-            status = self.submit_user(
-                env=env,
-                _id=_id,
-                operations=bundle,
-                walltime=walltime,
-                force=force,
-                **kwargs)
-            if status is not None:
-                logger.info("Submitted job '{}' ({}).".format(_id, status.name))
-                for op in bundle:
-                    op.set_status(status)
+    # Bundle all eligible operations and submit the bundles
+    for bundle in make_bundles(operations, bundle_size):
+        _id = self._store_bundled(bundle)
+        status = self.submit_user(
+            env=env,
+            _id=_id,
+            operations=bundle,
+            walltime=walltime,
+            force=force,
+            **kwargs)
+        if status is not None:
+            logger.info("Submitted job '{}' ({}).".format(_id, status.name))
+            for op in bundle:
+                op.set_status(status)
 
 
 def support_submit_operations_legacy_api(func):

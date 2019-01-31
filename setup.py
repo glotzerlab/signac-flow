@@ -43,7 +43,7 @@ setup(
     description=description,
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://bitbucket.org/glotzer/signac-flow",
+    url="https://signac.io",
     keywords='workflow management signac framework database',
 
     classifiers=[

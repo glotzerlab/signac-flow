@@ -3,11 +3,11 @@
 ## Feedback
 
 The report of issues and the proposal of new features is very welcome.
-Please use the bitbucket issue page for this.
+Please use the GitHub issue page for this.
 
 ## Contributing code
 
-Code contributions to the signac-flow open-source project are welcomed via pull requests on bitbucket.
+Code contributions to the signac-flow open-source project are welcomed via pull requests on GitHub.
 Prior any work you should contact the signac-flow developers to ensure that the planned development meshes well with the directions and standards of the project.
 All contributors must agree to the Contributor Agreement ([ContributorAgreement.md](ContributorAgreement.md)) before their pull request can be merged.
 
@@ -24,7 +24,7 @@ General guidelines:
   * Document any portions of the code that might be less clear to others, especially to new developers.
   * Write API documentation in this package, and put usage information, guides, and concept overviews in the [framework documentation](https://docs.signac.io/) ([source][signac-docs-src]).
 
-[signac-docs-src]: https://bitbucket.org/glotzer/signac-docs/
+[signac-docs-src]: https://github.com/glotzerlab/signac-flow
 [gitflow]: https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow
 
 Please see the [Support](https://docs.signac.io/projects/flow/en/latest/support.html) section as part of the documentation for detailed development guidelines.

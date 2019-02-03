@@ -122,9 +122,12 @@ def submit_04(self, env, job_ids=None, operation_name=None, walltime=None,
     def eligible(op):
         if force:
             return True
-        if cmd is None:
-            if operation_name is not None and op.name != operation_name:
-                return False
+        if (
+            cmd is None
+            and operation_name is not None
+            and op.name != operation_name
+        ):
+            return False
         if requires is not None:
             labels = set(self.classify(op.job))
             if not all([req in labels for req in requires]):

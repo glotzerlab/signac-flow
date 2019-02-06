@@ -632,6 +632,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         template_environment.filters['get_account_name'] = tf.get_account_name
         if 'max' not in template_environment.filters:    # for jinja2 < 2.10
             template_environment.filters['max'] = max
+        if 'min' not in template_environment.filters:    # for jinja2 < 2.10
+            template_environment.filters['min'] = min
         return template_environment
 
     def _template_environment(self, environment=None):

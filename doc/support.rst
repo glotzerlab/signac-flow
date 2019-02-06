@@ -9,8 +9,8 @@ Getting help and reporting issues
 
 To get help using the **signac-flow** package, either send an email to `signac-support@umich.edu <mailto:signac-support@umich.edu>`_ or join the `signac gitter chatroom <https://gitter.im/signac/Lobby>`_.
 
-The **signac-flow** package is hosted on `Bitbucket <https://bitbucket.org/glotzer/signac-flow>`_ and licensed under the open-source BSD 3-Clause license.
-Please use the `repository's issue tracker <https://bitbucket.org/glotzer/signac-flow/issues?status=new&status=open>`_ to report bugs or request new features.
+The **signac-flow** package is hosted on `GitHub <https://github.com/glotzerlab/signac-flow>`_ and licensed under the open-source BSD 3-Clause license.
+Please use the `repository's issue tracker <https://github.com/glotzerlab/signac-flow/issues>`_ to report bugs or request new features.
 
 Code contributions
 ==================
@@ -19,13 +19,13 @@ This project is open-source.
 Users are highly encouraged to contribute directly by implementing new features and fixing issues.
 Development for packages as part of the **signac** framework should follow the general development guidelines outlined `here <http://docs.signac.io/en/latest/community.html#contributions>`_.
 
-A brief summary of contributing guidelines are outlined in the `CONTRIBUTING.md <https://bitbucket.org/glotzer/signac-flow/src/master/CONTRIBUTING.md>`_ file as part of the repository.
-All contributors must agree to the `Contributor Agreement <https://bitbucket.org/glotzer/signac-flow/src/master/ContributorAgreement.md>`_ before their pull request can be merged.
+A brief summary of contributing guidelines are outlined in the `CONTRIBUTING.md <https://github.com/glotzerlab/signac-flow/blob/master/CONTRIBUTING.md>`_ file as part of the repository.
+All contributors must agree to the `Contributor Agreement <https://github.com/glotzerlab/signac-flow/blob/master/ContributorAgreement.md>`_ before their pull request can be merged.
 
 Set up a development environment
 --------------------------------
 
-Start by `forking <https://bitbucket.org/glotzer/signac-flow/fork/>`_ the project.
+Start by `forking <https://github.com/glotzerlab/signac-flow/fork>`_ the project.
 
 
 We highly recommend to setup a dedicated development environment,
@@ -67,7 +67,7 @@ The continuous integration pipeline for the package will perform these checks as
 The git-flow development workflow
 ---------------------------------
 
-Prior to working on a patch, it is advisable to create an `issue <https://bitbucket.org/glotzer/signac-flow/issues?status=new&status=open>`_ that describes the problem or proposed feature.
+Prior to working on a patch, it is advisable to create an `issue <https://github.com/glotzerlab/signac-flow/issues>`_ that describes the problem or proposed feature.
 This means that the code maintainers and other users get a chance to provide some input on the scope and possible limitations of the proposed changes, as well as advise on the actual implementation.
 
 All code changes should be developed within a dedicated git branch and must all be related to each other.
@@ -96,9 +96,6 @@ To run tests, execute:
 
     (signac-flow-dev) signac-flow $ python -m unittest discover tests/
 
-.. tip::
-
-    Enable `Bitbucket pipelines <https://bitbucket.org/product/features/pipelines>`_ and `CircleCI <https://circleci.com>`_ for your repository to execute tests automatically.
 
 Building documentation
 ----------------------
@@ -119,13 +116,13 @@ Then you can build the documentation from within the ``doc/`` directory as part 
 .. note::
 
     Documentation as part of the package should be largely limited to the API.
-    More elaborate documentation on how to integrate **signac-flow** into a computational workflow should be documented as part of the `framework documentation <https://docs.signac.io>`_, which is maintained `here <https://bitbucket.org/glotzer/signac-docs>`_.
+    More elaborate documentation on how to integrate **signac-flow** into a computational workflow should be documented as part of the `framework documentation <https://docs.signac.io>`_, which is maintained `here <https://github.com/glotzerlab/signac-docs>`_.
 
 
 Updating the changelog
 ----------------------
 
-To update the changelog, add a one-line description to the `changelog.txt <https://bitbucket.org/glotzer/signac-flow/src/master/changelog.txt>`_ file within the ``next`` section.
+To update the changelog, add a one-line description to the `changelog.txt <https://docs.signac.io/projects/flow/en/latest/changes.html>`_ file within the ``next`` section.
 For example:
 
 .. code-block:: bash

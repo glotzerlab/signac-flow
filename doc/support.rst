@@ -67,7 +67,7 @@ The continuous integration pipeline for the package will perform these checks as
 The git-flow development workflow
 ---------------------------------
 
-Prior to working on a patch, it is advisable to create an `issue <<https://github.com/glotzerlab/signac-flow/issues>>`_ that describes the problem or proposed feature.
+Prior to working on a patch, it is advisable to create an `issue <https://github.com/glotzerlab/signac-flow/issues>`_ that describes the problem or proposed feature.
 This means that the code maintainers and other users get a chance to provide some input on the scope and possible limitations of the proposed changes, as well as advise on the actual implementation.
 
 All code changes should be developed within a dedicated git branch and must all be related to each other.
@@ -122,7 +122,7 @@ Then you can build the documentation from within the ``doc/`` directory as part 
 Updating the changelog
 ----------------------
 
-To update the changelog, add a one-line description to the `changelog.txt <https://github.com/glotzerlab/signac-flow/blob/master/changelog.txt>`_ file within the ``next`` section.
+To update the changelog, add a one-line description to the `changelog.txt <https://docs.signac.io/projects/flow/en/latest/changes.html>`_ file within the ``next`` section.
 For example:
 
 .. code-block:: bash

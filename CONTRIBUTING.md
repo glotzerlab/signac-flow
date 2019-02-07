@@ -7,7 +7,7 @@ Please use the [GitHub issue page](https://github.com/glotzerlab/signac-flow/iss
 
 ## Contributing code
 
-Code contributions to the signac open-source project are welcomed via pull requests on GitHub.
+Code contributions to the signac-flow open-source project are welcomed via pull requests on GitHub.
 Prior any work you should contact the signac developers to ensure that the planned development meshes well with the directions and standards of the project.
 All contributors must agree to the Contributor Agreement ([ContributorAgreement.md](ContributorAgreement.md)) before their pull request can be merged.
 
@@ -27,6 +27,6 @@ Please see the [Support](https://docs.signac.io/projects/signac-flow/en/latest/s
 
 ### Code Style
 
-Code submitted to the signac project must adhere to the [PEP8 style guide](https://www.python.org/dev/peps/pep-0008/) with the exception that lines may have up to 100 characters.
+Code submitted to the signac-flow project must adhere to the [PEP8 style guide](https://www.python.org/dev/peps/pep-0008/) with the exception that lines may have up to 100 characters.
 
 We recommend to use [flake8](http://flake8.pycqa.org/en/latest/) and [autopep8](https://pypi.org/project/autopep8/) to find and fix any code style issues prior to committing and pushing.

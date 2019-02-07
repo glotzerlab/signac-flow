@@ -121,6 +121,12 @@ class directives(object):
         return func
 
 
+def aggregate(func):
+    """Decorator for operation functions that are aggregate operations."""
+    setattr(func, '_flow_aggregate_operation', True)
+    return func
+
+
 def _get_operations(include_private=False):
     """"Yields the name of all functions that qualify as an operation function.
 

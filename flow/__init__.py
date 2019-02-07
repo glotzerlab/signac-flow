@@ -14,6 +14,7 @@ from . import scheduling
 from . import errors
 from .project import FlowProject
 from .project import JobOperation
+from .project import JobsOperation
 from .project import label
 from .project import classlabel
 from .project import staticlabel
@@ -33,6 +34,7 @@ __all__ = [
     'errors',
     'FlowProject',
     'JobOperation',
+    'JobsOperation',
     'label',
     'classlabel',
     'staticlabel',

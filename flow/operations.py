@@ -123,7 +123,7 @@ class directives(object):
 
 def aggregate(func):
     """Decorator for operation functions that are aggregate operations."""
-    setattr(func, '_flow_aggregate_operation', True)
+    setattr(func, '_flow_aggregate', True)
     return func
 
 

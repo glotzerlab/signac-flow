@@ -229,7 +229,7 @@ def make_bundles(operations, size=None):
             break
 
 
-class JobOperation(object):
+class JobsOperation(object):
     """This class represents the information needed to execute one operation for one job.
 
     An operation function in this context is a shell command, which should be a function
@@ -243,11 +243,11 @@ class JobOperation(object):
     .. versionchanged:: 0.6
 
     :param name:
-        The name of this JobOperation instance. The name is arbitrary,
+        The name of this JobsOperation instance. The name is arbitrary,
         but helps to concisely identify the operation in various contexts.
     :type name:
         str
-    :param job:
+    :param jobs:
         The job instance associated with this operation.
     :type job:
         :py:class:`signac.Job`.
@@ -263,9 +263,11 @@ class JobOperation(object):
     """
     MAX_LEN_ID = 100
 
-    def __init__(self, name, job, cmd, directives=None, np=None):
+    def __init__(self, name, cmd, *jobs, directives=None, np=None):
+        if not len(jobs):
+            raise ValueError("The jobs argument cannot be empty!")
         self.name = name
-        self.job = job
+        self.jobs = jobs
         self.cmd = cmd
         if directives is None:
             directives = dict()  # default argument
@@ -282,7 +284,7 @@ class JobOperation(object):
         # Handle deprecated np argument:
         if np is not None:
             warnings.warn(
-                "The np argument for the JobOperation constructor is deprecated.",
+                "The np argument for the JobsOperation constructor is deprecated.",
                 DeprecationWarning)
             assert directives.setdefault('np', np) == np
         else:
@@ -296,9 +298,12 @@ class JobOperation(object):
         # Evaluate strings and callables for job:
         def evaluate(value):
             if value and callable(value):
-                return value(job)
+                return value(* self.jobs)
             elif isinstance(value, six.string_types):
-                return value.format(job=job)
+                if len(jobs) == 1:
+                    return value.format(job=self.jobs[0])
+                else:
+                    return value.format(jobs=self.jobs)
             else:
                 return value
 
@@ -310,15 +315,20 @@ class JobOperation(object):
         self.directives._keys_set_by_user = keys_set_by_user
 
     def __str__(self):
-        return "{}({})".format(self.name, self.job)
+        return "{}({})".format(self.name, ', '.join([job.get_id() for job in self.jobs]))
 
     def __repr__(self):
-        return "{type}(name='{name}', job='{job}', cmd={cmd}, directives={directives})".format(
+        return "{type}(name='{name}', cmd={cmd}, jobs='{jobs}', directives={directives})".format(
             type=type(self).__name__,
             name=self.name,
-            job=str(self.job),
+            jobs=', '.join(self.jobs),
             cmd=repr(self.cmd),
             directives=self.directives)
+
+    @property
+    def job(self):
+        assert len(self.jobs) == 1
+        return self.jobs[0]
 
     def _get_legacy_id(self):
         "Return a name, which identifies this job-operation."
@@ -326,29 +336,32 @@ class JobOperation(object):
 
     def get_id(self, index=0):
         "Return a name, which identifies this job-operation."
-        project = self.job._project
+        project = self.jobs[0]._project
 
         # The full name is designed to be truly unique for each job-operation.
         full_name = '{}%{}%{}%{}'.format(
-            project.root_directory(), self.job.get_id(), self.name, index)
+            project.root_directory(),
+            ','.join([job.get_id() for job in self.jobs]),
+            self.name, index)
 
-        # The job_op_id is a hash computed from the unique full name.
-        job_op_id = calc_id(full_name)
+        # The jobs_op_id is a hash computed from the unique full name.
+        jobs_op_id = calc_id(full_name)
 
-        # The actual job id is then constructed from a readable part and the job_op_id,
+        # The actual job id is then constructed from a readable part and the jobs_op_id,
         # ensuring that the job-op is still somewhat identifiable, but guarantueed to
         # be unique. The readable name is based on the project id, job id, operation name,
         # and the index number. All names and the id itself are restricted in length
         # to guarantuee that the id does not get too long.
-        max_len = self.MAX_LEN_ID - len(job_op_id)
-        if max_len < len(job_op_id):
+        max_len = self.MAX_LEN_ID - len(jobs_op_id)
+        if max_len < len(jobs_op_id):
             raise ValueError("Value for MAX_LEN_ID is too small ({}).".format(self.MAX_LEN_ID))
 
         readable_name = '{}/{}/{}/{:04d}/'.format(
-            str(project)[:12], str(self.job)[:8], self.name[:12], index)[:max_len]
+            str(project)[:12], ','.join([str(job)[:8] for job in self.jobs]),
+            self.name[:12], index)[:max_len]
 
-        # By appending the unique job_op_id, we ensure that each id is truly unique.
-        return readable_name + job_op_id
+        # By appending the unique jobs_op_id, we ensure that each id is truly unique.
+        return readable_name + jobs_op_id
 
     @classmethod
     def expand_id(self, _id):
@@ -363,17 +376,21 @@ class JobOperation(object):
 
     def set_status(self, value):
         "Store the operation's status."
-        status_doc = self.job.document.get('_status', dict())
-        status_doc[self.get_id()] = int(value)
-        self.job.document['_status'] = status_doc
+        for job in self.jobs:
+            status_doc = job.document.get('_status', dict())
+            status_doc[self.get_id()] = int(value)
+            job.document['_status'] = status_doc
 
     def get_status(self):
         "Retrieve the operation's last known status."
         try:
-            status_cache = self.job.document['_status']
+            status_cache = self.jobs[0].document['_status']
             return JobStatus(status_cache[self.get_id()])
         except KeyError:
             return JobStatus.unknown
+
+
+JobOperation = JobsOperation
 
 
 class FlowCondition(object):
@@ -760,7 +777,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         :param operations:
             The operations to be written to the script.
         :type operations:
-            A sequence of JobOperation
+            A sequence of JobsOperation
         :param background:
             Whether operations should be executed in the background;
             useful to parallelize execution.
@@ -955,7 +972,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         :param operations:
             The operations to bundle.
         :type operations:
-            A sequence of instances of :py:class:`.JobOperation`
+            A sequence of instances of :py:class:`.JobsOperation`
         :return:
             The  bundle id
         :rtype:
@@ -1008,7 +1025,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         for sjob in scheduler_jobs:
             name = sjob.name()
             if name[32] == '-':
-                expanded = JobOperation.expand_id(name)
+                expanded = JobsOperation.expand_id(name)
                 yield expanded['job_id'], expanded['operation-name'], sjob
 
     def map_scheduler_jobs(self, scheduler_jobs):
@@ -1530,7 +1547,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         :param operations:
             The operations to execute (optional).
         :type operations:
-            Sequence of instances of :class:`.JobOperation`
+            Sequence of instances of :class:`.JobsOperation`
         :param pretend:
             Do not actually execute the operations, but show which command would have been used.
         :type pretend:
@@ -1602,11 +1619,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
     @staticmethod
     def _dumps_op(op):
-        return (op.name, op.job._id, op.cmd, op.directives)
+        return (op.name, op.cmd, tuple(job._id for job in op.jobs), op.directives)
 
     def _loads_op(self, blob):
-        name, job_id, cmd, directives = blob
-        return JobOperation(name, self.open_job(id=job_id), cmd, directives)
+        name, cmd, job_ids, directives = blob
+        jobs = (self.open_job(id=job_id) for job_id in job_ids)
+        return JobsOperation(name, cmd, *jobs, directives=directives)
 
     def _run_operations_in_parallel(self, pool, pickle, operations, progress, timeout):
         """Execute operations in parallel.
@@ -1637,7 +1655,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         if timeout is None and operation.name in self._operation_functions and \
                 operation.directives.get('executable', sys.executable) == sys.executable:
             logger.debug("Able to optimize execution of operation '{}'.".format(operation))
-            self._operation_functions[operation.name](operation.job)
+            self._operation_functions[operation.name](* operation.jobs)
         else:   # need to fork
             fork(cmd=operation.cmd, timeout=timeout)
 
@@ -1714,9 +1732,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         reached_execution_limit = Event()
 
         def select(operation):
-            if operation.job not in self:
-                log("Job '{}' is no longer part of the project.".format(operation.job))
-                return False
+            for job in operation.jobs:
+                if job not in self:
+                    log("Job '{}' is no longer part of the project.".format(operation.job))
+                    return False
             if num is not None and select.total_execution_count >= num:
                 reached_execution_limit.set()
                 raise StopIteration  # Reached total number of executions
@@ -1775,7 +1794,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             if requires and requires.difference(self.labels(job)):
                 continue
             cmd_ = cmd.format(job=job)
-            yield JobOperation(name=cmd_.replace(' ', '-'), cmd=cmd_, job=job)
+            yield JobsOperation(job, name=cmd_.replace(' ', '-'), cmd=cmd_)
 
     def _get_pending_operations(self, jobs, operation_names=None):
         "Get all pending operations for the given selection."
@@ -1814,7 +1833,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         :param operations:
             The operations to execute.
         :type operations:
-            Sequence of instances of :class:`.JobOperation`
+            Sequence of instances of :class:`.JobsOperation`
         :param parallel:
             Execute all operations in parallel (default is False).
         :param parallel:
@@ -1909,7 +1928,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         :param operations:
             The operations to submit.
         :type operations:
-            A sequence of instances of :py:class:`.JobOperation`
+            A sequence of instances of :py:class:`.JobsOperation`
         :param _id:
             The _id to be used for this submission.
         :type _id:
@@ -2420,11 +2439,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 yield name
 
     def _job_operations(self, job, only_eligible=False):
-        "Yield instances of JobOperation constructed for specific job."
+        "Yield instances of JobsOperation constructed for specific job."
         for name, op in self.operations.items():
             if only_eligible and not op.eligible(job):
                 continue
-            yield name, JobOperation(name=name, job=job, cmd=op(job), directives=op.directives)
+            yield name, JobsOperation(name, op(job), job, directives=op.directives)
 
     def next_operations(self, job):
         """Determine the next eligible operations for job.
@@ -2434,7 +2453,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         :type job:
             :class:`~signac.contrib.job.Job`
         :yield:
-            All instances of :class:`~.JobOperation` job is eligible for.
+            All instances of :class:`~.JobsOperation` job is eligible for.
         """
         next_ops = OrderedDict(self._job_operations(job, only_eligible=True))
         for op in next_ops.values():
@@ -2448,9 +2467,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         :type job:
             :class:`~signac.contrib.job.Job`
         :return:
-            An instance of JobOperation to execute next or `None`, if no operation is eligible.
+            An instance of JobsOperation to execute next or `None`, if no operation is eligible.
         :rtype:
-            `:py:class:`~.JobOperation` or `NoneType`
+            `:py:class:`~.JobsOperation` or `NoneType`
         """
         for op in self.next_operations(job):
             return op

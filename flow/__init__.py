@@ -14,6 +14,7 @@ from . import scheduling
 from . import errors
 from .project import FlowProject
 from .project import JobOperation
+from .project import JobsOperation
 from .project import label
 from .project import classlabel
 from .project import staticlabel
@@ -25,6 +26,7 @@ from .template import init
 from .util.misc import redirect_log
 from .operations import with_job
 
+
 __version__ = '0.6.4'
 
 __all__ = [
@@ -33,6 +35,7 @@ __all__ = [
     'errors',
     'FlowProject',
     'JobOperation',
+    'JobsOperation',
     'label',
     'classlabel',
     'staticlabel',

@@ -321,7 +321,7 @@ class JobsOperation(object):
         return "{type}(name='{name}', cmd={cmd}, jobs='{jobs}', directives={directives})".format(
             type=type(self).__name__,
             name=self.name,
-            jobs=', '.join(self.jobs),
+            jobs=', '.join([job.get_id() for job in self.jobs]),
             cmd=repr(self.cmd),
             directives=self.directives)
 
@@ -383,6 +383,8 @@ class JobsOperation(object):
 
     def get_status(self):
         "Retrieve the operation's last known status."
+        # Possibly use the maximum of all values?
+        # Or return all value?
         try:
             status_cache = self.jobs[0].document['_status']
             return JobStatus(status_cache[self.get_id()])
@@ -475,13 +477,14 @@ class FlowOperation(object):
         :class:`dict`
     """
 
-    def __init__(self, cmd, pre=None, post=None, directives=None, np=None):
+    def __init__(self, cmd, pre=None, post=None, directives=None, aggregate=False, np=None):
         if pre is None:
             pre = []
         if post is None:
             post = []
         self._cmd = cmd
         self.directives = directives
+        self.aggregate = aggregate
 
         # Handle deprecated np argument.
         if np is not None:
@@ -499,32 +502,34 @@ class FlowOperation(object):
     def __str__(self):
         return "{type}(cmd='{cmd}')".format(type=type(self).__name__, cmd=self._cmd)
 
-    def eligible(self, job):
+    def eligible(self, *jobs):
         "Eligible, when all pre-conditions are true and at least one post-condition is false."
-        pre = all(cond(job) for cond in self._prereqs)
+        pre = all(cond(job) for job in jobs for cond in self._prereqs)
         if pre and len(self._postconds):
-            post = any(not cond(job) for cond in self._postconds)
+            post = any(not cond(job) for job in jobs for cond in self._postconds)
         else:
             post = True
         return pre and post
 
-    def complete(self, job):
+    def complete(self, *jobs):
         "True when all post-conditions are met."
         if len(self._postconds):
-            return all(cond(job) for cond in self._postconds)
+            return all(cond(job) for cond in self._postconds for job in jobs)
         else:
             return False
 
-    def __call__(self, job=None):
+    def __call__(self, *jobs):
+        job_ids = ' '.join(map(str, jobs))
         if callable(self._cmd):
-            return self._cmd(job).format(job=job)
+            return self._cmd(*jobs).format(job=jobs[0], job_ids=job_ids)
         else:
-            return self._cmd.format(job=job)
+            return self._cmd.format(job=jobs[0], job_ids=job_ids)
 
-    def np(self, job):
+    def np(self, *jobs):
         "(deprecated) Return the number of processors this operation requires."
+        assert len(jobs) == 1
         if callable(self._np):
-            return self._np(job)
+            return self._np(jobs[0])
         else:
             return self._np
 
@@ -1060,7 +1065,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
     def _get_operations_status(self, job):
         "Return a dict with information about job-operations for this job."
         cached_status = job.document.get('_status', dict())
-        for name, job_op in self._job_operations(job):
+        for name, job_op in self._jobs_operations(job):
             flow_op = self.operations[name]
             completed = flow_op.complete(job)
             eligible = False if completed else flow_op.eligible(job)
@@ -1146,7 +1151,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 job_status = dict()
                 # ... and all job-operations to attempt to map the job-operation id
                 # to scheduler names.
-                for name, op in self._job_operations(job):
+                for name, op in self._jobs_operations(job):
                     scheduler_jobs = sjobs_map.get(
                         op.get_id(), sjobs_map.get(op._get_legacy_id(), []))
                     from operator import methodcaller
@@ -1799,16 +1804,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
     def _get_pending_operations(self, jobs, operation_names=None):
         "Get all pending operations for the given selection."
         operation_names = None if operation_names is None else set(operation_names)
-
-        if len(jobs) > 1:
-            jobs = with_progressbar(jobs, desc='Gather pending operations:')
-        for job in jobs:
-            for op in self.next_operations(job):
-                if operation_names and op.name not in operation_names:
-                    continue
-                if not self.eligible_for_submission(op):
-                    continue
-                yield op
+        for op in self.next_operations(*jobs):
+            if operation_names and op.name not in operation_names:
+                continue
+            if not self.eligible_for_submission(op):
+                continue
+            yield op
 
     @contextlib.contextmanager
     def _potentially_buffered(self):
@@ -2336,7 +2337,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             elif bool(label_value) is True:
                 yield label_name
 
-    def add_operation(self, name, cmd, pre=None, post=None, **kwargs):
+    def add_operation(self, name, cmd, pre=None, post=None, aggregate=False, **kwargs):
         """
         Add an operation to the workflow.
 
@@ -2400,10 +2401,15 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             post-conditions to determine completion
         :type pre:
             sequence of callables
+        :param aggregate:
+            specify if this is an aggregate operation
+        :type aggregate:
+            bool
         """
         if name in self.operations:
             raise KeyError("An operation with this identifier is already added.")
-        self.operations[name] = FlowOperation(cmd=cmd, pre=pre, post=post, directives=kwargs)
+        self.operations[name] = FlowOperation(cmd=cmd, pre=pre, post=post,
+                                              aggregate=aggregate, directives=kwargs)
 
     def classify(self, job):
         """Generator function which yields labels for job.
@@ -2438,14 +2444,20 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             if op.complete(job):
                 yield name
 
-    def _job_operations(self, job, only_eligible=False):
+    def _jobs_operations(self, *jobs, only_eligible=False):
         "Yield instances of JobsOperation constructed for specific job."
         for name, op in self.operations.items():
-            if only_eligible and not op.eligible(job):
-                continue
-            yield name, JobsOperation(name, op(job), job, directives=op.directives)
+            if op.aggregate:
+                if only_eligible and not op.eligible(*jobs):
+                    continue
+                yield name, JobsOperation(name, op(*jobs), *jobs, directives=op.directives)
+            else:
+                for job in jobs:
+                    if only_eligible and not op.eligible(job):
+                        continue
+                    yield name, JobsOperation(name, op(job), job, directives=op.directives)
 
-    def next_operations(self, job):
+    def next_operations(self, *jobs):
         """Determine the next eligible operations for job.
 
         :param job:
@@ -2455,11 +2467,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         :yield:
             All instances of :class:`~.JobsOperation` job is eligible for.
         """
-        next_ops = OrderedDict(self._job_operations(job, only_eligible=True))
-        for op in next_ops.values():
+        if len(jobs) > 1:
+            jobs = with_progressbar(jobs, desc='Gather pending operations:')
+        for _, op in self._jobs_operations(*jobs, only_eligible=True):
             yield op
 
-    def next_operation(self, job):
+    def next_operation(self, *job):
         """Determine the next operation for this job.
 
         :param job:
@@ -2471,7 +2484,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         :rtype:
             `:py:class:`~.JobsOperation` or `NoneType`
         """
-        for op in self.next_operations(job):
+        for op in self.next_operations(*job):
             return op
 
     @classmethod
@@ -2532,10 +2545,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 executable = sys.executable
 
             path = getattr(func, '_flow_path', inspect.getsourcefile(inspect.getmodule(func)))
-            cmd_str = "{} {} exec {} {{job._id}}"
+            cmd_str = "{} {} exec {} {{job_ids}}"
 
             if callable(executable):
-                return lambda job: cmd_str.format(executable(job), path, name)
+                def cmd(*jobs):
+                    return cmd_str.format(executable(*jobs), path, name)
+                return cmd
             else:
                 return cmd_str.format(executable, path, name)
 
@@ -2546,7 +2561,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
             # Extract pre/post conditions and directives from function:
             params = {key: getattr(func, '_flow_{}'.format(key), None)
-                      for key in ('pre', 'post', 'directives')}
+                      for key in ('pre', 'post', 'directives', 'aggregate')}
 
             # Construct FlowOperation:
             if getattr(func, '_flow_cmd', False):
@@ -2733,7 +2748,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             raise KeyError("Unknown operation '{}'.".format(args.operation))
 
         if getattr(operation_function, '_flow_aggregate', False):
-            operation_function(jobs)
+            operation_function(*jobs)
         else:
             for job in jobs:
                 operation_function(job)

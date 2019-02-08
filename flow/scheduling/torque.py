@@ -142,6 +142,8 @@ class TorqueScheduler(Scheduler):
         "Return True if it appears that a TORQUE scheduler is available within the environment."
         try:
             subprocess.check_output(['qsub', '--version'], stderr=subprocess.STDOUT)
+        except subprocess.CalledProcessError:
+            return True
         except (IOError, OSError):
             return False
         else:

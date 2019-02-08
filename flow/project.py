@@ -2512,7 +2512,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             except (KeyError, TypeError):
                 executable = sys.executable
 
-            path = getattr(func, '_flow_path', inspect.getsourcefile(func))
+            path = getattr(func, '_flow_path', inspect.getsourcefile(inspect.getmodule(func)))
             cmd_str = "{} {} exec {} {{job._id}}"
 
             if callable(executable):

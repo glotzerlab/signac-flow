@@ -30,6 +30,7 @@ from collections import defaultdict
 from collections import OrderedDict
 from itertools import islice
 from itertools import count
+from itertools import tee
 from hashlib import sha1
 from multiprocessing import Pool
 from multiprocessing import cpu_count
@@ -2448,9 +2449,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         "Yield instances of JobsOperation constructed for specific job."
         for name, op in self.operations.items():
             if op.aggregate:
-                if only_eligible and not op.eligible(*jobs):
-                    continue
-                yield name, JobsOperation(name, op(*jobs), *jobs, directives=op.directives)
+                for group in op.aggregate(jobs):
+                    g1, g2, g3 = tee(group, 3)
+                    if only_eligible and not op.eligible(*g1):
+                        continue
+                    yield name, JobsOperation(name, op(*g2), *g3, directives=op.directives)
             else:
                 for job in jobs:
                     if only_eligible and not op.eligible(job):
@@ -2513,20 +2516,22 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             raise ValueError(
                 "An operation with name '{}' is already registered.".format(name))
 
-        if six.PY2:
-            signature = inspect.getargspec(func)
-            if len(signature.args) > 1:
-                if signature.defaults is None or len(signature.defaults) + 1 < len(signature.args):
-                    raise ValueError(
-                        "Only the first argument in an operation argument may not have "
-                        "a default value! ({})".format(name))
-        else:
-            signature = inspect.signature(func)
-            for i, (k, v) in enumerate(signature.parameters.items()):
-                if i and v.default is inspect.Parameter.empty:
-                    raise ValueError(
-                        "Only the first argument in an operation argument may not have "
-                        "a default value! ({})".format(name))
+        if not getattr(func, '_flow_aggregate', False):
+            if six.PY2:
+                signature = inspect.getargspec(func)
+                if len(signature.args) > 1:
+                    if signature.defaults is None or \
+                            len(signature.defaults) + 1 < len(signature.args):
+                        raise ValueError(
+                            "Only the first argument in an operation argument may not have "
+                            "a default value! ({})".format(name))
+            else:
+                signature = inspect.signature(func)
+                for i, (k, v) in enumerate(signature.parameters.items()):
+                    if i and v.default is inspect.Parameter.empty:
+                        raise ValueError(
+                            "Only the first argument in an operation argument may not have "
+                            "a default value! ({})".format(name))
 
         # Append the name and function to the class registry
         cls._OPERATION_FUNCTIONS.append((name, func))
@@ -2747,8 +2752,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         except KeyError:
             raise KeyError("Unknown operation '{}'.".format(args.operation))
 
-        if getattr(operation_function, '_flow_aggregate', False):
-            operation_function(*jobs)
+        aggregate = getattr(operation_function, '_flow_aggregate', None)
+        if aggregate:
+            for group in aggregate(jobs):
+                operation_function(*group)
         else:
             for job in jobs:
                 operation_function(job)

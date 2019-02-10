@@ -13,12 +13,18 @@ import logging
 import inspect
 from multiprocessing import Pool
 from functools import wraps
+from itertools import groupby
+from itertools import zip_longest
 
 from signac import get_project
 from signac.common import six
 
 from .util.tqdm import tqdm
 from .util.execution import fork
+if six.PY2:
+    from collections import Iterable
+else:
+    from collections.abc import Iterable
 
 
 logger = logging.getLogger(__name__)
@@ -121,10 +127,60 @@ class directives(object):
         return func
 
 
-def aggregate(func):
+class aggregate(object):
     """Decorator for operation functions that are aggregate operations."""
-    setattr(func, '_flow_aggregate', True)
-    return func
+
+    def __init__(self, grouper=None):
+        if grouper is None:
+            def grouper(jobs):
+                yield jobs
+
+        self.grouper = grouper
+
+    @classmethod
+    def groupsof(cls, num, fillvalue=None):
+        # copied from: https://docs.python.org/3/library/itertools.html#itertools.zip_longest
+        def grouper(jobs):
+            args = [iter(jobs)] * num
+            return zip_longest(*args, fillvalue=fillvalue)
+
+        return cls(grouper)
+
+    @classmethod
+    def groupby(cls, key=None, default=None):
+        if isinstance(key, six.string_types):
+            if default is None:
+                def keyfunction(job):
+                    return job.sp[key]
+            else:
+                def keyfunction(job):
+                    return job.sp.get(key, default)
+
+        elif isinstance(key, Iterable):
+            if default is None:
+                def keyfunction(job):
+                    return tuple(job.sp[k] for k in key)
+            else:
+                def keyfunction(job):
+                    return tuple(job.sp.get(k, default) for k in key)
+
+        elif key is None:
+            # Must return a type that can be ordered with <, >
+            def keyfunction(job):
+                return str(job)
+
+        else:
+            keyfunction = key
+
+        def grouper(jobs):
+            for key, group in groupby(sorted(jobs, key=keyfunction), key=keyfunction):
+                yield group
+
+        return cls(grouper)
+
+    def __call__(self, func):
+        setattr(func, '_flow_aggregate', self.grouper)
+        return func
 
 
 def _get_operations(include_private=False):

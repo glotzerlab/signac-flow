@@ -1003,12 +1003,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
     def _get_operations_status(self, job):
         "Return a dict with information about job-operations for this job."
         cached_status = self.document.get('_status', dict())
-        for name, job_op in self._job_operations([job]):
-            flow_op = self.operations[name]
+        for job_op in self._job_operations([job], False):
+            flow_op = self.operations[job_op.name]
             completed = flow_op.complete(job)
             eligible = False if completed else flow_op.eligible(job)
             scheduler_status = cached_status.get(job_op.get_id(), JobStatus.unknown)
-            yield name, {
+            yield job_op.name, {
                 'scheduler_status': scheduler_status,
                 'eligible': eligible,
                 'completed': completed,
@@ -1082,7 +1082,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             scheduler_info = {sjob.name(): sjob.status() for sjob in self.scheduler_jobs(scheduler)}
             status = dict()
             print(self._tr("Query scheduler..."), file=file)
-            for name, op in self._job_operations(jobs):
+            for op in self.next_operations(*jobs):
                 status[op.get_id()] = int(scheduler_info.get(op.get_id(), JobStatus.unknown))
             self.document._status.update(status)
         except NoSchedulerError:
@@ -1504,7 +1504,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         if timeout is not None and timeout < 0:
             timeout = None
         if operations is None:
-            operations = [op for job in self for op in self.next_operations(job) if op is not None]
+            operations = [op for job in self for op in self._job_operations(job, False)]
         else:
             operations = list(operations)   # ensure list
 
@@ -2366,25 +2366,25 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             if op.complete(job):
                 yield name
 
-    def _job_operations(self, jobs, only_eligible=False):
-        "Yield instances of JobOperation constructed for specific job."
-        for name, op in self.operations.items():
-            for job in jobs:
+    def _job_operations(self, jobs, only_eligible):
+        "Yield instances of JobOperation constructed for specific jobs."
+        for job in jobs:
+            for name, op in self.operations.items():
                 if only_eligible and not op.eligible(job):
                     continue
-                yield name, JobOperation(name=name, job=job, cmd=op(job), directives=op.directives)
+                yield JobOperation(name=name, job=job, cmd=op(job), directives=op.directives)
 
     def next_operations(self, *jobs):
-        """Determine the next eligible operations for job.
+        """Determine the next eligible operations for jobs.
 
-        :param job:
-            The signac job handle.
+        :param jobs:
+            The signac job handles.
         :type job:
             :class:`~signac.contrib.job.Job`
         :yield:
-            All instances of :class:`~.JobOperation` job is eligible for.
+            All instances of :class:`~.JobOperation` jobs are eligible for.
         """
-        for name, op in self._job_operations(jobs, only_eligible=True):
+        for op in self._job_operations(jobs, True):
             yield op
 
     def next_operation(self, job):

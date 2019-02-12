@@ -69,7 +69,6 @@ from .util.misc import _positive_int
 from .util.misc import _mkdir_p
 from .util.misc import draw_progressbar
 from .util import template_filters as tf
-from .util.misc import write_human_readable_statepoint
 from .util.misc import add_cwd_to_environment_pythonpath
 from .util.misc import switch_to_directory
 from .util.misc import TrackGetItemDict
@@ -111,20 +110,6 @@ For example: {{ project.get_id() | captialize }}.
 
 The available filters are:
 {filters}"""
-
-
-# Global variable that is used internally to keep track of which
-# FlowProject methods belong to the legacy templating system. Such
-# a method is docorated with the _part_of_legacy_template_system()
-# decorator and then registered in this variable.
-_LEGACY_TEMPLATING_METHODS = set()
-
-
-def _part_of_legacy_template_system(method):
-    "Label a method to be part of the legacy templating system."
-    _LEGACY_TEMPLATING_METHODS.add(method.__name__)
-    method._legacy_intact = True
-    return method
 
 
 def _support_legacy_api(method):
@@ -510,7 +495,10 @@ class _FlowProjectClass(type):
         return cls
 
 
-class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project)):
+class FlowProject(six.with_metaclass(_FlowProjectClass,
+                                     # Remove next line as of version 0.8:
+                                     legacy.FlowProjectLegacyTemplatingSystem,
+                                     signac.contrib.Project)):
     """A signac project class specialized for workflow management.
 
     This class provides a command line interface for the definition, execution, and
@@ -545,8 +533,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         self._template_dir = os.path.join(
             self.root_directory(), self._config.get('template_dir', 'templates'))
         self._template_environment_ = dict()
-
-        self._setup_legacy_templating()  # TODO: Disable in 0.8.
 
         # Register all label functions with this project instance.
         self._label_functions = OrderedDict()
@@ -641,114 +627,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             template_vars='\n'.join(wrapper.wrap(', '.join(sorted(context)))),
             filters='\n'.join(wrapper.wrap(', '.join(sorted(template_environment.filters))))))
         sys.exit(2)
-
-    def _setup_legacy_templating(self):
-        """This function identifies whether a subclass has implemented deprecated template
-        functions.
-
-        The legacy templating system is used to generate run and cluster submission scripts
-        if that is the case. A warning is emitted to inform the user that they will not be
-        able to use the standard templating system.
-
-        The legacy templating functions are decorated with the _part_of_legacy_template_system()
-        decorator.
-        """
-        self._legacy_templating = False
-        legacy_methods = set()
-        for method in _LEGACY_TEMPLATING_METHODS:
-            if hasattr(self, method) and not hasattr(getattr(self, method), '_legacy_intact'):
-                warnings.warn(
-                    "The use of FlowProject method '{}' is deprecated!".format(method),
-                    DeprecationWarning)
-                legacy_methods.add(method)
-        if legacy_methods:
-            self._legacy_templating = True
-            warnings.warn(
-                "You are using the following deprecated templating methods: {}. Please remove "
-                "those methods from your project class implementation to use the jinja2 templating "
-                "system (version >= 0.6).".format(', '.join(legacy_methods)))
-
-    @_part_of_legacy_template_system
-    def write_script_header(self, script, **kwargs):
-        """"Write the script header for the execution script.
-
-        .. deprecated:: 0.6
-           Users should migrate to the new templating system.
-        """
-        # Add some whitespace
-        script.writeline()
-        # Don't use uninitialized environment variables.
-        script.writeline('set -u')
-        # Exit on errors.
-        script.writeline('set -e')
-        # Switch into the project root directory
-        script.writeline('cd {}'.format(self.root_directory()))
-        script.writeline()
-
-    @_part_of_legacy_template_system
-    def write_script_operations(self, script, operations, background=False, **kwargs):
-        """Write the commands for the execution of operations as part of a script.
-
-        .. deprecated:: 0.6
-           Users should migrate to the new templating system.
-        """
-        for op in operations:
-            write_human_readable_statepoint(script, op.job)
-            script.write_cmd(op.cmd.format(job=op.job), bg=background)
-            script.writeline()
-
-    @classmethod
-    def write_human_readable_statepoint(cls, script, job):
-        """Write statepoint of job in human-readable format to script.
-
-        .. deprecated:: 0.6
-           Users should migrate to the new templating system.
-        """
-        warnings.warn(
-            "The write_human_readable_statepoint() function is deprecated.",
-            DeprecationWarning)
-        return write_human_readable_statepoint(script, job)
-
-    @_part_of_legacy_template_system
-    def write_script_footer(self, script, **kwargs):
-        """"Write the script footer for the execution script.
-
-        .. deprecated:: 0.6
-           Users should migrate to the new templating system.
-        """
-        # Wait until all processes have finished
-        script.writeline('wait')
-
-    @_part_of_legacy_template_system
-    def write_script(self, script, operations, background=False, **kwargs):
-        """Write a script for the execution of operations.
-
-        .. deprecated:: 0.6
-           Users should migrate to the new templating system.
-
-        By default, this function will generate a script with the following components:
-
-        .. code-block:: python
-
-            write_script_header(script)
-            write_script_operations(script, operations, background=background)
-            write_script_footer(script)
-
-        :param script:
-            The script to write the commands to.
-        :param operations:
-            The operations to be written to the script.
-        :type operations:
-            A sequence of JobOperation
-        :param background:
-            Whether operations should be executed in the background;
-            useful to parallelize execution.
-        :type background:
-            bool
-        """
-        self.write_script_header(script, **kwargs)
-        self.write_script_operations(script, operations, background=background, **kwargs)
-        self.write_script_footer(script, **kwargs)
 
     @classmethod
     def label(cls, label_name_or_func=None):
@@ -1054,15 +932,14 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             row[2] += ' ' + self._alias('requires_attention')
         return row
 
-    def _fetch_scheduler_status(self, jobs=None, scheduler=None, file=None, ignore_errors=False):
+    def _fetch_scheduler_status(self, jobs=None, file=None, ignore_errors=False):
         "Update the status docs."
         if file is None:
             file = sys.stderr
         if jobs is None:
             jobs = list(self)
         try:
-            if scheduler is None:
-                scheduler = self._environment.get_scheduler()
+            scheduler = self._environment.get_scheduler()
 
             self.document.setdefault('_status', dict())
             scheduler_info = {sjob.name(): sjob.status() for sjob in self.scheduler_jobs(scheduler)}
@@ -1104,7 +981,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                      expand=False, all_ops=False, only_incomplete=False, dump_json=False,
                      unroll=True, compact=False, pretty=False,
                      file=None, err=None, ignore_errors=False,
-                     scheduler=None, pool=None, job_filter=None, no_parallelize=False):
+                     no_parallelize=False):
         """Print the status of the project.
 
         .. versionchanged:: 0.6
@@ -1149,7 +1026,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             jobs = self     # all jobs
 
         # Update the status docs of each job:
-        self._fetch_scheduler_status(jobs, scheduler, err, ignore_errors)
+        self._fetch_scheduler_status(jobs, err, ignore_errors)
 
         # Get status dict for all selected jobs
         def _print_progress(x):
@@ -1715,6 +1592,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         else:
             yield
 
+    @legacy.script_support_legacy_templating_system
     def script(self, operations, parallel=False, template='script.sh', show_template_help=False):
         """Generate a run script to execute given operations.
 
@@ -1735,75 +1613,44 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         :type show_template_help:
             bool
         """
-        if self._legacy_templating:
-            from .environment import TestEnvironment
-            # We first check whether it appears that the user has provided a templating script
-            # in which case we raise an exception to avoid highly unexpected behavior.
-            fn_template = os.path.join(self.root_directory(), 'templates', template)
-            if os.path.isfile(fn_template):
-                raise RuntimeError(
-                    "In legacy templating mode, unable to use template '{}'.".format(fn_template))
-            script = TestEnvironment.script()
-            self.write_script(script, operations, background=parallel)
-            script.seek(0)
-            return script.read()
-        else:
-            # By default we use the jinja2 templating system to generate the script.
-            template_environment = self._template_environment()
-            template = template_environment.get_template(template)
-            context = self._get_standard_template_context()
-            # For script generation we do not need the extra logic used for
-            # generating cluster job scripts.
-            context['base_script'] = 'base_script.sh'
-            context['operations'] = list(operations)
-            context['parallel'] = parallel
-            if show_template_help:
-                self._show_template_help_and_exit(template_environment, context)
-            return template.render(** context)
+        template_environment = self._template_environment()
+        template = template_environment.get_template(template)
+        context = self._get_standard_template_context()
+        # For script generation we do not need the extra logic used for
+        # generating cluster job scripts.
+        context['base_script'] = 'base_script.sh'
+        context['operations'] = list(operations)
+        context['parallel'] = parallel
+        if show_template_help:
+            self._show_template_help_and_exit(template_environment, context)
+        return template.render(** context)
 
+    @legacy._generate_submit_script_support_legacy_templating_system
     def _generate_submit_script(self, _id, operations, template, show_template_help, env, **kwargs):
         """Generate submission script to submit the execution of operations to a scheduler."""
         if template is None:
             template = env.template
         assert _id is not None
 
-        if self._legacy_templating:
-            fn_template = os.path.join(self._template_dir, template)
-            if os.path.isfile(fn_template):
-                raise RuntimeError(
-                    "In legacy templating mode, unable to use template '{}'.".format(fn_template))
+        template_environment = self._template_environment(env)
+        template = template_environment.get_template(template)
+        context = self._get_standard_template_context()
+        # The flow 'script.sh' file simply extends the base script
+        # provided. The choice of base script is dependent on the
+        # environment, but will default to the 'base_script.sh' provided
+        # with signac-flow unless additional environment information is
+        # detected.
 
-            # For maintaining backwards compatibility for Versions<0.7
-            if kwargs['parallel']:
-                np_total = sum(op.directives['np'] for op in operations)
-            else:
-                np_total = max(op.directives['np'] for op in operations)
-
-            script = env.script(_id=_id, np_total=np_total, **kwargs)
-            background = kwargs.pop('parallel', not kwargs.pop('serial', False))
-            self.write_script(script=script, operations=operations, background=background, **kwargs)
-            script.seek(0)
-            return script.read()
-        else:
-            template_environment = self._template_environment(env)
-            template = template_environment.get_template(template)
-            context = self._get_standard_template_context()
-            # The flow 'script.sh' file simply extends the base script
-            # provided. The choice of base script is dependent on the
-            # environment, but will default to the 'base_script.sh' provided
-            # with signac-flow unless additional environment information is
-            # detected.
-
-            logger.info("Use environment '{}'.".format(env))
-            logger.info("Set 'base_script={}'.".format(env.template))
-            context['base_script'] = env.template
-            context['environment'] = env.__name__
-            context['id'] = _id
-            context['operations'] = list(operations)
-            context.update(kwargs)
-            if show_template_help:
-                self._show_template_help_and_exit(template_environment, context)
-            return template.render(** context)
+        logger.info("Use environment '{}'.".format(env))
+        logger.info("Set 'base_script={}'.".format(env.template))
+        context['base_script'] = env.template
+        context['environment'] = env.__name__
+        context['id'] = _id
+        context['operations'] = list(operations)
+        context.update(kwargs)
+        if show_template_help:
+            self._show_template_help_and_exit(template_environment, context)
+        return template.render(** context)
 
     @_support_legacy_api
     def submit_operations(self, operations, _id=None, env=None, parallel=False, flags=None,
@@ -2700,7 +2547,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         parser_run = subparsers.add_parser(
             'run',
             parents=[base_parser],
-            )
+        )
         parser_run.add_argument(          # Hidden positional arguments for backwards-compatibility.
             'hidden_operation_name',
             type=str,

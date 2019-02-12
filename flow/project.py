@@ -995,43 +995,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         for sjob in self._expand_bundled_jobs(scheduler.jobs()):
             yield sjob
 
-    @staticmethod
-    def _map_scheduler_jobs(scheduler_jobs):
-        "Map all scheduler jobs by job id and operation name."
-        for sjob in scheduler_jobs:
-            name = sjob.name()
-            if name[32] == '-':
-                expanded = JobOperation.expand_id(name)
-                yield expanded['job_id'], expanded['operation-name'], sjob
-
     def map_scheduler_jobs(self, scheduler_jobs):
-        """Map all scheduler jobs by job id and operation name.
-
-        This function fetches all scheduled jobs from the scheduler
-        and generates a nested dictionary, where the first key is
-        the job id, the second key the operation name and the last
-        value are the cooresponding scheduler jobs.
-
-        For example, to print the status of all scheduler jobs, associated
-        with a specific job operation, execute:
-
-        .. code::
-
-                sjobs = project.scheduler_jobs(scheduler)
-                sjobs_map = project.map_scheduler_jobs(sjobs)
-                for sjob in sjobs_map[job.get_id()][operation]:
-                    print(sjob._id(), sjob.status())
-
-        :param scheduler_jobs:
-            An iterable of scheduler job instances.
-        :return:
-            A nested dictionary (job_id, op_name, scheduler jobs)
-        """
-        sjobs_map = defaultdict(dict)
-        for job_id, op, sjob in self._map_scheduler_jobs(scheduler_jobs):
-            sjobs = sjobs_map[job_id].setdefault(op, list())
-            sjobs.append(sjob)
-        return sjobs_map
+        """Function was removed as of version 0.7."""
+        raise RuntimeError("The FlowProject.map_scheduler_jobs() function has "
+                           "been removed as of version 0.7!")
 
     def _get_operations_status(self, job):
         "Return a dict with information about job-operations for this job."

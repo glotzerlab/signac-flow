@@ -1098,7 +1098,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
     ])
     "Pretty (unicode) symbols denoting the execution status of operations."
 
-    @legacy.support_print_status_legacy_api
+    @_support_legacy_api
     def print_status(self, jobs=None, overview=True, overview_max_lines=None,
                      detailed=False, parameters=None, skip_active=False, param_max_width=None,
                      expand=False, all_ops=False, only_incomplete=False, dump_json=False,

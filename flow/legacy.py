@@ -44,7 +44,7 @@ def support_submit_legacy_api(func):
         # Raise an exception or warn based on the detected API version.
         if api_version is None:
             raise RuntimeError("Unable to determine legacy API use.")
-        elif api_version < 3:
+        elif api_version < 5:
             raise RuntimeError(
                 "This FlowProject implementation uses deprecated API "
                 "version 0.{}.x Please downgrade your signac-flow installation "

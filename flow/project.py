@@ -280,14 +280,12 @@ class JobOperation(object):
 
         # Handle deprecated np argument:
         if np is not None:
-            warnings.warn(
-                "The np argument for the JobOperation constructor is deprecated.",
-                DeprecationWarning)
-            assert directives.setdefault('np', np) == np
-        else:
-            # Future: We can remove everything but the else: clause.
-            directives.setdefault(
-                'np', directives.get('nranks', 1) * directives.get('omp_num_threads', 1))
+            raise RuntimeError(
+                "The np argument for the JobOperatoin constructor has been deprecated "
+                "as version 0.6 and been removed as of version 0.7!")
+
+        directives.setdefault(
+            'np', directives.get('nranks', 1) * directives.get('omp_num_threads', 1))
         directives.setdefault('ngpu', 0)
         directives.setdefault('nranks', 0)
         directives.setdefault('omp_num_threads', 0)
@@ -451,22 +449,18 @@ class FlowOperation(object):
     """
 
     def __init__(self, cmd, pre=None, post=None, directives=None, np=None):
+        # Handle deprecated np argument.
+        if np is not None:
+            raise RuntimeError(
+                "The np argument for the FlowOperation() constructor has been deprecated "
+                "as of version 0.6 and been removed as of version 0.7!")
+
         if pre is None:
             pre = []
         if post is None:
             post = []
         self._cmd = cmd
         self.directives = directives
-
-        # Handle deprecated np argument.
-        if np is not None:
-            warnings.warn(
-                "The np argument for the FlowOperation() constructor is deprecated.",
-                DeprecationWarning)
-            if self.directives is None:
-                self.directives = dict(np=np)
-            else:
-                assert self.directives.setdefault('np', np) == np
 
         self._prereqs = [FlowCondition(cond) for cond in pre]
         self._postconds = [FlowCondition(cond) for cond in post]
@@ -495,13 +489,6 @@ class FlowOperation(object):
             return self._cmd(job).format(job=job)
         else:
             return self._cmd.format(job=job)
-
-    def np(self, job):
-        "(deprecated) Return the number of processors this operation requires."
-        if callable(self._np):
-            return self._np(job)
-        else:
-            return self._np
 
 
 class _FlowProjectClass(type):
@@ -1153,15 +1140,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             Redirect all output to this file, defaults to sys.stdout.
         :param err:
             Redirect all error output to this file, defaults to sys.stderr.
-        :param scheduler:
-            (deprecated) The scheduler instance used to fetch the job statuses.
-        :type scheduler:
-            :class:`~.manage.Scheduler`
-        :param pool:
-            (deprecated) A multiprocessing or threading pool. Providing a pool
-            parallelizes this method.
-        :param job_filter:
-            (deprecated) A JSON encoded filter, that all jobs to be submitted need to match.
         """
         if file is None:
             file = sys.stdout
@@ -2471,14 +2449,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         "The dictionary of operations that have been added to the workflow."
         return self._operations
 
-    def eligible(self, job_operation, **kwargs):
-        """Determine if job is eligible for operation.
-
-        .. deprecated:: 0.5
-           Please use :py:meth:`~.eligible_for_submission` instead.
-        """
-        raise RuntimeError("The eligible() method is deprecated.")
-
     def eligible_for_submission(self, job_operation):
         """Determine if a job-operation is eligible for submission.
 
@@ -2537,12 +2507,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 args.operation_name = args.hidden_operation_name
 
         if args.np is not None:  # Remove completely beginning of version 0.7.
-            logger.warning(
-                "The run --np option is deprecated as of version 0.6, use '-p/--parallel' instead.")
-            if args.parallel is None:
-                args.parallel = args.np
-            else:
-                raise ValueError("Conflicting arguments for '--np' and '-p/--parallel'!")
+            raise RuntimeError(
+                "The run --np option has been deprecated as of version 0.6 and been removed "
+                "as of version 0.7, use '-p/--parallel' instead.")
 
         # Select jobs:
         jobs = self._select_jobs_from_args(args)
@@ -2566,15 +2533,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         "Generate a script for the execution of operations."
         _requires_jinja2('The signac-flow script function')
         if args.serial:             # Handle legacy API: The --serial option is deprecated
-            if args.parallel:       # as of version 0.6. The default execution mode is 'serial'
-                raise ValueError(   # and can be switched with the '--parallel' argument.
-                    "Cannot provide both --serial and --parallel arguments a the same time! "
-                    "The --serial option is deprecated as of version 0.6!")
-            else:
-                logger.warning(
-                    "The script --serial option is deprecated as of version 0.6, because "
-                    "serial execution is now the default behavior. Please use the '--parallel' "
-                    "argument to execute bundled operations in parallel.")
+            raise RuntimeError(
+                "The script --serial option is deprecated as of version 0.6, because "
+                "serial execution is now the default behavior. Please use the '--parallel' "
+                "argument to execute bundled operations in parallel.")
 
         if args.requires and not args.cmd:
             raise ValueError(
@@ -2688,7 +2650,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             $ python my_project.py --help
         """
         if pool is not None:
-            logger.warning(
+            raise RuntimeError(
                 "The 'pool' argument for the FlowProject.main() function is deprecated!")
 
         if parser is None:
@@ -2883,25 +2845,26 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
     @classmethod
     def add_submit_args(cls, parser):
-        warnings.warn(
-            "The add_submit_args() method is private as of version 0.6.", DeprecationWarning)
-        return cls._add_submit_args(parser=parser)
+        raise RuntimeError(
+            "The add_submit_args() method is private as of version 0.6. and has been removed "
+            "as of version 0.7!")
 
     @classmethod
     def add_script_args(cls, parser):
-        warnings.warn(
-            "The add_script_args() method is private as of version 0.6.", DeprecationWarning)
-        return cls._add_script_args(parser=parser)
+        raise RuntimeError(
+            "The add_script_args() method is private as of version 0.6. and has been removed "
+            "as of version 0.7!")
 
     @classmethod
     def add_print_status_args(cls, parser):
-        warnings.warn(
-            "The add_print_status_args() method is private as of version 0.6.", DeprecationWarning)
-        return cls._add_print_status_args(parser=parser)
+        raise RuntimeError(
+            "The add_print_status_args() method is private as of version 0.6. and has been "
+            "removed as of version 0.7!")
 
     def format_row(self, *args, **kwargs):
-        warnings.warn("The format_row() method is private as of version 0.6.", DeprecationWarning)
-        return self._format_row(*args, **kwargs)
+        raise RuntimeError(
+            "The format_row() method is private as of version 0.6. and has been removed as "
+            "of version 0.7!")
 
 
 def _fork_with_serialization(loads, project, operation):

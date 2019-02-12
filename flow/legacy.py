@@ -43,10 +43,10 @@ def support_submit_legacy_api(func):
         # Raise an exception or warn based on the detected API version.
         if api_version is None:
             raise RuntimeError("Unable to determine legacy API use.")
-        elif api_version < 5:
-            raise RuntimeError(
+        elif api_version < 4:
+            warnings.warn(
                 "This FlowProject implementation uses deprecated API "
-                "version 0.{}.x Please downgrade your signac-flow installation "
+                "version 0.{}.x. Please downgrade your signac-flow installation "
                 "or update your project.".format(api_version))
         else:
             logger.warning(
@@ -207,14 +207,28 @@ def support_print_status_legacy_api(func):
 
     @functools.wraps(func)
     def wrapper(self, jobs=None, *args, **kwargs):
-        print('args', args)
-        print('kwargs', kwargs)
-        for deprecated_arg in ('scheduler', 'pool', 'job_filter'):
+        if kwargs.pop('full', False):
+            kwargs['detailed'] = kwargs['all_ops'] = True
+
+        # remove parser args
+        for arg in ('func', 'verbose', 'debug', 'show_traceback', 'job_id', 'filter', 'doc_filter'):
+            if arg in kwargs:
+                del kwargs[arg]
+
+        for deprecated_arg in ('scheduler', 'pool'):
             if deprecated_arg in kwargs:
-                raise RuntimeError(
-                    "The {} argument for flow.FlowProject.print_status() "
-                    " was deprecated as of signac-flow version 0.6 and has "
-                    "been removed as of version 0.7!".format(deprecated_arg))
+                value = kwargs.pop(deprecated_arg)
+                if value is None:
+                    warnings.warn(
+                        "The {} argument for flow.FlowProject.print_status() "
+                        " was deprecated as of signac-flow version 0.6 and has "
+                        "been removed as of version 0.7!".format(deprecated_arg),
+                        DeprecationWarning)
+                else:
+                    raise RuntimeError(
+                        "The {} argument for flow.FlowProject.print_status() "
+                        " was deprecated as of signac-flow version 0.6 and has "
+                        "been removed as of version 0.7!".format(deprecated_arg))
         if isinstance(jobs, Scheduler):
             raise ValueError(
                 "The first argument of flow.FlowProject.print_status() is 'jobs' "

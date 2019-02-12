@@ -56,7 +56,6 @@ else:
     JINJA2 = True
 
 from .environment import get_environment
-from .scheduling.base import Scheduler
 from .scheduling.base import ClusterJob
 from .scheduling.base import JobStatus
 from .scheduling.status import update_status
@@ -1112,6 +1111,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
     ])
     "Pretty (unicode) symbols denoting the execution status of operations."
 
+    @legacy.support_print_status_legacy_api
     def print_status(self, jobs=None, overview=True, overview_max_lines=None,
                      detailed=False, parameters=None, skip_active=False, param_max_width=None,
                      expand=False, all_ops=False, only_incomplete=False, dump_json=False,
@@ -1167,26 +1167,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             file = sys.stdout
         if err is None:
             err = sys.stderr
-        # TODO: Replace legacy code below with this code in future:
-        # if jobs is None:
-        #     jobs = self     # all jobs
-        # Handle legacy API:
         if jobs is None:
-            if job_filter is not None and isinstance(job_filter, str):
-                warnings.warn(
-                    "The 'job_filter' argument is deprecated, use the 'jobs' argument instead.",
-                    DeprecationWarning)
-                job_filter = json.loads(job_filter)
-            jobs = legacy.JobsCursorWrapper(self, job_filter)
-        elif isinstance(jobs, Scheduler):
-            warnings.warn(
-                "The signature of the print_status() method has changed!", DeprecationWarning)
-            scheduler, jobs = jobs, None
-        elif job_filter is not None:
-            raise ValueError("Can't provide both the 'jobs' and 'job_filter' argument.")
-        if scheduler is not None:
-            warnings.warn(
-                "print_status(): the scheduler argument is deprecated!", DeprecationWarning)
+            jobs = self     # all jobs
 
         # Update the status docs of each job:
         self._fetch_scheduler_status(jobs, scheduler, err, ignore_errors)
@@ -1504,7 +1486,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         if timeout is not None and timeout < 0:
             timeout = None
         if operations is None:
-            operations = [op for job in self for op in self._job_operations(job, False)]
+            operations = [op for job in self for op in self._job_operations([job], False)]
         else:
             operations = list(operations)   # ensure list
 

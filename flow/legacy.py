@@ -5,6 +5,7 @@
 import logging
 import functools
 import warnings
+import json
 
 
 logger = logging.getLogger(__name__)
@@ -199,6 +200,33 @@ def support_run_legacy_api(func):
         else:
             return func(self, jobs=jobs, names=names, *args, **kwargs)
 
+    return wrapper
+
+
+def support_print_status_legacy_api(func):
+    from .scheduling.base import Scheduler
+
+    @functools.wraps(func)
+    def wrapper(self, jobs=None, *args, **kwargs):
+        if 'job_filter' in kwargs:
+            if jobs is None:
+                warnings.warn(
+                    "The 'job_filter' argument is deprecated, use the 'jobs' argument instead.",
+                    DeprecationWarning)
+                job_filter = json.loads(kwargs['job_filter'])
+                jobs = JobsCursorWrapper(self, job_filter)
+            else:
+                raise ValueError("Cannot provide job_filter and jobs argument at the same time!")
+        if isinstance(jobs, Scheduler):
+            raise ValueError(
+                "The first argument of flow.FlowProject.print_status() is 'jobs' "
+                "as of signac-flow version 0.6!")
+        if 'scheduler' in kwargs:
+            raise ValueError(
+                "The scheduler argument for flow.FlowProject.print_status() was deprecated as "
+                "of signac-flow version 0.6 and has been removed as of version 0.7!")
+
+        return func(self, jobs=jobs, *args, **kwargs)
     return wrapper
 
 

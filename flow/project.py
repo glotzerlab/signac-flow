@@ -350,11 +350,6 @@ class JobOperation(object):
         # By appending the unique job_op_id, we ensure that each id is truly unique.
         return readable_name + job_op_id
 
-    @classmethod
-    def expand_id(self, _id):
-        # TODO: Remove beginning version 0.7.
-        raise RuntimeError("The expand_id() method has been removed as of version 0.6.")
-
     def __hash__(self):
         return int(sha1(self.get_id().encode('utf-8')).hexdigest(), 16)
 
@@ -363,15 +358,13 @@ class JobOperation(object):
 
     def set_status(self, value):
         "Store the operation's status."
-        status_doc = self.job.document.get('_status', dict())
-        status_doc[self.get_id()] = int(value)
-        self.job.document['_status'] = status_doc
+        self.job._project.document.setdefault('_status', dict())
+        self.job._project.document._status[self.get_id()] = int(value)
 
     def get_status(self):
         "Retrieve the operation's last known status."
         try:
-            status_cache = self.job.document['_status']
-            return JobStatus(status_cache[self.get_id()])
+            return JobStatus(self.job._project.document['_status'][self.get_id()])
         except KeyError:
             return JobStatus.unknown
 
@@ -1042,8 +1035,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
     def _get_operations_status(self, job):
         "Return a dict with information about job-operations for this job."
-        cached_status = job.document.get('_status', dict())
-        for name, job_op in self._job_operations(job):
+        cached_status = self.document.get('_status', dict())
+        for name, job_op in self._job_operations([job]):
             flow_op = self.operations[name]
             completed = flow_op.complete(job)
             eligible = False if completed else flow_op.eligible(job)
@@ -1112,31 +1105,19 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         "Update the status docs."
         if file is None:
             file = sys.stderr
+        if jobs is None:
+            jobs = list(self)
         try:
-            if jobs is None:
-                jobs = list(self)
             if scheduler is None:
                 scheduler = self._environment.get_scheduler()
 
-            # Map all scheduler jobs by their name.
+            self.document.setdefault('_status', dict())
+            scheduler_info = {sjob.name(): sjob.status() for sjob in self.scheduler_jobs(scheduler)}
+            status = dict()
             print(self._tr("Query scheduler..."), file=file)
-            sjobs_map = defaultdict(list)
-            for sjob in self.scheduler_jobs(scheduler):
-                sjobs_map[sjob.name()].append(sjob)
-
-            # Iterate through all jobs ...
-            for job in with_progressbar(jobs, desc='Update status cache:', file=file):
-                job_status = dict()
-                # ... and all job-operations to attempt to map the job-operation id
-                # to scheduler names.
-                for name, op in self._job_operations(job):
-                    scheduler_jobs = sjobs_map.get(
-                        op.get_id(), sjobs_map.get(op._get_legacy_id(), []))
-                    from operator import methodcaller
-                    tmp = list(map(methodcaller('status'), scheduler_jobs))
-                    job_status[op.get_id()] = int(max(tmp) if tmp else JobStatus.unknown)
-                job.document['_status'] = job_status
-
+            for name, op in self._job_operations(jobs):
+                status[op.get_id()] = int(scheduler_info.get(op.get_id(), JobStatus.unknown))
+            self.document._status.update(status)
         except NoSchedulerError:
             logger.debug("No scheduler available.")
         except RuntimeError as error:
@@ -1782,14 +1763,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         operation_names = None if operation_names is None else set(operation_names)
 
         if len(jobs) > 1:
-            jobs = with_progressbar(jobs, desc='Gather pending operations:')
-        for job in jobs:
-            for op in self.next_operations(job):
-                if operation_names and op.name not in operation_names:
-                    continue
-                if not self.eligible_for_submission(op):
-                    continue
-                yield op
+            jobs = self
+        for op in self.next_operations(*jobs):
+            if operation_names and op.name not in operation_names:
+                continue
+            if not self.eligible_for_submission(op):
+                continue
+            yield op
 
     @contextlib.contextmanager
     def _potentially_buffered(self):
@@ -2419,14 +2399,15 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             if op.complete(job):
                 yield name
 
-    def _job_operations(self, job, only_eligible=False):
+    def _job_operations(self, jobs, only_eligible=False):
         "Yield instances of JobOperation constructed for specific job."
         for name, op in self.operations.items():
-            if only_eligible and not op.eligible(job):
-                continue
-            yield name, JobOperation(name=name, job=job, cmd=op(job), directives=op.directives)
+            for job in jobs:
+                if only_eligible and not op.eligible(job):
+                    continue
+                yield name, JobOperation(name=name, job=job, cmd=op(job), directives=op.directives)
 
-    def next_operations(self, job):
+    def next_operations(self, *jobs):
         """Determine the next eligible operations for job.
 
         :param job:
@@ -2436,8 +2417,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         :yield:
             All instances of :class:`~.JobOperation` job is eligible for.
         """
-        next_ops = OrderedDict(self._job_operations(job, only_eligible=True))
-        for op in next_ops.values():
+        for name, op in self._job_operations(jobs, only_eligible=True):
             yield op
 
     def next_operation(self, job):

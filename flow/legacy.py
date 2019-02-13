@@ -43,8 +43,8 @@ def support_submit_legacy_api(func):
         # Raise an exception or warn based on the detected API version.
         if api_version is None:
             raise RuntimeError("Unable to determine legacy API use.")
-        elif api_version < 4:
-            warnings.warn(
+        elif api_version < 5:
+            raise RuntimeError(
                 "This FlowProject implementation uses deprecated API "
                 "version 0.{}.x. Please downgrade your signac-flow installation "
                 "or update your project.".format(api_version))
@@ -53,14 +53,7 @@ def support_submit_legacy_api(func):
                 "Activating legacy layer for API version 0.{}.x.".format(api_version))
 
         # Delegate to legacy submit function based on detected API version.
-        if api_version == 4:
-            kwargs.setdefault('walltime', 12)
-            if kwargs.get('nn') is not None:
-                raise RuntimeError(
-                    "You can't directly provide the number of nodes with the legacy API "
-                    "for version 0.4.x!")
-            return submit_04(self=self, env=env, *args, **kwargs)
-        elif api_version == 5:
+        if api_version == 5:
             if 'serial' in kwargs and 'parallel' not in kwargs:
                 kwargs['parallel'] = not kwargs.pop('serial')
             return func(self, env=env, _api_version=5, *args, **kwargs)

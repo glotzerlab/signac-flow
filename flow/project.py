@@ -1955,7 +1955,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             help="Manually specify all labels that are required for the direct command "
                  "to be considered eligible for execution.")
 
-    def update_stati(self, scheduler, jobs=None, file=sys.stderr, pool=None, ignore_errors=False):
+    def update_stati(self, *args, **kwargs):
         "This function has been removed as of version 0.6."
         raise RuntimeError(
             "The update_stati() method has been removed as of version 0.6.")

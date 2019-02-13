@@ -303,10 +303,6 @@ class JobOperation(object):
             cmd=repr(self.cmd),
             directives=self.directives)
 
-    def _get_legacy_id(self):
-        "Return a name, which identifies this job-operation."
-        return '{}-{}'.format(self.job, self.name)
-
     def get_id(self, index=0):
         "Return a name, which identifies this job-operation."
         project = self.job._project

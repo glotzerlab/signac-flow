@@ -267,8 +267,8 @@ class JobOperation(object):
         # Handle deprecated np argument:
         if np is not None:
             raise RuntimeError(
-                "The np argument for the JobOperatoin constructor has been deprecated "
-                "as version 0.6 and been removed as of version 0.7!")
+                "The np argument for the JobOperation constructor has been deprecated "
+                "as of version 0.6 and been removed as of version 0.7!")
 
         directives.setdefault(
             'np', directives.get('nranks', 1) * directives.get('omp_num_threads', 1))

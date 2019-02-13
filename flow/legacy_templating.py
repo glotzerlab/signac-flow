@@ -5,6 +5,7 @@
 
 Will be removed beginning version 0.8.
 """
+from __future__ import print_function
 import sys
 import io
 import warnings

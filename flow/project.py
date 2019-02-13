@@ -958,6 +958,45 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         else:
             logger.info("Updated job status cache.")
 
+    def _fetch_status(self, jobs, err, ignore_errors, no_parallelize):
+        # Update the project's status cache
+        self._fetch_scheduler_status(jobs, err, ignore_errors)
+
+        # Get status dict for all selected jobs
+        def _print_progress(x):
+            print("Updating status: ", end='', file=err)
+            err.flush()
+            n = max(1, int(len(jobs) / 10))
+            for i, _ in enumerate(x):
+                if (i % n) == 0:
+                    print('.', end='', file=err)
+                    err.flush()
+                yield _
+
+        _get_job_status = functools.partial(self.get_job_status, ignore_errors=ignore_errors)
+
+        with self._potentially_buffered():
+            try:
+                with contextlib.closing(ThreadPool()) as pool:
+                    _map = map if no_parallelize else pool.imap
+                    # First attempt at parallelized status determination.
+                    # This may fail on systems that don't allow threads.
+                    return list(tqdm(
+                        iterable=_map(_get_job_status, jobs),
+                        desc="Collect job status info", total=len(jobs), file=err))
+            except RuntimeError as error:
+                if "can't start new thread" not in error.args:
+                    raise   # unrelated error
+                # The parallelized status determination has failed and we fall
+                # back to a serial approach.
+                logger.warning(
+                    "A parallelized status update failed due to error ('{}'). "
+                    "Entering serial mode with fallback progress indicator. The "
+                    "status update may take longer than ususal.".format(error))
+                return list(with_progressbar(
+                    iterable=map(_get_job_status, jobs),
+                    total=len(jobs), desc='Collect job status info:', file=err))
+
     OPERATION_STATUS_SYMBOLS = OrderedDict([
         ('ineligible', u'-'),
         ('eligible', u'+'),
@@ -1026,43 +1065,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         if jobs is None:
             jobs = self     # all jobs
 
-        # Update the status docs of each job:
-        self._fetch_scheduler_status(jobs, err, ignore_errors)
-
-        # Get status dict for all selected jobs
-        def _print_progress(x):
-            print("Updating status: ", end='', file=err)
-            err.flush()
-            n = max(1, int(len(jobs) / 10))
-            for i, _ in enumerate(x):
-                if (i % n) == 0:
-                    print('.', end='', file=err)
-                    err.flush()
-                yield _
-
-        _get_job_status = functools.partial(self.get_job_status, ignore_errors=ignore_errors)
-
-        with self._potentially_buffered():
-            try:
-                with contextlib.closing(ThreadPool()) as pool:
-                    _map = map if no_parallelize else pool.imap
-                    # First attempt at parallelized status determination.
-                    # This may fail on systems that don't allow threads.
-                    tmp = list(tqdm(
-                        iterable=_map(_get_job_status, jobs),
-                        desc="Collect job status info", total=len(jobs), file=err))
-            except RuntimeError as error:
-                if "can't start new thread" not in error.args:
-                    raise   # unrelated error
-                # The parallelized status determination has failed and we fall
-                # back to a serial approach.
-                logger.warning(
-                    "A parallelized status update failed due to error ('{}'). "
-                    "Entering serial mode with fallback progress indicator. The "
-                    "status update may take longer than ususal.".format(error))
-                tmp = list(with_progressbar(
-                    iterable=map(_get_job_status, jobs),
-                    total=len(jobs), desc='Collect job status info:', file=err))
+        tmp = self._fetch_status(jobs, err, ignore_errors, no_parallelize)
 
         operations_errors = {s['_operations_error'] for s in tmp}
         labels_errors = {s['_labels_error'] for s in tmp}

@@ -138,3 +138,38 @@ For example:
     - Fix issue related to dynamic data spaces, ...
 
 Just add the ``next`` section in case it doesn't exist yet.
+
+.. _deprecation-policy:
+
+Deprecation Policy
+------------------
+
+While the signac-flow API is not considered stable yet (a *1.0* release has not
+been made), we apply the following deprecation policy:
+
+Some features may be deprecated in future releases in which case the
+deprecation is announced as part of the documentation, the change log, and
+their use will trigger warnings.
+A deprecated feature is removed in the next minor version, unless it is
+considered part of the core API in which case a reasonable attempt at
+maintaining backwards compatibility is made in the next minor version, but is
+then completely removed in any following minor or major release.
+
+*A feature is considered to be part of the core API if it is likely to be used by the majority of existing projects.*
+
+For example, a feature which is deprecated in version *0.x*, will trigger
+warnings for all releases with release number *0.x.\**, and will be removed in
+version *0.y.0*.
+A feature, which is deprecated in version *0.x* and which is considered core
+API will trigger warnings for versions *0.x.\** and *0.y.\**, limited backwards
+compatibility will be maintained throughout versions *0.y.\**, and the feature
+will be removed in version *0.z.0*.
+
+After the release of version *1.0*, we apply the following deprecation policy:
+
+Some features may be deprecated in future releases in which case the
+deprecation is announced as part of the documentation, the change log, and
+their use will trigger warnings, but remains supported until the next *major* release.
+
+For example, a feature which is deprecated in version *A.x* will continue to be supported for all *A.\** versions, but will trigger deprecation warnings.
+The feature is then removed in version *B.0*.

@@ -157,13 +157,15 @@ then completely removed in any following minor or major release.
 
 *A feature is considered to be part of the core API if it is likely to be used by the majority of existing projects.*
 
-For example, a feature which is deprecated in version *0.x*, will trigger
+A feature which is deprecated in version *0.x*, will trigger
 warnings for all releases with release number *0.x.\**, and will be removed in
 version *0.y.0*.
 A feature, which is deprecated in version *0.x* and which is considered core
 API will trigger warnings for versions *0.x.\** and *0.y.\**, limited backwards
 compatibility will be maintained throughout versions *0.y.\**, and the feature
 will be removed in version *0.z.0*.
+
+**For example: A feature deprecated in version 0.6, will be removed in version 0.7, unless it is considered core API, in which case, some backwards compatibility is maintained in version 0.7, and it is removed in version 0.8.**
 
 After the release of version *1.0*, we apply the following deprecation policy:
 

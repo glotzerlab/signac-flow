@@ -166,12 +166,3 @@ compatibility will be maintained throughout versions *0.y.\**, and the feature
 will be removed in version *0.z.0*.
 
 **For example: A feature deprecated in version 0.6, will be removed in version 0.7, unless it is considered core API, in which case, some backwards compatibility is maintained in version 0.7, and it is removed in version 0.8.**
-
-After the release of version *1.0*, we apply the following deprecation policy:
-
-Some features may be deprecated in future releases in which case the
-deprecation is announced as part of the documentation, the change log, and
-their use will trigger warnings, but remains supported until the next *major* release.
-
-For example, a feature which is deprecated in version *A.x* will continue to be supported for all *A.\** versions, but will trigger deprecation warnings.
-The feature is then removed in version *B.0*.

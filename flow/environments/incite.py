@@ -21,7 +21,7 @@ class SummitEnvironment(DefaultLSFEnvironment):
         @directives(ngpu=3) # 3 GPUs
         @directives(np=3) # 3 CPU cores
         @directives(rs_tasks=3) # 3 tasks per resource set
-        @directives(extra_jsrun_args='-smpiargs="-gpu"') # extra jsrun arguments
+        @directives(extra_jsrun_args='--smpiargs="-gpu"') # extra jsrun arguments
         def my_operation(job):
             ...
 
@@ -51,8 +51,12 @@ class SummitEnvironment(DefaultLSFEnvironment):
         cpus_per_task = operation.directives.get('omp_num_threads', 0)
         np = operation.directives.get('np', ntasks * max(cpus_per_task, 1))
         ngpu = operation.directives.get('ngpu', 0)
-        nsets = max(math.ceil(np / cores_per_node),
-                    math.ceil(ngpu / gpus_per_node), 1)
+        if np % cores_per_node != 0 and (ngpu == 0 or ngpu == np):
+            # fill the nodes using small resource sets
+            nsets = np
+        else:
+            nsets = max(math.ceil(np / cores_per_node),
+                        math.ceil(ngpu / gpus_per_node), 1)
         cpus_per_set = max(np // nsets, 1)
         gpus_per_set = ngpu // nsets
         tasks_per_set = max(ntasks // nsets, 1)  # Require at least one task per set

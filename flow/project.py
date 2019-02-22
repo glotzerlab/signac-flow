@@ -328,7 +328,7 @@ class JobsOperation(object):
 
     @property
     def job(self):
-        assert len(self.jobs) == 1
+        assert len(self.jobs) >= 1
         return self.jobs[0]
 
     def _get_legacy_id(self):
@@ -1147,18 +1147,18 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             for sjob in self.scheduler_jobs(scheduler):
                 sjobs_map[sjob.name()].append(sjob)
 
-            # Iterate through all jobs ...
-            for job in with_progressbar(jobs, desc='Update status cache:', file=file):
+            # Iterate through all jobs and all job-operations to attempt to map the job-operation id
+            # to scheduler names.
+            job_op = list(self._jobs_operations(*jobs))
+            for name,op in with_progressbar(job_op, desc='Update status cache:', file=file):
                 job_status = dict()
-                # ... and all job-operations to attempt to map the job-operation id
-                # to scheduler names.
-                for name, op in self._jobs_operations(job):
-                    scheduler_jobs = sjobs_map.get(
-                        op.get_id(), sjobs_map.get(op._get_legacy_id(), []))
-                    from operator import methodcaller
-                    tmp = list(map(methodcaller('status'), scheduler_jobs))
-                    job_status[op.get_id()] = int(max(tmp) if tmp else JobStatus.unknown)
-                job.document['_status'] = job_status
+                scheduler_jobs = sjobs_map.get(
+                    op.get_id(), sjobs_map.get(op._get_legacy_id(), []))
+                from operator import methodcaller
+                tmp = list(map(methodcaller('status'), scheduler_jobs))
+                job_status[op.get_id()] = int(max(tmp) if tmp else JobStatus.unknown)
+                for job in op.jobs:
+                    job.document['_status'] = job_status
 
         except NoSchedulerError:
             logger.debug("No scheduler available.")

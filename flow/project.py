@@ -2379,7 +2379,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             else:
                 args.operation_name = args.hidden_operation_name
 
-        if args.np is not None:  # Remove completely beginning of version 0.7.
+        if args.np is not None:  # Remove completely beginning of version 0.8.
             raise RuntimeError(
                 "The run --np option has been deprecated as of version 0.6 and been removed "
                 "as of version 0.7, use '-p/--parallel' instead.")
@@ -2609,11 +2609,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             const='-1',
             help="Specify the number of cores to parallelize to. Defaults to all available "
                  "processing units if argument is ommitted.")
-        execution_group.add_argument(    # Remove beginning of version 0.7.
+        execution_group.add_argument(  # deprecated: Completely remove beginning with version 0.8.
             '--np',
             type=int,
-            help="(deprecated) Specify the number of cores to parallelize to. "
-                 "This option is deprecated as of version 0.6, use '-p/--parallel' instead.")
+            help=argparse.SUPPRESS)
         parser_run.set_defaults(func=self._main_run)
 
         parser_script = subparsers.add_parser(

@@ -6,6 +6,7 @@ import os
 import warnings
 
 from signac.common import six
+import deprecation
 from flow import FlowProject
 from flow import get_environment
 from flow.scheduling.base import JobStatus
@@ -91,7 +92,7 @@ def expect_deprecation_warnings(func):
             raise unittest.SkipTest("Not implemented for Python 2.7.")
         with self.assertWarns(DeprecationWarning):
             return func(self)
-    return wrapper
+    return deprecation.fail_if_not_removed(wrapper)
 
 
 class ProjectTest(unittest.TestCase):

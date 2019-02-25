@@ -14,6 +14,8 @@ requirements = [
     'cloudpickle',
     # To define IntEnum in flow/scheduling/base.py.
     'enum34;python_version<"3.4"',
+    # Deprecation management
+    'deprecation>=2',
 ]
 
 description = "Simple workflow management for signac projects."

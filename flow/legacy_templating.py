@@ -12,6 +12,7 @@ import warnings
 import functools
 
 from signac.common import six
+import deprecation
 
 
 NUM_NODES_WARNING = """Unable to determine the reqired number of nodes (nn) for this submission.
@@ -262,14 +263,9 @@ class JobScript(io.StringIO):
 
 def deprecated_since_06(func):
 
-    def wrapper(cls, *args, **kwargs):
-        warnings.warn(
-            "Function '{}.{}()' is part of the legacy templating system, "
-            "which was deprecated as of version 0.6 and will be completely "
-            "removed in version 0.7. Please upgrade your scripts!".format(
-                    cls.__name__, func.__name__), DeprecationWarning)
-        return func(cls, *args, **kwargs)
-    return wrapper
+    return deprecation.deprecated(
+        deprecated_in=0.6, removed_in=0.8,
+        details="This function is part of the legacy templating system.")(func)
 
 
 class LegacyComputeEnvironment(object):

@@ -1873,11 +1873,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             '-p', '--parallel',
             action='store_true',
             help="Execute all operations in parallel.")
-        execution_group.add_argument(   # TODO: Remove with version 0.7.
-            '-s', '--serial',
-            action='store_const',
-            const=True,
-            help=argparse.SUPPRESS)
         cls._add_direct_cmd_arg_group(parser)
         cls._add_template_arg_group(parser)
 
@@ -1969,12 +1964,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             '-p', '--parallel',
             action='store_true',
             help="Execute all (bundled) operations in parallel.")
-        bundling_group.add_argument(
-            '-s', '--serial',
-            action='store_const',
-            const=True,
-            help="(deprecated) Execute all (bundled) operations in serial. This is the "
-                 "default mode as of version 0.6.")
 
     @classmethod
     def _add_direct_cmd_arg_group(cls, parser):
@@ -2416,11 +2405,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
     def _main_script(self, args):
         "Generate a script for the execution of operations."
         _requires_jinja2('The signac-flow script function')
-        if args.serial:             # Handle legacy API: The --serial option is deprecated
-            raise RuntimeError(
-                "The script --serial option is deprecated as of version 0.6, because "
-                "serial execution is now the default behavior. Please use the '--parallel' "
-                "argument to execute bundled operations in parallel.")
 
         if args.requires and not args.cmd:
             raise ValueError(

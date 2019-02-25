@@ -64,6 +64,7 @@ from .errors import ConfigKeyError
 from .errors import NoSchedulerError
 from .errors import TemplateError
 from .util import tabulate
+from .util import deprecation
 from .util.tqdm import tqdm
 from .util.misc import _positive_int
 from .util.misc import _mkdir_p
@@ -865,6 +866,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 expanded = JobOperation.expand_id(name)
                 yield expanded['job_id'], expanded['operation-name'], sjob
 
+    @deprecation.deprecated(deprecated_in=0.7, removed_in=0.8)
     def map_scheduler_jobs(self, scheduler_jobs):
         """Map all scheduler jobs by job id and operation name.
         This function fetches all scheduled jobs from the scheduler
@@ -883,9 +885,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         :return:
             A nested dictionary (job_id, op_name, scheduler jobs)
         """
-        warnings.warn(
-            "The FlowProject.map_scheduler_jobs() function is deprecated as of version "
-            "0.7 and will be removed in version 0.8!", DeprecationWarning)
         sjobs_map = defaultdict(dict)
         for job_id, op, sjob in self._map_scheduler_jobs(scheduler_jobs):
             sjobs = sjobs_map[job_id].setdefault(op, list())

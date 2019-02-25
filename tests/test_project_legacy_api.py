@@ -13,6 +13,7 @@ from flow import label
 from flow import classlabel
 from flow import staticlabel
 from flow import init
+from flow.util import deprecation
 from flow.legacy_templating import JobScript
 from test_project import redirect_stdout, redirect_stderr, suspend_logging, \
     MockEnvironment, MockScheduler, StringIO
@@ -91,7 +92,7 @@ def expect_deprecation_warnings(func):
             raise unittest.SkipTest("Not implemented for Python 2.7.")
         with self.assertWarns(DeprecationWarning):
             return func(self)
-    return wrapper
+    return deprecation.fail_if_not_removed(wrapper)
 
 
 class ProjectTest(unittest.TestCase):

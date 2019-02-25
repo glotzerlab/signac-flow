@@ -1348,7 +1348,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         if timeout is not None and timeout < 0:
             timeout = None
         if operations is None:
-            operations = [op for job in self for op in self._job_operations([job], False)]
+            operations = list(self._get_pending_operations(self))
         else:
             operations = list(operations)   # ensure list
 
@@ -1572,10 +1572,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         "Get all pending operations for the given selection."
         operation_names = None if operation_names is None else set(operation_names)
 
-        for op in self.next_operations(*jobs):
+        for op in self.next_operations(* jobs):
             if operation_names and op.name not in operation_names:
-                continue
-            if not self.eligible_for_submission(op):
                 continue
             yield op
 
@@ -1798,7 +1796,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
         # Gather all pending operations.
         with self._potentially_buffered():
-            operations = self._get_pending_operations(jobs, names)
+            operations = (op for op in self._get_pending_operations(jobs, names)
+                          if self.eligible_for_submission(op))
             if num is not None:
                 operations = list(islice(operations, num))
 

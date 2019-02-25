@@ -32,3 +32,8 @@ POSSIBILITY OF SUCH DAMAGE.
 
 This software ships with a copy of the source code of the tqdm project, licensed under the
 MPL 2.0 License. Please see flow/tqdm/LICENSE for more information.
+
+
+------------
+This software ships with a copy of the source code of the deprecation project, licensed under the
+Apache 2.0 License. Please see flow/util/deprecation-LICENSE for a full copy of the license.

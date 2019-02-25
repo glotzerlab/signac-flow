@@ -6,6 +6,7 @@ import os
 import warnings
 
 from signac.common import six
+import deprecation
 from flow import FlowProject
 from flow import get_environment
 from flow.scheduling.base import JobStatus
@@ -13,7 +14,6 @@ from flow import label
 from flow import classlabel
 from flow import staticlabel
 from flow import init
-from flow.util import deprecation
 from flow.legacy_templating import JobScript
 from test_project import redirect_stdout, redirect_stderr, suspend_logging, \
     MockEnvironment, MockScheduler, StringIO

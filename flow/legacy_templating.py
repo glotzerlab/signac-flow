@@ -12,8 +12,7 @@ import warnings
 import functools
 
 from signac.common import six
-
-from .util import deprecation
+import deprecation
 
 
 NUM_NODES_WARNING = """Unable to determine the reqired number of nodes (nn) for this submission.

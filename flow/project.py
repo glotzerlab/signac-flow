@@ -41,6 +41,7 @@ import signac
 from signac.common import six
 from signac.contrib.hashing import calc_id
 from signac.contrib.filterparse import parse_filter_arg
+import deprecation
 
 # Try to import jinja2 for templating, used in script and submit functions.
 try:
@@ -64,7 +65,6 @@ from .errors import ConfigKeyError
 from .errors import NoSchedulerError
 from .errors import TemplateError
 from .util import tabulate
-from .util import deprecation
 from .util.tqdm import tqdm
 from .util.misc import _positive_int
 from .util.misc import _mkdir_p

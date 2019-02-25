@@ -2517,7 +2517,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
             $ python my_project.py --help
         """
-        if pool is not None:
+        if pool is not None:     # deprecated: remove with version 0.8.
             raise RuntimeError(
                 "The 'pool' argument for the FlowProject.main() function is deprecated!")
 

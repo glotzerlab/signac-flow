@@ -247,18 +247,6 @@ class TorqueEnvironment(ComputeEnvironment):
     template = 'torque.sh'
 
 
-class MoabEnvironment(ComputeEnvironment):
-    """"An environment with TORQUE scheduler.
-
-    This class is deprecated and only kept for backwards
-    compatibility.
-    """
-    scheduler_type = TorqueScheduler
-
-    def __init__(self, *args, **kwargs):
-        raise RuntimeError("The MoabEnvironment has been replaced by the TorqueEnvironment.")
-
-
 class SlurmEnvironment(ComputeEnvironment):
     "An environment with SLURM scheduler."
     scheduler_type = SlurmScheduler

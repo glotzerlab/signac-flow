@@ -2706,31 +2706,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                           "more information.", file=sys.stderr)
             _exit_or_raise()
 
-    # All class methods below are wrappers for legacy API and should be removed as of version 0.7.
-
-    @classmethod
-    def add_submit_args(cls, parser):
-        raise RuntimeError(
-            "The add_submit_args() method is private as of version 0.6. and has been removed "
-            "as of version 0.7!")
-
-    @classmethod
-    def add_script_args(cls, parser):
-        raise RuntimeError(
-            "The add_script_args() method is private as of version 0.6. and has been removed "
-            "as of version 0.7!")
-
-    @classmethod
-    def add_print_status_args(cls, parser):
-        raise RuntimeError(
-            "The add_print_status_args() method is private as of version 0.6. and has been "
-            "removed as of version 0.7!")
-
-    def format_row(self, *args, **kwargs):
-        raise RuntimeError(
-            "The format_row() method is private as of version 0.6. and has been removed as "
-            "of version 0.7!")
-
 
 def _fork_with_serialization(loads, project, operation):
     """Invoke the _fork() method on a serialized project instance."""

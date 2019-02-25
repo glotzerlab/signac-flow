@@ -1701,9 +1701,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             The _id to be used for this submission.
         :type _id:
             str
-        :param serial:
-            Execute all bundled operations in serial.
-        :type serial:
+        :param parallel:
+            Execute all bundled operations in parallel.
+        :type parallel:
             bool
         :param flags:
             Additional options to be forwarded to the scheduler.
@@ -1721,6 +1721,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             Do not actually submit, but only print the submission script to screen. Useful
             for testing the submission workflow.
         :type pretend:
+            bool
+        :param show_template_help:
+            Show information about available template variables and filters and exit.
+        :type show_template_help:
             bool
         :param kwargs:
             Additional keyword arguments to be forwarded to the scheduler.

@@ -265,13 +265,15 @@ class JobOperation(object):
         keys_set_by_user = set(directives.keys())
 
         # Handle deprecated np argument:
-        if np is not None:
-            raise RuntimeError(
+        if np is None:
+            directives.setdefault(
+                'np', directives.get('nranks', 1) * directives.get('omp_num_threads', 1))
+        else:
+            warnings.warn(
                 "The np argument for the JobOperation constructor has been deprecated "
-                "as of version 0.6 and been removed as of version 0.7!")
+                "as of version 0.6 and will be removed in version 0.8!", DeprecationWarning)
+            directives['np'] = np
 
-        directives.setdefault(
-            'np', directives.get('nranks', 1) * directives.get('omp_num_threads', 1))
         directives.setdefault('ngpu', 0)
         directives.setdefault('nranks', 0)
         directives.setdefault('omp_num_threads', 0)
@@ -856,10 +858,41 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         for sjob in self._expand_bundled_jobs(scheduler.jobs()):
             yield sjob
 
+    @staticmethod
+    def _map_scheduler_jobs(scheduler_jobs):
+        "Map all scheduler jobs by job id and operation name."
+        for sjob in scheduler_jobs:
+            name = sjob.name()
+            if name[32] == '-':
+                expanded = JobOperation.expand_id(name)
+                yield expanded['job_id'], expanded['operation-name'], sjob
+
     def map_scheduler_jobs(self, scheduler_jobs):
-        """Function was removed as of version 0.7."""
-        raise RuntimeError("The FlowProject.map_scheduler_jobs() function has "
-                           "been removed as of version 0.7!")
+        """Map all scheduler jobs by job id and operation name.
+        This function fetches all scheduled jobs from the scheduler
+        and generates a nested dictionary, where the first key is
+        the job id, the second key the operation name and the last
+        value are the cooresponding scheduler jobs.
+        For example, to print the status of all scheduler jobs, associated
+        with a specific job operation, execute:
+        .. code::
+                sjobs = project.scheduler_jobs(scheduler)
+                sjobs_map = project.map_scheduler_jobs(sjobs)
+                for sjob in sjobs_map[job.get_id()][operation]:
+                    print(sjob._id(), sjob.status())
+        :param scheduler_jobs:
+            An iterable of scheduler job instances.
+        :return:
+            A nested dictionary (job_id, op_name, scheduler jobs)
+        """
+        warnings.warn(
+            "The FlowProject.map_scheduler_jobs() function is deprecated as of version "
+            "0.7 and will be removed in version 0.8!", DeprecationWarning)
+        sjobs_map = defaultdict(dict)
+        for job_id, op, sjob in self._map_scheduler_jobs(scheduler_jobs):
+            sjobs = sjobs_map[job_id].setdefault(op, list())
+            sjobs.append(sjob)
+        return sjobs_map
 
     def _get_operations_status(self, job):
         "Return a dict with information about job-operations for this job."

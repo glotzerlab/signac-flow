@@ -265,15 +265,13 @@ class JobOperation(object):
         keys_set_by_user = set(directives.keys())
 
         # Handle deprecated np argument:
-        if np is None:
-            directives.setdefault(
-                'np', directives.get('nranks', 1) * directives.get('omp_num_threads', 1))
-        else:
-            warnings.warn(
+        if np is not None:
+            raise RuntimeError(
                 "The np argument for the JobOperation constructor has been deprecated "
-                "as of version 0.6 and will be removed in version 0.8!", DeprecationWarning)
-            directives['np'] = np
+                "as of version 0.6 and has been removed in version 0.7!")
 
+        directives.setdefault(
+            'np', directives.get('nranks', 1) * directives.get('omp_num_threads', 1))
         directives.setdefault('ngpu', 0)
         directives.setdefault('nranks', 0)
         directives.setdefault('omp_num_threads', 0)

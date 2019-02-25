@@ -8,6 +8,7 @@ import logging
 
 from ..environment import DefaultSlurmEnvironment
 from ..errors import SubmitError
+from ..legacy_templating import deprecated_since_06
 
 
 logger = logging.getLogger(__name__)
@@ -23,6 +24,7 @@ class CometEnvironment(DefaultSlurmEnvironment):
     cores_per_node = 24
 
     @classmethod
+    @deprecated_since_06
     def calc_num_nodes(cls, np_total, ppn, force, partition, **kwargs):
         if 'shared' in partition:
             return 1
@@ -36,6 +38,7 @@ class CometEnvironment(DefaultSlurmEnvironment):
                     raise error
 
     @classmethod
+    @deprecated_since_06
     def gen_tasks(cls, js, np_total):
         js.writeline('#SBATCH --nodes={}'.format(np_total/cls.cores_per_node))
         js.writeline('#SBATCH --ntasks-per-node={}'.format(
@@ -43,6 +46,7 @@ class CometEnvironment(DefaultSlurmEnvironment):
         return js
 
     @classmethod
+    @deprecated_since_06
     def script(cls, _id, np_total, partition, memory=None, job_output=None, **kwargs):
         js = super(CometEnvironment, cls).script(_id=_id, **kwargs)
         js.writeline('#SBATCH -A {}'.format(cls.get_config_value('account')))
@@ -55,6 +59,7 @@ class CometEnvironment(DefaultSlurmEnvironment):
         return js
 
     @classmethod
+    @deprecated_since_06
     def mpi_cmd(cls, cmd, np):
         return "ibrun -v -np {np} {cmd}".format(cmd=cmd, np=np)
 
@@ -90,11 +95,13 @@ class Stampede2Environment(DefaultSlurmEnvironment):
     cores_per_node = 48
 
     @classmethod
+    @deprecated_since_06
     def script(cls, _id, tpn, ppn, partition, job_output=None, **kwargs):
         raise NotImplementedError(
                 "The Stampede2 environment is only available for flow>=0.7")
 
     @classmethod
+    @deprecated_since_06
     def mpi_cmd(cls, cmd, np):
         return "ibrun {cmd}".format(cmd=cmd)
 
@@ -124,6 +131,7 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
     cores_per_node = 28
 
     @classmethod
+    @deprecated_since_06
     def calc_num_nodes(cls, np_total, ppn, force, partition, **kwargs):
         if 'shared' in partition.lower():
             return 1
@@ -137,6 +145,7 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
                     raise error
 
     @classmethod
+    @deprecated_since_06
     def script(cls, _id, ppn, partition, **kwargs):
         js = super(BridgesEnvironment, cls).script(_id=_id, ppn=ppn, **kwargs)
         js.writeline('#SBATCH --partition={}'.format(partition))

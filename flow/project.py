@@ -768,7 +768,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         return cls.NAMES.get(x, x)
 
     ALIASES = dict(
-        status='S',
         unknown='U',
         registered='R',
         queued='Q',
@@ -1328,6 +1327,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                             _print_unicode(msg)
                 legend = u'Legend: ' + u' '.join(u'{}:{}'.format(v, k) for k, v in symbols.items())
                 _print_unicode(legend)
+            print(' '.join('[{}]:{}'.format(v, k) for k, v in self.ALIASES.items()))
 
         # Show any abbreviations used
         if abbreviate.table:

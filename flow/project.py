@@ -1815,7 +1815,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         if isinstance(names, six.string_types):
             raise ValueError(
                 "The 'names' argument must be a sequence of strings, however you "
-                "provided a single string.")
+                "provided a single string: {}.".format(names))
         if env is None:
             env = self._environment
         if walltime is not None:

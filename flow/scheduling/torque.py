@@ -144,7 +144,8 @@ class TorqueScheduler(Scheduler):
             # some qsub wrappers don't run on no-tty
             import pty
             master, slave = pty.openpty()
-            subprocess.Popen(['qsub', '--version'],stdin=slave, stdout=slave, stderr=slave, shell=True)
+            subprocess.Popen(['qsub', '--version'],stdin=slave, stdout=slave, stderr=slave,
+                shell=True)
         except (IOError, OSError):
             return False
         else:

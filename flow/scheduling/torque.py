@@ -141,7 +141,10 @@ class TorqueScheduler(Scheduler):
     def is_present(cls):
         "Return True if it appears that a TORQUE scheduler is available within the environment."
         try:
-            subprocess.check_output(['qsub', '--version'], stderr=subprocess.STDOUT)
+            # some qsub wrappers don't run on no-tty
+            import pty
+            master, slave = pty.openpty()
+            p = subprocess.Popen(['qsub', '--version'],stdin=slave, stdout=slave, stderr=slave, shell=True)
         except (IOError, OSError):
             return False
         else:

@@ -48,12 +48,13 @@ class SummitEnvironment(DefaultLSFEnvironment):
     @staticmethod
     def guess_resource_sets(operation, cores_per_node, gpus_per_node):
         ntasks = max(operation.directives.get('nranks', 1), 1)
-        cpus_per_task = operation.directives.get('omp_num_threads', 0)
-        np = operation.directives.get('np', ntasks * max(cpus_per_task, 1))
+        cpus_per_task = operation.directives.get('omp_num_threads', 1)
+        np = operation.directives.get('np', ntasks * cpus_per_task)
         ngpu = operation.directives.get('ngpu', 0)
         if np % cores_per_node != 0 and (ngpu == 0 or ngpu == np):
             # fill the nodes using small resource sets
-            nsets = np
+            # threads are never split across resource sets
+            nsets = np//cpus_per_task
         else:
             nsets = max(math.ceil(np / cores_per_node),
                         math.ceil(ngpu / gpus_per_node), 1)

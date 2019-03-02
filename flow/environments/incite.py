@@ -48,7 +48,7 @@ class SummitEnvironment(DefaultLSFEnvironment):
     @staticmethod
     def guess_resource_sets(operation, cores_per_node, gpus_per_node):
         ntasks = max(operation.directives.get('nranks', 1), 1)
-        cpus_per_task = max(operation.directives.get('omp_num_threads', 1),1)
+        cpus_per_task = max(operation.directives.get('omp_num_threads', 1), 1)
         np = operation.directives.get('np', ntasks * cpus_per_task)
         ngpu = operation.directives.get('ngpu', 0)
         if np % cores_per_node != 0 and (ngpu == 0 or ngpu == np):

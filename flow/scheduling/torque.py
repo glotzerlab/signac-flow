@@ -27,7 +27,7 @@ def _fetch(user=None):
     cmd = "qstat -fx -u {user}".format(user=user)
     try:
         result = io.BytesIO(subprocess.check_output(cmd.split()))
-    except FileNotFoundError:
+    except OSError:
         raise RuntimeError("Torque not available.")
     tree = ET.parse(source=result)
     return tree.getroot()

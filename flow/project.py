@@ -1150,7 +1150,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             # Iterate through all jobs and all job-operations to attempt to map the job-operation id
             # to scheduler names.
             job_op = list(self._jobs_operations(*jobs))
-            for name,op in with_progressbar(job_op, desc='Update status cache:', file=file):
+            for name, op in with_progressbar(job_op, desc='Update status cache:', file=file):
                 job_status = dict()
                 scheduler_jobs = sjobs_map.get(
                     op.get_id(), sjobs_map.get(op._get_legacy_id(), []))

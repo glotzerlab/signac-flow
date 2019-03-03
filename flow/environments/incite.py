@@ -85,11 +85,6 @@ class SummitEnvironment(DefaultLSFEnvironment):
                'jsrun_extra_args': jsrun_extra_args.__func__}
 
 
-class AscentEnvironment(SummitEnvironment):
-    """Environment profile for the Ascent supercomputer (Summit testing)."""
-    hostname_pattern = r'.*\.ascent\.olcf\.ornl\.gov'
-
-
 class TitanEnvironment(DefaultTorqueEnvironment):
     """Environment profile for the titan super computer.
 

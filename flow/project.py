@@ -1158,7 +1158,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 tmp = list(map(methodcaller('status'), scheduler_jobs))
                 job_status[op.get_id()] = int(max(tmp) if tmp else JobStatus.unknown)
                 for job in op.jobs:
-                    job.document['_status'] = job_status
+                    job.document.setdefault('_status', dict()).update(job_status)
 
         except NoSchedulerError:
             logger.debug("No scheduler available.")

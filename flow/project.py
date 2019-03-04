@@ -283,7 +283,7 @@ class JobsOperation(object):
 
     @property
     def job(self):
-        assert len(self.jobs) == 1
+        assert len(self.jobs) >= 1
         return self.jobs[0]
 
     def _get_legacy_id(self):
@@ -2223,7 +2223,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             if op.complete(job):
                 yield name
 
-    def _job_operations(self, *jobs, only_eligible):
+    def _job_operations(self, jobs, only_eligible):
         "Yield instances of JobsOperation constructed for specific job."
         for name, op in self.operations.items():
             if op.aggregate:

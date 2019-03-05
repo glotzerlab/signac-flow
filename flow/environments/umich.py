@@ -5,7 +5,6 @@
 import math
 
 from ..environment import DefaultTorqueEnvironment
-from ..legacy_templating import deprecated_since_06
 
 
 class FluxEnvironment(DefaultTorqueEnvironment):
@@ -16,41 +15,6 @@ class FluxEnvironment(DefaultTorqueEnvironment):
     hostname_pattern = '(nyx|flux).*.umich.edu'
     template = 'umich-flux.sh'
     cores_per_node = 1
-
-    @classmethod
-    @deprecated_since_06
-    def mpi_cmd(cls, cmd, np):
-        return "mpirun -np {np} {cmd}".format(cmd=cmd, np=np)
-
-    @classmethod
-    @deprecated_since_06
-    def gen_tasks(cls, js, np_total, mode):
-        """Helper function to generate the number of tasks (for overriding)"""
-        if mode == 'cpu':
-            js = js.writeline('#PBS -l nodes={}'.format(
-                math.ceil(np_total/cls.cores_per_node)))
-        elif mode == 'gpu':
-            js.writeline('#PBS -l nodes={np}:gpus=1'.format(
-                np=math.ceil(np_total/cls.cores_per_node)))
-        return js
-
-    @classmethod
-    @deprecated_since_06
-    def script(cls, _id, np_total, mode, memory, **kwargs):
-        js = super(FluxEnvironment, cls).script(_id=_id, **kwargs)
-        js.writeline('#PBS -A {}'.format(cls.get_config_value('account')))
-        js.writeline('#PBS -l qos={}'.format(cls.get_config_value('qos', 'flux')))
-        js.writeline('#PBS -l pmem={}'.format(memory))
-        if mode == 'cpu':
-            js.writeline('#PBS -q {}'.format(cls.get_config_value('cpu_queue', 'flux')))
-            js = cls.gen_tasks(js, np_total, mode)
-        elif mode == 'gpu':
-            q = cls.get_config_value('gpu_queue', cls.get_config_value('cpu_queue', 'flux') + 'g')
-            js.writeline('#PBS -q {}'.format(q))
-            js = cls.gen_tasks(js, np_total, mode)
-        else:
-            raise ValueError("Unknown mode '{}'.".format(mode))
-        return js
 
     @classmethod
     def add_args(cls, parser):

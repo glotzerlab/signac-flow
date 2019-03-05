@@ -84,7 +84,6 @@ from .labels import staticlabel
 from .labels import classlabel
 from .labels import _is_label_func
 from . import legacy
-from . import legacy_templating
 from .util import config as flow_config
 
 
@@ -494,8 +493,6 @@ class _FlowProjectClass(type):
 
 
 class FlowProject(six.with_metaclass(_FlowProjectClass,
-                                     # Remove next line as of version 0.8:
-                                     legacy_templating.FlowProjectLegacyTemplatingSystem,
                                      signac.contrib.Project)):
     """A signac project class specialized for workflow management.
 
@@ -1622,7 +1619,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         else:
             yield
 
-    @legacy_templating.script_support_legacy_templating_system
     def script(self, operations, parallel=False, template='script.sh', show_template_help=False):
         """Generate a run script to execute given operations.
 
@@ -1655,7 +1651,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             self._show_template_help_and_exit(template_environment, context)
         return template.render(** context)
 
-    @legacy_templating._generate_submit_script_support_legacy_templating_system
     def _generate_submit_script(self, _id, operations, template, show_template_help, env, **kwargs):
         """Generate submission script to submit the execution of operations to a scheduler."""
         if template is None:

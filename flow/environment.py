@@ -30,7 +30,6 @@ from .scheduling.simple_scheduler import SimpleScheduler
 from .scheduling.fakescheduler import FakeScheduler
 from .util import config as flow_config
 from .errors import NoSchedulerError
-from . import legacy_templating
 
 if six.PY2:
     import imp
@@ -97,8 +96,7 @@ class ComputeEnvironmentType(type):
         return super(ComputeEnvironmentType, cls).__init__(name, bases, dct)
 
 
-class ComputeEnvironment(with_metaclass(ComputeEnvironmentType,
-                                        legacy_templating.LegacyComputeEnvironment)):
+class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
     """Define computational environments.
 
     The ComputeEnvironment class allows us to automatically determine
@@ -146,7 +144,6 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType,
                 "No scheduler defined for environment '{}'.".format(cls.__name__))
 
     @classmethod
-    @legacy_templating.support_legacy_templating_submit
     def submit(cls, script, flags=None, *args, **kwargs):
         """Submit a job submission script to the environment's scheduler.
 
@@ -223,7 +220,6 @@ class UnknownEnvironment(StandardEnvironment):
             "'flow.environment.StandardEnvironment' class.")
 
 
-@legacy_templating.support_legacy_templating
 class TestEnvironment(ComputeEnvironment):
     """This is a test environment.
 
@@ -259,15 +255,14 @@ class LSFEnvironment(ComputeEnvironment):
     template = 'lsf.sh'
 
 
-@legacy_templating.support_legacy_templating
 class NodesEnvironment(ComputeEnvironment):
     """A compute environment consisting of multiple compute nodes.
 
     Each compute node is assumed to have a specific number of compute units, e.g., CPUs.
     """
+    pass
 
 
-@legacy_templating.support_legacy_templating
 class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
     "A default environment for environments with TORQUE scheduler."
 
@@ -293,7 +288,6 @@ class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
             help="Do not copy current environment variables into compute node environment.")
 
 
-@legacy_templating.support_legacy_templating
 class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
     "A default environment for environments with SLURM scheduler."
 
@@ -316,7 +310,6 @@ class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
                  "completion of a cluster job with this id.")
 
 
-@legacy_templating.support_legacy_templating
 class DefaultLSFEnvironment(NodesEnvironment, LSFEnvironment):
     "A default environment for environments with LSF scheduler."
 

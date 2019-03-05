@@ -99,29 +99,6 @@ class ProjectTest(unittest.TestCase):
                 project.open_job(dict(a=a, b=b)).init()
         return project
 
-    def test_instance(self):
-        self.assertTrue(isinstance(self.project, FlowProject))
-
-    def test_classify(self):
-        project = self.mock_project()
-        for job in project:
-            labels = list(project.classify(job))
-            self.assertEqual(len(labels), 2 - (job.sp.b % 2))
-            self.assertTrue(all((isinstance(l, str)) for l in labels))
-
-    def test_labels(self):
-        project = self.mock_project()
-        for job in project:
-            labels = list(project.labels(job))
-            if job.sp.a == 0:
-                if job.sp.b % 2:
-                    self.assertEqual(set(labels), {'a', 'b', 'c', 'has_a'})
-                else:
-                    self.assertEqual(len(labels), 5)
-                    self.assertIn('b_is_even', labels)
-            else:
-                self.assertIn('a is {}'.format(job.sp.a), labels)
-
     def test_print_status(self):
         project = self.mock_project()
         for job in project:
@@ -132,55 +109,6 @@ class ProjectTest(unittest.TestCase):
         with redirect_stderr(StringIO()):
             with redirect_stdout(StringIO()):
                 project.print_status(file=fd, err=fd)
-
-    def test_script(self):
-        project = self.mock_project()
-        for job in project:
-            script = project.script(project.next_operations(job))
-            self.assertIn('echo "hello"', script)
-            self.assertIn(str(job), script)
-
-    def test_script_with_custom_script(self):
-        project = self.mock_project()
-        template_dir = project._template_dir
-        os.mkdir(template_dir)
-        with open(os.path.join(template_dir, 'script.sh'), 'w') as file:
-            file.write("{% extends base_script %}\n")
-            file.write("{% block header %}\n")
-            file.write("THIS IS A CUSTOM SCRIPT!\n")
-            file.write("{% endblock %}\n")
-        for job in project:
-            script = project.script(project.next_operations(job))
-            self.assertIn("THIS IS A CUSTOM SCRIPT", script)
-            self.assertIn('echo "hello"', script)
-            self.assertIn(str(job), script)
-
-    def test_run_operations_explicit_argument(self):
-        project = self.mock_project()
-        for job in project:
-            ops = project.next_operations(job)
-            with suspend_logging():
-                with redirect_stderr(StringIO()):
-                    project.run(operations=ops)
-        for job in project:
-            self.assertIn('said_hello', list(project.labels(job)))
-
-    def test_run_operations_implicit_argument(self):
-        project = self.mock_project()
-        for job in project:
-            ops = project.next_operations(job)
-            with suspend_logging():
-                with redirect_stderr(StringIO()):
-                    project.run(ops)
-        for job in project:
-            self.assertIn('said_hello', list(project.labels(job)))
-
-    def test_run(self):
-        project = self.mock_project()
-        with redirect_stderr(StringIO()):
-            project.run()
-        for job in project:
-            self.assertIn('said_hello', list(project.labels(job)))
 
     def test_submit_operations(self):
         env = get_environment()
@@ -197,97 +125,6 @@ class ProjectTest(unittest.TestCase):
                 project.submit_operations(_id=cluster_job_id, env=env, operations=operations)
         self.assertEqual(len(list(sched.jobs())), 1)
         sched.reset()
-
-    @unittest.expectedFailure
-    def test_submit(self):
-        env = get_environment()
-        sched = env.scheduler_type()
-        sched.reset()
-        project = self.mock_project()
-        self.assertEqual(len(list(sched.jobs())), 0)
-        with suspend_logging():
-            with redirect_stdout(StringIO()):
-                project.submit(env)
-        self.assertEqual(len(list(sched.jobs())), len(project))
-        sched.reset()
-
-    @unittest.expectedFailure
-    def test_submit_limited(self):
-        env = get_environment()
-        sched = env.scheduler_type()
-        sched.reset()
-        project = self.mock_project()
-        self.assertEqual(len(list(sched.jobs())), 0)
-        with suspend_logging():
-            with redirect_stderr(StringIO()):
-                project.submit(env, num=1)
-                self.assertEqual(len(list(sched.jobs())), 1)
-                project.submit(env, num=1)
-                self.assertEqual(len(list(sched.jobs())), 2)
-
-    @unittest.expectedFailure
-    def test_resubmit(self):
-        env = get_environment()
-        sched = env.scheduler_type()
-        sched.reset()
-        project = self.mock_project()
-        self.assertEqual(len(list(sched.jobs())), 0)
-        with suspend_logging():
-            with redirect_stdout(StringIO()):
-                project.submit(env)
-                for i in range(5):  # push all jobs through the queue
-                    self.assertEqual(len(list(sched.jobs())), len(project))
-                    project.submit(env)
-                    sched.step()
-        self.assertEqual(len(list(sched.jobs())), 0)
-
-    def test_bundles(self):
-        env = get_environment()
-        sched = env.scheduler_type()
-        sched.reset()
-        project = self.mock_project()
-        self.assertEqual(len(list(sched.jobs())), 0)
-        with suspend_logging():
-            with redirect_stderr(StringIO()):
-                project.submit(bundle_size=2, num=2)
-                self.assertEqual(len(list(sched.jobs())), 1)
-                project.submit(bundle_size=2, num=4)
-                self.assertEqual(len(list(sched.jobs())), 3)
-                sched.reset()
-                project._fetch_scheduler_status(file=StringIO())
-                project.submit(bundle_size=0)
-                self.assertEqual(len(list(sched.jobs())), 1)
-
-    @unittest.expectedFailure
-    def test_submit_status(self):
-        env = get_environment()
-        sched = env.scheduler_type()
-        sched.reset()
-        project = self.mock_project()
-        for job in project:
-            list(project.classify(job))
-            self.assertEqual(project.next_operation(job).name, 'a_op')
-            self.assertEqual(project.next_operation(job).job, job)
-        with suspend_logging():
-            with redirect_stdout(StringIO()):
-                project.submit(env)
-        self.assertEqual(len(list(sched.jobs())), len(project))
-
-        for job in project:
-            self.assertEqual(project.next_operation(job).get_status(), JobStatus.submitted)
-
-        sched.step()
-        sched.step()
-        project._fetch_scheduler_status(file=StringIO())
-
-        for job in project:
-            self.assertEqual(project.next_operation(job).get_status(), JobStatus.queued)
-
-    def test_init(self):
-        with open(os.devnull, 'w') as out:
-            for fn in init(root=self._tmp_dir.name, out=out):
-                fn_ = os.path.join(self._tmp_dir.name, fn)
-                self.assertTrue(os.path.isfile(fn_))
 
 
 if __name__ == '__main__':

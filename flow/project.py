@@ -1453,7 +1453,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         else:   # need to fork
             fork(cmd=operation.cmd, timeout=timeout)
 
-    @_support_legacy_api
     def run(self, jobs=None, names=None, pretend=False, np=None, timeout=None, num=None,
             num_passes=1, progress=False):
         """Execute all pending operations for the given selection.
@@ -1770,7 +1769,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             else:
                 return env.submit(_id=_id, script=script, flags=flags, **kwargs)
 
-    @_support_legacy_api
     def submit(self, bundle_size=1, jobs=None, names=None, num=None, parallel=False,
                force=False, walltime=None, env=None, **kwargs):
         """Submit function for the project's main submit interface.

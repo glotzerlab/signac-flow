@@ -43,18 +43,8 @@ from signac.contrib.hashing import calc_id
 from signac.contrib.filterparse import parse_filter_arg
 import deprecation
 
-# Try to import jinja2 for templating, used in script and submit functions.
-try:
-    import jinja2
-    from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
-except ImportError:
-    # Mock exception, which will never be raised.
-    class Jinja2TemplateNotFound(Exception):
-        pass
-
-    JINJA2 = False
-else:
-    JINJA2 = True
+import jinja2
+from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
 
 from .environment import get_environment
 from .scheduling.base import ClusterJob
@@ -78,7 +68,6 @@ from .util.translate import abbreviate
 from .util.translate import shorten
 from .util.execution import fork
 from .util.execution import TimeoutExpired
-from .util.dependencies import _requires_jinja2
 from .labels import label
 from .labels import staticlabel
 from .labels import classlabel
@@ -551,8 +540,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         and submit_operations() / submit() function and the corresponding command line
         sub commands.
         """
-        _requires_jinja2()
-
         if self._config.get('flow') and self._config['flow'].get('environment_modules'):
             envs = self._config['flow'].as_list('environment_modules')
         else:
@@ -2394,8 +2381,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
     def _main_script(self, args):
         "Generate a script for the execution of operations."
-        _requires_jinja2('The signac-flow script function')
-
         if args.requires and not args.cmd:
             raise ValueError(
                 "The --requires option can only be used in combination with --cmd.")
@@ -2420,7 +2405,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             template=args.template, show_template_help=args.show_template_help))
 
     def _main_submit(self, args):
-        _requires_jinja2('The signac-flow submit function')
         if args.test:
             args.pretend = True
         kwargs = vars(args)

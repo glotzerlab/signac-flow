@@ -37,8 +37,6 @@ def support_submit_operations_legacy_api(func):
 
 
 def support_print_status_legacy_api(func):
-    from .scheduling.base import Scheduler
-
     @functools.wraps(func)
     def wrapper(self, jobs=None, *args, **kwargs):
         if kwargs.pop('full', False):

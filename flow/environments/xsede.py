@@ -3,11 +3,9 @@
 # This software is licensed under the BSD 3-Clause License.
 """Environments for XSEDE supercomputers."""
 from __future__ import print_function
-import sys
 import logging
 
 from ..environment import DefaultSlurmEnvironment
-from ..errors import SubmitError
 
 
 logger = logging.getLogger(__name__)

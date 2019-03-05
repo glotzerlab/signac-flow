@@ -2,8 +2,6 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 """Environments for the University of Michigan HPC environment."""
-import math
-
 from ..environment import DefaultTorqueEnvironment
 
 

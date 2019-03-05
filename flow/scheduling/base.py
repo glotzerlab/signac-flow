@@ -4,7 +4,6 @@
 """Definition of base classes for the scheduling system."""
 import enum
 import time
-import warnings
 
 
 class JobStatus(enum.IntEnum):

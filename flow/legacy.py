@@ -36,21 +36,6 @@ def support_submit_operations_legacy_api(func):
     return wrapper
 
 
-def support_print_status_legacy_api(func):
-    @functools.wraps(func)
-    def wrapper(self, jobs=None, *args, **kwargs):
-        if kwargs.pop('full', False):
-            kwargs['detailed'] = kwargs['all_ops'] = True
-
-        # remove parser args
-        for arg in ('func', 'verbose', 'debug', 'show_traceback', 'job_id', 'filter', 'doc_filter'):
-            if arg in kwargs:
-                del kwargs[arg]
-
-        return func(self, jobs=jobs, *args, **kwargs)
-    return wrapper
-
-
 class JobsCursorWrapper(object):
     """Enables the execution of workflows on dynamic data spaces.
 

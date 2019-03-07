@@ -95,17 +95,6 @@ class ProjectTest(unittest.TestCase):
                 project.open_job(dict(a=a, b=b)).init()
         return project
 
-    def test_print_status(self):
-        project = self.mock_project()
-        for job in project:
-            list(project.classify(job))
-            self.assertEqual(project.next_operation(job).name, 'a_op')
-            self.assertEqual(project.next_operation(job).job, job)
-        fd = StringIO()
-        with redirect_stderr(StringIO()):
-            with redirect_stdout(StringIO()):
-                project.print_status(file=fd, err=fd)
-
     def test_submit_operations(self):
         env = get_environment()
         sched = env.scheduler_type()

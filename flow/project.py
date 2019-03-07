@@ -1025,13 +1025,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
     ])
     "Pretty (unicode) symbols denoting the execution status of operations."
 
-    @_support_legacy_api
     def print_status(self, jobs=None, overview=True, overview_max_lines=None,
                      detailed=False, parameters=None, skip_active=False, param_max_width=None,
                      expand=False, all_ops=False, only_incomplete=False, dump_json=False,
                      unroll=True, compact=False, pretty=False,
                      file=None, err=None, ignore_errors=False,
-                     no_parallelize=False):
+                     no_parallelize=False, full=False):
         """Print the status of the project.
 
         .. versionchanged:: 0.6
@@ -1063,11 +1062,59 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         :param param_max_width:
             Limit the number of characters of parameter columns,
             see also: :py:meth:`~.update_aliases`.
+        :type param_max_width:
+            int
+        :param expand:
+            Present labels and operations in two separate tables.
+        :type expand:
+            bool
+        :param all_ops:
+            Include operations that are not eligible to run.
+        :type all_ops:
+            bool
+        :param only_incomplete:
+            Remove all jobs that have no eligible operations.
+        :type only_incomplete:
+            bool
+        :param dump_json:
+            Output the data as JSON instead of printing the formatted output.
+        :type dump_json:
+            bool
+        :param unroll:
+            Separate columns for jobs and the corresponding operations.
+        :type unroll:
+            bool
+        :param compact:
+            Print a compact version of the output.
+        :type compact:
+            bool
+        :param pretty:
+            Prettify the output.
+        :type pretty:
+            bool
         :param file:
             Redirect all output to this file, defaults to sys.stdout.
+        :type file:
+            str
         :param err:
             Redirect all error output to this file, defaults to sys.stderr.
+        :type err:
+            str
+        :param ignore_errors:
+            Print status even if querying the scheduler fails.
+        :type ignore_errors:
+            bool
+        :param no_parallelize:
+            Don't parallelize the status update.
+        :type no_parallelize:
+            bool
+        :param full:
+            Alias for `detailed=True, all_ops=True`.
+        :type full:
+            bool
         """
+        if full:
+            detailed = all_ops = True
         if file is None:
             file = sys.stdout
         if err is None:

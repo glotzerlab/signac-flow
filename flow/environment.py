@@ -260,7 +260,6 @@ class NodesEnvironment(ComputeEnvironment):
 
     Each compute node is assumed to have a specific number of compute units, e.g., CPUs.
     """
-    pass
 
 
 class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):

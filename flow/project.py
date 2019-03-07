@@ -41,7 +41,6 @@ import signac
 from signac.common import six
 from signac.contrib.hashing import calc_id
 from signac.contrib.filterparse import parse_filter_arg
-import deprecation
 
 import jinja2
 from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
@@ -827,31 +826,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             if name[32] == '-':
                 expanded = JobOperation.expand_id(name)
                 yield expanded['job_id'], expanded['operation-name'], sjob
-
-    @deprecation.deprecated(deprecated_in=0.7, removed_in=0.8)
-    def map_scheduler_jobs(self, scheduler_jobs):
-        """Map all scheduler jobs by job id and operation name.
-        This function fetches all scheduled jobs from the scheduler
-        and generates a nested dictionary, where the first key is
-        the job id, the second key the operation name and the last
-        value are the cooresponding scheduler jobs.
-        For example, to print the status of all scheduler jobs, associated
-        with a specific job operation, execute:
-        .. code::
-                sjobs = project.scheduler_jobs(scheduler)
-                sjobs_map = project.map_scheduler_jobs(sjobs)
-                for sjob in sjobs_map[job.get_id()][operation]:
-                    print(sjob._id(), sjob.status())
-        :param scheduler_jobs:
-            An iterable of scheduler job instances.
-        :return:
-            A nested dictionary (job_id, op_name, scheduler jobs)
-        """
-        sjobs_map = defaultdict(dict)
-        for job_id, op, sjob in self._map_scheduler_jobs(scheduler_jobs):
-            sjobs = sjobs_map[job_id].setdefault(op, list())
-            sjobs.append(sjob)
-        return sjobs_map
 
     def _get_operations_status(self, job):
         "Return a dict with information about job-operations for this job."
@@ -2487,7 +2461,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             doc_filter = parse_filter_arg(args.doc_filter)
             return legacy.JobsCursorWrapper(self, filter_, doc_filter)
 
-    def main(self, parser=None, pool=None):
+    def main(self, parser=None):
         """Call this function to use the main command line interface.
 
         In most cases one would want to call this function as part of the
@@ -2510,10 +2484,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
             $ python my_project.py --help
         """
-        if pool is not None:     # deprecated: remove with version 0.8.
-            raise RuntimeError(
-                "The 'pool' argument for the FlowProject.main() function is deprecated!")
-
         if parser is None:
             parser = argparse.ArgumentParser()
 

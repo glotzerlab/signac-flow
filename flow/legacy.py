@@ -3,8 +3,6 @@
 # This software is licensed under the BSD 3-Clause License.
 """Wrapper functions to detect and support deprecated APIs from previous versions."""
 import logging
-import functools
-import warnings
 
 
 logger = logging.getLogger(__name__)

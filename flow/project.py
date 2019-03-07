@@ -102,16 +102,6 @@ The available filters are:
 {filters}"""
 
 
-def _support_legacy_api(method):
-    """Label a method to be wrapped with a legacy API compatibility layer.
-
-    This is a decorator function, that will wrap 'method' with a wrapper function
-    that attempts to detect and resolve legacy API use of said method.
-    All wrapper functions are implemented in the 'legacy' module.
-    """
-    return getattr(legacy, 'support_{}_legacy_api'.format(method.__name__))(method)
-
-
 class _condition(object):
 
     def __init__(self, condition):
@@ -252,12 +242,6 @@ class JobOperation(object):
         # keys set by the user and check whether they have been evaluated by the template
         # script engine later.
         keys_set_by_user = set(directives.keys())
-
-        # Handle deprecated np argument:
-        if np is not None:
-            raise RuntimeError(
-                "The np argument for the JobOperation constructor has been deprecated "
-                "as of version 0.6 and has been removed in version 0.7!")
 
         directives.setdefault(
             'np', directives.get('nranks', 1) * directives.get('omp_num_threads', 1))
@@ -419,13 +403,7 @@ class FlowOperation(object):
         :class:`dict`
     """
 
-    def __init__(self, cmd, pre=None, post=None, directives=None, np=None):
-        # Handle deprecated np argument.
-        if np is not None:
-            raise RuntimeError(
-                "The np argument for the FlowOperation() constructor has been deprecated "
-                "as of version 0.6 and been removed as of version 0.7!")
-
+    def __init__(self, cmd, pre=None, post=None, directives=None):
         if pre is None:
             pre = []
         if post is None:
@@ -1710,7 +1688,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             self._show_template_help_and_exit(template_environment, context)
         return template.render(** context)
 
-    @_support_legacy_api
     def submit_operations(self, operations, _id=None, env=None, parallel=False, flags=None,
                           force=False, template='script.sh', pretend=False,
                           show_template_help=False, **kwargs):
@@ -2403,11 +2380,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             else:
                 args.operation_name = args.hidden_operation_name
 
-        if args.np is not None:  # Remove completely beginning of version 0.8.
-            raise RuntimeError(
-                "The run --np option has been deprecated as of version 0.6 and been removed "
-                "as of version 0.7, use '-p/--parallel' instead.")
-
         # Select jobs:
         jobs = self._select_jobs_from_args(args)
 
@@ -2630,10 +2602,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             const='-1',
             help="Specify the number of cores to parallelize to. Defaults to all available "
                  "processing units if argument is ommitted.")
-        execution_group.add_argument(  # deprecated: Completely remove beginning with version 0.8.
-            '--np',
-            type=int,
-            help=argparse.SUPPRESS)
         parser_run.set_defaults(func=self._main_run)
 
         parser_script = subparsers.add_parser(

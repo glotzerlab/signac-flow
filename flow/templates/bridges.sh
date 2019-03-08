@@ -25,7 +25,7 @@
 #SBATCH --gres=gpu:p100:2
 {% elif partition == 'GPU-shared' %}
 {% if gpu_tasks > 1 and gpu_tasks % 2 %}
-{% raise "Can only request multitudes of two GPUs when submitting to the GPU-shared partition." %}
+{% raise "Can only request multiples of two GPUs when submitting to the GPU-shared partition." %}
 {% endif %}
 #SBATCH -N {{ nn|default(1, true)|check_utilization(gpu_tasks, 1, threshold, 'GPU') }}
 #SBATCH --ntasks-per-node=16

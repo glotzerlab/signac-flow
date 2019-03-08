@@ -4,7 +4,6 @@
 """Definition of base classes for the scheduling system."""
 import enum
 import time
-import warnings
 
 
 class JobStatus(enum.IntEnum):
@@ -43,14 +42,6 @@ class ClusterJob(object):
 
 class Scheduler(object):
     """Abstract base class for schedulers."""
-
-    def __init__(self, header=None, cores_per_node=None):
-        if header is not None:
-            warnings.warn(
-                "Scheduler: Ignoring deprecated 'header' argument.", DeprecationWarning)
-        if cores_per_node is not None:
-            warnings.warn(
-                "Scheduler: Ignoring deprecated 'cores_per_node' argument.", DeprecationWarning)
 
     # The UNIX time stamp of the last scheduler query.
     _last_query = None

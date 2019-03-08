@@ -487,6 +487,14 @@ class ExecutionProjectTest(BaseProjectTest):
         self.assertEqual(len(list(MockScheduler.jobs())), num_jobs_submitted)
         MockScheduler.reset()
 
+    def test_submit_bad_names_argument(self):
+        MockScheduler.reset()
+        project = self.mock_project()
+        self.assertEqual(len(list(MockScheduler.jobs())), 0)
+        with self.assertRaises(ValueError):
+            project.submit(names='foo')
+        project.submit(names=['foo'])
+
     def test_submit_limited(self):
         MockScheduler.reset()
         project = self.mock_project()

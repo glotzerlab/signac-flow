@@ -5,7 +5,7 @@
 version: 2
 
 jobs:
-  style-check:
+  pre-test-checks:
     docker:
       - image: circleci/python:3.7
 
@@ -14,7 +14,10 @@ jobs:
     steps:
       - checkout
       - run:
-          name: style-check
+          name: check-citation-metadata
+          command: ./.sync-zenodo-metadata.py --check >/dev/null
+      - run:
+          name: check-code-style
           command: |
             pip install --user -U flake8
             python -m flake8 --show-source flow/

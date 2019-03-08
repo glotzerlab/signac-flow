@@ -15,7 +15,9 @@ jobs:
       - checkout
       - run:
           name: check-citation-metadata
-          command: ./.sync-zenodo-metadata.py --check >/dev/null
+          command: |
+            pip install --user -U click ruamel.yaml
+            ./.sync-zenodo-metadata.py --check >/dev/null
       - run:
           name: check-code-style
           command: |

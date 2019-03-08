@@ -71,21 +71,21 @@ jobs:
 
 workflows:
   version: 2
-  style-check-and-tests:
+  pre-test-checks-and-tests:
     jobs:
-      - style-check
+      - pre-test-checks
       - test-2.7:
           requires:
-            - style-check
+            - pre-test-checks
       - test-3.4:
           requires:
-            - style-check
+            - pre-test-checks
       - test-3.5:
           requires:
-            - style-check
+            - pre-test-checks
       - test-3.6:
           requires:
-            - style-check
+            - pre-test-checks
       - test-3.7:
           requires:
-            - style-check
+            - pre-test-checks

@@ -39,9 +39,12 @@ class Contributor:
 
 
 @click.command()
+@click.pass_context
+@click.option('--check', default=False, is_flag=True,
+              help="Return with non-zero exit code if metadata needs to be updated.")
 @click.option('-i', '--in-place', type=bool, is_flag=True,
-              help="Modify the zenodo metadata in place.")
-def sync(in_place=False):
+              help="Modify metadata in place.")
+def sync(ctx, in_place=False, check=True):
     with open('CITATION.cff', 'rb') as file:
         citation = load(file.read(), Loader=Loader)
         authors = [
@@ -56,13 +59,21 @@ def sync(in_place=False):
 
     with open('.zenodo.json', 'rb') as file:
         zenodo = json.loads(file.read())
-        zenodo['creators'] = [a.as_zenodo_creator() for a in authors]
-        zenodo['contributors'] = [c.as_zenodo_creator() for c in contributors if c not in authors]
-    if in_place:
-        with open('.zenodo.json', 'wb') as file:
-            file.write(json.dumps(zenodo, indent=4, sort_keys=True).encode('utf-8'))
+        zenodo_updated = zenodo.copy()
+        zenodo_updated['creators'] = [a.as_zenodo_creator() for a in authors]
+        zenodo_updated['contributors'] = [c.as_zenodo_creator()
+                                          for c in contributors if c not in authors]
+    modified = json.dumps(zenodo, sort_keys=True) != json.dumps(zenodo_updated, sort_keys=True)
+    if modified:
+        if in_place:
+            with open('.zenodo.json', 'wb') as file:
+                file.write(json.dumps(zenodo, indent=4, sort_keys=True).encode('utf-8'))
+        else:
+            click.echo(json.dumps(zenodo, indent=4, sort_keys=True))
+        if check:
+            ctx.exit(1)
     else:
-        print(json.dumps(zenodo, indent=4, sort_keys=True))
+        click.echo("No changes.", err=True)
 
 
 if __name__ == '__main__':

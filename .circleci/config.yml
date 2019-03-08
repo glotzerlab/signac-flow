@@ -16,7 +16,7 @@ jobs:
       - run:
           name: check-citation-metadata
           command: |
-            pip install --user -U click ruamel.yaml
+            pip install --user -U click==7.0 ruamel.yaml==0.15
             ./.sync-zenodo-metadata.py --check >/dev/null
       - run:
           name: check-code-style

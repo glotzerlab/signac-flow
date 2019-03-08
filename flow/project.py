@@ -982,7 +982,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                      expand=False, all_ops=False, only_incomplete=False, dump_json=False,
                      unroll=True, compact=False, pretty=False,
                      file=None, err=None, ignore_errors=False,
-                     no_parallelize=False, full=False):
+                     no_parallelize=False):
         """Print the status of the project.
 
         .. versionchanged:: 0.6
@@ -1025,7 +1025,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         :type all_ops:
             bool
         :param only_incomplete:
-            Remove all jobs that have no eligible operations.
+            Only show jobs that have eligible operations.
         :type only_incomplete:
             bool
         :param dump_json:
@@ -1057,16 +1057,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         :type ignore_errors:
             bool
         :param no_parallelize:
-            Don't parallelize the status update.
+            Do not parallelize the status update.
         :type no_parallelize:
             bool
-        :param full:
-            Alias for `detailed=True, all_ops=True`.
-        :type full:
-            bool
         """
-        if full:
-            detailed = all_ops = True
         if file is None:
             file = sys.stdout
         if err is None:
@@ -2622,6 +2616,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         if args.debug:  # Implies '-vv' and '--show-traceback'
             args.verbose = max(2, args.verbose)
             args.show_traceback = True
+
+        # Support print_status argument alias
+        if args.func == self._main_status and args.full:
+            args.detailed = args.all_ops = True
 
         # Set verbosity level according to the `-v` argument.
         logging.basicConfig(level=max(0, logging.WARNING - 10 * args.verbose))

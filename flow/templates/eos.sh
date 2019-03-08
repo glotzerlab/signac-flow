@@ -7,8 +7,8 @@
 {% if operations|calc_tasks('ngpu', true, true) and not force %}
 {% raise "GPUs were requested but are unsupported by Eos!" %}
 {% endif %}
-{% set nn = nn|default(cpu_tasks|calc_num_nodes(24), true) %}
-#PBS -l nodes={{ nn|check_utilization(cpu_tasks, 24, threshold, 'CPU') }}
+{% set nn = nn|default(cpu_tasks|calc_num_nodes(32), true) %}
+#PBS -l nodes={{ nn|check_utilization(cpu_tasks, 32, threshold, 'CPU') }}
 {% endblock %}
 {% block header %}
 {{ super() -}}

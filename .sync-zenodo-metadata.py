@@ -1,12 +1,16 @@
 #!/usr/bin/env python
 """Synchronize authors and contributor metadata.
 
-This script synchronizes the metadata provided in the CITATION.cff
-file with the zenodo metadata stored in .zenodo.json.
+This script synchronizes the metadata provided in the CITATION.cff and
+the contributors.yaml file with the metadata stored in the .zenodo.json
+file.
 
 All authors should be listed in the CITATION.cff file, while contributors
-should be listed in the contributors.yaml file. Both files use the citation
-file-format.
+should be listed in the contributors.yaml file.
+Both files use the [citation file-format][1] for [person objects][2].
+
+[1] https://citation-file-format.github.io/
+[2] https://citation-file-format.github.io/1.0.3/specifications/#/person-objects
 """
 from dataclasses import dataclass
 

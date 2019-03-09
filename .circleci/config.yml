@@ -14,9 +14,12 @@ jobs:
     steps:
       - checkout
       - run:
-          name: check-citation-metadata
+          name: install-dev-requirements
           command: |
             pip install --user -U -r requirements-dev.txt
+      - run:
+          name: check-citation-metadata
+          command: |
             ./.sync-zenodo-metadata.py --check >/dev/null
       - run:
           name: check-code-style

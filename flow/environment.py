@@ -12,10 +12,12 @@ environment, e.g. for the adjustemt of scheduler submission scripts.
 from __future__ import print_function
 from __future__ import division
 import os
+import sys
 import re
 import socket
 import logging
 import importlib
+from math import ceil
 from collections import OrderedDict
 
 from signac.common import config
@@ -29,8 +31,11 @@ from .scheduling.torque import TorqueScheduler
 from .scheduling.simple_scheduler import SimpleScheduler
 from .scheduling.fakescheduler import FakeScheduler
 from .util import config as flow_config
+from .util.template_filters import format_timedelta
+from .errors import SubmitError
 from .errors import NoSchedulerError
-from . import legacy_templating
+
+from .legacy_templating import JobScript
 
 if six.PY2:
     import imp
@@ -82,6 +87,14 @@ def setup(py_modules, **attrs):
         **attrs)
 
 
+def deprecated_since_06(func):
+    import deprecation
+
+    return deprecation.deprecated(
+        deprecated_in=0.6, removed_in=0.8,
+        details="This function is part of the legacy templating system.")(func)
+
+
 class ComputeEnvironmentType(type):
     """Meta class for the definition of ComputeEnvironments.
 
@@ -97,8 +110,7 @@ class ComputeEnvironmentType(type):
         return super(ComputeEnvironmentType, cls).__init__(name, bases, dct)
 
 
-class ComputeEnvironment(with_metaclass(ComputeEnvironmentType,
-                                        legacy_templating.LegacyComputeEnvironment)):
+class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
     """Define computational environments.
 
     The ComputeEnvironment class allows us to automatically determine
@@ -114,6 +126,16 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType,
     hostname_pattern = None
     submit_flags = None
     template = 'base_script.sh'
+
+    @classmethod
+    @deprecated_since_06
+    def script(cls, **kwargs):
+        """Return a JobScript instance.
+
+        Derived ComputeEnvironment classes may require additional
+        arguments for the creation of a job submission script.
+        """
+        return JobScript(cls)
 
     @classmethod
     def is_present(cls):
@@ -146,7 +168,6 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType,
                 "No scheduler defined for environment '{}'.".format(cls.__name__))
 
     @classmethod
-    @legacy_templating.support_legacy_templating_submit
     def submit(cls, script, flags=None, *args, **kwargs):
         """Submit a job submission script to the environment's scheduler.
 
@@ -160,8 +181,16 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType,
             flags.extend(env_flags)
 
         # Hand off the actual submission to the scheduler
+        if isinstance(script, JobScript):  # api version < 6
+            script = str(script)
+
         if cls.get_scheduler().submit(script, flags=flags, *args, **kwargs):
             return JobStatus.submitted
+
+    @staticmethod
+    def bg(cmd):
+        "Wrap a command (cmd) to be executed in the background."
+        return cmd + ' &'
 
     @classmethod
     def add_args(cls, parser):
@@ -218,12 +247,12 @@ class UnknownEnvironment(StandardEnvironment):
     "Deprecated 'standard' environment, replaced by 'StandardEnvironment.'"
 
     def __init__(self, *args, **kwargs):
-        raise RuntimeError(
-            "The 'flow.environment.UnknownEnvironment' class has been replaced by the "
-            "'flow.environment.StandardEnvironment' class.")
+        super(
+            "The 'UnknownEnvironment' class has been replaced by the "
+            "'StandardEnvironment' class.", DeprecationWarning)
+        super(UnknownEnvironment, self).__init__(*args, **kwargs)
 
 
-@legacy_templating.support_legacy_templating
 class TestEnvironment(ComputeEnvironment):
     """This is a test environment.
 
@@ -233,6 +262,19 @@ class TestEnvironment(ComputeEnvironment):
     a real scheduler.
     """
     scheduler_type = FakeScheduler
+
+    @classmethod
+    @deprecated_since_06
+    def mpi_cmd(cls, cmd, np):
+        return 'mpirun -np {np} {cmd}'.format(np=np, cmd=cmd)
+
+    @classmethod
+    @deprecated_since_06
+    def script(cls, **kwargs):
+        js = super(TestEnvironment, cls).script(**kwargs)
+        for key in sorted(kwargs):
+            js.writeline('#TEST {}={}'.format(key, kwargs[key]))
+        return js
 
 
 class SimpleSchedulerEnvironment(ComputeEnvironment):
@@ -259,17 +301,51 @@ class LSFEnvironment(ComputeEnvironment):
     template = 'lsf.sh'
 
 
-@legacy_templating.support_legacy_templating
 class NodesEnvironment(ComputeEnvironment):
     """A compute environment consisting of multiple compute nodes.
 
     Each compute node is assumed to have a specific number of compute units, e.g., CPUs.
     """
 
+    @classmethod
+    @deprecated_since_06
+    def calc_num_nodes(cls, np_total, ppn, force=False, **kwargs):
+        if ppn is None:
+            try:
+                ppn = getattr(cls, 'cores_per_node')
+            except AttributeError:
+                from .legacy_templating import NUM_NODES_WARNING
+                raise SubmitError(NUM_NODES_WARNING)
 
-@legacy_templating.support_legacy_templating
+        # Calculate the total number of required nodes
+        nn = int(ceil(np_total / ppn))
+
+        if not force:  # Perform basic check concerning the node utilization.
+            usage = np_total / nn / ppn
+            if usage < 0.9:
+                from .legacy_templating import UTILIZATION_WARNING
+                print(UTILIZATION_WARNING.format(ppn=ppn, usage=usage), file=sys.stderr)
+                raise SubmitError("Bad node utilization!")
+        return nn
+
+    @classmethod
+    @deprecated_since_06
+    def add_args(cls, parser):
+        super(NodesEnvironment, cls).add_args(parser)
+        parser.add_argument(
+            '--nn',
+            type=int,
+            help="Specify the total number of nodes. This value is computed automatically "
+                 "from the 'np' directive otherwise.")
+
+
 class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
     "A default environment for environments with TORQUE scheduler."
+
+    @classmethod
+    @deprecated_since_06
+    def mpi_cmd(cls, cmd, np):
+        return 'mpirun -np {np} {cmd}'.format(np=np, cmd=cmd)
 
     @classmethod
     def add_args(cls, parser):
@@ -292,10 +368,51 @@ class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
             action='store_true',
             help="Do not copy current environment variables into compute node environment.")
 
+    @classmethod
+    @deprecated_since_06
+    def gen_tasks(cls, js, np_total):
+        """Helper function to generate the number of tasks (for overriding)"""
+        js.writeline('#PBS -l nodes={}'.format(np_total))
+        return js
 
-@legacy_templating.support_legacy_templating
+    @classmethod
+    @deprecated_since_06
+    def script(cls, _id, np_total, walltime=None, no_copy_env=False, **kwargs):
+        js = super(DefaultTorqueEnvironment, cls).script()
+        js.writeline('#PBS -N {}'.format(_id))
+        js = cls.gen_tasks(js)
+        if walltime is not None:
+            js.writeline('#PBS -l walltime={}'.format(format_timedelta(walltime)))
+        if not no_copy_env:
+            js.writeline('#PBS -V')
+        return js
+
+
 class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
     "A default environment for environments with SLURM scheduler."
+
+    @classmethod
+    @deprecated_since_06
+    def mpi_cmd(cls, cmd, np):
+        return 'mpirun -np {np} {cmd}'.format(np=np, cmd=cmd)
+
+    @classmethod
+    @deprecated_since_06
+    def gen_tasks(cls, js, np_total):
+        """Helper function to generate the number of tasks (for overriding)"""
+        js.writeline('#SBATCH --ntasks={}'.format(np_total))
+        return js
+
+    @classmethod
+    @deprecated_since_06
+    def script(cls, _id, np_total, walltime=None, **kwargs):
+        js = super(DefaultSlurmEnvironment, cls).script()
+        js.writeline('#!/bin/bash')
+        js.writeline('#SBATCH --job-name="{}"'.format(_id))
+        js = cls.gen_tasks(js, np_total)
+        if walltime is not None:
+            js.writeline('#SBATCH -t {}'.format(format_timedelta(walltime)))
+        return js
 
     @classmethod
     def add_args(cls, parser):
@@ -316,11 +433,29 @@ class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
                  "completion of a cluster job with this id.")
 
 
-@legacy_templating.support_legacy_templating
 class DefaultLSFEnvironment(NodesEnvironment, LSFEnvironment):
     "A default environment for environments with LSF scheduler."
 
     @classmethod
+    @deprecated_since_06
+    def mpi_cmd(cls, cmd, np):
+        raise NotImplementedError("LSF environments are not supported by the "
+                                  "legacy templating system.")
+
+    @classmethod
+    @deprecated_since_06
+    def gen_tasks(cls, js, np_total):
+        raise NotImplementedError("LSF environments are not supported by the "
+                                  "legacy templating system.")
+
+    @classmethod
+    @deprecated_since_06
+    def script(cls, _id, np_total, walltime=None, **kwargs):
+        raise NotImplementedError("LSF environments are not supported by the "
+                                  "legacy templating system.")
+
+    @classmethod
+    @deprecated_since_06
     def add_args(cls, parser):
         super(DefaultLSFEnvironment, cls).add_args(parser)
         parser.add_argument(

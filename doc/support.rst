@@ -35,13 +35,13 @@ for example with `venv <https://docs.python.org/3/library/venv.html>`_:
 
     ~ $ python -m venv ~/envs/signac-flow-dev
     ~ $ source ~/envs/signac-flow-dev/bin/activate
-    (signac-flow-dev) ~ $ pip install six flake8
+    (signac-flow-dev) ~ $ pip install -r requirements-dev.txt
 
 or alternatively with `conda <https://conda.io/docs/>`_:
 
 .. code-block:: bash
 
-    ~ $ conda create -n signac-flow-dev python signac six flake8
+    ~ $ conda create -n signac-flow-dev python --file requirements-dev.txt
     ~ $ activate signac-flow-dev
 
 Then clone your fork and install the package from source with:

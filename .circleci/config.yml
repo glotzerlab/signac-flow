@@ -16,12 +16,11 @@ jobs:
       - run:
           name: check-citation-metadata
           command: |
-            pip install --user -U click==7.0 ruamel.yaml==0.15.89
+            pip install --user -U -r requirements-dev.txt
             ./.sync-zenodo-metadata.py --check >/dev/null
       - run:
           name: check-code-style
           command: |
-            pip install --user -U flake8
             python -m flake8 --show-source flow/
 
 

@@ -80,7 +80,7 @@ Choose from one of the following prefixes depending on the type of change:
   * ``feature/``: Any changes that introduce a new feature.
   * ``release/``: Reserved for release branches.
 
-If your change does not seem to fall into any of the above mentioned categories, use ``fix/``.
+If your change does not seem to fall into any of the above mentioned categories, use ``misc/``.
 
 Once you are content with your changes, push the new branch to your forked repository and create a pull request into the main repository.
 Feel free to push a branch before completion to get input from the maintainers and other users, but make sure to add a comment that clarifies that the branch is not ready for merge yet.

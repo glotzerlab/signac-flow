@@ -16,7 +16,7 @@ jobs:
       - run:
           name: install-dev-requirements
           command: |
-            pip install --user -U -r requirements-dev.txt
+            pip install --user -U -r requirements-test.txt
       - run:
           name: check-citation-metadata
           command: |

@@ -23,7 +23,7 @@ class SummitEnvironment(DefaultLSFEnvironment):
         @directives(ngpu=3) # 3 GPUs
         @directives(np=3) # 3 CPU cores
         @directives(rs_tasks=3) # 3 tasks per resource set
-        @directives(extra_jsrun_args='-smpiargs="-gpu"') # extra jsrun arguments
+        @directives(extra_jsrun_args='--smpiargs="-gpu"') # extra jsrun arguments
         def my_operation(job):
             ...
 
@@ -50,11 +50,16 @@ class SummitEnvironment(DefaultLSFEnvironment):
     @staticmethod
     def guess_resource_sets(operation, cores_per_node, gpus_per_node):
         ntasks = max(operation.directives.get('nranks', 1), 1)
-        cpus_per_task = operation.directives.get('omp_num_threads', 0)
-        np = operation.directives.get('np', ntasks * max(cpus_per_task, 1))
+        cpus_per_task = max(operation.directives.get('omp_num_threads', 1), 1)
+        np = operation.directives.get('np', ntasks * cpus_per_task)
         ngpu = operation.directives.get('ngpu', 0)
-        nsets = max(math.ceil(np / cores_per_node),
-                    math.ceil(ngpu / gpus_per_node), 1)
+        if np % cores_per_node != 0 and (ngpu == 0 or ngpu == np):
+            # fill the nodes using small resource sets
+            # threads are never split across resource sets
+            nsets = np//cpus_per_task
+        else:
+            nsets = max(math.ceil(np / cores_per_node),
+                        math.ceil(ngpu / gpus_per_node), 1)
         cpus_per_set = max(np // nsets, 1)
         gpus_per_set = ngpu // nsets
         tasks_per_set = max(ntasks // nsets, 1)  # Require at least one task per set
@@ -80,11 +85,6 @@ class SummitEnvironment(DefaultLSFEnvironment):
                'guess_resource_sets': guess_resource_sets.__func__,
                'jsrun_options': jsrun_options.__func__,
                'jsrun_extra_args': jsrun_extra_args.__func__}
-
-
-class AscentEnvironment(SummitEnvironment):
-    """Environment profile for the Ascent supercomputer (Summit testing)."""
-    hostname_pattern = r'.*\.ascent\.olcf\.ornl\.gov'
 
 
 class TitanEnvironment(DefaultTorqueEnvironment):

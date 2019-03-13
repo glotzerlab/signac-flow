@@ -49,6 +49,7 @@ We recommend to go through the tutorial on signac-docs_ to learn how to best tak
 - Fixes issues with the Summit environment resource set calculation for parallel operations under specific conditions.
 - Remove the Ascent environment (host decomissioned).
 - Fixes issue where callable cmd-directives were not evaluated.
+- Fixes issue where using the buffered mode would lead to confusing error messages when condition-functions would raise an AttributeError exception.
 
 [0.6.4] -- 2018-12-28
 ---------------------

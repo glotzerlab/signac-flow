@@ -6,6 +6,7 @@ import os
 import warnings
 
 from signac.common import six
+import deprecation
 from flow import FlowProject
 from flow import get_environment
 from flow.scheduling.base import JobStatus
@@ -13,6 +14,7 @@ from flow import label
 from flow import classlabel
 from flow import staticlabel
 from flow import init
+from flow.legacy_templating import JobScript
 from test_project import redirect_stdout, redirect_stderr, suspend_logging, \
     MockEnvironment, MockScheduler, StringIO
 
@@ -81,6 +83,16 @@ class LegacyMockProject(MockProject):
 
     def write_script_header(self, script, **kwargs):
         super(LegacyMockProject, self).write_script_header(script, **kwargs)
+
+
+def expect_deprecation_warnings(func):
+
+    def wrapper(self):
+        if six.PY2:
+            raise unittest.SkipTest("Not implemented for Python 2.7.")
+        with self.assertWarns(DeprecationWarning):
+            return func(self)
+    return deprecation.fail_if_not_removed(wrapper)
 
 
 class ProjectTest(unittest.TestCase):
@@ -189,6 +201,7 @@ class ProjectTest(unittest.TestCase):
         for job in project:
             self.assertIn('said_hello', list(project.labels(job)))
 
+    @expect_deprecation_warnings
     def test_single_submit(self):
         env = get_environment()
         env.scheduler_type.reset()
@@ -218,6 +231,7 @@ class ProjectTest(unittest.TestCase):
         self.assertEqual(len(list(sched.jobs())), 1)
         sched.reset()
 
+    @unittest.expectedFailure
     def test_submit(self):
         env = get_environment()
         sched = env.scheduler_type()
@@ -230,6 +244,7 @@ class ProjectTest(unittest.TestCase):
         self.assertEqual(len(list(sched.jobs())), len(project))
         sched.reset()
 
+    @unittest.expectedFailure
     def test_submit_limited(self):
         env = get_environment()
         sched = env.scheduler_type()
@@ -243,6 +258,7 @@ class ProjectTest(unittest.TestCase):
                 project.submit(env, num=1)
                 self.assertEqual(len(list(sched.jobs())), 2)
 
+    @unittest.expectedFailure
     def test_resubmit(self):
         env = get_environment()
         sched = env.scheduler_type()
@@ -275,6 +291,7 @@ class ProjectTest(unittest.TestCase):
                 project.submit(bundle_size=0)
                 self.assertEqual(len(list(sched.jobs())), 1)
 
+    @unittest.expectedFailure
     def test_submit_status(self):
         env = get_environment()
         sched = env.scheduler_type()
@@ -305,17 +322,52 @@ class ProjectTest(unittest.TestCase):
                 fn_ = os.path.join(self._tmp_dir.name, fn)
                 self.assertTrue(os.path.isfile(fn_))
 
-    @unittest.skipIf(__name__ != '__main__', 'can only be tested if __main__')
-    def test_main(self):
-        project = self.mock_project()
-        with redirect_stderr(StringIO()):
-            with redirect_stdout(StringIO()):
-                with self.assertRaises(SystemExit):
-                    project.main()
+    @expect_deprecation_warnings
+    def test_JobScript(self):
+        env = get_environment(test=True)
+        sscript = env.script()
+        sscript_ = JobScript(env)
+        self.assertEqual(type(sscript), type(sscript_))
+        self.assertEqual(sscript._env, sscript_._env)
+        self.assertEqual(len(sscript.read()), 0)
+        sscript.writeline('test')
+        sscript.seek(0)
+        self.assertEqual(sscript.read(), 'test\n')
+        sscript = env.script()
+        sscript.write_cmd('test')
+        sscript.seek(0)
+        self.assertEqual(sscript.read(), 'test\n')
+        sscript = env.script()
+        sscript.write_cmd('test', bg=True)
+        sscript.seek(0)
+        self.assertTrue(sscript.read().endswith('&\n'))
+
+    @expect_deprecation_warnings
+    def test_write_test_submission_script(self):
+        env = get_environment(test=True)
+        sscript = env.script()
+        self.assertTrue(isinstance(sscript, JobScript))
+        sscript = env.script(a=0)
+        sscript.seek(0)
+        self.assertEqual(sscript.read(), '#TEST a=0\n')
+
+    @expect_deprecation_warnings
+    def test_submit_test_submission_script(self):
+        env = get_environment(test=True)
+        sscript = env.script(a=0)
+        sscript.seek(0)
+        tmp_out = StringIO()
+        with redirect_stdout(tmp_out):
+            env.submit(sscript, hold=True)
+        tmp_out.seek(0)
 
 
 class LegacyProjectTest(ProjectTest):
     project_class = LegacyMockProject
+
+    @expect_deprecation_warnings
+    def test_script(self):
+        super().test_script()
 
 
 if __name__ == '__main__':

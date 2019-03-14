@@ -1,11 +1,45 @@
 {
-    "description": "<p>The signac-flow tool provides the basic components to setup simple to complex workflows for signac projects (https://glotzerlab.engin.umich.edu/signac). That includes the definition of data pipelines, execution of data space operations and the submission of operations to high-performance super computers.</p>",
-    "license": "BSD-3-Clause",
-    "upload_type": "software",
+    "contributors": [
+        {
+            "affiliation": "University of Michigan",
+            "name": "Benjamin Swerdlow",
+            "orcid": "0000-0001-6240-1430"
+        },
+        {
+            "affiliation": "University of Michigan",
+            "name": "Joshua A. Anderson"
+        },
+        {
+            "affiliation": "University of Michigan",
+            "name": "Jens Glaser",
+            "orcid": "0000-0003-1852-3849"
+        },
+        {
+            "affiliation": "University of Michigan",
+            "name": "Timothy Moore",
+            "orcid": "0000-0002-5709-7259"
+        }
+    ],
     "creators": [
         {
             "affiliation": "University of Michigan",
-            "name": "Carl S. Adorf"
+            "name": "Carl Simon Adorf",
+            "orcid": "0000-0003-4962-2495"
+        },
+        {
+            "affiliation": "University of Michigan",
+            "name": "Vyas Ramasubramani",
+            "orcid": "0000-0001-5181-9532"
+        },
+        {
+            "affiliation": "University of Michigan",
+            "name": "Bradley D. Dice",
+            "orcid": "0000-0002-9983-0770"
+        },
+        {
+            "affiliation": "Boise State University",
+            "name": "Mike Henry",
+            "orcid": "0000-0002-3870-9993"
         },
         {
             "affiliation": "University of Michigan",
@@ -13,32 +47,22 @@
         },
         {
             "affiliation": "University of Michigan",
-            "name": "Vyas Ramasubramani"
-        },
-        {
-            "affiliation": "University of Michigan",
-            "name": "Bradley Dice"
-        },
-        {
-            "affiliation": "University of Michigan",
-            "name": "Benjamin Swerdlow"
-        },
-        {
-            "affiliation": "University of Michigan",
-            "name": "Joshua Anderson"
+            "name": "Sharon C. Glotzer",
+            "orcid": "0000-0002-7197-0085"
         }
     ],
-    "access_right": "open",
-    "related_identifiers": [
-        {
-            "scheme": "url",
-            "identifier": "https://dx.doi.org/10.1016/j.commatsci.2018.01.035",
-            "relation": "isSupplementedBy"
-        },
-        {
-            "scheme": "url",
-            "identifier": "arXiv://1611.03543 [cs.DB]",
-            "relation": "isSupplementedBy"
-        }
-    ]
+    "description": "The signac-flow tool provides the basic components to set up simple to complex workflows for projects as part of the signac framework. That includes the definition of data pipelines, execution of data space operations and the submission of operations to high-performance super computers.",
+    "keywords": [
+        "python",
+        "data management",
+        "reproducibility",
+        "shareability",
+        "workflow",
+        "scientific computing"
+    ],
+    "license": {
+        "id": "http://www.opensource.org/licenses/BSD-3-Clause"
+    },
+    "title": "signac-flow",
+    "version": "0.7.0"
 }

@@ -2,9 +2,10 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 """Environments for the University of Michigan HPC environment."""
-from ..environment import DefaultTorqueEnvironment
-
 import math
+
+from ..environment import DefaultTorqueEnvironment
+from ..legacy_templating import deprecated_since_06
 
 
 class FluxEnvironment(DefaultTorqueEnvironment):
@@ -12,15 +13,17 @@ class FluxEnvironment(DefaultTorqueEnvironment):
 
     http://arc-ts.umich.edu/systems-and-services/flux/
     """
-    hostname_pattern = '(nyx|flux).*.umich.edu'
+    hostname_pattern = '(nyx|flux)((?!-hadoop).).*.umich.edu'
     template = 'umich-flux.sh'
     cores_per_node = 1
 
     @classmethod
+    @deprecated_since_06
     def mpi_cmd(cls, cmd, np):
         return "mpirun -np {np} {cmd}".format(cmd=cmd, np=np)
 
     @classmethod
+    @deprecated_since_06
     def gen_tasks(cls, js, np_total, mode):
         """Helper function to generate the number of tasks (for overriding)"""
         if mode == 'cpu':
@@ -32,6 +35,7 @@ class FluxEnvironment(DefaultTorqueEnvironment):
         return js
 
     @classmethod
+    @deprecated_since_06
     def script(cls, _id, np_total, mode, memory, **kwargs):
         js = super(FluxEnvironment, cls).script(_id=_id, **kwargs)
         js.writeline('#PBS -A {}'.format(cls.get_config_value('account')))

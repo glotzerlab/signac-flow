@@ -16,8 +16,6 @@ import sys
 import re
 import socket
 import logging
-import warnings
-import io
 import importlib
 from math import ceil
 from collections import OrderedDict
@@ -37,6 +35,8 @@ from .util.template_filters import format_timedelta
 from .errors import SubmitError
 from .errors import NoSchedulerError
 
+from .legacy_templating import JobScript
+
 if six.PY2:
     import imp
 else:
@@ -49,22 +49,6 @@ if six.PY2:
 
 # Global variable can be used to override detected environment
 ENVIRONMENT = None
-
-
-NUM_NODES_WARNING = """Unable to determine the reqired number of nodes (nn) for this submission.
-Either provide this value directly with '--nn' or provide the number of processors
-per node: '--ppn'.
-
-Please note, you can ignore this message by specifying extra submission options
-with '--' or by using the '--force' option."""
-
-UTILIZATION_WARNING = """You either specified or the environment is configured to use {ppn}
-processors per node (ppn), however you only use {usage:0.2%} of each node.
-Consider to increase the number of processors per operation (--np)
-or adjust the processors per node (--ppn).
-
-Alternatively, you can also use --force to ignore this warning.
-"""
 
 
 def setup(py_modules, **attrs):
@@ -103,6 +87,14 @@ def setup(py_modules, **attrs):
         **attrs)
 
 
+def deprecated_since_06(func):
+    import deprecation
+
+    return deprecation.deprecated(
+        deprecated_in=0.6, removed_in=0.8,
+        details="This function is part of the legacy templating system.")(func)
+
+
 class ComputeEnvironmentType(type):
     """Meta class for the definition of ComputeEnvironments.
 
@@ -116,52 +108,6 @@ class ComputeEnvironmentType(type):
         else:
             cls.registry[name] = cls
         return super(ComputeEnvironmentType, cls).__init__(name, bases, dct)
-
-
-class JobScript(io.StringIO):
-    """"Simple StringIO wrapper for the creation of job submission scripts.
-
-    Using this class to write a job submission script allows us to use
-    environment specific expressions, for example for MPI commands.
-    """
-    eol = '\n'
-
-    def __init__(self, env):
-        self._env = env
-        super(JobScript, self).__init__()
-
-    def __str__(self):
-        self.seek(0)
-        return self.read()
-
-    def write(self, s):
-        if six.PY2:
-            super(JobScript, self).write(unicode(s))  # noqa
-        else:
-            super(JobScript, self).write(s)
-
-    def writeline(self, line=''):
-        "Write one line to the job script."
-        self.write(line + self.eol)
-
-    def write_cmd(self, cmd, bg=False, np=None):
-        """Write a command to the jobscript.
-
-        This command wrapper function is a convenience function, which
-        adds mpi and other directives whenever necessary.
-
-        :param cmd: The command to write to the jobscript.
-        :type cmd: str
-        :param np: The number of processors required for execution.
-        :type np: int
-        """
-        if np is not None:
-            warnings.warn(DeprecationWarning("Do not provide np with write_cmd()!"))
-            if np > 1:
-                cmd = self._env.mpi_cmd(cmd, np=np)
-        if bg:
-            cmd = self._env.bg(cmd)
-        self.writeline(cmd)
 
 
 class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
@@ -182,6 +128,7 @@ class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
     template = 'base_script.sh'
 
     @classmethod
+    @deprecated_since_06
     def script(cls, **kwargs):
         """Return a JobScript instance.
 
@@ -317,10 +264,12 @@ class TestEnvironment(ComputeEnvironment):
     scheduler_type = FakeScheduler
 
     @classmethod
+    @deprecated_since_06
     def mpi_cmd(cls, cmd, np):
         return 'mpirun -np {np} {cmd}'.format(np=np, cmd=cmd)
 
     @classmethod
+    @deprecated_since_06
     def script(cls, **kwargs):
         js = super(TestEnvironment, cls).script(**kwargs)
         for key in sorted(kwargs):
@@ -338,18 +287,6 @@ class TorqueEnvironment(ComputeEnvironment):
     "An environment with TORQUE scheduler."
     scheduler_type = TorqueScheduler
     template = 'torque.sh'
-
-
-class MoabEnvironment(ComputeEnvironment):
-    """"An environment with TORQUE scheduler.
-
-    This class is deprecated and only kept for backwards
-    compatibility.
-    """
-    scheduler_type = TorqueScheduler
-
-    def __init__(self, *args, **kwargs):
-        raise RuntimeError("The MoabEnvironment has been replaced by the TorqueEnvironment.")
 
 
 class SlurmEnvironment(ComputeEnvironment):
@@ -371,11 +308,13 @@ class NodesEnvironment(ComputeEnvironment):
     """
 
     @classmethod
+    @deprecated_since_06
     def calc_num_nodes(cls, np_total, ppn, force=False, **kwargs):
         if ppn is None:
             try:
                 ppn = getattr(cls, 'cores_per_node')
             except AttributeError:
+                from .legacy_templating import NUM_NODES_WARNING
                 raise SubmitError(NUM_NODES_WARNING)
 
         # Calculate the total number of required nodes
@@ -384,11 +323,13 @@ class NodesEnvironment(ComputeEnvironment):
         if not force:  # Perform basic check concerning the node utilization.
             usage = np_total / nn / ppn
             if usage < 0.9:
+                from .legacy_templating import UTILIZATION_WARNING
                 print(UTILIZATION_WARNING.format(ppn=ppn, usage=usage), file=sys.stderr)
                 raise SubmitError("Bad node utilization!")
         return nn
 
     @classmethod
+    @deprecated_since_06
     def add_args(cls, parser):
         super(NodesEnvironment, cls).add_args(parser)
         parser.add_argument(
@@ -402,6 +343,7 @@ class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
     "A default environment for environments with TORQUE scheduler."
 
     @classmethod
+    @deprecated_since_06
     def mpi_cmd(cls, cmd, np):
         return 'mpirun -np {np} {cmd}'.format(np=np, cmd=cmd)
 
@@ -427,12 +369,14 @@ class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
             help="Do not copy current environment variables into compute node environment.")
 
     @classmethod
+    @deprecated_since_06
     def gen_tasks(cls, js, np_total):
         """Helper function to generate the number of tasks (for overriding)"""
         js.writeline('#PBS -l nodes={}'.format(np_total))
         return js
 
     @classmethod
+    @deprecated_since_06
     def script(cls, _id, np_total, walltime=None, no_copy_env=False, **kwargs):
         js = super(DefaultTorqueEnvironment, cls).script()
         js.writeline('#PBS -N {}'.format(_id))
@@ -448,16 +392,19 @@ class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
     "A default environment for environments with SLURM scheduler."
 
     @classmethod
+    @deprecated_since_06
     def mpi_cmd(cls, cmd, np):
         return 'mpirun -np {np} {cmd}'.format(np=np, cmd=cmd)
 
     @classmethod
+    @deprecated_since_06
     def gen_tasks(cls, js, np_total):
         """Helper function to generate the number of tasks (for overriding)"""
         js.writeline('#SBATCH --ntasks={}'.format(np_total))
         return js
 
     @classmethod
+    @deprecated_since_06
     def script(cls, _id, np_total, walltime=None, **kwargs):
         js = super(DefaultSlurmEnvironment, cls).script()
         js.writeline('#!/bin/bash')
@@ -490,21 +437,25 @@ class DefaultLSFEnvironment(NodesEnvironment, LSFEnvironment):
     "A default environment for environments with LSF scheduler."
 
     @classmethod
+    @deprecated_since_06
     def mpi_cmd(cls, cmd, np):
         raise NotImplementedError("LSF environments are not supported by the "
                                   "legacy templating system.")
 
     @classmethod
+    @deprecated_since_06
     def gen_tasks(cls, js, np_total):
         raise NotImplementedError("LSF environments are not supported by the "
                                   "legacy templating system.")
 
     @classmethod
+    @deprecated_since_06
     def script(cls, _id, np_total, walltime=None, **kwargs):
         raise NotImplementedError("LSF environments are not supported by the "
                                   "legacy templating system.")
 
     @classmethod
+    @deprecated_since_06
     def add_args(cls, parser):
         super(DefaultLSFEnvironment, cls).add_args(parser)
         parser.add_argument(

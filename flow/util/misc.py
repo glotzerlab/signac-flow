@@ -184,7 +184,11 @@ class TrackGetItemDict(dict):
         self._keys_used.add(key)
         return super(TrackGetItemDict, self).__getitem__(key)
 
+    def get(self, key, default=None):
+        self._keys_used.add(key)
+        return super(TrackGetItemDict, self).get(key, default)
+
     @property
     def keys_used(self):
-        "Return all keys that were accessed via the __getitem__ method."
+        "Return all keys that have been accessed."
         return self._keys_used.copy()

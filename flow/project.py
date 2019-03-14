@@ -41,6 +41,7 @@ import signac
 from signac.common import six
 from signac.contrib.hashing import calc_id
 from signac.contrib.filterparse import parse_filter_arg
+import deprecation
 
 # Try to import jinja2 for templating, used in script and submit functions.
 try:
@@ -56,7 +57,6 @@ else:
     JINJA2 = True
 
 from .environment import get_environment
-from .scheduling.base import Scheduler
 from .scheduling.base import ClusterJob
 from .scheduling.base import JobStatus
 from .scheduling.status import update_status
@@ -70,7 +70,6 @@ from .util.misc import _positive_int
 from .util.misc import _mkdir_p
 from .util.misc import draw_progressbar
 from .util import template_filters as tf
-from .util.misc import write_human_readable_statepoint
 from .util.misc import add_cwd_to_environment_pythonpath
 from .util.misc import switch_to_directory
 from .util.misc import TrackGetItemDict
@@ -85,6 +84,7 @@ from .labels import staticlabel
 from .labels import classlabel
 from .labels import _is_label_func
 from . import legacy
+from . import legacy_templating
 from .util import config as flow_config
 
 
@@ -112,20 +112,6 @@ For example: {{ project.get_id() | captialize }}.
 
 The available filters are:
 {filters}"""
-
-
-# Global variable that is used internally to keep track of which
-# FlowProject methods belong to the legacy templating system. Such
-# a method is docorated with the _part_of_legacy_template_system()
-# decorator and then registered in this variable.
-_LEGACY_TEMPLATING_METHODS = set()
-
-
-def _part_of_legacy_template_system(method):
-    "Label a method to be part of the legacy templating system."
-    _LEGACY_TEMPLATING_METHODS.add(method.__name__)
-    method._legacy_intact = True
-    return method
 
 
 def _support_legacy_api(method):
@@ -281,14 +267,12 @@ class JobOperation(object):
 
         # Handle deprecated np argument:
         if np is not None:
-            warnings.warn(
-                "The np argument for the JobOperation constructor is deprecated.",
-                DeprecationWarning)
-            assert directives.setdefault('np', np) == np
-        else:
-            # Future: We can remove everything but the else: clause.
-            directives.setdefault(
-                'np', directives.get('nranks', 1) * directives.get('omp_num_threads', 1))
+            raise RuntimeError(
+                "The np argument for the JobOperation constructor has been deprecated "
+                "as of version 0.6 and has been removed in version 0.7!")
+
+        directives.setdefault(
+            'np', directives.get('nranks', 1) * directives.get('omp_num_threads', 1))
         directives.setdefault('ngpu', 0)
         directives.setdefault('nranks', 0)
         directives.setdefault('omp_num_threads', 0)
@@ -320,10 +304,6 @@ class JobOperation(object):
             cmd=repr(self.cmd),
             directives=self.directives)
 
-    def _get_legacy_id(self):
-        "Return a name, which identifies this job-operation."
-        return '{}-{}'.format(self.job, self.name)
-
     def get_id(self, index=0):
         "Return a name, which identifies this job-operation."
         project = self.job._project
@@ -350,11 +330,6 @@ class JobOperation(object):
         # By appending the unique job_op_id, we ensure that each id is truly unique.
         return readable_name + job_op_id
 
-    @classmethod
-    def expand_id(self, _id):
-        # TODO: Remove beginning version 0.7.
-        raise RuntimeError("The expand_id() method has been removed as of version 0.6.")
-
     def __hash__(self):
         return int(sha1(self.get_id().encode('utf-8')).hexdigest(), 16)
 
@@ -363,15 +338,13 @@ class JobOperation(object):
 
     def set_status(self, value):
         "Store the operation's status."
-        status_doc = self.job.document.get('_status', dict())
-        status_doc[self.get_id()] = int(value)
-        self.job.document['_status'] = status_doc
+        self.job._project.document.setdefault('_status', dict())
+        self.job._project.document._status[self.get_id()] = int(value)
 
     def get_status(self):
         "Retrieve the operation's last known status."
         try:
-            status_cache = self.job.document['_status']
-            return JobStatus(status_cache[self.get_id()])
+            return JobStatus(self.job._project.document['_status'][self.get_id()])
         except KeyError:
             return JobStatus.unknown
 
@@ -459,22 +432,18 @@ class FlowOperation(object):
     """
 
     def __init__(self, cmd, pre=None, post=None, directives=None, np=None):
+        # Handle deprecated np argument.
+        if np is not None:
+            raise RuntimeError(
+                "The np argument for the FlowOperation() constructor has been deprecated "
+                "as of version 0.6 and been removed as of version 0.7!")
+
         if pre is None:
             pre = []
         if post is None:
             post = []
         self._cmd = cmd
         self.directives = directives
-
-        # Handle deprecated np argument.
-        if np is not None:
-            warnings.warn(
-                "The np argument for the FlowOperation() constructor is deprecated.",
-                DeprecationWarning)
-            if self.directives is None:
-                self.directives = dict(np=np)
-            else:
-                assert self.directives.setdefault('np', np) == np
 
         self._prereqs = [FlowCondition(cond) for cond in pre]
         self._postconds = [FlowCondition(cond) for cond in post]
@@ -504,13 +473,6 @@ class FlowOperation(object):
         else:
             return self._cmd.format(job=job)
 
-    def np(self, job):
-        "(deprecated) Return the number of processors this operation requires."
-        if callable(self._np):
-            return self._np(job)
-        else:
-            return self._np
-
 
 class _FlowProjectClass(type):
     """Metaclass for the FlowProject class."""
@@ -531,7 +493,10 @@ class _FlowProjectClass(type):
         return cls
 
 
-class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project)):
+class FlowProject(six.with_metaclass(_FlowProjectClass,
+                                     # Remove next line as of version 0.8:
+                                     legacy_templating.FlowProjectLegacyTemplatingSystem,
+                                     signac.contrib.Project)):
     """A signac project class specialized for workflow management.
 
     This class provides a command line interface for the definition, execution, and
@@ -566,8 +531,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         self._template_dir = os.path.join(
             self.root_directory(), self._config.get('template_dir', 'templates'))
         self._template_environment_ = dict()
-
-        self._setup_legacy_templating()  # TODO: Disable in 0.8.
 
         # Register all label functions with this project instance.
         self._label_functions = OrderedDict()
@@ -632,6 +595,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         template_environment.filters['get_account_name'] = tf.get_account_name
         if 'max' not in template_environment.filters:    # for jinja2 < 2.10
             template_environment.filters['max'] = max
+        if 'min' not in template_environment.filters:    # for jinja2 < 2.10
+            template_environment.filters['min'] = min
         return template_environment
 
     def _template_environment(self, environment=None):
@@ -660,114 +625,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             template_vars='\n'.join(wrapper.wrap(', '.join(sorted(context)))),
             filters='\n'.join(wrapper.wrap(', '.join(sorted(template_environment.filters))))))
         sys.exit(2)
-
-    def _setup_legacy_templating(self):
-        """This function identifies whether a subclass has implemented deprecated template
-        functions.
-
-        The legacy templating system is used to generate run and cluster submission scripts
-        if that is the case. A warning is emitted to inform the user that they will not be
-        able to use the standard templating system.
-
-        The legacy templating functions are decorated with the _part_of_legacy_template_system()
-        decorator.
-        """
-        self._legacy_templating = False
-        legacy_methods = set()
-        for method in _LEGACY_TEMPLATING_METHODS:
-            if hasattr(self, method) and not hasattr(getattr(self, method), '_legacy_intact'):
-                warnings.warn(
-                    "The use of FlowProject method '{}' is deprecated!".format(method),
-                    DeprecationWarning)
-                legacy_methods.add(method)
-        if legacy_methods:
-            self._legacy_templating = True
-            warnings.warn(
-                "You are using the following deprecated templating methods: {}. Please remove "
-                "those methods from your project class implementation to use the jinja2 templating "
-                "system (version >= 0.6).".format(', '.join(legacy_methods)))
-
-    @_part_of_legacy_template_system
-    def write_script_header(self, script, **kwargs):
-        """"Write the script header for the execution script.
-
-        .. deprecated:: 0.6
-           Users should migrate to the new templating system.
-        """
-        # Add some whitespace
-        script.writeline()
-        # Don't use uninitialized environment variables.
-        script.writeline('set -u')
-        # Exit on errors.
-        script.writeline('set -e')
-        # Switch into the project root directory
-        script.writeline('cd {}'.format(self.root_directory()))
-        script.writeline()
-
-    @_part_of_legacy_template_system
-    def write_script_operations(self, script, operations, background=False, **kwargs):
-        """Write the commands for the execution of operations as part of a script.
-
-        .. deprecated:: 0.6
-           Users should migrate to the new templating system.
-        """
-        for op in operations:
-            write_human_readable_statepoint(script, op.job)
-            script.write_cmd(op.cmd.format(job=op.job), bg=background)
-            script.writeline()
-
-    @classmethod
-    def write_human_readable_statepoint(cls, script, job):
-        """Write statepoint of job in human-readable format to script.
-
-        .. deprecated:: 0.6
-           Users should migrate to the new templating system.
-        """
-        warnings.warn(
-            "The write_human_readable_statepoint() function is deprecated.",
-            DeprecationWarning)
-        return write_human_readable_statepoint(script, job)
-
-    @_part_of_legacy_template_system
-    def write_script_footer(self, script, **kwargs):
-        """"Write the script footer for the execution script.
-
-        .. deprecated:: 0.6
-           Users should migrate to the new templating system.
-        """
-        # Wait until all processes have finished
-        script.writeline('wait')
-
-    @_part_of_legacy_template_system
-    def write_script(self, script, operations, background=False, **kwargs):
-        """Write a script for the execution of operations.
-
-        .. deprecated:: 0.6
-           Users should migrate to the new templating system.
-
-        By default, this function will generate a script with the following components:
-
-        .. code-block:: python
-
-            write_script_header(script)
-            write_script_operations(script, operations, background=background)
-            write_script_footer(script)
-
-        :param script:
-            The script to write the commands to.
-        :param operations:
-            The operations to be written to the script.
-        :type operations:
-            A sequence of JobOperation
-        :param background:
-            Whether operations should be executed in the background;
-            useful to parallelize execution.
-        :type background:
-            bool
-        """
-        self.write_script_header(script, **kwargs)
-        self.write_script_operations(script, operations, background=background, **kwargs)
-        self.write_script_footer(script, **kwargs)
 
     @classmethod
     def label(cls, label_name_or_func=None):
@@ -911,7 +768,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         return cls.NAMES.get(x, x)
 
     ALIASES = dict(
-        status='S',
         unknown='U',
         registered='R',
         queued='Q',
@@ -1009,24 +865,20 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 expanded = JobOperation.expand_id(name)
                 yield expanded['job_id'], expanded['operation-name'], sjob
 
+    @deprecation.deprecated(deprecated_in=0.7, removed_in=0.8)
     def map_scheduler_jobs(self, scheduler_jobs):
         """Map all scheduler jobs by job id and operation name.
-
         This function fetches all scheduled jobs from the scheduler
         and generates a nested dictionary, where the first key is
         the job id, the second key the operation name and the last
         value are the cooresponding scheduler jobs.
-
         For example, to print the status of all scheduler jobs, associated
         with a specific job operation, execute:
-
         .. code::
-
                 sjobs = project.scheduler_jobs(scheduler)
                 sjobs_map = project.map_scheduler_jobs(sjobs)
                 for sjob in sjobs_map[job.get_id()][operation]:
                     print(sjob._id(), sjob.status())
-
         :param scheduler_jobs:
             An iterable of scheduler job instances.
         :return:
@@ -1040,13 +892,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
     def _get_operations_status(self, job):
         "Return a dict with information about job-operations for this job."
-        cached_status = job.document.get('_status', dict())
-        for name, job_op in self._job_operations(job):
-            flow_op = self.operations[name]
+        cached_status = self.document.get('_status', dict())
+        for job_op in self._job_operations([job], False):
+            flow_op = self.operations[job_op.name]
             completed = flow_op.complete(job)
             eligible = False if completed else flow_op.eligible(job)
             scheduler_status = cached_status.get(job_op.get_id(), JobStatus.unknown)
-            yield name, {
+            yield job_op.name, {
                 'scheduler_status': scheduler_status,
                 'eligible': eligible,
                 'completed': completed,
@@ -1106,35 +958,22 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             row[2] += ' ' + self._alias('requires_attention')
         return row
 
-    def _fetch_scheduler_status(self, jobs=None, scheduler=None, file=None, ignore_errors=False):
+    def _fetch_scheduler_status(self, jobs=None, file=None, ignore_errors=False):
         "Update the status docs."
         if file is None:
             file = sys.stderr
+        if jobs is None:
+            jobs = list(self)
         try:
-            if jobs is None:
-                jobs = list(self)
-            if scheduler is None:
-                scheduler = self._environment.get_scheduler()
+            scheduler = self._environment.get_scheduler()
 
-            # Map all scheduler jobs by their name.
+            self.document.setdefault('_status', dict())
+            scheduler_info = {sjob.name(): sjob.status() for sjob in self.scheduler_jobs(scheduler)}
+            status = dict()
             print(self._tr("Query scheduler..."), file=file)
-            sjobs_map = defaultdict(list)
-            for sjob in self.scheduler_jobs(scheduler):
-                sjobs_map[sjob.name()].append(sjob)
-
-            # Iterate through all jobs ...
-            for job in with_progressbar(jobs, desc='Update status cache:', file=file):
-                job_status = dict()
-                # ... and all job-operations to attempt to map the job-operation id
-                # to scheduler names.
-                for name, op in self._job_operations(job):
-                    scheduler_jobs = sjobs_map.get(
-                        op.get_id(), sjobs_map.get(op._get_legacy_id(), []))
-                    from operator import methodcaller
-                    tmp = list(map(methodcaller('status'), scheduler_jobs))
-                    job_status[op.get_id()] = int(max(tmp) if tmp else JobStatus.unknown)
-                job.document['_status'] = job_status
-
+            for op in self.next_operations(*jobs):
+                status[op.get_id()] = int(scheduler_info.get(op.get_id(), JobStatus.unknown))
+            self.document._status.update(status)
         except NoSchedulerError:
             logger.debug("No scheduler available.")
         except RuntimeError as error:
@@ -1143,6 +982,45 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 raise
         else:
             logger.info("Updated job status cache.")
+
+    def _fetch_status(self, jobs, err, ignore_errors, no_parallelize):
+        # Update the project's status cache
+        self._fetch_scheduler_status(jobs, err, ignore_errors)
+
+        # Get status dict for all selected jobs
+        def _print_progress(x):
+            print("Updating status: ", end='', file=err)
+            err.flush()
+            n = max(1, int(len(jobs) / 10))
+            for i, _ in enumerate(x):
+                if (i % n) == 0:
+                    print('.', end='', file=err)
+                    err.flush()
+                yield _
+
+        _get_job_status = functools.partial(self.get_job_status, ignore_errors=ignore_errors)
+
+        with self._potentially_buffered():
+            try:
+                with contextlib.closing(ThreadPool()) as pool:
+                    _map = map if no_parallelize else pool.imap
+                    # First attempt at parallelized status determination.
+                    # This may fail on systems that don't allow threads.
+                    return list(tqdm(
+                        iterable=_map(_get_job_status, jobs),
+                        desc="Collect job status info", total=len(jobs), file=err))
+            except RuntimeError as error:
+                if "can't start new thread" not in error.args:
+                    raise   # unrelated error
+                # The parallelized status determination has failed and we fall
+                # back to a serial approach.
+                logger.warning(
+                    "A parallelized status update failed due to error ('{}'). "
+                    "Entering serial mode with fallback progress indicator. The "
+                    "status update may take longer than ususal.".format(error))
+                return list(with_progressbar(
+                    iterable=map(_get_job_status, jobs),
+                    total=len(jobs), desc='Collect job status info:', file=err))
 
     OPERATION_STATUS_SYMBOLS = OrderedDict([
         ('ineligible', u'-'),
@@ -1162,12 +1040,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
     ])
     "Pretty (unicode) symbols denoting the execution status of operations."
 
+    @_support_legacy_api
     def print_status(self, jobs=None, overview=True, overview_max_lines=None,
                      detailed=False, parameters=None, skip_active=False, param_max_width=None,
                      expand=False, all_ops=False, only_incomplete=False, dump_json=False,
                      unroll=True, compact=False, pretty=False,
                      file=None, err=None, ignore_errors=False,
-                     scheduler=None, pool=None, job_filter=None, no_parallelize=False):
+                     no_parallelize=False):
         """Print the status of the project.
 
         .. versionchanged:: 0.6
@@ -1203,78 +1082,15 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             Redirect all output to this file, defaults to sys.stdout.
         :param err:
             Redirect all error output to this file, defaults to sys.stderr.
-        :param scheduler:
-            (deprecated) The scheduler instance used to fetch the job statuses.
-        :type scheduler:
-            :class:`~.manage.Scheduler`
-        :param pool:
-            (deprecated) A multiprocessing or threading pool. Providing a pool
-            parallelizes this method.
-        :param job_filter:
-            (deprecated) A JSON encoded filter, that all jobs to be submitted need to match.
         """
         if file is None:
             file = sys.stdout
         if err is None:
             err = sys.stderr
-        # TODO: Replace legacy code below with this code in future:
-        # if jobs is None:
-        #     jobs = self     # all jobs
-        # Handle legacy API:
         if jobs is None:
-            if job_filter is not None and isinstance(job_filter, str):
-                warnings.warn(
-                    "The 'job_filter' argument is deprecated, use the 'jobs' argument instead.",
-                    DeprecationWarning)
-                job_filter = json.loads(job_filter)
-            jobs = legacy.JobsCursorWrapper(self, job_filter)
-        elif isinstance(jobs, Scheduler):
-            warnings.warn(
-                "The signature of the print_status() method has changed!", DeprecationWarning)
-            scheduler, jobs = jobs, None
-        elif job_filter is not None:
-            raise ValueError("Can't provide both the 'jobs' and 'job_filter' argument.")
-        if scheduler is not None:
-            warnings.warn(
-                "print_status(): the scheduler argument is deprecated!", DeprecationWarning)
+            jobs = self     # all jobs
 
-        # Update the status docs of each job:
-        self._fetch_scheduler_status(jobs, scheduler, err, ignore_errors)
-
-        # Get status dict for all selected jobs
-        def _print_progress(x):
-            print("Updating status: ", end='', file=err)
-            err.flush()
-            n = max(1, int(len(jobs) / 10))
-            for i, _ in enumerate(x):
-                if (i % n) == 0:
-                    print('.', end='', file=err)
-                    err.flush()
-                yield _
-
-        _get_job_status = functools.partial(self.get_job_status, ignore_errors=ignore_errors)
-
-        with self._potentially_buffered():
-            try:
-                with contextlib.closing(ThreadPool()) as pool:
-                    _map = map if no_parallelize else pool.imap
-                    # First attempt at parallelized status determination.
-                    # This may fail on systems that don't allow threads.
-                    tmp = list(tqdm(
-                        iterable=_map(_get_job_status, jobs),
-                        desc="Collect job status info", total=len(jobs), file=err))
-            except RuntimeError as error:
-                if "can't start new thread" not in error.args:
-                    raise   # unrelated error
-                # The parallelized status determination has failed and we fall
-                # back to a serial approach.
-                logger.warning(
-                    "A parallelized status update failed due to error ('{}'). "
-                    "Entering serial mode with fallback progress indicator. The "
-                    "status update may take longer than ususal.".format(error))
-                tmp = list(with_progressbar(
-                    iterable=map(_get_job_status, jobs),
-                    total=len(jobs), desc='Collect job status info:', file=err))
+        tmp = self._fetch_status(jobs, err, ignore_errors, no_parallelize)
 
         operations_errors = {s['_operations_error'] for s in tmp}
         labels_errors = {s['_labels_error'] for s in tmp}
@@ -1511,6 +1327,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                             _print_unicode(msg)
                 legend = u'Legend: ' + u' '.join(u'{}:{}'.format(v, k) for k, v in symbols.items())
                 _print_unicode(legend)
+            print(' '.join('[{}]:{}'.format(v, k) for k, v in self.ALIASES.items()))
 
         # Show any abbreviations used
         if abbreviate.table:
@@ -1554,7 +1371,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         if timeout is not None and timeout < 0:
             timeout = None
         if operations is None:
-            operations = [op for job in self for op in self.next_operations(job) if op is not None]
+            operations = [op for job in self for op in self._job_operations([job], False)]
         else:
             operations = list(operations)   # ensure list
 
@@ -1779,25 +1596,22 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         "Get all pending operations for the given selection."
         operation_names = None if operation_names is None else set(operation_names)
 
-        if len(jobs) > 1:
-            jobs = with_progressbar(jobs, desc='Gather pending operations:')
-        for job in jobs:
-            for op in self.next_operations(job):
-                if operation_names and op.name not in operation_names:
-                    continue
-                if not self.eligible_for_submission(op):
-                    continue
-                yield op
+        for op in self.next_operations(*jobs):
+            if operation_names and op.name not in operation_names:
+                continue
+            if not self.eligible_for_submission(op):
+                continue
+            yield op
 
     @contextlib.contextmanager
     def _potentially_buffered(self):
         if self._use_buffered_mode:
-            try:
+            if hasattr(signac, 'buffered'):
                 logger.debug("Entering buffered mode...")
                 with signac.buffered():
                     yield
                 logger.debug("Exiting buffered mode.")
-            except AttributeError:
+            else:
                 warnings.warn(
                     "Configuration specifies to use buffered mode, but the buffered "
                     "mode is not supported by the installed version of signac. "
@@ -1806,6 +1620,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         else:
             yield
 
+    @legacy_templating.script_support_legacy_templating_system
     def script(self, operations, parallel=False, template='script.sh', show_template_help=False):
         """Generate a run script to execute given operations.
 
@@ -1826,75 +1641,44 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         :type show_template_help:
             bool
         """
-        if self._legacy_templating:
-            from .environment import TestEnvironment
-            # We first check whether it appears that the user has provided a templating script
-            # in which case we raise an exception to avoid highly unexpected behavior.
-            fn_template = os.path.join(self.root_directory(), 'templates', template)
-            if os.path.isfile(fn_template):
-                raise RuntimeError(
-                    "In legacy templating mode, unable to use template '{}'.".format(fn_template))
-            script = TestEnvironment.script()
-            self.write_script(script, operations, background=parallel)
-            script.seek(0)
-            return script.read()
-        else:
-            # By default we use the jinja2 templating system to generate the script.
-            template_environment = self._template_environment()
-            template = template_environment.get_template(template)
-            context = self._get_standard_template_context()
-            # For script generation we do not need the extra logic used for
-            # generating cluster job scripts.
-            context['base_script'] = 'base_script.sh'
-            context['operations'] = list(operations)
-            context['parallel'] = parallel
-            if show_template_help:
-                self._show_template_help_and_exit(template_environment, context)
-            return template.render(** context)
+        template_environment = self._template_environment()
+        template = template_environment.get_template(template)
+        context = self._get_standard_template_context()
+        # For script generation we do not need the extra logic used for
+        # generating cluster job scripts.
+        context['base_script'] = 'base_script.sh'
+        context['operations'] = list(operations)
+        context['parallel'] = parallel
+        if show_template_help:
+            self._show_template_help_and_exit(template_environment, context)
+        return template.render(** context)
 
+    @legacy_templating._generate_submit_script_support_legacy_templating_system
     def _generate_submit_script(self, _id, operations, template, show_template_help, env, **kwargs):
         """Generate submission script to submit the execution of operations to a scheduler."""
         if template is None:
             template = env.template
         assert _id is not None
 
-        if self._legacy_templating:
-            fn_template = os.path.join(self._template_dir, template)
-            if os.path.isfile(fn_template):
-                raise RuntimeError(
-                    "In legacy templating mode, unable to use template '{}'.".format(fn_template))
+        template_environment = self._template_environment(env)
+        template = template_environment.get_template(template)
+        context = self._get_standard_template_context()
+        # The flow 'script.sh' file simply extends the base script
+        # provided. The choice of base script is dependent on the
+        # environment, but will default to the 'base_script.sh' provided
+        # with signac-flow unless additional environment information is
+        # detected.
 
-            # For maintaining backwards compatibility for Versions<0.7
-            if kwargs['parallel']:
-                np_total = sum(op.directives['np'] for op in operations)
-            else:
-                np_total = max(op.directives['np'] for op in operations)
-
-            script = env.script(_id=_id, np_total=np_total, **kwargs)
-            background = kwargs.pop('parallel', not kwargs.pop('serial', False))
-            self.write_script(script=script, operations=operations, background=background, **kwargs)
-            script.seek(0)
-            return script.read()
-        else:
-            template_environment = self._template_environment(env)
-            template = template_environment.get_template(template)
-            context = self._get_standard_template_context()
-            # The flow 'script.sh' file simply extends the base script
-            # provided. The choice of base script is dependent on the
-            # environment, but will default to the 'base_script.sh' provided
-            # with signac-flow unless additional environment information is
-            # detected.
-
-            logger.info("Use environment '{}'.".format(env))
-            logger.info("Set 'base_script={}'.".format(env.template))
-            context['base_script'] = env.template
-            context['environment'] = env.__name__
-            context['id'] = _id
-            context['operations'] = list(operations)
-            context.update(kwargs)
-            if show_template_help:
-                self._show_template_help_and_exit(template_environment, context)
-            return template.render(** context)
+        logger.info("Use environment '{}'.".format(env))
+        logger.info("Set 'base_script={}'.".format(env.template))
+        context['base_script'] = env.template
+        context['environment'] = env.__name__
+        context['id'] = _id
+        context['operations'] = list(operations)
+        context.update(kwargs)
+        if show_template_help:
+            self._show_template_help_and_exit(template_environment, context)
+        return template.render(** context)
 
     @_support_legacy_api
     def submit_operations(self, operations, _id=None, env=None, parallel=False, flags=None,
@@ -1912,9 +1696,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             The _id to be used for this submission.
         :type _id:
             str
-        :param serial:
-            Execute all bundled operations in serial.
-        :type serial:
+        :param parallel:
+            Execute all bundled operations in parallel.
+        :type parallel:
             bool
         :param flags:
             Additional options to be forwarded to the scheduler.
@@ -1932,6 +1716,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             Do not actually submit, but only print the submission script to screen. Useful
             for testing the submission workflow.
         :type pretend:
+            bool
+        :param show_template_help:
+            Show information about available template variables and filters and exit.
+        :type show_template_help:
             bool
         :param kwargs:
             Additional keyword arguments to be forwarded to the scheduler.
@@ -2022,6 +1810,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         # Regular argument checks and expansion
         if jobs is None:
             jobs = self  # select all jobs
+        if isinstance(names, six.string_types):
+            raise ValueError(
+                "The 'names' argument must be a sequence of strings, however you "
+                "provided a single string: {}.".format(names))
         if env is None:
             env = self._environment
         if walltime is not None:
@@ -2080,11 +1872,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             '-p', '--parallel',
             action='store_true',
             help="Execute all operations in parallel.")
-        execution_group.add_argument(   # TODO: Remove with version 0.7.
-            '-s', '--serial',
-            action='store_const',
-            const=True,
-            help=argparse.SUPPRESS)
         cls._add_direct_cmd_arg_group(parser)
         cls._add_template_arg_group(parser)
 
@@ -2176,12 +1963,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             '-p', '--parallel',
             action='store_true',
             help="Execute all (bundled) operations in parallel.")
-        bundling_group.add_argument(
-            '-s', '--serial',
-            action='store_const',
-            const=True,
-            help="(deprecated) Execute all (bundled) operations in serial. This is the "
-                 "default mode as of version 0.6.")
 
     @classmethod
     def _add_direct_cmd_arg_group(cls, parser):
@@ -2198,7 +1979,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             help="Manually specify all labels that are required for the direct command "
                  "to be considered eligible for execution.")
 
-    def update_stati(self, scheduler, jobs=None, file=sys.stderr, pool=None, ignore_errors=False):
+    def update_stati(self, *args, **kwargs):
         "This function has been removed as of version 0.6."
         raise RuntimeError(
             "The update_stati() method has been removed as of version 0.6.")
@@ -2417,25 +2198,25 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             if op.complete(job):
                 yield name
 
-    def _job_operations(self, job, only_eligible=False):
-        "Yield instances of JobOperation constructed for specific job."
-        for name, op in self.operations.items():
-            if only_eligible and not op.eligible(job):
-                continue
-            yield name, JobOperation(name=name, job=job, cmd=op(job), directives=op.directives)
+    def _job_operations(self, jobs, only_eligible):
+        "Yield instances of JobOperation constructed for specific jobs."
+        for job in jobs:
+            for name, op in self.operations.items():
+                if only_eligible and not op.eligible(job):
+                    continue
+                yield JobOperation(name=name, job=job, cmd=op(job), directives=op.directives)
 
-    def next_operations(self, job):
-        """Determine the next eligible operations for job.
+    def next_operations(self, *jobs):
+        """Determine the next eligible operations for jobs.
 
-        :param job:
-            The signac job handle.
+        :param jobs:
+            The signac job handles.
         :type job:
             :class:`~signac.contrib.job.Job`
         :yield:
-            All instances of :class:`~.JobOperation` job is eligible for.
+            All instances of :class:`~.JobOperation` jobs are eligible for.
         """
-        next_ops = OrderedDict(self._job_operations(job, only_eligible=True))
-        for op in next_ops.values():
+        for op in self._job_operations(jobs, True):
             yield op
 
     def next_operation(self, job):
@@ -2509,8 +2290,14 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                 executable = kwargs['directives']['executable']
             except (KeyError, TypeError):
                 executable = sys.executable
-            path = getattr(func, '_flow_path', inspect.getsourcefile(func))
-            return '{} {} exec {} {{job._id}}'.format(executable, path, name)
+
+            path = getattr(func, '_flow_path', inspect.getsourcefile(inspect.getmodule(func)))
+            cmd_str = "{} {} exec {} {{job._id}}"
+
+            if callable(executable):
+                return lambda job: cmd_str.format(executable(job), path, name)
+            else:
+                return cmd_str.format(executable, path, name)
 
         for name, func in operations:
             if name in self._operations:
@@ -2533,14 +2320,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
     def operations(self):
         "The dictionary of operations that have been added to the workflow."
         return self._operations
-
-    def eligible(self, job_operation, **kwargs):
-        """Determine if job is eligible for operation.
-
-        .. deprecated:: 0.5
-           Please use :py:meth:`~.eligible_for_submission` instead.
-        """
-        raise RuntimeError("The eligible() method is deprecated.")
 
     def eligible_for_submission(self, job_operation):
         """Determine if a job-operation is eligible for submission.
@@ -2599,13 +2378,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             else:
                 args.operation_name = args.hidden_operation_name
 
-        if args.np is not None:  # Remove completely beginning of version 0.7.
-            logger.warning(
-                "The run --np option is deprecated as of version 0.6, use '-p/--parallel' instead.")
-            if args.parallel is None:
-                args.parallel = args.np
-            else:
-                raise ValueError("Conflicting arguments for '--np' and '-p/--parallel'!")
+        if args.np is not None:  # Remove completely beginning of version 0.8.
+            raise RuntimeError(
+                "The run --np option has been deprecated as of version 0.6 and been removed "
+                "as of version 0.7, use '-p/--parallel' instead.")
 
         # Select jobs:
         jobs = self._select_jobs_from_args(args)
@@ -2628,16 +2404,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
     def _main_script(self, args):
         "Generate a script for the execution of operations."
         _requires_jinja2('The signac-flow script function')
-        if args.serial:             # Handle legacy API: The --serial option is deprecated
-            if args.parallel:       # as of version 0.6. The default execution mode is 'serial'
-                raise ValueError(   # and can be switched with the '--parallel' argument.
-                    "Cannot provide both --serial and --parallel arguments a the same time! "
-                    "The --serial option is deprecated as of version 0.6!")
-            else:
-                logger.warning(
-                    "The script --serial option is deprecated as of version 0.6, because "
-                    "serial execution is now the default behavior. Please use the '--parallel' "
-                    "argument to execute bundled operations in parallel.")
 
         if args.requires and not args.cmd:
             raise ValueError(
@@ -2750,8 +2516,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
 
             $ python my_project.py --help
         """
-        if pool is not None:
-            logger.warning(
+        if pool is not None:     # deprecated: remove with version 0.8.
+            raise RuntimeError(
                 "The 'pool' argument for the FlowProject.main() function is deprecated!")
 
         if parser is None:
@@ -2801,7 +2567,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
         parser_run = subparsers.add_parser(
             'run',
             parents=[base_parser],
-            )
+        )
         parser_run.add_argument(          # Hidden positional arguments for backwards-compatibility.
             'hidden_operation_name',
             type=str,
@@ -2842,11 +2608,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
             const='-1',
             help="Specify the number of cores to parallelize to. Defaults to all available "
                  "processing units if argument is ommitted.")
-        execution_group.add_argument(    # Remove beginning of version 0.7.
+        execution_group.add_argument(  # deprecated: Completely remove beginning with version 0.8.
             '--np',
             type=int,
-            help="(deprecated) Specify the number of cores to parallelize to. "
-                 "This option is deprecated as of version 0.6, use '-p/--parallel' instead.")
+            help=argparse.SUPPRESS)
         parser_run.set_defaults(func=self._main_run)
 
         parser_script = subparsers.add_parser(
@@ -2941,30 +2706,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass, signac.contrib.Project))
                           "Execute with '--show-traceback' or '--debug' to get "
                           "more information.", file=sys.stderr)
             _exit_or_raise()
-
-    # All class methods below are wrappers for legacy API and should be removed as of version 0.7.
-
-    @classmethod
-    def add_submit_args(cls, parser):
-        warnings.warn(
-            "The add_submit_args() method is private as of version 0.6.", DeprecationWarning)
-        return cls._add_submit_args(parser=parser)
-
-    @classmethod
-    def add_script_args(cls, parser):
-        warnings.warn(
-            "The add_script_args() method is private as of version 0.6.", DeprecationWarning)
-        return cls._add_script_args(parser=parser)
-
-    @classmethod
-    def add_print_status_args(cls, parser):
-        warnings.warn(
-            "The add_print_status_args() method is private as of version 0.6.", DeprecationWarning)
-        return cls._add_print_status_args(parser=parser)
-
-    def format_row(self, *args, **kwargs):
-        warnings.warn("The format_row() method is private as of version 0.6.", DeprecationWarning)
-        return self._format_row(*args, **kwargs)
 
 
 def _fork_with_serialization(loads, project, operation):

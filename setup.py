@@ -7,13 +7,15 @@ from setuptools import setup, find_packages
 
 requirements = [
     # The core package.
-    'signac>=0.6',
+    'signac>=0.9.0',
     # For the templated generation of (submission) scripts.
-    'jinja2',
+    'jinja2>=2.8',
     # To enable the parallelized execution of operations across processes.
     'cloudpickle',
     # To define IntEnum in flow/scheduling/base.py.
     'enum34;python_version<"3.4"',
+    # Deprecation management
+    'deprecation>=2',
 ]
 
 description = "Simple workflow management for signac projects."
@@ -33,7 +35,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name='signac-flow',
-    version='0.6.4',
+    version='0.7.0',
     packages=find_packages(),
     include_package_data=True,
     zip_safe=True,

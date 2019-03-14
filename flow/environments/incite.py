@@ -10,9 +10,22 @@ from ..environment import DefaultLSFEnvironment, DefaultTorqueEnvironment
 import math
 from fractions import gcd
 
+from ..legacy_templating import deprecated_since_06
+
 
 class SummitEnvironment(DefaultLSFEnvironment):
     """Environment profile for the Summit supercomputer.
+
+    Example::
+
+        @Project.operation
+        @directives(nranks=3) # 3 MPI ranks per operation
+        @directives(ngpu=3) # 3 GPUs
+        @directives(np=3) # 3 CPU cores
+        @directives(rs_tasks=3) # 3 tasks per resource set
+        @directives(extra_jsrun_args='--smpiargs="-gpu"') # extra jsrun arguments
+        def my_operation(job):
+            ...
 
     https://www.olcf.ornl.gov/summit/
     """
@@ -37,33 +50,41 @@ class SummitEnvironment(DefaultLSFEnvironment):
     @staticmethod
     def guess_resource_sets(operation, cores_per_node, gpus_per_node):
         ntasks = max(operation.directives.get('nranks', 1), 1)
-        cpus_per_task = operation.directives.get('omp_num_threads', 0)
-        np = operation.directives.get('np', ntasks * max(cpus_per_task, 1))
-        cpus_per_task = np // ntasks
+        cpus_per_task = max(operation.directives.get('omp_num_threads', 1), 1)
+        np = operation.directives.get('np', ntasks * cpus_per_task)
         ngpu = operation.directives.get('ngpu', 0)
-        nsets = max(math.ceil(np / cores_per_node),
-                    math.ceil(ngpu / gpus_per_node), 1)
+        if np % cores_per_node != 0 and (ngpu == 0 or ngpu == np):
+            # fill the nodes using small resource sets
+            # threads are never split across resource sets
+            nsets = np//cpus_per_task
+        else:
+            nsets = max(math.ceil(np / cores_per_node),
+                        math.ceil(ngpu / gpus_per_node), 1)
+        cpus_per_set = max(np // nsets, 1)
         gpus_per_set = ngpu // nsets
         tasks_per_set = max(ntasks // nsets, 1)  # Require at least one task per set
-        factor = gcd(tasks_per_set, gpus_per_set)
+        factor = gcd(tasks_per_set, gcd(gpus_per_set, cpus_per_set))
+        min_tasks_per_set = operation.directives.get('rs_tasks', 1)
+        factor = max(1, factor//min_tasks_per_set)
         nsets *= factor
         tasks_per_set //= factor
+        cpus_per_set //= factor
         gpus_per_set //= factor
-        return nsets, tasks_per_set, cpus_per_task, gpus_per_set
+        return nsets, tasks_per_set, cpus_per_set, gpus_per_set
 
     @staticmethod
     def jsrun_options(resource_set):
         nsets, tasks, cpus, gpus = resource_set
         return '-n {} -a {} -c {} -g {}'.format(nsets, tasks, cpus, gpus)
 
+    @staticmethod
+    def jsrun_extra_args(operation):
+        return str(operation.directives.get('extra_jsrun_args', ''))
+
     filters = {'calc_num_nodes': calc_num_nodes.__func__,
                'guess_resource_sets': guess_resource_sets.__func__,
-               'jsrun_options': jsrun_options.__func__}
-
-
-class AscentEnvironment(SummitEnvironment):
-    """Environment profile for the Ascent supercomputer (Summit testing)."""
-    hostname_pattern = r'.*\.ascent\.olcf\.ornl\.gov'
+               'jsrun_options': jsrun_options.__func__,
+               'jsrun_extra_args': jsrun_extra_args.__func__}
 
 
 class TitanEnvironment(DefaultTorqueEnvironment):
@@ -76,16 +97,19 @@ class TitanEnvironment(DefaultTorqueEnvironment):
     cores_per_node = 16
 
     @classmethod
+    @deprecated_since_06
     def mpi_cmd(cls, cmd, np):
         return "aprun -n {np} -N 1 -b {cmd}".format(cmd=cmd, np=np)
 
     @classmethod
+    @deprecated_since_06
     def gen_tasks(cls, js, np_total):
         """Helper function to generate the number of tasks (for overriding)"""
         js.writeline('#PBS -l nodes={}'.format(math.ceil(np_total/cls.cores_per_node)))
         return js
 
     @classmethod
+    @deprecated_since_06
     def script(cls, _id, **kwargs):
         js = super(TitanEnvironment, cls).script(_id=_id, **kwargs)
         js.writeline('#PBS -A {}'.format(cls.get_config_value('account')))
@@ -102,16 +126,19 @@ class EosEnvironment(DefaultTorqueEnvironment):
     cores_per_node = 32
 
     @classmethod
+    @deprecated_since_06
     def mpi_cmd(cls, cmd, np):
         return "aprun -n {np} -b {cmd}".format(cmd=cmd, np=np)
 
     @classmethod
+    @deprecated_since_06
     def gen_tasks(cls, js, np_total):
         """Helper function to generate the number of tasks (for overriding)"""
         js.writeline('#PBS -l nodes={}'.format(math.ceil(np_total/cls.cores_per_node)))
         return js
 
     @classmethod
+    @deprecated_since_06
     def script(cls, _id, **kwargs):
         js = super(EosEnvironment, cls).script(_id=_id, **kwargs)
         js.writeline('#PBS -A {}'.format(cls.get_config_value('account')))

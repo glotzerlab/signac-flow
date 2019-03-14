@@ -7,6 +7,7 @@ This module implements the Scheduler and ClusterJob classes for TORQUE.
 """
 from __future__ import print_function
 import io
+import errno
 import getpass
 import subprocess
 import tempfile
@@ -27,8 +28,11 @@ def _fetch(user=None):
     cmd = "qstat -fx -u {user}".format(user=user)
     try:
         result = io.BytesIO(subprocess.check_output(cmd.split()))
-    except FileNotFoundError:
-        raise RuntimeError("Torque not available.")
+    except (IOError, OSError) as error:
+        if error.errno == errno.ENOENT:
+            raise RuntimeError("Torque not available.")
+        else:
+            raise error
     tree = ET.parse(source=result)
     return tree.getroot()
 
@@ -142,6 +146,8 @@ class TorqueScheduler(Scheduler):
         "Return True if it appears that a TORQUE scheduler is available within the environment."
         try:
             subprocess.check_output(['qsub', '--version'], stderr=subprocess.STDOUT)
+        except subprocess.CalledProcessError:
+            return True
         except (IOError, OSError):
             return False
         else:

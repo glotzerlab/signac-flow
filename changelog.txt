@@ -4,6 +4,41 @@ Changes
 
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 
+Version 0.7
+===========
+
+[0.7.0] -- 2019-03-14
+---------------------
+
+*The numbers in brackets denote the related GitHub issue or pull request.*
+
+Added
++++++
+
+- Add legend explaining the scheduler-related symbols to the detailed status view (#68).
+- Allow the specification of the number of tasks per resource set and additional jsrun arguments for Summit scripts.
+
+Fixes (general)
++++++++++++++++
+
+- Fixes issue where callable cmd-directives were not evaluated (#47).
+- Fixes issue where the source file of wrapped functions was not determined correctly (#55).
+- Fix a Python 2.7 incompatibility and another unrelated issue with the TORQUE scheduler driver (#54, #81).
+- Fixes issue where providing the wrong argument type to Project.submit() would go undetected and lead to unexpected behavior (#58).
+- Fixes issue where using the buffered mode would lead to confusing error messages when condition-functions would raise an AttributeError exception.
+- Fixes issue with erroneous unused-directive-keys-warning.
+
+Fixes (compute environments)
+++++++++++++++++++++++++++++
+
+- Fixes issues with the Summit environment resource set calculation for parallel operations under specific conditions (#63).
+- Fix the node size specified in the template for the ORNL Eos system (#77).
+- Fixes issue with a missing ``--gres`` directive when using the GPU-shared partition on the XSEDE Bridges system (#59).
+- Fixed University of Michigan Flux hostname pattern to ignore the Flux Hadoop cluster (#82).
+- Remove the Ascent environment (host decommissioned).
+
+Note: The official support for Python 3.4 will be dropped beginning with version 0.8.0.
+
 Version 0.6
 ===========
 

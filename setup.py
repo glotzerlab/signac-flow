@@ -7,9 +7,9 @@ from setuptools import setup, find_packages
 
 requirements = [
     # The core package.
-    'signac>=0.6',
+    'signac>=0.9.0',
     # For the templated generation of (submission) scripts.
-    'jinja2',
+    'jinja2>=2.8',
     # To enable the parallelized execution of operations across processes.
     'cloudpickle',
     # To define IntEnum in flow/scheduling/base.py.

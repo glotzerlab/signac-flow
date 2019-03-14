@@ -1606,12 +1606,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
     @contextlib.contextmanager
     def _potentially_buffered(self):
         if self._use_buffered_mode:
-            try:
+            if hasattr(signac, 'buffered'):
                 logger.debug("Entering buffered mode...")
                 with signac.buffered():
                     yield
                 logger.debug("Exiting buffered mode.")
-            except AttributeError:
+            else:
                 warnings.warn(
                     "Configuration specifies to use buffered mode, but the buffered "
                     "mode is not supported by the installed version of signac. "

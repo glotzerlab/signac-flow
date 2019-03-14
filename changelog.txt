@@ -53,6 +53,7 @@ We recommend to go through the tutorial on signac-docs_ to learn how to best tak
 - Fixes issue with a missing ``--gres`` directive when using the GPU-shared partition on the XSEDE Bridges system.
 - Fix the node size specified in the template for the ORNL Eos system.
 - Fixed University of Michigan Flux hostname pattern to ignore the Flux Hadoop cluster.
+- Fixes issue where using the buffered mode would lead to confusing error messages when condition-functions would raise an AttributeError exception.
 
 [0.6.4] -- 2018-12-28
 ---------------------

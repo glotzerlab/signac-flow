@@ -1,45 +1,50 @@
-# README
+# <img src="https://raw.githubusercontent.com/glotzerlab/signac-flow/master/doc/images/logo.png" width="75" height="75"> signac-flow - manage workflows with signac
 
-[![Anaconda-Server Badge](https://anaconda.org/conda-forge/signac-flow/badges/version.svg)](https://anaconda.org/conda-forge/signac-flow)
-[![PyPi](https://img.shields.io/pypi/v/signac-flow.svg)](https://img.shields.io/pypi/v/signac-flow.svg)
+[![PyPI](https://img.shields.io/pypi/v/signac-flow.svg)](https://pypi.org/project/signac-flow/)
+[![conda-forge](https://img.shields.io/conda/vn/conda-forge/signac-flow.svg?style=flat)](https://anaconda.org/conda-forge/signac-flow)
+![CircleCI](https://img.shields.io/circleci/project/github/glotzerlab/signac-flow/master.svg)
+[![RTD](https://img.shields.io/readthedocs/signac.svg?style=flat)](https://docs.signac.io)
+[![License](https://img.shields.io/github/license/glotzerlab/signac-flow.svg)](https://github.com/glotzerlab/signac-flow/blob/master/LICENSE.txt)
 [![conda-forge-downloads](https://img.shields.io/conda/dn/conda-forge/signac-flow.svg)](https://anaconda.org/conda-forge/signac-flow)
-[![RTD](https://readthedocs.org/projects/signac-flow/badge/?version=latest)](https://signac-flow.readthedocs.io)
+[![Gitter](https://img.shields.io/gitter/room/signac/Lobby.svg?style=flat)](https://gitter.im/signac/Lobby)
 
-## About
+The [**signac** framework](https://signac.io) helps users manage and scale file-based workflows, facilitating data reuse, sharing, and reproducibility.
 
-The **signac-flow** tool provides the basic components to set up simple to complex workflows for projects as part of the [signac framework](https://www.signac.io).
+The **signac-flow** tool provides the basic components to set up simple to complex workflows for projects as part of the [signac framework](https://signac.io).
 That includes the definition of data pipelines, execution of data space operations and the submission of operations to high-performance super computers.
 
-## Maintainers
 
-  * Carl Simon Adorf (csadorf@umich.edu)
-  * Vyas Ramasubramani (vramasub@umich.edu)
-  * Bradley D. Dice (bdice@umich.edu)
+## Resources
+
+- [Framework documentation](https://docs.signac.io/):
+  Examples, tutorials, topic guides, and package Python APIs.
+- [Package documentation](https://docs.signac.io/projects/flow/):
+  API reference for the signac-flow package.
+- [Chat Support](https://gitter.im/signac/Lobby):
+  Get help and ask questions on the **signac** gitter channel.
+- [**signac** website](https://signac.io/):
+  Framework overview and news.
+
 
 ## Installation
 
-The recommendend installation method for **signac-flow** is through **conda** or **pip**.
+The recommended installation method for **signac-flow** is through **conda** or **pip**.
 The software is tested for Python versions 2.7 and 3.4+ and is built for all major platforms.
 
-This package is available via the [conda-forge](https://conda-forge.org/) conda channel:
+To install **signac-flow** *via* the [conda-forge](https://conda-forge.github.io/) channel, execute:
 
-`conda install -c conda-forge signac-flow`
+```bash
+conda install -c conda-forge signac-flow
+```
 
-or pip:
+To install **signac-flow** *via* **pip**, execute:
 
-`pip install --user signac-flow`
+```bash
+pip install signac-flow
+```
 
-## Documentation
+**Detailed information about alternative installation methods can be found in the [documentation](https://docs.signac.io/en/latest/installation.html).**
 
-The framework documentation is hosted at [https://docs.signac.io](https://docs.signac.io).
-
-The API reference for this package is hosted at [https://docs.signac.io/projects/flow/](https://docs.signac.io/projects/flow/).
-
-## Acknowledgment
-
-When using **signac** as part of your work towards a publication, we would really appreciate that you acknowledge **signac** appropriately.
-We have prepared examples on how to do that [here](https://docs.signac.io/en/latest/acknowledge.html).
-**Thank you very much!**
 
 ## Testing
 
@@ -48,3 +53,10 @@ You can test this package by executing
     $ python -m unittest discover tests/
 
 within the repository root directory.
+
+
+## Acknowledgment
+
+When using **signac** as part of your work towards a publication, we would really appreciate that you acknowledge **signac** appropriately.
+We have prepared examples on how to do that [here](http://docs.signac.io/en/latest/acknowledge.html).
+**Thank you very much!**

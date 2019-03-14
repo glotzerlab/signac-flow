@@ -35,13 +35,13 @@ for example with `venv <https://docs.python.org/3/library/venv.html>`_:
 
     ~ $ python -m venv ~/envs/signac-flow-dev
     ~ $ source ~/envs/signac-flow-dev/bin/activate
-    (signac-flow-dev) ~ $ pip install six flake8
+    (signac-flow-dev) ~ $ pip install -r requirements-dev.txt
 
 or alternatively with `conda <https://conda.io/docs/>`_:
 
 .. code-block:: bash
 
-    ~ $ conda create -n signac-flow-dev python signac six flake8
+    ~ $ conda create -n signac-flow-dev python --file requirements-dev.txt
     ~ $ activate signac-flow-dev
 
 Then clone your fork and install the package from source with:
@@ -80,7 +80,7 @@ Choose from one of the following prefixes depending on the type of change:
   * ``feature/``: Any changes that introduce a new feature.
   * ``release/``: Reserved for release branches.
 
-If your change does not seem to fall into any of the above mentioned categories, use ``fix/``.
+If your change does not seem to fall into any of the above mentioned categories, use ``misc/``.
 
 Once you are content with your changes, push the new branch to your forked repository and create a pull request into the main repository.
 Feel free to push a branch before completion to get input from the maintainers and other users, but make sure to add a comment that clarifies that the branch is not ready for merge yet.

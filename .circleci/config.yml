@@ -5,7 +5,7 @@
 version: 2
 
 jobs:
-  style-check:
+  pre-test-checks:
     docker:
       - image: circleci/python:3.7
 
@@ -14,13 +14,21 @@ jobs:
     steps:
       - checkout
       - run:
-          name: style-check
+          name: install-dev-requirements
           command: |
-            pip install --user -U flake8
+            pip install --user -U -r requirements-test.txt
+      - run:
+          name: check-citation-metadata
+          command: |
+            ./.sync-zenodo-metadata.py --check >/dev/null
+      - run:
+          name: check-code-style
+          command: |
             python -m flake8 --show-source flow/
 
-
   test-3.7: &test-template
+    environment:
+      SIGNAC_VERSION: master
     docker:
       - image: circleci/python:3.7
 
@@ -35,6 +43,7 @@ jobs:
             mkdir -p ./venv
             python -m virtualenv ./venv
             . venv/bin/activate
+            pip install git+ssh://git@github.com/glotzerlab/signac.git@${SIGNAC_VERSION}
             pip install -r requirements.txt
             pip install -U coverage mock
 
@@ -49,6 +58,18 @@ jobs:
           path: test-reports
           destination: test-reports
 
+  test-3.7-signac-0.9.0:
+    <<: *test-template
+    environment:
+      SIGNAC_VERSION: "v0.9.0"
+  test-3.7-signac-0.9.4:
+    <<: *test-template
+    environment:
+      SIGNAC_VERSION: "v0.9.4"
+  test-3.7-signac-1.0.0:
+    <<: *test-template
+    environment:
+      SIGNAC_VERSION: "v1.0.0"
   test-3.6:
     <<: *test-template
     docker:
@@ -61,28 +82,107 @@ jobs:
     <<: *test-template
     docker:
       - image: circleci/python:3.4
-  test-2.7:
+  test-2.7: &test-template-27
     <<: *test-template
     docker:
       - image: circleci/python:2.7
+  test-2.7-signac-0.9.0:
+    <<: *test-template-27
+    environment:
+      SIGNAC_VERSION: "v0.9.0"
+  test-2.7-signac-0.9.4:
+    <<: *test-template-27
+    environment:
+      SIGNAC_VERSION: "v0.9.4"
+  test-2.7-signac-1.0.0:
+    <<: *test-template-27
+    environment:
+      SIGNAC_VERSION: "v1.0.0"
+
+  test-deploy-pypi:
+    docker:
+      - image: circleci/python:3.7
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - run:
+          name: test-deploy-pypi
+          command: |
+            pip install --user -U -r .requirements-deploy.txt
+            bash .test-deploy.bash
+
+  deploy-pypi:
+    docker:
+      - image: circleci/python:3.7
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - run:
+          name: deploy-pypi
+          command: |
+            pip install --user -U -r .requirements-deploy.txt
+            bash .deploy.bash
+
 
 workflows:
   version: 2
-  style-check-and-tests:
+  pre-test-checks-and-tests:
     jobs:
-      - style-check
+      - pre-test-checks
       - test-2.7:
           requires:
-            - style-check
+            - pre-test-checks
+      - test-2.7-signac-0.9.0:
+          requires:
+            - test-2.7
+      - test-2.7-signac-0.9.4:
+          requires:
+            - test-2.7
+      - test-2.7-signac-1.0.0:
+          requires:
+            - test-2.7
       - test-3.4:
           requires:
-            - style-check
+            - pre-test-checks
       - test-3.5:
           requires:
-            - style-check
+            - pre-test-checks
       - test-3.6:
           requires:
-            - style-check
+            - pre-test-checks
       - test-3.7:
           requires:
-            - style-check
+            - pre-test-checks
+      - test-3.7-signac-0.9.0:
+          requires:
+            - test-3.7
+      - test-3.7-signac-0.9.4:
+          requires:
+            - test-3.7
+      - test-3.7-signac-1.0.0:
+          requires:
+            - test-3.7
+      - test-deploy-pypi:
+          filters:
+            branches:
+              only: /release\/.*/
+          requires:
+            - test-2.7
+            - test-2.7-signac-0.9.0
+            - test-2.7-signac-0.9.4
+            - test-2.7-signac-1.0.0
+            - test-3.4
+            - test-3.5
+            - test-3.6
+            - test-3.7
+            - test-3.7-signac-0.9.0
+            - test-3.7-signac-0.9.4
+            - test-3.7-signac-1.0.0
+  deploy:
+    jobs:
+      - deploy-pypi:
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /v.*/

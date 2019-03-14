@@ -11,6 +11,7 @@ import sys
 import inspect
 import subprocess
 from contextlib import contextmanager
+from distutils.version import StrictVersion
 
 import signac
 from signac.common import six
@@ -448,6 +449,25 @@ class ExecutionProjectTest(BaseProjectTest):
             else:
                 self.assertFalse(job.isfile('world.txt'))
 
+    def test_run_with_selection(self):
+        project = self.mock_project()
+        output = StringIO()
+        with add_cwd_to_environment_pythonpath():
+            with switch_to_directory(project.root_directory()):
+                with redirect_stderr(output):
+                    if StrictVersion(signac.__version__) < StrictVersion('0.9.4'):
+                        project.run(list(project.find_jobs(dict(a=0))))
+                    else:
+                        project.run(project.find_jobs(dict(a=0)))
+        output.seek(0)
+        output.read()
+        even_jobs = [job for job in project if job.sp.b % 2 == 0]
+        for job in project:
+            if job in even_jobs and job.sp.a == 0:
+                self.assertTrue(job.isfile('world.txt'))
+            else:
+                self.assertFalse(job.isfile('world.txt'))
+
     def test_run_parallel(self):
         project = self.mock_project()
         output = StringIO()
@@ -486,6 +506,14 @@ class ExecutionProjectTest(BaseProjectTest):
         num_jobs_submitted = len(project) + len(even_jobs)
         self.assertEqual(len(list(MockScheduler.jobs())), num_jobs_submitted)
         MockScheduler.reset()
+
+    def test_submit_bad_names_argument(self):
+        MockScheduler.reset()
+        project = self.mock_project()
+        self.assertEqual(len(list(MockScheduler.jobs())), 0)
+        with self.assertRaises(ValueError):
+            project.submit(names='foo')
+        project.submit(names=['foo'])
 
     def test_submit_limited(self):
         MockScheduler.reset()

@@ -729,7 +729,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         return cls.NAMES.get(x, x)
 
     ALIASES = dict(
-        status='S',
         unknown='U',
         registered='R',
         queued='Q',
@@ -1305,6 +1304,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                             _print_unicode(msg)
                 legend = u'Legend: ' + u' '.join(u'{}:{}'.format(v, k) for k, v in symbols.items())
                 _print_unicode(legend)
+            print(' '.join('[{}]:{}'.format(v, k) for k, v in self.ALIASES.items()))
 
         # Show any abbreviations used
         if abbreviate.table:
@@ -1572,8 +1572,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         "Get all pending operations for the given selection."
         operation_names = None if operation_names is None else set(operation_names)
 
-        if len(jobs) > 1:
-            jobs = self
         for op in self.next_operations(*jobs):
             if operation_names and op.name not in operation_names:
                 continue
@@ -1584,12 +1582,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
     @contextlib.contextmanager
     def _potentially_buffered(self):
         if self._use_buffered_mode:
-            try:
+            if hasattr(signac, 'buffered'):
                 logger.debug("Entering buffered mode...")
                 with signac.buffered():
                     yield
                 logger.debug("Exiting buffered mode.")
-            except AttributeError:
+            else:
                 warnings.warn(
                     "Configuration specifies to use buffered mode, but the buffered "
                     "mode is not supported by the installed version of signac. "
@@ -1784,6 +1782,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         # Regular argument checks and expansion
         if jobs is None:
             jobs = self  # select all jobs
+        if isinstance(names, six.string_types):
+            raise ValueError(
+                "The 'names' argument must be a sequence of strings, however you "
+                "provided a single string: {}.".format(names))
         if env is None:
             env = self._environment
         if walltime is not None:

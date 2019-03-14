@@ -10,7 +10,7 @@ class FluxEnvironment(DefaultTorqueEnvironment):
 
     http://arc-ts.umich.edu/systems-and-services/flux/
     """
-    hostname_pattern = '(nyx|flux).*.umich.edu'
+    hostname_pattern = '(nyx|flux)((?!-hadoop).).*.umich.edu'
     template = 'umich-flux.sh'
     cores_per_node = 1
 

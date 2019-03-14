@@ -26,7 +26,6 @@ jobs:
           command: |
             python -m flake8 --show-source flow/
 
-
   test-3.7: &test-template
     environment:
       SIGNAC_VERSION: master
@@ -100,6 +99,31 @@ jobs:
     environment:
       SIGNAC_VERSION: "v1.0.0"
 
+  test-deploy-pypi:
+    docker:
+      - image: circleci/python:3.7
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - run:
+          name: test-deploy-pypi
+          command: |
+            pip install --user -U -r .requirements-deploy.txt
+            bash .test-deploy.bash
+
+  deploy-pypi:
+    docker:
+      - image: circleci/python:3.7
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - run:
+          name: deploy-pypi
+          command: |
+            pip install --user -U -r .requirements-deploy.txt
+            bash .deploy.bash
+
+
 workflows:
   version: 2
   pre-test-checks-and-tests:
@@ -138,3 +162,27 @@ workflows:
       - test-3.7-signac-1.0.0:
           requires:
             - test-3.7
+      - test-deploy-pypi:
+          filters:
+            branches:
+              only: /release\/.*/
+          requires:
+            - test-2.7
+            - test-2.7-signac-0.9.0
+            - test-2.7-signac-0.9.4
+            - test-2.7-signac-1.0.0
+            - test-3.4
+            - test-3.5
+            - test-3.6
+            - test-3.7
+            - test-3.7-signac-0.9.0
+            - test-3.7-signac-0.9.4
+            - test-3.7-signac-1.0.0
+  deploy:
+    jobs:
+      - deploy-pypi:
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /v.*/

@@ -11,6 +11,7 @@ import sys
 import inspect
 import subprocess
 from contextlib import contextmanager
+from distutils.version import StrictVersion
 
 import signac
 from signac.common import six
@@ -454,7 +455,10 @@ class ExecutionProjectTest(BaseProjectTest):
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
                 with redirect_stderr(output):
-                    project.run(project.find_jobs(dict(a=0)))
+                    if StrictVersion(signac.__version__) < StrictVersion('0.9.4'):
+                        project.run(list(project.find_jobs(dict(a=0))))
+                    else:
+                        project.run(project.find_jobs(dict(a=0)))
         output.seek(0)
         output.read()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]

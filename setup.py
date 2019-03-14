@@ -13,7 +13,7 @@ requirements = [
     # To enable the parallelized execution of operations across processes.
     'cloudpickle',
     # To define IntEnum in flow/scheduling/base.py.
-    'enum34;python_version<3.4',
+    'enum34;python_version<"3.4"',
     # Deprecation management
     'deprecation>=2',
 ]

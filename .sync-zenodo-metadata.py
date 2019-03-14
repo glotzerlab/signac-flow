@@ -67,7 +67,8 @@ def sync(ctx, in_place=False, check=True):
         zenodo_updated['creators'] = [a.as_zenodo_creator() for a in authors]
         zenodo_updated['contributors'] = [c.as_zenodo_creator()
                                           for c in contributors if c not in authors]
-        zenodo_updated['version'] = citation['version']
+        for key in ('version', 'keywords'):
+            zenodo_updated[key] = citation[key]
 
     modified = json.dumps(zenodo, sort_keys=True) != json.dumps(zenodo_updated, sort_keys=True)
     if modified:

@@ -20,6 +20,41 @@
 {% endblock %}
 
 {% block body %}
+{% set use_mpi = false %}
+{% for operation in operations %}
+{% if operation.directives.nranks or operations.directives.omp_num_threads %}
+{% set use_mpi = true %}
+{% endif %}
+{% endfor %}
+
+{% if not use_mpi %}
+{% set launcher_file = 'launcher_' ~ id|replace('/', '_') %}
+{% set cmd_suffix = cmd_suffix|default('') %}
+cat << EOF > {{ launcher_file }}
+{% for operation in (operations|with_np_offset) %}
+{% if operation.directives.omp_num_threads %}
+export OMP_NUM_THREADS={{ operation.directives.omp_num_threads }}
+{% endif %}
+{% if operation.directives.nranks %}
+{% if parallel %}
+{% set mpi_prefix = "ibrun -n %d -o %d task_affinity "|format(operation.directives.nranks, operation.directives.np_offset) %}
+{% else %}
+{% set mpi_prefix = "ibrun -n %d "|format(operation.directives.nranks) %}
+{% endif %}
+{% endif %}
+{{ mpi_prefix }}{{ cmd_prefix }}{{ operation.cmd }}{{ cmd_suffix }}
+{% endfor %}
+EOF
+
+export LAUNCHER_PLUGIN_DIR=$LAUNCHER_DIR/plugins
+export LAUNCHER_RMI=SLURM
+export LAUNCHER_JOB_FILE={{ launcher_file }}
+
+#cat {{ launcher_file }}
+#env
+$LAUNCHER_DIR/paramrun
+
+{% else %}
 {% set cmd_suffix = cmd_suffix|default('') ~ (' &' if parallel else '') %}
 {% for operation in (operations|with_np_offset) %}
 
@@ -36,4 +71,5 @@ export OMP_NUM_THREADS={{ operation.directives.omp_num_threads }}
 {% endif %}
 {{ mpi_prefix }}{{ cmd_prefix }}{{ operation.cmd }}{{ cmd_suffix }}
 {% endfor %}
+{% endif %}
 {% endblock %}

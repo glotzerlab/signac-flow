@@ -247,6 +247,7 @@ class JobOperation(object):
         directives.setdefault('ngpu', 0)
         directives.setdefault('nranks', 0)
         directives.setdefault('omp_num_threads', 0)
+        directives.setdefault('factor', 1)
 
         # Evaluate strings and callables for job:
         def evaluate(value):

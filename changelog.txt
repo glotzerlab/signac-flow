@@ -4,6 +4,11 @@ Changes
 
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 
+next
+----
+
+- added functionality to print all statepoint parameters with a status call "-l"
+
 Version 0.7
 ===========
 

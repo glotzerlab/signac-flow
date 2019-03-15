@@ -1042,7 +1042,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
     @_support_legacy_api
     def print_status(self, jobs=None, overview=True, overview_max_lines=None,
-                     detailed=False, parameters=None, skip_active=False, param_max_width=None,
+                     detailed=False, parameters=None, all_parameters=False,
+                     skip_active=False, param_max_width=None,
                      expand=False, all_ops=False, only_incomplete=False, dump_json=False,
                      unroll=True, compact=False, pretty=False,
                      file=None, err=None, ignore_errors=False,
@@ -1071,6 +1072,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             Print the value of the specified parameters.
         :type parameters:
             list of str
+        :param all_parameters:
+            Print the value of the all statepoint parameters.
+        :type parameters:
+            bool
         :param skip_active:
             Only print jobs that are currently inactive.
         :type skip_active:
@@ -1089,6 +1094,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             err = sys.stderr
         if jobs is None:
             jobs = self     # all jobs
+        # print(all_parameters, parameters)
 
         tmp = self._fetch_status(jobs, err, ignore_errors, no_parallelize)
 
@@ -1164,6 +1170,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             else:
                 return x
 
+        if all_parameters and parameters is None:
+            sp = self.open_job(id=status['job_id']).statepoint()
+            parameters = list(sp.keys())
+
         if detailed:
             rows_status = []
             columns = ['job_id', 'labels']
@@ -1194,6 +1204,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                     for i, k in enumerate(parameters):
                         v = self._alias(get(k, sp))
                         row.insert(i + 1, None if v is None else shorten(str(v), param_max_width))
+
                 if unroll:
                     selected_ops = [name for name, op in status['operations'].items()
                                     if _select_op(op)]
@@ -2058,6 +2069,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             nargs='*',
             help="Display select parameters of the job's "
                  "statepoint with the detailed view.")
+        view_group.add_argument(
+            '-l', '--all-parameters',
+            action='store_true',
+            help="Display all parameters of the job's "
+                  "statepoint with the detailed view.")
         view_group.add_argument(
             '--param-max-width',
             type=int,

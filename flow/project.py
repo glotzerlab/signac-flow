@@ -18,6 +18,7 @@ option is to use a FlowGraph.
 from __future__ import print_function
 import sys
 import os
+import re
 import logging
 import warnings
 import argparse
@@ -1570,12 +1571,18 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
     def _get_pending_operations(self, jobs, operation_names=None):
         "Get all pending operations for the given selection."
-        operation_names = None if operation_names is None else set(operation_names)
+        if operation_names is None:
+            names = patterns = None
+        else:
+            patterns = [name.lstrip('/') for name in operation_names if name.startswith('/')]
+            names = [name for name in operation_names if not name.startswith('/')]
 
         for op in self.next_operations(* jobs):
-            if operation_names and op.name not in operation_names:
-                continue
-            yield op
+            if names or patterns:
+                if op.name in names or any(re.match(p, op.name) for p in patterns):
+                    yield op
+            else:
+                yield op
 
     @contextlib.contextmanager
     def _potentially_buffered(self):
@@ -1904,7 +1911,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             '-o', '--operation',
             dest='operation_name',
             nargs='+',
-            choices=operations,
             help="Only select operations that match the given operation name(s).")
         selection_group.add_argument(
             '-n', '--num',

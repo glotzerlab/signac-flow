@@ -33,6 +33,9 @@
 
 {% block body %}
 {% if not use_mpi %}
+{% if parellel%}
+{% print_warning('parallel warning') %}
+{% endif %}
 {% set launcher_file = 'launcher_' ~ id|replace('/', '_') %}
 {% set cmd_suffix = cmd_suffix|default('') %}
 cat << EOF > {{ launcher_file }}

@@ -188,3 +188,11 @@ def get_account_name(environment, required=False):
                     env=environment, key=str(error)),
                 file=sys.stderr)
             _GET_ACCOUNT_NAME_MESSAGES_SHOWN.add(environment)
+
+
+def print_warning(warning):
+    """
+
+    """
+    print(warning)
+    return None

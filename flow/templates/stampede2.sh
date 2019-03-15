@@ -1,6 +1,14 @@
 {# Templated in accordance with: https://portal.tacc.utexas.edu/user-guides/stampede2 #}
 {% extends "slurm.sh" %}
 {% block tasks %}
+
+{% set use_mpi = false %}
+{% for operation in operations %}
+{% if operation.directives.nranks or operation.directives.omp_num_threads %}
+{% set use_mpi = true %}
+{% endif %}
+{% endfor %}
+
 {% set threshold = 0 if force else 0.9 %}
 {% set cpu_tasks = operations|calc_tasks('np', parallel, force) %}
 {% if operations|calc_tasks('ngpu', false, true) and not force %}
@@ -8,7 +16,11 @@
 {% endif %}
 {% set cpn = 48 if 'skx' in partition else 68 %}
 #SBATCH --nodes={{ nn|default(cpu_tasks|calc_num_nodes(cpn, threshold, 'CPU'), true) }}
+{% if not use_mpi %}
+#SBATCH --ntasks={{ cpu_tasks }}
+{% else %}
 #SBATCH --ntasks={{ (operations|calc_tasks('nranks', parallel, force), 1)|max }}
+{% endif %}
 {% endblock %}
 
 {% block header %}
@@ -20,13 +32,6 @@
 {% endblock %}
 
 {% block body %}
-{% set use_mpi = false %}
-{% for operation in operations %}
-{% if operation.directives.nranks or operations.directives.omp_num_threads %}
-{% set use_mpi = true %}
-{% endif %}
-{% endfor %}
-
 {% if not use_mpi %}
 {% set launcher_file = 'launcher_' ~ id|replace('/', '_') %}
 {% set cmd_suffix = cmd_suffix|default('') %}
@@ -50,7 +55,7 @@ export LAUNCHER_PLUGIN_DIR=$LAUNCHER_DIR/plugins
 export LAUNCHER_RMI=SLURM
 export LAUNCHER_JOB_FILE={{ launcher_file }}
 
-#cat {{ launcher_file }}
+cat {{ launcher_file }}
 #env
 $LAUNCHER_DIR/paramrun
 

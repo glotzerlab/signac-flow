@@ -74,7 +74,7 @@ def calc_tasks(operations, name, parallel=False, allow_mixed=False):
     processing_units = [op.directives[name] * op.directives.get('factor',1) for op in operations]
     if identical(processing_units) or allow_mixed:
         if len(processing_units) > 0:
-            return sum(processing_units) if parallel else max(processing_units)
+            return round(sum(processing_units)) if parallel else round(max(processing_units))
         else:
             return 0    # empty set
     else:

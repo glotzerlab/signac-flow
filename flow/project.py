@@ -555,6 +555,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         template_environment.filters['require_config_value'] = \
             flow_config.require_config_value
         template_environment.filters['get_account_name'] = tf.get_account_name
+        template_environment.filters['print_warning'] = tf.print_warning
         if 'max' not in template_environment.filters:    # for jinja2 < 2.10
             template_environment.filters['max'] = max
         if 'min' not in template_environment.filters:    # for jinja2 < 2.10

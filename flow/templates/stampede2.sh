@@ -33,24 +33,14 @@
 
 {% block body %}
 {% if not use_mpi %}
-{% if parellel%}
-{% print_warning('parallel warning') %}
+{% if parallel%}
+{{("Warning! Bundle submission without mpi on stampede2 is using launcher and --parallel is ignored")|print_warning}}
 {% endif %}
 {% set launcher_file = 'launcher_' ~ id|replace('/', '_') %}
 {% set cmd_suffix = cmd_suffix|default('') %}
 cat << EOF > {{ launcher_file }}
 {% for operation in (operations|with_np_offset) %}
-{% if operation.directives.omp_num_threads %}
-export OMP_NUM_THREADS={{ operation.directives.omp_num_threads }}
-{% endif %}
-{% if operation.directives.nranks %}
-{% if parallel %}
-{% set mpi_prefix = "ibrun -n %d -o %d task_affinity "|format(operation.directives.nranks, operation.directives.np_offset) %}
-{% else %}
-{% set mpi_prefix = "ibrun -n %d "|format(operation.directives.nranks) %}
-{% endif %}
-{% endif %}
-{{ mpi_prefix }}{{ cmd_prefix }}{{ operation.cmd }}{{ cmd_suffix }}
+{{ cmd_prefix }}{{ operation.cmd }}{{ cmd_suffix }}
 {% endfor %}
 EOF
 

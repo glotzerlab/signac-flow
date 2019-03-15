@@ -155,6 +155,14 @@ def calc_num_nodes(np, ppn=1, threshold=0, name=None):
     nn = int(ceil(np / ppn))
     return check_utilization(nn, np, ppn, threshold, name)
 
+def print_warning(warning):
+    """Print warning message within jinja2 template
+
+    :param:
+        The warning message as a string
+    """
+    print(warning)
+    return ''
 
 _GET_ACCOUNT_NAME_MESSAGES_SHOWN = set()
 
@@ -190,9 +198,3 @@ def get_account_name(environment, required=False):
             _GET_ACCOUNT_NAME_MESSAGES_SHOWN.add(environment)
 
 
-def print_warning(warning):
-    """
-
-    """
-    print(warning)
-    return None

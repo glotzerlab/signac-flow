@@ -1166,8 +1166,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 return x
 
         if parameters is not None and len(parameters) == 0:
-            sp = self.open_job(id=status['job_id']).statepoint()
-            parameters = list(sp.keys())
+            parameters = list(sorted({key for job in jobs for key in job.sp.keys()
+                                      if len(set([job.sp[key] for job in jobs])) > 1}))
 
         if detailed:
             rows_status = []

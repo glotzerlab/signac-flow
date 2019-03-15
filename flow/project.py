@@ -1749,7 +1749,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
     def submit(self, bundle_size=1, jobs=None, names=None, num=None, parallel=False,
                force=False, walltime=None, env=None, **kwargs):
         """Submit function for the project's main submit interface.
-
         .. versionchanged:: 0.6
 
         :param bundle_size:
@@ -2329,6 +2328,51 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 "update anyways.")
             if show_traceback:
                 raise
+
+    def calculate_budget(self):
+        if('_walltime' not in self.document):
+            self.document['_walltime'] = {}
+        remaining_time = {}
+        remaining_jobs = {}
+        for name, op in sorted(self.operations.items()):
+            if(name not in self.document._walltime):
+                self.document['_walltime'][name] = \
+                    int(input("Average walltime (in hours) for {}:\t".format(name)))
+            remaining_time[name] = sum([self.document._walltime[name] for
+                                        job in self if op.eligible(job) and not op.complete(job)])
+            remaining_jobs[name] = len([self.document._walltime[name] for
+                                        job in self if op.eligible(job) and not op.complete(job)])
+
+        headers = ['Operation', 'Remaining Jobs', 'Remaining Time']
+
+        def elems(name):
+            return [name, remaining_jobs[name], remaining_time[name]]
+
+        widths = [max(len(headers[i]), max([len(str(elems(name)[i])) for name, op in
+                                           sorted(self.operations.items())]))
+                  for i in range(len(headers))]
+        r1 = '\n\n'
+        r2 = ''
+        for header, width in zip(headers, widths):
+            r1 += ''.join([' ' for i in range(width-len(header))]) + header + '    '
+            r2 += ''.join(['-' for i in range(width)]) + '    '
+        print(r1)
+        print(r2)
+        for name in remaining_time:
+            row = ''.join([' ' for i in range(widths[0]-len(name))]) + \
+                    '{}'.format(name) + \
+                    ''.join([' ' for i in range(widths[1]-len(str(remaining_jobs[name])))]) + \
+                    '    ' + str(remaining_jobs[name]) + \
+                    ''.join([' ' for i in range(widths[2]-len(str(remaining_time[name]) +
+                            " Hours"))]) + '    ' + str(remaining_time[name]) + " Hours"
+            print(row)
+        print(r2)
+        row = ''.join([' ' for i in range(widths[0]-5)]) + 'Total    ' + \
+              ''.join([' ' for i in range(widths[1])]) + \
+              ''.join([' ' for i in range(widths[2] -
+                       len(str(sum([remaining_time[k] for k in remaining_time]))+" Hours"))]) + \
+              '    ' + str(sum([remaining_time[k] for k in remaining_time]))+" Hours"
+        print(row+'\n')
 
     def _main_next(self, args):
         "Determine the jobs that are eligible for a specific operation."

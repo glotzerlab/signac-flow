@@ -829,7 +829,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
     def _get_operations_status(self, job, cached_status=None):
         "Return a dict with information about job-operations for this job."
         if cached_status is None:
-            cached_status = self.document.get('_status', dict())._as_dict()
+            cached_status = self.document.get('_status', dict())
+            # Convert JSONDict to a dictionary if needed
+            try:
+                cached_status = cached_status._as_dict()
+            except AttributeError:
+                pass
+
         for job_op in self._job_operations([job], False):
             flow_op = self.operations[job_op.name]
             completed = flow_op.complete(job)

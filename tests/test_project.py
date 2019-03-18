@@ -146,6 +146,7 @@ class BaseProjectTest(unittest.TestCase):
         return project
 
 
+@unittest.skipIf(six.PY2, 'Only check performance on Python 3')
 class ProjectStatusTest(BaseProjectTest):
 
     class Project(FlowProject):
@@ -171,7 +172,6 @@ class ProjectStatusTest(BaseProjectTest):
         project = self.mock_project()
 
         MockScheduler.reset()
-        project.update_cache()
 
         time = timeit.timeit(
             lambda: project._fetch_status(project, io.StringIO(),

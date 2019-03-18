@@ -943,7 +943,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                     err.flush()
                 yield _
 
-        cached_status = self.document.get('_status', dict())._as_dict()
+        cached_status = self.document.get('_status', dict())
+        # Convert JSONDict to a dictionary if needed
+        try:
+            cached_status = cached_status._as_dict()
+        except AttributeError:
+            pass
         _get_job_status = functools.partial(self.get_job_status,
                                             ignore_errors=ignore_errors,
                                             cached_status=cached_status)

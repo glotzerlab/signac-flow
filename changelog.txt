@@ -4,6 +4,15 @@ Changes
 
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 
+next
+----
+
+Changed
+++++++
+
+- Status updates only pull from the cache once rather than once per operation.
+
+
 Version 0.7
 ===========
 

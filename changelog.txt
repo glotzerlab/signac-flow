@@ -10,7 +10,7 @@ next
 Changed
 ++++++
 
-- Status updates only pull from the cache once rather than once per operation.
+- The performance of status updates has been improved by a factor of up to 1000 for large data spaces by only pulling from the status cache once rather than once per operation.
 
 
 Version 0.7

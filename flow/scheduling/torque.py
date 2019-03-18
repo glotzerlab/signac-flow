@@ -34,12 +34,12 @@ def _fetch(user=None):
             raise RuntimeError("Torque not available.")
         else:
             raise error
-    if result == "":
+    if len(result.getbuffer()) == 0:
         warnings.warn(
             "No scheduler jobs, from any user(s), were detected. "
             "This may be the result of a misconfiguration in the "
             "environment.", UserWarning)
-        result = "<Data></Data>"
+        result = io.BytesIO(b"<Data></Data>")
     tree = ET.parse(source=result)
     return tree.getroot()
 

@@ -728,7 +728,11 @@ class ProjectMainInterfaceTest(BaseProjectTest):
         try:
             with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
                 with switch_to_directory(self.project.root_directory()):
-                    return subprocess.check_output(_cmd.split(), stderr=subprocess.STDOUT)
+                    if six.PY2:
+                        with open(os.devnull, 'w') as devnull:
+                            return subprocess.check_output(_cmd.split(), stderr=devnull)
+                    else:
+                        return subprocess.check_output(_cmd.split(), stderr=subprocess.DEVNULL)
         except subprocess.CalledProcessError as error:
             print(error, file=sys.stderr)
             print(error.output, file=sys.stderr)

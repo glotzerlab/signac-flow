@@ -63,4 +63,13 @@ contributors:
     given-names: "Matthew  W."
     affiliation: "Vanderbilt University"
     orcid: "https://orcid.org/0000-0002-1460-3983"
+  -
+    family-names: Moran
+    given-names: Shannon
+    affiliation: "University of Michigan"
+    orcid: "https://orcid.org/0000-0002-3579-3149"
+  -
+    family-names: Melle
+    given-names: Yannah
+    affiliation: "University of Michigan"
 ...

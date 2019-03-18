@@ -2586,6 +2586,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             '{} options'.format(self._environment.__name__))
         self._environment.add_args(env_group)
         parser_submit.set_defaults(func=self._main_submit)
+        print('Using environment configuration:', self._environment.__name__, file=sys.stderr)
 
         parser_exec = subparsers.add_parser(
             'exec',

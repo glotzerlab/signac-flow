@@ -12,6 +12,7 @@ import getpass
 import subprocess
 import tempfile
 import logging
+import warnings
 import xml.etree.ElementTree as ET
 
 from .base import Scheduler
@@ -33,6 +34,12 @@ def _fetch(user=None):
             raise RuntimeError("Torque not available.")
         else:
             raise error
+    if results == "":
+        warnings.warn(
+            "No scheduler jobs, from any user(s), were detected. "
+            "This may be the result of a misconfiguration in the "
+            "environment.", UserWarning)
+        results = "<Data></Data>"
     tree = ET.parse(source=result)
     return tree.getroot()
 

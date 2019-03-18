@@ -147,7 +147,7 @@ class BaseProjectTest(unittest.TestCase):
 
 
 @unittest.skipIf(six.PY2, 'Only check performance on Python 3')
-class ProjectStatusTest(BaseProjectTest):
+class ProjectStatusPerformanceTest(BaseProjectTest):
 
     class Project(FlowProject):
         pass

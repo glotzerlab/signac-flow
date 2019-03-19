@@ -11,7 +11,7 @@ next
 Changed
 ++++++
 
-- The performance of status updates has been improved by a factor of up to 1000 for large data spaces by only pulling from the status cache once rather than once per operation (#94).
+- The performance of status updates has been significantly improved (up to a factor of 1,000 for large data spaces) by applying a more efficient caching strategy (#94).
 - Add clear environment notification when submitting job scripts.
 
 Version 0.7

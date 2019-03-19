@@ -16,10 +16,10 @@
 {% endif %}
 {% set cpn = 48 if 'skx' in partition else 68 %}
 #SBATCH --nodes={{ nn|default(cpu_tasks|calc_num_nodes(cpn, threshold, 'CPU'), true) }}
-{% if not use_mpi %}
-#SBATCH --ntasks={{ cpu_tasks }}
-{% else %}
+{% if use_mpi %}
 #SBATCH --ntasks={{ (operations|calc_tasks('nranks', parallel, force), 1)|max }}
+{% else %}
+#SBATCH --ntasks={{ cpu_tasks }}
 {% endif %}
 {% endblock %}
 

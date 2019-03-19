@@ -890,9 +890,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             sjobs.append(sjob)
         return sjobs_map
 
-    def _get_operations_status(self, job):
+    def _get_operations_status(self, job, cached_status):
         "Return a dict with information about job-operations for this job."
-        cached_status = self.document.get('_status', dict())
         for job_op in self._job_operations([job], False):
             flow_op = self.operations[job_op.name]
             completed = flow_op.complete(job)
@@ -904,12 +903,17 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 'completed': completed,
             }
 
-    def get_job_status(self, job, ignore_errors=False):
+    def get_job_status(self, job, ignore_errors=False, cached_status=None):
         "Return a dict with detailed information about the status of a job."
         result = dict()
         result['job_id'] = str(job)
         try:
-            result['operations'] = OrderedDict(self._get_operations_status(job))
+            if cached_status is None:
+                try:
+                    cached_status = self.document['_status']._as_dict()
+                except KeyError:
+                    cached_status = dict()
+            result['operations'] = OrderedDict(self._get_operations_status(job, cached_status))
             result['_operations_error'] = None
         except Exception as error:
             msg = "Error while getting operations status for job '{}': '{}'.".format(job, error)
@@ -971,7 +975,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             scheduler_info = {sjob.name(): sjob.status() for sjob in self.scheduler_jobs(scheduler)}
             status = dict()
             print(self._tr("Query scheduler..."), file=file)
-            for op in self._job_operations(jobs=jobs, only_eligible=False):
+            for op in tqdm(self._job_operations(jobs=jobs, only_eligible=False),
+                           desc="Fetching operation status",
+                           total=len(jobs), file=file):
                 status[op.get_id()] = int(scheduler_info.get(op.get_id(), JobStatus.unknown))
             self.document._status.update(status)
         except NoSchedulerError:
@@ -998,7 +1004,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                     err.flush()
                 yield _
 
-        _get_job_status = functools.partial(self.get_job_status, ignore_errors=ignore_errors)
+        try:
+            cached_status = self.document['_status']._as_dict()
+        except KeyError:
+            cached_status = dict()
+        _get_job_status = functools.partial(self.get_job_status,
+                                            ignore_errors=ignore_errors,
+                                            cached_status=cached_status)
 
         with self._potentially_buffered():
             try:

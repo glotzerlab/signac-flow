@@ -66,6 +66,6 @@ export LAUNCHER_RMI=SLURM
 export LAUNCHER_JOB_FILE={{ launcher_file }}
 
 $LAUNCHER_DIR/paramrun
-
+rm {{ launcher_file }}
 {% endif %}
 {% endblock %}

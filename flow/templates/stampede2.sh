@@ -1,14 +1,13 @@
 {# Templated in accordance with: https://portal.tacc.utexas.edu/user-guides/stampede2 #}
 {% extends "slurm.sh" %}
-{% block tasks %}
-
-{% set use_mpi = false %}
+{% set ns = namespace(use_mpi=false) %}
 {% for operation in operations %}
-{% if operation.directives.nranks or operation.directives.omp_num_threads %}
-{% set use_mpi = true %}
+{% if operation.directives.nranks or operation.directives.omp_num_threads or operation.directives.np > 1 %}
+{% set ns.use_mpi = true %}
 {% endif %}
 {% endfor %}
 
+{% block tasks %}
 {% set threshold = 0 if force else 0.9 %}
 {% set cpu_tasks = operations|calc_tasks('np', parallel, force) %}
 {% if operations|calc_tasks('ngpu', false, true) and not force %}
@@ -16,7 +15,7 @@
 {% endif %}
 {% set cpn = 48 if 'skx' in partition else 68 %}
 #SBATCH --nodes={{ nn|default(cpu_tasks|calc_num_nodes(cpn, threshold, 'CPU'), true) }}
-{% if use_mpi %}
+{% if ns.use_mpi %}
 #SBATCH --ntasks={{ (operations|calc_tasks('nranks', parallel, force), 1)|max }}
 {% else %}
 #SBATCH --ntasks={{ cpu_tasks }}
@@ -32,9 +31,10 @@
 {% endblock %}
 
 {% block body %}
-{% if use_mpi %}
+{% if ns.use_mpi %}
 {% set cmd_suffix = cmd_suffix|default('') ~ (' &' if parallel else '') %}
 {% for operation in (operations|with_np_offset) %}
+
 # {{ "%s"|format(operation) }}
 {% if operation.directives.omp_num_threads %}
 export OMP_NUM_THREADS={{ operation.directives.omp_num_threads }}
@@ -48,7 +48,6 @@ export OMP_NUM_THREADS={{ operation.directives.omp_num_threads }}
 {% endif %}
 {{ mpi_prefix }}{{ cmd_prefix }}{{ operation.cmd }}{{ cmd_suffix }}
 {% endfor %}
-
 {% else %}
 {% if parallel %}
 {{("Bundled submission without MPI on Stampede2 is using launcher; the --parallel option is therefore ignored.")|print_warning}}

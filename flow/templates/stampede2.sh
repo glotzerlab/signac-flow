@@ -32,30 +32,9 @@
 {% endblock %}
 
 {% block body %}
-{% if not use_mpi %}
-{% if parallel%}
-{{("Warning! Bundle submission without mpi on stampede2 is using launcher and --parallel is ignored")|print_warning}}
-{% endif %}
-{% set launcher_file = 'launcher_' ~ id|replace('/', '_') %}
-{% set cmd_suffix = cmd_suffix|default('') %}
-cat << EOF > {{ launcher_file }}
-{% for operation in (operations|with_np_offset) %}
-{{ cmd_prefix }}{{ operation.cmd }}{{ cmd_suffix }}
-{% endfor %}
-EOF
-
-export LAUNCHER_PLUGIN_DIR=$LAUNCHER_DIR/plugins
-export LAUNCHER_RMI=SLURM
-export LAUNCHER_JOB_FILE={{ launcher_file }}
-
-cat {{ launcher_file }}
-#env
-$LAUNCHER_DIR/paramrun
-
-{% else %}
+{% if use_mpi %}
 {% set cmd_suffix = cmd_suffix|default('') ~ (' &' if parallel else '') %}
 {% for operation in (operations|with_np_offset) %}
-
 # {{ "%s"|format(operation) }}
 {% if operation.directives.omp_num_threads %}
 export OMP_NUM_THREADS={{ operation.directives.omp_num_threads }}
@@ -69,5 +48,24 @@ export OMP_NUM_THREADS={{ operation.directives.omp_num_threads }}
 {% endif %}
 {{ mpi_prefix }}{{ cmd_prefix }}{{ operation.cmd }}{{ cmd_suffix }}
 {% endfor %}
+
+{% else %}
+{% if parallel %}
+{{("Bundled submission without MPI on Stampede2 is using launcher; the --parallel option is therefore ignored.")|print_warning}}
+{% endif %}
+{% set launcher_file = 'launcher_' ~ id|replace('/', '_') %}
+{% set cmd_suffix = cmd_suffix|default('') %}
+cat << EOF > {{ launcher_file }}
+{% for operation in (operations|with_np_offset) %}
+{{ cmd_prefix }}{{ operation.cmd }}{{ cmd_suffix }}
+{% endfor %}
+EOF
+
+export LAUNCHER_PLUGIN_DIR=$LAUNCHER_DIR/plugins
+export LAUNCHER_RMI=SLURM
+export LAUNCHER_JOB_FILE={{ launcher_file }}
+
+$LAUNCHER_DIR/paramrun
+
 {% endif %}
 {% endblock %}

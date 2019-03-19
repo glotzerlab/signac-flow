@@ -156,13 +156,15 @@ def calc_num_nodes(np, ppn=1, threshold=0, name=None):
     return check_utilization(nn, np, ppn, threshold, name)
 
 
-def print_warning(warning):
+def print_warning(msg):
     """Print warning message within jinja2 template
 
     :param:
         The warning message as a string
     """
-    print(warning)
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.warn(msg)
     return ''
 
 

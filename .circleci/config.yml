@@ -5,6 +5,19 @@
 version: 2
 
 jobs:
+  check-metadata:
+    docker:
+      - image: circleci/python:3.7
+      - checkout
+      - run:
+          name: install-dev-requirements
+          command: |
+            pip install --user -U -r requirements-test.txt
+      - run:
+          name: check-citation-metadata
+          command: |
+            ./.sync-zenodo-metadata.py --check >/dev/null
+
   pre-test-checks:
     docker:
       - image: circleci/python:3.7
@@ -17,10 +30,6 @@ jobs:
           name: install-dev-requirements
           command: |
             pip install --user -U -r requirements-test.txt
-      - run:
-          name: check-citation-metadata
-          command: |
-            ./.sync-zenodo-metadata.py --check >/dev/null
       - run:
           name: check-code-style
           command: |
@@ -128,6 +137,10 @@ workflows:
   version: 2
   pre-test-checks-and-tests:
     jobs:
+      - check-metadata:
+          filters:
+            branches:
+              only: /release\/.*/
       - pre-test-checks
       - test-2.7:
           requires:

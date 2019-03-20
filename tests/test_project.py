@@ -138,9 +138,11 @@ class BaseProjectTest(unittest.TestCase):
             name='FlowTestProject',
             root=self._tmp_dir.name)
 
-    def mock_project(self):
+    def mock_project(self, heterogeneous=False):
         project = self.project_class.get_project(root=self._tmp_dir.name)
         for a in range(3):
+            if heterogeneous:
+                project.open_job(dict(a=a)).init()   # heterogeneous
             for b in range(3):
                 project.open_job(dict(a=a, b=b)).init()
         return project
@@ -376,7 +378,7 @@ class ProjectTest(BaseProjectTest):
                     self.assertEqual(op.name, 'op2')
             self.assertEqual(i, int(job in even_jobs))
 
-    def test_status(self):
+    def test_get_job_status(self):
         project = self.mock_project()
         for job in project:
             status = project.get_job_status(job)
@@ -388,6 +390,16 @@ class ProjectTest(BaseProjectTest):
                 self.assertEqual(op_status['eligible'], project.operations[op.name].eligible(job))
                 self.assertEqual(op_status['completed'], project.operations[op.name].complete(job))
                 self.assertEqual(op_status['scheduler_status'], JobStatus.unknown)
+
+    def test_project_status_homogenous(self):
+        project = self.mock_project()
+        with redirect_stdout():
+            project.print_status()
+
+    def test_project_status_heterogeneous(self):
+        project = self.mock_project(heterogeneous=True)
+        with redirect_stdout():
+            project.print_status()
 
     def test_script(self):
         project = self.mock_project()

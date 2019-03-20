@@ -146,6 +146,41 @@ class BaseProjectTest(unittest.TestCase):
         return project
 
 
+@unittest.skipIf(six.PY2, 'Only check performance on Python 3')
+class ProjectStatusPerformanceTest(BaseProjectTest):
+
+    class Project(FlowProject):
+        pass
+
+    @Project.operation
+    @Project.post.isfile('DOES_NOT_EXIST')
+    def foo(job):
+        pass
+
+    project_class = Project
+
+    def mock_project(self):
+        project = self.project_class.get_project(root=self._tmp_dir.name)
+        for i in range(1000):
+            project.open_job(dict(i=i)).init()
+        return project
+
+    def test_status_performance(self):
+        '''Ensure that status updates take less than 1 second for a data space of 1000 jobs'''
+        import timeit
+
+        project = self.mock_project()
+
+        MockScheduler.reset()
+
+        time = timeit.timeit(
+            lambda: project._fetch_status(project, io.StringIO(),
+                ignore_errors=False, no_parallelize=False), number=10)
+
+        self.assertTrue(time < 10)
+        MockScheduler.reset()
+
+
 class ProjectClassTest(BaseProjectTest):
 
     def test_operation_definition(self):
@@ -690,7 +725,11 @@ class ProjectMainInterfaceTest(BaseProjectTest):
         try:
             with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
                 with switch_to_directory(self.project.root_directory()):
-                    return subprocess.check_output(_cmd.split(), stderr=subprocess.STDOUT)
+                    if six.PY2:
+                        with open(os.devnull, 'w') as devnull:
+                            return subprocess.check_output(_cmd.split(), stderr=devnull)
+                    else:
+                        return subprocess.check_output(_cmd.split(), stderr=subprocess.DEVNULL)
         except subprocess.CalledProcessError as error:
             print(error, file=sys.stderr)
             print(error.output, file=sys.stderr)

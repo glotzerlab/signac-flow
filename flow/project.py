@@ -1172,7 +1172,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         # Optionally expand parameters argument to all varying parameters.
         if parameters is self.PRINT_STATUS_ALL_VARYING_PARAMETERS:
             parameters = list(sorted({key for job in jobs for key in job.sp.keys()
-                                      if len(set([job.sp[key] for job in jobs])) > 1}))
+                                      if len(set([job.sp.get(key) for job in jobs])) > 1}))
 
         if detailed:
             rows_status = []

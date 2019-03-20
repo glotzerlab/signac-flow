@@ -1040,6 +1040,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
     ])
     "Pretty (unicode) symbols denoting the execution status of operations."
 
+    PRINT_STATUS_ALL_VARYING_PARAMETERS = True
+    """This constant can be used to signal that the print_status() method is supposed
+    to automatically show all varying parameters."""
+
     @_support_legacy_api
     def print_status(self, jobs=None, overview=True, overview_max_lines=None,
                      detailed=False, parameters=None,
@@ -1165,7 +1169,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             else:
                 return x
 
-        if parameters is not None and len(parameters) == 0:
+        # Optionally expand parameters argument to all varying parameters.
+        if parameters is self.PRINT_STATUS_ALL_VARYING_PARAMETERS:
             parameters = list(sorted({key for job in jobs for key in job.sp.keys()
                                       if len(set([job.sp[key] for job in jobs])) > 1}))
 
@@ -2669,6 +2674,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         if args.debug:  # Implies '-vv' and '--show-traceback'
             args.verbose = max(2, args.verbose)
             args.show_traceback = True
+
+        # Empty parameters argument on the command line means: show all varying parameters.
+        if hasattr(args, 'parameters'):
+            if args.parameters is not None and len(args.parameters) == 0:
+                args.parameters = self.PRINT_STATUS_ALL_VARYING_PARAMETERS
 
         # Set verbosity level according to the `-v` argument.
         logging.basicConfig(level=max(0, logging.WARNING - 10 * args.verbose))

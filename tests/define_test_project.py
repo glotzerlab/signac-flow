@@ -18,7 +18,10 @@ def negative_default_label(job):
 
 @TestProject.label
 def b_is_even(job):
-    return job.sp.b % 2 == 0
+    try:
+        return job.sp.b % 2 == 0
+    except AttributeError:
+        return False
 
 
 @TestProject.operation

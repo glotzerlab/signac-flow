@@ -7,7 +7,7 @@ The **signac-flow** package follows `semantic versioning <https://semver.org/>`_
 next
 ----
 
-- added functionality to print all statepoint parameters with a status call "-l"
+- Add function to automatically print all varying state point parameters in the detailed status view triggered by providing option `-p/--parameters` without arguments (#19, #87).
 
 Version 0.7
 ===========

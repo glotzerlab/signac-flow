@@ -391,15 +391,19 @@ class ProjectTest(BaseProjectTest):
                 self.assertEqual(op_status['completed'], project.operations[op.name].complete(job))
                 self.assertEqual(op_status['scheduler_status'], JobStatus.unknown)
 
-    def test_project_status_homogenous(self):
+    def test_project_status_homogeneous_schema(self):
         project = self.mock_project()
-        with redirect_stdout():
-            project.print_status()
+        for parameters in (None, True, ['a'], ['b'], ['a', 'b']):
+            with redirect_stdout():
+                with redirect_stderr():
+                    project.print_status(parameters=parameters, detailed=True)
 
-    def test_project_status_heterogeneous(self):
+    def test_project_status_heterogeneous_schema(self):
         project = self.mock_project(heterogeneous=True)
-        with redirect_stdout():
-            project.print_status()
+        for parameters in (None, True, ['a'], ['b'], ['a', 'b']):
+            with redirect_stdout():
+                with redirect_stderr():
+                    project.print_status(parameters=parameters, detailed=True)
 
     def test_script(self):
         project = self.mock_project()

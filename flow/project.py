@@ -2066,7 +2066,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         view_group.add_argument(
             '-p', '--parameters',
             type=str,
-            # action='store',
             nargs='*',
             help="Display select parameters of the job's "
                  "statepoint with the detailed view.")

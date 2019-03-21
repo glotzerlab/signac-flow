@@ -12,7 +12,6 @@ import getpass
 import subprocess
 import tempfile
 import logging
-import warnings
 import xml.etree.ElementTree as ET
 
 from .base import Scheduler

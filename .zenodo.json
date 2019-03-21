@@ -20,11 +20,6 @@
             "orcid": "0000-0002-5709-7259"
         },
         {
-            "affiliation": "Vanderbilt University",
-            "name": "Matthew  W. Thompson",
-            "orcid": "0000-0002-1460-3983"
-        },
-        {
             "affiliation": "University of Michigan",
             "name": "Rose Cersonsky",
             "orcid": "0000-0003-4515-3441"
@@ -32,6 +27,11 @@
         {
             "affiliation": "University of Michigan",
             "name": "Yuan Zhou"
+        },
+        {
+            "affiliation": "Vanderbilt University",
+            "name": "Matthew  W. Thompson",
+            "orcid": "0000-0002-1460-3983"
         }
     ],
     "creators": [

@@ -58,4 +58,9 @@ contributors:
     family-names: Zhou
     given-names: Yuan
     affiliation: "University of Michigan"
+  -
+    family-names: Thompson
+    given-names: "Matthew  W."
+    affiliation: "Vanderbilt University"
+    orcid: "https://orcid.org/0000-0002-1460-3983"
 ...

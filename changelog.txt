@@ -8,6 +8,7 @@ next
 ----
 
 - Add function to automatically print all varying state point parameters in the detailed status view triggered by providing option `-p/--parameters` without arguments (#19, #87).
+- Fix issue with the TORQUE scheduler that occured when there was no job scheduled at all on the system (for any user) (#92, #93).
 
 Version 0.7
 ===========

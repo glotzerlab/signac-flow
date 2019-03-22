@@ -247,7 +247,7 @@ class JobOperation(object):
         directives.setdefault('ngpu', 0)
         directives.setdefault('nranks', 0)
         directives.setdefault('omp_num_threads', 0)
-        directives.setdefault('factor', 1)
+        directives.setdefault('processor_fraction', 1)
 
         # Evaluate strings and callables for job:
         def evaluate(value):
@@ -1235,7 +1235,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 print("\n## Labels:", file=file)
                 print(status_table, file=file)
                 print("\n## Operations:", file=file)
-                rows_operations = [row for rows in rows_operations for row in rows]  # flatten list
+                rows_operations = [row for rs in rows_operations for row in rs]  # flatten list
                 print(tabulate.tabulate(rows_operations, headers=header_operations), file=file)
             elif unroll:
                 print(status_table, file=file)

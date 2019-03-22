@@ -4,6 +4,11 @@ Changes
 
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 
+next
+----
+
+- Add full launcher support for job submission on stampede2 for large parallel single processor jobs.
+
 Version 0.7
 ===========
 

@@ -18,7 +18,6 @@ option is to use a FlowGraph.
 from __future__ import print_function
 import sys
 import os
-import re
 import logging
 import warnings
 import argparse
@@ -63,6 +62,7 @@ from .util import template_filters as tf
 from .util.misc import add_cwd_to_environment_pythonpath
 from .util.misc import switch_to_directory
 from .util.misc import TrackGetItemDict
+from .util.misc import fullmatch
 from .util.progressbar import with_progressbar
 from .util.translate import abbreviate
 from .util.translate import shorten
@@ -1583,17 +1583,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
     def _get_pending_operations(self, jobs, operation_names=None):
         "Get all pending operations for the given selection."
-        if operation_names is None:
-            names = patterns = None
-        else:
-            patterns = [name.lstrip('/') for name in operation_names if name.startswith('/')]
-            names = [name for name in operation_names if not name.startswith('/')]
-
         for op in self.next_operations(* jobs):
-            if names or patterns:
-                if op.name in names or any(re.match(p, op.name) for p in patterns):
-                    yield op
-            else:
+            if operation_names is None or any(fullmatch(n, op.name) for n in operation_names):
                 yield op
 
     @contextlib.contextmanager

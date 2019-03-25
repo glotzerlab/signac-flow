@@ -7,10 +7,15 @@ The **signac-flow** package follows `semantic versioning <https://semver.org/>`_
 Version 0.7
 ===========
 
-[0.7.0] -- 2019-03-14
+*The numbers in brackets denote the related GitHub issue or pull request.*
+
+[0.7.1] -- 2019-03-25
 ---------------------
 
-*The numbers in brackets denote the related GitHub issue or pull request.*
+- Fix issue where the scheduler status of job-operations would not be properly updated for *ineligible* operations (#96).
+
+[0.7.0] -- 2019-03-14
+---------------------
 
 Added
 +++++

@@ -102,15 +102,13 @@ class MockScheduler(Scheduler):
                 break
         cid = uuid.uuid4()
         cls._jobs[cid] = ClusterJob(_id, status=JobStatus.submitted)
-        cls._scripts[cid] = script
+        pythonpath = ':'.join(os.environ.get('PYTHONPATH', '').split(':') + flow.__path__)
+        cls._scripts[cid] = 'export PYTHONPATH={}\n'.format(pythonpath) + script
         return JobStatus.submitted
 
     @classmethod
     def step(cls):
         "Mock pushing of jobs through the queue."
-        env = dict(os.environ)
-        env['PYTHONPATH'] = ':'.join(env.get('PYTHONPATH', '').split(':') + flow.__path__)
-
         remove = set()
         for cid, job in cls._jobs.items():
             if job._status == JobStatus.inactive:
@@ -124,7 +122,7 @@ class MockScheduler(Scheduler):
                         with tempfile.NamedTemporaryFile() as tmpfile:
                             tmpfile.write(cls._scripts[cid].encode('utf-8'))
                             tmpfile.flush()
-                            subprocess.check_call(['/bin/bash', tmpfile.name], env=env)
+                            subprocess.check_call(['/bin/bash', tmpfile.name])
                     except Exception:
                         job._status = JobStatus.error
                         raise

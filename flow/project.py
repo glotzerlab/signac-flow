@@ -971,7 +971,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             scheduler_info = {sjob.name(): sjob.status() for sjob in self.scheduler_jobs(scheduler)}
             status = dict()
             print(self._tr("Query scheduler..."), file=file)
-            for op in self.next_operations(*jobs):
+            for op in self._job_operations(jobs=jobs, only_eligible=False):
                 status[op.get_id()] = int(scheduler_info.get(op.get_id(), JobStatus.unknown))
             self.document._status.update(status)
         except NoSchedulerError:

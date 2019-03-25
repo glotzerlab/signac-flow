@@ -227,7 +227,7 @@ class JobsOperation(object):
     """
     MAX_LEN_ID = 100
 
-    def __init__(self, name, cmd, *jobs, directives=None, np=None):
+    def __init__(self, name, cmd, *jobs, directives=None):
         if not len(jobs):
             raise ValueError("The jobs argument cannot be empty!")
         self.name = name

@@ -16,6 +16,7 @@ from distutils.version import StrictVersion
 
 import signac
 from signac.common import six
+import flow
 from flow import FlowProject, cmd, with_job, directives
 from flow.scheduling.base import Scheduler
 from flow.scheduling.base import ClusterJob
@@ -107,6 +108,9 @@ class MockScheduler(Scheduler):
     @classmethod
     def step(cls):
         "Mock pushing of jobs through the queue."
+        env = dict(os.environ)
+        env['PYTHONPATH'] = ':'.join(env.get('PYTHONPATH', '').split(':') + flow.__path__)
+
         remove = set()
         for cid, job in cls._jobs.items():
             if job._status == JobStatus.inactive:
@@ -120,7 +124,7 @@ class MockScheduler(Scheduler):
                         with tempfile.NamedTemporaryFile() as tmpfile:
                             tmpfile.write(cls._scripts[cid].encode('utf-8'))
                             tmpfile.flush()
-                            subprocess.check_call(['/bin/bash', tmpfile.name])
+                            subprocess.check_call(['/bin/bash', tmpfile.name], env=env)
                     except Exception:
                         job._status = JobStatus.error
                         raise

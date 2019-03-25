@@ -10,11 +10,13 @@ import os
 import sys
 import inspect
 import subprocess
+import tempfile
 from contextlib import contextmanager
 from distutils.version import StrictVersion
 
 import signac
 from signac.common import six
+import flow
 from flow import FlowProject, cmd, with_job, directives
 from flow.scheduling.base import Scheduler
 from flow.scheduling.base import ClusterJob
@@ -85,6 +87,7 @@ class StringIO(io.StringIO):
 
 class MockScheduler(Scheduler):
     _jobs = {}  # needs to be singleton
+    _scripts = {}
 
     @classmethod
     def jobs(cls):
@@ -99,6 +102,10 @@ class MockScheduler(Scheduler):
                 break
         cid = uuid.uuid4()
         cls._jobs[cid] = ClusterJob(_id, status=JobStatus.submitted)
+        signac_path = os.path.dirname(os.path.dirname(os.path.abspath(signac.__file__)))
+        flow_path = os.path.dirname(os.path.dirname(os.path.abspath(flow.__file__)))
+        pythonpath = ':'.join(os.environ.get('PYTHONPATH', []) + [signac_path, flow_path])
+        cls._scripts[cid] = 'export PYTHONPATH={}\n'.format(pythonpath) + script
         return JobStatus.submitted
 
     @classmethod
@@ -109,9 +116,22 @@ class MockScheduler(Scheduler):
             if job._status == JobStatus.inactive:
                 remove.add(cid)
             else:
-                job._status = JobStatus(job._status + 1)
-                if job._status > JobStatus.active:
-                    job._status = JobStatus.inactive
+                if job._status in (JobStatus.submitted, JobStatus.held):
+                    job._status = JobStatus(job._status + 1)
+                elif job._status == JobStatus.queued:
+                    job._status = JobStatus.active
+                    try:
+                        with tempfile.NamedTemporaryFile() as tmpfile:
+                            tmpfile.write(cls._scripts[cid].encode('utf-8'))
+                            tmpfile.flush()
+                            subprocess.check_call(['/bin/bash', tmpfile.name])
+                    except Exception:
+                        job._status = JobStatus.error
+                        raise
+                    else:
+                        job._status = JobStatus.inactive
+                else:
+                    raise RuntimeError("Unable to process status '{}'.".format(job._status))
         for cid in remove:
             del cls._jobs[cid]
 
@@ -146,6 +166,41 @@ class BaseProjectTest(unittest.TestCase):
             for b in range(3):
                 project.open_job(dict(a=a, b=b)).init()
         return project
+
+
+@unittest.skipIf(six.PY2, 'Only check performance on Python 3')
+class ProjectStatusPerformanceTest(BaseProjectTest):
+
+    class Project(FlowProject):
+        pass
+
+    @Project.operation
+    @Project.post.isfile('DOES_NOT_EXIST')
+    def foo(job):
+        pass
+
+    project_class = Project
+
+    def mock_project(self):
+        project = self.project_class.get_project(root=self._tmp_dir.name)
+        for i in range(1000):
+            project.open_job(dict(i=i)).init()
+        return project
+
+    def test_status_performance(self):
+        '''Ensure that status updates take less than 1 second for a data space of 1000 jobs'''
+        import timeit
+
+        project = self.mock_project()
+
+        MockScheduler.reset()
+
+        time = timeit.timeit(
+            lambda: project._fetch_status(project, io.StringIO(),
+                                          ignore_errors=False, no_parallelize=False), number=10)
+
+        self.assertTrue(time < 10)
+        MockScheduler.reset()
 
 
 class ProjectClassTest(BaseProjectTest):
@@ -448,6 +503,7 @@ class ProjectTest(BaseProjectTest):
 
 class ExecutionProjectTest(BaseProjectTest):
     project_class = TestProject
+    expected_number_of_steps = 4
 
     def test_run(self):
         project = self.mock_project()
@@ -549,12 +605,19 @@ class ExecutionProjectTest(BaseProjectTest):
         num_jobs_submitted = len(project) + len(even_jobs)
         self.assertEqual(len(list(MockScheduler.jobs())), 0)
         with redirect_stderr(StringIO()):
+            # Initial submission
             project.submit()
-            for i in range(5):  # push all jobs through the queue
-                self.assertEqual(len(list(MockScheduler.jobs())), num_jobs_submitted)
-                project.submit()
+            self.assertEqual(len(list(MockScheduler.jobs())), num_jobs_submitted)
+
+            # Resubmit a bunch of times:
+            for i in range(1, self.expected_number_of_steps + 3):
                 MockScheduler.step()
-        self.assertEqual(len(list(MockScheduler.jobs())), 0)
+                project.submit()
+                if len(list(MockScheduler.jobs())) == 0:
+                    break    # break when there are no jobs left
+
+        # Check that the actually required number of steps is equal to the expected number:
+        self.assertEqual(i, self.expected_number_of_steps)
 
     def test_bundles(self):
         MockScheduler.reset()
@@ -598,6 +661,15 @@ class ExecutionProjectTest(BaseProjectTest):
             next_op = project.next_operation(job)
             self.assertIsNotNone(next_op)
             self.assertEqual(next_op.get_status(), JobStatus.queued)
+
+        MockScheduler.step()
+        project._fetch_scheduler_status(file=StringIO())
+        for job in project:
+            job_status = project.get_job_status(job)
+            for op in ('op1', 'op2'):
+                self.assertIn(
+                    job_status['operations'][op]['scheduler_status'],
+                    (JobStatus.unknown, JobStatus.inactive))
 
     @unittest.skipIf(six.PY2, 'logger output not caught for Python 2.7')
     def test_submit_operations_bad_directive(self):
@@ -678,6 +750,7 @@ class BufferedExecutionProjectTest(ExecutionProjectTest):
 
 class ExecutionDynamicProjectTest(ExecutionProjectTest):
     project_class = TestDynamicProject
+    expected_number_of_steps = 10
 
 
 class BufferedExecutionDynamicProjectTest(BufferedExecutionProjectTest,
@@ -706,7 +779,11 @@ class ProjectMainInterfaceTest(BaseProjectTest):
         try:
             with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
                 with switch_to_directory(self.project.root_directory()):
-                    return subprocess.check_output(_cmd.split(), stderr=subprocess.STDOUT)
+                    if six.PY2:
+                        with open(os.devnull, 'w') as devnull:
+                            return subprocess.check_output(_cmd.split(), stderr=devnull)
+                    else:
+                        return subprocess.check_output(_cmd.split(), stderr=subprocess.DEVNULL)
         except subprocess.CalledProcessError as error:
             print(error, file=sys.stderr)
             print(error.output, file=sys.stderr)

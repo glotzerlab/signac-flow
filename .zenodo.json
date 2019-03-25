@@ -32,6 +32,15 @@
             "affiliation": "Vanderbilt University",
             "name": "Matthew  W. Thompson",
             "orcid": "0000-0002-1460-3983"
+        },
+        {
+            "affiliation": "University of Michigan",
+            "name": "Shannon Moran",
+            "orcid": "0000-0002-3579-3149"
+        },
+        {
+            "affiliation": "University of Michigan",
+            "name": "Yannah Melle"
         }
     ],
     "creators": [
@@ -78,5 +87,5 @@
         "id": "http://www.opensource.org/licenses/BSD-3-Clause"
     },
     "title": "signac-flow",
-    "version": "0.7.0"
+    "version": "0.7.1"
 }

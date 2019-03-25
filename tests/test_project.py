@@ -10,6 +10,7 @@ import os
 import sys
 import inspect
 import subprocess
+import tempfile
 from contextlib import contextmanager
 from distutils.version import StrictVersion
 
@@ -85,6 +86,7 @@ class StringIO(io.StringIO):
 
 class MockScheduler(Scheduler):
     _jobs = {}  # needs to be singleton
+    _scripts = {}
 
     @classmethod
     def jobs(cls):
@@ -99,6 +101,7 @@ class MockScheduler(Scheduler):
                 break
         cid = uuid.uuid4()
         cls._jobs[cid] = ClusterJob(_id, status=JobStatus.submitted)
+        cls._scripts[cid] = script
         return JobStatus.submitted
 
     @classmethod
@@ -109,9 +112,20 @@ class MockScheduler(Scheduler):
             if job._status == JobStatus.inactive:
                 remove.add(cid)
             else:
-                job._status = JobStatus(job._status + 1)
-                if job._status > JobStatus.active:
-                    job._status = JobStatus.inactive
+                if job._status in (JobStatus.submitted, JobStatus.held):
+                    job._status = JobStatus(job._status + 1)
+                elif job._status == JobStatus.queued:
+                    job._status = JobStatus.active
+                    try:
+                        with tempfile.NamedTemporaryFile() as tmpfile:
+                            tmpfile.write(cls._scripts[cid].encode('utf-8'))
+                            tmpfile.flush()
+                            subprocess.check_call(['/bin/bash', tmpfile.name])
+                    except Exception:
+                        job._status = JobStatus.error
+                        raise
+                    else:
+                        job._status = JobStatus.inactive
         for cid in remove:
             del cls._jobs[cid]
 
@@ -432,6 +446,7 @@ class ProjectTest(BaseProjectTest):
 
 class ExecutionProjectTest(BaseProjectTest):
     project_class = TestProject
+    expected_number_of_steps = 4
 
     def test_run(self):
         project = self.mock_project()
@@ -533,12 +548,19 @@ class ExecutionProjectTest(BaseProjectTest):
         num_jobs_submitted = len(project) + len(even_jobs)
         self.assertEqual(len(list(MockScheduler.jobs())), 0)
         with redirect_stderr(StringIO()):
+            # Initial submission
             project.submit()
-            for i in range(5):  # push all jobs through the queue
-                self.assertEqual(len(list(MockScheduler.jobs())), num_jobs_submitted)
-                project.submit()
+            self.assertEqual(len(list(MockScheduler.jobs())), num_jobs_submitted)
+
+            # Resubmit a bunch of times:
+            for i in range(1, self.expected_number_of_steps + 3):
                 MockScheduler.step()
-        self.assertEqual(len(list(MockScheduler.jobs())), 0)
+                project.submit()
+                if len(list(MockScheduler.jobs())) == 0:
+                    break    # break when there are no jobs left
+
+        # Check that the actually required number of steps is equal to the expected number:
+        self.assertEqual(i, self.expected_number_of_steps)
 
     def test_bundles(self):
         MockScheduler.reset()
@@ -582,6 +604,15 @@ class ExecutionProjectTest(BaseProjectTest):
             next_op = project.next_operation(job)
             self.assertIsNotNone(next_op)
             self.assertEqual(next_op.get_status(), JobStatus.queued)
+
+        MockScheduler.step()
+        project._fetch_scheduler_status(file=StringIO())
+        for job in project:
+            job_status = project.get_job_status(job)
+            for op in ('op1', 'op2'):
+                self.assertIn(
+                    job_status['operations'][op]['scheduler_status'],
+                    (JobStatus.unknown, JobStatus.inactive))
 
     @unittest.skipIf(six.PY2, 'logger output not caught for Python 2.7')
     def test_submit_operations_bad_directive(self):
@@ -662,6 +693,7 @@ class BufferedExecutionProjectTest(ExecutionProjectTest):
 
 class ExecutionDynamicProjectTest(ExecutionProjectTest):
     project_class = TestDynamicProject
+    expected_number_of_steps = 10
 
 
 class BufferedExecutionDynamicProjectTest(BufferedExecutionProjectTest,

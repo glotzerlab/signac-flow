@@ -53,4 +53,4 @@ def op3(job):
 
 
 if __name__ == '__main__':
-    TestProject().main()
+    TestDynamicProject().main()

@@ -7,9 +7,6 @@ The **signac-flow** package follows `semantic versioning <https://semver.org/>`_
 next
 ----
 
-- Add function to automatically print all varying state point parameters in the detailed status view triggered by providing option `-p/--parameters` without arguments (#19, #87).
-- Fix issue with the TORQUE scheduler that occured when there was no job scheduled at all on the system (for any user) (#92, #93).
-
 Version 0.7
 ===========
 
@@ -18,7 +15,19 @@ Version 0.7
 [0.7.1] -- 2019-03-25
 ---------------------
 
+Added
++++++
+- Add function to automatically print all varying state point parameters in the detailed status view triggered by providing option `-p/--parameters` without arguments (#19, #87).
+
+Fixes
++++++
+
 - Fix issue where the scheduler status of job-operations would not be properly updated for *ineligible* operations (#96).
+
+Fixes (compute environments)
+++++++++++++++++++++++++++++
+
+- Fix issue with the TORQUE scheduler that occured when there was no job scheduled at all on the system (for any user) (#92, #93).
 
 [0.7.0] -- 2019-03-14
 ---------------------

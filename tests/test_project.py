@@ -130,6 +130,8 @@ class MockScheduler(Scheduler):
                         raise
                     else:
                         job._status = JobStatus.inactive
+                else:
+                    raise RuntimeError("Unable to process status '{}'.".format(job._status))
         for cid in remove:
             del cls._jobs[cid]
 

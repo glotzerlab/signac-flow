@@ -912,7 +912,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             scheduler_info = {sjob.name(): sjob.status() for sjob in self.scheduler_jobs(scheduler)}
             status = dict()
             print(self._tr("Query scheduler..."), file=file)
-            for op in tqdm(self.next_operations(*jobs),
+            for op in tqdm(self._job_operations(jobs=jobs, only_eligible=False),
                            desc="Fetching operation status",
                            total=len(jobs), file=file):
                 status[op.get_id()] = int(scheduler_info.get(op.get_id(), JobStatus.unknown))
@@ -989,8 +989,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
     ])
     "Pretty (unicode) symbols denoting the execution status of operations."
 
+    PRINT_STATUS_ALL_VARYING_PARAMETERS = True
+    """This constant can be used to signal that the print_status() method is supposed
+    to automatically show all varying parameters."""
+
     def print_status(self, jobs=None, overview=True, overview_max_lines=None,
-                     detailed=False, parameters=None, skip_active=False, param_max_width=None,
+                     detailed=False, parameters=None,
+                     skip_active=False, param_max_width=None,
                      expand=False, all_ops=False, only_incomplete=False, dump_json=False,
                      unroll=True, compact=False, pretty=False,
                      file=None, err=None, ignore_errors=False,
@@ -1154,6 +1159,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             else:
                 return x
 
+        # Optionally expand parameters argument to all varying parameters.
+        if parameters is self.PRINT_STATUS_ALL_VARYING_PARAMETERS:
+            parameters = list(sorted({key for job in jobs for key in job.sp.keys()
+                                      if len(set([job.sp.get(key) for job in jobs])) > 1}))
+
         if detailed:
             rows_status = []
             columns = ['job_id', 'labels']
@@ -1184,6 +1194,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                     for i, k in enumerate(parameters):
                         v = self._alias(get(k, sp))
                         row.insert(i + 1, None if v is None else shorten(str(v), param_max_width))
+
                 if unroll:
                     selected_ops = [name for name, op in status['operations'].items()
                                     if _select_op(op)]
@@ -2631,6 +2642,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         # Support print_status argument alias
         if args.func == self._main_status and args.full:
             args.detailed = args.all_ops = True
+
+        # Empty parameters argument on the command line means: show all varying parameters.
+        if hasattr(args, 'parameters'):
+            if args.parameters is not None and len(args.parameters) == 0:
+                args.parameters = self.PRINT_STATUS_ALL_VARYING_PARAMETERS
 
         # Set verbosity level according to the `-v` argument.
         logging.basicConfig(level=max(0, logging.WARNING - 10 * args.verbose))

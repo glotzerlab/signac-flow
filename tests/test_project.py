@@ -125,7 +125,9 @@ class MockScheduler(Scheduler):
                             tmpfile.write(cls._scripts[cid].encode('utf-8'))
                             tmpfile.flush()
                             if six.PY2:
-                                unittest.skip("requires python 3")
+                                with open(os.devnull, 'w') as devnull:
+                                    subprocess.check_call(
+                                        ['/bin/bash', tmpfile.name], stderr=devnull)
                             else:
                                 subprocess.check_call(
                                     ['/bin/bash', tmpfile.name], stderr=subprocess.DEVNULL)

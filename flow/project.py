@@ -1296,7 +1296,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
     def _loads_op(self, blob):
         name, cmd, job_ids, directives = blob
-        jobs = (self.open_job(id=job_id) for job_id in job_ids)
+        jobs = [self.open_job(id=job_id) for job_id in job_ids]
         return JobsOperation(name, cmd, jobs, directives=directives)
 
     def _run_operations_in_parallel(self, pool, pickle, operations, progress, timeout):

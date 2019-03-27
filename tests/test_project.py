@@ -124,7 +124,11 @@ class MockScheduler(Scheduler):
                         with tempfile.NamedTemporaryFile() as tmpfile:
                             tmpfile.write(cls._scripts[cid].encode('utf-8'))
                             tmpfile.flush()
-                            subprocess.check_call(['/bin/bash', tmpfile.name])
+                            if six.PY2:
+                                unittest.skip("requires python 3")
+                            else:
+                                subprocess.check_call(
+                                    ['/bin/bash', tmpfile.name], stderr=subprocess.DEVNULL)
                     except Exception:
                         job._status = JobStatus.error
                         raise

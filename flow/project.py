@@ -30,7 +30,6 @@ from collections import defaultdict
 from collections import OrderedDict
 from itertools import islice
 from itertools import count
-from itertools import tee
 from hashlib import sha1
 from multiprocessing import Pool
 from multiprocessing import cpu_count
@@ -2230,11 +2229,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         assert isinstance(jobs, (list, tuple))
         for name, op in self.operations.items():
             if op.aggregate:
-                for group in op.aggregate(jobs):
-                    g1, g2, g3 = tee(group, 3)
-                    if only_eligible and not op.eligible(*g1):
+                for group in [[job for job in group if job is not None]
+                              for group in op.aggregate(jobs)]:
+                    if only_eligible and not op.eligible(*group):
                         continue
-                    yield JobsOperation(name, op(*g2), *g3, directives=op.directives)
+                    yield JobsOperation(name, op(*group), *group, directives=op.directives)
             else:
                 for job in jobs:
                     if only_eligible and not op.eligible(job):

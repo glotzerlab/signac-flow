@@ -560,7 +560,7 @@ class ExecutionProjectTest(BaseProjectTest):
                 project.run(names=['op1', 'non-existent-op'])
                 self.assertTrue(all(job.isfile('world.txt') for job in even_jobs))
                 self.assertFalse(any(job.doc.get('test') for job in project))
-                project.run(names=['op.*', 'non-existent-op'])
+                project.run(names=['op[^3]', 'non-existent-op'])
                 self.assertTrue(all(job.isfile('world.txt') for job in even_jobs))
                 self.assertTrue(all(job.doc.get('test') for job in project))
 

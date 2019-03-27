@@ -25,7 +25,7 @@ from .template import init
 from .util.misc import redirect_log
 from .operations import with_job
 
-__version__ = '0.7.0'
+__version__ = '0.7.1'
 
 __all__ = [
     'environment',

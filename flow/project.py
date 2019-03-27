@@ -828,9 +828,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 expanded = JobOperation.expand_id(name)
                 yield expanded['job_id'], expanded['operation-name'], sjob
 
-    def _get_operations_status(self, job):
+    def _get_operations_status(self, job, cached_status):
         "Return a dict with information about job-operations for this job."
-        cached_status = self.document.get('_status', dict())
         for job_op in self._job_operations([job], False):
             flow_op = self.operations[job_op.name]
             completed = flow_op.complete(job)
@@ -842,12 +841,17 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 'completed': completed,
             }
 
-    def get_job_status(self, job, ignore_errors=False):
+    def get_job_status(self, job, ignore_errors=False, cached_status=None):
         "Return a dict with detailed information about the status of a job."
         result = dict()
         result['job_id'] = str(job)
         try:
-            result['operations'] = OrderedDict(self._get_operations_status(job))
+            if cached_status is None:
+                try:
+                    cached_status = self.document['_status']._as_dict()
+                except KeyError:
+                    cached_status = dict()
+            result['operations'] = OrderedDict(self._get_operations_status(job, cached_status))
             result['_operations_error'] = None
         except Exception as error:
             msg = "Error while getting operations status for job '{}': '{}'.".format(job, error)
@@ -909,7 +913,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             scheduler_info = {sjob.name(): sjob.status() for sjob in self.scheduler_jobs(scheduler)}
             status = dict()
             print(self._tr("Query scheduler..."), file=file)
-            for op in self.next_operations(*jobs):
+            for op in tqdm(self._job_operations(jobs=jobs, only_eligible=False),
+                           desc="Fetching operation status",
+                           total=len(jobs), file=file):
                 status[op.get_id()] = int(scheduler_info.get(op.get_id(), JobStatus.unknown))
             self.document._status.update(status)
         except NoSchedulerError:
@@ -936,7 +942,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                     err.flush()
                 yield _
 
-        _get_job_status = functools.partial(self.get_job_status, ignore_errors=ignore_errors)
+        try:
+            cached_status = self.document['_status']._as_dict()
+        except KeyError:
+            cached_status = dict()
+        _get_job_status = functools.partial(self.get_job_status,
+                                            ignore_errors=ignore_errors,
+                                            cached_status=cached_status)
 
         with self._potentially_buffered():
             try:
@@ -978,8 +990,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
     ])
     "Pretty (unicode) symbols denoting the execution status of operations."
 
+    PRINT_STATUS_ALL_VARYING_PARAMETERS = True
+    """This constant can be used to signal that the print_status() method is supposed
+    to automatically show all varying parameters."""
+
     def print_status(self, jobs=None, overview=True, overview_max_lines=None,
-                     detailed=False, parameters=None, skip_active=False, param_max_width=None,
+                     detailed=False, parameters=None,
+                     skip_active=False, param_max_width=None,
                      expand=False, all_ops=False, only_incomplete=False, dump_json=False,
                      unroll=True, compact=False, pretty=False,
                      file=None, err=None, ignore_errors=False,
@@ -1143,6 +1160,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             else:
                 return x
 
+        # Optionally expand parameters argument to all varying parameters.
+        if parameters is self.PRINT_STATUS_ALL_VARYING_PARAMETERS:
+            parameters = list(sorted({key for job in jobs for key in job.sp.keys()
+                                      if len(set([job.sp.get(key) for job in jobs])) > 1}))
+
         if detailed:
             rows_status = []
             columns = ['job_id', 'labels']
@@ -1173,6 +1195,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                     for i, k in enumerate(parameters):
                         v = self._alias(get(k, sp))
                         row.insert(i + 1, None if v is None else shorten(str(v), param_max_width))
+
                 if unroll:
                     selected_ops = [name for name, op in status['operations'].items()
                                     if _select_op(op)]
@@ -2588,6 +2611,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             '{} options'.format(self._environment.__name__))
         self._environment.add_args(env_group)
         parser_submit.set_defaults(func=self._main_submit)
+        print('Using environment configuration:', self._environment.__name__, file=sys.stderr)
 
         parser_exec = subparsers.add_parser(
             'exec',
@@ -2624,6 +2648,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         # Support print_status argument alias
         if args.func == self._main_status and args.full:
             args.detailed = args.all_ops = True
+
+        # Empty parameters argument on the command line means: show all varying parameters.
+        if hasattr(args, 'parameters'):
+            if args.parameters is not None and len(args.parameters) == 0:
+                args.parameters = self.PRINT_STATUS_ALL_VARYING_PARAMETERS
 
         # Set verbosity level according to the `-v` argument.
         logging.basicConfig(level=max(0, logging.WARNING - 10 * args.verbose))

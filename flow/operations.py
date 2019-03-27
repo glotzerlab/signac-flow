@@ -15,7 +15,6 @@ from multiprocessing import Pool
 from hashlib import sha1
 from functools import wraps
 from itertools import groupby
-from itertools import zip_longest
 
 from signac import get_project
 from signac.common import six
@@ -146,7 +145,12 @@ class aggregate(object):
         # copied from: https://docs.python.org/3/library/itertools.html#itertools.zip_longest
         def grouper(jobs):
             args = [iter(jobs)] * num
-            return zip_longest(*args, fillvalue=fillvalue)
+            if six.PY2:
+                from itertools import izip_longest
+                return list(izip_longest(*args, fillvalue=fillvalue))
+            else:
+                from itertools import zip_longest
+                return zip_longest(*args, fillvalue=fillvalue)
 
         return cls(grouper)
 

@@ -851,12 +851,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
     def _get_operations_status(self, job, cached_status):
         "Return a dict with information about job-operations for this job."
-        for job_op in self._job_operations([job], False):
-            flow_op = self.operations[job_op.name]
+        for jobs_op in self._jobs_operations([job], only_eligible=False):
+            flow_op = self.operations[jobs_op.name]
             completed = flow_op.complete(job)
             eligible = False if completed else flow_op.eligible(job)
-            scheduler_status = cached_status.get(job_op.get_id(), JobStatus.unknown)
-            yield job_op.name, {
+            scheduler_status = cached_status.get(jobs_op.get_id(), JobStatus.unknown)
+            yield jobs_op.name, {
                 'scheduler_status': scheduler_status,
                 'eligible': eligible,
                 'completed': completed,
@@ -926,7 +926,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         if file is None:
             file = sys.stderr
         if jobs is None:
-            jobs = list(self)
+            jobs = self
         try:
             scheduler = self._environment.get_scheduler()
 
@@ -934,7 +934,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             scheduler_info = {sjob.name(): sjob.status() for sjob in self.scheduler_jobs(scheduler)}
             status = dict()
             print(self._tr("Query scheduler..."), file=file)
-            for op in tqdm(self._job_operations(jobs=jobs, only_eligible=False),
+            for op in tqdm(self._jobs_operations(jobs=list(jobs), only_eligible=False),
                            desc="Fetching operation status",
                            total=len(jobs), file=file):
                 status[op.get_id()] = int(scheduler_info.get(op.get_id(), JobStatus.unknown))
@@ -949,6 +949,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             logger.info("Updated job status cache.")
 
     def _fetch_status(self, jobs, err, ignore_errors, no_parallelize):
+        assert isinstance(jobs, (list, tuple))
+
         # Update the project's status cache
         self._fetch_scheduler_status(jobs, err, ignore_errors)
 
@@ -1107,7 +1109,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         if jobs is None:
             jobs = self     # all jobs
 
-        tmp = self._fetch_status(jobs, err, ignore_errors, no_parallelize)
+        tmp = self._fetch_status(list(jobs), err, ignore_errors, no_parallelize)
 
         operations_errors = {s['_operations_error'] for s in tmp}
         labels_errors = {s['_labels_error'] for s in tmp}
@@ -1394,7 +1396,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         if timeout is not None and timeout < 0:
             timeout = None
         if operations is None:
-            operations = [op for job in self for op in self._job_operations([job], False)]
+            operations = [op for job in self for op in self._jobs_operations([job], False)]
         else:
             operations = list(operations)   # ensure list
 
@@ -2223,8 +2225,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             if op.complete(job):
                 yield name
 
-    def _job_operations(self, jobs, only_eligible):
-        "Yield instances of JobsOperation constructed for specific job."
+    def _jobs_operations(self, jobs, only_eligible):
+        "Yield instances of JobsOperation constructed for specific jobs."
+        assert isinstance(jobs, (list, tuple))
         for name, op in self.operations.items():
             if op.aggregate:
                 for group in op.aggregate(jobs):
@@ -2248,7 +2251,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         :yield:
             All instances of :class:`~.JobsOperation` job is eligible for.
         """
-        for op in self._jobs_operations(*jobs, only_eligible=True):
+        for op in self._jobs_operations(jobs, only_eligible=True):
             yield op
 
     def next_operation(self, *jobs):
@@ -2357,15 +2360,15 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         "The dictionary of operations that have been added to the workflow."
         return self._operations
 
-    def eligible_for_submission(self, job_operation):
+    def eligible_for_submission(self, jobs_operation):
         """Determine if a job-operation is eligible for submission.
 
         By default, an operation is eligible for submission when it
         is not considered active, that means already queued or running.
         """
-        if job_operation is None:
+        if jobs_operation is None:
             return False
-        if job_operation.get_status() >= JobStatus.submitted:
+        if jobs_operation.get_status() >= JobStatus.submitted:
             return False
         return True
 

@@ -200,7 +200,7 @@ class ProjectStatusPerformanceTest(BaseProjectTest):
         MockScheduler.reset()
 
         time = timeit.timeit(
-            lambda: project._fetch_status(project, io.StringIO(),
+            lambda: project._fetch_status(list(project), io.StringIO(),
                                           ignore_errors=False, no_parallelize=False), number=10)
 
         self.assertTrue(time < 10)

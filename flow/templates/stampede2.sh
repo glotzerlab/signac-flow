@@ -12,15 +12,17 @@
 
 {% block tasks %}
 {% set threshold = 0 if force else 0.9 %}
-{% set cpu_tasks = operations|calc_tasks('np', parallel, force) %}
 {% if operations|calc_tasks('ngpu', false, true) and not force %}
 {% raise "GPUs were requested but are unsupported by Stampede2!" %}
 {% endif %}
 {% set cpn = 48 if 'skx' in partition else 68 %}
-#SBATCH --nodes={{ nn|default(cpu_tasks|calc_num_nodes(cpn, threshold, 'CPU'), true) }}
 {% if ns.use_launcher %}
+{% set cpu_tasks = operations|calc_tasks('np', true, force) %}
+#SBATCH --nodes={{ nn|default(cpu_tasks|calc_num_nodes(cpn, threshold, 'CPU'), true) }}
 #SBATCH --ntasks={{ nn|default(cpu_tasks|calc_num_nodes(cpn, threshold, 'CPU'), true) * cpn }}
 {% else %}
+{% set cpu_tasks = operations|calc_tasks('np', parallel, force) %}
+#SBATCH --nodes={{ nn|default(cpu_tasks|calc_num_nodes(cpn, threshold, 'CPU'), true) }}
 #SBATCH --ntasks={{ (operations|calc_tasks('nranks', parallel, force), 1)|max }}
 {% endif %}
 {% endblock %}

@@ -24,6 +24,7 @@ from .scheduling.base import JobStatus
 from .util.tqdm import tqdm
 from .util.execution import fork
 from .util.misc import TrackGetItemDict
+from six.moves import zip_longest
 if six.PY2:
     from collections import Iterable
 else:
@@ -145,12 +146,7 @@ class aggregate(object):
         # copied from: https://docs.python.org/3/library/itertools.html#itertools.zip_longest
         def grouper(jobs):
             args = [iter(jobs)] * num
-            if six.PY2:
-                from itertools import izip_longest
-                return list(izip_longest(*args, fillvalue=fillvalue))
-            else:
-                from itertools import zip_longest
-                return zip_longest(*args, fillvalue=fillvalue)
+            return zip_longest(*args, fillvalue=fillvalue)
 
         return cls(grouper)
 

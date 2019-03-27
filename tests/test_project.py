@@ -544,6 +544,21 @@ class ExecutionProjectTest(BaseProjectTest):
             else:
                 self.assertFalse(job.isfile('world.txt'))
 
+    def test_run_with_operation_selection(self):
+        project = self.mock_project()
+        even_jobs = [job for job in project if job.sp.b % 2 == 0]
+        with add_cwd_to_environment_pythonpath():
+            with switch_to_directory(project.root_directory()):
+                project.run(names=['non-existent-op'])
+                self.assertFalse(any(job.isfile('world.txt') for job in even_jobs))
+                self.assertFalse(any(job.doc.get('test') for job in project))
+                project.run(names=['op1', 'non-existent-op'])
+                self.assertTrue(all(job.isfile('world.txt') for job in even_jobs))
+                self.assertFalse(any(job.doc.get('test') for job in project))
+                project.run(names=['op.*', 'non-existent-op'])
+                self.assertTrue(all(job.isfile('world.txt') for job in even_jobs))
+                self.assertTrue(all(job.doc.get('test') for job in project))
+
     def test_run_parallel(self):
         project = self.mock_project()
         output = StringIO()

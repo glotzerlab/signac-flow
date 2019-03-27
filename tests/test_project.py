@@ -549,6 +549,9 @@ class ExecutionProjectTest(BaseProjectTest):
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
+                with self.assertRaises(ValueError):
+                    # The names argument must be a sequence of strings, not a string.
+                    project.run(names='op1')
                 project.run(names=['non-existent-op'])
                 self.assertFalse(any(job.isfile('world.txt') for job in even_jobs))
                 self.assertFalse(any(job.doc.get('test') for job in project))

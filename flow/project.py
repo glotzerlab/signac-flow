@@ -1521,6 +1521,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         if num and num < 0:
             num = None
 
+        # The 'names' argument must be a sequence, not a string.
+        if isinstance(names, six.string_types):
+            raise ValueError(
+                "The names argument of FlowProject.run() must be a sequence of strings, "
+                "not a string.")
+
         messages = list()
 
         def log(msg, lvl=logging.INFO):
@@ -1594,6 +1600,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
     def _get_pending_operations(self, jobs, operation_names=None):
         "Get all pending operations for the given selection."
+        assert not isinstance(operation_names, six.string_types)
         for op in self.next_operations(* jobs):
             if operation_names is None or any(fullmatch(n, op.name) for n in operation_names):
                 yield op

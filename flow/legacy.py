@@ -4,6 +4,8 @@
 """Wrapper functions to detect and support deprecated APIs from previous versions."""
 import logging
 
+from . operations import JobsOperation
+
 
 logger = logging.getLogger(__name__)
 
@@ -29,3 +31,41 @@ class JobsCursorWrapper(object):
 
     def __len__(self):
         return len(self._find_ids())
+
+
+class JobOperation(JobsOperation):
+
+    def __init__(self, name, job, cmd, directives=None):
+        """This class represents the information needed to execute one operation for one job.
+
+        An operation function in this context is a shell command, which should be a function
+        of one and only one signac job.
+
+        .. note::
+
+            This class is used by the :class:`~.FlowProject` class for the execution and
+            submission process and should not be instantiated by users themselves.
+
+        .. versionchanged:: 0.6
+
+        :param name:
+            The name of this JobsOperation instance. The name is arbitrary,
+            but helps to concisely identify the operation in various contexts.
+        :type name:
+            str
+        :param jobs:
+            The job instance associated with this operation.
+        :type job:
+            :py:class:`signac.Job`.
+        :param cmd:
+            The command that executes this operation.
+        :type cmd:
+            str
+        :param directives:
+            A dictionary of additional parameters that provide instructions on how
+            to execute this operation, e.g., specifically required resources.
+        :type directives:
+            :class:`dict`
+        """
+        return super(JobOperation, self).__init__(
+            name=name, jobs=[job], cmd=cmd, directives=directives)

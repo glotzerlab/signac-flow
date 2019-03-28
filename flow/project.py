@@ -34,7 +34,6 @@ from hashlib import sha1
 from multiprocessing import Pool
 from multiprocessing import cpu_count
 from multiprocessing import TimeoutError
-from multiprocessing.pool import ThreadPool
 from multiprocessing import Event
 
 import signac
@@ -602,6 +601,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         return cls.NAMES.get(x, x)
 
     ALIASES = dict(
+        status='S',
         unknown='U',
         registered='R',
         queued='Q',
@@ -771,12 +771,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             row[2] += ' ' + self._alias('requires_attention')
         return row
 
-    def _fetch_scheduler_status(self, jobs=None, file=None, ignore_errors=False):
+    def _fetch_scheduler_status(self, jobs_ops=None, file=None, ignore_errors=False):
         "Update the status docs."
         if file is None:
             file = sys.stderr
-        if jobs is None:
-            jobs = self
+        if jobs_ops is None:
+            jobs_ops = list(self._jobs_operations(list(self), only_eligible=False))
         try:
             scheduler = self._environment.get_scheduler()
 
@@ -784,11 +784,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             scheduler_info = {sjob.name(): sjob.status() for sjob in self.scheduler_jobs(scheduler)}
             status = dict()
             print(self._tr("Query scheduler..."), file=file)
-            for op in tqdm(self._jobs_operations(jobs=list(jobs), only_eligible=False),
-                           desc="Fetching operation status",
-                           total=len(jobs), file=file):
+            for op in tqdm(jobs_ops,
+                           desc="Fetching operations status",
+                           total=len(jobs_ops), file=file):
                 status[op.get_id()] = int(scheduler_info.get(op.get_id(), JobStatus.unknown))
-            self.document._status.update(status)
+            ret = self.document._status.update(status)
         except NoSchedulerError:
             logger.debug("No scheduler available.")
         except RuntimeError as error:
@@ -796,54 +796,18 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             if not ignore_errors:
                 raise
         else:
-            logger.info("Updated job status cache.")
+            logger.info("Updated job-operations status cache.")
+            return ret
 
-    def _fetch_status(self, jobs, err, ignore_errors, no_parallelize):
-        assert isinstance(jobs, (list, tuple))
-
-        # Update the project's status cache
-        self._fetch_scheduler_status(jobs, err, ignore_errors)
-
-        # Get status dict for all selected jobs
-        def _print_progress(x):
-            print("Updating status: ", end='', file=err)
-            err.flush()
-            n = max(1, int(len(jobs) / 10))
-            for i, _ in enumerate(x):
-                if (i % n) == 0:
-                    print('.', end='', file=err)
-                    err.flush()
-                yield _
-
-        try:
-            cached_status = self.document['_status']._as_dict()
-        except KeyError:
-            cached_status = dict()
-        _get_job_status = functools.partial(self.get_job_status,
-                                            ignore_errors=ignore_errors,
-                                            cached_status=cached_status)
-
-        with self._potentially_buffered():
-            try:
-                with contextlib.closing(ThreadPool()) as pool:
-                    _map = map if no_parallelize else pool.imap
-                    # First attempt at parallelized status determination.
-                    # This may fail on systems that don't allow threads.
-                    return list(tqdm(
-                        iterable=_map(_get_job_status, jobs),
-                        desc="Collect job status info", total=len(jobs), file=err))
-            except RuntimeError as error:
-                if "can't start new thread" not in error.args:
-                    raise   # unrelated error
-                # The parallelized status determination has failed and we fall
-                # back to a serial approach.
-                logger.warning(
-                    "A parallelized status update failed due to error ('{}'). "
-                    "Entering serial mode with fallback progress indicator. The "
-                    "status update may take longer than ususal.".format(error))
-                return list(with_progressbar(
-                    iterable=map(_get_job_status, jobs),
-                    total=len(jobs), desc='Collect job status info:', file=err))
+    def _get_status_doc(self, jobs_op):
+        flow_op = self.operations[jobs_op.name]
+        return {
+            'name': jobs_op.name,
+            'cmd': jobs_op.cmd,
+            'job_ids': [job.get_id() for job in jobs_op.jobs],
+            'eligible': flow_op.eligible(*jobs_op.jobs),
+            'completed': flow_op.complete(*jobs_op.jobs),
+        }
 
     OPERATION_STATUS_SYMBOLS = OrderedDict([
         ('ineligible', u'-'),
@@ -959,63 +923,57 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         if jobs is None:
             jobs = self     # all jobs
 
-        tmp = self._fetch_status(list(jobs), err, ignore_errors, no_parallelize)
+        if not no_parallelize:
+            warnings.warn("Parallelized status update not implemented for this branch.")
 
-        operations_errors = {s['_operations_error'] for s in tmp}
-        labels_errors = {s['_labels_error'] for s in tmp}
-        errors = list(filter(None, operations_errors.union(labels_errors)))
-
-        if errors:
-            logger.warning(
-                "Some job status updates did not succeed due to errors. "
-                "Number of unique errors: {}. Use --debug to list all errors.".format(len(errors)))
-            for i, error in enumerate(errors):
-                logger.debug("Status update error #{}: '{}'".format(i+1, error))
+        with self._potentially_buffered():
+            jobs_ops = list(self._jobs_operations(jobs=list(jobs), only_eligible=False))
+            self._fetch_scheduler_status(jobs_ops, file=file, ignore_errors=ignore_errors)
+            scheduler_status_cache = self.document.get('_status', dict())
+            status = dict()
+            errors = dict()
+            for jobs_op in jobs_ops:
+                try:
+                    jobs_op_id = jobs_op.get_id()
+                    status[jobs_op_id] = self._get_status_doc(jobs_op)
+                    status[jobs_op_id]['scheduler_status'] = scheduler_status_cache.get(
+                        jobs_op_id, JobStatus.unknown)
+                except Exception as error:
+                    if ignore_errors:
+                        errors[jobs_op.get_id()] = error
+                    else:
+                        raise
 
         if only_incomplete:
-            # Remove all jobs from the status info, that have not a single
-            # eligible operation.
-
-            def _incomplete(s):
-                return any(op['eligible'] for op in s['operations'].values())
-
-            tmp = list(filter(_incomplete, tmp))
-
-        statuses = OrderedDict([(s['job_id'], s) for s in tmp])
+            # Remove all operations from the status info, that are not eligible.
+            status = {_id: doc for _id, doc in status.items() if not doc['eligible']}
 
         # If the dump_json variable is set, just dump all status info
         # formatted in JSON to screen.
         if dump_json:
-            print(json.dumps(statuses, indent=4), file=file)
+            print(json.dumps(status, indent=4), file=file)
             return
 
         # Generate status overview:
         if overview:
             print("# Overview:", file=file)
-            print("{} {}\n".format(self._tr("Total # of jobs:"), len(statuses), file=file))
+            print("{} {}".format(self._tr("Total # of operations:"), len(status)), file=file)
+            print("{} {}\n".format(self._tr("Total # of jobs:"), len(jobs)), file=file)
 
             # Draw progress bars
             progress = defaultdict(int)
-            for status in statuses.values():
-                for label in status['labels']:
-                    progress[label] += 1
-            progress_sorted = list(islice(
-                sorted(progress.items(), key=lambda x: (x[1], x[0]), reverse=True),
-                overview_max_lines))
-            rows = [[
-                label,
-                '{} {:0.2f}%'.format(draw_progressbar(num, len(statuses)),
-                                     100 * num / len(statuses))
-            ]
-                for label, num in progress_sorted]
+            total = defaultdict(int)
+            for doc in status.values():
+                progress[doc['name']] += 1 if doc['completed'] else 0
+                total[doc['name']] += 1
 
-            print(tabulate.tabulate(rows, headers=['label', 'ratio']), file=file)
-            if not rows:
-                print("[no labels to show]", file=file)
-            if overview_max_lines is not None:
-                lines_skipped = len(progress) - overview_max_lines
-                if lines_skipped > 0:
-                    print(self._tr("Lines omitted:"), lines_skipped, file=file)
+            rows_overview = [[name,
+                              '{} {:0.2f}%'.format(draw_progressbar(progress[name], total[name]),
+                                                   100 * progress[name] / total[name])]
+                             for name in progress]
+
+            print('Operations', file=file)
+            print(tabulate.tabulate(rows_overview, headers=['name', 'ratio']), file=file)
 
         # Generate detailed view:
         def _select_op(doc):
@@ -1037,172 +995,67 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         if parameters is self.PRINT_STATUS_ALL_VARYING_PARAMETERS:
             parameters = list(sorted({key for job in jobs for key in job.sp.keys()
                                       if len(set([job.sp.get(key) for job in jobs])) > 1}))
+        elif parameters is None:
+            parameters = []
 
         if detailed:
+            print(file=file)
             rows_status = []
-            columns = ['job_id', 'labels']
-            if unroll:
-                columns.insert(1, 'operation')
+            columns = ['status', 'operation', 'jobs']
+
             header_detailed = [self._tr(self._alias(c)) for c in columns]
             if parameters:
-                offset = 2 if unroll else 1
                 for i, value in enumerate(parameters):
-                    header_detailed.insert(
-                        i + offset, shorten(self._alias(str(value)), param_max_width))
+                    header_detailed.append(shorten(self._alias(str(value)), param_max_width))
 
-            def _format_status(status):
-                sp = self.open_job(id=status['job_id']).statepoint()
+            status_by_name = defaultdict(list)
+            for doc in sorted(status.values(), key=lambda doc: doc['name']):
+                status_by_name[doc['name']].append(doc)
 
-                def get(k, m):
-                    if m is None:
-                        return
-                    t = k.split('.')
-                    if len(t) > 1:
-                        return get('.'.join(t[1:]), m.get(t[0]))
-                    else:
-                        return m.get(k)
-
-                row = [status['job_id']]
-                row.append(', '.join(status.get('labels', [])))
-                if parameters:
-                    for i, k in enumerate(parameters):
-                        v = self._alias(get(k, sp))
-                        row.insert(i + 1, None if v is None else shorten(str(v), param_max_width))
-
-                if unroll:
-                    selected_ops = [name for name, op in status['operations'].items()
-                                    if _select_op(op)]
-                    if compact:
-                        if len(selected_ops):
-                            next_name = selected_ops[0]
-                            sched_stat = status['operations'][next_name]['scheduler_status']
-                            cell = '{} [{}]'.format(next_name, _FMT_SCHEDULER_STATUS[sched_stat])
-                            if len(selected_ops) > 1:
-                                cell += ' (+{})'.format(len(selected_ops) - 1)
-                        else:
-                            cell = ''
-                        row.insert(1, cell)
-                        yield row
-                    elif selected_ops:
-                        row.insert(1, None)
-                        max_len = max(len(header_detailed[1])-4, max(map(len, selected_ops)))
-                        for i, name in enumerate(selected_ops):
-                            if i:
-                                row[0] = None
-                            row[1] = name.ljust(max_len)
-
-                            op = status['operations'][name]
-                            if pretty and op['eligible']:
-                                row[1] = _bold(row[1])
-                            row[1] += " [{}]".format(_FMT_SCHEDULER_STATUS[op['scheduler_status']])
-                            yield list(row)
-                    else:
-                        row.insert(1, None)
-                        yield list(row)
+            def _map_status(doc):
+                if doc['scheduler_status'] >= JobStatus.active:
+                    op_status = u'running'
+                elif doc['scheduler_status'] > JobStatus.inactive:
+                    op_status = u'active'
+                elif doc['completed']:
+                    op_status = u'completed'
+                elif doc['eligible']:
+                    op_status = u'eligible'
                 else:
-                    yield row
+                    op_status = u'ineligible'
+                return op_status
 
-            for status in statuses.values():
-                rows_status.extend(_format_status(status))
-
-            rows_operations = []
-            header_operations = [self._tr(self._alias(s))
-                                 for s in ('job_id', 'operation', 'eligible', 'cluster_status')]
-
-            def _fmt_status_operations(status):
-                for name, doc in status['operations'].items():
-                    if not _select_op(doc):
-                        continue
-
-                    yield [
-                        status['job_id'],
-                        _bold(name) if (pretty and doc['eligible']) else name,
-                        'Y' if doc['eligible'] else 'N',
-                        _FMT_SCHEDULER_STATUS[doc['scheduler_status']]]
-
-            for status in statuses.values():
-                rows_operations.append(list(_fmt_status_operations(status)))
-
-        # Actually display information
-        if detailed:
-            print(('\n' if overview else '') + "# Detailed View:", file=file)
-            status_table = tabulate.tabulate(rows_status, headers=header_detailed)
-            if expand:  # Present labels and operations in two separate tables.
-                print("\n## Labels:", file=file)
-                print(status_table, file=file)
-                print("\n## Operations:", file=file)
-                rows_operations = [row for rows in rows_operations for row in rows]  # flatten list
-                print(tabulate.tabulate(rows_operations, headers=header_operations), file=file)
-            elif unroll:
-                print(status_table, file=file)
-            else:       # Present labels and operations in a combined 'compact' view.
-                # We need to split the labels table into individual lines
-                # to combine them with the operations lines.
-                status_table_lines = iter(status_table.splitlines())
-
-                # The first two lines are the table header.
-                print(next(status_table_lines), file=file)
-                print(next(status_table_lines), file=file)
-
-                def _print_unicode(value):
-                    "Python 2/3 compatibility layer."
-                    if six.PY2:
-                        print(value.encode('utf-8'), file=file)
-                    else:
-                        print(value, file=file)
-
-                if pretty:
-                    open_frame = u'\u251c'      # open frame
-                    closing_frame = u'\u2514'   # closing frame
-                    symbols = self.PRETTY_OPERATION_STATUS_SYMBOLS
+            def get(k, m):
+                if m is None:
+                    return
+                t = k.split('.')
+                if len(t) > 1:
+                    return get('.'.join(t[1:]), m.get(t[0]))
                 else:
-                    open_frame, closing_frame = '', ''
-                    symbols = self.OPERATION_STATUS_SYMBOLS
+                    return m.get(k)
 
-                for line, status in zip(status_table_lines, statuses.values()):
-                    _print_unicode(line)
-                    if status['operations']:
-                        width = max(map(len, status['operations']))
+            def append_sp(row, job_id=None):
+                if job_id is None:
+                    return row + [None] * len(parameters)
+                else:
+                    sp = self.open_job(id=job_id).sp()
+                    return row + [shorten(str(self._alias(get(k, sp))), param_max_width)
+                                  for k in parameters]
 
-                        def select(op):
-                            name, doc = op
-                            active = JobStatus(doc['scheduler_status']) > JobStatus.unknown
-                            if skip_active and active:
-                                return False
-                            if not all_ops and not (active or doc['eligible']):
-                                return False
-                            return True
-
-                        selected_ops = list(filter(select, status['operations'].items()))
-                        for i, (name, doc) in enumerate(selected_ops):
-                            name = name.ljust(width)
-                            if pretty and doc['eligible']:
-                                name = _bold(name)
-                            if six.PY2:
-                                name = name.decode('utf-8')
-                            frame = closing_frame if (i+1) == len(selected_ops) else open_frame
-
-                            if doc['scheduler_status'] >= JobStatus.active:
-                                op_status = u'running'
-                            elif doc['scheduler_status'] > JobStatus.inactive:
-                                op_status = u'active'
-                            elif doc['completed']:
-                                op_status = u'completed'
-                            elif doc['eligible']:
-                                op_status = u'eligible'
-                            else:
-                                op_status = u'ineligible'
-
-                            frame += symbols[op_status]
-
-                            sched_stat = _FMT_SCHEDULER_STATUS[doc['scheduler_status']]
-                            if six.PY2:
-                                sched_stat = sched_stat.decode('utf-8')
-                            msg = u"{} {} [{}]".format(frame, name, sched_stat)
-                            _print_unicode(msg)
-                legend = u'Legend: ' + u' '.join(u'{}:{}'.format(v, k) for k, v in symbols.items())
-                _print_unicode(legend)
-            print(' '.join('[{}]:{}'.format(v, k) for k, v in self.ALIASES.items()))
+            for name, docs in status_by_name.items():
+                for doc in docs:
+                    symbol = self.OPERATION_STATUS_SYMBOLS[_map_status(doc)]
+                    if expand:
+                        rows_status.append(append_sp([symbol, name, None]))
+                        for job_id in doc['job_ids']:
+                            rows_status.append(append_sp([None, None, job_id], job_id))
+                    elif len(doc['job_ids']) > 1:
+                        rows_status.append(append_sp(
+                            [symbol, name, '< {} jobs >'.format(len(doc['job_ids']))]))
+                    else:
+                        job_id = doc['job_ids'][0]
+                        rows_status.append(append_sp([symbol, name, job_id], job_id))
+            print(tabulate.tabulate(rows_status, headers=header_detailed), file=file)
 
         # Show any abbreviations used
         if abbreviate.table:

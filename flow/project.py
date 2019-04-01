@@ -62,6 +62,7 @@ from .util import template_filters as tf
 from .util.misc import add_cwd_to_environment_pythonpath
 from .util.misc import switch_to_directory
 from .util.misc import TrackGetItemDict
+from .util.misc import fullmatch
 from .util.progressbar import with_progressbar
 from .util.translate import abbreviate
 from .util.translate import shorten
@@ -1371,7 +1372,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         if timeout is not None and timeout < 0:
             timeout = None
         if operations is None:
-            operations = [op for job in self for op in self._job_operations([job], False)]
+            operations = list(self._get_pending_operations(self))
         else:
             operations = list(operations)   # ensure list
 
@@ -1520,6 +1521,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         if num and num < 0:
             num = None
 
+        # The 'names' argument must be a sequence, not a string.
+        if isinstance(names, six.string_types):
+            raise ValueError(
+                "The names argument of FlowProject.run() must be a sequence of strings, "
+                "not a string.")
+
         messages = list()
 
         def log(msg, lvl=logging.INFO):
@@ -1593,14 +1600,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
     def _get_pending_operations(self, jobs, operation_names=None):
         "Get all pending operations for the given selection."
-        operation_names = None if operation_names is None else set(operation_names)
-
-        for op in self.next_operations(*jobs):
-            if operation_names and op.name not in operation_names:
-                continue
-            if not self.eligible_for_submission(op):
-                continue
-            yield op
+        assert not isinstance(operation_names, six.string_types)
+        for op in self.next_operations(* jobs):
+            if operation_names is None or any(fullmatch(n, op.name) for n in operation_names):
+                yield op
 
     @contextlib.contextmanager
     def _potentially_buffered(self):
@@ -1821,7 +1824,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
         # Gather all pending operations.
         with self._potentially_buffered():
-            operations = self._get_pending_operations(jobs, names)
+            operations = (op for op in self._get_pending_operations(jobs, names)
+                          if self.eligible_for_submission(op))
             if num is not None:
                 operations = list(islice(operations, num))
 
@@ -1928,7 +1932,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             '-o', '--operation',
             dest='operation_name',
             nargs='+',
-            choices=operations,
             help="Only select operations that match the given operation name(s).")
         selection_group.add_argument(
             '-n', '--num',

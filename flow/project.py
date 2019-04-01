@@ -248,6 +248,7 @@ class JobOperation(object):
         directives.setdefault('ngpu', 0)
         directives.setdefault('nranks', 0)
         directives.setdefault('omp_num_threads', 0)
+        directives.setdefault('processor_fraction', 1)
 
         # Evaluate strings and callables for job:
         def evaluate(value):
@@ -555,6 +556,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         template_environment.filters['require_config_value'] = \
             flow_config.require_config_value
         template_environment.filters['get_account_name'] = tf.get_account_name
+        template_environment.filters['print_warning'] = tf.print_warning
         if 'max' not in template_environment.filters:    # for jinja2 < 2.10
             template_environment.filters['max'] = max
         if 'min' not in template_environment.filters:    # for jinja2 < 2.10
@@ -1257,7 +1259,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 print("\n## Labels:", file=file)
                 print(status_table, file=file)
                 print("\n## Operations:", file=file)
-                rows_operations = [row for rows in rows_operations for row in rows]  # flatten list
+                rows_operations = [row for rs in rows_operations for row in rs]  # flatten list
                 print(tabulate.tabulate(rows_operations, headers=header_operations), file=file)
             elif unroll:
                 print(status_table, file=file)

@@ -563,6 +563,7 @@ class ExecutionProjectTest(BaseProjectTest):
                 project.run(names=['op[^3]', 'non-existent-op'])
                 self.assertTrue(all(job.isfile('world.txt') for job in even_jobs))
                 self.assertTrue(all(job.doc.get('test') for job in project))
+                self.assertTrue(all('dynamic' not in job.doc for job in project))
 
     def test_run_parallel(self):
         project = self.mock_project()

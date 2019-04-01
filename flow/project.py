@@ -41,20 +41,9 @@ import signac
 from signac.common import six
 from signac.contrib.hashing import calc_id
 from signac.contrib.filterparse import parse_filter_arg
-import deprecation
 
-# Try to import jinja2 for templating, used in script and submit functions.
-try:
-    import jinja2
-    from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
-except ImportError:
-    # Mock exception, which will never be raised.
-    class Jinja2TemplateNotFound(Exception):
-        pass
-
-    JINJA2 = False
-else:
-    JINJA2 = True
+import jinja2
+from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
 
 from .environment import get_environment
 from .scheduling.base import ClusterJob
@@ -73,18 +62,17 @@ from .util import template_filters as tf
 from .util.misc import add_cwd_to_environment_pythonpath
 from .util.misc import switch_to_directory
 from .util.misc import TrackGetItemDict
+from .util.misc import fullmatch
 from .util.progressbar import with_progressbar
 from .util.translate import abbreviate
 from .util.translate import shorten
 from .util.execution import fork
 from .util.execution import TimeoutExpired
-from .util.dependencies import _requires_jinja2
 from .labels import label
 from .labels import staticlabel
 from .labels import classlabel
 from .labels import _is_label_func
 from . import legacy
-from . import legacy_templating
 from .util import config as flow_config
 
 
@@ -112,16 +100,6 @@ For example: {{ project.get_id() | captialize }}.
 
 The available filters are:
 {filters}"""
-
-
-def _support_legacy_api(method):
-    """Label a method to be wrapped with a legacy API compatibility layer.
-
-    This is a decorator function, that will wrap 'method' with a wrapper function
-    that attempts to detect and resolve legacy API use of said method.
-    All wrapper functions are implemented in the 'legacy' module.
-    """
-    return getattr(legacy, 'support_{}_legacy_api'.format(method.__name__))(method)
 
 
 class _condition(object):
@@ -265,17 +243,12 @@ class JobOperation(object):
         # script engine later.
         keys_set_by_user = set(directives.keys())
 
-        # Handle deprecated np argument:
-        if np is not None:
-            raise RuntimeError(
-                "The np argument for the JobOperation constructor has been deprecated "
-                "as of version 0.6 and has been removed in version 0.7!")
-
         directives.setdefault(
             'np', directives.get('nranks', 1) * directives.get('omp_num_threads', 1))
         directives.setdefault('ngpu', 0)
         directives.setdefault('nranks', 0)
         directives.setdefault('omp_num_threads', 0)
+        directives.setdefault('processor_fraction', 1)
 
         # Evaluate strings and callables for job:
         def evaluate(value):
@@ -431,13 +404,7 @@ class FlowOperation(object):
         :class:`dict`
     """
 
-    def __init__(self, cmd, pre=None, post=None, directives=None, np=None):
-        # Handle deprecated np argument.
-        if np is not None:
-            raise RuntimeError(
-                "The np argument for the FlowOperation() constructor has been deprecated "
-                "as of version 0.6 and been removed as of version 0.7!")
-
+    def __init__(self, cmd, pre=None, post=None, directives=None):
         if pre is None:
             pre = []
         if post is None:
@@ -494,8 +461,6 @@ class _FlowProjectClass(type):
 
 
 class FlowProject(six.with_metaclass(_FlowProjectClass,
-                                     # Remove next line as of version 0.8:
-                                     legacy_templating.FlowProjectLegacyTemplatingSystem,
                                      signac.contrib.Project)):
     """A signac project class specialized for workflow management.
 
@@ -554,8 +519,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         and submit_operations() / submit() function and the corresponding command line
         sub commands.
         """
-        _requires_jinja2()
-
         if self._config.get('flow') and self._config['flow'].get('environment_modules'):
             envs = self._config['flow'].as_list('environment_modules')
         else:
@@ -593,6 +556,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         template_environment.filters['require_config_value'] = \
             flow_config.require_config_value
         template_environment.filters['get_account_name'] = tf.get_account_name
+        template_environment.filters['print_warning'] = tf.print_warning
         if 'max' not in template_environment.filters:    # for jinja2 < 2.10
             template_environment.filters['max'] = max
         if 'min' not in template_environment.filters:    # for jinja2 < 2.10
@@ -865,31 +829,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 expanded = JobOperation.expand_id(name)
                 yield expanded['job_id'], expanded['operation-name'], sjob
 
-    @deprecation.deprecated(deprecated_in=0.7, removed_in=0.8)
-    def map_scheduler_jobs(self, scheduler_jobs):
-        """Map all scheduler jobs by job id and operation name.
-        This function fetches all scheduled jobs from the scheduler
-        and generates a nested dictionary, where the first key is
-        the job id, the second key the operation name and the last
-        value are the cooresponding scheduler jobs.
-        For example, to print the status of all scheduler jobs, associated
-        with a specific job operation, execute:
-        .. code::
-                sjobs = project.scheduler_jobs(scheduler)
-                sjobs_map = project.map_scheduler_jobs(sjobs)
-                for sjob in sjobs_map[job.get_id()][operation]:
-                    print(sjob._id(), sjob.status())
-        :param scheduler_jobs:
-            An iterable of scheduler job instances.
-        :return:
-            A nested dictionary (job_id, op_name, scheduler jobs)
-        """
-        sjobs_map = defaultdict(dict)
-        for job_id, op, sjob in self._map_scheduler_jobs(scheduler_jobs):
-            sjobs = sjobs_map[job_id].setdefault(op, list())
-            sjobs.append(sjob)
-        return sjobs_map
-
     def _get_operations_status(self, job, cached_status):
         "Return a dict with information about job-operations for this job."
         for job_op in self._job_operations([job], False):
@@ -1056,7 +995,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
     """This constant can be used to signal that the print_status() method is supposed
     to automatically show all varying parameters."""
 
-    @_support_legacy_api
     def print_status(self, jobs=None, overview=True, overview_max_lines=None,
                      detailed=False, parameters=None,
                      skip_active=False, param_max_width=None,
@@ -1095,10 +1033,52 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         :param param_max_width:
             Limit the number of characters of parameter columns,
             see also: :py:meth:`~.update_aliases`.
+        :type param_max_width:
+            int
+        :param expand:
+            Present labels and operations in two separate tables.
+        :type expand:
+            bool
+        :param all_ops:
+            Include operations that are not eligible to run.
+        :type all_ops:
+            bool
+        :param only_incomplete:
+            Only show jobs that have eligible operations.
+        :type only_incomplete:
+            bool
+        :param dump_json:
+            Output the data as JSON instead of printing the formatted output.
+        :type dump_json:
+            bool
+        :param unroll:
+            Separate columns for jobs and the corresponding operations.
+        :type unroll:
+            bool
+        :param compact:
+            Print a compact version of the output.
+        :type compact:
+            bool
+        :param pretty:
+            Prettify the output.
+        :type pretty:
+            bool
         :param file:
             Redirect all output to this file, defaults to sys.stdout.
+        :type file:
+            str
         :param err:
             Redirect all error output to this file, defaults to sys.stderr.
+        :type err:
+            str
+        :param ignore_errors:
+            Print status even if querying the scheduler fails.
+        :type ignore_errors:
+            bool
+        :param no_parallelize:
+            Do not parallelize the status update.
+        :type no_parallelize:
+            bool
         """
         if file is None:
             file = sys.stdout
@@ -1279,7 +1259,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 print("\n## Labels:", file=file)
                 print(status_table, file=file)
                 print("\n## Operations:", file=file)
-                rows_operations = [row for rows in rows_operations for row in rows]  # flatten list
+                rows_operations = [row for rs in rows_operations for row in rs]  # flatten list
                 print(tabulate.tabulate(rows_operations, headers=header_operations), file=file)
             elif unroll:
                 print(status_table, file=file)
@@ -1394,7 +1374,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         if timeout is not None and timeout < 0:
             timeout = None
         if operations is None:
-            operations = [op for job in self for op in self._job_operations([job], False)]
+            operations = list(self._get_pending_operations(self))
         else:
             operations = list(operations)   # ensure list
 
@@ -1479,7 +1459,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         else:   # need to fork
             fork(cmd=operation.cmd, timeout=timeout)
 
-    @_support_legacy_api
     def run(self, jobs=None, names=None, pretend=False, np=None, timeout=None, num=None,
             num_passes=1, progress=False):
         """Execute all pending operations for the given selection.
@@ -1543,6 +1522,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             num_passes = None
         if num and num < 0:
             num = None
+
+        # The 'names' argument must be a sequence, not a string.
+        if isinstance(names, six.string_types):
+            raise ValueError(
+                "The names argument of FlowProject.run() must be a sequence of strings, "
+                "not a string.")
 
         messages = list()
 
@@ -1617,14 +1602,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
     def _get_pending_operations(self, jobs, operation_names=None):
         "Get all pending operations for the given selection."
-        operation_names = None if operation_names is None else set(operation_names)
-
-        for op in self.next_operations(*jobs):
-            if operation_names and op.name not in operation_names:
-                continue
-            if not self.eligible_for_submission(op):
-                continue
-            yield op
+        assert not isinstance(operation_names, six.string_types)
+        for op in self.next_operations(* jobs):
+            if operation_names is None or any(fullmatch(n, op.name) for n in operation_names):
+                yield op
 
     @contextlib.contextmanager
     def _potentially_buffered(self):
@@ -1643,7 +1624,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         else:
             yield
 
-    @legacy_templating.script_support_legacy_templating_system
     def script(self, operations, parallel=False, template='script.sh', show_template_help=False):
         """Generate a run script to execute given operations.
 
@@ -1676,7 +1656,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             self._show_template_help_and_exit(template_environment, context)
         return template.render(** context)
 
-    @legacy_templating._generate_submit_script_support_legacy_templating_system
     def _generate_submit_script(self, _id, operations, template, show_template_help, env, **kwargs):
         """Generate submission script to submit the execution of operations to a scheduler."""
         if template is None:
@@ -1703,7 +1682,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             self._show_template_help_and_exit(template_environment, context)
         return template.render(** context)
 
-    @_support_legacy_api
     def submit_operations(self, operations, _id=None, env=None, parallel=False, flags=None,
                           force=False, template='script.sh', pretend=False,
                           show_template_help=False, **kwargs):
@@ -1796,7 +1774,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             else:
                 return env.submit(_id=_id, script=script, flags=flags, **kwargs)
 
-    @_support_legacy_api
     def submit(self, bundle_size=1, jobs=None, names=None, num=None, parallel=False,
                force=False, walltime=None, env=None, **kwargs):
         """Submit function for the project's main submit interface.
@@ -1849,7 +1826,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
         # Gather all pending operations.
         with self._potentially_buffered():
-            operations = self._get_pending_operations(jobs, names)
+            operations = (op for op in self._get_pending_operations(jobs, names)
+                          if self.eligible_for_submission(op))
             if num is not None:
                 operations = list(islice(operations, num))
 
@@ -1956,7 +1934,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             '-o', '--operation',
             dest='operation_name',
             nargs='+',
-            choices=operations,
             help="Only select operations that match the given operation name(s).")
         selection_group.add_argument(
             '-n', '--num',
@@ -2401,11 +2378,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             else:
                 args.operation_name = args.hidden_operation_name
 
-        if args.np is not None:  # Remove completely beginning of version 0.8.
-            raise RuntimeError(
-                "The run --np option has been deprecated as of version 0.6 and been removed "
-                "as of version 0.7, use '-p/--parallel' instead.")
-
         # Select jobs:
         jobs = self._select_jobs_from_args(args)
 
@@ -2426,8 +2398,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
     def _main_script(self, args):
         "Generate a script for the execution of operations."
-        _requires_jinja2('The signac-flow script function')
-
         if args.requires and not args.cmd:
             raise ValueError(
                 "The --requires option can only be used in combination with --cmd.")
@@ -2452,7 +2422,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             template=args.template, show_template_help=args.show_template_help))
 
     def _main_submit(self, args):
-        _requires_jinja2('The signac-flow submit function')
         if args.test:
             args.pretend = True
         kwargs = vars(args)
@@ -2516,7 +2485,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             doc_filter = parse_filter_arg(args.doc_filter)
             return legacy.JobsCursorWrapper(self, filter_, doc_filter)
 
-    def main(self, parser=None, pool=None):
+    def main(self, parser=None):
         """Call this function to use the main command line interface.
 
         In most cases one would want to call this function as part of the
@@ -2539,10 +2508,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
             $ python my_project.py --help
         """
-        if pool is not None:     # deprecated: remove with version 0.8.
-            raise RuntimeError(
-                "The 'pool' argument for the FlowProject.main() function is deprecated!")
-
         if parser is None:
             parser = argparse.ArgumentParser()
 
@@ -2631,10 +2596,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             const='-1',
             help="Specify the number of cores to parallelize to. Defaults to all available "
                  "processing units if argument is ommitted.")
-        execution_group.add_argument(  # deprecated: Completely remove beginning with version 0.8.
-            '--np',
-            type=int,
-            help=argparse.SUPPRESS)
         parser_run.set_defaults(func=self._main_run)
 
         parser_script = subparsers.add_parser(
@@ -2686,6 +2647,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         if args.debug:  # Implies '-vv' and '--show-traceback'
             args.verbose = max(2, args.verbose)
             args.show_traceback = True
+
+        # Support print_status argument alias
+        if args.func == self._main_status and args.full:
+            args.detailed = args.all_ops = True
 
         # Empty parameters argument on the command line means: show all varying parameters.
         if hasattr(args, 'parameters'):

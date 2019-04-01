@@ -7,15 +7,8 @@ from .torque import TorqueScheduler
 from .slurm import SlurmScheduler
 
 
-class MoabScheduler(TorqueScheduler):
-
-    def __init__(self, *args, **kwargs):
-        raise RuntimeError("The MoabScheduler has been renamed to TorqueScheduler.")
-
-
 __all__ = [
     'FakeScheduler',
     'TorqueScheduler',
     'SlurmScheduler',
-    'MoabScheduler',
     ]

@@ -20,7 +20,6 @@ from signac import get_project
 from . import __version__
 from . import template
 from .util.misc import _is_identifier
-from .util.dependencies import _requires_jinja2
 
 
 logger = logging.getLogger(__name__)
@@ -28,8 +27,6 @@ logger = logging.getLogger(__name__)
 
 def main_init(args):
     "Initialize a FlowProject from one of the templates defined in the template module."
-    _requires_jinja2('The flow init function')
-
     if not _is_identifier(args.alias):
         raise ValueError(
             "The alias '{}' is not a valid Python identifier and can therefore "

@@ -10,8 +10,6 @@ from ..environment import DefaultLSFEnvironment, DefaultTorqueEnvironment
 import math
 from fractions import gcd
 
-from ..legacy_templating import deprecated_since_06
-
 
 class SummitEnvironment(DefaultLSFEnvironment):
     """Environment profile for the Summit supercomputer.
@@ -96,25 +94,6 @@ class TitanEnvironment(DefaultTorqueEnvironment):
     template = 'titan.sh'
     cores_per_node = 16
 
-    @classmethod
-    @deprecated_since_06
-    def mpi_cmd(cls, cmd, np):
-        return "aprun -n {np} -N 1 -b {cmd}".format(cmd=cmd, np=np)
-
-    @classmethod
-    @deprecated_since_06
-    def gen_tasks(cls, js, np_total):
-        """Helper function to generate the number of tasks (for overriding)"""
-        js.writeline('#PBS -l nodes={}'.format(math.ceil(np_total/cls.cores_per_node)))
-        return js
-
-    @classmethod
-    @deprecated_since_06
-    def script(cls, _id, **kwargs):
-        js = super(TitanEnvironment, cls).script(_id=_id, **kwargs)
-        js.writeline('#PBS -A {}'.format(cls.get_config_value('account')))
-        return js
-
 
 class EosEnvironment(DefaultTorqueEnvironment):
     """Environment profile for the eos super computer.
@@ -124,25 +103,6 @@ class EosEnvironment(DefaultTorqueEnvironment):
     hostname_pattern = 'eos'
     template = 'eos.sh'
     cores_per_node = 32
-
-    @classmethod
-    @deprecated_since_06
-    def mpi_cmd(cls, cmd, np):
-        return "aprun -n {np} -b {cmd}".format(cmd=cmd, np=np)
-
-    @classmethod
-    @deprecated_since_06
-    def gen_tasks(cls, js, np_total):
-        """Helper function to generate the number of tasks (for overriding)"""
-        js.writeline('#PBS -l nodes={}'.format(math.ceil(np_total/cls.cores_per_node)))
-        return js
-
-    @classmethod
-    @deprecated_since_06
-    def script(cls, _id, **kwargs):
-        js = super(EosEnvironment, cls).script(_id=_id, **kwargs)
-        js.writeline('#PBS -A {}'.format(cls.get_config_value('account')))
-        return js
 
 
 __all__ = ['TitanEnvironment', 'EosEnvironment']

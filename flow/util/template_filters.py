@@ -71,10 +71,14 @@ def calc_tasks(operations, name, parallel=False, allow_mixed=False):
         Raises a RuntimeError if the required processing units across operations
         is not identical unless the allow_mixed parameter is set to True.
     """
-    processing_units = [op.directives[name] for op in operations]
+    processing_units = [op.directives[name] *
+                        op.directives.get('processor_fraction', 1) for op in operations]
     if identical(processing_units) or allow_mixed:
         if len(processing_units) > 0:
-            return sum(processing_units) if parallel else max(processing_units)
+            # need to cast int for python2
+            sum_processing_units = int(round(sum(processing_units)))
+            max_processing_units = int(round(max(processing_units)))
+            return sum_processing_units if parallel else max_processing_units
         else:
             return 0    # empty set
     else:
@@ -154,6 +158,18 @@ def calc_num_nodes(np, ppn=1, threshold=0, name=None):
     """
     nn = int(ceil(np / ppn))
     return check_utilization(nn, np, ppn, threshold, name)
+
+
+def print_warning(msg):
+    """Print warning message within jinja2 template
+
+    :param:
+        The warning message as a string
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.warn(msg)
+    return ''
 
 
 _GET_ACCOUNT_NAME_MESSAGES_SHOWN = set()

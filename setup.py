@@ -72,8 +72,4 @@ setup(
     install_requires=requirements,
 
     python_requires='>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, <4',
-
-    extras_require={
-        'templating': ['jinja2>=2.8'],
-    },
 )

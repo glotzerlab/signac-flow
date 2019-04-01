@@ -64,8 +64,8 @@ Finally, we recommend to setup a `Flake8 <http://flake8.pycqa.org/en/latest/>`_ 
 With the *flake8* hook, your code will be checked for syntax and style before you make a commit.
 The continuous integration pipeline for the package will perform these checks as well, so running these tests before committing / pushing will prevent the pipeline from failing due to style-related issues.
 
-The git-flow development workflow
----------------------------------
+The development workflow
+------------------------
 
 Prior to working on a patch, it is advisable to create an `issue <https://github.com/glotzerlab/signac-flow/issues>`_ that describes the problem or proposed feature.
 This means that the code maintainers and other users get a chance to provide some input on the scope and possible limitations of the proposed changes, as well as advise on the actual implementation.

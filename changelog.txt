@@ -7,8 +7,7 @@ The **signac-flow** package follows `semantic versioning <https://semver.org/>`_
 next
 ----
 
-- Add function to automatically print all varying state point parameters in the detailed status view triggered by providing option `-p/--parameters` without arguments (#19, #87).
-- Fix issue with the TORQUE scheduler that occured when there was no job scheduled at all on the system (for any user) (#92, #93).
+- Add full launcher support for job submission on XSEDE Stampede2 for large parallel single processor jobs (#85, #91).
 
 Version 0.7
 ===========

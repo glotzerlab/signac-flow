@@ -2,6 +2,7 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 import os
+import re
 import errno
 import json
 import argparse
@@ -192,3 +193,9 @@ class TrackGetItemDict(dict):
     def keys_used(self):
         "Return all keys that have been accessed."
         return self._keys_used.copy()
+
+
+# Remove this after we drop Python 2.7 support:
+def fullmatch(regex, string, flags=0):
+    """Emulate python-3.4 re.fullmatch()."""
+    return re.match("(?:" + regex + r")\Z", string, flags=flags)

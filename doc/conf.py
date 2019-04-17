@@ -64,8 +64,8 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'signac-flow'
-copyright = '2017, Carl Simon Adorf, Paul Dodd'
-author = 'Carl Simon Adorf, Paul Dodd'
+copyright = 'The Regents of the University of Michigan'
+author = u'Carl S. Adorf, Vyas Ramasubramani, Bradley D. Dice, Michael M. Henry, Paul M. Dodd, Sharon C. Glotzer'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the

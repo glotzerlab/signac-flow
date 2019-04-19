@@ -43,6 +43,7 @@ from signac.contrib.filterparse import parse_filter_arg
 import jinja2
 from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
 
+from .conditions import Condition
 from .environment import get_environment
 from .operations import JobsOperation
 from .scheduling.base import ClusterJob
@@ -100,37 +101,7 @@ The available filters are:
 {filters}"""
 
 
-class _condition(object):
-
-    def __init__(self, condition):
-        self.condition = condition
-
-    @classmethod
-    def isfile(cls, filename):
-        return cls(lambda job: job.isfile(filename))
-
-    @classmethod
-    def true(cls, key):
-        return cls(lambda job: job.document.get(key, False))
-
-    @classmethod
-    def false(cls, key):
-        return cls(lambda job: not job.document.get(key, False))
-
-    @classmethod
-    def always(cls, func):
-        return cls(lambda _: True)(func)
-
-    @classmethod
-    def never(cls, func):
-        return cls(lambda _: False)(func)
-
-    @classmethod
-    def not_(cls, condition):
-        return cls(lambda job: not condition(job))
-
-
-class _pre(_condition):
+class _pre(Condition):
 
     def __call__(self, func):
         pre_conditions = getattr(func, '_flow_pre', list())
@@ -155,7 +126,7 @@ class _pre(_condition):
         return cls(metacondition)
 
 
-class _post(_condition):
+class _post(Condition):
 
     def __init__(self, condition):
         self.condition = condition

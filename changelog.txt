@@ -8,6 +8,7 @@ next
 ----
 
 - Add full launcher support for job submission on XSEDE Stampede2 for large parallel single processor jobs (#85, #91).
+- Show submission error messages in combination with a TORQUE scheduler (#103, #104).
 
 Version 0.7
 ===========

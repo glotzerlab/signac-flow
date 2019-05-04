@@ -1505,7 +1505,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             int
         :param num_passes:
             The total number of one specific job-operation pair will not exceed this argument.
-            The default is 1, there is no limit if this argumet is `None`.
+            The default is 1, there is no limit if this argument is `None`.
         :type num_passes:
             int
         :param progress:

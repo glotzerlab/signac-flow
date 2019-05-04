@@ -72,4 +72,9 @@ contributors:
     family-names: Melle
     given-names: Yannah
     affiliation: "University of Michigan"
+  -
+    family-names: Justin
+    given-names: Gilmer
+    affiliation: "Vanderbilt University"
+    orcid: "https://orcid.org/0000-0002-6915-5591"
 ...

@@ -16,6 +16,7 @@ import xml.etree.ElementTree as ET
 
 from .base import Scheduler
 from .base import ClusterJob, JobStatus
+from ..errors import SubmitError
 
 
 logger = logging.getLogger(__name__)
@@ -146,9 +147,12 @@ class TorqueScheduler(Scheduler):
             with tempfile.NamedTemporaryFile() as tmp_submit_script:
                 tmp_submit_script.write(str(script).encode('utf-8'))
                 tmp_submit_script.flush()
-                output = subprocess.check_output(
-                    submit_cmd + [tmp_submit_script.name])
-            jobsid = output.decode('utf-8').strip()
+                try:
+                    output = subprocess.check_output(
+                        submit_cmd + [tmp_submit_script.name])
+                    jobsid = output.decode('utf-8').strip()
+                except subprocess.CalledProcessError as e:
+                    raise SubmitError("qsub error: {}".format(e.output()))
             return jobsid
 
     @classmethod

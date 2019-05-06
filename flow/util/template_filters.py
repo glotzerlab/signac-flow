@@ -172,6 +172,43 @@ def print_warning(msg):
     return ''
 
 
+def bold_font(s, eligible, pretty=False):
+    """Change font to bold within jinja2 template
+
+    :param s:
+        The string to be printed
+    :param pretty:
+        style option
+    """
+    if eligible and pretty:
+        return '\033[1m' + s + '\033[0m'
+    else:
+        return s
+
+
+def draw_progressbar(value, total, width=40):
+    """Visualize progess with a progress bar.
+
+    :param value:
+        The current progress as a fraction of total.
+    :type value:
+        int
+    :param total:
+        The maximum value that 'value' may obtain.
+    :type total:
+        int
+    :param width:
+        The character width of the drawn progress bar.
+    :type width:
+        int
+    """
+    "Helper function for the visualization of progress."
+    assert value >= 0 and total > 0
+    ratio = ' %0.2f%%' % (100 * value / total)
+    n = int(value / total * width)
+    return '|' + ''.join(['#'] * n) + ''.join(['-'] * (width - n)) + '|' + ratio
+
+
 _GET_ACCOUNT_NAME_MESSAGES_SHOWN = set()
 
 

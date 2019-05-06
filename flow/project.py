@@ -53,11 +53,9 @@ from .errors import SubmitError
 from .errors import ConfigKeyError
 from .errors import NoSchedulerError
 from .errors import TemplateError
-from .util import tabulate
 from .util.tqdm import tqdm
 from .util.misc import _positive_int
 from .util.misc import _mkdir_p
-from .util.misc import draw_progressbar
 from .util import template_filters as tf
 from .util.misc import add_cwd_to_environment_pythonpath
 from .util.misc import switch_to_directory
@@ -557,6 +555,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             flow_config.require_config_value
         template_environment.filters['get_account_name'] = tf.get_account_name
         template_environment.filters['print_warning'] = tf.print_warning
+        template_environment.filters['bold_font'] = tf.bold_font
+        template_environment.filters['draw_progressbar'] = tf.draw_progressbar
         if 'max' not in template_environment.filters:    # for jinja2 < 2.10
             template_environment.filters['max'] = max
         if 'min' not in template_environment.filters:    # for jinja2 < 2.10
@@ -995,91 +995,14 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
     """This constant can be used to signal that the print_status() method is supposed
     to automatically show all varying parameters."""
 
-    def print_status(self, jobs=None, overview=True, overview_max_lines=None,
+    def print_status(self, jobs=None, template=None, overview=True, overview_max_lines=None,
                      detailed=False, parameters=None,
                      skip_active=False, param_max_width=None,
                      expand=False, all_ops=False, only_incomplete=False, dump_json=False,
                      unroll=True, compact=False, pretty=False,
                      file=None, err=None, ignore_errors=False,
                      no_parallelize=False):
-        """Print the status of the project.
 
-        .. versionchanged:: 0.6
-
-        :param jobs:
-            Only execute operations for the given jobs, or all if the argument is omitted.
-        :type jobs:
-            Sequence of instances :class:`.Job`.
-        :param overview:
-            Aggregate an overview of the project' status.
-        :type overview:
-            bool
-        :param overview_max_lines:
-            Limit the number of overview lines.
-        :type overview_max_lines:
-            int
-        :param detailed:
-            Print a detailed status of each job.
-        :type detailed:
-            bool
-        :param parameters:
-            Print the value of the specified parameters.
-        :type parameters:
-            list of str
-        :param skip_active:
-            Only print jobs that are currently inactive.
-        :type skip_active:
-            bool
-        :param param_max_width:
-            Limit the number of characters of parameter columns,
-            see also: :py:meth:`~.update_aliases`.
-        :type param_max_width:
-            int
-        :param expand:
-            Present labels and operations in two separate tables.
-        :type expand:
-            bool
-        :param all_ops:
-            Include operations that are not eligible to run.
-        :type all_ops:
-            bool
-        :param only_incomplete:
-            Only show jobs that have eligible operations.
-        :type only_incomplete:
-            bool
-        :param dump_json:
-            Output the data as JSON instead of printing the formatted output.
-        :type dump_json:
-            bool
-        :param unroll:
-            Separate columns for jobs and the corresponding operations.
-        :type unroll:
-            bool
-        :param compact:
-            Print a compact version of the output.
-        :type compact:
-            bool
-        :param pretty:
-            Prettify the output.
-        :type pretty:
-            bool
-        :param file:
-            Redirect all output to this file, defaults to sys.stdout.
-        :type file:
-            str
-        :param err:
-            Redirect all error output to this file, defaults to sys.stderr.
-        :type err:
-            str
-        :param ignore_errors:
-            Print status even if querying the scheduler fails.
-        :type ignore_errors:
-            bool
-        :param no_parallelize:
-            Do not parallelize the status update.
-        :type no_parallelize:
-            bool
-        """
         if file is None:
             file = sys.stdout
         if err is None:
@@ -1098,7 +1021,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 "Some job status updates did not succeed due to errors. "
                 "Number of unique errors: {}. Use --debug to list all errors.".format(len(errors)))
             for i, error in enumerate(errors):
-                logger.debug("Status update error #{}: '{}'".format(i+1, error))
+                logger.debug("Status update error #{}: '{}'".format(i + 1, error))
 
         if only_incomplete:
             # Remove all jobs from the status info, that have not a single
@@ -1117,11 +1040,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             print(json.dumps(statuses, indent=4), file=file)
             return
 
+        total_jobs = len(statuses)
         # Generate status overview:
         if overview:
-            print("# Overview:", file=file)
-            print("{} {}\n".format(self._tr("Total # of jobs:"), len(statuses), file=file))
-
             # Draw progress bars
             progress = defaultdict(int)
             for status in statuses.values():
@@ -1130,213 +1051,45 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             progress_sorted = list(islice(
                 sorted(progress.items(), key=lambda x: (x[1], x[0]), reverse=True),
                 overview_max_lines))
-            rows = [[
-                label,
-                '{} {:0.2f}%'.format(draw_progressbar(num, len(statuses)),
-                                     100 * num / len(statuses))
-            ]
-                for label, num in progress_sorted]
 
-            print(tabulate.tabulate(rows, headers=['label', 'ratio']), file=file)
-            if not rows:
-                print("[no labels to show]", file=file)
-            if overview_max_lines is not None:
-                lines_skipped = len(progress) - overview_max_lines
-                if lines_skipped > 0:
-                    print(self._tr("Lines omitted:"), lines_skipped, file=file)
+        if template is None:
+            template = 'print_status.sh'
+        env = self._environment
+        template_environment = self._template_environment(env)
+        template = template_environment.get_template(template)
+        context = self._get_standard_template_context()
 
-        # Generate detailed view:
-        def _select_op(doc):
-            active = JobStatus(doc['scheduler_status']) > JobStatus.unknown
-            if skip_active and active:
-                return False
-            if not all_ops and not (active or doc['eligible']):
-                return False
-            return True
+        bar_length = 50
+        id_length = 32
+        label_length = 0
+        total_label_length = 0
+        operation_length = 0
 
-        def _bold(x):
-            "Bold markup."
-            if pretty:
-                return '\033[1m' + x + '\033[0m'
-            else:
-                return x
+        for key, value in self._label_functions.items():
+            label_length = max(label_length, len(key.__name__))
+        job = tmp[0]
+        for key, value in job['operations'].items():
+            operation_length = max(operation_length, len(key))
+        for job in tmp:
+            total_label_length = max(total_label_length, len(', '.join(job['labels'])))
+            label_length = max(label_length, len(max(job['labels'], key=len)))
 
-        # Optionally expand parameters argument to all varying parameters.
-        if parameters is self.PRINT_STATUS_ALL_VARYING_PARAMETERS:
-            parameters = list(sorted({key for job in jobs for key in job.sp.keys()
-                                      if len(set([job.sp.get(key) for job in jobs])) > 1}))
+        context['jobs'] = list(tmp)
+        context['total_jobs'] = total_jobs
+        context['progress_sorted'] = progress_sorted
+        context['scheduler_status_code'] = _FMT_SCHEDULER_STATUS
+        context['bar_length'] = bar_length
+        context['id_length'] = id_length
+        context['operation_length'] = operation_length
+        context['label_length'] = label_length
+        context['total_label_length'] = total_label_length
+        context['detailed'] = detailed
+        context['all_ops'] = all_ops
+        context['pretty'] = pretty
 
-        if detailed:
-            rows_status = []
-            columns = ['job_id', 'labels']
-            if unroll:
-                columns.insert(1, 'operation')
-            header_detailed = [self._tr(self._alias(c)) for c in columns]
-            if parameters:
-                offset = 2 if unroll else 1
-                for i, value in enumerate(parameters):
-                    header_detailed.insert(
-                        i + offset, shorten(self._alias(str(value)), param_max_width))
+        print(template.render(** context), file=file)
 
-            def _format_status(status):
-                sp = self.open_job(id=status['job_id']).statepoint()
-
-                def get(k, m):
-                    if m is None:
-                        return
-                    t = k.split('.')
-                    if len(t) > 1:
-                        return get('.'.join(t[1:]), m.get(t[0]))
-                    else:
-                        return m.get(k)
-
-                row = [status['job_id']]
-                row.append(', '.join(status.get('labels', [])))
-                if parameters:
-                    for i, k in enumerate(parameters):
-                        v = self._alias(get(k, sp))
-                        row.insert(i + 1, None if v is None else shorten(str(v), param_max_width))
-
-                if unroll:
-                    selected_ops = [name for name, op in status['operations'].items()
-                                    if _select_op(op)]
-                    if compact:
-                        if len(selected_ops):
-                            next_name = selected_ops[0]
-                            sched_stat = status['operations'][next_name]['scheduler_status']
-                            cell = '{} [{}]'.format(next_name, _FMT_SCHEDULER_STATUS[sched_stat])
-                            if len(selected_ops) > 1:
-                                cell += ' (+{})'.format(len(selected_ops) - 1)
-                        else:
-                            cell = ''
-                        row.insert(1, cell)
-                        yield row
-                    elif selected_ops:
-                        row.insert(1, None)
-                        max_len = max(len(header_detailed[1])-4, max(map(len, selected_ops)))
-                        for i, name in enumerate(selected_ops):
-                            if i:
-                                row[0] = None
-                            row[1] = name.ljust(max_len)
-
-                            op = status['operations'][name]
-                            if pretty and op['eligible']:
-                                row[1] = _bold(row[1])
-                            row[1] += " [{}]".format(_FMT_SCHEDULER_STATUS[op['scheduler_status']])
-                            yield list(row)
-                    else:
-                        row.insert(1, None)
-                        yield list(row)
-                else:
-                    yield row
-
-            for status in statuses.values():
-                rows_status.extend(_format_status(status))
-
-            rows_operations = []
-            header_operations = [self._tr(self._alias(s))
-                                 for s in ('job_id', 'operation', 'eligible', 'cluster_status')]
-
-            def _fmt_status_operations(status):
-                for name, doc in status['operations'].items():
-                    if not _select_op(doc):
-                        continue
-
-                    yield [
-                        status['job_id'],
-                        _bold(name) if (pretty and doc['eligible']) else name,
-                        'Y' if doc['eligible'] else 'N',
-                        _FMT_SCHEDULER_STATUS[doc['scheduler_status']]]
-
-            for status in statuses.values():
-                rows_operations.append(list(_fmt_status_operations(status)))
-
-        # Actually display information
-        if detailed:
-            print(('\n' if overview else '') + "# Detailed View:", file=file)
-            status_table = tabulate.tabulate(rows_status, headers=header_detailed)
-            if expand:  # Present labels and operations in two separate tables.
-                print("\n## Labels:", file=file)
-                print(status_table, file=file)
-                print("\n## Operations:", file=file)
-                rows_operations = [row for rs in rows_operations for row in rs]  # flatten list
-                print(tabulate.tabulate(rows_operations, headers=header_operations), file=file)
-            elif unroll:
-                print(status_table, file=file)
-            else:       # Present labels and operations in a combined 'compact' view.
-                # We need to split the labels table into individual lines
-                # to combine them with the operations lines.
-                status_table_lines = iter(status_table.splitlines())
-
-                # The first two lines are the table header.
-                print(next(status_table_lines), file=file)
-                print(next(status_table_lines), file=file)
-
-                def _print_unicode(value):
-                    "Python 2/3 compatibility layer."
-                    if six.PY2:
-                        print(value.encode('utf-8'), file=file)
-                    else:
-                        print(value, file=file)
-
-                if pretty:
-                    open_frame = u'\u251c'      # open frame
-                    closing_frame = u'\u2514'   # closing frame
-                    symbols = self.PRETTY_OPERATION_STATUS_SYMBOLS
-                else:
-                    open_frame, closing_frame = '', ''
-                    symbols = self.OPERATION_STATUS_SYMBOLS
-
-                for line, status in zip(status_table_lines, statuses.values()):
-                    _print_unicode(line)
-                    if status['operations']:
-                        width = max(map(len, status['operations']))
-
-                        def select(op):
-                            name, doc = op
-                            active = JobStatus(doc['scheduler_status']) > JobStatus.unknown
-                            if skip_active and active:
-                                return False
-                            if not all_ops and not (active or doc['eligible']):
-                                return False
-                            return True
-
-                        selected_ops = list(filter(select, status['operations'].items()))
-                        for i, (name, doc) in enumerate(selected_ops):
-                            name = name.ljust(width)
-                            if pretty and doc['eligible']:
-                                name = _bold(name)
-                            if six.PY2:
-                                name = name.decode('utf-8')
-                            frame = closing_frame if (i+1) == len(selected_ops) else open_frame
-
-                            if doc['scheduler_status'] >= JobStatus.active:
-                                op_status = u'running'
-                            elif doc['scheduler_status'] > JobStatus.inactive:
-                                op_status = u'active'
-                            elif doc['completed']:
-                                op_status = u'completed'
-                            elif doc['eligible']:
-                                op_status = u'eligible'
-                            else:
-                                op_status = u'ineligible'
-
-                            frame += symbols[op_status]
-
-                            sched_stat = _FMT_SCHEDULER_STATUS[doc['scheduler_status']]
-                            if six.PY2:
-                                sched_stat = sched_stat.decode('utf-8')
-                            msg = u"{} {} [{}]".format(frame, name, sched_stat)
-                            _print_unicode(msg)
-                legend = u'Legend: ' + u' '.join(u'{}:{}'.format(v, k) for k, v in symbols.items())
-                _print_unicode(legend)
-            print(' '.join('[{}]:{}'.format(v, k) for k, v in self.ALIASES.items()))
-
-        # Show any abbreviations used
-        if abbreviate.table:
-            print('\n', self._tr("Abbreviations used:"), file=file)
-            for a in sorted(abbreviate.table):
-                print('{}: {}'.format(a, abbreviate.table[a]), file=file)
+        return None
 
     def run_operations(self, operations=None, pretend=False, np=None, timeout=None, progress=False):
         """Execute the next operations as specified by the project's workflow.

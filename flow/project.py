@@ -1328,8 +1328,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                                 sched_stat = sched_stat.decode('utf-8')
                             msg = u"{} {} [{}]".format(frame, name, sched_stat)
                             _print_unicode(msg)
-                legend = u'Legend: ' + u' '.join(u'{}:{}'.format(v, k) for k, v in symbols.items())
-                _print_unicode(legend)
+            legend = u'Legend: ' + u' '.join(u'{}:{}'.format(v, k) for k, v in symbols.items())
+            _print_unicode(legend)
             print(' '.join('[{}]:{}'.format(v, k) for k, v in self.ALIASES.items()))
 
         # Show any abbreviations used

@@ -202,7 +202,6 @@ def draw_progressbar(value, total, width=40):
     :type width:
         int
     """
-    "Helper function for the visualization of progress."
     assert value >= 0 and total > 0
     ratio = ' %0.2f%%' % (100 * value / total)
     n = int(value / total * width)

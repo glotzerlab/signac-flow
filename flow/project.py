@@ -1123,7 +1123,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         context['pretty'] = pretty
         context['parameters'] = parameters
         context['parameters_length'] = parameters_length
-
+        print(context['jobs'][0])
         print(template.render(** context), file=file)
 
         return None

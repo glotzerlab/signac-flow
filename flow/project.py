@@ -33,6 +33,8 @@ from itertools import islice
 from itertools import count
 from itertools import groupby
 from hashlib import sha1
+import multiprocessing
+import threading
 from multiprocessing import Pool
 from multiprocessing import cpu_count
 from multiprocessing import TimeoutError
@@ -972,7 +974,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                      expand=False, all_ops=False, only_incomplete=False, dump_json=False,
                      unroll=True, compact=False, pretty=False,
                      file=None, err=None, ignore_errors=False,
-                     no_parallelize=False, template=None):
+                     no_parallelize=False, template=None, profile=False):
         """Print the status of the project.
 
         .. versionchanged:: 0.6
@@ -1191,7 +1193,56 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         context = self._get_standard_template_context()
 
         # get job status information
-        tmp = self._fetch_status(jobs, err, ignore_errors, no_parallelize)
+        if profile:
+            try:
+                import pprofile
+            except ImportError:
+                raise RuntimeWarning(
+                    "Profiling requires the pprofile package. "
+                    "Install with `pip install pprofile`.")
+            prof = pprofile.StatisticalProfile()
+
+            fn_filter = [
+                inspect.getfile(threading),
+                inspect.getfile(multiprocessing),
+                inspect.getfile(Pool),
+                inspect.getfile(ThreadPool),
+            ]
+
+            with prof(single=False):
+                tmp = self._fetch_status(jobs, err, ignore_errors, no_parallelize)
+
+            prof._mergeFileTiming()
+            i = count()
+            total_impact = 0
+            total_num_hits = sum([hit[2] for fn, ft in prof.merged_file_dict.items()
+                                  if fn not in fn_filter for hit in ft.iterHits()])
+            hits = [hit for fn, ft in prof.merged_file_dict.items()
+                    if fn not in fn_filter for hit in ft.iterHits()]
+            sorted_hits = reversed(sorted(hits, key=lambda hit: hit[2]))
+
+            profiling_results = [
+                '# Profiling:\n',
+                'Rank Impact Code object',
+                '---- ------ -----------']
+
+            for i, (line, code, hits, duration) in enumerate(sorted_hits):
+                impact = hits / total_num_hits
+                total_impact += impact
+                profiling_results.append(
+                    "{rank:>4} {impact:>6.0%} {code.co_filename}:"
+                    "{code.co_firstlineno}:{code.co_name}".format(
+                        rank=i+1, impact=impact, code=code))
+                if i > 10 or total_impact > 0.8:
+                    break
+            profiling_results.append("Total runtime: {}s".format(int(prof.total_time)))
+            if prof.total_time < 20:
+                profiling_results.append(
+                    "Warning: Profiler ran only for a short time, "
+                    "results may be highly inaccurate.")
+        else:
+            tmp = self._fetch_status(jobs, err, ignore_errors, no_parallelize)
+            profiling_results = None
 
         operations_errors = {s['_operations_error'] for s in tmp}
         labels_errors = {s['_labels_error'] for s in tmp}
@@ -1332,6 +1383,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 context['operation_status_symbols'] = OPERATION_STATUS_SYMBOLS
 
         print(template.render(**context), file=file)
+
+        # Show profiling results (if enabled)
+        if profiling_results:
+            print('\n' + '\n'.join(profiling_results), file=file)
 
     def run_operations(self, operations=None, pretend=False, np=None, timeout=None, progress=False):
         """Execute the next operations as specified by the project's workflow.
@@ -2575,6 +2630,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             'status',
             parents=[base_parser])
         self._add_print_status_args(parser_status)
+        parser_status.add_argument(
+            '--profile',
+            action='store_true',
+            help="Collect statistics to determine code paths that are responsible "
+                 "for the majority of runtime required for status determination. "
+                 "(requires pprofile)")
         parser_status.set_defaults(func=self._main_status)
 
         parser_next = subparsers.add_parser(

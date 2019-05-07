@@ -1040,10 +1040,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             print(json.dumps(statuses, indent=4), file=file)
             return
 
-        total_jobs = len(statuses)
+        jobs_count = len(statuses)
         # Generate status overview:
         if overview:
-            # Draw progress bars
+            # get progress info
             progress = defaultdict(int)
             for status in statuses.values():
                 for label in status['labels']:
@@ -1051,6 +1051,38 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             progress_sorted = list(islice(
                 sorted(progress.items(), key=lambda x: (x[1], x[0]), reverse=True),
                 overview_max_lines))
+
+        parameters_length = 0
+        # Optionally expand parameters argument to all varying parameters.
+        if parameters is self.PRINT_STATUS_ALL_VARYING_PARAMETERS:
+            parameters = list(sorted({key for job in jobs for key in job.sp.keys()
+                                      if len(set([job.sp.get(key) for job in jobs])) > 1}))
+
+        if parameters:
+            parameters_length = list([0]*len(parameters))
+            for i, para in enumerate(parameters):
+                parameters_length[i] = len(para)
+
+            def _add_parameters(status):
+                sp = self.open_job(id=status['job_id']).statepoint()
+
+                def get(k, m):
+                    if m is None:
+                        return
+                    t = k.split('.')
+                    if len(t) > 1:
+                        return get('.'.join(t[1:]), m.get(t[0]))
+                    else:
+                        return m.get(k)
+
+                status['parameters'] = OrderedDict()
+                for i, k in enumerate(parameters):
+                    v = self._alias(get(k, sp))
+                    parameters_length[i] = max(parameters_length[i], len(v))
+                    status['parameters'][k] = v
+
+            for status in statuses.values():
+                _add_parameters(status)
 
         if template is None:
             template = 'print_status.sh'
@@ -1068,14 +1100,16 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         for key, value in self._label_functions.items():
             label_length = max(label_length, len(key.__name__))
         job = tmp[0]
+        operations_count = len(job['operations'])
         for key, value in job['operations'].items():
             operation_length = max(operation_length, len(key))
         for job in tmp:
             total_label_length = max(total_label_length, len(', '.join(job['labels'])))
             label_length = max(label_length, len(max(job['labels'], key=len)))
 
-        context['jobs'] = list(tmp)
-        context['total_jobs'] = total_jobs
+        context['jobs'] = list(statuses.values())
+        context['jobs_count'] = jobs_count
+        context['operations_count'] = operations_count
         context['progress_sorted'] = progress_sorted
         context['scheduler_status_code'] = _FMT_SCHEDULER_STATUS
         context['bar_length'] = bar_length
@@ -1083,9 +1117,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         context['operation_length'] = operation_length
         context['label_length'] = label_length
         context['total_label_length'] = total_label_length
+        context['overview'] = overview
         context['detailed'] = detailed
         context['all_ops'] = all_ops
         context['pretty'] = pretty
+        context['parameters'] = parameters
+        context['parameters_length'] = parameters_length
 
         print(template.render(** context), file=file)
 

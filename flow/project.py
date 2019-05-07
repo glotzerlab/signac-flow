@@ -1077,7 +1077,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
                 status['parameters'] = OrderedDict()
                 for i, k in enumerate(parameters):
-                    v = self._alias(get(k, sp))
+                    v = shorten(str(self._alias(get(k, sp))))
                     parameters_length[i] = max(parameters_length[i], len(v))
                     status['parameters'][k] = v
 
@@ -1127,7 +1127,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         context['pretty'] = pretty
         context['parameters'] = parameters
         context['parameters_length'] = parameters_length
-        print(context['jobs'][0])
         print(template.render(** context), file=file)
 
         return None

@@ -1085,7 +1085,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 _add_parameters(status)
 
         if template is None:
-            template = 'print_status.sh'
+            if expand:
+                template = 'print_status_expand.sh'
+            else:
+                template = 'print_status.sh'
         env = self._environment
         template_environment = self._template_environment(env)
         template = template_environment.get_template(template)
@@ -1112,6 +1115,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         context['operations_count'] = operations_count
         context['progress_sorted'] = progress_sorted
         context['scheduler_status_code'] = _FMT_SCHEDULER_STATUS
+        context['alias_bool'] = {True: 'T', False: 'U'}
         context['bar_length'] = bar_length
         context['id_length'] = id_length
         context['operation_length'] = operation_length

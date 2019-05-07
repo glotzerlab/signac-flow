@@ -1,6 +1,7 @@
 {# The following variables are available to all scripts. #}
 {% if detailed %}
 {% set alias = scheduler_status_code %}
+{% set operation_length = [operation_length,5] | max %}
 {% set format_progress_bar = ("%%-%ss  %%-%ss" | format(label_length,bar_length,)) %}
 {% set format_job_id = ("%%-%ss  " | format(id_length,)) %}
 {% set format_operation = ("%%-%ss %%3s  " | format(operation_length,)) %}
@@ -32,7 +33,7 @@ Total # of jobs: {{'%s' |format(jobs_count)}}
 
 {% if detailed %}
 # Detailed View:
-{{ format_head | format('job_id', 'opeartions', para_head, 'labels',) }}
+{{ format_head | format('job_id', 'operation', para_head, 'labels',) }}
 {{ format_head | format('-'*id_length, '-'*(operation_length+4), ns.dash, '-'*total_label_length,) }}
 
 {% for job in jobs %}
@@ -52,6 +53,5 @@ Total # of jobs: {{'%s' |format(jobs_count)}}
 {% endfor %}
 {% endfor %}
 {% endif %}
-[U]:unknown [R]:registered [Q]:queued [A]:active [I]:inactive [!]:requires_attention
-
 {% endblock %}
+[U]:unknown [R]:registered [Q]:queued [A]:active [I]:inactive [!]:requires_attention

@@ -1207,6 +1207,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 inspect.getfile(multiprocessing),
                 inspect.getfile(Pool),
                 inspect.getfile(ThreadPool),
+                inspect.getfile(tqdm),
             ]
 
             with prof(single=False):

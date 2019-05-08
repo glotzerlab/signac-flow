@@ -8,6 +8,7 @@ next
 ----
 
 - Add full launcher support for job submission on XSEDE Stampede2 for large parallel single processor jobs (#85, #91).
+- Rewrite print status function with using Jinja2 templates.
 
 Version 0.7
 ===========

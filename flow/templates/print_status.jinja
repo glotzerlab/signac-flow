@@ -1,17 +1,17 @@
 {# The following variables are available to all scripts. #}
-{% set format_progress_bar = ("%%-%ss  %%-%ss" | format(label_length,bar_length,)) %}
+{% set format_progress_bar = ("%%-%ss  %%-%ss" | format(column_width_label,column_width_bar,)) %}
 {% if detailed %}
 {% set alias = scheduler_status_code %}
-{% set operation_length = [operation_length,5] | max %}
-{% set format_job_id = ("%%-%ss  " | format(id_length,)) %}
-{% set format_operation = ("%%-%ss %%3s  " | format(operation_length,)) %}
-{% set format_operation_title = ("%%-%ss  " | format(operation_length+4,)) %}
-{% set format_label = ("%%-%ss" | format(total_label_length,)) %}
+{% set column_width_operation = [column_width_operation,5] | max %}
+{% set format_job_id = ("%%-%ss  " | format(column_width_id,)) %}
+{% set format_operation = ("%%-%ss %%3s  " | format(column_width_operation,)) %}
+{% set format_operation_title = ("%%-%ss  " | format(column_width_operation+4,)) %}
+{% set format_label = ("%%-%ss" | format(column_width_total_label,)) %}
 {% set ns = namespace(dash='', format_parameters='') %}
 {% if parameters %}
 {% for para in parameters %}
-{% set ns.dash = ns.dash + ("%s  " | format('-' * parameters_length[loop.index-1])) %}
-{% set ns.format_parameters = ns.format_parameters + ("%%-%ss  " | format(parameters_length[loop.index-1],)) %}
+{% set ns.dash = ns.dash + ("%s  " | format('-' * column_width_parameters[loop.index-1])) %}
+{% set ns.format_parameters = ns.format_parameters + ("%%-%ss  " | format(column_width_parameters[loop.index-1],)) %}
 {% endfor %}
 {% set para_head = ns.format_parameters | format(*parameters,) %}
 {% endif %}
@@ -21,19 +21,19 @@
 {% block body %}
 {% if overview %}
 # Overview:
-Total # of jobs: {{'%s' |format(jobs_count)}}
+Total # of jobs: {{'%s' |format(num_jobs)}}
 
 {{ format_progress_bar | format('label','ratio')}}
-{{ format_progress_bar | format('-'*label_length,'-'*bar_length)}}
+{{ format_progress_bar | format('-'*column_width_label,'-'*column_width_bar)}}
 {% for label in progress_sorted %}
-{{ format_progress_bar | format(label[0], label[1] | draw_progressbar(jobs_count))}}
+{{ format_progress_bar | format(label[0], label[1] | draw_progressbar(num_jobs))}}
 {% endfor %}
 {% endif %}
 {% if detailed %}
 
 # Detailed View:
 {{ format_head | format('job_id', 'operation', para_head, 'labels',) }}
-{{ format_head | format('-'*id_length, '-'*(operation_length+4), ns.dash, '-'*total_label_length,) }}
+{{ format_head | format('-'*column_width_id, '-'*(column_width_operation+4), ns.dash, '-'*column_width_total_label,) }}
 {% for job in jobs %}
 {% if parameters %}
 {% set para_output = ns.format_parameters | format(*job['parameters'].values()) %}

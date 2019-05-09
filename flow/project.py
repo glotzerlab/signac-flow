@@ -1051,7 +1051,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             progress_sorted = list(islice(
                 sorted(progress.items(), key=lambda x: (x[1], x[0]), reverse=True),
                 overview_max_lines))
-            context['progress_sorted'] = progress_sorted
 
         parameters_length = 0
         # Optionally expand parameters argument to all varying parameters.
@@ -1117,6 +1116,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         context['jobs'] = list(statuses.values())
         context['jobs_count'] = jobs_count
         context['operations_count'] = operations_count
+        context['progress_sorted'] = progress_sorted
         context['scheduler_status_code'] = _FMT_SCHEDULER_STATUS
         context['alias_bool'] = {True: 'T', False: 'U'}
         context['bar_length'] = bar_length

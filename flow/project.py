@@ -1099,17 +1099,19 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         label_length = 5
         total_label_length = 0
         operation_length = 0
+        operations_count = 0
 
         for key, value in self._label_functions.items():
             label_length = max(label_length, len(key.__name__))
-        job = tmp[0]
-        operations_count = len(job['operations'])
-        for key, value in job['operations'].items():
-            operation_length = max(operation_length, len(key))
-        for job in tmp:
-            total_label_length = max(total_label_length, len(', '.join(job['labels'])))
-            if job['labels']:
-                label_length = max(label_length, len(max(job['labels'], key=len)))
+        if len(tmp):
+            job = tmp[0]
+            for key, value in job['operations'].items():
+                operation_length = max(operation_length, len(key))
+                operations_count += 1
+            for job in tmp:
+                total_label_length = max(total_label_length, len(', '.join(job['labels'])))
+                if job['labels']:
+                    label_length = max(label_length, len(max(job['labels'], key=len)))
 
         context['jobs'] = list(statuses.values())
         context['jobs_count'] = jobs_count

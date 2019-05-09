@@ -7,7 +7,6 @@
 {% set format_operation = ("%%-%ss %%3s  " | format(operation_length,)) %}
 {% set format_operation_title = ("%%-%ss  " | format(operation_length+4,)) %}
 {% set format_label = ("%%-%ss" | format(total_label_length,)) %}
-
 {% set ns = namespace(dash='', format_parameters='') %}
 {% if parameters %}
 {% for para in parameters %}
@@ -31,10 +30,10 @@ Total # of jobs: {{'%s' |format(jobs_count)}}
 {% endfor %}
 {% endif %}
 {% if detailed %}
+
 # Detailed View:
 {{ format_head | format('job_id', 'operation', para_head, 'labels',) }}
 {{ format_head | format('-'*id_length, '-'*(operation_length+4), ns.dash, '-'*total_label_length,) }}
-
 {% for job in jobs %}
 {% if parameters %}
 {% set para_output = ns.format_parameters | format(*job['parameters'].values()) %}

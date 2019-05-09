@@ -1116,7 +1116,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         context['jobs'] = list(statuses.values())
         context['jobs_count'] = jobs_count
         context['operations_count'] = operations_count
-        context['progress_sorted'] = progress_sorted
+        context['progress_sorted'] = progress_sorted if overview else None
         context['scheduler_status_code'] = _FMT_SCHEDULER_STATUS
         context['alias_bool'] = {True: 'T', False: 'U'}
         context['bar_length'] = bar_length

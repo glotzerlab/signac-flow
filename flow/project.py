@@ -1096,7 +1096,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
         bar_length = 50
         id_length = 32
-        label_length = 0
+        label_length = 5
         total_label_length = 0
         operation_length = 0
 

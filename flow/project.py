@@ -1108,7 +1108,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             operation_length = max(operation_length, len(key))
         for job in tmp:
             total_label_length = max(total_label_length, len(', '.join(job['labels'])))
-            label_length = max(label_length, len(max(job['labels'], key=len)))
+            if job['labels']:
+                label_length = max(label_length, len(max(job['labels'], key=len)))
 
         context['jobs'] = list(statuses.values())
         context['jobs_count'] = jobs_count

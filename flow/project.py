@@ -914,10 +914,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             scheduler_info = {sjob.name(): sjob.status() for sjob in self.scheduler_jobs(scheduler)}
             status = dict()
             print(self._tr("Query scheduler..."), file=file)
-            for op in tqdm(self._job_operations(jobs=jobs, only_eligible=False),
-                           desc="Fetching operation status",
-                           total=len(jobs), file=file):
-                status[op.get_id()] = int(scheduler_info.get(op.get_id(), JobStatus.unknown))
+            for job in tqdm(jobs,
+                            desc="Fetching operation status",
+                            total=len(jobs), file=file):
+                for op in self._job_operations(jobs=[job], only_eligible=False):
+                    status[op.get_id()] = int(scheduler_info.get(op.get_id(), JobStatus.unknown))
             self.document._status.update(status)
         except NoSchedulerError:
             logger.debug("No scheduler available.")

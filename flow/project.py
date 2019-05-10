@@ -1091,6 +1091,18 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         if jobs is None:
             jobs = self     # all jobs
 
+        # use Jinja2 template for status output
+        if template is None:
+            if expand:
+                template = 'print_status_expand.jinja'
+            else:
+                template = 'print_status.jinja'
+        env = self._environment
+        template_environment = self._template_environment(env)
+        template = template_environment.get_template(template)
+        context = self._get_standard_template_context()
+
+        # get job status information
         tmp = self._fetch_status(jobs, err, ignore_errors, no_parallelize)
 
         operations_errors = {s['_operations_error'] for s in tmp}
@@ -1121,10 +1133,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             print(json.dumps(statuses, indent=4), file=file)
             return
 
-        num_jobs = len(statuses)
-        # Generate status overview:
         if overview:
-            # get progress info
+            # get overview info:
+            column_width_bar = 50
+            column_width_label = 5
+            for key, value in self._label_functions.items():
+                column_width_label = max(column_width_label, len(key.__name__))
             progress = defaultdict(int)
             for status in statuses.values():
                 for label in status['labels']:
@@ -1133,13 +1147,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 sorted(progress.items(), key=lambda x: (x[1], x[0]), reverse=True),
                 overview_max_lines))
 
-        column_width_parameters = 0
         # Optionally expand parameters argument to all varying parameters.
         if parameters is self.PRINT_STATUS_ALL_VARYING_PARAMETERS:
             parameters = list(sorted({key for job in jobs for key in job.sp.keys()
                                       if len(set([job.sp.get(key) for job in jobs])) > 1}))
 
         if parameters:
+            # get parameters info
             column_width_parameters = list([0]*len(parameters))
             for i, para in enumerate(parameters):
                 column_width_parameters[i] = len(para)
@@ -1165,53 +1179,38 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             for status in statuses.values():
                 _add_parameters(status)
 
-        if template is None:
-            if expand:
-                template = 'print_status_expand.jinja'
-            else:
-                template = 'print_status.jinja'
-        env = self._environment
-        template_environment = self._template_environment(env)
-        template = template_environment.get_template(template)
-        context = self._get_standard_template_context()
-
-        column_width_bar = 50
-        column_width_id = 32
-        column_width_label = 5
-        column_width_total_label = 0
-        column_width_operation = 0
-        num_operations = 0
-
-        for key, value in self._label_functions.items():
-            column_width_label = max(column_width_label, len(key.__name__))
-        if len(tmp):
-            job = tmp[0]
-            for key, value in job['operations'].items():
-                column_width_operation = max(column_width_operation, len(key))
-                num_operations += 1
-            for job in tmp:
-                column_width_total_label = max(
-                    column_width_total_label, len(', '.join(job['labels'])))
-                if job['labels']:
-                    column_width_label = max(column_width_label, len(max(job['labels'], key=len)))
+        if detailed:
+            # get detailed view info
+            column_width_id = 32
+            column_width_total_label = 0
+            column_width_operation = 0
+            if len(tmp):
+                job = tmp[0]
+                for key, value in job['operations'].items():
+                    column_width_operation = max(column_width_operation, len(key))
+                for job in tmp:
+                    column_width_total_label = max(
+                        column_width_total_label, len(', '.join(job['labels'])))
 
         context['jobs'] = list(statuses.values())
-        context['num_jobs'] = num_jobs
-        context['num_operations'] = num_operations
-        context['progress_sorted'] = progress_sorted if overview else None
-        context['scheduler_status_code'] = _FMT_SCHEDULER_STATUS
-        context['alias_bool'] = {True: 'T', False: 'U'}
-        context['column_width_bar'] = column_width_bar
-        context['column_width_id'] = column_width_id
-        context['column_width_operation'] = column_width_operation
-        context['column_width_label'] = column_width_label
-        context['column_width_total_label'] = column_width_total_label
+
         context['overview'] = overview
         context['detailed'] = detailed
         context['all_ops'] = all_ops
         context['pretty'] = pretty
         context['parameters'] = parameters
-        context['column_width_parameters'] = column_width_parameters
+        if overview:
+            context['progress_sorted'] = progress_sorted
+            context['column_width_bar'] = column_width_bar
+            context['column_width_label'] = column_width_label
+        if detailed:
+            context['column_width_id'] = column_width_id
+            context['column_width_operation'] = column_width_operation
+            context['column_width_total_label'] = column_width_total_label
+        if parameters:
+            context['column_width_parameters'] = column_width_parameters
+        context['alias_bool'] = {True: 'T', False: 'U'}
+        context['scheduler_status_code'] = _FMT_SCHEDULER_STATUS
         print(template.render(** context), file=file)
 
         return None

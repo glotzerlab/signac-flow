@@ -1,5 +1,7 @@
 {# The following variables are available to all scripts. #}
+{% if overview %}
 {% set format_progress_bar = ("%%-%ss  %%-%ss" | format(column_width_label,column_width_bar,)) %}
+{% endif %}
 {% if detailed %}
 {% set alias = scheduler_status_code %}
 {% set column_width_operation = [column_width_operation,5] | max %}
@@ -21,12 +23,12 @@
 {% block body %}
 {% if overview %}
 # Overview:
-Total # of jobs: {{'%s' |format(num_jobs)}}
+Total # of jobs: {{ '%s' |format(jobs | length()) }}
 
-{{ format_progress_bar | format('label','ratio')}}
-{{ format_progress_bar | format('-'*column_width_label,'-'*column_width_bar)}}
+{{ format_progress_bar | format('label','ratio') }}
+{{ format_progress_bar | format('-'*column_width_label,'-'*column_width_bar) }}
 {% for label in progress_sorted %}
-{{ format_progress_bar | format(label[0], label[1] | draw_progressbar(num_jobs))}}
+{{ format_progress_bar | format(label[0], label[1] | draw_progressbar((jobs | length()))) }}
 {% endfor %}
 {% endif %}
 {% if detailed %}

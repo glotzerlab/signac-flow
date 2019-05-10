@@ -1,5 +1,5 @@
-{% extends "print_status.sh" %}
-{% block body %}
+{% extends "print_status.jinja" %}
+{% block detailed %}
 {{ super () }}
 ## Operations:
 {% set column_width_operation = [column_width_operation,9] | max %}

@@ -1093,7 +1093,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
         # use Jinja2 template for status output
         if template is None:
-            if expand:
+            if detailed and expand:
                 template = 'print_status_expand.jinja'
             else:
                 template = 'print_status.jinja'

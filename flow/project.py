@@ -875,33 +875,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 raise
         return result
 
-    def _format_row(self, status, statepoint=None, max_width=None):
-        "Format each row in the detailed status output."
-        row = [
-            status['job_id'],
-            status['operation'],
-            ', '.join((self._alias(s) for s in status['submission_status'])),
-            ', '.join(status.get('labels', [])),
-        ]
-        if statepoint:
-            sps = self.open_job(id=status['job_id']).statepoint()
-
-            def get(k, m):
-                if m is None:
-                    return
-                t = k.split('.')
-                if len(t) > 1:
-                    return get('.'.join(t[1:]), m.get(t[0]))
-                else:
-                    return m.get(k)
-
-            for i, k in enumerate(statepoint):
-                v = self._alias(get(k, sps))
-                row.insert(i + 3, None if v is None else shorten(str(v), max_width))
-        if status['operation'] and not status['active']:
-            row[2] += ' ' + self._alias('requires_attention')
-        return row
-
     def _fetch_scheduler_status(self, jobs=None, file=None, ignore_errors=False):
         "Update the status docs."
         if file is None:

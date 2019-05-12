@@ -1153,7 +1153,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 num_operations = len(self._operations)
                 column_width_operations_count = len(str(max(num_operations-1, 0))) + 3
 
-        print(tmp[0])
         context['jobs'] = list(statuses.values())
         context['overview'] = overview
         context['detailed'] = detailed

@@ -557,6 +557,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         template_environment.filters['print_warning'] = tf.print_warning
         template_environment.filters['bold_font'] = tf.bold_font
         template_environment.filters['draw_progressbar'] = tf.draw_progressbar
+        template_environment.filters['get_operation_status'] = tf.get_operation_status
         if 'max' not in template_environment.filters:    # for jinja2 < 2.10
             template_environment.filters['max'] = max
         if 'min' not in template_environment.filters:    # for jinja2 < 2.10
@@ -973,24 +974,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                     iterable=map(_get_job_status, jobs),
                     total=len(jobs), desc='Collect job status info:', file=err))
 
-    OPERATION_STATUS_SYMBOLS = OrderedDict([
-        ('ineligible', u'-'),
-        ('eligible', u'+'),
-        ('active', u'*'),
-        ('running', u'>'),
-        ('completed', u'X')
-    ])
-    "Symbols denoting the execution status of operations."
-
-    PRETTY_OPERATION_STATUS_SYMBOLS = OrderedDict([
-        ('ineligible', u'\u25cb'),   # open circle
-        ('eligible', u'\u25cf'),     # black circle
-        ('active', u'\u25b9'),       # open triangle
-        ('running', u'\u25b8'),      # black triangle
-        ('completed', u'\u2714'),    # check mark
-    ])
-    "Pretty (unicode) symbols denoting the execution status of operations."
-
     PRINT_STATUS_ALL_VARYING_PARAMETERS = True
     """This constant can be used to signal that the print_status() method is supposed
     to automatically show all varying parameters."""
@@ -1095,6 +1078,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         if template is None:
             if detailed and expand:
                 template = 'print_status_expand.jinja'
+            elif detailed and not unroll:
+                template = 'print_status_stack.jinja'
             elif detailed and compact:
                 template = 'print_status_compact.jinja'
             else:
@@ -1195,6 +1180,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 num_operations = len(self._operations)
                 column_width_operations_count = len(str(max(num_operations-1, 0))) + 3
 
+        print(tmp[0])
         context['jobs'] = list(statuses.values())
         context['overview'] = overview
         context['detailed'] = detailed
@@ -1202,6 +1188,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         context['pretty'] = pretty
         context['parameters'] = parameters
         context['compact'] = compact
+        context['unroll'] = unroll
         if overview:
             context['progress_sorted'] = progress_sorted
             context['column_width_bar'] = column_width_bar
@@ -1213,7 +1200,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             if parameters:
                 context['column_width_parameters'] = column_width_parameters
             if compact:
-                context['extra_num_operations'] = str(max(num_operations-1, 0))
+                context['extra_num_operations'] = max(num_operations-1, 0)
                 context['column_width_operations_count'] = column_width_operations_count
         context['alias_bool'] = {True: 'T', False: 'U'}
         context['scheduler_status_code'] = _FMT_SCHEDULER_STATUS

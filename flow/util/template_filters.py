@@ -5,10 +5,12 @@
 from __future__ import division, print_function
 import sys
 from math import ceil
+from collections import OrderedDict
 
 from .config import require_config_value
 from ..errors import ConfigKeyError
 from ..errors import SubmitError
+from ..scheduling.base import JobStatus
 
 
 def identical(iterable):
@@ -206,6 +208,52 @@ def draw_progressbar(value, total, width=40):
     ratio = ' %0.2f%%' % (100 * value / total)
     n = int(value / total * width)
     return '|' + ''.join(['#'] * n) + ''.join(['-'] * (width - n)) + '|' + ratio
+
+
+def get_operation_status(operation_info, pretty=False):
+    """Visualize progess with a progress bar.
+
+    :param job:
+        The dictionary with all info for an operation.
+    :type job:
+        dictionary
+    """
+
+    OPERATION_STATUS_SYMBOLS = OrderedDict([
+        ('ineligible', u'-'),
+        ('eligible', u'+'),
+        ('active', u'*'),
+        ('running', u'>'),
+        ('completed', u'X')
+    ])
+    "Symbols denoting the execution status of operations."
+
+    PRETTY_OPERATION_STATUS_SYMBOLS = OrderedDict([
+        ('ineligible', u'\u25cb'),   # open circle
+        ('eligible', u'\u25cf'),     # black circle
+        ('active', u'\u25b9'),       # open triangle
+        ('running', u'\u25b8'),      # black triangle
+        ('completed', u'\u2714'),    # check mark
+    ])
+    "Pretty (unicode) symbols denoting the execution status of operations."
+
+    if operation_info['scheduler_status'] >= JobStatus.active:
+        op_status = u'running'
+    elif operation_info['scheduler_status'] > JobStatus.inactive:
+        op_status = u'active'
+    elif operation_info['completed']:
+        op_status = u'completed'
+    elif operation_info['eligible']:
+        op_status = u'eligible'
+    else:
+        op_status = u'ineligible'
+
+    if pretty:
+        symbols = PRETTY_OPERATION_STATUS_SYMBOLS
+    else:
+        symbols = OPERATION_STATUS_SYMBOLS
+
+    return symbols[op_status]
 
 
 _GET_ACCOUNT_NAME_MESSAGES_SHOWN = set()

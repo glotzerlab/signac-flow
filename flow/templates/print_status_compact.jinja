@@ -12,7 +12,7 @@
 {% endif %}
 {% if all_ops %}
 {% set key,value = job['operations'].items() | first() %}
-{{ format_job_id | format(job['job_id'],) }}{{ format_operation | bold_font(value['eligible'],pretty) | format(key,'['+alias[value['scheduler_status']]+']', '+('+extra_num_operations+')',) }}{{para_output}}{{ '%s' | format(job['labels']|join(', ')) }}
+{{ format_job_id | format(job['job_id'],) }}{{ format_operation | bold_font(value['eligible'],pretty) | format(key,'['+alias[value['scheduler_status']]+']', '+('+extra_num_operations|string()+')',) }}{{para_output}}{{ '%s' | format(job['labels']|join(', ')) }}
 {% else %}
 {% set ns.extra_num_operation = -1 %}
 {% set ns.if_first_eligible_operation = True %}
@@ -29,5 +29,4 @@
 {{ format_job_id | format(job['job_id'],) }}{{ format_operation | bold_font(ns.first_operation_value['eligible'],pretty) | format(ns.first_operation_key,'['+alias[ns.first_operation_value['scheduler_status']]+']','+('+ns.extra_num_operation|string()+')',) }}{{para_output}}{{ '%s' | format(job['labels']|join(', ')) }}
 {% endif %}
 {% endfor %}
-[U]:unknown [R]:registered [Q]:queued [A]:active [I]:inactive [!]:requires_attention
 {% endblock %}

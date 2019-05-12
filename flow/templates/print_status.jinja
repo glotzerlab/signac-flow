@@ -55,6 +55,8 @@ Total # of jobs: {{ '%s' |format(jobs | length()) }}
 {% endif %}
 {% endfor %}
 {% endfor %}
-[U]:unknown [R]:registered [Q]:queued [A]:active [I]:inactive [!]:requires_attention
 {% endif %}
+{% endblock %}
+{% block legend %}
+[U]:unknown [R]:registered [Q]:queued [A]:active [I]:inactive [!]:requires_attention
 {% endblock %}

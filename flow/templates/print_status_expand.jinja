@@ -1,5 +1,7 @@
 {% if compact %}
 {% extends "print_status_compact.jinja" %}
+{% elif not unroll %}
+{% extends "print_status_stack.jinja" %}
 {% else %}
 {% extends "print_status.jinja" %}
 {% endif %}

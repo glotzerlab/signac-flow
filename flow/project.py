@@ -1182,15 +1182,16 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         if detailed:
             # get detailed view info
             column_width_id = 32
-            column_width_total_label = 0
-            column_width_operation = 0
-            if len(tmp):
-                job = tmp[0]
-                for key, value in job['operations'].items():
-                    column_width_operation = max(column_width_operation, len(key))
-                for job in tmp:
-                    column_width_total_label = max(
-                        column_width_total_label, len(', '.join(job['labels'])))
+            column_width_total_label = 6
+            column_width_operation = 5
+            for key, value in self._operations.items():
+                column_width_operation = max(column_width_operation, len(key))
+            for job in tmp:
+                column_width_total_label = max(
+                    column_width_total_label, len(', '.join(job['labels'])))
+            if all_ops and compact:
+                num_operations = len(self._operations)
+                column_withd_operations_count = len(str(num_operations-1)) + 3
 
         context['jobs'] = list(statuses.values())
 
@@ -1207,8 +1208,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             context['column_width_id'] = column_width_id
             context['column_width_operation'] = column_width_operation
             context['column_width_total_label'] = column_width_total_label
-        if parameters:
-            context['column_width_parameters'] = column_width_parameters
+            if parameters:
+                context['column_width_parameters'] = column_width_parameters
+            if all_ops and compact:
+                context['num_operations'] = num_operations
+                context['column_withd_operations_count'] = column_withd_operations_count
         context['alias_bool'] = {True: 'T', False: 'U'}
         context['scheduler_status_code'] = _FMT_SCHEDULER_STATUS
         print(template.render(** context), file=file)

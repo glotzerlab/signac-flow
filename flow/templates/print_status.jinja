@@ -7,9 +7,6 @@
 {% set column_width_operation = [column_width_operation,5] | max %}
 {% set format_job_id = ("%%-%ss  " | format(column_width_id,)) %}
 {% set format_operation = ("%%-%ss %%3s  " | format(column_width_operation,)) %}
-{% if compact %}
-{% set format_operation_compact = ("%%-%ss %%3s %%-%ss  " | format(column_width_operation,column_withd_operations_count,)) %}
-{% endif %}
 {% set format_operation_title = ("%%-%ss  " | format(column_width_operation+4,)) %}
 {% set format_label = ("%%-%ss" | format(column_width_total_label,)) %}
 {% set ns = namespace(dash='', format_parameters='') %}
@@ -21,7 +18,6 @@
 {% set para_head = ns.format_parameters | format(*parameters,) %}
 {% endif %}
 {% set format_head = format_job_id + format_operation_title + '%s' + format_label %}
-{% set format_row = format_job_id + format_operation + '%s' + format_label %}
 {% endif %}
 {% block overview %}
 {% if overview %}

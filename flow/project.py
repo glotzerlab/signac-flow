@@ -1095,6 +1095,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         if template is None:
             if detailed and expand:
                 template = 'print_status_expand.jinja'
+            elif detailed and compact:
+                template = 'print_status_compact.jinja'
             else:
                 template = 'print_status.jinja'
         env = self._environment
@@ -1189,17 +1191,17 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             for job in tmp:
                 column_width_total_label = max(
                     column_width_total_label, len(', '.join(job['labels'])))
-            if all_ops and compact:
+            if compact:
                 num_operations = len(self._operations)
-                column_withd_operations_count = len(str(num_operations-1)) + 3
+                column_width_operations_count = len(str(max(num_operations-1, 0))) + 3
 
         context['jobs'] = list(statuses.values())
-
         context['overview'] = overview
         context['detailed'] = detailed
         context['all_ops'] = all_ops
         context['pretty'] = pretty
         context['parameters'] = parameters
+        context['compact'] = compact
         if overview:
             context['progress_sorted'] = progress_sorted
             context['column_width_bar'] = column_width_bar
@@ -1210,9 +1212,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             context['column_width_total_label'] = column_width_total_label
             if parameters:
                 context['column_width_parameters'] = column_width_parameters
-            if all_ops and compact:
-                context['num_operations'] = num_operations
-                context['column_withd_operations_count'] = column_withd_operations_count
+            if compact:
+                context['extra_num_operations'] = str(max(num_operations-1, 0))
+                context['column_width_operations_count'] = column_width_operations_count
         context['alias_bool'] = {True: 'T', False: 'U'}
         context['scheduler_status_code'] = _FMT_SCHEDULER_STATUS
         print(template.render(** context), file=file)

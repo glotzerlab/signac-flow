@@ -1,15 +1,15 @@
 {% extends "print_status.jinja" %}
 {% block detailed %}
-{% set format_head = format_job_id  + '%s' + format_label %}
-{% set format_operation = ("%%1s %%-%ss %%3s  " | format(column_width_operation,)) %}
+{% set field_head = field_job_id  + '%s' + field_label %}
+{% set field_operation = ("%%1s %%-%ss %%3s  " | format(column_width_operation)) %}
 {% for job in jobs %}
 {% if parameters %}
-{% set para_output = ns.format_parameters | format(*job['parameters'].values()) %}
+{% set para_output = ns.field_parameters | format(*job['parameters'].values()) %}
 {% endif %}
-{{ format_job_id | format(job['job_id'],) }}{{para_output}}{{ '%s' | format(job['labels']|join(', ')) }}
-{% for key,value in job['operations'].items() %}
+{{ field_job_id | format(job['job_id']) }}{{para_output}}{{ '%s' | format(job['labels'] | join(', ')) }}
+{% for key, value in job['operations'].items() %}
 {% if (alias[value['scheduler_status']] != 'U' or value['eligible']) or all_ops%}
-{{ format_operation | bold_font(value['eligible'],pretty) | format(value | get_operation_status(pretty),key,'['+alias[value['scheduler_status']]+']',) }}
+{{ field_operation | bold_font(value['eligible'], pretty) | format(value | get_operation_status(pretty), key, '['+alias[value['scheduler_status']]+']') }}
 {% endif %}
 {% endfor %}
 {% endfor %}

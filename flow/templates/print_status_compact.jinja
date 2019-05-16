@@ -11,7 +11,7 @@
 {% set para_output = ns.field_parameters | format(*job['parameters'].values()) %}
 {% endif %}
 {% if all_ops %}
-{% set key, value = job['operations').items() | first() %}
+{% set key, value = job['operations'].items() | first() %}
 {{ field_job_id | format(job['job_id']) }}{{ field_operation | bold_font(value['eligible'], pretty) | format(key, '['+scheduler_status_code[value['scheduler_status']]+']', '+('+extra_num_operations | string()+')') }}{{para_output}}{{ '%s' | format(job['labels'] | join(', ')) }}
 {% else %}
 {% set ns.extra_num_operation = -1 %}

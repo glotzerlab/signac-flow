@@ -9,7 +9,7 @@ next
 
 - Add full launcher support for job submission on XSEDE Stampede2 for large parallel single processor jobs (#85, #91).
 - Show submission error messages in combination with a TORQUE scheduler (#103, #104).
-- Fix "Fetching operation status" progressbar to scale up to number of jobs (which is a known quantity) instead of job-operations (which are not known a priori) (#108).
+- Fix issue that caused the "Fetching operation status" progressbar to be inaccurate (#108).
 
 Version 0.7
 ===========

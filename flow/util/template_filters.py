@@ -203,10 +203,26 @@ def draw_progressbar(value, total, width=40):
     :type width:
         int
     """
+
     assert value >= 0 and total > 0
     ratio = ' %0.2f%%' % (100 * value / total)
     n = int(value / total * width)
     return '|' + ''.join(['#'] * n) + ''.join(['-'] * (width - n)) + '|' + ratio
+
+
+def job_filter(job_op, scheduler_status_code, all_ops):
+    """Visualize progess with a progress bar.
+
+    :param job_ops:
+        operations information for a job.
+    :type job_ops:
+        OrderedDict
+    """
+
+    if scheduler_status_code[job_op['scheduler_status']] != 'U' or job_op['eligible'] or all_ops:
+        return True
+    else:
+        return False
 
 
 def get_operation_status(operation_info, symbols):

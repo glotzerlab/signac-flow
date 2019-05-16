@@ -558,6 +558,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         template_environment.filters['bold_font'] = tf.bold_font
         template_environment.filters['draw_progressbar'] = tf.draw_progressbar
         template_environment.filters['get_operation_status'] = tf.get_operation_status
+        template_environment.filters['job_filter'] = tf.job_filter
         if 'max' not in template_environment.filters:    # for jinja2 < 2.10
             template_environment.filters['max'] = max
         if 'min' not in template_environment.filters:    # for jinja2 < 2.10

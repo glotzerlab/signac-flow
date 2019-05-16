@@ -1144,6 +1144,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             column_width_id = 32
             column_width_total_label = 6
             column_width_operation = 5
+            status_legend = ' '.join('[{}]:{}'.format(v, k) for k, v in self.ALIASES.items())
+
             for key, value in self._operations.items():
                 column_width_operation = max(column_width_operation, len(key))
             for job in tmp:
@@ -1152,6 +1154,27 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             if compact:
                 num_operations = len(self._operations)
                 column_width_operations_count = len(str(max(num_operations-1, 0))) + 3
+
+            if pretty:
+                OPERATION_STATUS_SYMBOLS = OrderedDict([
+                    ('ineligible', u'\u25cb'),   # open circle
+                    ('eligible', u'\u25cf'),     # black circle
+                    ('active', u'\u25b9'),       # open triangle
+                    ('running', u'\u25b8'),      # black triangle
+                    ('completed', u'\u2714'),    # check mark
+                ])
+                "Pretty (unicode) symbols denoting the execution status of operations."
+            else:
+                OPERATION_STATUS_SYMBOLS = OrderedDict([
+                    ('ineligible', u'-'),
+                    ('eligible', u'+'),
+                    ('active', u'*'),
+                    ('running', u'>'),
+                    ('completed', u'X')
+                ])
+                "Symbols denoting the execution status of operations."
+            operation_status_legend = ' '.join('[{}]:{}'.format(v, k)
+                                               for k, v in OPERATION_STATUS_SYMBOLS.items())
 
         context['jobs'] = list(statuses.values())
         context['overview'] = overview
@@ -1169,14 +1192,19 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             context['column_width_id'] = column_width_id
             context['column_width_operation'] = column_width_operation
             context['column_width_total_label'] = column_width_total_label
+            context['alias_bool'] = {True: 'T', False: 'U'}
+            context['scheduler_status_code'] = _FMT_SCHEDULER_STATUS
+            context['status_legend'] = status_legend
             if parameters:
                 context['column_width_parameters'] = column_width_parameters
             if compact:
                 context['extra_num_operations'] = max(num_operations-1, 0)
                 context['column_width_operations_count'] = column_width_operations_count
-        context['alias_bool'] = {True: 'T', False: 'U'}
-        context['scheduler_status_code'] = _FMT_SCHEDULER_STATUS
-        print(template.render(** context), file=file)
+            if not unroll:
+                context['operation_status_legend'] = operation_status_legend
+                context['operation_status_symbols'] = OPERATION_STATUS_SYMBOLS
+
+        print(template.render(**context), file=file)
 
         return None
 

@@ -1,9 +1,8 @@
-length{# The following variables are available to all scripts. #}
+{# The following variables are available to all scripts. #}
 {% if overview %}
 {% set field_progress_bar = ("%%-%ss  %%-%ss" | format(column_width_label, column_width_bar)) %}
 {% endif %}
 {% if detailed %}
-{% set alias = scheduler_status_code %}
 {% set column_width_operation = [column_width_operation, 5] | max %}
 {% set field_job_id = ("%%-%ss  " | format(column_width_id)) %}
 {% set field_operation = ("%%-%ss %%3s  " | format(column_width_operation)) %}
@@ -45,12 +44,12 @@ Total # of jobs: {{ '%s' | format(jobs | length) }}
 {% endif %}
 {% set ns.first_row = True %}
 {% for key, value in job['operations'].items() %}
-{% if (alias[value['scheduler_status']] != 'U' or value['eligible']) or all_ops%}
+{% if (scheduler_status_code[value['scheduler_status']] != 'U' or value['eligible']) or all_ops%}
 {% if ns.first_row %}
-{{ field_job_id | format(job['job_id']) }}{{ field_operation | bold_font(value['eligible'], pretty) | format(key, '['+alias[value['scheduler_status']]+']') }}{{para_output}}{{ '%s' | format(job['labels'] | join(', ')) }}
+{{ field_job_id | format(job['job_id']) }}{{ field_operation | bold_font(value['eligible'], pretty) | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }}{{para_output}}{{ '%s' | format(job['labels'] | join(', ')) }}
 {% set ns.first_row = False %}
 {% else %}
-{{field_job_id | format('')}}{{ field_operation | bold_font(value['eligible'], pretty) | format(key, '['+alias[value['scheduler_status']]+']') }}{{para_output}}{{ '%s' | format(job['labels'] | join(', ')) }}
+{{field_job_id | format('')}}{{ field_operation | bold_font(value['eligible'], pretty) | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }}{{para_output}}{{ '%s' | format(job['labels'] | join(', ')) }}
 {% endif %}
 {% endif %}
 {% endfor %}
@@ -59,6 +58,6 @@ Total # of jobs: {{ '%s' | format(jobs | length) }}
 {% endblock %}
 {% block legend %}
 {% if detailed %}
-[U]:unknown [R]:registered [Q]:queued [A]:active [I]:inactive [!]:requires_attention
+{{ status_legend }}
 {% endif %}
 {% endblock %}

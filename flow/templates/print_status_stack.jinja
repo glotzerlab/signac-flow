@@ -8,14 +8,10 @@
 {% endif %}
 {{ field_job_id | format(job['job_id']) }}{{para_output}}{{ '%s' | format(job['labels'] | join(', ')) }}
 {% for key, value in job['operations'].items() %}
-{% if (alias[value['scheduler_status']] != 'U' or value['eligible']) or all_ops%}
-{{ field_operation | bold_font(value['eligible'], pretty) | format(value | get_operation_status(pretty), key, '['+alias[value['scheduler_status']]+']') }}
+{% if (scheduler_status_code[value['scheduler_status']] != 'U' or value['eligible']) or all_ops%}
+{{ field_operation | bold_font(value['eligible'], pretty) | format(value | get_operation_status(operation_status_symbols), key, '['+scheduler_status_code[value['scheduler_status']]+']') }}
 {% endif %}
 {% endfor %}
 {% endfor %}
-{% if pretty %}
-Legend: ○:ineligible ●:eligible ▹:active ▸:running ✔:completed
-{% else %}
-Legend: -:ineligible +:eligible *:active >:running X:completed
-{% endif %}
+{{ operation_status_legend }}
 {% endblock %}

@@ -15,8 +15,8 @@
 {{ field_op_table | format('-' * column_width_id, '-' * column_width_operation, '-' * 8, '-' * 14) }}
 {% for job in jobs %}
 {% for key, value in job['operations'].items() %}
-{% if (alias[value['scheduler_status']] != 'U' or value['eligible']) or all_ops%}
-{{ field_job_id | format(job['job_id']) }}{{ field_operation | bold_font(value['eligible'], pretty) | format(key) }}{{ '%-8s  ' | format(alias_bool[value['eligible']])}}{{ '%-14s  ' | format(alias[value['scheduler_status']])}}
+{% if (scheduler_status_code[value['scheduler_status']] != 'U' or value['eligible']) or all_ops%}
+{{ field_job_id | format(job['job_id']) }}{{ field_operation | bold_font(value['eligible'], pretty) | format(key) }}{{ '%-8s  ' | format(scheduler_status_code_bool[value['eligible']])}}{{ '%-14s  ' | format(scheduler_status_code[value['scheduler_status']])}}
 {% endif %}
 {% endfor %}
 {% endfor %}

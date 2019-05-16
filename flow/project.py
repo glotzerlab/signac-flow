@@ -1058,6 +1058,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 template = 'print_status_compact.jinja'
             else:
                 template = 'print_status.jinja'
+
+        if skip_active:
+            raise NotImplementedError("The deprecated --skip-active option is no longer supported.")
+
         env = self._environment
         template_environment = self._template_environment(env)
         template = template_environment.get_template(template)

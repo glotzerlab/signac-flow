@@ -9,7 +9,6 @@ from math import ceil
 from .config import require_config_value
 from ..errors import ConfigKeyError
 from ..errors import SubmitError
-from ..scheduling.base import JobStatus
 
 
 def identical(iterable):
@@ -171,81 +170,6 @@ def print_warning(msg):
     logger = logging.getLogger(__name__)
     logger.warn(msg)
     return ''
-
-
-def bold_font(s, eligible, pretty=False):
-    """Change font to bold within jinja2 template
-
-    :param s:
-        The string to be printed
-    :param pretty:
-        style option
-    """
-    if eligible and pretty:
-        return '\033[1m' + s + '\033[0m'
-    else:
-        return s
-
-
-def draw_progressbar(value, total, width=40):
-    """Visualize progess with a progress bar.
-
-    :param value:
-        The current progress as a fraction of total.
-    :type value:
-        int
-    :param total:
-        The maximum value that 'value' may obtain.
-    :type total:
-        int
-    :param width:
-        The character width of the drawn progress bar.
-    :type width:
-        int
-    """
-
-    assert value >= 0 and total > 0
-    ratio = ' %0.2f%%' % (100 * value / total)
-    n = int(value / total * width)
-    return '|' + ''.join(['#'] * n) + ''.join(['-'] * (width - n)) + '|' + ratio
-
-
-def job_filter(job_op, scheduler_status_code, all_ops):
-    """Visualize progess with a progress bar.
-
-    :param job_ops:
-        operations information for a job.
-    :type job_ops:
-        OrderedDict
-    """
-
-    if scheduler_status_code[job_op['scheduler_status']] != 'U' or job_op['eligible'] or all_ops:
-        return True
-    else:
-        return False
-
-
-def get_operation_status(operation_info, symbols):
-    """Visualize progess with a progress bar.
-
-    :param job:
-        The dictionary with all info for an operation.
-    :type job:
-        dictionary
-    """
-
-    if operation_info['scheduler_status'] >= JobStatus.active:
-        op_status = u'running'
-    elif operation_info['scheduler_status'] > JobStatus.inactive:
-        op_status = u'active'
-    elif operation_info['completed']:
-        op_status = u'completed'
-    elif operation_info['eligible']:
-        op_status = u'eligible'
-    else:
-        op_status = u'ineligible'
-
-    return symbols[op_status]
 
 
 _GET_ACCOUNT_NAME_MESSAGES_SHOWN = set()

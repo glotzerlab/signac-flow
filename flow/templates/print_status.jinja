@@ -44,16 +44,12 @@ Total # of jobs: {{ '%s' | format(jobs | length) }}
 {% endif %}
 {% for key, value in job['operations'].items() if value | job_filter(scheduler_status_code, all_ops) %}
 {% if loop.first %}
-{{ field_job_id | format(job['job_id']) }}{{ field_operation | bold_font(value['eligible'], pretty) | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }}{{para_output}}{{ '%s' | format(job['labels'] | join(', ')) }}
+{{ field_job_id | format(job['job_id']) }}{{ field_operation | highlight(value['eligible']) | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }}{{para_output}}{{ '%s' | format(job['labels'] | join(', ')) }}
 {% else %}
-{{field_job_id | format('')}}{{ field_operation | bold_font(value['eligible'], pretty) | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }}{{para_output}}{{ '%s' | format(job['labels'] | join(', ')) }}
+{{field_job_id | format('')}}{{ field_operation | highlight(value['eligible']) | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }}{{para_output}}{{ '%s' | format(job['labels'] | join(', ')) }}
 {% endif %}
 {% endfor %}
 {% endfor %}
-{% endif %}
-{% endblock %}
-{% block legend %}
-{% if detailed %}
 {{ status_legend }}
 {% endif %}
 {% endblock %}

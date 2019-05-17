@@ -539,6 +539,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         template_environment = jinja2.Environment(
             loader=jinja2.ChoiceLoader(load_envs),
             trim_blocks=True,
+            lstrip_blocks=True,
             extensions=[TemplateError])
 
         # Setup standard filters that can be used to format context variables.
@@ -1059,8 +1060,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             raise NotImplementedError("The deprecated --skip-active option is no longer supported.")
 
         # initialize jinja2 template evnronment and necessary filters
-        env = self._environment
-        template_environment = self._template_environment(env)
+        template_environment = self._template_environment()
 
         def draw_progressbar(value, total, width=40):
             """Visualize progess with a progress bar.

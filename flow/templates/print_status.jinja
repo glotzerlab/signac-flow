@@ -1,4 +1,3 @@
-#jinja2: lstrip_blocks: True
 {# The following variables are available to all scripts. #}
 {% if overview %}
     {% set field_progress_bar = ("%%-%ss  %%-%ss" | format(column_width_label, column_width_bar)) %}
@@ -37,7 +36,7 @@ Total # of jobs: {{ '%s' | format(jobs | length) }}
 
 {% block detailed %}
 {% if detailed %}
-# Overview:
+# Detailed view:
 {{ field_head | format('job_id', 'operation', para_head, 'labels') }}
 {{ field_head | format('-' * column_width_id, '-' * (column_width_operation+4), ns.dash, '-' * column_width_total_label) }}
     {% for job in jobs %}

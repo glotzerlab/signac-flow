@@ -149,6 +149,19 @@ class _condition(object):
                    'not_'.encode() + condition.__code__.co_code)
 
 
+def _create_all_metacondition(condition_dict, *other_funcs):
+    """Standard function for generating aggregate metaconditions that require
+    *all* provided conditions to be met. The resulting metacondition is
+    constructed with appropriate information for graph detection."""
+    condition_list = [c for f in other_funcs for c in condition_dict[f]]
+
+    def _flow_metacondition(job):
+        return all(c(job) for c in condition_list)
+
+    _flow_metacondition._composed_of = condition_list
+    return _flow_metacondition
+
+
 def make_bundles(operations, size=None):
     """Utility function for the generation of bundles.
 
@@ -429,17 +442,58 @@ class FlowOperation(object):
             return self._cmd.format(job=job)
 
 
-def _create_all_metacondition(condition_dict, *other_funcs):
-    """Standard function for generating aggregate metaconditions that require
-    *all* provided conditions to be met. The resulting metacondition is
-    constructed with appropriate information for graph detection."""
-    condition_list = [c for f in other_funcs for c in condition_dict[f]]
+class FlowGroup(object):
+    """A FlowGroup represents a subset of a workflow for any given job.
 
-    def _flow_metacondition(job):
-        return all(c(job) for c in condition_list)
+    Any :class:`FlowGroup` is associated with a group of
+    :class:`FlowOperation`s. The command (cmd) is by default a modified
+    :func:`run` command, but can be overwritten with any function that takes a
+    job and operations argument.
 
-    _flow_metacondition._composed_of = condition_list
-    return _flow_metacondition
+    :param name:
+        The name of the group to be used when calling from the commandline.
+    :type name:
+        :class:`str`
+    :param operations:
+        The list of operations associated with the group.
+    :type operations:
+        :class:`list` of :class:`FlowOperation`
+    :param cmd:
+        The command to execute group; should be a function of job, and
+        operations.
+    :type cmd:
+        str or callable
+    :param directives:
+        A dictionary of additional parameters that provide instructions on how
+        to execute this operation, e.g., specifically required resources.
+    :type directives:
+        :class:`dict`
+    """
+
+    def __init__(self, name, operations=None, cmd=None, directives=None):
+        self.name = name
+        if operations is None:
+            self.operations = []
+        else:
+            self.operations = operations
+        if cmd is None:
+            def cmd(operations, job=None):
+                if job is None:
+                    return "run -o {}".format(' '.join(operations))
+                return "run -j {} -o {}".format(job, ' '.join(operations))
+            self._cmd = cmd
+        else:
+            self._cmd = cmd
+        self.directives = None
+
+    def __call__(self, job=None):
+        if callable(self._cmd):
+            return self._cmd(self.operations, job)
+        else:
+            return self._cmd.format(self.operations, job)
+
+    def add_operation(self, operation):
+        self.operations.append(operation)
 
 
 class _FlowProjectClass(type):
@@ -468,6 +522,14 @@ class _FlowProjectClass(type):
         # are in.
         cls.pre = cls._setup_pre_conditions_class(parent_class=cls)
         cls.post = cls._setup_post_conditions_class(parent_class=cls)
+
+        # All groups are registered with the function returned by the make_group
+        # classmethod. In contradistinction to operations and labels, the
+        # make_group classmethod does not serve as the decorator, the function
+        # it returns does. The _GROUPS list records the groups created and their
+        # passed parameters for later initialization.
+        cls._GROUPS = list()
+
         return cls
 
     @staticmethod
@@ -602,6 +664,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         self._operation_functions = dict()
         self._operations = OrderedDict()
         self._register_operations()
+
+        # Register all groups with this project instance.
+        self._groups = dict()
+        self._register_groups()
 
         # Enable the use of buffered mode for certain functions
         try:
@@ -2604,6 +2670,48 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 self._operations[name] = FlowOperation(
                     cmd=_guess_cmd(func, name, **params), **params)
                 self._operation_functions[name] = func
+
+    @classmethod
+    def make_group(cls, name, cmd=None, directives=None):
+        cls._GROUPS.append({'name': name, 'cmd': cmd,
+                            'directives': directives})
+
+        def add_to_group(func):
+            if hasattr(func, '_flow_group'):
+                func._flow_group.append(add_to_group.group_name)
+            else:
+                func._flow_group = [add_to_group.group_name]
+            return func
+        add_to_group.group_name = name
+        return add_to_group
+
+    def _register_groups(self):
+        "Register all groups and add the correct operations to each."
+        groups = []
+        # Gather all groups from class and parent classes.
+        for cls in type(self).__mro__:
+            groups.extend(getattr(cls, '_GROUPS', []))
+
+        # Initialize all groups without operations
+        for group in groups:
+            # Raise error for duplicate groups
+            if group['name'] in self._groups:
+                raise ValueError(
+                        "Repeat definition of group with name " +
+                        "'{}'.".format(group['name']))
+            # Create group
+            self._groups[group['name']] = FlowGroup(**group)
+
+        # Add operations to group
+        # Currently recreating operation list. There may be a better way to do
+        # this.
+        operations = []
+        for cls in type(self).__mro__:
+            operations.extend(getattr(cls, '_OPERATION_FUNCTIONS', []))
+        for (name, func) in operations:
+            if hasattr(func, '_flow_group'):
+                for group in func._flow_group:
+                    self._groups[group].add_operation(self._operations[name])
 
     @property
     def operations(self):

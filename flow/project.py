@@ -539,7 +539,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         template_environment = jinja2.Environment(
             loader=jinja2.ChoiceLoader(load_envs),
             trim_blocks=True,
-            lstrip_blocks=True,
             extensions=[TemplateError])
 
         # Setup standard filters that can be used to format context variables.

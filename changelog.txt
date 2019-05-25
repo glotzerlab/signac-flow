@@ -14,6 +14,7 @@ next
 - Allow the provision of multiple operation-functions to the ``pre.after`` and ``*.copy_from`` conditions (#120).
 - Add option to specify the operation execution order (#121).
 - Fix erroneous line in the torque submission template (#126).
+- Add feature for integrated profiling of status updates to aid with the optimization of the FlowProject imlementation (#107, #110).
 
 Fixes
 +++++

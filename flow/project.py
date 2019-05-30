@@ -2186,11 +2186,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             help="Do not interact with the scheduler, implies --pretend.")
         cls._add_operation_selection_arg_group(parser)
         cls._add_operation_bundling_arg_group(parser)
+        cls._add_group_selection_args(parser)
         cls._add_template_arg_group(parser)
 
     @classmethod
     def _add_script_args(cls, parser):
         cls._add_operation_selection_arg_group(parser)
+        cls._add_group_selection_args(parser)
         execution_group = parser.add_argument_group('execution')
         execution_group.add_argument(
             '-p', '--parallel',
@@ -2244,6 +2246,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             type=str,
             nargs='+',
             help="Only select jobs that match the given document filter.")
+
+    @classmethod
+    def _add_group_selection_args(cls, parser):
+        "Add argument group to parser for group selection."
+        parser.add_argument(
+                '-g', '--group',
+                nargs='+',
+                help='Only select the in given group(s).')
 
     @classmethod
     def _add_operation_selection_arg_group(cls, parser, operations=None):
@@ -2997,6 +3007,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             nargs='*',
             help=argparse.SUPPRESS)
         self._add_operation_selection_arg_group(parser_run, list(sorted(self._operations)))
+        self._add_group_selection_args(parser_run)
 
         execution_group = parser_run.add_argument_group('execution')
         execution_group.add_argument(

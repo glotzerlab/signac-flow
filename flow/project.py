@@ -454,7 +454,7 @@ class FlowGroup(object):
     :type name:
         :class:`str`
     :param operations:
-        The list of operations associated with the group.
+        The list of operation names associated with the group.
     :type operations:
         :class:`list` of :class:`FlowOperation`
     :param cmd:
@@ -486,6 +486,7 @@ class FlowGroup(object):
         self.directives = None
 
     def __call__(self, job=None):
+        #Get operation names
         if callable(self._cmd):
             return self._cmd(self.operations, job)
         else:
@@ -493,6 +494,133 @@ class FlowGroup(object):
 
     def add_operation(self, operation):
         self.operations.append(operation)
+
+
+class JobGroup(FlowGroup):
+    """This class represents the information needed to execute one group for one job.
+
+    An group function in this context is a shell command, which should be a
+    string with one and only one signac job.
+
+    .. note::
+
+        This class is used by the :class:`~.FlowGroup` class for the execution and
+        submission process and should not be instantiated by users themselves.
+
+    .. versionchanged:: 0.6
+
+    :param name:
+        The name of this JobOperation instance. The name is arbitrary,
+        but helps to concisely identify the operation in various contexts.
+    :type name:
+        str
+    :param operations:
+        The list of operations associated with the group.
+    :type operations:
+        :class:`list` of :class:`FlowOperation`
+    :param job:
+        The job instance associated with this operation.
+    :type job:
+        :py:class:`signac.Job`.
+    :param cmd:
+        The command that executes this operation.
+    :type cmd:
+        str
+    :param directives:
+        A dictionary of additional parameters that provide instructions on how
+        to execute this operation, e.g., specifically required resources.
+    :type directives:
+        :class:`dict`
+    """
+    MAX_LEN_ID = 100
+
+    def __init__(self, name, operations, job, cmd=None, directives=None, np=None):
+        super(JobGroup, self).__init__(name, operations, cmd, directives)
+        self.job = job
+        self.cmd = super(JobGroup, self).__call__(job)
+        self.__call__ = None
+        if directives is None:
+            directives = dict()  # default argument
+        else:
+            directives = dict(directives)  # explicit copy
+
+        # Keys which were explicitly set by the user, but are not evaluated by the
+        # template engine are cause for concern and might hint at a bug in the template
+        # script or ill-defined directives. We are therefore keeping track of all
+        # keys set by the user and check whether they have been evaluated by the template
+        # script engine later.
+        keys_set_by_user = set(directives.keys())
+
+        directives.setdefault(
+            'np', directives.get('nranks', 1) * directives.get('omp_num_threads', 1))
+        directives.setdefault('ngpu', 0)
+        directives.setdefault('nranks', 0)
+        directives.setdefault('omp_num_threads', 0)
+        directives.setdefault('processor_fraction', 1)
+
+        # Evaluate strings and callables for job:
+        def evaluate(value):
+            if value and callable(value):
+                return value(job)
+            elif isinstance(value, six.string_types):
+                return value.format(job=job)
+            else:
+                return value
+
+        # We use a special dictionary that allows us to track all keys that have been
+        # evaluated by the template engine and compare them to those explicitly set
+        # by the user. See also comment above.
+        self.directives = TrackGetItemDict(
+            {key: evaluate(value) for key, value in directives.items()})
+        self.directives._keys_set_by_user = keys_set_by_user
+
+    @classmethod
+    def from_FlowGroup(cls, fgroup, job, np=None):
+        return cls(name=fgroup.name, operations=fgroup.operations, job=job,
+                   cmd=fgroup._cmd, directives=fgroup.directives, np=np)
+
+    def __str__(self):
+        return "{}({})".format(self.name, self.job)
+
+    def __repr__(self):
+        return "{type}(name='{name}', job='{job}', cmd={cmd}, directives={directives})".format(
+            type=type(self).__name__,
+            name=self.name,
+            job=str(self.job),
+            cmd=repr(self.cmd),
+            directives=self.directives)
+
+    def get_id(self, index=0):
+        "Return a name, which identifies this job-group."
+        project = self.job._project
+
+        # The full name is designed to be truly unique for each job-group.
+        full_name = '{}%{}%{}%{}'.format(
+            project.root_directory(), self.job.get_id(), self.name, index)
+
+        # The job_op_id is a hash computed from the unique full name.
+        job_op_id = calc_id(full_name)
+
+        # The actual job id is then constructed from a readable part and the job_op_id,
+        # ensuring that the job-op is still somewhat identifiable, but guarantueed to
+        # be unique. The readable name is based on the project id, job id, operation name,
+        # and the index number. All names and the id itself are restricted in length
+        # to guarantuee that the id does not get too long.
+        max_len = self.MAX_LEN_ID - len(job_op_id)
+        if max_len < len(job_op_id):
+            raise ValueError("Value for MAX_LEN_ID is too small ({}).".format(self.MAX_LEN_ID))
+
+        readable_name = '{}/{}/{}/{:04d}/'.format(
+            str(project)[:12], str(self.job)[:8], self.name[:12], index)[:max_len]
+
+        # By appending the unique job_op_id, we ensure that each id is truly unique.
+        return readable_name + job_op_id
+
+    def __hash__(self):
+        return int(sha1(self.get_id().encode('utf-8')).hexdigest(), 16)
+
+    def __eq__(self, other):
+        return self.get_id() == other.get_id()
 
 
 class _FlowProjectClass(type):
@@ -1747,6 +1875,96 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             self._show_template_help_and_exit(template_environment, context)
         return template.render(** context)
 
+    def submit_group(self, group, _id=None, env=None, parallel=False, flags=None,
+                     force=False, template='script.sh', pretend=False,
+                     show_template_help=False, **kwargs):
+        """Submit a sequence of operations to the scheduler.
+
+        .. versionchanged:: 0.6
+
+        :param group:
+            The group to submit.
+        :type group:
+            An instance of :py:class:`.FlowGroup`
+        :param _id:
+            The _id to be used for this submission.
+        :type _id:
+            str
+        :param parallel:
+            Execute all bundled operations in parallel.
+        :type parallel:
+            bool
+        :param flags:
+            Additional options to be forwarded to the scheduler.
+        :type flags:
+            list
+        :param force:
+            Ignore all warnings or checks during submission, just submit.
+        :type force:
+            bool
+        :param template:
+            The name of the template file to be used to generate the submission script.
+        :type template:
+            str
+        :param pretend:
+            Do not actually submit, but only print the submission script to screen. Useful
+            for testing the submission workflow.
+        :type pretend:
+            bool
+        :param show_template_help:
+            Show information about available template variables and filters and exit.
+        :type show_template_help:
+            bool
+        :param kwargs:
+            Additional keyword arguments to be forwarded to the scheduler.
+        :return:
+            Return the submission status after successful submission or None.
+        """
+        if _id is None:
+            _id = group.get_id()
+        if env is None:
+            env = self._environment
+
+        print("Submitting cluster job '{}':".format(_id), file=sys.stderr)
+
+        def _msg(group):
+            print(" - Group: {}".format(group), file=sys.stderr)
+            return group
+
+        try:
+            script = self._generate_submit_script(
+                _id=_id,
+                operations=map(_msg, [group]),
+                template=template,
+                show_template_help=show_template_help,
+                env=env,
+                parallel=parallel,
+                force=force,
+                **kwargs
+            )
+        except ConfigKeyError as error:
+            raise SubmitError(
+                "Unable to submit, because of a configuration error.\n"
+                "The following key is missing: {key}.\n"
+                "You can add the key to the configuration for example with:\n\n"
+                "  $ signac config --global set {key} VALUE\n".format(key=str(error)))
+        else:
+            # Keys which were explicitly set by the user, but are not evaluated by the
+            # template engine are cause for concern and might hint at a bug in the template
+            # script or ill-defined directives. Here we check whether all directive keys that
+            # have been explicitly set by the user were actually evaluated by the template
+            # engine and warn about those that have not been.
+            keys_unused = {
+                key for key in
+                group.directives._keys_set_by_user.difference(group.directives.keys_used)}
+            if keys_unused:
+                logger.warning(
+                    "Some of the keys provided as part of the directives were not used by "
+                    "the template script, including: {}".format(
+                        ', '.join(sorted(keys_unused))))
+            if pretend:
+                print(script)
+
     def submit_operations(self, operations, _id=None, env=None, parallel=False, flags=None,
                           force=False, template='script.sh', pretend=False,
                           show_template_help=False, **kwargs):
@@ -1992,10 +2210,15 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
     @classmethod
     def _add_group_selection_args(cls, parser):
         "Add argument group to parser for group selection."
-        parser.add_argument(
-                '-g', '--group',
-                nargs='+',
-                help='Only select the in given group(s).')
+        selection_group = parser.add_argument_group(
+            'group selection',
+            "Allows for selection of a group to be run, sumbitted, or "
+            "scripted.")
+        selection_group.add_argument(
+            '-g', '--group',
+            nargs=1,
+            dest='group_name',
+            help='Only execute the given group.')
 
     @classmethod
     def _add_operation_selection_arg_group(cls, parser, operations=None):
@@ -2417,8 +2640,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             # Raise error for duplicate groups
             if group['name'] in self._groups:
                 raise ValueError(
-                        "Repeat definition of group with name " +
-                        "'{}'.".format(group['name']))
+                    "Repeat definition of group with name " +
+                    "'{}'.".format(group['name']))
             # Create group
             self._groups[group['name']] = FlowGroup(**group)
 
@@ -2431,7 +2654,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         for (name, func) in operations:
             if hasattr(func, '_flow_group'):
                 for group in func._flow_group:
-                    self._groups[group].add_operation(self._operations[name])
+                    self._groups[group].add_operation(name)
 
     @property
     def operations(self):
@@ -2550,17 +2773,29 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         if not args.test:
             self._fetch_scheduler_status(jobs)
 
-        # Gather all pending operations ...
-        with self._potentially_buffered():
-            ops = self._get_pending_operations(jobs, args.operation_name)
-            ops = list(islice(ops, args.num))
+        # Raise an exception if both groups and operations are choosen since
+        # this could result in undefined behavior.
+        if args.group_name is not None and args.operation_name is not None:
+            raise SubmitError("Operations and groups cannot both be selected.")
 
-        # Bundle operations up, generate the script, and submit to scheduler.
-        for bundle in make_bundles(ops, args.bundle_size):
-            status = self.submit_operations(operations=bundle, **kwargs)
-            if status is not None:
-                for op in bundle:
-                    op.set_status(status)
+        # Choose the group(s) or operations path
+        if args.group_name is not None:
+            for job in jobs:
+                job_group = JobGroup.from_FlowGroup(self._groups[args.group_name[0]],
+                                                    job)
+                self.submit_group(group=job_group, **kwargs)
+        else:
+            # Gather all pending operations ...
+            with self._potentially_buffered():
+                ops = self._get_pending_operations(jobs, args.operation_name)
+                ops = list(islice(ops, args.num))
+
+            # Bundle operations up, generate the script, and submit to scheduler.
+            for bundle in make_bundles(ops, args.bundle_size):
+                status = self.submit_operations(operations=bundle, **kwargs)
+                if status is not None:
+                    for op in bundle:
+                        op.set_status(status)
 
     def _main_exec(self, args):
         if len(args.jobid):

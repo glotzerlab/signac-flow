@@ -2,8 +2,8 @@ import signac
 import flow
 from flow import FlowProject, directives
 
-eg_group = FlowProject.make_group(name='eg_group')
-
+eg_group = FlowProject.make_group(name='eg_group', directives={'np': 2})
+new_group = FlowProject.make_group(name='new_group')
 
 @FlowProject.operation
 @eg_group
@@ -17,7 +17,17 @@ def bar(job):
     print('bar')
 
 
+@new_group
+@FlowProject.operation
+def num(job):
+    print('num')
+
+
+@FlowProject.operation
+@eg_group
+def who(job):
+    print('who')
+
+
 if __name__ == '__main__':
-    fp = FlowProject()
-    print(fp._groups['eg_group'].operations)
-    print(fp._operations)
+    FlowProject().main()

@@ -4,7 +4,7 @@ from flow import FlowProject, directives, environments
 
 eg_group = FlowProject.make_group(name='eg_group', directives={'np': 2,
                                                                'walltime': 0.5})
-new_group = FlowProject.make_group(name='new_group')
+new_group = FlowProject.make_group(name='new_group', options='--num-passes=3')
 
 
 @FlowProject.operation
@@ -33,4 +33,5 @@ def who(job):
 
 if __name__ == '__main__':
     f = FlowProject()
+    print(f._groups['new_group'].options)
     f.main()

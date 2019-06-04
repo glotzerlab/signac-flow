@@ -467,10 +467,20 @@ class FlowGroup(object):
         to execute this operation, e.g., specifically required resources.
     :type directives:
         :class:`dict`
+    :param options:
+        A string of options to append to the output of the object's call method.
+        This lets options like --num_passes to be given to a group.
+    :type options:
+        :class:`str`
     """
 
-    def __init__(self, name, operations=None, cmd=None, directives=None):
+    def __init__(self, name, operations=None, cmd=None, directives=None,
+                 options=None):
         self.name = name
+        if options is None:
+            self.options = ""
+        else:
+            self.options = options
         if operations is None:
             self.operations = []
         else:
@@ -488,9 +498,9 @@ class FlowGroup(object):
     def __call__(self, job=None):
         # Get string form of command
         if callable(self._cmd):
-            return self._cmd(self.operations, job)
+            return self._cmd(self.operations, job) + ' ' + self.options
         else:
-            return self._cmd.format(self.operations, job)
+            return self._cmd.format(self.operations, job) + ' ' + self.options
 
     def add_operation(self, operation):
         self.operations.append(operation)
@@ -531,11 +541,18 @@ class JobGroup(FlowGroup):
         to execute this operation, e.g., specifically required resources.
     :type directives:
         :class:`dict`
+    :param options:
+        A string of options to append to the output of the object's call method.
+        This lets options like --num_passes to be given to a group.
+    :type options:
+        :class:`str`
     """
     MAX_LEN_ID = 100
 
-    def __init__(self, name, operations, job, cmd=None, directives=None, np=None):
-        super(JobGroup, self).__init__(name, operations, cmd, directives)
+    def __init__(self, name, operations, job, cmd=None, directives=None,
+                 options=None, np=None):
+        super(JobGroup, self).__init__(name, operations, cmd, directives,
+                                       options)
         self.job = job
         self.cmd = super(JobGroup, self).__call__(job)
         self.__call__ = None
@@ -577,7 +594,8 @@ class JobGroup(FlowGroup):
     @classmethod
     def from_FlowGroup(cls, fgroup, job, np=None):
         return cls(name=fgroup.name, operations=fgroup.operations, job=job,
-                   cmd=fgroup._cmd, directives=fgroup.directives, np=np)
+                   cmd=fgroup._cmd, directives=fgroup.directives,
+                   options=fgroup.options, np=np)
 
     def __str__(self):
         return "{}({})".format(self.name, self.job)
@@ -1926,6 +1944,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             env = self._environment
 
         print("Submitting cluster job '{}':".format(_id), file=sys.stderr)
+        print("JobGroup cmd '{}'".format(group.cmd))
 
         def _msg(group):
             print(" - Group: {}".format(group), file=sys.stderr)
@@ -2615,9 +2634,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 self._operation_functions[name] = func
 
     @classmethod
-    def make_group(cls, name, cmd=None, directives=None):
+    def make_group(cls, name, cmd=None, directives=None, options=None):
         cls._GROUPS.append({'name': name, 'cmd': cmd,
-                            'directives': directives})
+                            'directives': directives,
+                            'options': options})
 
         def add_to_group(func):
             if hasattr(func, '_flow_group'):
@@ -2793,6 +2813,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         # Choose the group(s) or operations path
         if args.group_name is not None:
             for job in jobs:
+                print(self._groups[args.group_name[0]]('88a99fa3591c3e8cac1e9bc670d49dc1'))
                 job_group = JobGroup.from_FlowGroup(self._groups[args.group_name[0]],
                                                     job)
                 self.submit_group(group=job_group, **kwargs)

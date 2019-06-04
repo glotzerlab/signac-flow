@@ -1,9 +1,11 @@
 import signac
 import flow
-from flow import FlowProject, directives
+from flow import FlowProject, directives, environments
 
-eg_group = FlowProject.make_group(name='eg_group', directives={'np': 2})
+eg_group = FlowProject.make_group(name='eg_group', directives={'np': 2,
+                                                               'walltime': 0.5})
 new_group = FlowProject.make_group(name='new_group')
+
 
 @FlowProject.operation
 @eg_group
@@ -30,4 +32,5 @@ def who(job):
 
 
 if __name__ == '__main__':
-    FlowProject().main()
+    f = FlowProject()
+    f.main()

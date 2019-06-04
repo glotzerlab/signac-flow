@@ -486,7 +486,7 @@ class FlowGroup(object):
         self.directives = None
 
     def __call__(self, job=None):
-        #Get operation names
+        # Get string form of command
         if callable(self._cmd):
             return self._cmd(self.operations, job)
         else:
@@ -2721,11 +2721,17 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         # Select jobs:
         jobs = self._select_jobs_from_args(args)
 
+        # Get operations from group and operations to run
+        names = []
+        if args.group_name is not None:
+            names += self._groups[args.group_name[0]].operations
+        if args.operation_name is not None:
+            names += args.operation_name
         # Setup partial run function, because we need to call this either
         # inside some context managers or not based on whether we need
         # to switch to the project root directory or not.
         run = functools.partial(self.run,
-                                jobs=jobs, names=args.operation_name, pretend=args.pretend,
+                                jobs=jobs, names=names, pretend=args.pretend,
                                 np=args.parallel, timeout=args.timeout, num=args.num,
                                 num_passes=args.num_passes, progress=args.progress)
 

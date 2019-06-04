@@ -3068,7 +3068,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if args.cmd and args.operation_name:
             raise ValueError(
                 "Cannot use the -o/--operation-name and the --cmd options in combination!")
-
+        if args.group_name and args.operation_name:
+            raise ValueError("Cannot use the - o/--operation-name and the - g/--group options",
+                             "in combination!")
         # Select jobs:
         jobs = self._select_jobs_from_args(args)
 
@@ -3076,8 +3078,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         with self._potentially_buffered():
             if args.cmd:
                 operations = self._generate_operations(args.cmd, jobs, args.requires)
-            else:
+            elif args.operation_name:
                 operations = self._get_pending_operations(jobs, args.operation_name)
+            else:
+                operations = [JobGroup.from_FlowGroup(self._groups[args.group_name[0]],
+                                                      job) for job in jobs]
             operations = list(islice(operations, args.num))
 
         # Generate the script and print to screen.

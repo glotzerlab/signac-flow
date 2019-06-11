@@ -64,8 +64,8 @@ Finally, we recommend to setup a `Flake8 <http://flake8.pycqa.org/en/latest/>`_ 
 With the *flake8* hook, your code will be checked for syntax and style before you make a commit.
 The continuous integration pipeline for the package will perform these checks as well, so running these tests before committing / pushing will prevent the pipeline from failing due to style-related issues.
 
-The git-flow development workflow
----------------------------------
+The development workflow
+------------------------
 
 Prior to working on a patch, it is advisable to create an `issue <https://github.com/glotzerlab/signac-flow/issues>`_ that describes the problem or proposed feature.
 This means that the code maintainers and other users get a chance to provide some input on the scope and possible limitations of the proposed changes, as well as advise on the actual implementation.
@@ -152,7 +152,7 @@ Before you begin the process, make sure you have the following packages installe
 
 Once you've written the environment class and the template as described above, contributing the environments to the package involves the following:
 
-  1. Create a new branch of **signac-flow** based on the *develop* branch.
+  1. Create a new branch of **signac-flow** based on the *master* branch.
   2. Add your environment class to the *flow/environments/* directory, and add the corresponding template to the *flow/templates/* directory.
   3. Run the `tests/test_templates.py` test script. It should fail on your environment, indicating that no reference scripts exist yet.
   4. Update the `environments` dictionary in the `init` function of `tests/generate_template_reference_data.py`. The dictionary indicates the submission argument combinations that need to be tested for your environment.

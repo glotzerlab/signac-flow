@@ -829,7 +829,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
     def _get_operations_status(self, job, cached_status):
         "Return a dict with information about job-operations for this job."
-        for job_op in self._job_operations([job], False):
+        for job_op in self._job_operations(job, False):
             flow_op = self.operations[job_op.name]
             completed = flow_op.complete(job)
             eligible = False if completed else flow_op.eligible(job)
@@ -885,10 +885,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             scheduler_info = {sjob.name(): sjob.status() for sjob in self.scheduler_jobs(scheduler)}
             status = dict()
             print(self._tr("Query scheduler..."), file=file)
-            for op in tqdm(self._job_operations(jobs=jobs, only_eligible=False),
-                           desc="Fetching operation status",
-                           total=len(jobs), file=file):
-                status[op.get_id()] = int(scheduler_info.get(op.get_id(), JobStatus.unknown))
+            for job in tqdm(jobs,
+                            desc="Fetching operation status",
+                            total=len(jobs), file=file):
+                for op in self._job_operations(job, only_eligible=False):
+                    status[op.get_id()] = int(scheduler_info.get(op.get_id(), JobStatus.unknown))
             self.document._status.update(status)
         except NoSchedulerError:
             logger.debug("No scheduler available.")
@@ -1482,7 +1483,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             int
         :param num_passes:
             The total number of one specific job-operation pair will not exceed this argument.
-            The default is 1, there is no limit if this argumet is `None`.
+            The default is 1, there is no limit if this argument is `None`.
         :type num_passes:
             int
         :param progress:
@@ -2175,13 +2176,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             if op.complete(job):
                 yield name
 
-    def _job_operations(self, jobs, only_eligible):
+    def _job_operations(self, job, only_eligible):
         "Yield instances of JobOperation constructed for specific jobs."
-        for job in jobs:
-            for name, op in self.operations.items():
-                if only_eligible and not op.eligible(job):
-                    continue
-                yield JobOperation(name=name, job=job, cmd=op(job), directives=op.directives)
+        for name, op in self.operations.items():
+            if only_eligible and not op.eligible(job):
+                continue
+            yield JobOperation(name=name, job=job, cmd=op(job), directives=op.directives)
 
     def next_operations(self, *jobs):
         """Determine the next eligible operations for jobs.
@@ -2193,8 +2193,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         :yield:
             All instances of :class:`~.JobOperation` jobs are eligible for.
         """
-        for op in self._job_operations(jobs, True):
-            yield op
+        for job in jobs:
+            for op in self._job_operations(job, True):
+                yield op
 
     def next_operation(self, job):
         """Determine the next operation for this job.

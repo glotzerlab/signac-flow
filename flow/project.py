@@ -48,6 +48,7 @@ from .scheduling.base import ClusterJob
 from .scheduling.base import JobStatus
 from .scheduling.status import update_status
 from .errors import SubmitError
+from .errors import ExecModeError
 from .errors import ConfigKeyError
 from .errors import NoSchedulerError
 from .errors import UserConditionError
@@ -455,9 +456,10 @@ class FlowGroup(object):
     :type name:
         :class:`str`
     :param operations:
-        The list of operation names associated with the group.
+        A :class:`dict` of name : :class:`FlowOperation` key, value pairs in the
+        group.
     :type operations:
-        :class:`list` of :class:`FlowOperation`
+        :class:`dict` keys of :class:`str` and values of :class:`FlowOperation`
     :param cmd:
         The command to execute group; should be a function of job, and
         operations.
@@ -475,36 +477,73 @@ class FlowGroup(object):
         :class:`str`
     """
 
-    def __init__(self, name, operations=None, cmd=None, directives=None,
-                 options=None):
+    def __init__(self, name, operations=None, run_cmd=None, exec_cmd=None,
+                 directives=None, options=None):
         self.name = name
         if options is None:
             self.options = ""
         else:
             self.options = options
+
         if operations is None:
-            self.operations = []
+            self.operations = {}
         else:
             self.operations = operations
-        if cmd is None:
+
+        if run_cmd is None:
             def cmd(operations, job=None):
                 if job is None:
                     return "run -o {}".format(' '.join(operations))
                 return "run -j {} -o {}".format(job, ' '.join(operations))
-            self._cmd = cmd
+            self._run_cmd = cmd
         else:
-            self._cmd = cmd
+            self._run_cmd = run_cmd
+
+        if exec_cmd is None:
+            def cmd(operation, job=None):
+                return operation(job)
+            self._exec_cmd = cmd
+        else:
+            self._exec_cmd = exec_cmd
+
         self.directives = None
 
-    def __call__(self, job=None):
+    def __call__(self, job=None, run_type='run'):
         # Get string form of command
-        if callable(self._cmd):
-            return self._cmd(self.operations, job) + ' ' + self.options
-        else:
-            return self._cmd.format(self.operations, job) + ' ' + self.options
+        if run_type == 'run':
+            return self.run_call(job)
+        elif run_type == 'exec':
+            return self.exec_call(job)
 
-    def add_operation(self, operation):
-        self.operations.append(operation)
+    def eligible(self, job):
+        """Eligible, when at least one FlowOperation is eligible."""
+        return any(op.eligible(job) for op in self.operations.values())
+
+    def complete(self, job):
+        "True when all FlowOperation post-conditions are met"
+        return all(op.complete(job) for op in self.operations.values())
+
+    def add_operation(self, name, operation):
+        self.operations[name] = operation
+
+    def run_call(self, job):
+        if callable(self._run_cmd):
+            return self._run_cmd(self.operations.keys(), job) + ' '\
+                + self.options
+        else:
+            return self._run_cmd.format(self.operations.keys(), job) + ' ' \
+                + self.options
+
+    def exec_call(self, job):
+        if len(self.operations) > 1:
+            raise ExecModeError("FlowGroups of more than one operation are not",
+                                "eligible for running in exec mode.")
+        if callable(self._exec_cmd):
+            return self._exec_cmd(self.operations.values()[0], job) + ' '\
+                + self.options
+        else:
+            return self._exec_cmd.format(self.operations.values()[0], job)\
+                + ' ' + self.options
 
 
 class JobGroup(FlowGroup):
@@ -550,9 +589,9 @@ class JobGroup(FlowGroup):
     """
     MAX_LEN_ID = 100
 
-    def __init__(self, name, operations, job, cmd=None, directives=None,
-                 options=None, np=None):
-        super(JobGroup, self).__init__(name, operations, cmd, directives,
+    def __init__(self, name, operations, job, run_cmd=None, exec_cmd=None,
+                 directives=None, options=None, np=None):
+        super(JobGroup, self).__init__(name, operations, run_cmd, exec_cmd, directives,
                                        options)
         self.job = job
         self.cmd = super(JobGroup, self).__call__(job)
@@ -595,8 +634,8 @@ class JobGroup(FlowGroup):
     @classmethod
     def from_FlowGroup(cls, fgroup, job, np=None):
         return cls(name=fgroup.name, operations=fgroup.operations, job=job,
-                   cmd=fgroup._cmd, directives=fgroup.directives,
-                   options=fgroup.options, np=np)
+                   run_cmd=fgroup._run_cmd, exec_cmd=fgroup._exec_cmd,
+                   directives=fgroup.directives, options=fgroup.options, np=np)
 
     def __str__(self):
         return "{}({})".format(self.name, self.job)
@@ -2924,9 +2963,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 self._operation_functions[name] = func
 
     @classmethod
-    def make_group(cls, name, cmd=None, directives=None, options=None):
-        cls._GROUPS.append({'name': name, 'cmd': cmd,
-                            'directives': directives,
+    def make_group(cls, name, run_cmd=None, exec_cmd=None, directives=None, options=None):
+        cls._GROUPS.append({'name': name, 'run_cmd': run_cmd,
+                            'exec_cmd': exec_cmd, 'directives': directives,
                             'options': options})
 
         def add_to_group(func):
@@ -2964,7 +3003,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for (name, func) in operations:
             if hasattr(func, '_flow_group'):
                 for group in func._flow_group:
-                    self._groups[group].add_operation(name)
+                    self._groups[group].add_operation(name,
+                                                      self._operations[name])
 
     @property
     def operations(self):

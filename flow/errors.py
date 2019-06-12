@@ -27,6 +27,11 @@ class NoSchedulerError(AttributeError):
     pass
 
 
+class ExecModeError(RuntimeError):
+    """Indicates that an unsafe attempt submit in exec mode."""
+    pass
+
+
 if JINJA2:
 
     class TemplateError(Jinja2Extension):

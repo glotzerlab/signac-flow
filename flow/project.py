@@ -48,7 +48,6 @@ from .scheduling.base import ClusterJob
 from .scheduling.base import JobStatus
 from .scheduling.status import update_status
 from .errors import SubmitError
-from .errors import ExecModeError
 from .errors import ConfigKeyError
 from .errors import NoSchedulerError
 from .errors import UserConditionError
@@ -508,11 +507,11 @@ class FlowGroup(object):
 
         self.directives = None
 
-    def __call__(self, job=None, run_type='run'):
+    def __call__(self, job=None, mode='run'):
         # Get string form of command
-        if run_type == 'run':
+        if mode == 'run':
             return self.run_call(job)
-        elif run_type == 'exec':
+        elif mode == 'exec':
             return self.exec_call(job)
 
     def eligible(self, job):
@@ -536,14 +535,19 @@ class FlowGroup(object):
 
     def exec_call(self, job):
         if len(self.operations) > 1:
-            raise ExecModeError("FlowGroups of more than one operation are not",
-                                "eligible for running in exec mode.")
+            raise SubmitError("FlowGroups of more than one operation are not "
+                              "eligible for running in exec mode.")
         if callable(self._exec_cmd):
-            return self._exec_cmd(self.operations.values()[0], job) + ' '\
-                + self.options
+            return self._exec_cmd(list(self.operations.values())[0], job)
         else:
-            return self._exec_cmd.format(self.operations.values()[0], job)\
-                + ' ' + self.options
+            return self._exec_cmd.format(list(self.operations.values())[0], job)
+
+    def compatible(self, group):
+        for name in self.operations.keys():
+            for name2 in group.operations.keys():
+                if name == name2:
+                    return False
+        return True
 
 
 class JobGroup(FlowGroup):
@@ -589,12 +593,13 @@ class JobGroup(FlowGroup):
     """
     MAX_LEN_ID = 100
 
-    def __init__(self, name, operations, job, run_cmd=None, exec_cmd=None,
+    def __init__(self, name, operations, job, mode='run', run_cmd=None, exec_cmd=None,
                  directives=None, options=None, np=None):
         super(JobGroup, self).__init__(name, operations, run_cmd, exec_cmd, directives,
                                        options)
         self.job = job
-        self.cmd = super(JobGroup, self).__call__(job)
+        self.mode = mode
+        self.cmd = super(JobGroup, self).__call__(job, mode=mode)
         self.__call__ = None
         if directives is None:
             directives = dict()  # default argument
@@ -631,6 +636,11 @@ class JobGroup(FlowGroup):
             {key: evaluate(value) for key, value in directives.items()})
         self.directives._keys_set_by_user = keys_set_by_user
 
+    def switch_mode(self, mode='exec'):
+        self.mode = mode
+        self.cmd = super(JobGroup, self).__call__(self.job, mode)
+        return self
+
     @classmethod
     def from_FlowGroup(cls, fgroup, job, np=None):
         return cls(name=fgroup.name, operations=fgroup.operations, job=job,
@@ -641,11 +651,12 @@ class JobGroup(FlowGroup):
         return "{}({})".format(self.name, self.job)
 
     def __repr__(self):
-        return "{type}(name='{name}', job='{job}', cmd={cmd}, directives={directives})".format(
+        return "{type}(name='{name}', operations='{operations}', job='{job}', cmd={cmd}, directives={directives})".format(
             type=type(self).__name__,
             name=self.name,
+            operations=self.operations.keys(),
             job=str(self.job),
-            cmd=repr(self.cmd),
+            cmd=repr(self._run_cmd),
             directives=self.directives)
 
     def get_id(self, index=0):
@@ -654,7 +665,7 @@ class JobGroup(FlowGroup):
 
         # The full name is designed to be truly unique for each job-group.
         full_name = '{}%{}%{}%{}'.format(
-            project.root_directory(), self.job.get_id(), self.name, index)
+            project.root_directory(), self.job.get_id(), self.operations.keys(), index)
 
         # The job_op_id is a hash computed from the unique full name.
         job_op_id = calc_id(full_name)
@@ -669,7 +680,8 @@ class JobGroup(FlowGroup):
             raise ValueError("Value for MAX_LEN_ID is too small ({}).".format(self.MAX_LEN_ID))
 
         readable_name = '{}/{}/{}/{:04d}/'.format(
-            str(project)[:12], str(self.job)[:8], self.name[:12], index)[:max_len]
+            str(project)[:12], str(self.job)[:8],
+            list(self.operations.keys())[0][:12], index)[:max_len]
 
         # By appending the unique job_op_id, we ensure that each id is truly unique.
         return readable_name + job_op_id
@@ -679,6 +691,11 @@ class JobGroup(FlowGroup):
 
     def __eq__(self, other):
         return self.get_id() == other.get_id()
+
+    def set_status(self, value):
+        "Store the operation's status."
+        self.job._project.document.setdefault('_status', dict())
+        self.job._project.document._status[self.get_id()] = int(value)
 
 
 class _FlowProjectClass(type):
@@ -1192,8 +1209,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _get_operations_status(self, job, cached_status):
         "Return a dict with information about job-operations for this job."
-        for job_op in self._job_operations(job, False):
-            flow_op = self.operations[job_op.name]
+        for job_group in self._job_operations(job, False):
+            flow_op = self.operations[job_group.name]
             completed = flow_op.complete(job)
             eligible = False if completed else flow_op.eligible(job)
             scheduler_status = cached_status.get(job_op.get_id(), JobStatus.unknown)
@@ -1933,6 +1950,71 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     'An exception was raised during operation {operation.name} '
                     'for job {operation.job}.'.format(operation=operation)) from e
 
+    def submit(self, bundle_size=1, jobs=None, names=None, num=None, parallel=False,
+               force=False, walltime=None, env=None, **kwargs):
+        """Submit function for the project's main submit interface.
+        .. versionchanged:: 0.6
+        :param bundle_size:
+            Specify the number of operations to be bundled into one submission, defaults to 1.
+        :type bundle_size:
+            int
+        :param jobs:
+            Only submit operations associated with the provided jobs. Defaults to all jobs.
+        :type jobs:
+            Sequence of instances :class:`.Job`.
+        :param names:
+            Only submit operations with any of the given names, defaults to all names.
+        :type names:
+            Sequence of :class:`str`
+        :param num:
+            Limit the total number of submitted operations, defaults to no limit.
+        :type num:
+            int
+        :param parallel:
+            Execute all bundled operations in parallel. Has no effect without bundling.
+        :type parallel:
+            bool
+        :param force:
+            Ignore all warnings or checks during submission, just submit.
+        :type force:
+            bool
+        :param walltime:
+            Specify the walltime in hours or as instance of datetime.timedelta.
+        """
+        # Regular argument checks and expansion
+        if jobs is None:
+            jobs = self  # select all jobs
+        if isinstance(names, six.string_types):
+            raise ValueError(
+                "The 'names' argument must be a sequence of strings, however you "
+                "provided a single string: {}.".format(names))
+        if env is None:
+            env = self._environment
+        if walltime is not None:
+            try:
+                walltime = datetime.timedelta(hours=walltime)
+            except TypeError as error:
+                if str(error) != 'unsupported type for timedelta ' \
+                                 'hours component: datetime.timedelta':
+                    raise
+
+        # Gather all pending operations.
+        with self._potentially_buffered():
+            operations = (op for op in self._get_pending_operations(jobs, names)
+                          if self.eligible_for_submission(op))
+            if num is not None:
+                operations = list(islice(operations, num))
+
+        # Bundle them up and submit.
+        for bundle in make_bundles(operations, bundle_size):
+            status = self.submit_operations(
+                operations=bundle, env=env, parallel=parallel,
+                force=force, walltime=walltime, **kwargs)
+
+            if status is not None:  # operations were submitted, store status
+                for op in bundle:
+                    op.set_status(status)
+
     def run(self, jobs=None, names=None, pretend=False, np=None, timeout=None, num=None,
             num_passes=1, progress=False, order=None):
         """Execute all pending operations for the given selection.
@@ -2112,12 +2194,25 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             cmd_ = cmd.format(job=job)
             yield JobOperation(name=cmd_.replace(' ', '-'), cmd=cmd_, job=job)
 
+    def _get_pending_groups(self, jobs, groups):
+        for job in jobs:
+            for group in groups:
+                if group.eligible(job):
+                    yield JobGroup.from_FlowGroup(group, job)
+
     def _get_pending_operations(self, jobs, operation_names=None):
         "Get all pending operations for the given selection."
         assert not isinstance(operation_names, str)
         for op in self.next_operations(* jobs):
             if operation_names is None or any(re.fullmatch(n, op.name) for n in operation_names):
                 yield op
+
+    def _verify_group_compatibility(self, groups):
+        for i in range(len(groups)):
+            for j in range(i + 1, len(groups)):
+                if not groups[i].compatible(groups[j]):
+                    return False
+        return True
 
     @contextlib.contextmanager
     def _potentially_buffered(self):
@@ -2187,17 +2282,17 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             self._show_template_help_and_exit(template_environment, context)
         return template.render(** context)
 
-    def submit_group(self, group, _id=None, env=None, parallel=False, flags=None,
-                     force=False, template='script.sh', pretend=False,
-                     show_template_help=False, **kwargs):
+    def submit_groups(self, groups, _id=None, env=None, parallel=False, flags=None,
+                      force=False, template='script.sh', pretend=False,
+                      show_template_help=False, **kwargs):
         """Submit a sequence of operations to the scheduler.
 
         .. versionchanged:: 0.6
 
-        :param group:
-            The group to submit.
-        :type group:
-            An instance of :py:class:`.FlowGroup`
+        :param groups:
+            The groups to submit.
+        :type groups:
+            A sequence of instances of :py:class:`.JobGroup`
         :param _id:
             The _id to be used for this submission.
         :type _id:
@@ -2233,12 +2328,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Return the submission status after successful submission or None.
         """
         if _id is None:
-            _id = group.get_id()
+            _id = self._store_bundled(groups)
         if env is None:
             env = self._environment
 
         print("Submitting cluster job '{}':".format(_id), file=sys.stderr)
-        print("JobGroup cmd '{}'".format(group.cmd))
 
         def _msg(group):
             print(" - Group: {}".format(group), file=sys.stderr)
@@ -2247,7 +2341,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         try:
             script = self._generate_submit_script(
                 _id=_id,
-                operations=map(_msg, [group]),
+                operations=map(_msg, groups),
                 template=template,
                 show_template_help=show_template_help,
                 env=env,
@@ -2268,7 +2362,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             # have been explicitly set by the user were actually evaluated by the template
             # engine and warn about those that have not been.
             keys_unused = {
-                key for key in
+                key for group in groups for key in
                 group.directives._keys_set_by_user.difference(group.directives.keys_used)}
             if keys_unused:
                 logger.warning(
@@ -2278,167 +2372,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if pretend:
                 print(script)
 
-    def submit_operations(self, operations, _id=None, env=None, parallel=False, flags=None,
-                          force=False, template='script.sh', pretend=False,
-                          show_template_help=False, **kwargs):
-        """Submit a sequence of operations to the scheduler.
-
-        .. versionchanged:: 0.6
-
-        :param operations:
-            The operations to submit.
-        :type operations:
-            A sequence of instances of :py:class:`.JobOperation`
-        :param _id:
-            The _id to be used for this submission.
-        :type _id:
-            str
-        :param parallel:
-            Execute all bundled operations in parallel.
-        :type parallel:
-            bool
-        :param flags:
-            Additional options to be forwarded to the scheduler.
-        :type flags:
-            list
-        :param force:
-            Ignore all warnings or checks during submission, just submit.
-        :type force:
-            bool
-        :param template:
-            The name of the template file to be used to generate the submission script.
-        :type template:
-            str
-        :param pretend:
-            Do not actually submit, but only print the submission script to screen. Useful
-            for testing the submission workflow.
-        :type pretend:
-            bool
-        :param show_template_help:
-            Show information about available template variables and filters and exit.
-        :type show_template_help:
-            bool
-        :param kwargs:
-            Additional keyword arguments to be forwarded to the scheduler.
-        :return:
-            Return the submission status after successful submission or None.
-        """
-        if _id is None:
-            _id = self._store_bundled(operations)
-        if env is None:
-            env = self._environment
-
-        print("Submitting cluster job '{}':".format(_id), file=sys.stderr)
-
-        def _msg(op):
-            print(" - Operation: {}".format(op), file=sys.stderr)
-            return op
-
-        try:
-            script = self._generate_submit_script(
-                _id=_id,
-                operations=map(_msg, operations),
-                template=template,
-                show_template_help=show_template_help,
-                env=env,
-                parallel=parallel,
-                force=force,
-                **kwargs
-            )
-        except ConfigKeyError as error:
-            raise SubmitError(
-                "Unable to submit, because of a configuration error.\n"
-                "The following key is missing: {key}.\n"
-                "You can add the key to the configuration for example with:\n\n"
-                "  $ signac config --global set {key} VALUE\n".format(key=str(error)))
-        else:
-            # Keys which were explicitly set by the user, but are not evaluated by the
-            # template engine are cause for concern and might hint at a bug in the template
-            # script or ill-defined directives. Here we check whether all directive keys that
-            # have been explicitly set by the user were actually evaluated by the template
-            # engine and warn about those that have not been.
-            keys_unused = {
-                key for op in operations for key in
-                op.directives._keys_set_by_user.difference(op.directives.keys_used)
-                if key not in ('fork', )  # whitelist
-            }
-            if keys_unused:
-                logger.warning(
-                    "Some of the keys provided as part of the directives were not used by "
-                    "the template script, including: {}".format(
-                        ', '.join(sorted(keys_unused))))
-            if pretend:
-                print(script)
             else:
                 return env.submit(_id=_id, script=script, flags=flags, **kwargs)
-
-    def submit(self, bundle_size=1, jobs=None, names=None, num=None, parallel=False,
-               force=False, walltime=None, env=None, **kwargs):
-        """Submit function for the project's main submit interface.
-
-        .. versionchanged:: 0.6
-
-        :param bundle_size:
-            Specify the number of operations to be bundled into one submission, defaults to 1.
-        :type bundle_size:
-            int
-        :param jobs:
-            Only submit operations associated with the provided jobs. Defaults to all jobs.
-        :type jobs:
-            Sequence of instances :class:`.Job`.
-        :param names:
-            Only submit operations with any of the given names, defaults to all names.
-        :type names:
-            Sequence of :class:`str`
-        :param num:
-            Limit the total number of submitted operations, defaults to no limit.
-        :type num:
-            int
-        :param parallel:
-            Execute all bundled operations in parallel. Does nothing with the
-            default behavior or `bundle_size=1`.
-        :type parallel:
-            bool
-        :param force:
-            Ignore all warnings or checks during submission, just submit.
-        :type force:
-            bool
-        :param walltime:
-            Specify the walltime in hours or as instance of datetime.timedelta.
-        """
-        # Regular argument checks and expansion
-        if jobs is None:
-            jobs = self  # select all jobs
-        if isinstance(names, str):
-            raise ValueError(
-                "The 'names' argument must be a sequence of strings, however you "
-                "provided a single string: {}.".format(names))
-        if env is None:
-            env = self._environment
-        if walltime is not None:
-            try:
-                walltime = datetime.timedelta(hours=walltime)
-            except TypeError as error:
-                if str(error) != 'unsupported type for timedelta ' \
-                                 'hours component: datetime.timedelta':
-                    raise
-
-        # Gather all pending operations.
-        with self._potentially_buffered():
-            operations = (op for op in self._get_pending_operations(jobs, names)
-                          if self._eligible_for_submission(op))
-            if num is not None:
-                operations = list(islice(operations, num))
-
-        # Bundle them up and submit.
-        for bundle in make_bundles(operations, bundle_size):
-            status = self.submit_operations(
-                operations=bundle, env=env, parallel=parallel,
-                force=force, walltime=walltime, **kwargs)
-
-            if status is not None:  # operations were submitted, store status
-                for op in bundle:
-                    op.set_status(status)
 
     @classmethod
     def _add_submit_args(cls, parser):
@@ -2448,6 +2383,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             type=str,
             nargs='*',
             help="Flags to be forwarded to the scheduler.")
+        parser.add_argument(
+            '--exec',
+            default=False,
+            dest='exec_mode',
+            action='store_true',
+            help="Execute operation checks at submit time as opposed to"
+            " runtime.")
         parser.add_argument(
             '--pretend',
             action='store_true',
@@ -2474,6 +2416,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             '-p', '--parallel',
             action='store_true',
             help="Execute all operations in parallel.")
+        execution_group.add_argument(
+            '--exec',
+            default=False,
+            dest='exec_mode',
+            action='store_true',
+            help="Execute operation checks at submit time as opposed to"
+            " runtime.")
         cls._add_direct_cmd_arg_group(parser)
         cls._add_template_arg_group(parser)
 
@@ -2532,9 +2481,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             "scripted.")
         selection_group.add_argument(
             '-g', '--group',
-            nargs=1,
+            nargs="+",
             dest='group_name',
-            help='Only execute the given group.')
+            help='Only execute the given group(s).')
 
     @classmethod
     def _add_operation_selection_arg_group(cls, parser, operations=None):
@@ -2824,7 +2773,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for name, op in self.operations.items():
             if only_eligible and not op.eligible(job):
                 continue
-            yield JobOperation(name=name, job=job, cmd=op(job), directives=op.directives)
+            yield JobGroup(name=name, job=job, operations={name: op}, directives=op.directives)
 
     def next_operations(self, *jobs):
         """Determine the next eligible operations for jobs.
@@ -2837,8 +2786,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             All instances of :class:`~.JobOperation` jobs are eligible for.
         """
         for job in jobs:
-            for op in self._job_operations(job, True):
-                yield op
+            for group in self._job_operations(job, True):
+                yield group
 
     @deprecated(
         deprecated_in="0.8", removed_in="1.0",
@@ -2856,8 +2805,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :rtype:
             `:py:class:`~.JobOperation` or `NoneType`
         """
-        for op in self.next_operations(job):
-            return op
+        for group in self.next_operations(job):
+            return group
 
     @classmethod
     def operation(cls, func, name=None):
@@ -3011,7 +2960,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         "The dictionary of operations that have been added to the workflow."
         return self._operations
 
-    def _eligible_for_submission(self, job_operation):
+    def eligible_for_submission(self, job_operation):
         """Determine if a job-operation is eligible for submission.
 
         By default, an operation is eligible for submission when it
@@ -3128,9 +3077,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if args.cmd and args.operation_name:
             raise ValueError(
                 "Cannot use the -o/--operation-name and the --cmd options in combination!")
-        if args.group_name and args.operation_name:
-            raise ValueError("Cannot use the - o/--operation-name and the - g/--group options",
-                             "in combination!")
         # Select jobs:
         jobs = self._select_jobs_from_args(args)
 
@@ -3138,13 +3084,24 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         with self._potentially_buffered():
             if args.cmd:
                 operations = self._generate_operations(args.cmd, jobs, args.requires)
-            elif args.operation_name:
-                operations = self._get_pending_operations(jobs, args.operation_name)
+            elif args.group_name:
+                operations = [self._groups[name] for name in args.group_name]
+                if args.operation_name:
+                    for name in args.operation_name:
+                        op = self._operations[name]
+                        operations.append(FlowGroup(name=name, operations={name: op},
+                                                    directives=op.directives))
+                    if not self._verify_group_compatibility(operations):
+                        raise ValueError("Cannot specify groups or operations that "
+                                         "will be listed twice when using the"
+                                         " -o/--operation or -g/--group options.")
+                operations = self._get_pending_groups(jobs, operations)
             else:
-                operations = [JobGroup.from_FlowGroup(self._groups[args.group_name[0]],
-                                                      job) for job in jobs]
+                operations = self._get_pending_operations(jobs, args.operation_name)
             operations = list(islice(operations, args.num))
-
+        if args.exec_mode:
+            operations = self._switch_to_exec_mode(operations)
+        print(operations)
         # Generate the script and print to screen.
         print(self.script(
             operations=operations, parallel=args.parallel,
@@ -3170,23 +3127,35 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Choose the group(s) or operations path
         if args.group_name is not None:
-            for job in jobs:
-                print(self._groups[args.group_name[0]]('88a99fa3591c3e8cac1e9bc670d49dc1'))
-                job_group = JobGroup.from_FlowGroup(self._groups[args.group_name[0]],
-                                                    job)
-                self.submit_group(group=job_group, **kwargs)
+            groups = []
+            if args.group_name is not None:
+                groups.extend([self._groups[name] for name in args.group_name])
+            if args.operation_name is not None:
+                for name in args.operation_name:
+                    op = self._operations[name]
+                    groups.append(FlowGroup(name=name, operations={name: op},
+                                            directives=op.directives))
+            if not self._verify_group_compatibility(groups):
+                raise SubmitError("Cannot specify groups or operations that " +
+                                  "will be listed twice when using the" +
+                                  " -o/--operation or -g/--group options.")
+            job_groups = self._get_pending_groups(jobs, groups)
+
+        # Unspecified group or operationss
         else:
             # Gather all pending operations ...
             with self._potentially_buffered():
-                ops = self._get_pending_operations(jobs, args.operation_name)
-                ops = list(islice(ops, args.num))
+                job_groups = self._get_pending_operations(jobs, args.operation_name)
 
-            # Bundle operations up, generate the script, and submit to scheduler.
-            for bundle in make_bundles(ops, args.bundle_size):
-                status = self.submit_operations(operations=bundle, **kwargs)
-                if status is not None:
-                    for op in bundle:
-                        op.set_status(status)
+        job_groups = list(islice(job_groups, args.num))
+        if args.exec_mode:
+            self._switch_to_exec_mode(job_groups)
+        # Bundle operations up, generate the script, and submit to scheduler.
+        for bundle in make_bundles(job_groups, args.bundle_size):
+            status = self.submit_groups(groups=bundle, **kwargs)
+            if status is not None:
+                for group in bundle:
+                    group.set_status(status)
 
     def _main_exec(self, args):
         if len(args.jobid):

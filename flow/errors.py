@@ -36,11 +36,6 @@ class UserOperationError(RuntimeError):
     "Indicates an error during execution of a FlowOperation."
 
 
-class ExecModeError(RuntimeError):
-    """Indicates that an unsafe attempt submit in exec mode."""
-    pass
-
-
 if JINJA2:
 
     class TemplateError(Jinja2Extension):

@@ -35,5 +35,4 @@ def who(job):
 
 if __name__ == '__main__':
     f = FlowProject()
-    print(f._groups['new_group'].options)
     f.main()

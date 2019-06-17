@@ -13,7 +13,6 @@ from . import environment
 from . import scheduling
 from . import errors
 from .project import FlowProject
-from .project import JobOperation
 from .project import label
 from .project import classlabel
 from .project import staticlabel

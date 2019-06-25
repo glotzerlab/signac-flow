@@ -346,6 +346,8 @@ class FlowGroup(object):
         :class:`str`
     """
 
+    MAX_LEN_ID = 100
+
     def __init__(self, name, operations=None, run_cmd=None, exec_cmd=None,
                  directives=None, options=None):
         self.name = name
@@ -374,8 +376,7 @@ class FlowGroup(object):
             self._exec_cmd = cmd
         else:
             self._exec_cmd = exec_cmd
-
-        self.directives = None
+        self.directives = directives
 
     def __call__(self, job=None, mode='run'):
         # Get string form of command
@@ -419,8 +420,45 @@ class FlowGroup(object):
                     return False
         return True
 
+    def get_id(self, job, index=0):
+        "Return a name, which identifies this job-group."
+        project = job._project
 
-class JobGroup(FlowGroup):
+        # The full name is designed to be truly unique for each job-group.
+        full_name = '{}%{}%{}%{}'.format(project.root_directory(),
+                                         job.get_id(),
+                                         self.operations.keys(),
+                                         index)
+
+        # The job_op_id is a hash computed from the unique full name.
+        job_op_id = calc_id(full_name)
+
+        # The actual job id is then constructed from a readable part and the job_op_id,
+        # ensuring that the job-op is still somewhat identifiable, but guarantueed to
+        # be unique. The readable name is based on the project id, job id, operation name,
+        # and the index number. All names and the id itself are restricted in length
+        # to guarantuee that the id does not get too long.
+        max_len = self.MAX_LEN_ID - len(job_op_id)
+        if max_len < len(job_op_id):
+            raise ValueError("Value for MAX_LEN_ID is too small ({}).".format(self.MAX_LEN_ID))
+
+        readable_name = '{}/{}/{}/{:04d}/'.format(
+            str(project)[:12], str(job)[:8],
+            list(self.operations.keys())[0][:12], index)[:max_len]
+
+        # By appending the unique job_op_id, we ensure that each id is truly unique.
+        return readable_name + job_op_id
+
+    def create_job_operation(self, job, mode='run', index=0):
+        return JobOperation(self.get_id(job, index),
+                            self.name,
+                            job,
+                            self.__call__(job, mode),
+                            self.directives,
+                            job._project)
+
+
+class JobOperation(object):
     """This class represents the information needed to execute one group for one job.
 
     An group function in this context is a shell command, which should be a
@@ -433,15 +471,15 @@ class JobGroup(FlowGroup):
 
     .. versionchanged:: 0.6
 
-    :param name:
-        The name of this JobOperation instance. The name is arbitrary,
-        but helps to concisely identify the operation in various contexts.
+    :param id:
+        The id of this JobOperation instance. The id should be unique.
+    :type id:
+        str
+    :param id:
+        The name of the JobOperation instance. Generally this will be the name
+        of the FlowGroup or FlowOperation that the JobOperation is derived from.
     :type name:
         str
-    :param operations:
-        The list of operations associated with the group.
-    :type operations:
-        :class:`list` of :class:`FlowOperation`
     :param job:
         The job instance associated with this operation.
     :type job:
@@ -455,22 +493,22 @@ class JobGroup(FlowGroup):
         to execute this operation, e.g., specifically required resources.
     :type directives:
         :class:`dict`
-    :param options:
-        A string of options to append to the output of the object's call method.
-        This lets options like --num_passes to be given to a group.
-    :type options:
-        :class:`str`
+    :param project:
+        The :py:class:`signac.Project` associated with the job.
+    :type project:
+        :py:class:`signac.Project`
     """
-    MAX_LEN_ID = 100
 
-    def __init__(self, name, operations, job, mode='run', run_cmd=None, exec_cmd=None,
-                 directives=None, options=None, np=None):
-        super(JobGroup, self).__init__(name, operations, run_cmd, exec_cmd, directives,
-                                       options)
+    def __init__(self, id, name, job, cmd, directives=None, project=None):
+        self.id = id
+        self.name = name
         self.job = job
-        self.mode = mode
-        self.cmd = super(JobGroup, self).__call__(job, mode=mode)
-        self.__call__ = None
+        self.cmd = cmd
+        if project is None:
+            self.project = job._project
+        else:
+            self.project = project
+
         if directives is None:
             directives = dict()  # default argument
         else:
@@ -506,17 +544,6 @@ class JobGroup(FlowGroup):
             {key: evaluate(value) for key, value in directives.items()})
         self.directives._keys_set_by_user = keys_set_by_user
 
-    def switch_mode(self, mode='exec'):
-        self.mode = mode
-        self.cmd = super(JobGroup, self).__call__(self.job, mode)
-        return self
-
-    @classmethod
-    def from_FlowGroup(cls, fgroup, job, np=None):
-        return cls(name=fgroup.name, operations=fgroup.operations, job=job,
-                   run_cmd=fgroup._run_cmd, exec_cmd=fgroup._exec_cmd,
-                   directives=fgroup.directives, options=fgroup.options, np=np)
-
     def __str__(self):
         return "{}({})".format(self.name, self.job)
 
@@ -529,43 +556,16 @@ class JobGroup(FlowGroup):
             cmd=repr(self._run_cmd),
             directives=self.directives)
 
-    def get_id(self, index=0):
-        "Return a name, which identifies this job-group."
-        project = self.job._project
-
-        # The full name is designed to be truly unique for each job-group.
-        full_name = '{}%{}%{}%{}'.format(
-            project.root_directory(), self.job.get_id(), self.operations.keys(), index)
-
-        # The job_op_id is a hash computed from the unique full name.
-        job_op_id = calc_id(full_name)
-
-        # The actual job id is then constructed from a readable part and the job_op_id,
-        # ensuring that the job-op is still somewhat identifiable, but guarantueed to
-        # be unique. The readable name is based on the project id, job id, operation name,
-        # and the index number. All names and the id itself are restricted in length
-        # to guarantuee that the id does not get too long.
-        max_len = self.MAX_LEN_ID - len(job_op_id)
-        if max_len < len(job_op_id):
-            raise ValueError("Value for MAX_LEN_ID is too small ({}).".format(self.MAX_LEN_ID))
-
-        readable_name = '{}/{}/{}/{:04d}/'.format(
-            str(project)[:12], str(self.job)[:8],
-            list(self.operations.keys())[0][:12], index)[:max_len]
-
-        # By appending the unique job_op_id, we ensure that each id is truly unique.
-        return readable_name + job_op_id
-
     def __hash__(self):
-        return int(sha1(self.get_id().encode('utf-8')).hexdigest(), 16)
+        return int(sha1(self.id.encode('utf-8')).hexdigest(), 16)
 
     def __eq__(self, other):
-        return self.get_id() == other.get_id()
+        return self.id == other.id
 
     def set_status(self, value):
         "Store the operation's status."
         self.job._project.document.setdefault('_status', dict())
-        self.job._project.document._status[self.get_id()] = int(value)
+        self.job._project.document._status[self.id] = int(value)
 
 
 class _FlowProjectClass(type):
@@ -918,15 +918,15 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             str
         """
         if len(operations) == 1:
-            return operations[0].get_id()
+            return operations[0].id
         else:
-            h = '.'.join(op.get_id() for op in operations)
+            h = '.'.join(op.id for op in operations)
             bid = '{}/bundle/{}'.format(self, sha1(h.encode('utf-8')).hexdigest())
             fn_bundle = self._fn_bundle(bid)
             _mkdir_p(os.path.dirname(fn_bundle))
             with open(fn_bundle, 'w') as file:
                 for operation in operations:
-                    file.write(operation.get_id() + '\n')
+                    file.write(operation.id + '\n')
             return bid
 
     def _expand_bundled_jobs(self, scheduler_jobs):
@@ -1056,7 +1056,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                             desc="Fetching operation status",
                             total=len(jobs), file=file):
                 for op in self._job_operations(job, only_eligible=False):
-                    status[op.get_id()] = int(scheduler_info.get(op.get_id(), JobStatus.unknown))
+                    status[op.id] = int(scheduler_info.get(op.id), JobStatus.unknown)
             self.document._status.update(status)
         except NoSchedulerError:
             logger.debug("No scheduler available.")
@@ -1804,18 +1804,23 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             cmd_ = cmd.format(job=job)
             yield JobOperation(name=cmd_.replace(' ', '-'), cmd=cmd_, job=job)
 
-    def _get_pending_groups(self, jobs, groups):
+    def _get_pending_groups(self, jobs, groups, exec_mode=False):
+        if exec_mode:
+            mode = 'exec'
+        else:
+            mode = 'run'
         for job in jobs:
             for group in groups:
                 if group.eligible(job):
-                    yield JobGroup.from_FlowGroup(group, job)
+                    yield group.create_job_operation(job, mode=mode, index=0)
 
-    def _get_pending_operations(self, jobs, operation_names=None):
+    def _get_pending_operations(self, jobs, operation_names=None,
+                                exec_mode=False):
         "Get all pending operations for the given selection."
         assert not isinstance(operation_names, six.string_types)
-        for group in self.next_operations(* jobs):
-            if operation_names is None or any(fullmatch(n, group.name) for n in operation_names):
-                yield group
+        for op in self.next_operations(* jobs, exec_mode=exec_mode):
+            if operation_names is None or any(fullmatch(n, op.name) for n in operation_names):
+                yield op
 
     def _verify_group_compatibility(self, groups):
         for i in range(len(groups)):
@@ -1899,7 +1904,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             self._show_template_help_and_exit(template_environment, context)
         return template.render(** context)
 
-    def submit_groups(self, groups, _id=None, env=None, parallel=False, flags=None,
+    def submit_operations(self, groups, _id=None, env=None, parallel=False, flags=None,
                       force=False, template='script.sh', pretend=False,
                       show_template_help=False, **kwargs):
         """Submit a sequence of operations to the scheduler.
@@ -1909,7 +1914,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         :param groups:
             The groups to submit.
         :type groups:
-            A sequence of instances of :py:class:`.JobGroup`
+            A sequence of instances of :py:class:`.JobOperation`
         :param _id:
             The _id to be used for this submission.
         :type _id:
@@ -2377,14 +2382,21 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             if op.complete(job):
                 yield name
 
-    def _job_operations(self, job, only_eligible):
+    def _job_operations(self, job, only_eligible, exec_mode=False):
         "Yield instances of JobOperation constructed for specific jobs."
+        if exec_mode:
+            mode = 'exec'
+        else:
+            mode = 'run'
         for name, op in self.operations.items():
             if only_eligible and not op.eligible(job):
                 continue
-            yield JobGroup(name=name, job=job, operations={name: op}, directives=op.directives)
+            yield FlowGroup(name=name, operations={name: op},
+                            directives=op.directives).create_job_operation(job=job,
+                                                                           mode=mode,
+                                                                           index=0)
 
-    def next_operations(self, *jobs):
+    def next_operations(self, *jobs, exec_mode=False):
         """Determine the next eligible operations for jobs.
 
         :param jobs:
@@ -2395,8 +2407,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             All instances of :class:`~.JobOperation` jobs are eligible for.
         """
         for job in jobs:
-            for group in self._job_operations(job, True):
-                yield group
+            for op in self._job_operations(job, True, exec_mode=exec_mode):
+                yield op
 
     def next_operation(self, job):
         """Determine the next operation for this job.
@@ -2544,9 +2556,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         "The dictionary of operations that have been added to the workflow."
         return self._operations
 
-    def _switch_to_exec_mode(self, job_groups):
-        return [job_group.switch_mode() for job_group in job_groups]
-
     def eligible_for_submission(self, job_operation):
         """Determine if a job-operation is eligible for submission.
 
@@ -2654,13 +2663,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                         raise ValueError("Cannot specify groups or operations that "
                                          "will be listed twice when using the"
                                          " -o/--operation or -g/--group options.")
-                operations = self._get_pending_groups(jobs, operations)
+                operations = self._get_pending_groups(jobs, operations,
+                                                      args.exec_mode)
             else:
                 operations = self._get_pending_operations(jobs, args.operation_name)
             operations = list(islice(operations, args.num))
-        if args.exec_mode:
-            operations = self._switch_to_exec_mode(operations)
-        print(operations)
         # Generate the script and print to screen.
         print(self.script(
             operations=operations, parallel=args.parallel,
@@ -2692,20 +2699,19 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 raise SubmitError("Cannot specify groups or operations that " +
                                   "will be listed twice when using the" +
                                   " -o/--operation or -g/--group options.")
-            job_groups = self._get_pending_groups(jobs, groups)
+            job_groups = self._get_pending_groups(jobs, groups, args.exec_mode)
 
         # Unspecified group or operationss
         else:
             # Gather all pending operations ...
             with self._potentially_buffered():
-                job_groups = self._get_pending_operations(jobs, args.operation_name)
+                job_groups = self._get_pending_operations(jobs,
+                                                          args.operation_name, args.exec_mode)
 
         job_groups = list(islice(job_groups, args.num))
-        if args.exec_mode:
-            self._switch_to_exec_mode(job_groups)
         # Bundle operations up, generate the script, and submit to scheduler.
         for bundle in make_bundles(job_groups, args.bundle_size):
-            status = self.submit_groups(groups=bundle, **kwargs)
+            status = self.submit_operations(groups=bundle, **kwargs)
             if status is not None:
                 for group in bundle:
                     group.set_status(status)

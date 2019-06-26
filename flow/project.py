@@ -2117,6 +2117,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if jobs is None:
             jobs = self
 
+        # Change group names to their constituent operations
+        expanded_names = []
+        for name in names:
+            try:
+                expanded_names.extend(list(self._groups[name].operations.keys()))
+            except KeyError:
+                expanded_names.append(name)
+        names = list(set(expanded_names))
+
         # Negative values for the execution limits, means 'no limit'.
         if num_passes and num_passes < 0:
             num_passes = None

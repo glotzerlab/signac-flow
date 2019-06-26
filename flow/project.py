@@ -2020,11 +2020,45 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 if str(error) != 'unsupported type for timedelta ' \
                                  'hours component: datetime.timedelta':
                     raise
+        try:
+            if kwargs['exec_mode']:
+                mode = 'exec'
+            else:
+                mode = 'run'
+        except (KeyError, TypeError):
+            mode = 'run'
 
         # Gather all pending operations.
-        with self._potentially_buffered():
-            operations = (op for op in self._get_pending_operations(jobs, names)
-                          if self.eligible_for_submission(op))
+        if names is not None:
+            operations = []
+            for name in names:
+                try:
+                    operations.append(self._groups[name])
+                except KeyError:
+                    try:
+                        op = self._operations[name]
+                        path = self._get_operation_path(name)
+                        operations.append(
+                            FlowGroup(name=name,
+                                      group_path=path,
+                                      operations={name: op},
+                                      directives=op.directives)
+                        )
+                    except KeyError:
+                        raise ValueError("Operation/Group {} is not defined".
+                                         format(name))
+                if not self._verify_group_compatibility(operations):
+                    raise ValueError("Cannot specify groups or operations that "
+                                     "will be listed twice when using the"
+                                     " -o/--operation or option.")
+            operations = self._get_pending_groups(jobs,
+                                                  operations,
+                                                  args.exec_mode)
+        else:
+            with self._potentially_buffered():
+                operations = (op for op in self._get_pending_operations(jobs, names,
+                                                                        mode)
+                            if self.eligible_for_submission(op))
             if num is not None:
                 operations = list(islice(operations, num))
 

@@ -348,9 +348,10 @@ class FlowGroup(object):
 
     MAX_LEN_ID = 100
 
-    def __init__(self, name, operations=None, run_cmd=None, exec_cmd=None,
+    def __init__(self, name, group_path, operations=None, run_cmd=None, exec_cmd=None,
                  directives=None, options=None):
         self.name = name
+        self.group_path = group_path
         if options is None:
             self.options = ""
         else:
@@ -362,23 +363,46 @@ class FlowGroup(object):
             self.operations = operations
 
         if run_cmd is None:
-            def cmd(operations, job=None):
-                if job is None:
-                    return "run -o {}".format(' '.join(operations))
-                return "run -j {} -o {}".format(job, ' '.join(operations))
+            def cmd(operations, group_path, directives, job=None):
+                try:
+                    executable = directives['executable']
+                except (KeyError, TypeError):
+                    executable = sys.executable
+                try:
+                    path = directives['override_path']
+                except (KeyError, TypeError):
+                    path = group_path
+
+                if callable(executable):
+                    if job is None:
+                        raise ValueError("Executable cannot be callable if"
+                                         "job is not set.")
+                    else:
+                        return '{} {} run -o {}'.format(executable(job), path, name)
+                else:
+                    if job is None:
+                        return "{} {} run -o {}".format(executable,
+                                                        path,
+                                                        ' '.join(list(operations.keys()))
+                                                        )
+                    return "{} {} run -j {} -o {}".format(executable,
+                                                          path,
+                                                          job,
+                                                          ' '.join(list(operations.keys()))
+                                                          )
             self._run_cmd = cmd
         else:
             self._run_cmd = run_cmd
 
         if exec_cmd is None:
-            def cmd(operation, job=None):
-                return operation(job)
+            def cmd(operations, job=None):
+                return list(operations.values())[0](job)
             self._exec_cmd = cmd
         else:
             self._exec_cmd = exec_cmd
         self.directives = directives
 
-    def __call__(self, job=None, mode='run'):
+    def __call__(self, job=None, mode='run', path=None):
         # Get string form of command
         if mode == 'run':
             return self.run_call(job)
@@ -398,20 +422,21 @@ class FlowGroup(object):
 
     def run_call(self, job):
         if callable(self._run_cmd):
-            return self._run_cmd(self.operations.keys(), job) + ' '\
-                + self.options
+            return self._run_cmd(self.operations,
+                                 self.group_path,
+                                 self.directives,
+                                 job) + ' ' + self.options
         else:
-            return self._run_cmd.format(self.operations.keys(), job) + ' ' \
-                + self.options
+            return self._run_cmd.format(self.operations, job) + ' ' + self.options
 
     def exec_call(self, job):
         if len(self.operations) > 1:
             raise SubmitError("FlowGroups of more than one operation are not "
                               "eligible for running in exec mode.")
         if callable(self._exec_cmd):
-            return self._exec_cmd(list(self.operations.values())[0], job)
+            return self._exec_cmd(self.operations, job)
         else:
-            return self._exec_cmd.format(list(self.operations.values())[0], job)
+            return self._exec_cmd.format(self.operations, job)
 
     def compatible(self, group):
         for name in self.operations.keys():
@@ -688,11 +713,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         template_environment.filters['calc_tasks'] = tf.calc_tasks
         template_environment.filters['calc_num_nodes'] = tf.calc_num_nodes
         template_environment.filters['check_utilization'] = tf.check_utilization
-        template_environment.filters['homogeneous_openmp_mpi_config'] = \
-            tf.homogeneous_openmp_mpi_config
+        template_environment.filters['homogeneous_openmp_mpi_config'] = tf.homogeneous_openmp_mpi_config
         template_environment.filters['get_config_value'] = flow_config.get_config_value
-        template_environment.filters['require_config_value'] = \
-            flow_config.require_config_value
+        template_environment.filters['require_config_value'] = flow_config.require_config_value
         template_environment.filters['get_account_name'] = tf.get_account_name
         template_environment.filters['print_warning'] = tf.print_warning
         if 'max' not in template_environment.filters:    # for jinja2 < 2.10
@@ -969,12 +992,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
     def _get_operations_status(self, job, cached_status):
         "Return a dict with information about job-operations for this job."
-        for job_group in self._job_operations(job, False):
-            flow_op = self.operations[job_group.name]
+        for op in self._job_operations(job, False):
+            flow_op = self.operations[op.name]
             completed = flow_op.complete(job)
             eligible = False if completed else flow_op.eligible(job)
-            scheduler_status = cached_status.get(job_op.get_id(), JobStatus.unknown)
-            yield job_op.name, {
+            scheduler_status = cached_status.get(op.id, JobStatus.unknown)
+            yield op.name, {
                 'scheduler_status': scheduler_status,
                 'eligible': eligible,
                 'completed': completed,
@@ -1905,8 +1928,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         return template.render(** context)
 
     def submit_operations(self, groups, _id=None, env=None, parallel=False, flags=None,
-                      force=False, template='script.sh', pretend=False,
-                      show_template_help=False, **kwargs):
+                          force=False, template='script.sh', pretend=False,
+                          show_template_help=False, **kwargs):
         """Submit a sequence of operations to the scheduler.
 
         .. versionchanged:: 0.6
@@ -1994,7 +2017,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             if pretend:
                 print(script)
             else:
-                return env.sumbit(_id=_id, script=script, flags=flags, **kwargs)
+                return env.submit(_id=_id, script=script, flags=flags, **kwargs)
 
     @classmethod
     def _add_submit_args(cls, parser):
@@ -2025,13 +2048,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             help="Do not interact with the scheduler, implies --pretend.")
         cls._add_operation_selection_arg_group(parser)
         cls._add_operation_bundling_arg_group(parser)
-        cls._add_group_selection_args(parser)
         cls._add_template_arg_group(parser)
 
     @classmethod
     def _add_script_args(cls, parser):
         cls._add_operation_selection_arg_group(parser)
-        cls._add_group_selection_args(parser)
         execution_group = parser.add_argument_group('execution')
         execution_group.add_argument(
             '-p', '--parallel',
@@ -2094,19 +2115,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             help="Only select jobs that match the given document filter.")
 
     @classmethod
-    def _add_group_selection_args(cls, parser):
-        "Add argument group to parser for group selection."
-        selection_group = parser.add_argument_group(
-            'group selection',
-            "Allows for selection of a group to be run, sumbitted, or "
-            "scripted.")
-        selection_group.add_argument(
-            '-g', '--group',
-            nargs="+",
-            dest='group_name',
-            help='Only execute the given group(s).')
-
-    @classmethod
     def _add_operation_selection_arg_group(cls, parser, operations=None):
         "Add argument group to parser for job-operation selection."
         selection_group = parser.add_argument_group(
@@ -2118,7 +2126,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             '-o', '--operation',
             dest='operation_name',
             nargs='+',
-            help="Only select operations that match the given operation name(s).")
+            help="Only select operation or groups that match the given"
+            "operation/group name(s).")
         selection_group.add_argument(
             '-n', '--num',
             type=int,
@@ -2391,7 +2400,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         for name, op in self.operations.items():
             if only_eligible and not op.eligible(job):
                 continue
-            yield FlowGroup(name=name, operations={name: op},
+            path = self._get_operation_path(name)
+            yield FlowGroup(name=name, group_path=path, operations={name: op},
                             directives=op.directives).create_job_operation(job=job,
                                                                            mode=mode,
                                                                            index=0)
@@ -2509,16 +2519,20 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
     @classmethod
     def make_group(cls, name, run_cmd=None, exec_cmd=None, directives=None, options=None):
+        # Gets the relative filepath of the function caller
+        filepath = inspect.stack()[1][1]
         cls._GROUPS.append({'name': name, 'run_cmd': run_cmd,
                             'exec_cmd': exec_cmd, 'directives': directives,
-                            'options': options})
+                            'options': options, 'group_path': filepath})
 
+        # Create decorator that adds a _flow_group label to operations.
         def add_to_group(func):
             if hasattr(func, '_flow_group'):
                 func._flow_group.append(add_to_group.group_name)
             else:
                 func._flow_group = [add_to_group.group_name]
             return func
+        # Specify group name
         add_to_group.group_name = name
         return add_to_group
 
@@ -2550,6 +2564,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 for group in func._flow_group:
                     self._groups[group].add_operation(name,
                                                       self._operations[name])
+
+    def _get_operation_path(self, op_name):
+        func = [f for n, f in self._OPERATION_FUNCTIONS if n == op_name][0]
+        return getattr(func, '_flow_path',
+                       inspect.getsourcefile(inspect.getmodule(func)))
 
     @property
     def operations(self):
@@ -2618,10 +2637,19 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
         # Get operations from group and operations to run
         names = []
-        if args.group_name is not None:
-            names += self._groups[args.group_name[0]].operations
-        if args.operation_name is not None:
-            names += args.operation_name
+        for name in args.operation_name:
+            try:
+                names.extend(list(self._groups[name].operations.keys()))
+            except KeyError:
+                try:
+                    names.extend([name])
+                except KeyError:
+                    raise ValueError("Operation/Group {} is not defined".
+                                     format(name))
+
+        # If operations are specified multiple times remove them
+        names = list(set(names))
+
         # Setup partial run function, because we need to call this either
         # inside some context managers or not based on whether we need
         # to switch to the project root directory or not.
@@ -2652,21 +2680,35 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         with self._potentially_buffered():
             if args.cmd:
                 operations = self._generate_operations(args.cmd, jobs, args.requires)
-            elif args.group_name:
-                operations = [self._groups[name] for name in args.group_name]
-                if args.operation_name:
-                    for name in args.operation_name:
-                        op = self._operations[name]
-                        operations.append(FlowGroup(name=name, operations={name: op},
-                                                    directives=op.directives))
+            elif args.operation_name:
+                operations = []
+                for name in args.operation_name:
+                    try:
+                        operations.append(self._groups[name])
+                    except KeyError:
+                        try:
+                            op = self._operations[name]
+                            path = self._get_operation_path(name)
+                            operations.append(
+                                FlowGroup(name=name,
+                                          group_path=path,
+                                          operations={name: op},
+                                          directives=op.directives)
+                            )
+                        except KeyError:
+                            raise ValueError("Operation/Group {} is not defined".
+                                             format(name))
                     if not self._verify_group_compatibility(operations):
                         raise ValueError("Cannot specify groups or operations that "
                                          "will be listed twice when using the"
-                                         " -o/--operation or -g/--group options.")
-                operations = self._get_pending_groups(jobs, operations,
+                                         " -o/--operation option.")
+                operations = self._get_pending_groups(jobs,
+                                                      operations,
                                                       args.exec_mode)
             else:
-                operations = self._get_pending_operations(jobs, args.operation_name)
+                operations = self._get_pending_operations(jobs,
+                                                          args.operation_name,
+                                                          args.exec_mode)
             operations = list(islice(operations, args.num))
         # Generate the script and print to screen.
         print(self.script(
@@ -2686,31 +2728,41 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             self._fetch_scheduler_status(jobs)
 
         # Choose the group(s) or operations path
-        if args.group_name is not None:
-            groups = []
-            if args.group_name is not None:
-                groups.extend([self._groups[name] for name in args.group_name])
-            if args.operation_name is not None:
-                for name in args.operation_name:
-                    op = self._operations[name]
-                    groups.append(FlowGroup(name=name, operations={name: op},
-                                            directives=op.directives))
-            if not self._verify_group_compatibility(groups):
-                raise SubmitError("Cannot specify groups or operations that " +
-                                  "will be listed twice when using the" +
-                                  " -o/--operation or -g/--group options.")
-            job_groups = self._get_pending_groups(jobs, groups, args.exec_mode)
-
+        if args.operation_name:
+            operations = []
+            for name in args.operation_name:
+                try:
+                    operations.append(self._groups[name])
+                except KeyError:
+                    try:
+                        op = self._operations[name]
+                        path = self._get_operation_path(name)
+                        operations.append(
+                            FlowGroup(name=name,
+                                      group_path=path,
+                                      operations={name: op},
+                                      directives=op.directives)
+                        )
+                    except KeyError:
+                        raise ValueError("Operation/Group {} is not defined".
+                                         format(name))
+                if not self._verify_group_compatibility(operations):
+                    raise ValueError("Cannot specify groups or operations that "
+                                     "will be listed twice when using the"
+                                     " -o/--operation or option.")
+            operations = self._get_pending_groups(jobs,
+                                                  operations,
+                                                  args.exec_mode)
         # Unspecified group or operationss
         else:
             # Gather all pending operations ...
             with self._potentially_buffered():
-                job_groups = self._get_pending_operations(jobs,
+                operations = self._get_pending_operations(jobs,
                                                           args.operation_name, args.exec_mode)
 
-        job_groups = list(islice(job_groups, args.num))
+        operations = list(islice(operations, args.num))
         # Bundle operations up, generate the script, and submit to scheduler.
-        for bundle in make_bundles(job_groups, args.bundle_size):
+        for bundle in make_bundles(operations, args.bundle_size):
             status = self.submit_operations(groups=bundle, **kwargs)
             if status is not None:
                 for group in bundle:
@@ -2833,7 +2885,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             nargs='*',
             help=argparse.SUPPRESS)
         self._add_operation_selection_arg_group(parser_run, list(sorted(self._operations)))
-        self._add_group_selection_args(parser_run)
 
         execution_group = parser_run.add_argument_group('execution')
         execution_group.add_argument(

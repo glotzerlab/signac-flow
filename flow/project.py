@@ -1048,13 +1048,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         # use Jinja2 template for status output
         if template is None:
             if detailed and expand:
-                template = 'print_status_expand.jinja'
+                template = 'base_status_expand.jinja'
             elif detailed and not unroll:
-                template = 'print_status_stack.jinja'
+                template = 'base_status_stack.jinja'
             elif detailed and compact:
-                template = 'print_status_compact.jinja'
+                template = 'base_status_compact.jinja'
             else:
-                template = 'status.jinja'
+                template = 'base_status.jinja'
 
         if skip_active:
             raise NotImplementedError("The deprecated --skip-active option is no longer supported.")

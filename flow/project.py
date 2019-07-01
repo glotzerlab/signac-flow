@@ -2436,7 +2436,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
         # Gather all pending operations ...
         with self._potentially_buffered():
-            ops = self._get_pending_operations(jobs, args.operation_name)
+            ops = (op for op in self._get_pending_operations(jobs, args.operation_name)
+                   if self.eligible_for_submission(op))
             ops = list(islice(ops, args.num))
 
         # Bundle operations up, generate the script, and submit to scheduler.

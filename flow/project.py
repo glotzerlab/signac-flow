@@ -27,6 +27,7 @@ from collections import Counter
 from itertools import islice
 from itertools import count
 from itertools import groupby
+from itertools import combinations
 from hashlib import sha1
 import multiprocessing
 import threading
@@ -279,7 +280,8 @@ class JobOperation(object):
         return "{}({})".format(self.name, self.job)
 
     def __repr__(self):
-        return "{type}(name='{name}', operations='{operations}', job='{job}', cmd={cmd}, directives={directives})".format(
+        return "{type}(name='{name}', operations='{operations}', "
+        "job='{job}', cmd={cmd}, directives={directives})".format(
             type=type(self).__name__,
             name=self.name,
             operations=self.operations.keys(),
@@ -525,15 +527,15 @@ class FlowGroup(object):
         if mode == 'run':
             if callable(self._run_cmd):
                 return self._run_cmd(self.operations,
-                                    self.group_path,
-                                    self.directives,
-                                    job) + ' ' + self.options
+                                     self.group_path,
+                                     self.directives,
+                                     job) + ' ' + self.options
             else:
                 return self._run_cmd.format(self.operations, job) + ' ' + self.options
         elif mode == 'exec':
             if len(self.operations) > 1:
                 raise SubmitError("FlowGroups of more than one operation are not "
-                                "eligible for running in exec mode.")
+                                  "eligible for running in exec mode.")
             if callable(self._exec_cmd):
                 return self._exec_cmd(self.operations, job)
             else:
@@ -810,7 +812,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         template_environment.filters['calc_tasks'] = tf.calc_tasks
         template_environment.filters['calc_num_nodes'] = tf.calc_num_nodes
         template_environment.filters['check_utilization'] = tf.check_utilization
-        template_environment.filters['homogeneous_openmp_mpi_config'] = tf.homogeneous_openmp_mpi_config
+        template_environment.filters['homogeneous_openmp_mpi_config'] = \
+            tf.homogeneous_openmp_mpi_config
         template_environment.filters['get_config_value'] = flow_config.get_config_value
         template_environment.filters['require_config_value'] = flow_config.require_config_value
         template_environment.filters['get_account_name'] = tf.get_account_name
@@ -2047,8 +2050,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 yield op
 
     def _verify_group_compatibility(self, groups):
-        return all(a.compatible(b) for a, b in zip(groups[1:],
-                                                   groups[:-1]))
+        return all(a.compatible(b) for a, b in combinations(groups, 2))
 
     @contextlib.contextmanager
     def _potentially_buffered(self):
@@ -2293,7 +2295,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             with self._potentially_buffered():
                 operations = (op for op in self._get_pending_operations(jobs, names,
                                                                         mode)
-                            if self.eligible_for_submission(op))
+                              if self.eligible_for_submission(op))
             if num is not None:
                 operations = list(islice(operations, num))
 

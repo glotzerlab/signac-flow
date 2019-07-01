@@ -1,4 +1,4 @@
-{% extends "print_status.jinja" %}
+{% extends "base_status.jinja" %}
 {% block detailed %}
 {% set field_operation = ("%%-%ss %%3s %%-%ss  " | format(column_width_operation, column_width_operations_count)) %}
 {% set field_operation_title = ("%%-%ss  " | format(column_width_operation+column_width_operations_count+5)) %}

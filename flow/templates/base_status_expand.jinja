@@ -1,9 +1,9 @@
 {% if compact %}
-{% extends "print_status_compact.jinja" %}
+{% extends "base_status_compact.jinja" %}
 {% elif not unroll %}
-{% extends "print_status_stack.jinja" %}
+{% extends "base_status_stack.jinja" %}
 {% else %}
-{% extends "print_status.jinja" %}
+{% extends "base_status.jinja" %}
 {% endif %}
 {% block detailed %}
 {{ super () }}

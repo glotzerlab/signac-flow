@@ -1,4 +1,4 @@
-{% extends "print_status.jinja" %}
+{% extends "base_status.jinja" %}
 {% block detailed %}
 {% set field_head = field_job_id  + '%s' + field_label %}
 {% set field_operation = ("%%1s %%-%ss %%3s  " | format(column_width_operation)) %}

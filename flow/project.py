@@ -2849,8 +2849,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 func._flow_group.append(add_to_group.group_name)
             else:
                 func._flow_group = [add_to_group.group_name]
+            add_to_group._flow_post.extend([pc for pc in func._flow_post])
             return func
         # Specify group name
+        add_to_group._flow_post = []
         add_to_group.group_name = name
         return add_to_group
 

@@ -1,6 +1,4 @@
-import signac
-import flow
-from flow import FlowProject, directives, environments
+from flow import FlowProject
 
 eg_group = FlowProject.make_group(name='eg_group', directives={'np': 2,
                                                                'walltime': 0.5})
@@ -11,8 +9,11 @@ a_group = FlowProject.make_group(name='a', options='--num-passes=5')
 @FlowProject.operation
 @eg_group
 @a_group
+@FlowProject.post(lambda job: job.isfile("eg.txt"))
 def foo(job):
     print('foo')
+    with open(job.fn('eg.txt'), 'w') as fp:
+        fp.write("Hello World!")
 
 
 @FlowProject.operation
@@ -22,6 +23,7 @@ def bar(job):
 
 
 @new_group
+@FlowProject.pre.after(eg_group)
 @FlowProject.operation
 def num(job):
     print('num')

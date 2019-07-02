@@ -139,19 +139,21 @@ class _pre(_condition):
         return func
 
     @classmethod
-    def copy_from(cls, other_func):
+    def copy_from(cls, *other_funcs):
         "True if and only if all pre conditions of other function are met."
         def metacondition(job):
-            pre_conditions = getattr(other_func, '_flow_pre', list())
-            return all(c(job) for c in pre_conditions)
+            return all(c(job)
+                       for other_func in other_funcs
+                       for c in getattr(other_func, '_flow_pre', list()))
         return cls(metacondition)
 
     @classmethod
-    def after(cls, other_func):
+    def after(cls, *other_funcs):
         "True if and only if all post conditions of other function are met."
         def metacondition(job):
-            post_conditions = getattr(other_func, '_flow_post', list())
-            return all(c(job) for c in post_conditions)
+            return all(c(job)
+                       for other_func in other_funcs
+                       for c in getattr(other_func, '_flow_post', list()))
         return cls(metacondition)
 
 
@@ -167,11 +169,12 @@ class _post(_condition):
         return func
 
     @classmethod
-    def copy_from(cls, other_func):
+    def copy_from(cls, *other_funcs):
         "True if and only if all post conditions of other function are met."
         def metacondition(job):
-            post_conditions = getattr(other_func, '_flow_post', list())
-            return all(c(job) for c in post_conditions)
+            return all(c(job)
+                       for other_func in other_funcs
+                       for c in getattr(other_func, '_flow_post', list()))
         return cls(metacondition)
 
 

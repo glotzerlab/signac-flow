@@ -26,6 +26,7 @@ import json
 import inspect
 import functools
 import contextlib
+import random
 from collections import defaultdict
 from collections import OrderedDict
 from itertools import islice
@@ -1438,7 +1439,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             fork(cmd=operation.cmd, timeout=timeout)
 
     def run(self, jobs=None, names=None, pretend=False, np=None, timeout=None, num=None,
-            num_passes=1, progress=False):
+            num_passes=1, progress=False, shuffle=False):
         """Execute all pending operations for the given selection.
 
         This function will run in an infinite loop until all pending operations
@@ -1565,6 +1566,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                     del messages[:]     # clear
             if not operations:
                 break   # No more pending operations or execution limits reached.
+            if shuffle:
+                random.shuffle(operations)
             logger.info(
                 "Executing {} operation(s) (Pass # {:02d})...".format(len(operations), i_pass))
             self.run_operations(operations, pretend=pretend,
@@ -2365,7 +2368,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         run = functools.partial(self.run,
                                 jobs=jobs, names=args.operation_name, pretend=args.pretend,
                                 np=args.parallel, timeout=args.timeout, num=args.num,
-                                num_passes=args.num_passes, progress=args.progress)
+                                num_passes=args.num_passes, progress=args.progress,
+                                shuffle=args.shuffle)
 
         if args.switch_to_project_root:
             with add_cwd_to_environment_pythonpath():
@@ -2575,6 +2579,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             const='-1',
             help="Specify the number of cores to parallelize to. Defaults to all available "
                  "processing units if argument is ommitted.")
+        execution_group.add_argument(
+            '-s', '--shuffle',
+            action='store_true',
+            help="Shuffle the order of operations prior to each execution pass.")
         parser_run.set_defaults(func=self._main_run)
 
         parser_script = subparsers.add_parser(

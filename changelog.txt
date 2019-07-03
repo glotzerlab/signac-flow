@@ -11,6 +11,7 @@ next
 - Show submission error messages in combination with a TORQUE scheduler (#103, #104).
 - Fix issue that caused the "Fetching operation status" progressbar to be inaccurate (#108).
 - Rewrite print status function using Jinja2 templates.
+- Allow the provision of multiple operation-functions to the `pre.after` condition (#120).
 
 Version 0.7
 ===========

@@ -140,7 +140,7 @@ class _pre(_condition):
 
     @classmethod
     def copy_from(cls, *other_funcs):
-        "True if and only if all pre conditions of other function are met."
+        "True if and only if all pre conditions of other function(s) are met."
         def metacondition(job):
             return all(c(job)
                        for other_func in other_funcs
@@ -149,7 +149,7 @@ class _pre(_condition):
 
     @classmethod
     def after(cls, *other_funcs):
-        "True if and only if all post conditions of other function are met."
+        "True if and only if all post conditions of other function(s) are met."
         def metacondition(job):
             return all(c(job)
                        for other_func in other_funcs
@@ -170,7 +170,7 @@ class _post(_condition):
 
     @classmethod
     def copy_from(cls, *other_funcs):
-        "True if and only if all post conditions of other function are met."
+        "True if and only if all post conditions of other function(s) are met."
         def metacondition(job):
             return all(c(job)
                        for other_func in other_funcs

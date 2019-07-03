@@ -1491,6 +1491,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             Show a progress bar during execution.
         :type progess:
             bool
+        :param shuffle:
+            Shuffle operations prior to each execution pass.
+        :type shuffle:
+            bool
         """
         # If no jobs argument is provided, we run operations for all jobs.
         if jobs is None:

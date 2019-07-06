@@ -1439,7 +1439,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             fork(cmd=operation.cmd, timeout=timeout)
 
     def run(self, jobs=None, names=None, pretend=False, np=None, timeout=None, num=None,
-            num_passes=1, progress=False, shuffle=False):
+            num_passes=1, progress=False, order=None):
         """Execute all pending operations for the given selection.
 
         This function will run in an infinite loop until all pending operations
@@ -1491,11 +1491,16 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             Show a progress bar during execution.
         :type progess:
             bool
-        :param shuffle:
-            Shuffle operations prior to each execution pass.
-        :type shuffle:
-            bool
+        :param order:
+            Specify the order of operations, possible values are:
+                * None or 'none' (no reordering, operations are grouped by job)
+                * 'round-robin' (order operations in round-robin fashion by job)
+                * 'random'    (shuffle the execution order randomly)
+                * callable specify a key-callable by which to order operations
+            The default value is None.
         """
+        from itertools import groupby
+        from .util.misc import roundrobin
         # If no jobs argument is provided, we run operations for all jobs.
         if jobs is None:
             jobs = self
@@ -1570,8 +1575,23 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                     del messages[:]     # clear
             if not operations:
                 break   # No more pending operations or execution limits reached.
-            if shuffle:
+
+            # Optionally re-order operations for execution if order argument is provided:
+            if callable(order):
+                operations = list(sorted(operations, key=order))
+            elif order == 'round-robin':
+                groups = [list(group)
+                          for _, group in groupby(operations, key=lambda op: op.job)]
+                operations = list(roundrobin(*groups))
+            elif order == 'random':
                 random.shuffle(operations)
+            elif order is None or order == 'none':
+                pass  # no reordering
+            else:
+                raise ValueError(
+                    "Invalid value for 'order' argument, valid arguments are "
+                    "None, 'none', 'round-robin', or 'random'.")
+
             logger.info(
                 "Executing {} operation(s) (Pass # {:02d})...".format(len(operations), i_pass))
             self.run_operations(operations, pretend=pretend,
@@ -2373,7 +2393,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                                 jobs=jobs, names=args.operation_name, pretend=args.pretend,
                                 np=args.parallel, timeout=args.timeout, num=args.num,
                                 num_passes=args.num_passes, progress=args.progress,
-                                shuffle=args.shuffle)
+                                order=args.order)
 
         if args.switch_to_project_root:
             with add_cwd_to_environment_pythonpath():
@@ -2584,9 +2604,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             help="Specify the number of cores to parallelize to. Defaults to all available "
                  "processing units if argument is ommitted.")
         execution_group.add_argument(
-            '-s', '--shuffle',
-            action='store_true',
-            help="Shuffle the order of operations prior to each execution pass.")
+            '--order',
+            type=str,
+            choices=['none', 'round-robin', 'random'],
+            default=None,
+            help="Specify the execution order of operations for each execution pass.")
         parser_run.set_defaults(func=self._main_run)
 
         parser_script = subparsers.add_parser(

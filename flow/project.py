@@ -1493,7 +1493,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             bool
         :param order:
             Specify the order of operations, possible values are:
-                * None or 'none' (no reordering, operations are grouped by job)
+                * None or 'none' (no reordering, do not assume any order)
+                * 'by-job'  (operations are grouped by job)
                 * 'round-robin' (order operations in round-robin fashion by job)
                 * 'random'    (shuffle the execution order randomly)
                 * callable specify a key-callable by which to order operations
@@ -1585,12 +1586,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 operations = list(roundrobin(*groups))
             elif order == 'random':
                 random.shuffle(operations)
-            elif order is None or order == 'none':
-                pass  # no reordering
+            elif order is None or order in ('none', 'by-job'):
+                pass  # by-job is the default order
             else:
                 raise ValueError(
                     "Invalid value for 'order' argument, valid arguments are "
-                    "None, 'none', 'round-robin', or 'random'.")
+                    "None, 'none', 'by-job', 'round-robin', or 'random'.")
 
             logger.info(
                 "Executing {} operation(s) (Pass # {:02d})...".format(len(operations), i_pass))
@@ -2606,7 +2607,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         execution_group.add_argument(
             '--order',
             type=str,
-            choices=['none', 'round-robin', 'random'],
+            choices=['none', 'by-job', 'round-robin', 'random'],
             default=None,
             help="Specify the execution order of operations for each execution pass.")
         parser_run.set_defaults(func=self._main_run)

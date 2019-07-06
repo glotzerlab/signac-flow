@@ -511,6 +511,16 @@ class ExecutionProjectTest(BaseProjectTest):
     project_class = TestProject
     expected_number_of_steps = 4
 
+    def test_pending_operations_order(self):
+        # The execution order of local runs is internally assumed to be
+        # 'by-job' by default. A failure of this unit tests means that
+        # a 'by-job' order must be implemented explicitly within the
+        # FlowProject.run() function.
+        project = self.mock_project()
+        ops = list(project._get_pending_operations(self.project.find_jobs()))
+        ops_sorted_by_job = list(sorted(ops, key=lambda op: op.job._id))
+        self.assertEqual(ops, ops_sorted_by_job)
+
     def test_run(self):
         project = self.mock_project()
         output = StringIO()

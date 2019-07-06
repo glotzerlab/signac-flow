@@ -11,7 +11,7 @@ next
 - Show submission error messages in combination with a TORQUE scheduler (#103, #104).
 - Fix issue that caused the "Fetching operation status" progressbar to be inaccurate (#108).
 - Rewrite print status function using Jinja2 templates.
-- Add option to shuffle the operation execution order (#121).
+- Add option to specify the operation execution order (#121).
 
 Version 0.7
 ===========

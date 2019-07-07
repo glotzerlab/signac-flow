@@ -31,6 +31,7 @@ from collections import defaultdict
 from collections import OrderedDict
 from itertools import islice
 from itertools import count
+from itertools import groupby
 from hashlib import sha1
 from multiprocessing import Pool
 from multiprocessing import cpu_count
@@ -57,6 +58,7 @@ from .errors import TemplateError
 from .util.tqdm import tqdm
 from .util.misc import _positive_int
 from .util.misc import _mkdir_p
+from .util.misc import roundrobin
 from .util import template_filters as tf
 from .util.misc import add_cwd_to_environment_pythonpath
 from .util.misc import switch_to_directory
@@ -1512,8 +1514,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         :type order:
             str, callable, or NoneType
         """
-        from itertools import groupby
-        from .util.misc import roundrobin
         # If no jobs argument is provided, we run operations for all jobs.
         if jobs is None:
             jobs = self

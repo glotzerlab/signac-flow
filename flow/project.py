@@ -1495,7 +1495,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             Specify the order of operations, possible values are:
                 * 'none' or None (no specific order)
                 * 'by-job' (operations are grouped by job)
-                * 'round-robin' (order operations in round-robin fashion by job)
+                * 'cyclic' (order operations cyclic by job)
                 * 'random' (explicitly shuffle the execution order randomly)
                 * callable (specify a key-callable used to sort operations)
 
@@ -1592,7 +1592,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             # Optionally re-order operations for execution if order argument is provided:
             if callable(order):
                 operations = list(sorted(operations, key=order))
-            elif order == 'round-robin':
+            elif order == 'cyclic':
                 groups = [list(group)
                           for _, group in groupby(operations, key=lambda op: op.job)]
                 operations = list(roundrobin(*groups))
@@ -1603,7 +1603,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             else:
                 raise ValueError(
                     "Invalid value for the 'order' argument, valid arguments are "
-                    "'none', 'by-job', 'round-robin', 'random', None, or a callable.")
+                    "'none', 'by-job', 'cyclic', 'random', None, or a callable.")
 
             logger.info(
                 "Executing {} operation(s) (Pass # {:02d})...".format(len(operations), i_pass))
@@ -2619,7 +2619,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         execution_group.add_argument(
             '--order',
             type=str,
-            choices=['none', 'by-job', 'round-robin', 'random'],
+            choices=['none', 'by-job', 'cyclic', 'random'],
             default=None,
             help="Specify the execution order of operations for each execution pass.")
         parser_run.set_defaults(func=self._main_run)

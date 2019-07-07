@@ -2615,7 +2615,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             nargs='?',
             const='-1',
             help="Specify the number of cores to parallelize to. Defaults to all available "
-                 "processing units if argument is ommitted.")
+                 "processing units if argument is omitted.")
         execution_group.add_argument(
             '--order',
             type=str,

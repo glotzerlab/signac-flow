@@ -13,6 +13,7 @@ import subprocess
 import tempfile
 from contextlib import contextmanager
 from distutils.version import StrictVersion
+from collections import OrderedDict
 
 import signac
 from signac.common import six
@@ -518,8 +519,10 @@ class ExecutionProjectTest(BaseProjectTest):
         # FlowProject.run() function.
         project = self.mock_project()
         ops = list(project._get_pending_operations(self.project.find_jobs()))
-        ops_sorted_by_job = list(sorted(ops, key=lambda op: op.job._id))
-        self.assertEqual(ops, ops_sorted_by_job)
+        ops_order_none = OrderedDict([(op.job, None) for op in ops])
+        ops_order_by_job = OrderedDict([(op.job, None)
+                                        for op in sorted(ops, key=lambda op: op.job._id)])
+        self.assertEqual(ops_order_none, ops_order_by_job)
 
     def test_run(self):
         project = self.mock_project()

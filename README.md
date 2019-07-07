@@ -1,5 +1,6 @@
 # <img src="https://raw.githubusercontent.com/glotzerlab/signac-flow/master/doc/images/logo.png" width="75" height="75"> signac-flow - manage workflows with signac
 
+[![Affiliated with NumFOCUS](https://img.shields.io/badge/NumFOCUS-affiliated%20project-orange.svg?style=flat&colorA=E1523D&colorB=007D8A)](https://numfocus.org/sponsored-projects/affiliated-projects)
 [![PyPI](https://img.shields.io/pypi/v/signac-flow.svg)](https://pypi.org/project/signac-flow/)
 [![conda-forge](https://img.shields.io/conda/vn/conda-forge/signac-flow.svg?style=flat)](https://anaconda.org/conda-forge/signac-flow)
 ![CircleCI](https://img.shields.io/circleci/project/github/glotzerlab/signac-flow/master.svg)
@@ -60,3 +61,5 @@ within the repository root directory.
 When using **signac** as part of your work towards a publication, we would really appreciate that you acknowledge **signac** appropriately.
 We have prepared examples on how to do that [here](http://docs.signac.io/en/latest/acknowledge.html).
 **Thank you very much!**
+
+The signac framework is a [NumFOCUS Affiliated Project](https://numfocus.org/sponsored-projects/affiliated-projects).

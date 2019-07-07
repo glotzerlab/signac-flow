@@ -204,7 +204,7 @@ def fullmatch(regex, string, flags=0):
 
 def roundrobin(*iterables):
     # From: https://docs.python.org/3/library/itertools.html#itertools-recipes
-    "roundrobin('ABC', 'D', 'EF') --> A D E B F C"
+    # roundrobin('ABC', 'D', 'EF') --> A D E B F C
     # Recipe credited to George Sakkis
     num_active = len(iterables)
     nexts = cycle(iter(it).__next__ for it in iterables)

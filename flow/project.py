@@ -1493,12 +1493,24 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             bool
         :param order:
             Specify the order of operations, possible values are:
-                * None or 'none' (no reordering, do not assume any order)
-                * 'by-job'  (operations are grouped by job)
+                * 'none' or None (no specific order)
+                * 'by-job' (operations are grouped by job)
                 * 'round-robin' (order operations in round-robin fashion by job)
-                * 'random'    (shuffle the execution order randomly)
-                * callable specify a key-callable by which to order operations
-            The default value is None.
+                * 'random' (explicitly shuffle the execution order randomly)
+                * callable (specify a key-callable used to sort operations)
+
+            The default value is `none`, which is equivalent to `by-job` in the current
+            implementation.
+
+            .. note::
+
+                Users are advised to not rely on a specific execution order, as a
+                subsitute for defining the worklow in terms of pre- and post-conditions.
+                However, a specific execution order may be more performant in cases where
+                operations need to access and potentially lock shared resources.
+
+        :type order:
+            str, callable, or NoneType
         """
         from itertools import groupby
         from .util.misc import roundrobin
@@ -1590,8 +1602,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 pass  # by-job is the default order
             else:
                 raise ValueError(
-                    "Invalid value for 'order' argument, valid arguments are "
-                    "None, 'none', 'by-job', 'round-robin', or 'random'.")
+                    "Invalid value for the 'order' argument, valid arguments are "
+                    "'none', 'by-job', 'round-robin', 'random', None, or a callable.")
 
             logger.info(
                 "Executing {} operation(s) (Pass # {:02d})...".format(len(operations), i_pass))

@@ -13,7 +13,7 @@ import subprocess
 import tempfile
 from contextlib import contextmanager
 from distutils.version import StrictVersion
-from collections import OrderedDict
+from itertools import groupby
 
 import signac
 from signac.common import six
@@ -519,10 +519,11 @@ class ExecutionProjectTest(BaseProjectTest):
         # FlowProject.run() function.
         project = self.mock_project()
         ops = list(project._get_pending_operations(self.project.find_jobs()))
-        ops_order_none = OrderedDict([(op.job, None) for op in ops])
-        ops_order_by_job = OrderedDict([(op.job, None)
-                                        for op in sorted(ops, key=lambda op: op.job._id)])
-        self.assertEqual(ops_order_none, ops_order_by_job)
+        # The length of the list of operations grouped by job is equal
+        # to the length of its set if and only if the operations are grouped
+        # by job already:
+        jobs_order_none = [job._id for job, _ in groupby(ops, key=lambda op: op.job)]
+        self.assertEqual(len(jobs_order_none), len(set(jobs_order_none)))
 
     def test_run(self):
         project = self.mock_project()

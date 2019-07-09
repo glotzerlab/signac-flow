@@ -307,6 +307,13 @@ class JobOperation(object):
         except KeyError:
             return JobStatus.unknown
 
+    def get_status(self):
+        "Retrieve the operation's last known status."
+        try:
+            return JobStatus(self.project.document['_status'][self.id])
+        except KeyError:
+            return JobStatus.unknown
+
 
 class FlowCondition(object):
     """A FlowCondition represents a condition as a function of a signac job.
@@ -1166,7 +1173,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                             desc="Fetching operation status",
                             total=len(jobs), file=file):
                 for op in self._job_operations(job, only_eligible=False):
-                    status[op.id] = int(scheduler_info.get(op.id), JobStatus.unknown)
+                    status[op.id] = int(scheduler_info.get(op.id, JobStatus.unknown))
             self.document._status.update(status)
         except NoSchedulerError:
             logger.debug("No scheduler available.")
@@ -1710,7 +1717,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if profiling_results:
             print('\n' + '\n'.join(profiling_results), file=file)
 
-    def run_operations(self, operations=None, pretend=False, np=None, timeout=None, progress=False):
+    def run_operations(self, operations=None, pretend=False, np=None,
+                       timeout=None, progress=False, mode='run'):
         """Execute the next operations as specified by the project's workflow.
 
         See also: :meth:`~.run`
@@ -1738,11 +1746,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Show a progress bar during execution.
         :type progess:
             bool
+        :param mode:
+            Select the execuation mode style for running operations. Options are
+            'run' and 'exec'. Default is 'exec'.
+        :type mode:
+            str
         """
         if timeout is not None and timeout < 0:
             timeout = None
         if operations is None:
-            operations = list(self._get_pending_operations(self))
+            operations = list(self._get_pending_operations(self, mode=mode))
         else:
             operations = list(operations)   # ensure list
 
@@ -1927,13 +1940,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             jobs = self
 
         # Change group names to their constituent operations
-        expanded_names = []
-        for name in names:
-            try:
-                expanded_names.extend(list(self._groups[name].operations.keys()))
-            except KeyError:
-                expanded_names.append(name)
-        names = list(set(expanded_names))
+        if names is not None:
+            expanded_names = []
+            for name in names:
+                try:
+                    expanded_names.extend(list(self._groups[name].operations.keys()))
+                except KeyError:
+                    expanded_names.append(name)
+            names = list(set(expanded_names))
 
         # Negative values for the execution limits, means 'no limit'.
         if num_passes and num_passes < 0:
@@ -1997,7 +2011,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 break
             try:
                 with self._potentially_buffered():
-                    operations = list(filter(select, self._get_pending_operations(jobs, names)))
+                    operations = list(filter(select, self._get_pending_operations(jobs,
+                                                                                  names,
+                                                                                  mode)))
             finally:
                 if messages:
                     for msg, level in set(messages):
@@ -2025,7 +2041,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             logger.info(
                 "Executing {} operation(s) (Pass # {:02d})...".format(len(operations), i_pass))
             self.run_operations(operations, pretend=pretend,
-                                np=np, timeout=timeout, progress=progress)
+                                np=np, timeout=timeout, progress=progress,
+                                mode=mode)
 
     def _generate_operations(self, cmd, jobs, requires=None):
         "Generate job-operations for a given 'direct' command."
@@ -2728,9 +2745,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             An instance of JobOperation to execute next or `None`, if no operation is eligible.
         :rtype:
             `:py:class:`~.JobOperation` or `NoneType`
+        :param mode:
+            The executation style within the groups paradigm.
+        :type mode:
+            str
         """
-        for group in self.next_operations(job):
-            return group
+        for operation in self.next_operations(job, mode=mode):
+            return operation
 
     @classmethod
     def operation(cls, func, name=None):
@@ -2993,7 +3014,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 names.extend(list(self._groups[name].operations.keys()))
             except KeyError:
                 try:
-                    names.extend([name])
+                    names.append(name)
                 except KeyError:
                     raise ValueError("Operation/Group {} is not defined".
                                      format(name))

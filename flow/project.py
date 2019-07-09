@@ -1481,7 +1481,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         print(template.render(**context), file=file)
 
     def run_operations(self, operations=None, pretend=False, np=None,
-                       timeout=None, progress=False, mode='run'):
+                       timeout=None, progress=False):
         """Execute the next operations as specified by the project's workflow.
 
         See also: :meth:`~.run`
@@ -1509,11 +1509,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             Show a progress bar during execution.
         :type progess:
             bool
-        :param mode:
-            Select the execuation mode style for running operations. Options are
-            'run' and 'exec'. Default is 'exec'.
-        :type mode:
-            str
         """
         if six.PY2 and timeout is not None:
             logger.warning(
@@ -1522,7 +1517,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         if timeout is not None and timeout < 0:
             timeout = None
         if operations is None:
-            operations = list(self._get_pending_operations(self, mode=mode))
+            operations = list(self._get_pending_operations(self, mode='exec'))
         else:
             operations = list(operations)   # ensure list
 
@@ -1608,7 +1603,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             fork(cmd=operation.cmd, timeout=timeout)
 
     def run(self, jobs=None, names=None, pretend=False, np=None, timeout=None, num=None,
-            num_passes=1, progress=False, mode='run'):
+            num_passes=1, progress=False):
         """Execute all pending operations for the given selection.
 
         This function will run in an infinite loop until all pending operations
@@ -1660,11 +1655,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             Show a progress bar during execution.
         :type progess:
             bool
-        :param mode:
-            When set to 'run', each operation is nested in another run command.
-            If 'exec', old behavior is expected.
-        :type mode;
-            str
         """
         # If no jobs argument is provided, we run operations for all jobs.
         if jobs is None:
@@ -1744,7 +1734,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 with self._potentially_buffered():
                     operations = list(filter(select, self._get_pending_operations(jobs,
                                                                                   names,
-                                                                                  mode)))
+                                                                                  mode='exec')))
             finally:
                 if messages:
                     for msg, level in set(messages):
@@ -1755,8 +1745,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             logger.info(
                 "Executing {} operation(s) (Pass # {:02d})...".format(len(operations), i_pass))
             self.run_operations(operations, pretend=pretend,
-                                np=np, timeout=timeout, progress=progress,
-                                mode=mode)
+                                np=np, timeout=timeout, progress=progress)
 
     def _generate_operations(self, cmd, jobs, requires=None):
         "Generate job-operations for a given 'direct' command."

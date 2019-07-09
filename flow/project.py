@@ -1718,7 +1718,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             print('\n' + '\n'.join(profiling_results), file=file)
 
     def run_operations(self, operations=None, pretend=False, np=None,
-                       timeout=None, progress=False, mode='run'):
+                       timeout=None, progress=False):
         """Execute the next operations as specified by the project's workflow.
 
         See also: :meth:`~.run`
@@ -1746,16 +1746,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Show a progress bar during execution.
         :type progess:
             bool
-        :param mode:
-            Select the execuation mode style for running operations. Options are
-            'run' and 'exec'. Default is 'exec'.
-        :type mode:
-            str
         """
         if timeout is not None and timeout < 0:
             timeout = None
         if operations is None:
-            operations = list(self._get_pending_operations(self, mode=mode))
+            operations = list(self._get_pending_operations(self, mode='exec'))
         else:
             operations = list(operations)   # ensure list
 
@@ -2013,7 +2008,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 with self._potentially_buffered():
                     operations = list(filter(select, self._get_pending_operations(jobs,
                                                                                   names,
-                                                                                  mode)))
+                                                                                  mode='exec')))
             finally:
                 if messages:
                     for msg, level in set(messages):
@@ -2041,8 +2036,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             logger.info(
                 "Executing {} operation(s) (Pass # {:02d})...".format(len(operations), i_pass))
             self.run_operations(operations, pretend=pretend,
-                                np=np, timeout=timeout, progress=progress,
-                                mode=mode)
+                                np=np, timeout=timeout, progress=progress)
 
     def _generate_operations(self, cmd, jobs, requires=None):
         "Generate job-operations for a given 'direct' command."

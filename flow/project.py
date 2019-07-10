@@ -2908,9 +2908,18 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                                       self._operations[name])
 
     def _get_operation_path(self, op_name):
-        func = [f for n, f in self._OPERATION_FUNCTIONS if n == op_name][0]
-        return getattr(func, '_flow_path',
-                       inspect.getsourcefile(inspect.getmodule(func)))
+        operations = []
+        for cls in type(self).__mro__:
+            operations.extend(getattr(cls, '_OPERATION_FUNCTIONS', []))
+        func = [f for n, f in operations if n == op_name]
+        if func == list():
+            raise ValueError("{} not found in OPERATION_FUNCTIONS : "
+                             "{}".format(op_name,
+                                         ' '.join([name for name, _ in
+                                                   self._OPERATION_FUNCTIONS]))
+                             )
+        return getattr(func[0], '_flow_path',
+                       inspect.getsourcefile(inspect.getmodule(func[0])))
 
     @property
     def operations(self):

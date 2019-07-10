@@ -1064,7 +1064,9 @@ class ProjectMainInterfaceTest(BaseProjectTest):
         self.assertTrue(len(self.project))
         even_jobs = [job for job in self.project if job.sp.b % 2 == 0]
         for job in self.project:
-            script_output = self.call_subcmd('script -j {}'.format(job)).decode().splitlines()
+            script_output = self.call_subcmd(
+                    'script -j {} --exec'.format(job)
+                    ).decode().splitlines()
             self.assertIn(job.get_id(), '\n'.join(script_output))
             if job in even_jobs:
                 self.assertIn('echo "hello"', '\n'.join(script_output))

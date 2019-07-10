@@ -525,21 +525,34 @@ class ExecutionProjectTest(BaseProjectTest):
         jobs_order_none = [job._id for job, _ in groupby(ops, key=lambda op: op.job)]
         self.assertEqual(len(jobs_order_none), len(set(jobs_order_none)))
 
+    @unittest.skipIf(six.PY2, 'requires python 3')
     def test_run(self):
-        project = self.mock_project()
-        output = StringIO()
-        with add_cwd_to_environment_pythonpath():
-            with switch_to_directory(project.root_directory()):
-                with redirect_stderr(output):
-                    project.run()
-        output.seek(0)
-        output.read()
-        even_jobs = [job for job in project if job.sp.b % 2 == 0]
-        for job in project:
-            if job in even_jobs:
-                self.assertTrue(job.isfile('world.txt'))
-            else:
-                self.assertFalse(job.isfile('world.txt'))
+        with self.subTest(order='invalid-order'):
+            with self.assertRaises(ValueError):
+                project = self.mock_project()
+                self.project.run(order='invalid-order')
+
+        def sort_key(op):
+            return op.name, op.job.get_id()
+
+        for order in (None, 'none', 'cyclic', 'by-job', 'random', sort_key):
+            for job in self.project.find_jobs():  # clear
+                job.remove()
+            with self.subTest(order=order):
+                project = self.mock_project()
+                output = StringIO()
+                with add_cwd_to_environment_pythonpath():
+                    with switch_to_directory(project.root_directory()):
+                        with redirect_stderr(output):
+                            project.run(order=order)
+                output.seek(0)
+                output.read()
+                even_jobs = [job for job in project if job.sp.b % 2 == 0]
+                for job in project:
+                    if job in even_jobs:
+                        self.assertTrue(job.isfile('world.txt'))
+                    else:
+                        self.assertFalse(job.isfile('world.txt'))
 
     def test_run_with_selection(self):
         project = self.mock_project()

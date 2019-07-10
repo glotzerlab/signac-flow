@@ -549,7 +549,8 @@ class FlowGroup(object):
                 return self._exec_cmd.format(self.operations, job)
 
     def __iter__(self):
-        yield from self.operations.values()
+        for op in self.operations.values():
+            yield op
 
     def eligible(self, job):
         """Eligible, when at least one FlowOperation is eligible."""

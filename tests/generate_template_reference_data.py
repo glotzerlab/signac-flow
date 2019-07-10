@@ -147,9 +147,9 @@ def init(project):
 # Mock the bundle storing to avoid needing to make a file
 def _store_bundled(self, operations):
     if len(operations) == 1:
-        return operations[0].get_id()
+        return operations[0].id
     else:
-        h = '.'.join(op.get_id() for op in operations)
+        h = '.'.join(op.id for op in operations)
         bid = '{}/bundle/{}'.format(self, sha1(h.encode('utf-8')).hexdigest())
         return bid
 

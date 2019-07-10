@@ -52,7 +52,8 @@ class BaseTemplateTest(object):
                             with redirect_stdout(tmp_out):
                                 fp.submit(
                                     env=self.env, jobs=[job], names=bundle, pretend=True,
-                                    force=True, bundle_size=len(bundle), **parameters)
+                                    force=True, bundle_size=len(bundle),
+                                    mode='exec', **parameters)
                     tmp_out.seek(0)
                     msg = "---------- Bundled submission of job {}".format(job)
                     generated.extend([msg] + tmp_out.read().splitlines())
@@ -77,7 +78,8 @@ class BaseTemplateTest(object):
                                 with redirect_stdout(tmp_out):
                                     fp.submit(
                                         env=self.env, jobs=[job],
-                                        names=[op], pretend=True, force=True, **parameters)
+                                        names=[op], pretend=True, force=True,
+                                        mode='exec', **parameters)
                         tmp_out.seek(0)
                         msg = "---------- Submission of operation {} for job {}.".format(op, job)
                         generated.extend([msg] + tmp_out.read().splitlines())

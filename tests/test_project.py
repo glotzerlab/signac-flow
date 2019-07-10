@@ -567,7 +567,7 @@ class ProjectTest(BaseProjectTest):
     def test_script(self):
         project = self.mock_project()
         for job in project:
-            script = project.script(project.next_operations(job))
+            script = project.script(project.next_operations(job, mode='exec'))
             if job.sp.b % 2 == 0:
                 self.assertIn(str(job), script)
                 self.assertIn('echo "hello"', script)
@@ -587,7 +587,7 @@ class ProjectTest(BaseProjectTest):
             file.write("THIS IS A CUSTOM SCRIPT!\n")
             file.write("{% endblock %}\n")
         for job in project:
-            script = project.script(project.next_operations(job))
+            script = project.script(project.next_operations(job, mode='exec'))
             self.assertIn("THIS IS A CUSTOM SCRIPT", script)
             if job.sp.b % 2 == 0:
                 self.assertIn(str(job), script)
@@ -873,7 +873,6 @@ class ExecutionProjectTest(BaseProjectTest):
             if job not in even_jobs:
                 continue
             list(project.classify(job))
-            print(project._OPERATION_FUNCTIONS)
             self.assertEqual(project.next_operation(job).name, 'op1')
             self.assertEqual(project.next_operation(job).job, job)
         with redirect_stderr(StringIO()):

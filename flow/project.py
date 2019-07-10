@@ -1498,8 +1498,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 * 'none' or None (no specific order)
                 * 'by-job' (operations are grouped by job)
                 * 'cyclic' (order operations cyclic by job)
-                * 'random' (explicitly shuffle the execution order randomly)
-                * callable (specify a key-callable used to sort operations)
+                * 'random' (shuffle the execution order randomly)
+                * callable (a callable returning a a comparison key for an
+                            operation used to sort operations)
 
             The default value is `none`, which is equivalent to `by-job` in the current
             implementation.
@@ -1507,7 +1508,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             .. note::
 
                 Users are advised to not rely on a specific execution order, as a
-                subsitute for defining the worklow in terms of pre- and post-conditions.
+                substitute for defining the workflow in terms of pre- and post-conditions.
                 However, a specific execution order may be more performant in cases where
                 operations need to access and potentially lock shared resources.
 

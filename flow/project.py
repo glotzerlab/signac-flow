@@ -572,7 +572,7 @@ class FlowGroup(object):
         # The full name is designed to be truly unique for each job-group.
         full_name = '{}%{}%{}%{}'.format(project.root_directory(),
                                          job.get_id(),
-                                         self.operations.keys(),
+                                         ' '.join(list(self.operations.keys())),
                                          index)
 
         # The job_op_id is a hash computed from the unique full name.
@@ -1796,11 +1796,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @staticmethod
     def _dumps_op(op):
-        return (op.name, op.job._id, op.cmd, op.directives)
+        return (op.id, op.name, op.job._id, op.cmd, op.directives)
 
     def _loads_op(self, blob):
-        name, job_id, cmd, directives = blob
-        return JobOperation(name, self.open_job(id=job_id), cmd, directives)
+        id, name, job_id, cmd, directives = blob
+        return JobOperation(id, name, self.open_job(id=job_id), cmd, directives)
 
     def _run_operations_in_parallel(self, pool, pickle, operations, progress, timeout):
         """Execute operations in parallel.
@@ -2046,6 +2046,31 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             cmd_ = cmd.format(job=job)
             yield JobOperation(name=cmd_.replace(' ', '-'), cmd=cmd_, job=job)
 
+    def _gather_FlowGroups(self, names):
+        operations = {}
+        for name in names:
+            if name in operations.keys():
+                continue
+            try:
+                operations[name] = self._groups[name]
+            except KeyError:
+                try:
+                    op = self._operations[name]
+                    path = self._get_operation_path(name)
+                    operations[name] = FlowGroup(name=name,
+                                                 group_path=path,
+                                                 operations={name: op},
+                                                 directives=op.directives)
+                except KeyError:
+                    raise ValueError("Operation/Group {} is not defined".
+                                     format(name))
+        operations = list(operations.values())
+        if not self._verify_group_compatibility(operations):
+            raise ValueError("Cannot specify groups or operations that "
+                             "will be listed twice when using the"
+                             " -o/--operation option.")
+        return operations
+
     def _get_pending_groups(self, jobs, groups, mode='run'):
         for job in jobs:
             for group in groups:
@@ -2225,7 +2250,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 return env.submit(_id=_id, script=script, flags=flags, **kwargs)
 
     def submit(self, bundle_size=1, jobs=None, names=None, num=None, parallel=False,
-               force=False, walltime=None, env=None, **kwargs):
+               force=False, walltime=None, env=None, mode='run', **kwargs):
         """Submit function for the project's main submit interface.
         .. versionchanged:: 0.6
         :param bundle_size:
@@ -2254,6 +2279,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             bool
         :param walltime:
             Specify the walltime in hours or as instance of datetime.timedelta.
+        :param mode:
+            Defines the execution mode. 'run' will perform operations using the
+            run command's logic on the compute nodes. 'exec' will perform all
+            pre and post checks on the submit side. Default is 'run'.
+        :type mode:
+            str
         """
         # Regular argument checks and expansion
         if jobs is None:
@@ -2271,34 +2302,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 if str(error) != 'unsupported type for timedelta ' \
                                  'hours component: datetime.timedelta':
                     raise
-        try:
-            mode = 'exec' if kwargs['exec_mode'] else 'run'
-        except (KeyError, TypeError):
-            mode = 'run'
 
         # Gather all pending operations.
         if names is not None:
-            operations = []
-            for name in names:
-                try:
-                    operations.append(self._groups[name])
-                except KeyError:
-                    try:
-                        op = self._operations[name]
-                        path = self._get_operation_path(name)
-                        operations.append(
-                            FlowGroup(name=name,
-                                      group_path=path,
-                                      operations={name: op},
-                                      directives=op.directives)
-                        )
-                    except KeyError:
-                        raise ValueError("Operation/Group {} is not defined".
-                                         format(name))
-                if not self._verify_group_compatibility(operations):
-                    raise ValueError("Cannot specify groups or operations that "
-                                     "will be listed twice when using the"
-                                     " -o/--operation or option.")
+            operations = self._gather_FlowGroups(names)
             operations = self._get_pending_groups(jobs,
                                                   operations,
                                                   mode)
@@ -3049,27 +3056,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if args.cmd:
                 operations = self._generate_operations(args.cmd, jobs, args.requires)
             elif args.operation_name:
-                operations = []
-                for name in args.operation_name:
-                    try:
-                        operations.append(self._groups[name])
-                    except KeyError:
-                        try:
-                            op = self._operations[name]
-                            path = self._get_operation_path(name)
-                            operations.append(
-                                FlowGroup(name=name,
-                                          group_path=path,
-                                          operations={name: op},
-                                          directives=op.directives)
-                            )
-                        except KeyError:
-                            raise ValueError("Operation/Group {} is not defined".
-                                             format(name))
-                    if not self._verify_group_compatibility(operations):
-                        raise ValueError("Cannot specify groups or operations that "
-                                         "will be listed twice when using the"
-                                         " -o/--operation option.")
+                operations = self._gather_FlowGroups(args.operation_name)
                 operations = self._get_pending_groups(jobs,
                                                       operations,
                                                       mode)
@@ -3098,27 +3085,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         mode = 'exec' if args.exec_mode else 'run'
         # Choose the group(s) or operations path
         if args.operation_name:
-            operations = []
-            for name in args.operation_name:
-                try:
-                    operations.append(self._groups[name])
-                except KeyError:
-                    try:
-                        op = self._operations[name]
-                        path = self._get_operation_path(name)
-                        operations.append(
-                            FlowGroup(name=name,
-                                      group_path=path,
-                                      operations={name: op},
-                                      directives=op.directives)
-                        )
-                    except KeyError:
-                        raise ValueError("Operation/Group {} is not defined".
-                                         format(name))
-                if not self._verify_group_compatibility(operations):
-                    raise ValueError("Cannot specify groups or operations that "
-                                     "will be listed twice when using the"
-                                     " -o/--operation or option.")
+            operations = self._gather_FlowGroups(args.operation_name)
             operations = self._get_pending_groups(jobs,
                                                   operations,
                                                   mode)

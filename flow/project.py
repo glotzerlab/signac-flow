@@ -26,10 +26,12 @@ import json
 import inspect
 import functools
 import contextlib
+import random
 from collections import defaultdict
 from collections import OrderedDict
 from itertools import islice
 from itertools import count
+from itertools import groupby
 from hashlib import sha1
 from multiprocessing import Pool
 from multiprocessing import cpu_count
@@ -56,6 +58,7 @@ from .errors import TemplateError
 from .util.tqdm import tqdm
 from .util.misc import _positive_int
 from .util.misc import _mkdir_p
+from .util.misc import roundrobin
 from .util import template_filters as tf
 from .util.misc import add_cwd_to_environment_pythonpath
 from .util.misc import switch_to_directory
@@ -1449,7 +1452,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             fork(cmd=operation.cmd, timeout=timeout)
 
     def run(self, jobs=None, names=None, pretend=False, np=None, timeout=None, num=None,
-            num_passes=1, progress=False):
+            num_passes=1, progress=False, order=None):
         """Execute all pending operations for the given selection.
 
         This function will run in an infinite loop until all pending operations
@@ -1501,6 +1504,27 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             Show a progress bar during execution.
         :type progess:
             bool
+        :param order:
+            Specify the order of operations, possible values are:
+                * 'none' or None (no specific order)
+                * 'by-job' (operations are grouped by job)
+                * 'cyclic' (order operations cyclic by job)
+                * 'random' (shuffle the execution order randomly)
+                * callable (a callable returning a comparison key for an
+                            operation used to sort operations)
+
+            The default value is `none`, which is equivalent to `by-job` in the current
+            implementation.
+
+            .. note::
+
+                Users are advised to not rely on a specific execution order, as a
+                substitute for defining the workflow in terms of pre- and post-conditions.
+                However, a specific execution order may be more performant in cases where
+                operations need to access and potentially lock shared resources.
+
+        :type order:
+            str, callable, or NoneType
         """
         # If no jobs argument is provided, we run operations for all jobs.
         if jobs is None:
@@ -1576,6 +1600,23 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                     del messages[:]     # clear
             if not operations:
                 break   # No more pending operations or execution limits reached.
+
+            # Optionally re-order operations for execution if order argument is provided:
+            if callable(order):
+                operations = list(sorted(operations, key=order))
+            elif order == 'cyclic':
+                groups = [list(group)
+                          for _, group in groupby(operations, key=lambda op: op.job)]
+                operations = list(roundrobin(*groups))
+            elif order == 'random':
+                random.shuffle(operations)
+            elif order is None or order in ('none', 'by-job'):
+                pass  # by-job is the default order
+            else:
+                raise ValueError(
+                    "Invalid value for the 'order' argument, valid arguments are "
+                    "'none', 'by-job', 'cyclic', 'random', None, or a callable.")
+
             logger.info(
                 "Executing {} operation(s) (Pass # {:02d})...".format(len(operations), i_pass))
             self.run_operations(operations, pretend=pretend,
@@ -2376,7 +2417,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         run = functools.partial(self.run,
                                 jobs=jobs, names=args.operation_name, pretend=args.pretend,
                                 np=args.parallel, timeout=args.timeout, num=args.num,
-                                num_passes=args.num_passes, progress=args.progress)
+                                num_passes=args.num_passes, progress=args.progress,
+                                order=args.order)
 
         if args.switch_to_project_root:
             with add_cwd_to_environment_pythonpath():
@@ -2585,7 +2627,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             nargs='?',
             const='-1',
             help="Specify the number of cores to parallelize to. Defaults to all available "
-                 "processing units if argument is ommitted.")
+                 "processing units if argument is omitted.")
+        execution_group.add_argument(
+            '--order',
+            type=str,
+            choices=['none', 'by-job', 'cyclic', 'random'],
+            default=None,
+            help="Specify the execution order of operations for each execution pass.")
         parser_run.set_defaults(func=self._main_run)
 
         parser_script = subparsers.add_parser(

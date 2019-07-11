@@ -1499,7 +1499,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 * 'by-job' (operations are grouped by job)
                 * 'cyclic' (order operations cyclic by job)
                 * 'random' (shuffle the execution order randomly)
-                * callable (a callable returning a a comparison key for an
+                * callable (a callable returning a comparison key for an
                             operation used to sort operations)
 
             The default value is `none`, which is equivalent to `by-job` in the current

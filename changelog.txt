@@ -12,6 +12,11 @@ next
 - Fix issue that caused the "Fetching operation status" progressbar to be inaccurate (#108).
 - Rewrite print status function using Jinja2 templates.
 
+Changed
++++++++
+
+- Packaged environments are now available by default and can be disabled by setting the config value IMPORT_ENVIRONMENTS.
+
 Version 0.7
 ===========
 

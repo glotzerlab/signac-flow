@@ -244,13 +244,17 @@ class JobOperation(object):
         keys_set_by_user = set(directives.keys())
 
         nranks = directives.get('nranks', 1)
-        omp_num_threads = directives.get('omp_num_threads', 1)
+        nthreads = directives.get('omp_num_threads', 1)
 
-        if callable(nranks) or callable(omp_num_threads):
-            np_callable = lambda job: (nranks(job) if callable(nranks) else nranks) * (
-                    omp_num_threads(job) if callable(omp_num_threads) else omp_num_threads)
+        if callable(nranks) or callable(nthreads):
+            def np_callable(job):
+                nr = nranks(job) if callable(nranks) else nranks
+                nt = nthreads(job) if callable(nthreads) else nthreads
+                return nr*nt
+
+            directives.setdefault('np', np_callable)
         else:
-            directives.setdefault('np', nranks*omp_num_threads )
+            directives.setdefault('np', nranks*nthreads)
 
         directives.setdefault('ngpu', 0)
         directives.setdefault('nranks', 0)

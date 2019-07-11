@@ -563,7 +563,7 @@ class FlowGroup(object):
         # The full name is designed to be truly unique for each job-group.
         full_name = '{}%{}%{}%{}'.format(project.root_directory(),
                                          job.get_id(),
-                                         ' '.join(list(self.operations.keys())),
+                                         ''.join(sorted(list(self.operations.keys()))),
                                          index)
 
         # The job_op_id is a hash computed from the unique full name.
@@ -1772,8 +1772,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                                                  operations={name: op},
                                                  directives=op.directives)
                 except KeyError:
-                    raise ValueError("Operation/Group {} is not defined".
-                                     format(name))
+                    # remove error for now until desided
+                    # raise ValueError("Operation/Group {} is not defined".
+                    #                  format(name))
+                    pass
         operations = list(operations.values())
         if not self._verify_group_compatibility(operations):
             raise ValueError("Cannot specify groups or operations that "

@@ -411,6 +411,45 @@ class ProjectClassTest(BaseProjectTest):
             self.assertIn('mpirun -np 3 python', next_op.cmd)
             break
 
+    def test_callable_directives(self):
+
+        class A(FlowProject):
+            pass
+
+        @A.operation
+        @directives(nranks=lambda job: job.doc.get('nranks', 1))
+        @directives(omp_num_threads=lambda job:job.doc.get('omp_num_threads', 1))
+        def a(job):
+            return 'hello!'
+
+        project = A(self.mock_project().config)
+
+        # test setting neither nranks nor omp_num_threads
+        for job in project:
+            next_op = project.next_operation(job)
+            self.assertEqual(next_op.directives['np'], 1)
+
+        # test only setting nranks
+        for i, job in enumerate(project):
+            job.doc.nranks = i+1
+            next_op = project.next_operation(job)
+            self.assertEqual(next_op.directives['np'], next_op.directives['nranks'])
+            del job.doc.nranks
+
+        # test only setting omp_num_threads
+        for i, job in enumerate(project):
+            job.doc.omp_num_threads = i+1
+            next_op = project.next_operation(job)
+            self.assertEqual(next_op.directives['np'], next_op.directives['omp_num_threads'])
+            del job.doc.omp_num_threads
+
+        # test setting both nranks and omp_num_threads
+        for i, job in enumerate(project):
+            job.doc.omp_num_threads = i+1
+            job.doc.nranks = i % 3 + 1
+            next_op = project.next_operation(job)
+            expected_np = (i + 1) * (i % 3 + 1)
+            self.assertEqual(next_op.directives['np'], expected_np)
 
 class ProjectTest(BaseProjectTest):
     project_class = TestProject

@@ -29,7 +29,6 @@ from .operations import with_job
 # configuration variable to avoid environment being imported. This may be done
 # on either a global or a local configuration level. The order of precedence is
 # local up to global.
-from signac.common import config as _config
 from signac import get_project as _get_project
 
 # Work up in the correct order

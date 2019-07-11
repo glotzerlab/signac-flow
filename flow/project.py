@@ -241,8 +241,19 @@ class JobOperation(object):
         # script engine later.
         keys_set_by_user = set(directives.keys())
 
-        directives.setdefault(
-            'np', directives.get('nranks', 1) * directives.get('omp_num_threads', 1))
+        nranks = directives.get('nranks', 1)
+        nthreads = directives.get('omp_num_threads', 1)
+
+        if callable(nranks) or callable(nthreads):
+            def np_callable(job):
+                nr = nranks(job) if callable(nranks) else nranks
+                nt = nthreads(job) if callable(nthreads) else nthreads
+                return nr*nt
+
+            directives.setdefault('np', np_callable)
+        else:
+            directives.setdefault('np', nranks*nthreads)
+
         directives.setdefault('ngpu', 0)
         directives.setdefault('nranks', 0)
         directives.setdefault('omp_num_threads', 0)

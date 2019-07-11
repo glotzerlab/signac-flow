@@ -29,11 +29,11 @@ from .operations import with_job
 # configuration variable to avoid environment being imported. This may be done
 # on either a global or a local configuration level. The order of precedence is
 # local up to global.
-from signac import get_project as _get_project
+from .util.config import get_config_value
 
 # Work up in the correct order
 try:
-    flag = _get_project().config['flow'].get('IMPORT_ENVIRONMENTS')
+    flag = get_config_value('IMPORT_ENVIRONMENTS')
 except LookupError:
     flag = None
 

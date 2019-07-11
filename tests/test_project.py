@@ -418,7 +418,7 @@ class ProjectClassTest(BaseProjectTest):
 
         @A.operation
         @directives(nranks=lambda job: job.doc.get('nranks', 1))
-        @directives(omp_num_threads=lambda job:job.doc.get('omp_num_threads', 1))
+        @directives(omp_num_threads=lambda job: job.doc.get('omp_num_threads', 1))
         def a(job):
             return 'hello!'
 
@@ -450,6 +450,7 @@ class ProjectClassTest(BaseProjectTest):
             next_op = project.next_operation(job)
             expected_np = (i + 1) * (i % 3 + 1)
             self.assertEqual(next_op.directives['np'], expected_np)
+
 
 class ProjectTest(BaseProjectTest):
     project_class = TestProject

@@ -2552,6 +2552,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         # Create decorator that adds a _flow_group label to operations.
         def add_to_group(func):
             if hasattr(func, '_flow_group'):
+                if add_to_group.group_name in func._flow_group:
+                    raise ValueError("Can't specify the same operation "
+                                     "for a group twice.")
                 func._flow_group.append(add_to_group.group_name)
             else:
                 func._flow_group = [add_to_group.group_name]

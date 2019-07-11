@@ -25,6 +25,20 @@ from .template import init
 from .util.misc import redirect_log
 from .operations import with_job
 
+# Enable flow environments on an opt-out basis. Users must set the relevant
+# configuration variable to avoid environment being imported. This may be done
+# on either a global or a local configuration level. The order of precedence is
+# local up to global.
+from signac.common import config as _config
+from signac import get_project as _get_project
+
+# Work up in the correct order
+flag = _get_project().config['flow'].get('IMPORT_ENVIRONMENTS')
+
+if flag is None or flag == "True":
+    from . import environments  # noqa:F401
+
+
 __version__ = '0.7.1'
 
 __all__ = [

@@ -434,14 +434,14 @@ class ProjectClassTest(BaseProjectTest):
             job.doc.nranks = i+1
             next_op = project.next_operation(job)
             self.assertEqual(next_op.directives['np'], next_op.directives['nranks'])
-            del job.doc.nranks
+            del job.doc['nranks']
 
         # test only setting omp_num_threads
         for i, job in enumerate(project):
             job.doc.omp_num_threads = i+1
             next_op = project.next_operation(job)
             self.assertEqual(next_op.directives['np'], next_op.directives['omp_num_threads'])
-            del job.doc.omp_num_threads
+            del job.doc['omp_num_threads']
 
         # test setting both nranks and omp_num_threads
         for i, job in enumerate(project):

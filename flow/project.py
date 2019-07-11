@@ -245,19 +245,12 @@ class JobOperation(object):
 
         nranks = directives.get('nranks', 1)
         omp_num_threads = directives.get('omp_num_threads', 1)
-        if callable(nranks):
-            if callable(omp_num_threads):
-                directives.setdefault(
-                    'np', lambda job: nranks(job)*omp_num_threads(job) )
-            else:
-                directives.setdefault(
-                    'np', lambda job: nranks(job)*omp_num_threads )
-        elif callable(omp_num_threads):
-            directives.setdefault(
-                'np', lambda job: nranks*omp_num_threads(job) )
+
+        if callable(nranks) or callable(omp_num_threads):
+            np_callable = lambda job: (nranks(job) if callable(nranks) else nranks) * (
+                    omp_num_threads(job) if callable(omp_num_threads) else omp_num_threads)
         else:
-            directives.setdefault(
-                'np', lambda job: nranks*omp_num_threads )
+            directives.setdefault('np', nranks*omp_num_threads )
 
         directives.setdefault('ngpu', 0)
         directives.setdefault('nranks', 0)

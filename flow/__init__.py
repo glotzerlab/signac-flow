@@ -32,7 +32,10 @@ from .operations import with_job
 from signac import get_project as _get_project
 
 # Work up in the correct order
-flag = _get_project().config['flow'].get('IMPORT_ENVIRONMENTS')
+try:
+    flag = _get_project().config['flow'].get('IMPORT_ENVIRONMENTS')
+except LookupError:
+    flag = None
 
 if flag is None or flag == "True":
     from . import environments  # noqa:F401

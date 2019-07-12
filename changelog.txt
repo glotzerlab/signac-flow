@@ -11,6 +11,12 @@ next
 - Show submission error messages in combination with a TORQUE scheduler (#103, #104).
 - Fix issue that caused the "Fetching operation status" progressbar to be inaccurate (#108).
 - Rewrite print status function using Jinja2 templates.
+- Add option to specify the operation execution order (#121).
+
+Fixes
++++++
+
+- Both the ``nranks`` and ``omp_num_threads`` directives properly support callables.
 
 Version 0.7
 ===========

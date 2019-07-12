@@ -1217,11 +1217,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
             # Unrestricted
             total_impact = 0
-            total_num_hits = sum([hit[2] for fn, ft in prof.merged_file_dict.items()
-                                  if fn not in fn_filter for hit in ft.iterHits()])
             hits = [hit for fn, ft in prof.merged_file_dict.items()
                     if fn not in fn_filter for hit in ft.iterHits()]
             sorted_hits = reversed(sorted(hits, key=lambda hit: hit[2]))
+            total_num_hits = sum([hit[2] for hit in hits])
 
             profiling_results = [
                 '# Profiling:\n',

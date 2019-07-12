@@ -12,6 +12,12 @@ next
 - Fix issue that caused the "Fetching operation status" progressbar to be inaccurate (#108).
 - Rewrite print status function using Jinja2 templates.
 - Allow the provision of multiple operation-functions to the ``pre.after`` and ``*.copy_from`` conditions (#120).
+- Add option to specify the operation execution order (#121).
+
+Fixes
++++++
+
+- Both the ``nranks`` and ``omp_num_threads`` directives properly support callables.
 
 Version 0.7
 ===========

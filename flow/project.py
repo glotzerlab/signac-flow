@@ -2052,17 +2052,22 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for name in names:
             if name in operations.keys():
                 continue
-            try:
-                operations[name] = self._groups[name]
-            except KeyError:
-                try:
-                    op = self._operations[name]
-                    path = self._get_operation_path(name)
-                    operations[name] = FlowGroup(name=name,
-                                                 group_path=path,
-                                                 operations={name: op},
-                                                 directives=op.directives)
-                except KeyError:
+            groups = [group for gname, group in self.groups.items() if
+                      fullmatch(name, gname)]
+            if groups != list():
+                for group in groups:
+                    operations[group.name] = group
+            else:
+                ops = [(op, oname) for oname, op in self.operations.items() if
+                       fullmatch(name, oname)]
+                if ops != list():
+                    for op, oname in ops:
+                        path = self._get_operation_path(oname)
+                        operations[oname] = FlowGroup(name=oname,
+                                                      group_path=path,
+                                                      operations={oname: op},
+                                                      directives=op.directives)
+                else:
                     # remove error for now until desided
                     # raise ValueError("Operation/Group {} is not defined".
                     #                  format(name))

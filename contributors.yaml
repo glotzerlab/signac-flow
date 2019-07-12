@@ -82,4 +82,9 @@ contributors:
     given-names: Gilmer
     affiliation: "Vanderbilt University"
     orcid: "https://orcid.org/0000-0002-6915-5591"
+  -
+    family-names: Travitz
+    given-names: Alyssa
+    affiliation: "University of Michigan"
+    orcid: "https://orcid.org/0000-0001-5953-8807"
 ...

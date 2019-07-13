@@ -452,6 +452,62 @@ class ProjectClassTest(BaseProjectTest):
             expected_np = (i + 1) * (i % 3 + 1)
             self.assertEqual(next_op.directives['np'], expected_np)
 
+    def test_copy_conditions(self):
+
+        class A(FlowProject):
+            pass
+
+        @A.operation
+        @A.post(lambda job: 'a' in job.doc)
+        def op1(job):
+            job.doc.a = True
+
+        @A.operation
+        @A.post.true('b')
+        def op2(job):
+            job.doc.b = True
+
+        @A.operation
+        @A.pre.after(op1, op2)
+        @A.post.true('c')
+        def op3(job):
+            job.doc.c = True
+
+        @A.operation
+        @A.pre.copy_from(op1)  # should be empty
+        @A.pre.copy_from(op3)
+        @A.post.true('d')
+        def op4(job):
+            job.doc.d = True
+
+        self.project_class = A
+        project = self.mock_project()
+        op3_ = project.operations['op3']
+        op4_ = project.operations['op4']
+        for job in project:
+            self.assertFalse(op3_.eligible(job))
+            self.assertFalse(op4_.eligible(job))
+
+        project.run(names=['op1'])
+        for job in project:
+            self.assertTrue(job.doc.a)
+            self.assertNotIn('b', job.doc)
+            self.assertNotIn('c', job.doc)
+            self.assertNotIn('d', job.doc)
+            self.assertFalse(op3_.eligible(job))
+            self.assertFalse(op4_.eligible(job))
+
+        project.run(names=['op2'])
+        for job in project:
+            self.assertTrue(op3_.eligible(job))
+            self.assertTrue(op4_.eligible(job))
+
+        project.run()
+        for job in project:
+            self.assertTrue(job.doc.a)
+            self.assertTrue(job.doc.b)
+            self.assertTrue(job.doc.c)
+
 
 class ProjectTest(BaseProjectTest):
     project_class = TestProject

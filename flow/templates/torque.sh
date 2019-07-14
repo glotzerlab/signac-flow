@@ -8,7 +8,7 @@
 #PBS -V
 {% endif %}
 {% if memory %}
-#PBS -l pmem={{ memory }}g
+#PBS -l pmem={{ memory }}
 {% endif %}
 {% block tasks %}
 {% set threshold = 0 if force else 0.9 %}

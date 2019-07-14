@@ -474,8 +474,7 @@ class ProjectClassTest(BaseProjectTest):
             job.doc.c = True
 
         @A.operation
-        @A.pre.copy_from(op1)  # should be empty
-        @A.pre.copy_from(op3)
+        @A.pre.copy_from(op1, op3)
         @A.post.true('d')
         def op4(job):
             job.doc.d = True

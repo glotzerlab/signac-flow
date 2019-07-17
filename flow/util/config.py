@@ -8,6 +8,13 @@ from signac.common import config
 from ..errors import ConfigKeyError
 
 
+# Monkeypatch the signac config spec to include flow-specific fields.
+config.cfg += """
+[flow]
+auto_import_environments = boolean()
+"""
+
+
 class _GetConfigValueNoneType(object):
     pass
 

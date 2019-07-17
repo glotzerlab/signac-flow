@@ -31,13 +31,9 @@ from .operations import with_job
 # local up to global.
 from .util.config import get_config_value
 
-# Work up in the correct order
-try:
-    flag = get_config_value('IMPORT_ENVIRONMENTS')
-except LookupError:
-    flag = None
 
-if flag is None or flag == "True":
+auto_import_environments = get_config_value('auto_import_environments', default=True)
+if auto_import_environments:
     from . import environments  # noqa:F401
 
 

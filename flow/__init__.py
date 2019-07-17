@@ -25,15 +25,9 @@ from .template import init
 from .util.misc import redirect_log
 from .operations import with_job
 
-# Enable flow environments on an opt-out basis. Users must set the relevant
-# configuration variable to avoid environment being imported. This may be done
-# on either a global or a local configuration level. The order of precedence is
-# local up to global.
+# Import packaged environments unless disabled in config:
 from .util.config import get_config_value
-
-
-auto_import_environments = get_config_value('auto_import_environments', default=True)
-if auto_import_environments:
+if get_config_value('import_packaged_environments', default=True):
     from . import environments  # noqa:F401
 
 

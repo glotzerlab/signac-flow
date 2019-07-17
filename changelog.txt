@@ -15,7 +15,7 @@ next
 Changed
 +++++++
 
-- Packaged environments are now available by default and can be disabled by setting the config value IMPORT_ENVIRONMENTS.
+- Packaged environments are now available by default. Set "import_packaged_environments = off" within the signac configuration "[flow]" section to revert to previous behavior.
 
 Version 0.7
 ===========

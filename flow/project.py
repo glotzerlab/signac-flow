@@ -1447,8 +1447,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         logger.info("Execute operation '{}'...".format(operation))
 
         # Execute without forking if possible...
-        if timeout is None and operation.name in self._operation_functions and \
-                operation.directives.get('executable', sys.executable) == sys.executable:
+        if not operation.directives.get('fork') \
+            and timeout is None \
+            and operation.name in self._operation_functions \
+            and operation.directives.get('executable', sys.executable) == sys.executable:
             logger.debug("Able to optimize execution of operation '{}'.".format(operation))
             self._operation_functions[operation.name](operation.job)
         else:   # need to fork

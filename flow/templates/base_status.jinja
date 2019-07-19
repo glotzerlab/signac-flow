@@ -45,17 +45,9 @@
 {% endif %}
 {% for key, value in job['operations'].items() if value | job_filter(scheduler_status_code, all_ops) %}
 {% if loop.first %}
-{% if scheduler_status_code[value['scheduler_status']] == "X" %}
-{{ field_job_id | format(job['job_id']) }}{{ " " * (column_width_operation+4+2) }}{{para_output}}{{ '%s' | format(job['labels'] | join(', ')) }}
-{% else %}
 {{ field_job_id | format(job['job_id']) }}{{ field_operation | highlight(value['eligible']) | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }}{{para_output}}{{ '%s' | format(job['labels'] | join(', ')) }}
-{% endif %}
-{% else %}
-{% if scheduler_status_code[value['scheduler_status']] == "X" %}
-{{ field_job_id | format('')}}{{ " " * (column_width_operation+4+2) }}{{para_output}}{{ '%s' | format(job['labels'] | join(', ')) }}
 {% else %}
 {{ field_job_id | format('')}}{{ field_operation | highlight(value['eligible']) | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }}{{para_output}}{{ '%s' | format(job['labels'] | join(', ')) }}
-{% endif %}
 {% endif %}
 {% endfor %}
 {% endfor %}

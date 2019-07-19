@@ -2773,7 +2773,7 @@ _FMT_SCHEDULER_STATUS = {
     JobStatus.queued: 'Q',
     JobStatus.active: 'A',
     JobStatus.error: 'E',
-    JobStatus.dummy: 'X',
+    JobStatus.dummy: ' ',
 }
 
 

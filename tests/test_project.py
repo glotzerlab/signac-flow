@@ -30,6 +30,8 @@ from flow import init
 
 from define_test_project import TestProject
 from define_test_project import TestDynamicProject
+from define_group_test_project import TestProject as GTestProject
+from define_group_test_project import TestDynamicProject as GTestDynamicProject
 
 if six.PY2:
     from tempdir import TemporaryDirectory
@@ -175,6 +177,7 @@ class BaseProjectTest(unittest.TestCase):
         return project
 
 
+# Tests for single operation groups
 @unittest.skipIf(six.PY2, 'Only check performance on Python 3')
 class ProjectStatusPerformanceTest(BaseProjectTest):
 
@@ -985,8 +988,8 @@ class ProjectMainInterfaceTest(BaseProjectTest):
         even_jobs = [job for job in self.project if job.sp.b % 2 == 0]
         for job in self.project:
             script_output = self.call_subcmd(
-                    'script -j {} --exec'.format(job)
-                    ).decode().splitlines()
+                'script -j {} --exec'.format(job)
+            ).decode().splitlines()
             self.assertIn(job.get_id(), '\n'.join(script_output))
             if job in even_jobs:
                 self.assertIn('echo "hello"', '\n'.join(script_output))
@@ -995,6 +998,218 @@ class ProjectMainInterfaceTest(BaseProjectTest):
 
 
 class DynamicProjectMainInterfaceTest(ProjectMainInterfaceTest):
+    project_class = TestDynamicProject
+
+
+# Tests for multiple operation groups or groups with options
+class GroupProjectTest(BaseProjectTest):
+    project_class = GTestProject
+
+    def test_instance(self):
+        self.assertTrue(isinstance(self.project, FlowProject))
+
+    def test_script(self):
+        project = self.mock_project()
+        # For run mode single operation groups
+        for job in project:
+            script = project.script(project.next_operations(job))
+            if job.sp.b % 2 == 0:
+                self.assertIn(str(job), script)
+                self.assertIn('run -j {} -o op1'.format(job), script)
+                self.assertIn('run -j {} -o op2'.format(job), script)
+            else:
+                self.assertIn(str(job), script)
+                self.assertNotIn('run -j {} -o op1'.format(job), script)
+                self.assertIn('run -j {} -o op2'.format(job), script)
+
+        # For multiple operation groups and options
+        for job in project:
+            job_op1 = project.groups['group1'].create_job_operation(job)
+            script1 = project.script([job_op1])
+            self.assertIn('run -j {} -o op1 op2'.format(job), script1)
+            job_op2 = project.groups['group2'].create_job_operation(job)
+            script2 = project.script([job_op2])
+            self.assertIn('--num-passes=2'.format(job), script2)
+
+
+class GroupExecutionProjectTest(BaseProjectTest):
+    project_class = GTestProject
+    expected_number_of_steps = 4
+
+    def test_run_with_operation_selection(self):
+        project = self.mock_project()
+        even_jobs = [job for job in project if job.sp.b % 2 == 0]
+        with add_cwd_to_environment_pythonpath():
+            with switch_to_directory(project.root_directory()):
+                with self.assertRaises(ValueError):
+                    # The names argument must be a sequence of strings, not a string.
+                    project.run(names='op1')
+                project.run(names=['nonexistent-op'])
+                self.assertFalse(any(job.isfile('world.txt') for job in even_jobs))
+                self.assertFalse(any(job.doc.get('test') for job in project))
+                project.run(names=['group1'])
+                self.assertTrue(all(job.isfile('world.txt') for job in even_jobs))
+                self.assertTrue(all(job.doc.get('test') for job in project))
+                project.run(names=['group2'])
+                self.assertTrue(all(job.isfile('world.txt') for job in even_jobs))
+                self.assertTrue(all(job.doc.get('test3') for job in project))
+                self.assertTrue(all('dynamic' not in job.doc for job in project))
+
+    def test_run_parallel(self):
+        project = self.mock_project()
+        output = StringIO()
+        with add_cwd_to_environment_pythonpath():
+            with switch_to_directory(project.root_directory()):
+                with redirect_stderr(output):
+                    project.run(names=['group1'], np=2)
+        output.seek(0)
+        output.read()
+        even_jobs = [job for job in project if job.sp.b % 2 == 0]
+        for job in project:
+            if job in even_jobs:
+                self.assertTrue(job.isfile('world.txt'))
+            else:
+                self.assertFalse(job.isfile('world.txt'))
+
+    def test_submit_operations(self):
+        MockScheduler.reset()
+        project = self.mock_project()
+        operations = [project.groups['group1'].create_job_operation(job)
+                      for job in project]
+        self.assertEqual(len(list(MockScheduler.jobs())), 0)
+        cluster_job_id = project._store_bundled(operations)
+        with redirect_stderr(StringIO()):
+            project.submit_operations(_id=cluster_job_id, operations=operations)
+        self.assertEqual(len(list(MockScheduler.jobs())), 1)
+
+    def test_submit(self):
+        MockScheduler.reset()
+        project = self.mock_project()
+        self.assertEqual(len(list(MockScheduler.jobs())), 0)
+        with redirect_stderr(StringIO()):
+            project.submit(names=['group1', 'group2'])
+        num_jobs_submitted = 2 * len(project)
+        self.assertEqual(len(list(MockScheduler.jobs())), num_jobs_submitted)
+        MockScheduler.reset()
+
+    def test_group_resubmit(self):
+        MockScheduler.reset()
+        project = self.mock_project()
+        num_jobs_submitted = len(project)
+        self.assertEqual(len(list(MockScheduler.jobs())), 0)
+        with redirect_stderr(StringIO()):
+            # Initial submission
+            project.submit(names=['group1'])
+            self.assertEqual(len(list(MockScheduler.jobs())), num_jobs_submitted)
+
+            # Resubmit a bunch of times:
+            for i in range(1, self.expected_number_of_steps + 3):
+                MockScheduler.step()
+                project.submit(names=['group1'])
+                if len(list(MockScheduler.jobs())) == 0:
+                    break    # break when there are no jobs left
+
+        # Check that the actually required number of steps is equal to the expected number:
+        self.assertEqual(i, self.expected_number_of_steps)
+
+    def test_operation_resubmit(self):
+        MockScheduler.reset()
+        project = self.mock_project()
+        num_jobs_submitted = len(project)
+        self.assertEqual(len(list(MockScheduler.jobs())), 0)
+        with redirect_stderr(StringIO()):
+            # Initial submission
+            project.submit(names=['group1'])
+            self.assertEqual(len(list(MockScheduler.jobs())), num_jobs_submitted)
+
+            # Resubmit a bunch of times:
+            for i in range(1, self.expected_number_of_steps + 3):
+                MockScheduler.step()
+                project.submit(names=['op1', 'op2'])
+                if len(list(MockScheduler.jobs())) == 0:
+                    break    # break when there are no jobs left
+
+        # Check that the actually required number of steps is equal to the expected number:
+        self.assertEqual(i, self.expected_number_of_steps)
+
+
+class GroupBufferedExecutionProjectTest(GroupExecutionProjectTest):
+
+    def mock_project(self):
+        project = super(GroupBufferedExecutionProjectTest, self).mock_project()
+        project._use_buffered_mode = True
+        return project
+
+
+class GroupExecutionDynamicProjectTest(GroupExecutionProjectTest):
+    project_class = GTestDynamicProject
+    expected_number_of_steps = 10
+
+
+class GroupBufferedExecutionDynamicProjectTest(GroupBufferedExecutionProjectTest,
+                                               GroupExecutionDynamicProjectTest):
+    pass
+
+
+class GroupProjectMainInterfaceTest(BaseProjectTest):
+    project_class = GTestProject
+
+    def switch_to_cwd(self):
+        os.chdir(self.cwd)
+
+    def setUp(self):
+        super(GroupProjectMainInterfaceTest, self).setUp()
+        self.project = self.mock_project()
+        self.cwd = os.getcwd()
+        self.addCleanup(self.switch_to_cwd)
+        os.chdir(self._tmp_dir.name)
+
+    def call_subcmd(self, subcmd):
+        # Determine path to project module and construct command.
+        fn_script = inspect.getsourcefile(type(self.project))
+        _cmd = 'python {} {}'.format(fn_script, subcmd)
+
+        try:
+            with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
+                with switch_to_directory(self.project.root_directory()):
+                    if six.PY2:
+                        with open(os.devnull, 'w') as devnull:
+                            return subprocess.check_output(_cmd.split(), stderr=devnull)
+                    else:
+                        return subprocess.check_output(_cmd.split(), stderr=subprocess.DEVNULL)
+        except subprocess.CalledProcessError as error:
+            print(error, file=sys.stderr)
+            print(error.output, file=sys.stderr)
+            raise
+
+    def test_main_run(self):
+        self.assertTrue(len(self.project))
+        for job in self.project:
+            self.assertFalse(job.isfile('world.txt'))
+        self.call_subcmd('run -o group1')
+        even_jobs = [job for job in self.project if job.sp.b % 2 == 0]
+        for job in self.project:
+            self.assertTrue(job.doc['test'])
+            if job in even_jobs:
+                self.assertTrue(job.isfile('world.txt'))
+            else:
+                self.assertFalse(job.isfile('world.txt'))
+
+    def test_main_script(self):
+        self.assertTrue(len(self.project))
+        for job in self.project:
+            script_output = self.call_subcmd(
+                'script -j {} -o group1'.format(job)
+            ).decode().splitlines()
+            self.assertIn(job.get_id(), '\n'.join(script_output))
+            self.assertIn('-o op1 op2', '\n'.join(script_output))
+            script_output = self.call_subcmd(
+                'script -j {} -o group2'.format(job)
+            ).decode().splitlines()
+            self.assertIn('--num-passes=2', '\n'.join(script_output))
+
+
+class GroupDynamicProjectMainInterfaceTest(ProjectMainInterfaceTest):
     project_class = TestDynamicProject
 
 

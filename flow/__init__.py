@@ -12,6 +12,7 @@ from __future__ import absolute_import
 from . import environment
 from . import scheduling
 from . import errors
+from . import testing
 from .project import FlowProject
 from .project import JobOperation
 from .project import label
@@ -42,5 +43,6 @@ __all__ = [
     'init',
     'redirect_log',
     'get_environment',
-    'with_job'
+    'with_job',
+    'testing'
     ]

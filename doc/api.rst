@@ -45,8 +45,9 @@ The FlowProject
     FlowProject.next_operations
     FlowProject.operation
     FlowProject.operations
-    FlowProject.post
     FlowProject.pre
+    FlowProject.pre.after
+    FlowProject.post
     FlowProject.run
     FlowProject.run_operations
     FlowProject.scheduler_jobs
@@ -59,7 +60,11 @@ The FlowProject
 .. autoclass:: FlowProject
     :show-inheritance:
     :members:
-    :undoc-members: pre,post
+    :exclude-members: pre,post
+
+.. autoattribute:: FlowProject.pre
+
+.. autoattribute:: FlowProject.post
 
 
 @flow.cmd

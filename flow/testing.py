@@ -5,6 +5,7 @@
 
 """
 import signac
+from signac.testing import init_jobs
 from .template import init
 
 
@@ -18,16 +19,3 @@ def make_project(alias='project', root=None, **kwargs):
     init(alias=alias, root=root, template='testing')
     project = signac.init_project(name=alias, root=root)
     init_jobs(project, **kwargs)
-
-
-def init_jobs(project, nested=False, listed=False, heterogeneous=False):
-    """Initialize a dataspace for testing purposes
-
-    """
-    vals = [1, 1.0, '1', True, None]
-    if nested:
-        vals += [{'b': v, 'c': 0} if heterogeneous else {'b': v} for v in vals]
-    if listed:
-        vals += [[v, 0] if heterogeneous else [v] for v in vals]
-    for v in vals:
-        project.open_job(dict(a=v)).init()

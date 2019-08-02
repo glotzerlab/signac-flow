@@ -19,3 +19,4 @@ def make_project(alias='project', root=None, **kwargs):
     init(alias=alias, root=root, template='testing')
     project = signac.init_project(name=alias, root=root)
     init_jobs(project, **kwargs)
+    return project

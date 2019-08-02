@@ -1071,7 +1071,7 @@ class GroupExecutionProjectTest(BaseProjectTest):
             else:
                 self.assertFalse(job.isfile('world.txt'))
 
-    def test_submit_operations(self):
+    def test_submit_groups(self):
         MockScheduler.reset()
         project = self.mock_project()
         operations = [project.groups['group1'].create_job_operation(job)
@@ -1143,7 +1143,7 @@ class GroupBufferedExecutionProjectTest(GroupExecutionProjectTest):
 
 class GroupExecutionDynamicProjectTest(GroupExecutionProjectTest):
     project_class = GTestDynamicProject
-    expected_number_of_steps = 10
+    expected_number_of_steps = 4
 
 
 class GroupBufferedExecutionDynamicProjectTest(GroupBufferedExecutionProjectTest,
@@ -1207,6 +1207,21 @@ class GroupProjectMainInterfaceTest(BaseProjectTest):
                 'script -j {} -o group2'.format(job)
             ).decode().splitlines()
             self.assertIn('--num-passes=2', '\n'.join(script_output))
+
+    def test_main_submit(self):
+        self.assertTrue(len(self.project))
+        # Assert that correct output for group submission is given
+        for job in self.project:
+            submit_output = self.call_subcmd(
+                'submit -j {} -o group1 --pretend'.format(job.get_id())
+            ).decode().splitlines()
+            self.assertIn('run -j {} -o op1 op2'.format(job.get_id()),
+                          '\n'.join(submit_output))
+            submit_output = self.call_subcmd(
+                'submit -j {} -o group2 --pretend'.format(job.get_id())
+            ).decode().splitlines()
+            self.assertIn('run -j {} -o op3 --num-passes=2'.format(job.get_id()),
+                          '\n'.join(submit_output))
 
 
 class GroupDynamicProjectMainInterfaceTest(ProjectMainInterfaceTest):

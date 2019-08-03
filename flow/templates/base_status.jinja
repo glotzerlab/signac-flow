@@ -1,14 +1,17 @@
 {# The following variables are available to all scripts. #}
-{% if overview %}
-{% set field_progress_bar = ("%%-%ss  %%-%ss " | format(column_width_label, column_width_bar)) %}
-{% endif %}
-{% if detailed %}
+{% if overview or detailed %}
 {% set column_width_operation = [column_width_operation, 5] | max %}
-{% set field_job_id = ("%%-%ss  " | format(column_width_id)) %}
 {% set field_operation = ("%%-%ss %%3s  " | format(column_width_operation)) %}
 {% set field_operation_title = ("%%-%ss  " | format(column_width_operation+4)) %}
-{% set field_label = ("%%-%ss" | format(column_width_total_label)) %}
 {% set ns = namespace(dash='', field_parameters='') %}
+{% endif %}
+{% if overview %}
+{% set field_progress_bar = ("%%-%ss  %%-%ss " | format(column_width_label, column_width_bar)) %}
+{% set column_width_num_jobs = 23 %}
+{% endif %}
+{% if detailed %}
+{% set field_job_id = ("%%-%ss  " | format(column_width_id)) %}
+{% set field_label = ("%%-%ss" | format(column_width_total_label)) %}
 {% if parameters %}
 {% for para in parameters %}
 {% set ns.dash = ns.dash + ("%s  " | format('-' * column_width_parameters[loop.index0])) %}
@@ -31,6 +34,16 @@
 {{ field_progress_bar | format(label[0], label[1] | draw_progressbar(jobs | length)) }}
 {% endfor %}
 {% endblock%}
+{% block operation_summary %}
+
+{% set field_head = field_operation_title + '%s' %}
+{{ field_head | format('operation', 'number of eligible jobs') }}
+{{ field_head | format('-' * (column_width_operation+4), '-' * column_width_num_jobs) }}
+{% for op, n_jobs in op_counter.items() %}
+{% set x = op | length %}
+{{ op }}{{ ' ' * (column_width_operation+2-x+4) }}{{ n_jobs }}
+{% endfor %}
+{% endblock %}
 {% endif %}
 {% endblock%}
 

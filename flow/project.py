@@ -31,6 +31,7 @@ import contextlib
 import random
 from collections import defaultdict
 from collections import OrderedDict
+from collections import Counter
 from itertools import islice
 from itertools import count
 from itertools import groupby
@@ -1354,15 +1355,16 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             for status in statuses.values():
                 _add_parameters(status)
 
+        column_width_operation = 5
+        for key, value in self._operations.items():
+            column_width_operation = max(column_width_operation, len(key))
+
         if detailed:
             # get detailed view info
             column_width_id = 32
             column_width_total_label = 6
-            column_width_operation = 5
             status_legend = ' '.join('[{}]:{}'.format(v, k) for k, v in self.ALIASES.items())
 
-            for key, value in self._operations.items():
-                column_width_operation = max(column_width_operation, len(key))
             for job in tmp:
                 column_width_total_label = max(
                     column_width_total_label, len(', '.join(job['labels'])))
@@ -1402,6 +1404,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             context['progress_sorted'] = progress_sorted
             context['column_width_bar'] = column_width_bar
             context['column_width_label'] = column_width_label
+            context['column_width_operation'] = column_width_operation
         if detailed:
             context['column_width_id'] = column_width_id
             context['column_width_operation'] = column_width_operation
@@ -1428,6 +1431,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             has_eligible_ops = any([v['eligible'] for v in job['operations'].values()])
             if not has_eligible_ops and not context['all_ops']:
                 _add_dummy_operation(job)
+
+        op_counter = Counter()
+        for job in context['jobs']:
+            for k, v in job['operations'].items():
+                if v['eligible']:
+                    op_counter[k] += 1
+        context['op_counter'] = op_counter
 
         print(template.render(**context), file=file)
 

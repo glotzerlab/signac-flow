@@ -40,8 +40,8 @@
 {{ field_head | format('operation', 'number of eligible jobs') }}
 {{ field_head | format('-' * (column_width_operation+4), '-' * column_width_num_jobs) }}
 {% for op, n_jobs in op_counter.items() %}
-{% set x = op | length %}
-{{ op }}{{ ' ' * (column_width_operation+2-x+4) }}{{ n_jobs }}
+{% set op_len = op | length %}
+{{ op }}{{ ' ' * (column_width_operation+2-op_len+4) }}{{ n_jobs }}
 {% endfor %}
 {% endblock %}
 {% endif %}

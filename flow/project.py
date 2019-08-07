@@ -1356,8 +1356,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 _add_parameters(status)
 
         column_width_operation = 5
-        for key, value in self._operations.items():
-            column_width_operation = max(column_width_operation, len(key))
+        for op_name in self._operations:
+            column_width_operation = max(column_width_operation, len(op_name))
 
         if detailed:
             # get detailed view info

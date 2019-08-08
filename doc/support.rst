@@ -62,8 +62,8 @@ That means any changes made to the source code are immediately reflected upon re
 
 .. code-block:: bash
 
-    $ flake8 --install-hook git
-    $ git config --bool flake8.strict true
+    flake8 --install-hook git
+    git config --bool flake8.strict true
 
 With the *flake8* hook, your code will be checked for syntax and style before you make a commit.
 The continuous integration pipeline for the package will perform these checks as well, so running these tests before committing / pushing will prevent the pipeline from failing due to style-related issues.
@@ -115,8 +115,8 @@ Then you can build the documentation from within the ``doc/`` directory as part 
 
 .. code-block:: bash
 
-    $ cd doc/
-    $ make html
+    cd doc/
+    make html
 
 .. note::
 

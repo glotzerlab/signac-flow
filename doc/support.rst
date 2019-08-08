@@ -25,44 +25,49 @@ All contributors must agree to the `Contributor Agreement <https://github.com/gl
 Set up a development environment
 --------------------------------
 
-Start by `forking <https://github.com/glotzerlab/signac-flow/fork>`_ the project.
+1. As a new contributor, start by `forking <https://github.com/glotzerlab/signac-flow/fork>`_ the project.
 
-
-We highly recommend to setup a dedicated development environment,
-for example with `venv <https://docs.python.org/3/library/venv.html>`_:
+Then clone the repository to your local computer and switch into the repository directory:
 
 .. code-block:: bash
 
-    ~ $ python -m venv ~/envs/signac-flow-dev
-    ~ $ source ~/envs/signac-flow-dev/bin/activate
-    (signac-flow-dev) ~ $ pip install -r requirements-dev.txt
+    git clone https://github.com/your-username/signac-flow.git
+    cd signac-flow/
 
-or alternatively with `conda <https://conda.io/docs/>`_:
-
-.. code-block:: bash
-
-    ~ $ conda create -n signac-flow-dev python --file requirements-dev.txt
-    ~ $ activate signac-flow-dev
-
-Then clone your fork and install the package from source with:
+2. We highly recommend to setup a dedicated development environment with `conda <https://conda.io/docs/>`_:
 
 .. code-block:: bash
 
-    (signac-flow-dev) ~ $ cd path/to/my/fork/of/signac-flow
-    (signac-flow-dev) signac-flow $ pip install -e .
+    conda create -n signac-flow-dev python --file requirements-dev.txt
+    conda activate signac-flow-dev
+
+or alternatively with `venv <https://docs.python.org/3/library/venv.html>`_:
+
+.. code-block:: bash
+
+    python -m venv ~/envs/signac-flow-dev
+    source ~/envs/signac-flow-dev/bin/activate
+    pip install -r requirements-dev.txt
+
+3. Install the package into your environment with:
+
+.. code-block:: bash
+
+    pip install -e .
 
 The ``-e`` option stands for *editable*, which means that the package is directly loaded from the source code repository.
 That means any changes made to the source code are immediately reflected upon reloading the Python interpreter.
 
-Finally, we recommend to setup a `Flake8 <http://flake8.pycqa.org/en/latest/>`_ git commit hook with:
+4. Finally, we recommend to setup a `Flake8 <http://flake8.pycqa.org/en/latest/>`_ git commit hook with:
 
 .. code-block:: bash
 
-    (signac-flow-dev) signac-flow $ flake8 --install-hook git
-    (signac-flow-dev) signac-flow $ git config --bool flake8.strict true
+    $ flake8 --install-hook git
+    $ git config --bool flake8.strict true
 
 With the *flake8* hook, your code will be checked for syntax and style before you make a commit.
 The continuous integration pipeline for the package will perform these checks as well, so running these tests before committing / pushing will prevent the pipeline from failing due to style-related issues.
+
 
 The development workflow
 ------------------------
@@ -94,7 +99,7 @@ To run tests, execute:
 
 .. code-block:: bash
 
-    (signac-flow-dev) signac-flow $ python -m unittest discover tests/
+    python -m unittest discover tests/
 
 
 Building documentation
@@ -104,14 +109,14 @@ Building documentation requires the `sphinx <http://www.sphinx-doc.org/en/master
 
 .. code-block:: bash
 
-   (signac-flow-dev) signac-flow $ pip install Sphinx sphinx_rtd_theme
+   conda install Sphinx sphinx_rtd_theme
 
 Then you can build the documentation from within the ``doc/`` directory as part of the source code repository:
 
 .. code-block:: bash
 
-    (signac-flow-dev) signac-flow $ cd doc/
-    (signac-flow-dev) doc $ make html
+    $ cd doc/
+    $ make html
 
 .. note::
 

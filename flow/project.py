@@ -18,6 +18,7 @@ option is to use a FlowGraph.
 from __future__ import print_function
 import sys
 import os
+import re
 import logging
 import warnings
 import argparse
@@ -1222,11 +1223,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             sorted_hits = reversed(sorted(hits, key=lambda hit: hit[2]))
             total_num_hits = sum([hit[2] for hit in hits])
 
-            profiling_results = [
-                '# Profiling:\n',
-                'Rank Impact Code object',
-                '---- ------ -----------']
+            profiling_results = ['# Profiling:\n']
 
+            profiling_results.extend([
+                'Rank Impact Code object',
+                '---- ------ -----------'])
             for i, (line, code, hits, duration) in enumerate(sorted_hits):
                 impact = hits / total_num_hits
                 total_impact += impact
@@ -1237,32 +1238,36 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 if i > 10 or total_impact > 0.8:
                     break
 
-            # Restricted to the 'self'-module:
+            for module_fn in prof.merged_file_dict:
+                if re.match(profile, module_fn):
+                    ft = prof.merged_file_dict[module_fn]
+                else:
+                    continue
 
-            self_module = inspect.getmodule(self)
-            self_module_fn = inspect.getsourcefile(self_module)
-            ft = prof.merged_file_dict[self_module_fn]
-            total_hits = ft.getTotalHitCount()
-            total_impact = 0
+                total_hits = ft.getTotalHitCount()
+                total_impact = 0
 
-            profiling_results.append(
-                "\nHits by line for '{}':".format(self_module_fn))
-            profiling_results.append('-' * len(profiling_results[-1]))
-
-            hits = list(sorted(ft.iterHits(), key=lambda h: 1/h[2]))
-            for line, code, hits, duration in hits:
-                impact = hits / total_hits
-                total_impact += impact
                 profiling_results.append(
-                    "{}:{} ({:2.0%}):".format(self_module_fn, line, impact))
-                lines, start = inspect.getsourcelines(code)
-                hits_ = [ft.getHitStatsFor(l)[0] for l in range(start, start+len(lines))]
-                profiling_results.extend(
-                    ["{:>5} {:>4}: {}".format(h, lineno, l.rstrip())
-                     for lineno, (l, h) in enumerate(zip(lines, hits_), start)])
-                profiling_results.append('')
-                if total_impact > 0.8:
-                    break
+                    "\nHits by line for '{}':".format(module_fn))
+                profiling_results.append('-' * len(profiling_results[-1]))
+
+                hits = list(sorted(ft.iterHits(), key=lambda h: 1/h[2]))
+                for line, code, hits, duration in hits:
+                    impact = hits / total_hits
+                    total_impact += impact
+                    profiling_results.append(
+                        "{}:{} ({:2.0%}):".format(module_fn, line, impact))
+                    try:
+                        lines, start = inspect.getsourcelines(code)
+                    except OSError:
+                        continue
+                    hits_ = [ft.getHitStatsFor(l)[0] for l in range(start, start+len(lines))]
+                    profiling_results.extend(
+                        ["{:>5} {:>4}: {}".format(h, lineno, l.rstrip())
+                         for lineno, (l, h) in enumerate(zip(lines, hits_), start)])
+                    profiling_results.append('')
+                    if total_impact > 0.8:
+                        break
 
             profiling_results.append("Total runtime: {}s".format(int(prof.total_time)))
             if prof.total_time < 20:
@@ -2662,9 +2667,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         self._add_print_status_args(parser_status)
         parser_status.add_argument(
             '--profile',
-            action='store_true',
+            const=inspect.getsourcefile(inspect.getmodule(self)),
+            nargs='?',
             help="Collect statistics to determine code paths that are responsible "
                  "for the majority of runtime required for status determination. "
+                 "Optionally provide a filename pattern to select for what files "
+                 "to show result for. Defaults to the main module. "
                  "(requires pprofile)")
         parser_status.set_defaults(func=self._main_status)
 

@@ -45,6 +45,14 @@ The FlowProject
     FlowProject.next_operations
     FlowProject.operation
     FlowProject.operations
+    FlowProject.post
+    FlowProject.post.always
+    FlowProject.post.copy_from
+    FlowProject.post.false
+    FlowProject.post.isfile
+    FlowProject.post.never
+    FlowProject.post.not_
+    FlowProject.post.true
     FlowProject.pre
     FlowProject.pre.after
     FlowProject.pre.always
@@ -54,14 +62,6 @@ The FlowProject
     FlowProject.pre.never
     FlowProject.pre.not_
     FlowProject.pre.true
-    FlowProject.post
-    FlowProject.post.always
-    FlowProject.post.copy_from
-    FlowProject.post.false
-    FlowProject.post.isfile
-    FlowProject.post.never
-    FlowProject.post.not_
-    FlowProject.post.true
     FlowProject.run
     FlowProject.run_operations
     FlowProject.scheduler_jobs

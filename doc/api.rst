@@ -29,8 +29,6 @@ The FlowProject
 
     FlowProject.ALIASES
     FlowProject.NAMES
-    FlowProject.OPERATION_STATUS_SYMBOLS
-    FlowProject.PRETTY_OPERATION_STATUS_SYMBOLS
     FlowProject.add_operation
     FlowProject.classify
     FlowProject.completed_operations
@@ -40,7 +38,6 @@ The FlowProject
     FlowProject.label
     FlowProject.labels
     FlowProject.main
-    FlowProject.map_scheduler_jobs
     FlowProject.next_operation
     FlowProject.next_operations
     FlowProject.operation

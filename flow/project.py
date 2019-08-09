@@ -1,4 +1,4 @@
-# Copyright (c) 2018 The Regents of the University of Michigan
+# self Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 """Workflow definition with the FlowProject.
@@ -132,49 +132,67 @@ class _condition(object):
         return cls(lambda job: not condition(job))
 
 
-class _pre(_condition):
+def get_pre(cls):
+    class _pre(_condition):
 
-    def __call__(self, func):
-        pre_conditions = getattr(func, '_flow_pre', list())
-        pre_conditions.insert(0, self.condition)
-        func._flow_pre = pre_conditions
-        return func
+        owner_class = cls
 
-    @classmethod
-    def copy_from(cls, other_func):
-        "True if and only if all pre conditions of other function are met."
-        def metacondition(job):
-            pre_conditions = getattr(other_func, '_flow_pre', list())
-            return all(c(job) for c in pre_conditions)
-        return cls(metacondition)
+        def __init__(self, condition):
+            self.condition = condition
 
-    @classmethod
-    def after(cls, other_func):
-        "True if and only if all post conditions of other function are met."
-        def metacondition(job):
-            post_conditions = getattr(other_func, '_flow_post', list())
-            return all(c(job) for c in post_conditions)
-        return cls(metacondition)
+        def __call__(self, func):
+            if func not in self.owner_class._OPERATION_PRECONDITIONS.keys():
+                self.owner_class._OPERATION_PRECONDITIONS[func] = list()
+            self.owner_class._OPERATION_PRECONDITIONS[func].append(self.condition)
+            return func
+
+        @classmethod
+        def copy_from(cls, *other_funcs):
+            "True if and only if all pre conditions of other function(s) are met."
+            def metacondition(job):
+                return all(c(job)
+                           for other_func in other_funcs
+                           for c in cls.owner_class._OPERATION_PRECONDITIONS
+                           .get(other_func, list()))
+            return cls(metacondition)
+
+        @classmethod
+        def after(cls, *other_funcs):
+            "True if and only if all post conditions of other function(s) are met."
+            def metacondition(job):
+                return all(c(job)
+                           for other_func in other_funcs
+                           for c in cls.owner_class._OPERATION_POSTCONDITIONS
+                           .get(other_func, list()))
+            return cls(metacondition)
+    return _pre
 
 
-class _post(_condition):
+def get_post(cls):
 
-    def __init__(self, condition):
-        self.condition = condition
+    class _post(_condition):
 
-    def __call__(self, func):
-        post_conditions = getattr(func, '_flow_post', list())
-        post_conditions.insert(0, self.condition)
-        func._flow_post = post_conditions
-        return func
+        owner_class = cls
 
-    @classmethod
-    def copy_from(cls, other_func):
-        "True if and only if all post conditions of other function are met."
-        def metacondition(job):
-            post_conditions = getattr(other_func, '_flow_post', list())
-            return all(c(job) for c in post_conditions)
-        return cls(metacondition)
+        def __init__(self, condition):
+            self.condition = condition
+
+        def __call__(self, func):
+            if func not in self.owner_class._OPERATION_POSTCONDITIONS.keys():
+                self.owner_class._OPERATION_POSTCONDITIONS[func] = list()
+            self.owner_class._OPERATION_POSTCONDITIONS[func].append(self.condition)
+            return func
+
+        @classmethod
+        def copy_from(cls, *other_funcs):
+            "True if and only if all post conditions of other function(s) are met."
+            def metacondition(job):
+                return all(c(job)
+                           for other_func in other_funcs
+                           for c in cls.owner_class._OPERATION_POSTCONDITIONS
+                           .get(other_func, list()))
+            return cls(metacondition)
+    return _post
 
 
 def make_bundles(operations, size=None):
@@ -442,20 +460,26 @@ class FlowOperation(object):
 
 
 class _FlowProjectClass(type):
-    """Metaclass for the FlowProject class."""
-
     def __new__(metacls, name, bases, namespace, **kwargs):
         cls = type.__new__(metacls, name, bases, dict(namespace))
 
         # All operation functions are registered with the operation() classmethod, which is
         # intended to be used as decorator function. The _OPERATION_FUNCTIONS dict maps the
-        # the operation name to the operation function.
-        cls._OPERATION_FUNCTIONS = list()
+        # the operation name to the operation function. In addition, pre and
+        # post conditions are registered with the class.
 
+        cls._OPERATION_FUNCTIONS = list()
+        cls._OPERATION_PRECONDITIONS = dict()
+        cls._OPERATION_POSTCONDITIONS = dict()
         # All label functions are registered with the label() classmethod, which is intendeded
         # to be used as decorator function. The _LABEL_FUNCTIONS dict contains the function as
         # key and the label name as value, or None to use the default label name.
         cls._LABEL_FUNCTIONS = OrderedDict()
+
+        # Give the class a pre and post class that are aware of the class they
+        # are in.
+        cls.pre = get_pre(cls)
+        cls.post = get_post(cls)
 
         return cls
 
@@ -655,7 +679,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         for cls in type(self).__mro__:
             self._label_functions.update(getattr(cls, '_LABEL_FUNCTIONS', dict()))
 
-    pre = _pre
     """Decorator to add a pre-condition function for an operation function.
 
     Use a label function (or any function of :code:`job`) as a condition:
@@ -695,7 +718,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             pass
     """
 
-    post = _post
     """Decorator to add a post-condition function for an operation function.
 
     Use a label function (or any function of :code:`job`) as a condition:
@@ -2305,8 +2327,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                     "Repeat definition of operation with name '{}'.".format(name))
 
             # Extract pre/post conditions and directives from function:
-            params = {key: getattr(func, '_flow_{}'.format(key), None)
-                      for key in ('pre', 'post', 'directives')}
+            params = {'pre': self._OPERATION_PRECONDITIONS.get(func, None),
+                      'post': self._OPERATION_POSTCONDITIONS.get(func, None),
+                      'directives': getattr(func, '_flow_directives', None)
+                      }
 
             # Construct FlowOperation:
             if getattr(func, '_flow_cmd', False):

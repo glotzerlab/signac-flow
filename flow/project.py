@@ -110,26 +110,34 @@ class _condition(object):
 
     @classmethod
     def isfile(cls, filename):
+        "True if the specified file exists for this job."
         return cls(lambda job: job.isfile(filename))
 
     @classmethod
     def true(cls, key):
+        """True if the specified key is present in the job document and
+        evaluates to True."""
         return cls(lambda job: job.document.get(key, False))
 
     @classmethod
     def false(cls, key):
+        """True if the specified key is present in the job document and
+        evaluates to False."""
         return cls(lambda job: not job.document.get(key, False))
 
     @classmethod
     def always(cls, func):
+        "Returns True."
         return cls(lambda _: True)(func)
 
     @classmethod
     def never(cls, func):
+        "Returns False."
         return cls(lambda _: False)(func)
 
     @classmethod
     def not_(cls, condition):
+        "Returns ``not condition(job)`` for the provided condition function."
         return cls(lambda job: not condition(job))
 
 

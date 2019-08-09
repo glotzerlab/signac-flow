@@ -47,7 +47,21 @@ The FlowProject
     FlowProject.operations
     FlowProject.pre
     FlowProject.pre.after
+    FlowProject.pre.always
+    FlowProject.pre.copy_from
+    FlowProject.pre.false
+    FlowProject.pre.isfile
+    FlowProject.pre.never
+    FlowProject.pre.not_
+    FlowProject.pre.true
     FlowProject.post
+    FlowProject.post.always
+    FlowProject.post.copy_from
+    FlowProject.post.false
+    FlowProject.post.isfile
+    FlowProject.post.never
+    FlowProject.post.not_
+    FlowProject.post.true
     FlowProject.run
     FlowProject.run_operations
     FlowProject.scheduler_jobs
@@ -64,7 +78,37 @@ The FlowProject
 
 .. autoattribute:: FlowProject.pre
 
+.. automethod:: flow.FlowProject.pre.after
+
+.. automethod:: flow.FlowProject.pre.always
+
+.. automethod:: flow.FlowProject.pre.copy_from
+
+.. automethod:: flow.FlowProject.pre.false
+
+.. automethod:: flow.FlowProject.pre.isfile
+
+.. automethod:: flow.FlowProject.pre.never
+
+.. automethod:: flow.FlowProject.pre.not_
+
+.. automethod:: flow.FlowProject.pre.true
+
 .. autoattribute:: FlowProject.post
+
+.. automethod:: flow.FlowProject.post.always
+
+.. automethod:: flow.FlowProject.post.copy_from
+
+.. automethod:: flow.FlowProject.post.false
+
+.. automethod:: flow.FlowProject.post.isfile
+
+.. automethod:: flow.FlowProject.post.never
+
+.. automethod:: flow.FlowProject.post.not_
+
+.. automethod:: flow.FlowProject.post.true
 
 
 @flow.cmd

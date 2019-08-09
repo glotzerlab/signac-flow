@@ -142,9 +142,7 @@ def get_pre(cls):
             self.condition = condition
 
         def __call__(self, func):
-            if func not in self.owner_class._OPERATION_PRECONDITIONS.keys():
-                self.owner_class._OPERATION_PRECONDITIONS[func] = list()
-            self.owner_class._OPERATION_PRECONDITIONS[func].append(self.condition)
+            self.owner_class._OPERATION_PRECONDITIONS[func].insert(0, self.condition)
             return func
 
         @classmethod
@@ -179,9 +177,7 @@ def get_post(cls):
             self.condition = condition
 
         def __call__(self, func):
-            if func not in self.owner_class._OPERATION_POSTCONDITIONS.keys():
-                self.owner_class._OPERATION_POSTCONDITIONS[func] = list()
-            self.owner_class._OPERATION_POSTCONDITIONS[func].append(self.condition)
+            self.owner_class._OPERATION_POSTCONDITIONS[func].insert(0, self.condition)
             return func
 
         @classmethod
@@ -481,8 +477,8 @@ class _FlowProjectClass(type):
         # post conditions are registered with the class.
 
         cls._OPERATION_FUNCTIONS = list()
-        cls._OPERATION_PRECONDITIONS = dict()
-        cls._OPERATION_POSTCONDITIONS = dict()
+        cls._OPERATION_PRECONDITIONS = defaultdict(list)
+        cls._OPERATION_POSTCONDITIONS = defaultdict(list)
         # All label functions are registered with the label() classmethod, which is intendeded
         # to be used as decorator function. The _LABEL_FUNCTIONS dict contains the function as
         # key and the label name as value, or None to use the default label name.

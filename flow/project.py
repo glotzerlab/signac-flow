@@ -133,7 +133,7 @@ class _condition(object):
         return cls(lambda job: not condition(job))
 
 
-def get_pre(cls):
+def setup_pre_conditions_class(cls):
     class _pre(_condition):
 
         owner_class = cls
@@ -167,7 +167,7 @@ def get_pre(cls):
     return _pre
 
 
-def get_post(cls):
+def setup_post_conditions_class(cls):
 
     class _post(_condition):
 
@@ -486,8 +486,8 @@ class _FlowProjectClass(type):
 
         # Give the class a pre and post class that are aware of the class they
         # are in.
-        cls.pre = get_pre(cls)
-        cls.post = get_post(cls)
+        cls.pre = setup_pre_conditions_class(cls)
+        cls.post = setup_post_conditions_class(cls)
 
         return cls
 

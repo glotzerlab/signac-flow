@@ -19,6 +19,7 @@ from .project import label
 from .project import classlabel
 from .project import staticlabel
 from .operations import cmd
+from .operations import fork
 from .operations import directives
 from .operations import run
 from .environment import get_environment
@@ -44,6 +45,7 @@ __all__ = [
     'classlabel',
     'staticlabel',
     'cmd',
+    'fork',
     'directives',
     'run',
     'init',

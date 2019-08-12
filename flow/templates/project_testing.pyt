@@ -35,6 +35,7 @@ def op2_count(job):
 
 
 @{{ project_class_name }}.operation
+@{{ project_class_name }}.pre.after(setup)
 @{{ project_class_name }}.post(lambda job: job.doc.get('n_op2', 0) >= 3)
 def op2(job):
     with open(job.fn('op2.txt'), 'a') as f:

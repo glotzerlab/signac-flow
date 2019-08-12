@@ -21,7 +21,7 @@ def setup(job):
 
 
 @{{ project_class_name }}.operation
-@{{ project_class_name }}.pre(lambda job: job.sp.get('b') is False)
+@{{ project_class_name }}.pre(lambda job: job.sp.get('a'))
 @{{ project_class_name }}.pre.after(setup)
 @{{ project_class_name }}.post.isfile('op1.txt')
 def op1(job):

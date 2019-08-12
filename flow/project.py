@@ -22,6 +22,7 @@ import re
 import logging
 import warnings
 import argparse
+import time
 import datetime
 import json
 import inspect
@@ -2469,6 +2470,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         if args.pop('full'):
             args['detailed'] = args['all_ops'] = True
 
+        start = time.time()
         try:
             self.print_status(jobs=jobs, **args)
         except NoSchedulerError:
@@ -2480,6 +2482,20 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 "update anyways.")
             if show_traceback:
                 raise
+        else:
+            delta_t = (time.time() - start) / len(jobs)
+            config_key = 'status_performance_warn_threshold'
+            warn_threshold = flow_config.get_config_value(config_key)
+            if not args['profile'] and delta_t > warn_threshold >= 0:
+                print(
+                    "WARNING: "
+                    "The status compilation took more than {}ms per job. Consider to "
+                    "use `--profile` to determine bottlenecks within your project "
+                    "workflow definition.\n"
+                    "Execute `signac config set flow.{} VALUE` to specify the "
+                    "warning threshold in ms. Use -1 to completely suppress this "
+                    "warning."
+                    .format(warn_threshold, config_key), file=sys.stderr)
 
     def _main_next(self, args):
         "Determine the jobs that are eligible for a specific operation."

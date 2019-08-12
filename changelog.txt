@@ -15,6 +15,7 @@ next
 - Add option to specify the operation execution order (#121).
 - Fix erroneous line in the torque submission template (#126).
 - Add a testing module to easily initialize a test project (#130).
+- Add feature for integrated profiling of status updates to aid with the optimization of the FlowProject imlementation (#107, #110).
 
 Fixes
 +++++

@@ -7,25 +7,9 @@ class {{ project_class_name }}(FlowProject):
     pass
 
 
-def setup_done(job):
-    return job.isfile('job.txt')
-
-
-def false_b(job):
-    return job.sp.get('b', None) is False
-
-
-def op1_done(job):
-    return job.isfile('op1.txt')
-
-
-def op2_three_times(job):
-    return job.doc.get('n_op2', 0) >= 3
-
-
 @{{ project_class_name }}.label
-def setup_done_label(job):
-    if setup_done(job):
+def setup_done(job):
+    if job.isfile('job.txt'):
         return 'setup'
 
 
@@ -42,27 +26,24 @@ def setup(job):
 
 
 @{{ project_class_name }}.operation
-@{{ project_class_name }}.pre(false_b)
+@{{ project_class_name }}.pre(lambda job: job.sp.get('b') is False)
 @{{ project_class_name }}.pre.after(setup)
-@{{ project_class_name }}.post(op1_done)
+@{{ project_class_name }}.post.isfile('op1.txt')
 def op1(job):
     with open(job.fn('op1.txt'), 'w') as f:
         f.write('b: False')
 
 
 @{{ project_class_name }}.operation
-@{{ project_class_name }}.post(op2_three_times)
+@{{ project_class_name }}.post(lambda job: job.doc.get('n_op2', 0) >= 3)
 def op2(job):
     with open(job.fn('op2.txt'), 'a') as f:
         f.write(str(datetime.datetime.now()) + '\n')
-    try:
-        job.doc.n_op2 += 1
-    except AttributeError:
-        job.doc.n_op2 = 1
+    job.doc.setdefault('n_op2', 0)
+    job.doc.n_op2 += 1
 
 
 if __name__ == '__main__':
-    import flow.testing
     project = signac.get_project()
-    flow.testing.init_jobs(project)
+    signac.testing.init_jobs(project)
     {{ project_class_name }}().main()

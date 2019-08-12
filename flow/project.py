@@ -2486,6 +2486,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             delta_t = (time.time() - start) / len(jobs)
             config_key = 'status_performance_warn_threshold'
             warn_threshold = flow_config.get_config_value(config_key)
+            warn_threshold = 0.2 if warn_threshold is None else warn_threshold  # signac 0.9.0
             if not args['profile'] and delta_t > warn_threshold >= 0:
                 print(
                     "WARNING: "

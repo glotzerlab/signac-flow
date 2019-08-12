@@ -1418,6 +1418,17 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 context['operation_status_legend'] = operation_status_legend
                 context['operation_status_symbols'] = OPERATION_STATUS_SYMBOLS
 
+        def _add_dummy_operation(job):
+            job['operations'][''] = {
+                    'completed': False,
+                    'eligible': True,
+                    'scheduler_status': JobStatus.dummy}
+
+        for job in context['jobs']:
+            has_eligible_ops = any([v['eligible'] for v in job['operations'].values()])
+            if not has_eligible_ops and not context['all_ops']:
+                _add_dummy_operation(job)
+
         print(template.render(**context), file=file)
 
         # Show profiling results (if enabled)
@@ -2878,6 +2889,7 @@ _FMT_SCHEDULER_STATUS = {
     JobStatus.queued: 'Q',
     JobStatus.active: 'A',
     JobStatus.error: 'E',
+    JobStatus.dummy: ' ',
 }
 
 

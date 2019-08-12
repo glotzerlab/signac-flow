@@ -13,11 +13,6 @@ def setup_done(job):
         return 'setup'
 
 
-@{{ project_class_name }}.label
-def op2_count(job):
-    return 'op2 {}x'.format(job.doc.get('n_op2', 0))
-
-
 @{{ project_class_name }}.operation
 @{{ project_class_name }}.post(setup_done)
 def setup(job):
@@ -26,7 +21,7 @@ def setup(job):
 
 
 @{{ project_class_name }}.operation
-@{{ project_class_name }}.pre(lambda job: job.sp.get('b') is False)
+@{{ project_class_name }}.pre(lambda job: job.sp.get('a'))
 @{{ project_class_name }}.pre.after(setup)
 @{{ project_class_name }}.post.isfile('op1.txt')
 def op1(job):
@@ -34,7 +29,13 @@ def op1(job):
         f.write('b: False')
 
 
+@{{ project_class_name }}.label
+def op2_count(job):
+    return 'op2({}x)'.format(job.doc.get('n_op2', 0))
+
+
 @{{ project_class_name }}.operation
+@{{ project_class_name }}.pre.after(setup)
 @{{ project_class_name }}.post(lambda job: job.doc.get('n_op2', 0) >= 3)
 def op2(job):
     with open(job.fn('op2.txt'), 'a') as f:

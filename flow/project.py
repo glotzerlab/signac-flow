@@ -2489,11 +2489,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             if not args['profile'] and delta_t > warn_threshold >= 0:
                 print(
                     "WARNING: "
-                    "The status compilation took more than {}ms per job. Consider to "
+                    "The status compilation took more than {}s per job. Consider to "
                     "use `--profile` to determine bottlenecks within your project "
                     "workflow definition.\n"
                     "Execute `signac config set flow.{} VALUE` to specify the "
-                    "warning threshold in ms. Use -1 to completely suppress this "
+                    "warning threshold in seconds. Use -1 to completely suppress this "
                     "warning."
                     .format(warn_threshold, config_key), file=sys.stderr)
 

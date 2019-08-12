@@ -13,11 +13,6 @@ def setup_done(job):
         return 'setup'
 
 
-@{{ project_class_name }}.label
-def op2_count(job):
-    return 'op2 {}x'.format(job.doc.get('n_op2', 0))
-
-
 @{{ project_class_name }}.operation
 @{{ project_class_name }}.post(setup_done)
 def setup(job):
@@ -32,6 +27,11 @@ def setup(job):
 def op1(job):
     with open(job.fn('op1.txt'), 'w') as f:
         f.write('b: False')
+
+
+@{{ project_class_name }}.label
+def op2_count(job):
+    return 'op2({}x)'.format(job.doc.get('n_op2', 0))
 
 
 @{{ project_class_name }}.operation

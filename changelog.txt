@@ -14,6 +14,7 @@ next
 - Allow the provision of multiple operation-functions to the ``pre.after`` and ``*.copy_from`` conditions (#120).
 - Add option to specify the operation execution order (#121).
 - Fix erroneous line in the torque submission template (#126).
+- Add a testing module to easily initialize a test project (#130).
 
 Fixes
 +++++

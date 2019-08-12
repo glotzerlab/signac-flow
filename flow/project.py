@@ -134,6 +134,7 @@ class _condition(object):
 
 
 def setup_pre_conditions_class(cls):
+
     class _pre(_condition):
 
         owner_class = cls
@@ -142,7 +143,7 @@ def setup_pre_conditions_class(cls):
             self.condition = condition
 
         def __call__(self, func):
-            self.owner_class._OPERATION_PRECONDITIONS[func].insert(0, self.condition)
+            self.owner_class._OPERATION_PRE_CONDITIONS[func].insert(0, self.condition)
             return func
 
         @classmethod
@@ -151,7 +152,7 @@ def setup_pre_conditions_class(cls):
             def metacondition(job):
                 return all(c(job)
                            for other_func in other_funcs
-                           for c in cls.owner_class._OPERATION_PRECONDITIONS
+                           for c in cls.owner_class._collect_pre_conditions()
                            .get(other_func, list()))
             return cls(metacondition)
 
@@ -161,7 +162,7 @@ def setup_pre_conditions_class(cls):
             def metacondition(job):
                 return all(c(job)
                            for other_func in other_funcs
-                           for c in cls.owner_class._OPERATION_POSTCONDITIONS
+                           for c in cls.owner_class._collect_post_conditions()
                            .get(other_func, list()))
             return cls(metacondition)
     return _pre
@@ -177,7 +178,7 @@ def setup_post_conditions_class(cls):
             self.condition = condition
 
         def __call__(self, func):
-            self.owner_class._OPERATION_POSTCONDITIONS[func].insert(0, self.condition)
+            self.owner_class._OPERATION_POST_CONDITIONS[func].insert(0, self.condition)
             return func
 
         @classmethod
@@ -186,7 +187,7 @@ def setup_post_conditions_class(cls):
             def metacondition(job):
                 return all(c(job)
                            for other_func in other_funcs
-                           for c in cls.owner_class._OPERATION_POSTCONDITIONS
+                           for c in cls.owner_class._collect_post_conditions()
                            .get(other_func, list()))
             return cls(metacondition)
     return _post
@@ -477,8 +478,9 @@ class _FlowProjectClass(type):
         # post conditions are registered with the class.
 
         cls._OPERATION_FUNCTIONS = list()
-        cls._OPERATION_PRECONDITIONS = defaultdict(list)
-        cls._OPERATION_POSTCONDITIONS = defaultdict(list)
+        cls._OPERATION_PRE_CONDITIONS = defaultdict(list)
+        cls._OPERATION_POST_CONDITIONS = defaultdict(list)
+
         # All label functions are registered with the label() classmethod, which is intendeded
         # to be used as decorator function. The _LABEL_FUNCTIONS dict contains the function as
         # key and the label name as value, or None to use the default label name.
@@ -2327,11 +2329,37 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         cls._OPERATION_FUNCTIONS.append((name, func))
         return func
 
+    @classmethod
+    def _collect_operations(cls):
+        "Collect all operations that were add via decorator."
+        operations = []
+        for cls_ in cls.__mro__:
+            operations.extend(getattr(cls_, '_OPERATION_FUNCTIONS', []))
+        return operations
+
+    @classmethod
+    def _collect_pre_conditions(cls):
+        "Collect all pre-conditions that were add via decorator."
+        ret = defaultdict(list)
+        for cls_ in cls.__mro__:
+            for func, conds in getattr(cls_, '_OPERATION_PRE_CONDITIONS', dict()).items():
+                ret[func].extend(conds)
+        return ret
+
+    @classmethod
+    def _collect_post_conditions(cls):
+        "Collect all post-conditions that were add via decorator."
+        ret = defaultdict(list)
+        for cls_ in cls.__mro__:
+            for func, conds in getattr(cls_, '_OPERATION_POST_CONDITIONS', dict()).items():
+                ret[func].extend(conds)
+        return ret
+
     def _register_operations(self):
         "Register all operation functions registered with this class and its parent classes."
-        operations = []
-        for cls in type(self).__mro__:
-            operations.extend(getattr(cls, '_OPERATION_FUNCTIONS', []))
+        operations = self._collect_operations()
+        pre_conditions = self._collect_pre_conditions()
+        post_conditions = self._collect_post_conditions()
 
         def _guess_cmd(func, name, **kwargs):
             try:
@@ -2353,10 +2381,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                     "Repeat definition of operation with name '{}'.".format(name))
 
             # Extract pre/post conditions and directives from function:
-            params = {'pre': self._OPERATION_PRECONDITIONS.get(func, None),
-                      'post': self._OPERATION_POSTCONDITIONS.get(func, None),
-                      'directives': getattr(func, '_flow_directives', None)
-                      }
+            params = {
+                'pre': pre_conditions.get(func, None),
+                'post': post_conditions.get(func, None),
+                'directives': getattr(func, '_flow_directives', None)}
 
             # Construct FlowOperation:
             if getattr(func, '_flow_cmd', False):

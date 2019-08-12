@@ -703,6 +703,24 @@ class ExecutionProjectTest(BaseProjectTest):
             else:
                 self.assertFalse(job.isfile('world.txt'))
 
+    def test_run_fork(self):
+        project = self.mock_project()
+        output = StringIO()
+        for job in project:
+            job.doc.fork = True
+            break
+
+        with add_cwd_to_environment_pythonpath():
+            with switch_to_directory(project.root_directory()):
+                with redirect_stderr(output):
+                    project.run()
+
+        for job in project:
+            if job.doc.get('fork'):
+                self.assertNotEqual(os.getpid(), job.doc.test)
+            else:
+                self.assertEqual(os.getpid(), job.doc.test)
+
     def test_submit_operations(self):
         MockScheduler.reset()
         project = self.mock_project()

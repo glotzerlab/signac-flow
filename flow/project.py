@@ -1519,11 +1519,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
     @staticmethod
     def _dumps_op(op):
-        return (op.name, op.job._id, op.cmd, op.directives)
+        return (op.name, op.job._id, op.cmd, op.fork, op.directives)
 
     def _loads_op(self, blob):
-        name, job_id, cmd, directives = blob
-        return JobOperation(name, self.open_job(id=job_id), cmd, directives)
+        name, job_id, cmd, fork, directives = blob
+        return JobOperation(name, self.open_job(id=job_id), cmd, fork, directives)
 
     def _run_operations_in_parallel(self, pool, pickle, operations, progress, timeout):
         """Execute operations in parallel.
@@ -1551,7 +1551,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         logger.info("Execute operation '{}'...".format(operation))
 
         # Execute without forking if possible...
-        if not operation.fork \
+        if not (operation.fork and (operation.fork is True or operation.fork(operation.job))) \
                 and timeout is None \
                 and operation.name in self._operation_functions \
                 and operation.directives.get('executable', sys.executable) == sys.executable:

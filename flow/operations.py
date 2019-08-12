@@ -100,17 +100,40 @@ def with_job(func):
     return decorated
 
 
-def fork(func):
+def fork(condition=None):
     """Specifies that ``func`` must be executed within a forked process.
 
     Functions that require their own process and should not be executed within the
-    same process as the interpreter should be decorated with `@fork`.
-
+    same process as the interpreter should be decorated with `@fork()`.
     This is useful for example for parallelized operations, such as functions
     that use `multiprocessing.Pool`.
+
+    You can specify an optional condition, which must be a function of job, to fork
+    only under specific circumstances. For example:
+
+    .. code-block:: python
+
+        @Project.operation
+        @fork()
+        def op_always_forks(job):
+            pass
+
+        def fork_condition(job):
+            return job.doc.fork is True
+
+        @Project.operation
+        @fork(fork_condition)
+        def op_forks_conditionally(job):
+            pass
     """
-    setattr(func, '_flow_fork', True)
-    return func
+    if condition is None:
+        condition = True
+
+    def _decorator(func):
+        setattr(func, '_flow_fork', condition)
+        return func
+
+    return _decorator
 
 
 class directives(object):

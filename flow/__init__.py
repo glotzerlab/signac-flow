@@ -25,6 +25,12 @@ from .template import init
 from .util.misc import redirect_log
 from .operations import with_job
 
+# Import packaged environments unless disabled in config:
+from .util.config import get_config_value
+if get_config_value('import_packaged_environments', default=True):
+    from . import environments  # noqa:F401
+
+
 __version__ = '0.7.1'
 
 __all__ = [

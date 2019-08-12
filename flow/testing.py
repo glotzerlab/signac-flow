@@ -5,7 +5,7 @@
 
 """
 import signac
-from signac.testing import init_jobs
+
 from .template import init
 
 
@@ -18,5 +18,5 @@ def make_project(alias='project', root=None, **kwargs):
     """
     init(alias=alias, root=root, template='testing')
     project = signac.init_project(name=alias, root=root)
-    init_jobs(project, **kwargs)
+    signac.testing.init_jobs(project, **kwargs)
     return project

@@ -20,6 +20,11 @@ Fixes
 
 - Both the ``nranks`` and ``omp_num_threads`` directives properly support callables.
 
+Changed
++++++++
+
+- Packaged environments are now available by default. Set "import_packaged_environments = off" within the signac configuration "[flow]" section to revert to previous behavior.
+
 Version 0.7
 ===========
 

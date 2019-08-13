@@ -306,6 +306,45 @@ class ProjectClassTest(BaseProjectTest):
         self.assertEqual(len(b._label_functions), 2)
         self.assertEqual(len(c._label_functions), 1)
 
+    def test_conditions_with_inheritance(self):
+
+        class A(FlowProject):
+            pass
+
+        class B(FlowProject):
+            pass
+
+        class C(A):
+            pass
+
+        @A.pre(lambda job: True)
+        @C.pre(lambda job: True)
+        @C.pre(lambda job: True)
+        @B.pre(lambda job: True)
+        @B.pre(lambda job: True)
+        @A.operation
+        @B.operation
+        def op1(job):
+            pass
+
+        self.assertEqual(len(A._collect_pre_conditions()[op1]), 1)
+        self.assertEqual(len(B._collect_pre_conditions()[op1]), 2)
+        self.assertEqual(len(C._collect_pre_conditions()[op1]), 3)
+
+        @A.post(lambda job: True)
+        @C.post(lambda job: True)
+        @C.post(lambda job: True)
+        @B.post(lambda job: True)
+        @B.post(lambda job: True)
+        @A.operation
+        @B.operation
+        def op2(job):
+            pass
+
+        self.assertEqual(len(A._collect_post_conditions()[op2]), 1)
+        self.assertEqual(len(B._collect_post_conditions()[op2]), 2)
+        self.assertEqual(len(C._collect_post_conditions()[op2]), 3)
+
     def test_with_job_decorator(self):
 
         class A(FlowProject):

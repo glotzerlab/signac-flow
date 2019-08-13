@@ -705,6 +705,7 @@ class ExecutionProjectTest(BaseProjectTest):
 
     @unittest.skipIf(StrictVersion(signac.__version__) < StrictVersion('0.9.1'),
                      'requires signac >=0.9.1')
+    @unittest.skipIf(six.PY2, 'requires python 3')
     def test_run_fork(self):
         project = self.mock_project()
         output = StringIO()

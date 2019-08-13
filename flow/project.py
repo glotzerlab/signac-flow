@@ -1484,7 +1484,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 if pretend:
                     print(operation.cmd)
                 else:
-                    self._fork(operation, timeout)
+                    self._execute_operation(operation, timeout)
         else:
             logger.debug("Parallelized execution of {} operation(s).".format(len(operations)))
             with contextlib.closing(Pool(processes=cpu_count() if np < 0 else np)) as pool:
@@ -1542,28 +1542,36 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         except Exception as error:  # Masking all errors since they must be pickling related.
             raise self._PickleError(error)
 
-        results = [pool.apply_async(_fork_with_serialization, task) for task in s_tasks]
+        results = [pool.apply_async(_execute_serialized_operation, task) for task in s_tasks]
 
         for result in tqdm(results) if progress else results:
             result.get(timeout=timeout)
 
-    def _fork(self, operation, timeout=None):
+    def _execute_operation(self, operation, timeout=None):
         logger.info("Execute operation '{}'...".format(operation))
 
-        # Execute without forking if possible...
-        if not (operation.fork and (operation.fork is True or operation.fork(operation.job))) \
-                and timeout is None \
-                and operation.name in self._operation_functions \
-                and operation.directives.get('executable', sys.executable) == sys.executable:
-            logger.debug(
-                "Executing operation '{}' with current interpreter "
-                "process ({}).".format(operation, os.getpid()))
-            self._operation_functions[operation.name](operation.job)
-        else:   # need to fork
+        # Check if we need to fork for operation execution...
+        if (
+            # The @fork decorator was applied:
+            (operation.fork and (operation.fork is True or operation.fork(operation.job)))
+            # Separate process needed to cancel with timeout:
+            or timeout is not None
+            # The operation function is not registered with the class:
+            or operation.name not in self._operation_functions
+            # The specified executable is not the same as the interpreter instance:
+            or operation.directives.get('executable', sys.executable) != sys.executable
+        ):
+            # ... need to fork:
             logger.debug(
                 "Forking to execute operation '{}' with "
                 "cmd '{}'.".format(operation, operation.cmd))
             fork(cmd=operation.cmd, timeout=timeout)
+        else:
+            # ... executing operation in interpreter process as function:
+            logger.debug(
+                "Executing operation '{}' with current interpreter "
+                "process ({}).".format(operation, os.getpid()))
+            self._operation_functions[operation.name](operation.job)
 
     def run(self, jobs=None, names=None, pretend=False, np=None, timeout=None, num=None,
             num_passes=1, progress=False, order=None):
@@ -2880,10 +2888,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             _exit_or_raise()
 
 
-def _fork_with_serialization(loads, project, operation):
-    """Invoke the _fork() method on a serialized project instance."""
+def _execute_serialized_operation(loads, project, operation):
+    """Invoke the _execute_operation() method on a serialized project instance."""
     project = loads(project)
-    project._fork(project._loads_op(operation))
+    project._execute_operation(project._loads_op(operation))
 
 
 ###

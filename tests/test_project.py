@@ -1315,8 +1315,13 @@ class GroupProjectMainInterfaceTest(BaseProjectTest):
             submit_output = self.call_subcmd(
                 'submit -j {} -o group1 --pretend'.format(job.get_id())
             ).decode().splitlines()
-            self.assertIn('run -j {} -o op1 op2'.format(job.get_id()),
-                          '\n'.join(submit_output))
+            output_string = '\n'.join(submit_output)
+            self.assertIn('run -j {} -o'.format(job.get_id()),
+                          output_string)
+            self.assertIn('op1'.format(job.get_id()),
+                          output_string)
+            self.assertIn('op2'.format(job.get_id()),
+                          output_string)
             submit_output = self.call_subcmd(
                 'submit -j {} -o group2 --pretend'.format(job.get_id())
             ).decode().splitlines()

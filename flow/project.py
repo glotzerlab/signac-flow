@@ -299,25 +299,17 @@ class JobOperation(object):
     def set_status(self, value):
         "Store the operation's status."
         self.job._project.document.setdefault('_status', dict())
-        self.job._project.document._status[self.id] = int(value)
-        if len(self.operation_ids) > 1:
-            for opid in self.operation_ids:
-                self.job._project.document._status[opid] = int(value)
+        for opid in self.operation_ids:
+            self.job._project.document._status[opid] = int(value)
 
     def get_status(self):
         "Retrieve the operation's last known status."
         try:
-            return JobStatus(self.job._project.document['_status'][self.get_id()])
+            return [JobStatus(self.job._project.document['_status'].get(op_id,
+                                                                        JobStatus.unknown))
+                    for op_id in self.operation_ids]
         except KeyError:
-            return JobStatus.unknown
-
-    def get_status(self, op_id=None):
-        "Retrieve the operation's last known status."
-        _id = self.id if op_id is None else op_id
-        try:
-            return JobStatus(self.project.document['_status'][_id])
-        except KeyError:
-            return JobStatus.unknown
+            return [JobStatus.unknown for op_id in self.operation_ids]
 
     def eligible_for_submission(self):
         """Determine if a job-operation is eligible for submission.
@@ -325,8 +317,8 @@ class JobOperation(object):
         By default, an operation is eligible for submission when it
         is not considered active, that means already queued or running.
         """
-        return not any([self.get_status(op_id) >= JobStatus.submitted
-                        for op_id in self.operation_ids])
+        return not any([status >= JobStatus.submitted
+                        for status in self.get_status()])
 
 
 class FlowCondition(object):
@@ -2380,7 +2372,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             with self._potentially_buffered():
                 operations = (op for op in self._get_pending_operations(jobs, names,
                                                                         mode)
-                              if self.eligible_for_submission(op))
+                              if op.eligible_for_submission())
             if num is not None:
                 operations = list(islice(operations, num))
 

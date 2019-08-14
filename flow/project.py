@@ -580,7 +580,7 @@ class FlowGroup(object):
     def compatible(self, group):
         return not set(self).intersection(group)
 
-    def get_id(self, job, operation_name=None, index=0):
+    def _generate_id(self, job, operation_name=None, index=0):
         "Return a name, which identifies this job-group."
         project = job._project
 
@@ -614,10 +614,10 @@ class FlowGroup(object):
         return readable_name + job_op_id
 
     def create_job_operation(self, job, mode='run', index=0):
-        return JobOperation(self.get_id(job, index=index),
+        return JobOperation(self._generate_id(job, index=index),
                             self.name,
-                            [self.get_id(job=job, operation_name=op_name,
-                                         index=0)
+                            [self._generate_id(job=job, operation_name=op_name,
+                                               index=0)
                                 for op_name in self.operations.keys()],
                             job,
                             self.__call__(job, mode),

@@ -36,6 +36,7 @@ if six.PY2:
 TEMPLATES = {
     'minimal': [('{alias}.py', 'project_minimal.pyt'), ],
     'example': [('{alias}.py', 'project_example.pyt'), ],
+    'testing': [('{alias}.py', 'project_testing.pyt'), ],
 }
 
 

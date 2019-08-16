@@ -26,10 +26,12 @@ import json
 import inspect
 import functools
 import contextlib
+import random
 from collections import defaultdict
 from collections import OrderedDict
 from itertools import islice
 from itertools import count
+from itertools import groupby
 from hashlib import sha1
 from multiprocessing import Pool
 from multiprocessing import cpu_count
@@ -53,11 +55,10 @@ from .errors import SubmitError
 from .errors import ConfigKeyError
 from .errors import NoSchedulerError
 from .errors import TemplateError
-from .util import tabulate
 from .util.tqdm import tqdm
 from .util.misc import _positive_int
 from .util.misc import _mkdir_p
-from .util.misc import draw_progressbar
+from .util.misc import roundrobin
 from .util import template_filters as tf
 from .util.misc import add_cwd_to_environment_pythonpath
 from .util.misc import switch_to_directory
@@ -132,7 +133,8 @@ class _condition(object):
         return cls(lambda job: not condition(job))
 
 
-def get_pre(cls):
+def setup_pre_conditions_class(cls):
+
     class _pre(_condition):
 
         owner_class = cls
@@ -141,9 +143,7 @@ def get_pre(cls):
             self.condition = condition
 
         def __call__(self, func):
-            if func not in self.owner_class._OPERATION_PRECONDITIONS.keys():
-                self.owner_class._OPERATION_PRECONDITIONS[func] = list()
-            self.owner_class._OPERATION_PRECONDITIONS[func].append(self.condition)
+            self.owner_class._OPERATION_PRE_CONDITIONS[func].insert(0, self.condition)
             return func
 
         @classmethod
@@ -152,7 +152,7 @@ def get_pre(cls):
             def metacondition(job):
                 return all(c(job)
                            for other_func in other_funcs
-                           for c in cls.owner_class._OPERATION_PRECONDITIONS
+                           for c in cls.owner_class._collect_pre_conditions()
                            .get(other_func, list()))
             return cls(metacondition)
 
@@ -162,13 +162,13 @@ def get_pre(cls):
             def metacondition(job):
                 return all(c(job)
                            for other_func in other_funcs
-                           for c in cls.owner_class._OPERATION_POSTCONDITIONS
+                           for c in cls.owner_class._collect_post_conditions()
                            .get(other_func, list()))
             return cls(metacondition)
     return _pre
 
 
-def get_post(cls):
+def setup_post_conditions_class(cls):
 
     class _post(_condition):
 
@@ -178,9 +178,7 @@ def get_post(cls):
             self.condition = condition
 
         def __call__(self, func):
-            if func not in self.owner_class._OPERATION_POSTCONDITIONS.keys():
-                self.owner_class._OPERATION_POSTCONDITIONS[func] = list()
-            self.owner_class._OPERATION_POSTCONDITIONS[func].append(self.condition)
+            self.owner_class._OPERATION_POST_CONDITIONS[func].insert(0, self.condition)
             return func
 
         @classmethod
@@ -189,7 +187,7 @@ def get_post(cls):
             def metacondition(job):
                 return all(c(job)
                            for other_func in other_funcs
-                           for c in cls.owner_class._OPERATION_POSTCONDITIONS
+                           for c in cls.owner_class._collect_post_conditions()
                            .get(other_func, list()))
             return cls(metacondition)
     return _post
@@ -261,8 +259,19 @@ class JobOperation(object):
         # script engine later.
         keys_set_by_user = set(directives.keys())
 
-        directives.setdefault(
-            'np', directives.get('nranks', 1) * directives.get('omp_num_threads', 1))
+        nranks = directives.get('nranks', 1)
+        nthreads = directives.get('omp_num_threads', 1)
+
+        if callable(nranks) or callable(nthreads):
+            def np_callable(job):
+                nr = nranks(job) if callable(nranks) else nranks
+                nt = nthreads(job) if callable(nthreads) else nthreads
+                return nr*nt
+
+            directives.setdefault('np', np_callable)
+        else:
+            directives.setdefault('np', nranks*nthreads)
+
         directives.setdefault('ngpu', 0)
         directives.setdefault('nranks', 0)
         directives.setdefault('omp_num_threads', 0)
@@ -469,6 +478,10 @@ class _FlowProjectClass(type):
         # post conditions are registered with the class.
 
         cls._OPERATION_FUNCTIONS = list()
+        cls._OPERATION_PRE_CONDITIONS = defaultdict(list)
+        cls._OPERATION_POST_CONDITIONS = defaultdict(list)
+
+        cls._OPERATION_FUNCTIONS = list()
         cls._OPERATION_PRECONDITIONS = dict()
         cls._OPERATION_POSTCONDITIONS = dict()
         # All label functions are registered with the label() classmethod, which is intendeded
@@ -478,8 +491,8 @@ class _FlowProjectClass(type):
 
         # Give the class a pre and post class that are aware of the class they
         # are in.
-        cls.pre = get_pre(cls)
-        cls.post = get_post(cls)
+        cls.pre = setup_pre_conditions_class(cls)
+        cls.post = setup_post_conditions_class(cls)
 
         return cls
 
@@ -853,7 +866,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
     def _get_operations_status(self, job, cached_status):
         "Return a dict with information about job-operations for this job."
-        for job_op in self._job_operations([job], False):
+        for job_op in self._job_operations(job, False):
             flow_op = self.operations[job_op.name]
             completed = flow_op.complete(job)
             eligible = False if completed else flow_op.eligible(job)
@@ -896,33 +909,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 raise
         return result
 
-    def _format_row(self, status, statepoint=None, max_width=None):
-        "Format each row in the detailed status output."
-        row = [
-            status['job_id'],
-            status['operation'],
-            ', '.join((self._alias(s) for s in status['submission_status'])),
-            ', '.join(status.get('labels', [])),
-        ]
-        if statepoint:
-            sps = self.open_job(id=status['job_id']).statepoint()
-
-            def get(k, m):
-                if m is None:
-                    return
-                t = k.split('.')
-                if len(t) > 1:
-                    return get('.'.join(t[1:]), m.get(t[0]))
-                else:
-                    return m.get(k)
-
-            for i, k in enumerate(statepoint):
-                v = self._alias(get(k, sps))
-                row.insert(i + 3, None if v is None else shorten(str(v), max_width))
-        if status['operation'] and not status['active']:
-            row[2] += ' ' + self._alias('requires_attention')
-        return row
-
     def _fetch_scheduler_status(self, jobs=None, file=None, ignore_errors=False):
         "Update the status docs."
         if file is None:
@@ -936,10 +922,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             scheduler_info = {sjob.name(): sjob.status() for sjob in self.scheduler_jobs(scheduler)}
             status = dict()
             print(self._tr("Query scheduler..."), file=file)
-            for op in tqdm(self._job_operations(jobs=jobs, only_eligible=False),
-                           desc="Fetching operation status",
-                           total=len(jobs), file=file):
-                status[op.get_id()] = int(scheduler_info.get(op.get_id(), JobStatus.unknown))
+            for job in tqdm(jobs,
+                            desc="Fetching operation status",
+                            total=len(jobs), file=file):
+                for op in self._job_operations(job, only_eligible=False):
+                    status[op.get_id()] = int(scheduler_info.get(op.get_id(), JobStatus.unknown))
             self.document._status.update(status)
         except NoSchedulerError:
             logger.debug("No scheduler available.")
@@ -995,24 +982,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                     iterable=map(_get_job_status, jobs),
                     total=len(jobs), desc='Collect job status info:', file=err))
 
-    OPERATION_STATUS_SYMBOLS = OrderedDict([
-        ('ineligible', u'-'),
-        ('eligible', u'+'),
-        ('active', u'*'),
-        ('running', u'>'),
-        ('completed', u'X')
-    ])
-    "Symbols denoting the execution status of operations."
-
-    PRETTY_OPERATION_STATUS_SYMBOLS = OrderedDict([
-        ('ineligible', u'\u25cb'),   # open circle
-        ('eligible', u'\u25cf'),     # black circle
-        ('active', u'\u25b9'),       # open triangle
-        ('running', u'\u25b8'),      # black triangle
-        ('completed', u'\u2714'),    # check mark
-    ])
-    "Pretty (unicode) symbols denoting the execution status of operations."
-
     PRINT_STATUS_ALL_VARYING_PARAMETERS = True
     """This constant can be used to signal that the print_status() method is supposed
     to automatically show all varying parameters."""
@@ -1023,7 +992,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                      expand=False, all_ops=False, only_incomplete=False, dump_json=False,
                      unroll=True, compact=False, pretty=False,
                      file=None, err=None, ignore_errors=False,
-                     no_parallelize=False):
+                     no_parallelize=False, template=None):
         """Print the status of the project.
 
         .. versionchanged:: 0.6
@@ -1101,6 +1070,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             Do not parallelize the status update.
         :type no_parallelize:
             bool
+        :param template:
+            user provided Jinja2 template file.
+        :type template:
+            str
         """
         if file is None:
             file = sys.stdout
@@ -1109,6 +1082,135 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         if jobs is None:
             jobs = self     # all jobs
 
+        # use Jinja2 template for status output
+        if template is None:
+            if detailed and expand:
+                template = 'status_expand.jinja'
+            elif detailed and not unroll:
+                template = 'status_stack.jinja'
+            elif detailed and compact:
+                template = 'status_compact.jinja'
+            else:
+                template = 'status.jinja'
+
+        if skip_active:
+            raise NotImplementedError("The deprecated --skip-active option is no longer supported.")
+
+        # initialize jinja2 template evnronment and necessary filters
+        template_environment = self._template_environment()
+
+        def draw_progressbar(value, total, width=40):
+            """Visualize progess with a progress bar.
+
+            :param value:
+                The current progress as a fraction of total.
+            :type value:
+                int
+            :param total:
+                The maximum value that 'value' may obtain.
+            :type total:
+                int
+            :param width:
+                The character width of the drawn progress bar.
+            :type width:
+                int
+            """
+
+            assert value >= 0 and total > 0
+            ratio = ' %0.2f%%' % (100 * value / total)
+            n = int(value / total * width)
+            return '|' + ''.join(['#'] * n) + ''.join(['-'] * (width - n)) + '|' + ratio
+
+        def job_filter(job_op, scheduler_status_code, all_ops):
+            """filter eligible jobs for status print.
+
+            :param job_ops:
+                Operations information for a job.
+            :type job_ops:
+                OrderedDict
+            :param scheduler_status_code:
+                Dictionary information for status code
+            :type scheduler_status_code:
+                Dictionary
+            :param all_ops:
+                Boolean value indicate if all operations should be displayed
+            :type all_ops:
+                Boolean
+            """
+
+            if scheduler_status_code[job_op['scheduler_status']] != 'U' or \
+               job_op['eligible'] or all_ops:
+                return True
+            else:
+                return False
+
+        def get_operation_status(operation_info, symbols):
+            """Determine the status of an operation.
+
+            :param operation_info:
+                Dicionary containing operation information
+            :type operation_info:
+                Dictionary
+            :param symbols:
+                Dicionary containing code for different job status
+            :type symbols:
+                Dictionary
+            """
+
+            if operation_info['scheduler_status'] >= JobStatus.active:
+                op_status = u'running'
+            elif operation_info['scheduler_status'] > JobStatus.inactive:
+                op_status = u'active'
+            elif operation_info['completed']:
+                op_status = u'completed'
+            elif operation_info['eligible']:
+                op_status = u'eligible'
+            else:
+                op_status = u'ineligible'
+
+            return symbols[op_status]
+
+        if pretty:
+            def highlight(s, eligible):
+                """Change font to bold within jinja2 template
+
+                :param s:
+                    The string to be printed
+                :type s:
+                    str
+                :param eligible:
+                    Boolean value for job eligibility
+                :type eligible:
+                    Boolean
+                """
+                if eligible:
+                    return '\033[1m' + s + '\033[0m'
+                else:
+                    return s
+        else:
+            def highlight(s, eligible):
+                """Change font to bold within jinja2 template
+
+                :param s:
+                    The string to be printed
+                :type s:
+                    str
+                :param eligible:
+                    Boolean value for job eligibility
+                :type eligible:
+                    boolean
+                """
+                return s
+
+        template_environment.filters['highlight'] = highlight
+        template_environment.filters['draw_progressbar'] = draw_progressbar
+        template_environment.filters['get_operation_status'] = get_operation_status
+        template_environment.filters['job_filter'] = job_filter
+
+        template = template_environment.get_template(template)
+        context = self._get_standard_template_context()
+
+        # get job status information
         tmp = self._fetch_status(jobs, err, ignore_errors, no_parallelize)
 
         operations_errors = {s['_operations_error'] for s in tmp}
@@ -1120,7 +1222,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 "Some job status updates did not succeed due to errors. "
                 "Number of unique errors: {}. Use --debug to list all errors.".format(len(errors)))
             for i, error in enumerate(errors):
-                logger.debug("Status update error #{}: '{}'".format(i+1, error))
+                logger.debug("Status update error #{}: '{}'".format(i + 1, error))
 
         if only_incomplete:
             # Remove all jobs from the status info, that have not a single
@@ -1139,12 +1241,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             print(json.dumps(statuses, indent=4), file=file)
             return
 
-        # Generate status overview:
         if overview:
-            print("# Overview:", file=file)
-            print("{} {}\n".format(self._tr("Total # of jobs:"), len(statuses), file=file))
-
-            # Draw progress bars
+            # get overview info:
+            column_width_bar = 50
+            column_width_label = 5
+            for key, value in self._label_functions.items():
+                column_width_label = max(column_width_label, len(key.__name__))
             progress = defaultdict(int)
             for status in statuses.values():
                 for label in status['labels']:
@@ -1152,55 +1254,19 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             progress_sorted = list(islice(
                 sorted(progress.items(), key=lambda x: (x[1], x[0]), reverse=True),
                 overview_max_lines))
-            rows = [[
-                label,
-                '{} {:0.2f}%'.format(draw_progressbar(num, len(statuses)),
-                                     100 * num / len(statuses))
-            ]
-                for label, num in progress_sorted]
-
-            print(tabulate.tabulate(rows, headers=['label', 'ratio']), file=file)
-            if not rows:
-                print("[no labels to show]", file=file)
-            if overview_max_lines is not None:
-                lines_skipped = len(progress) - overview_max_lines
-                if lines_skipped > 0:
-                    print(self._tr("Lines omitted:"), lines_skipped, file=file)
-
-        # Generate detailed view:
-        def _select_op(doc):
-            active = JobStatus(doc['scheduler_status']) > JobStatus.unknown
-            if skip_active and active:
-                return False
-            if not all_ops and not (active or doc['eligible']):
-                return False
-            return True
-
-        def _bold(x):
-            "Bold markup."
-            if pretty:
-                return '\033[1m' + x + '\033[0m'
-            else:
-                return x
 
         # Optionally expand parameters argument to all varying parameters.
         if parameters is self.PRINT_STATUS_ALL_VARYING_PARAMETERS:
             parameters = list(sorted({key for job in jobs for key in job.sp.keys()
                                       if len(set([job.sp.get(key) for job in jobs])) > 1}))
 
-        if detailed:
-            rows_status = []
-            columns = ['job_id', 'labels']
-            if unroll:
-                columns.insert(1, 'operation')
-            header_detailed = [self._tr(self._alias(c)) for c in columns]
-            if parameters:
-                offset = 2 if unroll else 1
-                for i, value in enumerate(parameters):
-                    header_detailed.insert(
-                        i + offset, shorten(self._alias(str(value)), param_max_width))
+        if parameters:
+            # get parameters info
+            column_width_parameters = list([0]*len(parameters))
+            for i, para in enumerate(parameters):
+                column_width_parameters[i] = len(para)
 
-            def _format_status(status):
+            def _add_parameters(status):
                 sp = self.open_job(id=status['job_id']).statepoint()
 
                 def get(k, m):
@@ -1212,153 +1278,80 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                     else:
                         return m.get(k)
 
-                row = [status['job_id']]
-                row.append(', '.join(status.get('labels', [])))
-                if parameters:
-                    for i, k in enumerate(parameters):
-                        v = self._alias(get(k, sp))
-                        row.insert(i + 1, None if v is None else shorten(str(v), param_max_width))
-
-                if unroll:
-                    selected_ops = [name for name, op in status['operations'].items()
-                                    if _select_op(op)]
-                    if compact:
-                        if len(selected_ops):
-                            next_name = selected_ops[0]
-                            sched_stat = status['operations'][next_name]['scheduler_status']
-                            cell = '{} [{}]'.format(next_name, _FMT_SCHEDULER_STATUS[sched_stat])
-                            if len(selected_ops) > 1:
-                                cell += ' (+{})'.format(len(selected_ops) - 1)
-                        else:
-                            cell = ''
-                        row.insert(1, cell)
-                        yield row
-                    elif selected_ops:
-                        row.insert(1, None)
-                        max_len = max(len(header_detailed[1])-4, max(map(len, selected_ops)))
-                        for i, name in enumerate(selected_ops):
-                            if i:
-                                row[0] = None
-                            row[1] = name.ljust(max_len)
-
-                            op = status['operations'][name]
-                            if pretty and op['eligible']:
-                                row[1] = _bold(row[1])
-                            row[1] += " [{}]".format(_FMT_SCHEDULER_STATUS[op['scheduler_status']])
-                            yield list(row)
-                    else:
-                        row.insert(1, None)
-                        yield list(row)
-                else:
-                    yield row
+                status['parameters'] = OrderedDict()
+                for i, k in enumerate(parameters):
+                    v = shorten(str(self._alias(get(k, sp))))
+                    column_width_parameters[i] = max(column_width_parameters[i], len(v))
+                    status['parameters'][k] = v
 
             for status in statuses.values():
-                rows_status.extend(_format_status(status))
+                _add_parameters(status)
 
-            rows_operations = []
-            header_operations = [self._tr(self._alias(s))
-                                 for s in ('job_id', 'operation', 'eligible', 'cluster_status')]
-
-            def _fmt_status_operations(status):
-                for name, doc in status['operations'].items():
-                    if not _select_op(doc):
-                        continue
-
-                    yield [
-                        status['job_id'],
-                        _bold(name) if (pretty and doc['eligible']) else name,
-                        'Y' if doc['eligible'] else 'N',
-                        _FMT_SCHEDULER_STATUS[doc['scheduler_status']]]
-
-            for status in statuses.values():
-                rows_operations.append(list(_fmt_status_operations(status)))
-
-        # Actually display information
         if detailed:
-            print(('\n' if overview else '') + "# Detailed View:", file=file)
-            status_table = tabulate.tabulate(rows_status, headers=header_detailed)
-            if expand:  # Present labels and operations in two separate tables.
-                print("\n## Labels:", file=file)
-                print(status_table, file=file)
-                print("\n## Operations:", file=file)
-                rows_operations = [row for rs in rows_operations for row in rs]  # flatten list
-                print(tabulate.tabulate(rows_operations, headers=header_operations), file=file)
-            elif unroll:
-                print(status_table, file=file)
-            else:       # Present labels and operations in a combined 'compact' view.
-                # We need to split the labels table into individual lines
-                # to combine them with the operations lines.
-                status_table_lines = iter(status_table.splitlines())
+            # get detailed view info
+            column_width_id = 32
+            column_width_total_label = 6
+            column_width_operation = 5
+            status_legend = ' '.join('[{}]:{}'.format(v, k) for k, v in self.ALIASES.items())
 
-                # The first two lines are the table header.
-                print(next(status_table_lines), file=file)
-                print(next(status_table_lines), file=file)
+            for key, value in self._operations.items():
+                column_width_operation = max(column_width_operation, len(key))
+            for job in tmp:
+                column_width_total_label = max(
+                    column_width_total_label, len(', '.join(job['labels'])))
+            if compact:
+                num_operations = len(self._operations)
+                column_width_operations_count = len(str(max(num_operations-1, 0))) + 3
 
-                def _print_unicode(value):
-                    "Python 2/3 compatibility layer."
-                    if six.PY2:
-                        print(value.encode('utf-8'), file=file)
-                    else:
-                        print(value, file=file)
+            if pretty:
+                OPERATION_STATUS_SYMBOLS = OrderedDict([
+                    ('ineligible', u'\u25cb'),   # open circle
+                    ('eligible', u'\u25cf'),     # black circle
+                    ('active', u'\u25b9'),       # open triangle
+                    ('running', u'\u25b8'),      # black triangle
+                    ('completed', u'\u2714'),    # check mark
+                ])
+                "Pretty (unicode) symbols denoting the execution status of operations."
+            else:
+                OPERATION_STATUS_SYMBOLS = OrderedDict([
+                    ('ineligible', u'-'),
+                    ('eligible', u'+'),
+                    ('active', u'*'),
+                    ('running', u'>'),
+                    ('completed', u'X')
+                ])
+                "Symbols denoting the execution status of operations."
+            operation_status_legend = ' '.join('[{}]:{}'.format(v, k)
+                                               for k, v in OPERATION_STATUS_SYMBOLS.items())
 
-                if pretty:
-                    open_frame = u'\u251c'      # open frame
-                    closing_frame = u'\u2514'   # closing frame
-                    symbols = self.PRETTY_OPERATION_STATUS_SYMBOLS
-                else:
-                    open_frame, closing_frame = '', ''
-                    symbols = self.OPERATION_STATUS_SYMBOLS
+        context['jobs'] = list(statuses.values())
+        context['overview'] = overview
+        context['detailed'] = detailed
+        context['all_ops'] = all_ops
+        context['parameters'] = parameters
+        context['compact'] = compact
+        context['unroll'] = unroll
+        if overview:
+            context['progress_sorted'] = progress_sorted
+            context['column_width_bar'] = column_width_bar
+            context['column_width_label'] = column_width_label
+        if detailed:
+            context['column_width_id'] = column_width_id
+            context['column_width_operation'] = column_width_operation
+            context['column_width_total_label'] = column_width_total_label
+            context['alias_bool'] = {True: 'T', False: 'U'}
+            context['scheduler_status_code'] = _FMT_SCHEDULER_STATUS
+            context['status_legend'] = status_legend
+            if parameters:
+                context['column_width_parameters'] = column_width_parameters
+            if compact:
+                context['extra_num_operations'] = max(num_operations-1, 0)
+                context['column_width_operations_count'] = column_width_operations_count
+            if not unroll:
+                context['operation_status_legend'] = operation_status_legend
+                context['operation_status_symbols'] = OPERATION_STATUS_SYMBOLS
 
-                for line, status in zip(status_table_lines, statuses.values()):
-                    _print_unicode(line)
-                    if status['operations']:
-                        width = max(map(len, status['operations']))
-
-                        def select(op):
-                            name, doc = op
-                            active = JobStatus(doc['scheduler_status']) > JobStatus.unknown
-                            if skip_active and active:
-                                return False
-                            if not all_ops and not (active or doc['eligible']):
-                                return False
-                            return True
-
-                        selected_ops = list(filter(select, status['operations'].items()))
-                        for i, (name, doc) in enumerate(selected_ops):
-                            name = name.ljust(width)
-                            if pretty and doc['eligible']:
-                                name = _bold(name)
-                            if six.PY2:
-                                name = name.decode('utf-8')
-                            frame = closing_frame if (i+1) == len(selected_ops) else open_frame
-
-                            if doc['scheduler_status'] >= JobStatus.active:
-                                op_status = u'running'
-                            elif doc['scheduler_status'] > JobStatus.inactive:
-                                op_status = u'active'
-                            elif doc['completed']:
-                                op_status = u'completed'
-                            elif doc['eligible']:
-                                op_status = u'eligible'
-                            else:
-                                op_status = u'ineligible'
-
-                            frame += symbols[op_status]
-
-                            sched_stat = _FMT_SCHEDULER_STATUS[doc['scheduler_status']]
-                            if six.PY2:
-                                sched_stat = sched_stat.decode('utf-8')
-                            msg = u"{} {} [{}]".format(frame, name, sched_stat)
-                            _print_unicode(msg)
-                legend = u'Legend: ' + u' '.join(u'{}:{}'.format(v, k) for k, v in symbols.items())
-                _print_unicode(legend)
-            print(' '.join('[{}]:{}'.format(v, k) for k, v in self.ALIASES.items()))
-
-        # Show any abbreviations used
-        if abbreviate.table:
-            print('\n', self._tr("Abbreviations used:"), file=file)
-            for a in sorted(abbreviate.table):
-                print('{}: {}'.format(a, abbreviate.table[a]), file=file)
+        print(template.render(**context), file=file)
 
     def run_operations(self, operations=None, pretend=False, np=None, timeout=None, progress=False):
         """Execute the next operations as specified by the project's workflow.
@@ -1482,7 +1475,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             fork(cmd=operation.cmd, timeout=timeout)
 
     def run(self, jobs=None, names=None, pretend=False, np=None, timeout=None, num=None,
-            num_passes=1, progress=False):
+            num_passes=1, progress=False, order=None):
         """Execute all pending operations for the given selection.
 
         This function will run in an infinite loop until all pending operations
@@ -1534,6 +1527,27 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             Show a progress bar during execution.
         :type progess:
             bool
+        :param order:
+            Specify the order of operations, possible values are:
+                * 'none' or None (no specific order)
+                * 'by-job' (operations are grouped by job)
+                * 'cyclic' (order operations cyclic by job)
+                * 'random' (shuffle the execution order randomly)
+                * callable (a callable returning a comparison key for an
+                            operation used to sort operations)
+
+            The default value is `none`, which is equivalent to `by-job` in the current
+            implementation.
+
+            .. note::
+
+                Users are advised to not rely on a specific execution order, as a
+                substitute for defining the workflow in terms of pre- and post-conditions.
+                However, a specific execution order may be more performant in cases where
+                operations need to access and potentially lock shared resources.
+
+        :type order:
+            str, callable, or NoneType
         """
         # If no jobs argument is provided, we run operations for all jobs.
         if jobs is None:
@@ -1609,6 +1623,23 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                     del messages[:]     # clear
             if not operations:
                 break   # No more pending operations or execution limits reached.
+
+            # Optionally re-order operations for execution if order argument is provided:
+            if callable(order):
+                operations = list(sorted(operations, key=order))
+            elif order == 'cyclic':
+                groups = [list(group)
+                          for _, group in groupby(operations, key=lambda op: op.job)]
+                operations = list(roundrobin(*groups))
+            elif order == 'random':
+                random.shuffle(operations)
+            elif order is None or order in ('none', 'by-job'):
+                pass  # by-job is the default order
+            else:
+                raise ValueError(
+                    "Invalid value for the 'order' argument, valid arguments are "
+                    "'none', 'by-job', 'cyclic', 'random', None, or a callable.")
+
             logger.info(
                 "Executing {} operation(s) (Pass # {:02d})...".format(len(operations), i_pass))
             self.run_operations(operations, pretend=pretend,
@@ -2220,13 +2251,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             if op.complete(job):
                 yield name
 
-    def _job_operations(self, jobs, only_eligible):
+    def _job_operations(self, job, only_eligible):
         "Yield instances of JobOperation constructed for specific jobs."
-        for job in jobs:
-            for name, op in self.operations.items():
-                if only_eligible and not op.eligible(job):
-                    continue
-                yield JobOperation(name=name, job=job, cmd=op(job), directives=op.directives)
+        for name, op in self.operations.items():
+            if only_eligible and not op.eligible(job):
+                continue
+            yield JobOperation(name=name, job=job, cmd=op(job), directives=op.directives)
 
     def next_operations(self, *jobs):
         """Determine the next eligible operations for jobs.
@@ -2238,8 +2268,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         :yield:
             All instances of :class:`~.JobOperation` jobs are eligible for.
         """
-        for op in self._job_operations(jobs, True):
-            yield op
+        for job in jobs:
+            for op in self._job_operations(job, True):
+                yield op
 
     def next_operation(self, job):
         """Determine the next operation for this job.
@@ -2301,11 +2332,37 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         cls._OPERATION_FUNCTIONS.append((name, func))
         return func
 
+    @classmethod
+    def _collect_operations(cls):
+        "Collect all operations that were add via decorator."
+        operations = []
+        for cls_ in cls.__mro__:
+            operations.extend(getattr(cls_, '_OPERATION_FUNCTIONS', []))
+        return operations
+
+    @classmethod
+    def _collect_pre_conditions(cls):
+        "Collect all pre-conditions that were add via decorator."
+        ret = defaultdict(list)
+        for cls_ in cls.__mro__:
+            for func, conds in getattr(cls_, '_OPERATION_PRE_CONDITIONS', dict()).items():
+                ret[func].extend(conds)
+        return ret
+
+    @classmethod
+    def _collect_post_conditions(cls):
+        "Collect all post-conditions that were add via decorator."
+        ret = defaultdict(list)
+        for cls_ in cls.__mro__:
+            for func, conds in getattr(cls_, '_OPERATION_POST_CONDITIONS', dict()).items():
+                ret[func].extend(conds)
+        return ret
+
     def _register_operations(self):
         "Register all operation functions registered with this class and its parent classes."
-        operations = []
-        for cls in type(self).__mro__:
-            operations.extend(getattr(cls, '_OPERATION_FUNCTIONS', []))
+        operations = self._collect_operations()
+        pre_conditions = self._collect_pre_conditions()
+        post_conditions = self._collect_post_conditions()
 
         def _guess_cmd(func, name, **kwargs):
             try:
@@ -2327,10 +2384,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                     "Repeat definition of operation with name '{}'.".format(name))
 
             # Extract pre/post conditions and directives from function:
-            params = {'pre': self._OPERATION_PRECONDITIONS.get(func, None),
-                      'post': self._OPERATION_POSTCONDITIONS.get(func, None),
-                      'directives': getattr(func, '_flow_directives', None)
-                      }
+            params = {
+                'pre': pre_conditions.get(func, None),
+                'post': post_conditions.get(func, None),
+                'directives': getattr(func, '_flow_directives', None)}
 
             # Construct FlowOperation:
             if getattr(func, '_flow_cmd', False):
@@ -2411,7 +2468,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         run = functools.partial(self.run,
                                 jobs=jobs, names=args.operation_name, pretend=args.pretend,
                                 np=args.parallel, timeout=args.timeout, num=args.num,
-                                num_passes=args.num_passes, progress=args.progress)
+                                num_passes=args.num_passes, progress=args.progress,
+                                order=args.order)
 
         if args.switch_to_project_root:
             with add_cwd_to_environment_pythonpath():
@@ -2459,7 +2517,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
         # Gather all pending operations ...
         with self._potentially_buffered():
-            ops = self._get_pending_operations(jobs, args.operation_name)
+            ops = (op for op in self._get_pending_operations(jobs, args.operation_name)
+                   if self.eligible_for_submission(op))
             ops = list(islice(ops, args.num))
 
         # Bundle operations up, generate the script, and submit to scheduler.
@@ -2619,7 +2678,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             nargs='?',
             const='-1',
             help="Specify the number of cores to parallelize to. Defaults to all available "
-                 "processing units if argument is ommitted.")
+                 "processing units if argument is omitted.")
+        execution_group.add_argument(
+            '--order',
+            type=str,
+            choices=['none', 'by-job', 'cyclic', 'random'],
+            default=None,
+            help="Specify the execution order of operations for each execution pass.")
         parser_run.set_defaults(func=self._main_run)
 
         parser_script = subparsers.add_parser(

@@ -13,6 +13,7 @@ import subprocess
 import tempfile
 from contextlib import contextmanager
 from distutils.version import StrictVersion
+from itertools import groupby
 
 import signac
 from signac.common import six
@@ -305,6 +306,45 @@ class ProjectClassTest(BaseProjectTest):
         self.assertEqual(len(b._label_functions), 2)
         self.assertEqual(len(c._label_functions), 1)
 
+    def test_conditions_with_inheritance(self):
+
+        class A(FlowProject):
+            pass
+
+        class B(FlowProject):
+            pass
+
+        class C(A):
+            pass
+
+        @A.pre(lambda job: True)
+        @C.pre(lambda job: True)
+        @C.pre(lambda job: True)
+        @B.pre(lambda job: True)
+        @B.pre(lambda job: True)
+        @A.operation
+        @B.operation
+        def op1(job):
+            pass
+
+        self.assertEqual(len(A._collect_pre_conditions()[op1]), 1)
+        self.assertEqual(len(B._collect_pre_conditions()[op1]), 2)
+        self.assertEqual(len(C._collect_pre_conditions()[op1]), 3)
+
+        @A.post(lambda job: True)
+        @C.post(lambda job: True)
+        @C.post(lambda job: True)
+        @B.post(lambda job: True)
+        @B.post(lambda job: True)
+        @A.operation
+        @B.operation
+        def op2(job):
+            pass
+
+        self.assertEqual(len(A._collect_post_conditions()[op2]), 1)
+        self.assertEqual(len(B._collect_post_conditions()[op2]), 2)
+        self.assertEqual(len(C._collect_post_conditions()[op2]), 3)
+
     def test_with_job_decorator(self):
 
         class A(FlowProject):
@@ -411,6 +451,101 @@ class ProjectClassTest(BaseProjectTest):
             self.assertIn('mpirun -np 3 python', next_op.cmd)
             break
 
+    def test_callable_directives(self):
+
+        class A(FlowProject):
+            pass
+
+        @A.operation
+        @directives(nranks=lambda job: job.doc.get('nranks', 1))
+        @directives(omp_num_threads=lambda job: job.doc.get('omp_num_threads', 1))
+        def a(job):
+            return 'hello!'
+
+        project = A(self.mock_project().config)
+
+        # test setting neither nranks nor omp_num_threads
+        for job in project:
+            next_op = project.next_operation(job)
+            self.assertEqual(next_op.directives['np'], 1)
+
+        # test only setting nranks
+        for i, job in enumerate(project):
+            job.doc.nranks = i+1
+            next_op = project.next_operation(job)
+            self.assertEqual(next_op.directives['np'], next_op.directives['nranks'])
+            del job.doc['nranks']
+
+        # test only setting omp_num_threads
+        for i, job in enumerate(project):
+            job.doc.omp_num_threads = i+1
+            next_op = project.next_operation(job)
+            self.assertEqual(next_op.directives['np'], next_op.directives['omp_num_threads'])
+            del job.doc['omp_num_threads']
+
+        # test setting both nranks and omp_num_threads
+        for i, job in enumerate(project):
+            job.doc.omp_num_threads = i+1
+            job.doc.nranks = i % 3 + 1
+            next_op = project.next_operation(job)
+            expected_np = (i + 1) * (i % 3 + 1)
+            self.assertEqual(next_op.directives['np'], expected_np)
+
+    def test_copy_conditions(self):
+
+        class A(FlowProject):
+            pass
+
+        @A.operation
+        @A.post(lambda job: 'a' in job.doc)
+        def op1(job):
+            job.doc.a = True
+
+        @A.operation
+        @A.post.true('b')
+        def op2(job):
+            job.doc.b = True
+
+        @A.operation
+        @A.pre.after(op1, op2)
+        @A.post.true('c')
+        def op3(job):
+            job.doc.c = True
+
+        @A.operation
+        @A.pre.copy_from(op1, op3)
+        @A.post.true('d')
+        def op4(job):
+            job.doc.d = True
+
+        self.project_class = A
+        project = self.mock_project()
+        op3_ = project.operations['op3']
+        op4_ = project.operations['op4']
+        for job in project:
+            self.assertFalse(op3_.eligible(job))
+            self.assertFalse(op4_.eligible(job))
+
+        project.run(names=['op1'])
+        for job in project:
+            self.assertTrue(job.doc.a)
+            self.assertNotIn('b', job.doc)
+            self.assertNotIn('c', job.doc)
+            self.assertNotIn('d', job.doc)
+            self.assertFalse(op3_.eligible(job))
+            self.assertFalse(op4_.eligible(job))
+
+        project.run(names=['op2'])
+        for job in project:
+            self.assertTrue(op3_.eligible(job))
+            self.assertTrue(op4_.eligible(job))
+
+        project.run()
+        for job in project:
+            self.assertTrue(job.doc.a)
+            self.assertTrue(job.doc.b)
+            self.assertTrue(job.doc.c)
+
 
 class ProjectTest(BaseProjectTest):
     project_class = TestProject
@@ -511,21 +646,47 @@ class ExecutionProjectTest(BaseProjectTest):
     project_class = TestProject
     expected_number_of_steps = 4
 
-    def test_run(self):
+    def test_pending_operations_order(self):
+        # The execution order of local runs is internally assumed to be
+        # 'by-job' by default. A failure of this unit tests means that
+        # a 'by-job' order must be implemented explicitly within the
+        # FlowProject.run() function.
         project = self.mock_project()
-        output = StringIO()
-        with add_cwd_to_environment_pythonpath():
-            with switch_to_directory(project.root_directory()):
-                with redirect_stderr(output):
-                    project.run()
-        output.seek(0)
-        output.read()
-        even_jobs = [job for job in project if job.sp.b % 2 == 0]
-        for job in project:
-            if job in even_jobs:
-                self.assertTrue(job.isfile('world.txt'))
-            else:
-                self.assertFalse(job.isfile('world.txt'))
+        ops = list(project._get_pending_operations(self.project.find_jobs()))
+        # The length of the list of operations grouped by job is equal
+        # to the length of its set if and only if the operations are grouped
+        # by job already:
+        jobs_order_none = [job._id for job, _ in groupby(ops, key=lambda op: op.job)]
+        self.assertEqual(len(jobs_order_none), len(set(jobs_order_none)))
+
+    @unittest.skipIf(six.PY2, 'requires python 3')
+    def test_run(self):
+        with self.subTest(order='invalid-order'):
+            with self.assertRaises(ValueError):
+                project = self.mock_project()
+                self.project.run(order='invalid-order')
+
+        def sort_key(op):
+            return op.name, op.job.get_id()
+
+        for order in (None, 'none', 'cyclic', 'by-job', 'random', sort_key):
+            for job in self.project.find_jobs():  # clear
+                job.remove()
+            with self.subTest(order=order):
+                project = self.mock_project()
+                output = StringIO()
+                with add_cwd_to_environment_pythonpath():
+                    with switch_to_directory(project.root_directory()):
+                        with redirect_stderr(output):
+                            project.run(order=order)
+                output.seek(0)
+                output.read()
+                even_jobs = [job for job in project if job.sp.b % 2 == 0]
+                for job in project:
+                    if job in even_jobs:
+                        self.assertTrue(job.isfile('world.txt'))
+                    else:
+                        self.assertFalse(job.isfile('world.txt'))
 
     def test_run_with_selection(self):
         project = self.mock_project()

@@ -1,0 +1,24 @@
+{% if compact %}
+{% extends "base_status_compact.jinja" %}
+{% elif not unroll %}
+{% extends "base_status_stack.jinja" %}
+{% else %}
+{% extends "base_status.jinja" %}
+{% endif %}
+{% block detailed %}
+{{ super () }}
+## Operations:
+{% set column_width_operation = [column_width_operation, 9] | max %}
+{% set field_operation = ("%%-%ss  " | format(column_width_operation)) %}
+{% set field_op_table = field_job_id + field_operation + '%-8s  ' + '%-14s  ' %}
+{{ field_op_table | format('job_id', 'operation', 'eligible', 'cluster_status') }}
+{{ field_op_table | format('-' * column_width_id, '-' * column_width_operation, '-' * 8, '-' * 14) }}
+{% for job in jobs %}
+{% for key, value in job['operations'].items() %}
+{% if (scheduler_status_code[value['scheduler_status']] != 'U' or value['eligible']) or all_ops%}
+{{ field_job_id | format(job['job_id']) }}{{ field_operation | highlight(value['eligible']) | format(key) }}{{ '%-8s  ' | format(alias_bool[value['eligible']])}}{{ '%-14s  ' | format(scheduler_status_code[value['scheduler_status']])}}
+{% endif %}
+{% endfor %}
+{% endfor %}
+{{ status_legend }}
+{% endblock %}

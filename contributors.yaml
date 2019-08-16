@@ -50,7 +50,7 @@ contributors:
     affiliation: "University of Michigan"
     orcid: "https://orcid.org/0000-0002-5709-7259"
   -
-    family-names: Cersonsky 
+    family-names: Cersonsky
     given-names: Rose
     affiliation: "University of Michigan"
     orcid: "http://orcid.org/0000-0003-4515-3441"
@@ -73,8 +73,18 @@ contributors:
     given-names: Yannah
     affiliation: "University of Michigan"
   -
+    family-names: Zhou
+    given-names: Pengji
+    affiliation: "University of Michigan"
+    orcid: "https://orcid.org/0000-0002-1409-9633"
+  -
     family-names: Justin
     given-names: Gilmer
     affiliation: "Vanderbilt University"
     orcid: "https://orcid.org/0000-0002-6915-5591"
+  -
+    family-names: Travitz
+    given-names: Alyssa
+    affiliation: "University of Michigan"
+    orcid: "https://orcid.org/0000-0001-5953-8807"
 ...

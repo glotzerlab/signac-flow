@@ -770,7 +770,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             return x
 
     @classmethod
-    @deprecated(deprecated_in="0.8",removed_in="1.0")
+    @deprecated(deprecated_in="0.8", removed_in="1.0")
     def update_aliases(cls, aliases):
         "Update the ALIASES table for this class."
         cls.ALIASES.update(aliases)
@@ -2122,10 +2122,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         raise RuntimeError(
             "The update_stati() method has been removed as of version 0.6.")
 
-    def export_job_statuses(self, collection, statuses):
-        "Export the job statuses to a database collection."
-        export_job_stati(self, collection, statuses)       
-
     @deprecated(deprecated_in="0.8", removed_in="1.0")
     def export_job_stati(self, collection, stati):
         "Export the job stati to a database collection."
@@ -2134,6 +2130,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             status['statepoint'] = job.statepoint()
             collection.update_one({'_id': status['job_id']},
                                   {'$set': status}, upsert=True)
+
+    def export_job_statuses(self, collection, statuses):
+        "Export the job statuses to a database collection."
+        export_job_stati(self, collection, statuses)
 
     @classmethod
     def _add_print_status_args(cls, parser):
@@ -2362,7 +2362,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         for job in jobs:
             for op in self._job_operations(job, True):
                 yield op
-    
+
     @deprecated(deprecated_in="0.8", removed_in="1.0")
     def next_operation(self, job):
         """Determine the next operation for this job.

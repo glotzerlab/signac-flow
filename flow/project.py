@@ -29,6 +29,7 @@ import inspect
 import functools
 import contextlib
 import random
+from deprecation import deprecated
 from collections import defaultdict
 from collections import OrderedDict
 from itertools import islice
@@ -769,6 +770,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             return x
 
     @classmethod
+    @deprecated(deprecated_in="0.8",removed_in="1.0")
     def update_aliases(cls, aliases):
         "Update the ALIASES table for this class."
         cls.ALIASES.update(aliases)
@@ -2114,11 +2116,17 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             help="Manually specify all labels that are required for the direct command "
                  "to be considered eligible for execution.")
 
+    @deprecated(deprecated_in="0.6", removed_in="0.8")
     def update_stati(self, *args, **kwargs):
         "This function has been removed as of version 0.6."
         raise RuntimeError(
             "The update_stati() method has been removed as of version 0.6.")
 
+    def export_job_statuses(self, collection, statuses):
+        "Export the job statuses to a database collection."
+        export_job_stati(self, collection, statuses)       
+
+    @deprecated(deprecated_in="0.8", removed_in="1.0")
     def export_job_stati(self, collection, stati):
         "Export the job stati to a database collection."
         for status in stati:
@@ -2300,6 +2308,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             raise KeyError("An operation with this identifier is already added.")
         self.operations[name] = FlowOperation(cmd=cmd, pre=pre, post=post, directives=kwargs)
 
+    @deprecated(deprecated_in="0.8", removed_in="1.0")
     def classify(self, job):
         """Generator function which yields labels for job.
 
@@ -2353,7 +2362,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         for job in jobs:
             for op in self._job_operations(job, True):
                 yield op
-
+    
+    @deprecated(deprecated_in="0.8", removed_in="1.0")
     def next_operation(self, job):
         """Determine the next operation for this job.
 

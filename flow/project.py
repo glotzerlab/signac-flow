@@ -2133,7 +2133,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
     def export_job_statuses(self, collection, statuses):
         "Export the job statuses to a database collection."
-        export_job_stati(self, collection, statuses)
+        self.export_job_stati(self, collection, statuses)
 
     @classmethod
     def _add_print_status_args(cls, parser):

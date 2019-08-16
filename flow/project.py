@@ -2812,10 +2812,19 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             setattr(args, dest, getattr(args, 'main_' + dest) or getattr(args, dest))
             delattr(args, 'main_' + dest)
 
+        # Read the config file and
+        flow_config.get_config_value('show_traceback')
+            
         if args.debug:  # Implies '-vv' and '--show-traceback'
             args.verbose = max(2, args.verbose)
             args.show_traceback = True
 
+
+        # the command line flag overwrites the value in the config file
+        # debug passed on the command line overwrites the value in the config file
+        # debug and config_show_traceback is true: the args.debug line applies
+        # debug and config_show_traceback is false: still the above applies
+            
         # Support print_status argument alias
         if args.func == self._main_status and args.full:
             args.detailed = args.all_ops = True

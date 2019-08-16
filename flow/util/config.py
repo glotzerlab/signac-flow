@@ -13,6 +13,7 @@ config.cfg += """
 [flow]
 import_packaged_environments = boolean()
 status_performance_warn_threshold = float(default=0.2)
+show_traceback = boolean()
 """
 
 

@@ -2485,7 +2485,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             if show_traceback:
                 raise
         else:
-            delta_t = (time.time() - start) / len(jobs)
+            delta_t = (time.time() - start) / max(len(jobs), 1)
             config_key = 'status_performance_warn_threshold'
             warn_threshold = flow_config.get_config_value(config_key)
             warn_threshold = 0.2 if warn_threshold is None else warn_threshold  # signac 0.9.0

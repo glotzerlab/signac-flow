@@ -220,10 +220,9 @@ class JobOperation(object):
         :py:class:`signac.Project`
     """
 
-    def __init__(self, id, name, operation_ids, job, cmd, directives=None, project=None):
+    def __init__(self, id, name, job, cmd, directives=None, project=None):
         self.id = id
         self.name = name
-        self.operation_ids = operation_ids
         self.job = job
         self.cmd = cmd
         if project is None:
@@ -299,26 +298,15 @@ class JobOperation(object):
     def set_status(self, value):
         "Store the operation's status."
         self.job._project.document.setdefault('_status', dict())
-        for opid in self.operation_ids:
-            self.job._project.document._status[opid] = int(value)
+        self.job._project.document._status[self.id] = int(value)
 
     def get_status(self):
         "Retrieve the operation's last known status."
         try:
-            return [JobStatus(self.job._project.document['_status'].get(op_id,
-                                                                        JobStatus.unknown))
-                    for op_id in self.operation_ids]
+            return JobStatus(self.job._project.document['_status'].get(self.id,
+                                                                       JobStatus.unknown))
         except KeyError:
-            return [JobStatus.unknown for op_id in self.operation_ids]
-
-    def eligible_for_submission(self):
-        """Determine if a job-operation is eligible for submission.
-
-        By default, an operation is eligible for submission when it
-        is not considered active, that means already queued or running.
-        """
-        return not any([status >= JobStatus.submitted
-                        for status in self.get_status()])
+            return JobStatus.unknown
 
 
 class FlowCondition(object):
@@ -593,15 +581,12 @@ class FlowGroup(object):
     def compatible(self, group):
         return not set(self).intersection(group)
 
-    def _generate_id(self, job, operation_name=None, index=0):
+    def _generate_id(self, job, index=0):
         "Return a name, which identifies this job-group."
         project = job._project
 
-        if operation_name is None:
-            # The full name is designed to be truly unique for each job-group.
-            op_string = ''.join(sorted(list(self.operations.keys())))
-        else:
-            op_string = operation_name
+        # The full name is designed to be truly unique for each job-group.
+        op_string = ''.join(sorted(list(self.operations.keys())))
 
         full_name = '{}%{}%{}%{}'.format(project.root_directory(),
                                          job.get_id(),
@@ -626,7 +611,15 @@ class FlowGroup(object):
         # By appending the unique job_op_id, we ensure that each id is truly unique.
         return readable_name + job_op_id
 
+    def _get_status(self, job):
+        try:
+            return JobStatus(job._project.document['_status'].get(self._generate_id(job),
+                                                                  JobStatus.unknown))
+        except KeyError:
+            return JobStatus.unknown
+
     def create_job_operation(self, job, mode='run', index=0):
+        """Create a JobOperation object from the FlowGroup."""
         # A copy is made to prevent unused directives warnings that are used in
         # the creation of the command.
         new_directives = dict(self.directives)
@@ -645,9 +638,6 @@ class FlowGroup(object):
 
         return JobOperation(self._generate_id(job, index=index),
                             self.name,
-                            [self._generate_id(job=job, operation_name=op_name,
-                                               index=0)
-                                for op_name in self.operations.keys()],
                             job,
                             self.__call__(job, mode),
                             new_directives,
@@ -1112,7 +1102,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :rtype:
             str
         """
-        op_ids = [op_id for op in operations for op_id in op.operation_ids]
+        op_ids = [op.id for op in operations]
         if len(op_ids) == 1:
             return op_ids[0]
         else:
@@ -1165,16 +1155,23 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _get_operations_status(self, job, cached_status):
         "Return a dict with information about job-operations for this job."
-        for op in self._job_operations(job, False):
-            flow_op = self.operations[op.name]
-            completed = flow_op.complete(job)
-            eligible = False if completed else flow_op.eligible(job)
-            scheduler_status = cached_status.get(op.id, JobStatus.unknown)
-            yield op.name, {
-                'scheduler_status': scheduler_status,
-                'eligible': eligible,
-                'completed': completed,
-            }
+        starting_dict = functools.partial(dict, scheduler_status=JobStatus.unknown)
+        status_dict = defaultdict(starting_dict)
+        for group in self._groups.values():
+            completed = group.complete(job)
+            eligible = False if completed else group.eligible(job)
+            scheduler_status = cached_status.get(group._generate_id(job),
+                                                 JobStatus.unknown)
+            for operation in group.operations.keys():
+                if scheduler_status >= status_dict[operation]['scheduler_status']:
+                    status_dict[operation] = {
+                            'scheduler_status': scheduler_status,
+                            'eligible': eligible,
+                            'completed': completed
+                            }
+
+        for status in status_dict.items():
+            yield status
 
     def get_job_status(self, job, ignore_errors=False, cached_status=None):
         "Return a dict with detailed information about the status of a job."
@@ -1224,8 +1221,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             for job in tqdm(jobs,
                             desc="Fetching operation status",
                             total=len(jobs), file=file):
-                for op in self._job_operations(job, only_eligible=False):
-                    status[op.id] = int(scheduler_info.get(op.id, JobStatus.unknown))
+                for group in self._groups.values():
+                    _id = group._generate_id(job)
+                    status[_id] = int(scheduler_info.get(_id, JobStatus.unknown))
             self.document._status.update(status)
         except NoSchedulerError:
             logger.debug("No scheduler available.")
@@ -1848,11 +1846,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @staticmethod
     def _dumps_op(op):
-        return (op.id, op.name, op.operation_ids, op.job._id, op.cmd, op.directives)
+        return (op.id, op.name, op.job._id, op.cmd, op.directives)
 
     def _loads_op(self, blob):
-        id, name, op_ids, job_id, cmd, directives = blob
-        return JobOperation(id, name, op_ids, self.open_job(id=job_id), cmd, directives)
+        id, name, job_id, cmd, directives = blob
+        return JobOperation(id, name, self.open_job(id=job_id), cmd, directives)
 
     def _run_operations_in_parallel(self, pool, pickle, operations, progress, timeout):
         """Execute operations in parallel.
@@ -1987,14 +1985,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             jobs = self
 
         # Change group names to their constituent operations
+        extended_names = []
         if names is not None:
-            expanded_names = []
-            for name in names:
-                try:
-                    expanded_names.extend(list(self._groups[name].operations.keys()))
-                except KeyError:
-                    expanded_names.append(name)
-            names = list(set(expanded_names))
+            groups = self._gather_FlowGroups(names)
+            for group in groups:
+                extended_names.extend(list(group.operations.keys()))
+            names = set(extended_names)
 
         # Negative values for the execution limits, means 'no limit'.
         if num_passes and num_passes < 0:
@@ -2109,18 +2105,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 for group in groups:
                     operations[group.name] = group
             else:
-                ops = [(op, oname) for oname, op in self.operations.items() if
-                       fullmatch(name, oname)]
-                if ops != list():
-                    for op, oname in ops:
-                        operations[oname] = FlowGroup(name=oname,
-                                                      operations={oname: op},
-                                                      directives=op.directives)
-                else:
-                    # remove error for now until desided
-                    # raise ValueError("Operation/Group {} is not defined".
-                    #                  format(name))
-                    pass
+                # remove error for now until desided
+                # raise ValueError("Operation/Group {} is not defined".
+                #                  format(name))
+                pass
         operations = list(operations.values())
         if not self._verify_group_compatibility(operations):
             raise ValueError("Cannot specify groups or operations that "
@@ -2131,10 +2119,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _get_pending_groups(self, jobs, groups, mode='run'):
         for job in jobs:
             for group in groups:
-                if group.eligible(job):
-                    job_ob = group.create_job_operation(job, mode=mode, index=0)
-                    if job_ob.eligible_for_submission():
-                        yield job_ob
+                if group.eligible(job) and self.eligible_for_submission(group,
+                                                                        job):
+                    yield group.create_job_operation(job, mode=mode, index=0)
 
     def _get_pending_operations(self, jobs, operation_names=None,
                                 mode='run'):
@@ -2371,8 +2358,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         else:
             with self._potentially_buffered():
                 operations = (op for op in self._get_pending_operations(jobs, names,
-                                                                        mode)
-                              if op.eligible_for_submission())
+                                                                        mode))
             if num is not None:
                 operations = list(islice(operations, num))
 
@@ -2765,15 +2751,22 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if op.complete(job):
                 yield name
 
-    def _job_operations(self, job, only_eligible, mode='run'):
+    def _job_operations(self, job, only_eligible, mode='run',
+                        submission_eligible=True):
         "Yield instances of JobOperation constructed for specific jobs."
         for name in self.operations.keys():
             group = self._groups[name]
-            if only_eligible and not group.eligible(job):
+            if only_eligible:
+                eligible = group.eligible(job)
+                if submission_eligible:
+                    eligible &= self.eligible_for_submission(group, job)
+            else:
+                eligible = True
+            if not eligible:
                 continue
             yield group.create_job_operation(job=job, mode=mode, index=0)
 
-    def next_operations(self, *jobs, mode='run'):
+    def next_operations(self, *jobs, mode='run', submission_eligible=True):
         """Determine the next eligible operations for jobs.
 
         :param jobs:
@@ -2784,14 +2777,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             All instances of :class:`~.JobOperation` jobs are eligible for.
         """
         for job in jobs:
-            for op in self._job_operations(job, True, mode=mode):
+            for op in self._job_operations(job, True, mode=mode,
+                                           submission_eligible=submission_eligible):
                 yield op
 
     @deprecated(
         deprecated_in="0.8", removed_in="1.0",
         current_version=__version__,
         details="Use next_operations() instead.")
-    def next_operation(self, job):
+    def next_operation(self, job, mode='run', submission_eligible=True):
         """Determine the next operation for this job.
 
         :param job:
@@ -2807,7 +2801,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type mode:
             str
         """
-        for operation in self.next_operations(job, mode=mode):
+        for operation in self.next_operations(job, mode=mode,
+                                              submission_eligible=submission_eligible):
             return operation
 
     @classmethod
@@ -2923,10 +2918,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 func._flow_group.append(add_to_group.group_name)
             else:
                 func._flow_group = [add_to_group.group_name]
-<<<<<<< HEAD
             add_to_group._flow_post.extend([pc for pc in func._flow_post])
-=======
->>>>>>> Singleton `FlowGroup`s and move directives to `FlowGroup`s
             return func
         # Specify group name
         add_to_group.group_name = name
@@ -2997,16 +2989,19 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def groups(self):
         return self._groups
 
-    def eligible_for_submission(self, job_operation):
-        """Determine if a job-operation is eligible for submission.
+    def eligible_for_submission(self, flow_group, job):
+        """Determine if a flow_group is eligible for submission wrt a given job.
 
         By default, an operation is eligible for submission when it
         is not considered active, that means already queued or running.
         """
-        if job_operation is None:
+        if flow_group is None or job is None:
             return False
-        if job_operation.get_status() >= JobStatus.submitted:
-            return False
+        group_ops = set(flow_group.operations.values())
+        for other_group in self._groups.values():
+            if group_ops & set(other_group.operations.values()):
+                if other_group._get_status(job) >= JobStatus.submitted:
+                    return False
         return True
 
     @deprecated(
@@ -3144,18 +3139,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             self._fetch_scheduler_status(jobs)
 
         mode = 'exec' if args.exec_mode else 'run'
-        # Choose the group(s) or operations path
-        if args.operation_name:
-            operations = self._gather_FlowGroups(args.operation_name)
-            operations = self._get_pending_groups(jobs,
-                                                  operations,
-                                                  mode)
-            operations = [op for op in operations if
-                          op.eligible_for_submission()]
-        # Unspecified group or operationss
-        else:
-            # Gather all pending operations ...
-            with self._potentially_buffered():
+        # Gather all pending operations ...
+        with self._potentially_buffered():
+            if args.operation_name:
+                operations = self._gather_FlowGroups(args.operation_name)
+                operations = self._get_pending_groups(jobs,
+                                                      operations,
+                                                      mode)
+            # Unspecified group or operationss
+            else:
                 operations = self._get_pending_operations(jobs,
                                                           args.operation_name,
                                                           mode)

@@ -884,18 +884,18 @@ class ExecutionProjectTest(BaseProjectTest):
         self.assertEqual(len(list(MockScheduler.jobs())), num_jobs_submitted)
 
         for job in project:
-            next_op = project.next_operation(job)
+            next_op = project.next_operation(job, submission_eligible=False)
             self.assertIsNotNone(next_op)
-            self.assertEqual(next_op.get_status()[0], JobStatus.submitted)
+            self.assertEqual(next_op.get_status(), JobStatus.submitted)
 
         MockScheduler.step()
         MockScheduler.step()
         project._fetch_scheduler_status(file=StringIO())
 
         for job in project:
-            next_op = project.next_operation(job)
+            next_op = project.next_operation(job, submission_eligible=False)
             self.assertIsNotNone(next_op)
-            self.assertEqual(next_op.get_status()[0], JobStatus.queued)
+            self.assertEqual(next_op.get_status(), JobStatus.queued)
 
         MockScheduler.step()
         project._fetch_scheduler_status(file=StringIO())

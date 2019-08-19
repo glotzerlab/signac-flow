@@ -2812,8 +2812,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             setattr(args, dest, getattr(args, 'main_' + dest) or getattr(args, dest))
             delattr(args, 'main_' + dest)
 
-        # Read the config file and
-        flow_config.get_config_value('show_traceback')
+        # Read the config file and set the internal flag
+        # flow_config.get_config_value('show_traceback')
             
         if args.debug:  # Implies '-vv' and '--show-traceback'
             args.verbose = max(2, args.verbose)

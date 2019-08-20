@@ -2810,21 +2810,31 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         # and the parent parser that are shared by all subparsers:
         for dest in ('verbose', 'show_traceback', 'debug'):
             setattr(args, dest, getattr(args, 'main_' + dest) or getattr(args, dest))
+            # args.verbose = args.main_verbose OR args.verbose = args.verbose
+            # args.show_traceback = args.main_show_traceback OR args.show_traceback = args.show_traceback
+            # args.debug = args.main_debug OR args.debug = args.debug
             delattr(args, 'main_' + dest)
+            # end up with only:
+            #     args.verbose, args.show_traceback, and args.debug
 
-        # Read the config file and set the internal flag
-        # flow_config.get_config_value('show_traceback')
-            
+        # LOGIC:
+        # the command line flag overwrites the value in the config
+        # file. However, if no command line flag is passed, the False
+        # does not overwrite the value if stored in the config
+
+        # debug passed on the command line overwrites the value in the config file
+        # debug and config_show_traceback is true: the args.debug line applies
+        # debug and config_show_traceback is false: still the above applies
+
+        # Read the config file and set the internal flag.
+        # Do not overwrite with False if not present in config file
+        if flow_config.get_config_value('show_traceback'):
+            args.show_traceback = True
+
         if args.debug:  # Implies '-vv' and '--show-traceback'
             args.verbose = max(2, args.verbose)
             args.show_traceback = True
 
-
-        # the command line flag overwrites the value in the config file
-        # debug passed on the command line overwrites the value in the config file
-        # debug and config_show_traceback is true: the args.debug line applies
-        # debug and config_show_traceback is false: still the above applies
-            
         # Support print_status argument alias
         if args.func == self._main_status and args.full:
             args.detailed = args.all_ops = True

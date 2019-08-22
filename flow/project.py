@@ -2116,12 +2116,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             help="Manually specify all labels that are required for the direct command "
                  "to be considered eligible for execution.")
 
-    @deprecated(deprecated_in="0.6", removed_in="0.8")
-    def update_stati(self, *args, **kwargs):
-        "This function has been removed as of version 0.6."
-        raise RuntimeError(
-            "The update_stati() method has been removed as of version 0.6.")
-
     @deprecated(deprecated_in="0.8", removed_in="1.0")
     def export_job_stati(self, collection, stati):
         "Export the job stati to a database collection."

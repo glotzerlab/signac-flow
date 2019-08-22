@@ -2119,15 +2119,15 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
     @deprecated(deprecated_in="0.8", removed_in="1.0")
     def export_job_stati(self, collection, stati):
         "Export the job stati to a database collection."
-        for status in stati:
+        self.export_job_statuses(self, collection, stati)
+
+    def export_job_statuses(self, collection, statuses):
+        "Export the job statuses to a database collection."
+        for status in statuses:
             job = self.open_job(id=status['job_id'])
             status['statepoint'] = job.statepoint()
             collection.update_one({'_id': status['job_id']},
                                   {'$set': status}, upsert=True)
-
-    def export_job_statuses(self, collection, statuses):
-        "Export the job statuses to a database collection."
-        self.export_job_stati(self, collection, statuses)
 
     @classmethod
     def _add_print_status_args(cls, parser):

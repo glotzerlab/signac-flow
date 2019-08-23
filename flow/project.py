@@ -133,66 +133,6 @@ class _condition(object):
         return cls(lambda job: not condition(job))
 
 
-def setup_pre_conditions_class(cls):
-
-    class _pre(_condition):
-
-        owner_class = cls
-
-        def __init__(self, condition):
-            self.condition = condition
-
-        def __call__(self, func):
-            self.owner_class._OPERATION_PRE_CONDITIONS[func].insert(0, self.condition)
-            return func
-
-        @classmethod
-        def copy_from(cls, *other_funcs):
-            "True if and only if all pre conditions of other function(s) are met."
-            def metacondition(job):
-                return all(c(job)
-                           for other_func in other_funcs
-                           for c in cls.owner_class._collect_pre_conditions()
-                           .get(other_func, list()))
-            return cls(metacondition)
-
-        @classmethod
-        def after(cls, *other_funcs):
-            "True if and only if all post conditions of other function(s) are met."
-            def metacondition(job):
-                return all(c(job)
-                           for other_func in other_funcs
-                           for c in cls.owner_class._collect_post_conditions()
-                           .get(other_func, list()))
-            return cls(metacondition)
-    return _pre
-
-
-def setup_post_conditions_class(cls):
-
-    class _post(_condition):
-
-        owner_class = cls
-
-        def __init__(self, condition):
-            self.condition = condition
-
-        def __call__(self, func):
-            self.owner_class._OPERATION_POST_CONDITIONS[func].insert(0, self.condition)
-            return func
-
-        @classmethod
-        def copy_from(cls, *other_funcs):
-            "True if and only if all post conditions of other function(s) are met."
-            def metacondition(job):
-                return all(c(job)
-                           for other_func in other_funcs
-                           for c in cls.owner_class._collect_post_conditions()
-                           .get(other_func, list()))
-            return cls(metacondition)
-    return _post
-
-
 def make_bundles(operations, size=None):
     """Utility function for the generation of bundles.
 
@@ -488,10 +428,66 @@ class _FlowProjectClass(type):
 
         # Give the class a pre and post class that are aware of the class they
         # are in.
-        cls.pre = setup_pre_conditions_class(cls)
-        cls.post = setup_post_conditions_class(cls)
-
+        cls.pre = cls._setup_pre_conditions_class(cls)
+        cls.post = cls._setup_post_conditions_class(cls)
         return cls
+
+    @classmethod
+    def _setup_pre_conditions_class(cls, _cls):
+
+        class _pre(_condition):
+
+            owner_class = _cls
+
+            def __init__(self, condition):
+                self.condition = condition
+
+            def __call__(self, func):
+                self.owner_class._OPERATION_PRE_CONDITIONS[func].insert(0, self.condition)
+                return func
+
+            @classmethod
+            def copy_from(cls, *other_funcs):
+                "True if and only if all pre conditions of other function(s) are met."
+                def metacondition(job):
+                    return all(c(job)
+                               for other_func in other_funcs
+                               for c in cls.owner_class._collect_pre_conditions()[other_func])
+                return cls(metacondition)
+
+            @classmethod
+            def after(cls, *other_funcs):
+                "True if and only if all post conditions of other function(s) are met."
+                def metacondition(job):
+                    return all(c(job)
+                               for other_func in other_funcs
+                               for c in cls.owner_class._collect_post_conditions()[other_func])
+                return cls(metacondition)
+        return _pre
+
+    @classmethod
+    def _setup_post_conditions_class(cls, _cls):
+
+        class _post(_condition):
+
+            owner_class = _cls
+
+            def __init__(self, condition):
+                self.condition = condition
+
+            def __call__(self, func):
+                self.owner_class._OPERATION_POST_CONDITIONS[func].insert(0, self.condition)
+                return func
+
+            @classmethod
+            def copy_from(cls, *other_funcs):
+                "True if and only if all post conditions of other function(s) are met."
+                def metacondition(job):
+                    return all(c(job)
+                               for other_func in other_funcs
+                               for c in cls.owner_class._collect_post_conditions()[other_func])
+                return cls(metacondition)
+        return _post
 
 
 class FlowProject(six.with_metaclass(_FlowProjectClass,
@@ -2333,27 +2329,28 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
     def _collect_operations(cls):
         "Collect all operations that were add via decorator."
         operations = []
-        for cls_ in cls.__mro__:
-            operations.extend(getattr(cls_, '_OPERATION_FUNCTIONS', []))
+        for parent_class in cls.__mro__:
+            operations.extend(getattr(parent_class, '_OPERATION_FUNCTIONS', []))
         return operations
+
+    @classmethod
+    def _collect_conditions(cls, attr):
+        "Collect conditions from attr using the mro hierarchy."
+        ret = defaultdict(list)
+        for parent_class in cls.__mro__:
+            for func, conds in getattr(parent_class, attr, dict()).items():
+                ret[func].extend(conds)
+        return ret
 
     @classmethod
     def _collect_pre_conditions(cls):
         "Collect all pre-conditions that were add via decorator."
-        ret = defaultdict(list)
-        for cls_ in cls.__mro__:
-            for func, conds in getattr(cls_, '_OPERATION_PRE_CONDITIONS', dict()).items():
-                ret[func].extend(conds)
-        return ret
+        return cls._collect_conditions('_OPERATION_PRE_CONDITIONS')
 
     @classmethod
     def _collect_post_conditions(cls):
         "Collect all post-conditions that were add via decorator."
-        ret = defaultdict(list)
-        for cls_ in cls.__mro__:
-            for func, conds in getattr(cls_, '_OPERATION_POST_CONDITIONS', dict()).items():
-                ret[func].extend(conds)
-        return ret
+        return cls._collect_conditions('_OPERATION_POST_CONDITIONS')
 
     def _register_operations(self):
         "Register all operation functions registered with this class and its parent classes."

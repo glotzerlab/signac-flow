@@ -307,7 +307,14 @@ class ProjectClassTest(BaseProjectTest):
         self.assertEqual(len(c._label_functions), 1)
 
     def test_conditions_with_inheritance(self):
+        """
+        Tests the inheritance of pre/post conditions.
 
+        Class A should only have one pre/post condition, while class C that
+        inherits from A should have three, and class B should just have two
+        explicitly defined. Proper execution is tested in the
+        ExecutionProjectTest.
+        """
         class A(FlowProject):
             pass
 
@@ -741,6 +748,66 @@ class ExecutionProjectTest(BaseProjectTest):
                 self.assertTrue(job.isfile('world.txt'))
             else:
                 self.assertFalse(job.isfile('world.txt'))
+
+    def test_run_condition_inheritance(self):
+        _project = getattr(self, 'project_class', None)
+
+        class A(FlowProject):
+            pass
+
+        class B(FlowProject):
+            pass
+
+        class C(A):
+            pass
+
+        @A.pre.never
+        @B.pre.always
+        @A.post.never
+        @B.post.never
+        @A.operation
+        @B.operation
+        def op1(job):
+            job.doc.op1 = True
+
+        @A.pre.always
+        @B.pre.never
+        @A.post.never
+        @B.post.never
+        @A.operation
+        @B.operation
+        def op2(job):
+            job.doc.op2 = True
+
+        @A.pre.always
+        @C.pre.never
+        @B.pre.never
+        @A.post.never
+        @B.post.never
+        @A.operation
+        @B.operation
+        def op3(job):
+            job.doc.op3 = True
+
+        for project_class, bad_ops, good_ops in zip(
+                [A, B, C],
+                [['op1'], ['op2', 'op3'], ['op1', 'op3']],
+                [['op2', 'op3'], ['op1'], []]):
+
+            self.project_class = project_class
+            for job in self.project.find_jobs():
+                job.remove()
+            project = self.mock_project()
+            project.run()
+            # All bad operations do not run
+            assert all([not job.doc.get(op, False)
+                        for op in bad_ops
+                        for job in project])
+            # All good operations do run
+            assert all([job.doc.get(op, False)
+                        for op in good_ops
+                        for job in project])
+        self.project_class = _project
 
     def test_submit_operations(self):
         MockScheduler.reset()

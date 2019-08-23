@@ -105,7 +105,7 @@ class MockScheduler(Scheduler):
         cls._jobs[cid] = ClusterJob(_id, status=JobStatus.submitted)
         signac_path = os.path.dirname(os.path.dirname(os.path.abspath(signac.__file__)))
         flow_path = os.path.dirname(os.path.dirname(os.path.abspath(flow.__file__)))
-        pythonpath = ':'.join(os.environ.get('PYTHONPATH', []) + [signac_path, flow_path])
+        pythonpath = ':'.join([os.environ.get('PYTHONPATH', '')] + [signac_path, flow_path])
         cls._scripts[cid] = 'export PYTHONPATH={}\n'.format(pythonpath) + script
         return JobStatus.submitted
 

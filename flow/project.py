@@ -68,7 +68,6 @@ from .util.misc import add_cwd_to_environment_pythonpath
 from .util.misc import switch_to_directory
 from .util.misc import TrackGetItemDict
 from .util.misc import fullmatch
-from .util.progressbar import with_progressbar
 from .util.translate import abbreviate
 from .util.translate import shorten
 from .util.execution import fork
@@ -962,9 +961,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                     "A parallelized status update failed due to error ('{}'). "
                     "Entering serial mode with fallback progress indicator. The "
                     "status update may take longer than ususal.".format(error))
-                return list(with_progressbar(
+                return list(tqdm(
                     iterable=map(_get_job_status, jobs),
-                    total=len(jobs), desc='Collect job status info:', file=err))
+                    desc='Collect job status info:', total=len(jobs), file=err))
 
     PRINT_STATUS_ALL_VARYING_PARAMETERS = True
     """This constant can be used to signal that the print_status() method is supposed
@@ -1420,9 +1419,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
         def _add_dummy_operation(job):
             job['operations'][''] = {
-                    'completed': False,
-                    'eligible': True,
-                    'scheduler_status': JobStatus.dummy}
+                'completed': False,
+                'eligible': True,
+                'scheduler_status': JobStatus.dummy}
 
         for job in context['jobs']:
             has_eligible_ops = any([v['eligible'] for v in job['operations'].values()])
@@ -1536,7 +1535,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         try:
             s_project = pickle.dumps(self)
             s_tasks = [(pickle.loads, s_project, self._dumps_op(op))
-                       for op in with_progressbar(operations, desc='Serialize tasks')]
+                       for op in tqdm(operations, desc='Serialize tasks', file=sys.stderr)]
         except Exception as error:  # Masking all errors since they must be pickling related.
             raise self._PickleError(error)
 

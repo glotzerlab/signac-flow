@@ -324,11 +324,11 @@ class ProjectClassTest(BaseProjectTest):
         class C(A):
             pass
 
-        @A.pre(lambda job: True)
-        @C.pre(lambda job: True)
-        @C.pre(lambda job: True)
-        @B.pre(lambda job: True)
-        @B.pre(lambda job: True)
+        @A.pre.always
+        @C.pre.always
+        @C.pre.always
+        @B.pre.always
+        @B.pre.always
         @A.operation
         @B.operation
         def op1(job):
@@ -338,11 +338,11 @@ class ProjectClassTest(BaseProjectTest):
         self.assertEqual(len(B._collect_pre_conditions()[op1]), 2)
         self.assertEqual(len(C._collect_pre_conditions()[op1]), 3)
 
-        @A.post(lambda job: True)
-        @C.post(lambda job: True)
-        @C.post(lambda job: True)
-        @B.post(lambda job: True)
-        @B.post(lambda job: True)
+        @A.post.always
+        @C.post.always
+        @C.post.always
+        @B.post.always
+        @B.post.always
         @A.operation
         @B.operation
         def op2(job):

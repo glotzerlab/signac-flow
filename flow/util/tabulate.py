@@ -6,6 +6,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 from collections import namedtuple
 from platform import python_version_tuple
+from deprecation import deprecated
 import re
 
 
@@ -138,6 +139,7 @@ def _latex_line_begin_tabular(colwidths, colaligns, booktabs=False):
     tabular_columns_fmt = "".join([alignment.get(a, "l") for a in colaligns])
     return "\n".join(["\\begin{tabular}{" + tabular_columns_fmt + "}",
                       "\\toprule" if booktabs else "\hline"])
+
 
 LATEX_ESCAPE_RULES = {r"&": r"\&", r"%": r"\%", r"$": r"\$", r"#": r"\#",
                       r"_": r"\_", r"^": r"\^{}", r"{": r"\{", r"}": r"\}",
@@ -674,6 +676,7 @@ def _normalize_tabular_data(tabular_data, headers):
     return rows, headers
 
 
+@deprecated(deprecated_in="0.8", removed_in="1.0")
 def tabulate(tabular_data, headers=(), tablefmt="simple",
              floatfmt="g", numalign="decimal", stralign="left",
              missingval=""):

@@ -87,4 +87,9 @@ contributors:
     given-names: Alyssa
     affiliation: "University of Michigan"
     orcid: "https://orcid.org/0000-0001-5953-8807"
+  -
+    family-names: Kerr
+    given-names: Corwin
+    affiliation: "University of Michigan"
+    orcid: "https://orcid.org/0000-0003-0776-2596"
 ...

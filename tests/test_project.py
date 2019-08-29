@@ -761,6 +761,8 @@ class ExecutionProjectTest(BaseProjectTest):
         class C(A):
             pass
 
+        # Never post conditions are to prevent warnings on operations without
+        # post conditions
         @A.pre.never
         @B.pre.always
         @A.post.never
@@ -792,7 +794,7 @@ class ExecutionProjectTest(BaseProjectTest):
         for project_class, bad_ops, good_ops in zip(
                 [A, B, C],
                 [['op1'], ['op2', 'op3'], ['op1', 'op3']],
-                [['op2', 'op3'], ['op1'], []]):
+                [['op2', 'op3'], ['op1'], ['op2']]):
 
             self.project_class = project_class
             for job in self.project.find_jobs():

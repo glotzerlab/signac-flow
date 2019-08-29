@@ -432,12 +432,12 @@ class _FlowProjectClass(type):
         cls.post = cls._setup_post_conditions_class(cls)
         return cls
 
-    @classmethod
-    def _setup_pre_conditions_class(cls, _cls):
+    @staticmethod
+    def _setup_pre_conditions_class(cls):
 
         class _pre(_condition):
 
-            owner_class = _cls
+            owner_class = cls
 
             def __init__(self, condition):
                 self.condition = condition
@@ -465,12 +465,12 @@ class _FlowProjectClass(type):
                 return cls(metacondition)
         return _pre
 
-    @classmethod
-    def _setup_post_conditions_class(cls, _cls):
+    @staticmethod
+    def _setup_post_conditions_class(cls):
 
         class _post(_condition):
 
-            owner_class = _cls
+            owner_class = cls
 
             def __init__(self, condition):
                 self.condition = condition

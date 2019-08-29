@@ -342,7 +342,7 @@ class FlowCondition(object):
         return self._callback == other._callback
 
 
-class FlowOperation(object):
+class BaseFlowOperation(object):
     """A FlowOperation represents a data space operation, operating on any job.
 
     Any FlowOperation is associated with a specific command, which should be
@@ -381,11 +381,6 @@ class FlowOperation(object):
         The command to execute operation; should be a function of job.
     :type cmd:
         str or callable
-    :param path:
-        A file path to the file where the operation is defined or specified by
-        the user.
-    :type path:
-        :class:`str`
     :param pre:
         required conditions
     :type pre:
@@ -396,19 +391,14 @@ class FlowOperation(object):
         sequence of callables
     """
 
-    def __init__(self, cmd, path, pre=None, post=None):
+    def __init__(self, pre=None, post=None):
         if pre is None:
             pre = []
         if post is None:
             post = []
-        self._cmd = cmd
-        self.path = path
 
         self._prereqs = [FlowCondition(cond) for cond in pre]
         self._postconds = [FlowCondition(cond) for cond in post]
-
-    def __str__(self):
-        return "{type}(cmd='{cmd}')".format(type=type(self).__name__, cmd=self._cmd)
 
     def eligible(self, job):
         "Eligible, when all pre-conditions are true and at least one post-condition is false."
@@ -426,11 +416,31 @@ class FlowOperation(object):
         else:
             return False
 
+
+class FlowCmdOperation(BaseFlowOperation):
+
+    def __init__(self, cmd, pre=None, post=None):
+        self._cmd = cmd
+        super(FlowCmdOperation, self).__init__(pre=pre, post=post)
+
+    def __str__(self):
+        return "{type}(cmd='{cmd}')".format(type=type(self).__name__, cmd=self._cmd)
+
     def __call__(self, job=None):
         if callable(self._cmd):
             return self._cmd(job).format(job=job)
         else:
             return self._cmd.format(job=job)
+
+
+class FlowOperation(BaseFlowOperation):
+
+    def __init__(self, name, pre=None, post=None):
+        self.name = name
+        super(FlowOperation, self).__init__(pre=pre, post=post)
+
+    def __str__(self):
+        return "{type}(name='{name}')".format(type=type(self).__name__, name=self.name)
 
 
 class FlowGroup(object):
@@ -469,16 +479,17 @@ class FlowGroup(object):
 
     MAX_LEN_ID = 100
 
-    def __init__(self, name, operations=None, run_cmd=None, exec_cmd=None,
+    def __init__(self, name, path, operations=None, run_cmd=None, exec_cmd=None,
                  directives=None, options=None):
         self.name = name
+        self.path = path
         if options is None:
             self.options = ""
         else:
             self.options = options
 
         if operations is None:
-            self.operations = {}
+            self.operations = dict()
         else:
             self.operations = operations
 
@@ -495,27 +506,21 @@ class FlowGroup(object):
                         executable = sys.executable
                 except (KeyError, TypeError):
                     executable = sys.executable
-                try:
-                    path = directives['override_path']
-                    if path == '':
-                        path = list(operations.values())[0].path
-                except (KeyError, TypeError):
-                    path = list(operations.values())[0].path
 
                 if callable(executable):
                     if job is None:
                         raise ValueError("Executable cannot be callable if"
                                          "job is not set.")
                     else:
-                        return '{} {} run -o {}'.format(executable(job), path, name)
+                        return '{} {} run -o {}'.format(executable(job), self.path, name)
                 else:
                     if job is None:
                         return "{} {} run -o {}".format(executable,
-                                                        path,
+                                                        self.path,
                                                         ' '.join(list(operations.keys()))
                                                         )
                     return "{} {} run -j {} -o {}".format(executable,
-                                                          path,
+                                                          self.path,
                                                           job,
                                                           ' '.join(list(operations.keys()))
                                                           )
@@ -526,20 +531,17 @@ class FlowGroup(object):
         if exec_cmd is None:
             def cmd(operations, directives, job=None):
                 op = list(operations.values())[0]
-                try:
-                    executable = directives['executable']
-                except (KeyError, TypeError):
-                    executable = sys.executable
-                try:
-                    path = directives['override_path']
-                except (KeyError, TypeError):
-                    path = op.path
 
-                if callable(executable):
-                    cmd_str = "{} {} ".format(executable(job), path) + op(job)
+                if isinstance(op, FlowCmdOperation):
+                    return op(job).lstrip()
                 else:
-                    cmd_str = "{} {} ".format(executable, path) + op(job)
-                return cmd_str.lstrip()
+                    try:
+                        executable = directives['executable']
+                        if callable(executable):
+                            executable = executable(job)
+                    except (KeyError, TypeError):
+                        executable = sys.executable
+                    return '{} {} exec {} {}'.format(executable, self.path, op.name, job).lstrip()
 
             self._exec_cmd = cmd
         else:
@@ -623,11 +625,6 @@ class FlowGroup(object):
         # A copy is made to prevent unused directives warnings that are used in
         # the creation of the command.
         new_directives = dict(self.directives)
-        for key in ['override_path']:
-            try:
-                del new_directives[key]
-            except KeyError:
-                pass
         # If 'executable' is '' then is must have been set to prevent the
         # inclusion of sys.executable for a command line operation
         try:
@@ -2127,8 +2124,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                 mode='run'):
         "Get all pending operations for the given selection."
         assert not isinstance(operation_names, str)
-        for op in self.next_operations(* jobs):
-            if operation_names is None or any(re.fullmatch(n, op.name) for n in operation_names):
+        for op in self.next_operations(* jobs, mode=mode):
+            if operation_names is None or any(fullmatch(n, op.name) for n in operation_names):
                 yield op
 
     def _verify_group_compatibility(self, groups):
@@ -2645,7 +2642,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             elif bool(label_value) is True:
                 yield label_name
 
-    def add_operation(self, name, cmd, pre=None, post=None, **kwargs):
+    def add_operation(self, name, cmd, pre=None, post=None):
         """
         Add an operation to the workflow.
 
@@ -2712,7 +2709,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         if name in self.operations:
             raise KeyError("An operation with this identifier is already added.")
-        self.operations[name] = FlowOperation(cmd=cmd, pre=pre, post=post, directives=kwargs)
+        self.operations[name] = FlowOperation(cmd=cmd, pre=pre, post=post)
 
     @deprecated(
         deprecated_in="0.8", removed_in="1.0",
@@ -2896,10 +2893,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
             # Construct FlowOperation:
             if getattr(func, '_flow_cmd', False):
-                self._operations[name] = FlowOperation(cmd=func, path=path, **params)
+                self._operations[name] = FlowCmdOperation(cmd=func, **params)
             else:
-                cmd_str = "exec {} {{job._id}}".format(name)
-                self._operations[name] = FlowOperation(cmd=cmd_str, path=path, **params)
+                self._operations[name] = FlowOperation(name=name, **params)
                 self._operation_functions[name] = func
 
     @classmethod
@@ -2940,7 +2936,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     "'{}'.".format(group['name']))
 
             # Create group
-            self._groups[group['name']] = FlowGroup(**group)
+            path = inspect.getsourcefile(inspect.getmodule(self))
+            self._groups[group['name']] = FlowGroup(path=path, **group)
 
         # Add operations to group
         # Currently recreating operation list. There may be a better way to do
@@ -2959,12 +2956,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 self._groups[name].directives = func._flow_directives
             except (AttributeError):
                 pass
-
-            # For flow command operations directives must be set to avoid
-            # overwriting the command
-            if hasattr(func, '_flow_cmd'):
-                self._groups[name].directives['executable'] = ''
-                self._groups[name].directives['override_path'] = ''
 
     def _get_operation_path(self, op_name):
         operations = []

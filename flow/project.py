@@ -1964,7 +1964,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         # Gather all pending operations.
         with self._potentially_buffered():
             operations = (op for op in self._get_pending_operations(jobs, names)
-                          if self.eligible_for_submission(op))
+                          if self._eligible_for_submission(op))
             if num is not None:
                 operations = list(islice(operations, num))
 
@@ -2460,7 +2460,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         "The dictionary of operations that have been added to the workflow."
         return self._operations
 
-    def eligible_for_submission(self, job_operation):
+    def _eligible_for_submission(self, job_operation):
         """Determine if a job-operation is eligible for submission.
 
         By default, an operation is eligible for submission when it
@@ -2471,6 +2471,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         if job_operation.get_status() >= JobStatus.submitted:
             return False
         return True
+
+    @deprecated(deprecated_in="0.8", removed_in="1.0", details="Use _eligible_for_submission instead.")
+    def eligible_for_submission(self, job_operation):
+        return _eligible_for_submission(self, job_operation)
 
     def _main_status(self, args):
         "Print status overview."
@@ -2592,7 +2596,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         # Gather all pending operations ...
         with self._potentially_buffered():
             ops = (op for op in self._get_pending_operations(jobs, args.operation_name)
-                   if self.eligible_for_submission(op))
+                   if self._eligible_for_submission(op))
             ops = list(islice(ops, args.num))
 
         # Bundle operations up, generate the script, and submit to scheduler.

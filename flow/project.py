@@ -731,16 +731,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             pass
     """
 
-    NAMES = {
-        'next_operation': 'next_op',
-    }
-    "Simple translation table for output strings."
-
-    @classmethod
-    def _tr(cls, x):
-        "Use name translation table for x."
-        return cls.NAMES.get(x, x)
-
     ALIASES = dict(
         unknown='U',
         registered='R',
@@ -897,7 +887,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             self.document.setdefault('_status', dict())
             scheduler_info = {sjob.name(): sjob.status() for sjob in self.scheduler_jobs(scheduler)}
             status = dict()
-            print(self._tr("Query scheduler..."), file=file)
+            print("Query scheduler...", file=file)
             for job in tqdm(jobs,
                             desc="Fetching operation status",
                             total=len(jobs), file=file):

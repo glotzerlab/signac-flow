@@ -16,9 +16,10 @@ next
 - Fix erroneous line in the torque submission template (#126).
 - Add a testing module to easily initialize a test project (#130).
 - Add feature for integrated profiling of status updates to aid with the optimization of the FlowProject imlementation (#107, #110).
-- Print number of eligible jobs for each operation in status view (#134)
 - Add show_traceback to config options (#61, #144).
 - The support for Python version 3.4 has been dropped.
+- Ensure default parameter range detection in status printing succeeds for nested statepoints (#154).
+- Print number of eligible jobs for each operation in status view (#134)
 
 Fixes
 +++++

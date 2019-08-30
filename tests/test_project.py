@@ -571,7 +571,7 @@ class ProjectTest(BaseProjectTest):
     def test_script(self):
         project = self.mock_project()
         for job in project:
-            script = project.script(project.next_operations(job, mode='exec'))
+            script = project.script(project.next_operations(job))
             if job.sp.b % 2 == 0:
                 self.assertIn(str(job), script)
                 self.assertIn('echo "hello"', script)
@@ -591,7 +591,7 @@ class ProjectTest(BaseProjectTest):
             file.write("THIS IS A CUSTOM SCRIPT!\n")
             file.write("{% endblock %}\n")
         for job in project:
-            script = project.script(project.next_operations(job, mode='exec'))
+            script = project.script(project.next_operations(job))
             self.assertIn("THIS IS A CUSTOM SCRIPT", script)
             if job.sp.b % 2 == 0:
                 self.assertIn(str(job), script)
@@ -884,7 +884,7 @@ class ExecutionProjectTest(BaseProjectTest):
         self.assertEqual(len(list(MockScheduler.jobs())), num_jobs_submitted)
 
         for job in project:
-            next_op = project.next_operation(job, submission_eligible=False)
+            next_op = project.next_operation(job)
             self.assertIsNotNone(next_op)
             self.assertEqual(next_op.get_status(), JobStatus.submitted)
 
@@ -893,7 +893,7 @@ class ExecutionProjectTest(BaseProjectTest):
         project._fetch_scheduler_status(file=StringIO())
 
         for job in project:
-            next_op = project.next_operation(job, submission_eligible=False)
+            next_op = project.next_operation(job)
             self.assertIsNotNone(next_op)
             self.assertEqual(next_op.get_status(), JobStatus.queued)
 
@@ -1112,7 +1112,8 @@ class GroupProjectTest(BaseProjectTest):
         project = self.mock_project()
         # For run mode single operation groups
         for job in project:
-            script = project.script(project.next_operations(job))
+            job_ops = project._get_submission_operations([job])
+            script = project.script(job_ops)
             if job.sp.b % 2 == 0:
                 self.assertIn(str(job), script)
                 self.assertIn('run -j {} -o op1'.format(job), script)

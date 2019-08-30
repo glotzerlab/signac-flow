@@ -561,7 +561,7 @@ class FlowGroup(object):
             self._exec_cmd = exec_cmd
 
     def __call__(self, job=None, mode='run'):
-        # Get string form of command
+        "Return the string forming the command for the execution of this group."
         if mode == 'run':
             if callable(self._run_cmd):
                 return self._run_cmd(self.operations,
@@ -574,6 +574,8 @@ class FlowGroup(object):
                 return self._exec_cmd(self.operations, self.directives, job)
             else:
                 return self._exec_cmd.format(self.operations, job)
+        else:
+            raise ValueError("Unknown mode '{}'.".format(mode))
 
     def __iter__(self):
         for op in self.operations.values():
@@ -632,22 +634,11 @@ class FlowGroup(object):
 
     def create_job_operation(self, job, mode='run', index=0):
         """Create a JobOperation object from the FlowGroup."""
-        # A copy is made to prevent unused directives warnings that are used in
-        # the creation of the command.
-        new_directives = dict(self.directives)
-        # If 'executable' is '' then is must have been set to prevent the
-        # inclusion of sys.executable for a command line operation
-        try:
-            if new_directives['executable'] == '':
-                del new_directives['executable']
-        except KeyError:
-            pass
-
         return JobOperation(self._generate_id(job, index=index),
                             self.name,
                             job,
-                            self.__call__(job, mode),
-                            new_directives,
+                            self(job, mode),
+                            dict(self.directives),
                             job._project)
 
 

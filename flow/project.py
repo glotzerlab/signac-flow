@@ -21,6 +21,7 @@ import random
 from deprecation import deprecated
 from collections import defaultdict
 from collections import OrderedDict
+from collections import Counter
 from itertools import islice
 from itertools import count
 from itertools import groupby
@@ -975,7 +976,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                      expand=False, all_ops=False, only_incomplete=False, dump_json=False,
                      unroll=True, compact=False, pretty=False,
                      file=None, err=None, ignore_errors=False,
-                     no_parallelize=False, template=None, profile=False):
+                     no_parallelize=False, template=None, profile=False,
+                     eligible_jobs_max_lines=None):
         """Print the status of the project.
 
         .. versionchanged:: 0.6
@@ -991,6 +993,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         :param overview_max_lines:
             Limit the number of overview lines.
         :type overview_max_lines:
+            int
+        :param eligible_jobs_max_lines:
+            Limit the number of eligible jobs that are printed in the overview.
+        :type eligible_jobs_max_lines:
             int
         :param detailed:
             Print a detailed status of each job.
@@ -1071,6 +1077,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 template = 'status_compact.jinja'
             else:
                 template = 'status.jinja'
+
+        if eligible_jobs_max_lines is None:
+            eligible_jobs_max_lines = flow_config.get_config_value('eligible_jobs_max_lines')
 
         # initialize jinja2 template evnronment and necessary filters
         template_environment = self._template_environment()
@@ -1347,15 +1356,16 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             for status in statuses.values():
                 _add_parameters(status)
 
+        column_width_operation = 5
+        for op_name in self._operations:
+            column_width_operation = max(column_width_operation, len(op_name))
+
         if detailed:
             # get detailed view info
             column_width_id = 32
             column_width_total_label = 6
-            column_width_operation = 5
             status_legend = ' '.join('[{}]:{}'.format(v, k) for k, v in self.ALIASES.items())
 
-            for key, value in self._operations.items():
-                column_width_operation = max(column_width_operation, len(key))
             for job in tmp:
                 column_width_total_label = max(
                     column_width_total_label, len(', '.join(job['labels'])))
@@ -1395,6 +1405,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             context['progress_sorted'] = progress_sorted
             context['column_width_bar'] = column_width_bar
             context['column_width_label'] = column_width_label
+            context['column_width_operation'] = column_width_operation
         if detailed:
             context['column_width_id'] = column_width_id
             context['column_width_operation'] = column_width_operation
@@ -1421,6 +1432,16 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             has_eligible_ops = any([v['eligible'] for v in job['operations'].values()])
             if not has_eligible_ops and not context['all_ops']:
                 _add_dummy_operation(job)
+
+        op_counter = Counter()
+        for job in context['jobs']:
+            for k, v in job['operations'].items():
+                if v['eligible']:
+                    op_counter[k] += 1
+        context['op_counter'] = op_counter.most_common(eligible_jobs_max_lines)
+        n = len(op_counter) - len(context['op_counter'])
+        if n > 0:
+            context['op_counter'].append(('[{} more operations omitted]'.format(n), ''))
 
         print(template.render(**context), file=file)
 
@@ -2180,6 +2201,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             '--param-max-width',
             type=int,
             help="Limit the width of each parameter row.")
+        view_group.add_argument(
+            '--eligible-jobs-max-lines',
+            type=_positive_int,
+            help="Limit the number of eligible jobs that are shown.")
         parser.add_argument(
             '--ignore-errors',
             action='store_true',

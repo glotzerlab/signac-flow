@@ -977,7 +977,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                      expand=False, all_ops=False, only_incomplete=False, dump_json=False,
                      unroll=True, compact=False, pretty=False,
                      file=None, err=None, ignore_errors=False,
-                     no_parallelize=False, template=None, profile=False):
+                     no_parallelize=False, template=None, profile=False,
+                     eligible_jobs_max_lines=None):
         """Print the status of the project.
 
         .. versionchanged:: 0.6
@@ -993,6 +994,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         :param overview_max_lines:
             Limit the number of overview lines.
         :type overview_max_lines:
+            int
+        :param eligible_jobs_max_lines:
+            Limit the number of eligible jobs that are printed in the overview.
+        :type eligible_jobs_max_lines:
             int
         :param detailed:
             Print a detailed status of each job.
@@ -1437,7 +1442,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             for k, v in job['operations'].items():
                 if v['eligible']:
                     op_counter[k] += 1
-        context['op_counter'] = op_counter
+        context['op_counter'] = op_counter.most_common(eligible_jobs_max_lines)
 
         print(template.render(**context), file=file)
 
@@ -2207,6 +2212,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             '--param-max-width',
             type=int,
             help="Limit the width of each parameter row.")
+        view_group.add_argument(
+            '--eligible-jobs-max-lines',
+            type=_positive_int,
+            help="Limit the number of eligible jobs that are shown.")
         parser.add_argument(
             '--ignore-errors',
             action='store_true',

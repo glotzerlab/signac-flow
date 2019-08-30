@@ -28,7 +28,6 @@ The FlowProject
 .. autosummary::
 
     FlowProject.ALIASES
-    FlowProject.NAMES
     FlowProject.add_operation
     FlowProject.classify
     FlowProject.completed_operations

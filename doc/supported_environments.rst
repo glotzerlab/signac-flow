@@ -4,7 +4,7 @@
 Supported Environments
 ======================
 
-The **signac-flow** package streamlines the :ref:`submission <cluster-submission>` of job-operations to a supercomputer scheduling system.
+The **signac-flow** package streamlines the submission of job-operations to a supercomputer scheduling system.
 We use a different template for the different schedulers and systems, but all templates are extending the :ref:`base-script`.
 
 .. _base-script: supported_environments/base
@@ -39,8 +39,6 @@ To use these environment profiles, make sure to add the following line to your `
 .. code-block:: python
 
        import flow.environments
-
-For more information, please see the :ref:`section about managing environments <environments>`.
 
 We develop environment profiles on a *per need* basis.
 Please `contact us <mailto:signac-support@umich.edu>`_ if you have trouble running **signac-flow** on your local cluster or need assistance in writing a profile.

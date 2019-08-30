@@ -5,7 +5,7 @@ Installation
 ============
 
 The recommended installation method for **signac-flow** is via conda_ or pip_.
-The software is tested for Python versions 3.5+ and only depends on the signac_ package.
+The software is tested for Python versions 3.5+ and signac_ versions 1.0+.
 
 .. _conda: https://conda.io/
 .. _conda-forge: https://conda-forge.org/

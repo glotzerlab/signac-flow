@@ -7,7 +7,7 @@ from setuptools import setup, find_packages
 
 requirements = [
     # The core package.
-    'signac>=0.9.0',
+    'signac>=1.0.0',
     # For the templated generation of (submission) scripts.
     'jinja2>=2.8',
     # To enable the parallelized execution of operations across processes.

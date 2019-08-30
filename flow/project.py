@@ -10,7 +10,6 @@ import sys
 import os
 import re
 import logging
-import warnings
 import argparse
 import time
 import datetime
@@ -1739,17 +1738,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
     @contextlib.contextmanager
     def _potentially_buffered(self):
         if self._use_buffered_mode:
-            if hasattr(signac, 'buffered'):
-                logger.debug("Entering buffered mode...")
-                with signac.buffered():
-                    yield
-                logger.debug("Exiting buffered mode.")
-            else:
-                warnings.warn(
-                    "Configuration specifies to use buffered mode, but the buffered "
-                    "mode is not supported by the installed version of signac. "
-                    "Required version: >= 0.9.3, your version: {}".format(signac.__version__))
+            logger.debug("Entering buffered mode...")
+            with signac.buffered():
                 yield
+            logger.debug("Exiting buffered mode.")
         else:
             yield
 
@@ -2524,7 +2516,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             delta_t = (time.time() - start - 0.5) / max(len(jobs), 1)
             config_key = 'status_performance_warn_threshold'
             warn_threshold = flow_config.get_config_value(config_key)
-            warn_threshold = 0.2 if warn_threshold is None else warn_threshold  # signac 0.9.0
             if not args['profile'] and delta_t > warn_threshold >= 0:
                 print(
                     "WARNING: "

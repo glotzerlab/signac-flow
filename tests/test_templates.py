@@ -3,7 +3,6 @@
 # This software is licensed under the BSD 3-Clause License.
 from __future__ import print_function
 import unittest
-from distutils.version import StrictVersion
 
 import sys
 import os
@@ -18,8 +17,6 @@ import generate_template_reference_data as gen
 from test_project import redirect_stdout, redirect_stderr
 
 
-@unittest.skipIf(StrictVersion(signac.__version__) < StrictVersion('0.9.4'),
-                 'requires signac >= 0.9.4')
 class BaseTemplateTest(object):
     project_class = signac.Project
     env = None
@@ -34,16 +31,9 @@ class BaseTemplateTest(object):
         self.maxDiff = None
 
         # Must import the data into the project.
-        # NOTE: We should replace the below line with
-        # with signac.TemporaryProject(name=PROJECT_NAME,
-        #                              cls=gen.TestProject) as fp:
-        # once the next version of signac is released, and we can then remove
-        # the additional FlowProject instantiation below
         with signac.TemporaryProject(name=gen.PROJECT_NAME) as p:
-
             fp = gen.get_masked_flowproject(p)
-            fp.import_from(
-                origin=gen.ARCHIVE_DIR)
+            fp.import_from(origin=gen.ARCHIVE_DIR)
 
             jobs = fp.find_jobs(dict(environment=self.env_name()))
             if not len(jobs):

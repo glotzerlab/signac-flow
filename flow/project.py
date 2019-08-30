@@ -1932,8 +1932,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         :type num:
             int
         :param parallel:
-            Execute all bundled operations in parallel. Does nohing with the
-            default behavior or bundle_size=1.
+            Execute all bundled operations in parallel. Does nothing with the
+            default behavior or `bundle_size=1`.
         :type parallel:
             bool
         :param force:

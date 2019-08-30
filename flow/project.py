@@ -519,30 +519,20 @@ class FlowGroup(object):
 
         if run_cmd is None:
             def cmd(operations, directives, job=None):
-                try:
-                    executable = directives['executable']
-                    if executable == '':
-                        executable = sys.executable
-                except (KeyError, TypeError):
-                    executable = sys.executable
+                executable = directives.get('executable', sys.executable)
 
                 if callable(executable):
                     if job is None:
-                        raise ValueError("Executable cannot be callable if"
-                                         "job is not set.")
+                        raise ValueError(
+                            "Executable cannot be callable if job is not set.")
                     else:
-                        return '{} {} run -o {}'.format(executable(job), self.path, name)
-                else:
-                    if job is None:
-                        return "{} {} run -o {}".format(executable,
-                                                        self.path,
-                                                        ' '.join(list(operations.keys()))
-                                                        )
-                    return "{} {} run -j {} -o {}".format(executable,
-                                                          self.path,
-                                                          job,
-                                                          ' '.join(list(operations.keys()))
-                                                          )
+                        executable = executable(job)
+
+                cmd = "{} {} run -o {}".format(executable, self.path, name)
+                if job is not None:
+                    cmd += ' -j {}'.format(job)
+                return cmd.lstrip()
+
             self._run_cmd = cmd
         else:
             self._run_cmd = run_cmd

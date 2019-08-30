@@ -750,6 +750,10 @@ class ExecutionProjectTest(BaseProjectTest):
                 self.assertFalse(job.isfile('world.txt'))
 
     def test_run_condition_inheritance(self):
+
+        # This assignment is necessary to use the `mock_project` function on
+        # classes A, B, and C. Otherwise, the self.project_class reassignment
+        # would break future tests.
         _project = getattr(self, 'project_class', None)
 
         class A(FlowProject):

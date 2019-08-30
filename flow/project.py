@@ -2901,8 +2901,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     "Repeat definition of group with name " +
                     "'{}'.".format(group['name']))
 
-            # Create group
-            path = inspect.getsourcefile(inspect.getmodule(self))
+            # Getting the path of the FlowProject is difficult. Using the line
+            # of code below can lead to situations where the flow/project.py
+            # module is choosen
+            # path = inspect.getsourcefile(inspect.getmodule(self))
+            # However, the line below relies on the stack which may not be the
+            # safest current choice.
+            path = inspect.stack()[2][1]
             self._groups[group['name']] = FlowGroup(path=path, **group)
 
         # Add operations to group

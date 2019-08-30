@@ -1690,7 +1690,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         if timeout is not None and timeout < 0:
             timeout = None
         if operations is None:
-            operations = list(self._get_pending_operations(self, mode='exec'))
+            operations = list(self._get_pending_operations(self))
         else:
             operations = list(operations)   # ensure list
 
@@ -1924,9 +1924,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 break
             try:
                 with self._potentially_buffered():
-                    operations = list(filter(select, self._get_pending_operations(jobs,
-                                                                                  names,
-                                                                                  mode='exec')))
+                    operations = list(filter(select, self._get_pending_operations(jobs, names)))
             finally:
                 if messages:
                     for msg, level in set(messages):
@@ -1964,8 +1962,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             cmd_ = cmd.format(job=job)
             yield JobOperation(name=cmd_.replace(' ', '-'), cmd=cmd_, job=job)
 
-    def _gather_FlowGroups(self, names):
+    def _gather_FlowGroups(self, names=None):
         operations = {}
+        # if no names are selected try all singleton groups
+        names = names if names is not None else self._operations.keys()
         for name in names:
             if name in operations.keys():
                 continue
@@ -1986,18 +1986,17 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                              " -o/--operation option.")
         return operations
 
-    def _get_pending_groups(self, jobs, groups, mode='run'):
+    def _get_submission_operations(self, jobs, names=None, mode='run'):
         for job in jobs:
-            for group in groups:
+            for group in self._gather_FlowGroups(names):
                 if group.eligible(job) and self.eligible_for_submission(group,
                                                                         job):
                     yield group.create_job_operation(job, mode=mode, index=0)
 
-    def _get_pending_operations(self, jobs, operation_names=None,
-                                mode='run'):
+    def _get_pending_operations(self, jobs, operation_names=None):
         "Get all pending operations for the given selection."
         assert not isinstance(operation_names, six.string_types)
-        for op in self.next_operations(* jobs, mode=mode):
+        for op in self.next_operations(* jobs):
             if operation_names is None or any(fullmatch(n, op.name) for n in operation_names):
                 yield op
 
@@ -2226,17 +2225,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                     raise
 
         # Gather all pending operations.
-        if names is not None:
-            operations = self._gather_FlowGroups(names)
-            operations = self._get_pending_groups(jobs,
-                                                  operations,
-                                                  mode)
-        else:
-            with self._potentially_buffered():
-                operations = (op for op in self._get_pending_operations(jobs, names,
-                                                                        mode))
-            if num is not None:
-                operations = list(islice(operations, num))
+        operations = self._get_submission_operations(jobs, names, mode)
+        if num is not None:
+            operations = list(islice(operations, num))
 
         # Bundle them up and submit.
         for bundle in make_bundles(operations, bundle_size):
@@ -2620,22 +2611,15 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             if op.complete(job):
                 yield name
 
-    def _job_operations(self, job, only_eligible, mode='run',
-                        submission_eligible=True):
+    def _job_operations(self, job, only_eligible):
         "Yield instances of JobOperation constructed for specific jobs."
         for name in self.operations.keys():
             group = self._groups[name]
-            if only_eligible:
-                eligible = group.eligible(job)
-                if submission_eligible:
-                    eligible &= self.eligible_for_submission(group, job)
-            else:
-                eligible = True
-            if not eligible:
+            if only_eligible and not group.eligible(job):
                 continue
-            yield group.create_job_operation(job=job, mode=mode, index=0)
+            yield group.create_job_operation(job=job, mode='exec', index=0)
 
-    def next_operations(self, *jobs, mode='run', submission_eligible=True):
+    def next_operations(self, *jobs):
         """Determine the next eligible operations for jobs.
 
         :param jobs:
@@ -2646,11 +2630,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             All instances of :class:`~.JobOperation` jobs are eligible for.
         """
         for job in jobs:
-            for op in self._job_operations(job, True, mode=mode,
-                                           submission_eligible=submission_eligible):
+            for op in self._job_operations(job, True):
                 yield op
 
-    def next_operation(self, job, mode='run', submission_eligible=True):
+    def next_operation(self, job):
         """Determine the next operation for this job.
 
         :param job:
@@ -2666,8 +2649,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         :type mode:
             str
         """
-        for operation in self.next_operations(job, mode=mode,
-                                              submission_eligible=submission_eligible):
+        for operation in self.next_operations(job):
             return operation
 
     @classmethod
@@ -2938,15 +2920,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             mode = 'exec' if args.exec_mode else 'run'
             if args.cmd:
                 operations = self._generate_operations(args.cmd, jobs, args.requires)
-            elif args.operation_name:
-                operations = self._gather_FlowGroups(args.operation_name)
-                operations = self._get_pending_groups(jobs,
-                                                      operations,
-                                                      mode)
             else:
-                operations = self._get_pending_operations(jobs,
-                                                          args.operation_name,
-                                                          mode)
+                names = args.operation_name if args.operation_name else None
+                operations = self._get_submission_operations(jobs, names, mode)
             operations = list(islice(operations, args.num))
         # Generate the script and print to screen.
         print(self.script(
@@ -2968,16 +2944,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         mode = 'exec' if args.exec_mode else 'run'
         # Gather all pending operations ...
         with self._potentially_buffered():
-            if args.operation_name:
-                operations = self._gather_FlowGroups(args.operation_name)
-                operations = self._get_pending_groups(jobs,
-                                                      operations,
-                                                      mode)
+            names = args.operation_name if args.operation_name else None
+            operations = self._get_submission_operations(jobs, names, mode)
             # Unspecified group or operationss
-            else:
-                operations = self._get_pending_operations(jobs,
-                                                          args.operation_name,
-                                                          mode)
         operations = list(islice(operations, args.num))
         # Bundle operations up, generate the script, and submit to scheduler.
         for bundle in make_bundles(operations, args.bundle_size):

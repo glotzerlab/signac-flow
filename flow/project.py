@@ -1,38 +1,33 @@
-# Copyright (c) 2018 The Regents of the University of Michigan
+# Copyright (c) 2019 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 """Workflow definition with the FlowProject.
 
-The FlowProject is a signac Project, that allows the user to define
-a workflow based on job classification and job operations.
-
-A job may be classified based on its metadata and data in the form
-of str labels. These str-labels are yielded in the classify() method.
-
-
-Based on the classification a "next operation" may be identified, that
-should be executed next to further the workflow. While the user is free
-to choose any method for the determination of the "next operation", one
-option is to use a FlowGraph.
+The FlowProject is a signac Project that allows the user to define a workflow.
 """
 from __future__ import print_function
 import sys
 import os
+import re
 import logging
-import warnings
 import argparse
+import time
 import datetime
 import json
 import inspect
 import functools
 import contextlib
 import random
+from deprecation import deprecated
 from collections import defaultdict
 from collections import OrderedDict
+from collections import Counter
 from itertools import islice
 from itertools import count
 from itertools import groupby
 from hashlib import sha1
+import multiprocessing
+import threading
 from multiprocessing import Pool
 from multiprocessing import cpu_count
 from multiprocessing import TimeoutError
@@ -59,12 +54,12 @@ from .util.tqdm import tqdm
 from .util.misc import _positive_int
 from .util.misc import _mkdir_p
 from .util.misc import roundrobin
+from .util.misc import to_hashable
 from .util import template_filters as tf
 from .util.misc import add_cwd_to_environment_pythonpath
 from .util.misc import switch_to_directory
 from .util.misc import TrackGetItemDict
 from .util.misc import fullmatch
-from .util.progressbar import with_progressbar
 from .util.translate import abbreviate
 from .util.translate import shorten
 from .util.execution import fork
@@ -139,54 +134,6 @@ class _condition(object):
     def not_(cls, condition):
         "Returns ``not condition(job)`` for the provided condition function."
         return cls(lambda job: not condition(job))
-
-
-class _pre(_condition):
-
-    def __call__(self, func):
-        pre_conditions = getattr(func, '_flow_pre', list())
-        pre_conditions.insert(0, self.condition)
-        func._flow_pre = pre_conditions
-        return func
-
-    @classmethod
-    def copy_from(cls, *other_funcs):
-        "True if and only if all pre conditions of other function(s) are met."
-        def metacondition(job):
-            return all(c(job)
-                       for other_func in other_funcs
-                       for c in getattr(other_func, '_flow_pre', list()))
-        return cls(metacondition)
-
-    @classmethod
-    def after(cls, *other_funcs):
-        "True if and only if all post conditions of other function(s) are met."
-        def metacondition(job):
-            return all(c(job)
-                       for other_func in other_funcs
-                       for c in getattr(other_func, '_flow_post', list()))
-        return cls(metacondition)
-
-
-class _post(_condition):
-
-    def __init__(self, condition):
-        self.condition = condition
-
-    def __call__(self, func):
-        post_conditions = getattr(func, '_flow_post', list())
-        post_conditions.insert(0, self.condition)
-        func._flow_post = post_conditions
-        return func
-
-    @classmethod
-    def copy_from(cls, *other_funcs):
-        "True if and only if all post conditions of other function(s) are met."
-        def metacondition(job):
-            return all(c(job)
-                       for other_func in other_funcs
-                       for c in getattr(other_func, '_flow_post', list()))
-        return cls(metacondition)
 
 
 def make_bundles(operations, size=None):
@@ -466,21 +413,88 @@ class FlowOperation(object):
 
 class _FlowProjectClass(type):
     """Metaclass for the FlowProject class."""
-
     def __new__(metacls, name, bases, namespace, **kwargs):
         cls = type.__new__(metacls, name, bases, dict(namespace))
 
         # All operation functions are registered with the operation() classmethod, which is
         # intended to be used as decorator function. The _OPERATION_FUNCTIONS dict maps the
-        # the operation name to the operation function.
-        cls._OPERATION_FUNCTIONS = list()
+        # the operation name to the operation function. In addition, pre and
+        # post conditions are registered with the class.
 
+        cls._OPERATION_FUNCTIONS = list()
+        cls._OPERATION_PRE_CONDITIONS = defaultdict(list)
+        cls._OPERATION_POST_CONDITIONS = defaultdict(list)
+
+        cls._OPERATION_FUNCTIONS = list()
+        cls._OPERATION_PRECONDITIONS = dict()
+        cls._OPERATION_POSTCONDITIONS = dict()
         # All label functions are registered with the label() classmethod, which is intendeded
         # to be used as decorator function. The _LABEL_FUNCTIONS dict contains the function as
         # key and the label name as value, or None to use the default label name.
         cls._LABEL_FUNCTIONS = OrderedDict()
 
+        # Give the class a pre and post class that are aware of the class they
+        # are in.
+        cls.pre = cls._setup_pre_conditions_class(cls)
+        cls.post = cls._setup_post_conditions_class(cls)
         return cls
+
+    @staticmethod
+    def _setup_pre_conditions_class(child_class):
+
+        class _pre(_condition):
+
+            owner_class = child_class
+
+            def __init__(self, condition):
+                self.condition = condition
+
+            def __call__(self, func):
+                self.owner_class._OPERATION_PRE_CONDITIONS[func].insert(0, self.condition)
+                return func
+
+            @classmethod
+            def copy_from(cls, *other_funcs):
+                "True if and only if all pre conditions of other function(s) are met."
+                def metacondition(job):
+                    return all(c(job)
+                               for other_func in other_funcs
+                               for c in cls.owner_class._collect_pre_conditions()[other_func])
+                return cls(metacondition)
+
+            @classmethod
+            def after(cls, *other_funcs):
+                "True if and only if all post conditions of other function(s) are met."
+                def metacondition(job):
+                    return all(c(job)
+                               for other_func in other_funcs
+                               for c in cls.owner_class._collect_post_conditions()[other_func])
+                return cls(metacondition)
+        return _pre
+
+    @staticmethod
+    def _setup_post_conditions_class(child_class):
+
+        class _post(_condition):
+
+            owner_class = child_class
+
+            def __init__(self, condition):
+                self.condition = condition
+
+            def __call__(self, func):
+                self.owner_class._OPERATION_POST_CONDITIONS[func].insert(0, self.condition)
+                return func
+
+            @classmethod
+            def copy_from(cls, *other_funcs):
+                "True if and only if all post conditions of other function(s) are met."
+                def metacondition(job):
+                    return all(c(job)
+                               for other_func in other_funcs
+                               for c in cls.owner_class._collect_post_conditions()[other_func])
+                return cls(metacondition)
+        return _post
 
 
 class FlowProject(six.with_metaclass(_FlowProjectClass,
@@ -678,7 +692,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         for cls in type(self).__mro__:
             self._label_functions.update(getattr(cls, '_LABEL_FUNCTIONS', dict()))
 
-    pre = _pre
     """Decorator to add a pre-condition function for an operation function.
 
     Use a label function (or any function of :code:`job`) as a condition:
@@ -718,7 +731,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             pass
     """
 
-    post = _post
     """Decorator to add a post-condition function for an operation function.
 
     Use a label function (or any function of :code:`job`) as a condition:
@@ -744,16 +756,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             pass
     """
 
-    NAMES = {
-        'next_operation': 'next_op',
-    }
-    "Simple translation table for output strings."
-
-    @classmethod
-    def _tr(cls, x):
-        "Use name translation table for x."
-        return cls.NAMES.get(x, x)
-
     ALIASES = dict(
         unknown='U',
         registered='R',
@@ -773,6 +775,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             return x
 
     @classmethod
+    @deprecated(deprecated_in="0.8", removed_in="1.0")
     def update_aliases(cls, aliases):
         "Update the ALIASES table for this class."
         cls.ALIASES.update(aliases)
@@ -886,10 +889,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             else:
                 raise
         try:
-            result['labels'] = sorted(set(self.classify(job)))
+            result['labels'] = sorted(set(self.labels(job)))
             result['_labels_error'] = None
         except Exception as error:
-            logger.debug("Error while classifying job '{}': '{}'.".format(job, error))
+            logger.debug("Error while determining labels for job '{}': '{}'.".format(job, error))
             if ignore_errors:
                 result['labels'] = list()
                 result['_labels_error'] = str(error)
@@ -909,7 +912,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             self.document.setdefault('_status', dict())
             scheduler_info = {sjob.name(): sjob.status() for sjob in self.scheduler_jobs(scheduler)}
             status = dict()
-            print(self._tr("Query scheduler..."), file=file)
+            print("Query scheduler...", file=file)
             for job in tqdm(jobs,
                             desc="Fetching operation status",
                             total=len(jobs), file=file):
@@ -956,19 +959,24 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                     # This may fail on systems that don't allow threads.
                     return list(tqdm(
                         iterable=_map(_get_job_status, jobs),
-                        desc="Collect job status info", total=len(jobs), file=err))
+                        desc="Collecting job status info", total=len(jobs), file=err))
             except RuntimeError as error:
                 if "can't start new thread" not in error.args:
                     raise   # unrelated error
-                # The parallelized status determination has failed and we fall
-                # back to a serial approach.
-                logger.warning(
-                    "A parallelized status update failed due to error ('{}'). "
-                    "Entering serial mode with fallback progress indicator. The "
-                    "status update may take longer than ususal.".format(error))
-                return list(with_progressbar(
-                    iterable=map(_get_job_status, jobs),
-                    total=len(jobs), desc='Collect job status info:', file=err))
+
+                t = time.time()
+                num_jobs = len(jobs)
+                statuses = []
+                for i, job in enumerate(jobs):
+                    statuses.append(_get_job_status(job))
+                    if time.time() - t > 0.2:  # status interval
+                        print(
+                            'Collecting job status info: {}/{}'.format(i+1, num_jobs),
+                            end='\r', file=err)
+                        t = time.time()
+                # Always print the completed progressbar.
+                print('Collecting job status info: {}/{}'.format(i+1, num_jobs), file=err)
+                return statuses
 
     PRINT_STATUS_ALL_VARYING_PARAMETERS = True
     """This constant can be used to signal that the print_status() method is supposed
@@ -976,11 +984,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
     def print_status(self, jobs=None, overview=True, overview_max_lines=None,
                      detailed=False, parameters=None,
-                     skip_active=False, param_max_width=None,
+                     param_max_width=None,
                      expand=False, all_ops=False, only_incomplete=False, dump_json=False,
                      unroll=True, compact=False, pretty=False,
                      file=None, err=None, ignore_errors=False,
-                     no_parallelize=False, template=None):
+                     no_parallelize=False, template=None, profile=False,
+                     eligible_jobs_max_lines=None):
         """Print the status of the project.
 
         .. versionchanged:: 0.6
@@ -997,6 +1006,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             Limit the number of overview lines.
         :type overview_max_lines:
             int
+        :param eligible_jobs_max_lines:
+            Limit the number of eligible jobs that are printed in the overview.
+        :type eligible_jobs_max_lines:
+            int
         :param detailed:
             Print a detailed status of each job.
         :type detailed:
@@ -1005,10 +1018,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             Print the value of the specified parameters.
         :type parameters:
             list of str
-        :param skip_active:
-            Only print jobs that are currently inactive.
-        :type skip_active:
-            bool
         :param param_max_width:
             Limit the number of characters of parameter columns,
             see also: :py:meth:`~.update_aliases`.
@@ -1081,8 +1090,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             else:
                 template = 'status.jinja'
 
-        if skip_active:
-            raise NotImplementedError("The deprecated --skip-active option is no longer supported.")
+        if eligible_jobs_max_lines is None:
+            eligible_jobs_max_lines = flow_config.get_config_value('eligible_jobs_max_lines')
 
         # initialize jinja2 template evnronment and necessary filters
         template_environment = self._template_environment()
@@ -1199,7 +1208,90 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         context = self._get_standard_template_context()
 
         # get job status information
-        tmp = self._fetch_status(jobs, err, ignore_errors, no_parallelize)
+        if profile:
+            try:
+                import pprofile
+            except ImportError:
+                raise RuntimeWarning(
+                    "Profiling requires the pprofile package. "
+                    "Install with `pip install pprofile`.")
+            prof = pprofile.StatisticalProfile()
+
+            fn_filter = [
+                inspect.getfile(threading),
+                inspect.getfile(multiprocessing),
+                inspect.getfile(Pool),
+                inspect.getfile(ThreadPool),
+                inspect.getfile(tqdm),
+            ]
+
+            with prof(single=False):
+                tmp = self._fetch_status(jobs, err, ignore_errors, no_parallelize)
+
+            prof._mergeFileTiming()
+
+            # Unrestricted
+            total_impact = 0
+            hits = [hit for fn, ft in prof.merged_file_dict.items()
+                    if fn not in fn_filter for hit in ft.iterHits()]
+            sorted_hits = reversed(sorted(hits, key=lambda hit: hit[2]))
+            total_num_hits = sum([hit[2] for hit in hits])
+
+            profiling_results = ['# Profiling:\n']
+
+            profiling_results.extend([
+                'Rank Impact Code object',
+                '---- ------ -----------'])
+            for i, (line, code, hits, duration) in enumerate(sorted_hits):
+                impact = hits / total_num_hits
+                total_impact += impact
+                profiling_results.append(
+                    "{rank:>4} {impact:>6.0%} {code.co_filename}:"
+                    "{code.co_firstlineno}:{code.co_name}".format(
+                        rank=i+1, impact=impact, code=code))
+                if i > 10 or total_impact > 0.8:
+                    break
+
+            for module_fn in prof.merged_file_dict:
+                if re.match(profile, module_fn):
+                    ft = prof.merged_file_dict[module_fn]
+                else:
+                    continue
+
+                total_hits = ft.getTotalHitCount()
+                total_impact = 0
+
+                profiling_results.append(
+                    "\nHits by line for '{}':".format(module_fn))
+                profiling_results.append('-' * len(profiling_results[-1]))
+
+                hits = list(sorted(ft.iterHits(), key=lambda h: 1/h[2]))
+                for line, code, hits, duration in hits:
+                    impact = hits / total_hits
+                    total_impact += impact
+                    profiling_results.append(
+                        "{}:{} ({:2.0%}):".format(module_fn, line, impact))
+                    try:
+                        lines, start = inspect.getsourcelines(code)
+                    except OSError:
+                        continue
+                    hits_ = [ft.getHitStatsFor(l)[0] for l in range(start, start+len(lines))]
+                    profiling_results.extend(
+                        ["{:>5} {:>4}: {}".format(h, lineno, l.rstrip())
+                         for lineno, (l, h) in enumerate(zip(lines, hits_), start)])
+                    profiling_results.append('')
+                    if total_impact > 0.8:
+                        break
+
+            profiling_results.append("Total runtime: {}s".format(int(prof.total_time)))
+            if prof.total_time < 20:
+                profiling_results.append(
+                    "Warning: Profiler ran only for a short time, "
+                    "results may be highly inaccurate.")
+
+        else:
+            tmp = self._fetch_status(jobs, err, ignore_errors, no_parallelize)
+            profiling_results = None
 
         operations_errors = {s['_operations_error'] for s in tmp}
         labels_errors = {s['_labels_error'] for s in tmp}
@@ -1245,8 +1337,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
         # Optionally expand parameters argument to all varying parameters.
         if parameters is self.PRINT_STATUS_ALL_VARYING_PARAMETERS:
-            parameters = list(sorted({key for job in jobs for key in job.sp.keys()
-                                      if len(set([job.sp.get(key) for job in jobs])) > 1}))
+            parameters = list(
+                sorted({key for job in jobs for key in job.sp.keys() if
+                        len(set([to_hashable(job.sp().get(key)) for job in jobs])) > 1}))
 
         if parameters:
             # get parameters info
@@ -1275,15 +1368,16 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             for status in statuses.values():
                 _add_parameters(status)
 
+        column_width_operation = 5
+        for op_name in self._operations:
+            column_width_operation = max(column_width_operation, len(op_name))
+
         if detailed:
             # get detailed view info
             column_width_id = 32
             column_width_total_label = 6
-            column_width_operation = 5
             status_legend = ' '.join('[{}]:{}'.format(v, k) for k, v in self.ALIASES.items())
 
-            for key, value in self._operations.items():
-                column_width_operation = max(column_width_operation, len(key))
             for job in tmp:
                 column_width_total_label = max(
                     column_width_total_label, len(', '.join(job['labels'])))
@@ -1323,6 +1417,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             context['progress_sorted'] = progress_sorted
             context['column_width_bar'] = column_width_bar
             context['column_width_label'] = column_width_label
+            context['column_width_operation'] = column_width_operation
         if detailed:
             context['column_width_id'] = column_width_id
             context['column_width_operation'] = column_width_operation
@@ -1339,7 +1434,32 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 context['operation_status_legend'] = operation_status_legend
                 context['operation_status_symbols'] = OPERATION_STATUS_SYMBOLS
 
+        def _add_dummy_operation(job):
+            job['operations'][''] = {
+                'completed': False,
+                'eligible': True,
+                'scheduler_status': JobStatus.dummy}
+
+        for job in context['jobs']:
+            has_eligible_ops = any([v['eligible'] for v in job['operations'].values()])
+            if not has_eligible_ops and not context['all_ops']:
+                _add_dummy_operation(job)
+
+        op_counter = Counter()
+        for job in context['jobs']:
+            for k, v in job['operations'].items():
+                if v['eligible']:
+                    op_counter[k] += 1
+        context['op_counter'] = op_counter.most_common(eligible_jobs_max_lines)
+        n = len(op_counter) - len(context['op_counter'])
+        if n > 0:
+            context['op_counter'].append(('[{} more operations omitted]'.format(n), ''))
+
         print(template.render(**context), file=file)
+
+        # Show profiling results (if enabled)
+        if profiling_results:
+            print('\n' + '\n'.join(profiling_results), file=file)
 
     def run_operations(self, operations=None, pretend=False, np=None, timeout=None, progress=False):
         """Execute the next operations as specified by the project's workflow.
@@ -1442,7 +1562,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         try:
             s_project = pickle.dumps(self)
             s_tasks = [(pickle.loads, s_project, self._dumps_op(op))
-                       for op in with_progressbar(operations, desc='Serialize tasks')]
+                       for op in tqdm(operations, desc='Serialize tasks', file=sys.stderr)]
         except Exception as error:  # Masking all errors since they must be pickling related.
             raise self._PickleError(error)
 
@@ -1651,17 +1771,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
     @contextlib.contextmanager
     def _potentially_buffered(self):
         if self._use_buffered_mode:
-            if hasattr(signac, 'buffered'):
-                logger.debug("Entering buffered mode...")
-                with signac.buffered():
-                    yield
-                logger.debug("Exiting buffered mode.")
-            else:
-                warnings.warn(
-                    "Configuration specifies to use buffered mode, but the buffered "
-                    "mode is not supported by the installed version of signac. "
-                    "Required version: >= 0.9.3, your version: {}".format(signac.__version__))
+            logger.debug("Entering buffered mode...")
+            with signac.buffered():
                 yield
+            logger.debug("Exiting buffered mode.")
         else:
             yield
 
@@ -1838,7 +1951,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         :type num:
             int
         :param parallel:
-            Execute all bundled operations in parallel. Has no effect without bundling.
+            Execute all bundled operations in parallel. Does nothing with the
+            default behavior or `bundle_size=1`.
         :type parallel:
             bool
         :param force:
@@ -1868,7 +1982,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         # Gather all pending operations.
         with self._potentially_buffered():
             operations = (op for op in self._get_pending_operations(jobs, names)
-                          if self.eligible_for_submission(op))
+                          if self._eligible_for_submission(op))
             if num is not None:
                 operations = list(islice(operations, num))
 
@@ -1997,13 +2111,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             const=0,
             default=1,
             dest='bundle_size',
-            help="Bundle multiple operations for execution. When this "
-                 "option is provided without argument, all pending operations "
-                 "are aggregated into one bundle.")
+            help="Bundle multiple operations for execution in a single "
+            "scheduler job. When this option is provided without argument, "
+            " all pending operations are aggregated into one bundle.")
         bundling_group.add_argument(
             '-p', '--parallel',
             action='store_true',
-            help="Execute all (bundled) operations in parallel.")
+            help="Execute all operations within a single bundle in parallel.")
 
     @classmethod
     def _add_direct_cmd_arg_group(cls, parser):
@@ -2020,14 +2134,14 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             help="Manually specify all labels that are required for the direct command "
                  "to be considered eligible for execution.")
 
-    def update_stati(self, *args, **kwargs):
-        "This function has been removed as of version 0.6."
-        raise RuntimeError(
-            "The update_stati() method has been removed as of version 0.6.")
-
+    @deprecated(deprecated_in="0.8", removed_in="1.0", details="Use export_job_statuses instead.")
     def export_job_stati(self, collection, stati):
         "Export the job stati to a database collection."
-        for status in stati:
+        self.export_job_statuses(self, collection, stati)
+
+    def export_job_statuses(self, collection, statuses):
+        "Export the job statuses to a database collection."
+        for status in statuses:
             job = self.open_job(id=status['job_id'])
             status['statepoint'] = job.statepoint()
             collection.update_one({'_id': status['job_id']},
@@ -2059,10 +2173,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             dest='only_incomplete',
             action='store_true',
             help="Only show information for jobs with incomplete operations.")
-        view_group.add_argument(
-            '--skip-active',
-            action='store_true',
-            help=argparse.SUPPRESS)
         view_group.add_argument(
             '--stack',
             action='store_false',
@@ -2103,6 +2213,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             '--param-max-width',
             type=int,
             help="Limit the width of each parameter row.")
+        view_group.add_argument(
+            '--eligible-jobs-max-lines',
+            type=_positive_int,
+            help="Limit the number of eligible jobs that are shown.")
         parser.add_argument(
             '--ignore-errors',
             action='store_true',
@@ -2206,6 +2320,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             raise KeyError("An operation with this identifier is already added.")
         self.operations[name] = FlowOperation(cmd=cmd, pre=pre, post=post, directives=kwargs)
 
+    @deprecated(deprecated_in="0.8", removed_in="1.0", details="Use self.labels(job) instead.")
     def classify(self, job):
         """Generator function which yields labels for job.
 
@@ -2216,7 +2331,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         :type job:
             :class:`~signac.contrib.job.Job`
         :yields:
-            The labels to classify job.
+            The labels for the provided job.
         :yield type:
             str
         """
@@ -2260,6 +2375,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             for op in self._job_operations(job, True):
                 yield op
 
+    @deprecated(deprecated_in="0.8", removed_in="1.0", details="Use next_operations instead.")
     def next_operation(self, job):
         """Determine the next operation for this job.
 
@@ -2320,11 +2436,38 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         cls._OPERATION_FUNCTIONS.append((name, func))
         return func
 
+    @classmethod
+    def _collect_operations(cls):
+        "Collect all operations that were add via decorator."
+        operations = []
+        for parent_class in cls.__mro__:
+            operations.extend(getattr(parent_class, '_OPERATION_FUNCTIONS', []))
+        return operations
+
+    @classmethod
+    def _collect_conditions(cls, attr):
+        "Collect conditions from attr using the mro hierarchy."
+        ret = defaultdict(list)
+        for parent_class in cls.__mro__:
+            for func, conds in getattr(parent_class, attr, dict()).items():
+                ret[func].extend(conds)
+        return ret
+
+    @classmethod
+    def _collect_pre_conditions(cls):
+        "Collect all pre-conditions that were add via decorator."
+        return cls._collect_conditions('_OPERATION_PRE_CONDITIONS')
+
+    @classmethod
+    def _collect_post_conditions(cls):
+        "Collect all post-conditions that were add via decorator."
+        return cls._collect_conditions('_OPERATION_POST_CONDITIONS')
+
     def _register_operations(self):
         "Register all operation functions registered with this class and its parent classes."
-        operations = []
-        for cls in type(self).__mro__:
-            operations.extend(getattr(cls, '_OPERATION_FUNCTIONS', []))
+        operations = self._collect_operations()
+        pre_conditions = self._collect_pre_conditions()
+        post_conditions = self._collect_post_conditions()
 
         def _guess_cmd(func, name, **kwargs):
             try:
@@ -2346,8 +2489,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                     "Repeat definition of operation with name '{}'.".format(name))
 
             # Extract pre/post conditions and directives from function:
-            params = {key: getattr(func, '_flow_{}'.format(key), None)
-                      for key in ('pre', 'post', 'directives')}
+            params = {
+                'pre': pre_conditions.get(func, None),
+                'post': post_conditions.get(func, None),
+                'directives': getattr(func, '_flow_directives', None)}
 
             # Construct FlowOperation:
             if getattr(func, '_flow_cmd', False):
@@ -2362,7 +2507,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         "The dictionary of operations that have been added to the workflow."
         return self._operations
 
-    def eligible_for_submission(self, job_operation):
+    def _eligible_for_submission(self, job_operation):
         """Determine if a job-operation is eligible for submission.
 
         By default, an operation is eligible for submission when it
@@ -2373,6 +2518,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         if job_operation.get_status() >= JobStatus.submitted:
             return False
         return True
+
+    @deprecated(deprecated_in="0.8", removed_in="1.0")
+    def eligible_for_submission(self, job_operation):
+        return self._eligible_for_submission(self, job_operation)
 
     def _main_status(self, args):
         "Print status overview."
@@ -2387,6 +2536,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         if args.pop('full'):
             args['detailed'] = args['all_ops'] = True
 
+        start = time.time()
         try:
             self.print_status(jobs=jobs, **args)
         except NoSchedulerError:
@@ -2398,6 +2548,21 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 "update anyways.")
             if show_traceback:
                 raise
+        else:
+            # Use small offset to account for overhead with few jobs
+            delta_t = (time.time() - start - 0.5) / max(len(jobs), 1)
+            config_key = 'status_performance_warn_threshold'
+            warn_threshold = flow_config.get_config_value(config_key)
+            if not args['profile'] and delta_t > warn_threshold >= 0:
+                print(
+                    "WARNING: "
+                    "The status compilation took more than {}s per job. Consider to "
+                    "use `--profile` to determine bottlenecks within your project "
+                    "workflow definition.\n"
+                    "Execute `signac config set flow.{} VALUE` to specify the "
+                    "warning threshold in seconds. Use -1 to completely suppress this "
+                    "warning."
+                    .format(warn_threshold, config_key), file=sys.stderr)
 
     def _main_next(self, args):
         "Determine the jobs that are eligible for a specific operation."
@@ -2478,7 +2643,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         # Gather all pending operations ...
         with self._potentially_buffered():
             ops = (op for op in self._get_pending_operations(jobs, args.operation_name)
-                   if self.eligible_for_submission(op))
+                   if self._eligible_for_submission(op))
             ops = list(islice(ops, args.num))
 
         # Bundle operations up, generate the script, and submit to scheduler.
@@ -2583,6 +2748,15 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             'status',
             parents=[base_parser])
         self._add_print_status_args(parser_status)
+        parser_status.add_argument(
+            '--profile',
+            const=inspect.getsourcefile(inspect.getmodule(self)),
+            nargs='?',
+            help="Collect statistics to determine code paths that are responsible "
+                 "for the majority of runtime required for status determination. "
+                 "Optionally provide a filename pattern to select for what files "
+                 "to show result for. Defaults to the main module. "
+                 "(requires pprofile)")
         parser_status.set_defaults(func=self._main_status)
 
         parser_next = subparsers.add_parser(
@@ -2693,6 +2867,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             setattr(args, dest, getattr(args, 'main_' + dest) or getattr(args, dest))
             delattr(args, 'main_' + dest)
 
+        # Read the config file and set the internal flag.
+        # Do not overwrite with False if not present in config file
+        if flow_config.get_config_value('show_traceback'):
+            args.show_traceback = True
+
         if args.debug:  # Implies '-vv' and '--show-traceback'
             args.verbose = max(2, args.verbose)
             args.show_traceback = True
@@ -2770,6 +2949,7 @@ _FMT_SCHEDULER_STATUS = {
     JobStatus.queued: 'Q',
     JobStatus.active: 'A',
     JobStatus.error: 'E',
+    JobStatus.dummy: ' ',
 }
 
 

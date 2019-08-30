@@ -3,8 +3,10 @@
 # This software is licensed under the BSD 3-Clause License.
 "Simple progressbar formatting."
 import sys
+from deprecation import deprecated
 
 
+@deprecated(deprecated_in="0.8", removed_in="1.0")
 def with_progressbar(iterable, total=None, width=120, desc='',
                      percentage=True, file=None):
     if file is None:

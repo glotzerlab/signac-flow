@@ -16,6 +16,7 @@ class JobStatus(enum.IntEnum):
     queued = 6
     active = 7
     error = 8
+    dummy = 127
     # All user statuses are >= 128.
     user = 128
 

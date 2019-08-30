@@ -18,9 +18,11 @@ option is to use a FlowGraph.
 from __future__ import print_function
 import sys
 import os
+import re
 import logging
 import warnings
 import argparse
+import time
 import datetime
 import json
 import inspect
@@ -33,6 +35,8 @@ from itertools import islice
 from itertools import count
 from itertools import groupby
 from hashlib import sha1
+import multiprocessing
+import threading
 from multiprocessing import Pool
 from multiprocessing import cpu_count
 from multiprocessing import TimeoutError
@@ -988,7 +992,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                      expand=False, all_ops=False, only_incomplete=False, dump_json=False,
                      unroll=True, compact=False, pretty=False,
                      file=None, err=None, ignore_errors=False,
-                     no_parallelize=False, template=None):
+                     no_parallelize=False, template=None, profile=False):
         """Print the status of the project.
 
         .. versionchanged:: 0.6
@@ -1207,7 +1211,90 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         context = self._get_standard_template_context()
 
         # get job status information
-        tmp = self._fetch_status(jobs, err, ignore_errors, no_parallelize)
+        if profile:
+            try:
+                import pprofile
+            except ImportError:
+                raise RuntimeWarning(
+                    "Profiling requires the pprofile package. "
+                    "Install with `pip install pprofile`.")
+            prof = pprofile.StatisticalProfile()
+
+            fn_filter = [
+                inspect.getfile(threading),
+                inspect.getfile(multiprocessing),
+                inspect.getfile(Pool),
+                inspect.getfile(ThreadPool),
+                inspect.getfile(tqdm),
+            ]
+
+            with prof(single=False):
+                tmp = self._fetch_status(jobs, err, ignore_errors, no_parallelize)
+
+            prof._mergeFileTiming()
+
+            # Unrestricted
+            total_impact = 0
+            hits = [hit for fn, ft in prof.merged_file_dict.items()
+                    if fn not in fn_filter for hit in ft.iterHits()]
+            sorted_hits = reversed(sorted(hits, key=lambda hit: hit[2]))
+            total_num_hits = sum([hit[2] for hit in hits])
+
+            profiling_results = ['# Profiling:\n']
+
+            profiling_results.extend([
+                'Rank Impact Code object',
+                '---- ------ -----------'])
+            for i, (line, code, hits, duration) in enumerate(sorted_hits):
+                impact = hits / total_num_hits
+                total_impact += impact
+                profiling_results.append(
+                    "{rank:>4} {impact:>6.0%} {code.co_filename}:"
+                    "{code.co_firstlineno}:{code.co_name}".format(
+                        rank=i+1, impact=impact, code=code))
+                if i > 10 or total_impact > 0.8:
+                    break
+
+            for module_fn in prof.merged_file_dict:
+                if re.match(profile, module_fn):
+                    ft = prof.merged_file_dict[module_fn]
+                else:
+                    continue
+
+                total_hits = ft.getTotalHitCount()
+                total_impact = 0
+
+                profiling_results.append(
+                    "\nHits by line for '{}':".format(module_fn))
+                profiling_results.append('-' * len(profiling_results[-1]))
+
+                hits = list(sorted(ft.iterHits(), key=lambda h: 1/h[2]))
+                for line, code, hits, duration in hits:
+                    impact = hits / total_hits
+                    total_impact += impact
+                    profiling_results.append(
+                        "{}:{} ({:2.0%}):".format(module_fn, line, impact))
+                    try:
+                        lines, start = inspect.getsourcelines(code)
+                    except OSError:
+                        continue
+                    hits_ = [ft.getHitStatsFor(l)[0] for l in range(start, start+len(lines))]
+                    profiling_results.extend(
+                        ["{:>5} {:>4}: {}".format(h, lineno, l.rstrip())
+                         for lineno, (l, h) in enumerate(zip(lines, hits_), start)])
+                    profiling_results.append('')
+                    if total_impact > 0.8:
+                        break
+
+            profiling_results.append("Total runtime: {}s".format(int(prof.total_time)))
+            if prof.total_time < 20:
+                profiling_results.append(
+                    "Warning: Profiler ran only for a short time, "
+                    "results may be highly inaccurate.")
+
+        else:
+            tmp = self._fetch_status(jobs, err, ignore_errors, no_parallelize)
+            profiling_results = None
 
         operations_errors = {s['_operations_error'] for s in tmp}
         labels_errors = {s['_labels_error'] for s in tmp}
@@ -1347,7 +1434,22 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 context['operation_status_legend'] = operation_status_legend
                 context['operation_status_symbols'] = OPERATION_STATUS_SYMBOLS
 
+        def _add_dummy_operation(job):
+            job['operations'][''] = {
+                    'completed': False,
+                    'eligible': True,
+                    'scheduler_status': JobStatus.dummy}
+
+        for job in context['jobs']:
+            has_eligible_ops = any([v['eligible'] for v in job['operations'].values()])
+            if not has_eligible_ops and not context['all_ops']:
+                _add_dummy_operation(job)
+
         print(template.render(**context), file=file)
+
+        # Show profiling results (if enabled)
+        if profiling_results:
+            print('\n' + '\n'.join(profiling_results), file=file)
 
     def run_operations(self, operations=None, pretend=False, np=None, timeout=None, progress=False):
         """Execute the next operations as specified by the project's workflow.
@@ -2424,6 +2526,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         if args.pop('full'):
             args['detailed'] = args['all_ops'] = True
 
+        start = time.time()
         try:
             self.print_status(jobs=jobs, **args)
         except NoSchedulerError:
@@ -2435,6 +2538,21 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 "update anyways.")
             if show_traceback:
                 raise
+        else:
+            delta_t = (time.time() - start) / len(jobs)
+            config_key = 'status_performance_warn_threshold'
+            warn_threshold = flow_config.get_config_value(config_key)
+            warn_threshold = 0.2 if warn_threshold is None else warn_threshold  # signac 0.9.0
+            if not args['profile'] and delta_t > warn_threshold >= 0:
+                print(
+                    "WARNING: "
+                    "The status compilation took more than {}s per job. Consider to "
+                    "use `--profile` to determine bottlenecks within your project "
+                    "workflow definition.\n"
+                    "Execute `signac config set flow.{} VALUE` to specify the "
+                    "warning threshold in seconds. Use -1 to completely suppress this "
+                    "warning."
+                    .format(warn_threshold, config_key), file=sys.stderr)
 
     def _main_next(self, args):
         "Determine the jobs that are eligible for a specific operation."
@@ -2620,6 +2738,15 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             'status',
             parents=[base_parser])
         self._add_print_status_args(parser_status)
+        parser_status.add_argument(
+            '--profile',
+            const=inspect.getsourcefile(inspect.getmodule(self)),
+            nargs='?',
+            help="Collect statistics to determine code paths that are responsible "
+                 "for the majority of runtime required for status determination. "
+                 "Optionally provide a filename pattern to select for what files "
+                 "to show result for. Defaults to the main module. "
+                 "(requires pprofile)")
         parser_status.set_defaults(func=self._main_status)
 
         parser_next = subparsers.add_parser(
@@ -2730,6 +2857,11 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             setattr(args, dest, getattr(args, 'main_' + dest) or getattr(args, dest))
             delattr(args, 'main_' + dest)
 
+        # Read the config file and set the internal flag.
+        # Do not overwrite with False if not present in config file
+        if flow_config.get_config_value('show_traceback'):
+            args.show_traceback = True
+
         if args.debug:  # Implies '-vv' and '--show-traceback'
             args.verbose = max(2, args.verbose)
             args.show_traceback = True
@@ -2807,6 +2939,7 @@ _FMT_SCHEDULER_STATUS = {
     JobStatus.queued: 'Q',
     JobStatus.active: 'A',
     JobStatus.error: 'E',
+    JobStatus.dummy: ' ',
 }
 
 

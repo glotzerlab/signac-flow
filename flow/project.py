@@ -884,7 +884,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             else:
                 raise
         try:
-            result['labels'] = sorted(set(self.classify(job)))
+            result['labels'] = sorted(set(self.labels(job)))
             result['_labels_error'] = None
         except Exception as error:
             logger.debug("Error while classifying job '{}': '{}'.".format(job, error))

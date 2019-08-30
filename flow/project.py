@@ -774,6 +774,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def __init__(self, config=None, environment=None):
         super(FlowProject, self).__init__(config=config)
 
+        # Save the path of the module that instantiates this object. This path is used
+        # to construct the execution and run commands later.
+        self._path = os.path.abspath(inspect.stack()[1][1])
+
         # Associate this class with a compute environment.
         self._environment = environment or get_environment()
 
@@ -2901,14 +2905,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     "Repeat definition of group with name " +
                     "'{}'.".format(group['name']))
 
-            # Getting the path of the FlowProject is difficult. Using the line
-            # of code below can lead to situations where the flow/project.py
-            # module is choosen
-            # path = inspect.getsourcefile(inspect.getmodule(self))
-            # However, the line below relies on the stack which may not be the
-            # safest current choice.
-            path = inspect.stack()[2][1]
-            self._groups[group['name']] = FlowGroup(path=path, **group)
+            self._groups[group['name']] = FlowGroup(path=self._path, **group)
 
         # Add operations to group
         # Currently recreating operation list. There may be a better way to do
@@ -3182,6 +3179,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
             $ python my_project.py --help
         """
+        if os.path.realpath(self._path) != os.path.realpath(inspect.stack()[1][1]):
+            raise RuntimeError(
+                "The FlowProject.main() class must be called from the same module "
+                "where the FlowProject instance was initialized.")
+
         if parser is None:
             parser = argparse.ArgumentParser()
 

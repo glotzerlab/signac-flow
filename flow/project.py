@@ -10,7 +10,6 @@ import sys
 import os
 import re
 import logging
-import warnings
 import argparse
 import time
 import datetime
@@ -973,7 +972,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
     def print_status(self, jobs=None, overview=True, overview_max_lines=None,
                      detailed=False, parameters=None,
-                     skip_active=False, param_max_width=None,
+                     param_max_width=None,
                      expand=False, all_ops=False, only_incomplete=False, dump_json=False,
                      unroll=True, compact=False, pretty=False,
                      file=None, err=None, ignore_errors=False,
@@ -1007,10 +1006,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             Print the value of the specified parameters.
         :type parameters:
             list of str
-        :param skip_active:
-            Only print jobs that are currently inactive.
-        :type skip_active:
-            bool
         :param param_max_width:
             Limit the number of characters of parameter columns,
             see also: :py:meth:`~.update_aliases`.
@@ -1082,6 +1077,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 template = 'status_compact.jinja'
             else:
                 template = 'status.jinja'
+
 
         if eligible_jobs_max_lines is None:
             eligible_jobs_max_lines = flow_config.get_config_value('eligible_jobs_max_lines')
@@ -1767,17 +1763,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
     @contextlib.contextmanager
     def _potentially_buffered(self):
         if self._use_buffered_mode:
-            if hasattr(signac, 'buffered'):
-                logger.debug("Entering buffered mode...")
-                with signac.buffered():
-                    yield
-                logger.debug("Exiting buffered mode.")
-            else:
-                warnings.warn(
-                    "Configuration specifies to use buffered mode, but the buffered "
-                    "mode is not supported by the installed version of signac. "
-                    "Required version: >= 0.9.3, your version: {}".format(signac.__version__))
+            logger.debug("Entering buffered mode...")
+            with signac.buffered():
                 yield
+            logger.debug("Exiting buffered mode.")
         else:
             yield
 
@@ -2177,10 +2166,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             action='store_true',
             help="Only show information for jobs with incomplete operations.")
         view_group.add_argument(
-            '--skip-active',
-            action='store_true',
-            help=argparse.SUPPRESS)
-        view_group.add_argument(
             '--stack',
             action='store_false',
             dest='unroll',
@@ -2556,10 +2541,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             if show_traceback:
                 raise
         else:
-            delta_t = (time.time() - start) / len(jobs)
+            # Use small offset to account for overhead with few jobs
+            delta_t = (time.time() - start - 0.5) / max(len(jobs), 1)
             config_key = 'status_performance_warn_threshold'
             warn_threshold = flow_config.get_config_value(config_key)
-            warn_threshold = 0.2 if warn_threshold is None else warn_threshold  # signac 0.9.0
             if not args['profile'] and delta_t > warn_threshold >= 0:
                 print(
                     "WARNING: "

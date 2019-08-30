@@ -2452,8 +2452,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             return False
         return True
 
-    @deprecated(deprecated_in="0.8", removed_in="1.0",
-                details="Use _eligible_for_submission instead.")
+    @deprecated(deprecated_in="0.8", removed_in="1.0")
     def eligible_for_submission(self, job_operation):
         return self._eligible_for_submission(self, job_operation)
 

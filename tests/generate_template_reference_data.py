@@ -181,10 +181,6 @@ def main(args):
                   "Use `-f/--force` to overwrite.".format(ARCHIVE_DIR))
             return
 
-    # NOTE: We should replace the below line with
-    # with signac.TemporaryProject(name=PROJECT_NAME, cls=TestProject) as fp:
-    # once the next version of signac is released, and we can then remove
-    # the additional FlowProject instantiation below
     with signac.TemporaryProject(name=PROJECT_NAME) as p:
         init(p)
         fp = get_masked_flowproject(p)

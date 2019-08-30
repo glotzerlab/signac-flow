@@ -31,16 +31,9 @@ class BaseTemplateTest(object):
         self.maxDiff = None
 
         # Must import the data into the project.
-        # NOTE: We should replace the below line with
-        # with signac.TemporaryProject(name=PROJECT_NAME,
-        #                              cls=gen.TestProject) as fp:
-        # once the next version of signac is released, and we can then remove
-        # the additional FlowProject instantiation below
         with signac.TemporaryProject(name=gen.PROJECT_NAME) as p:
-
             fp = gen.get_masked_flowproject(p)
-            fp.import_from(
-                origin=gen.ARCHIVE_DIR)
+            fp.import_from(origin=gen.ARCHIVE_DIR)
 
             jobs = fp.find_jobs(dict(environment=self.env_name()))
             if not len(jobs):

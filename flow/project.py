@@ -56,6 +56,7 @@ from .environment import get_environment
 from .scheduling.base import ClusterJob
 from .scheduling.base import JobStatus
 from .scheduling.status import update_status
+from .errors import ScriptError
 from .errors import SubmitError
 from .errors import ConfigKeyError
 from .errors import NoSchedulerError
@@ -494,6 +495,9 @@ class FlowGroup(object):
 
     MAX_LEN_ID = 100
 
+    class ExecCommandError(RuntimeError):
+        pass
+
     def __init__(self, name, path, operations=None, run_cmd=None, exec_cmd=None,
                  directives=None, options=None):
         self.name = name
@@ -545,7 +549,11 @@ class FlowGroup(object):
 
         if exec_cmd is None:
             def cmd(operations, directives, job=None):
-                op = list(operations.values())[0]
+                if len(self.operations) > 1:
+                    # Cannot use exec mode with more than one operation.
+                    raise self.ExecCommandError
+                else:
+                    op = list(operations.values())[0]
 
                 if isinstance(op, FlowCmdOperation):
                     return op(job).lstrip()
@@ -572,9 +580,6 @@ class FlowGroup(object):
             else:
                 return self._run_cmd.format(self.operations, job) + ' ' + self.options
         elif mode == 'exec':
-            if len(self.operations) > 1:
-                raise SubmitError("FlowGroups of more than one operation are not "
-                                  "eligible for running in exec mode.")
             if callable(self._exec_cmd):
                 return self._exec_cmd(self.operations, self.directives, job)
             else:
@@ -2919,8 +2924,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 operations = self._generate_operations(args.cmd, jobs, args.requires)
             else:
                 names = args.operation_name if args.operation_name else None
-                operations = self._get_submission_operations(jobs, names, mode)
-            operations = list(islice(operations, args.num))
+                try:
+                    operations = self._get_submission_operations(jobs, names, mode)
+                    operations = list(islice(operations, args.num))
+                except FlowGroup.ExecCommandError:
+                    raise ScriptError(
+                        "A FlowGroup with more than one operation cannot be added "
+                        "to a script in exec mode.")
         # Generate the script and print to screen.
         print(self.script(
             operations=operations, parallel=args.parallel,
@@ -2942,9 +2952,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         # Gather all pending operations ...
         with self._potentially_buffered():
             names = args.operation_name if args.operation_name else None
-            operations = self._get_submission_operations(jobs, names, mode)
-            # Unspecified group or operationss
-        operations = list(islice(operations, args.num))
+            try:
+                operations = self._get_submission_operations(jobs, names, mode)
+                operations = list(islice(operations, args.num))
+            except FlowGroup.ExecCommandError:
+                raise SubmitError(
+                    "A FlowGroup with more than operation cannot be "
+                    "submitted in exec mode.")
         # Bundle operations up, generate the script, and submit to scheduler.
         for bundle in make_bundles(operations, args.bundle_size):
             status = self.submit_operations(operations=bundle, **kwargs)
@@ -3194,6 +3208,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             print("ERROR: {}".format(error),
                   "Consider to use the 'script' command to generate an execution script instead.",
                   file=sys.stderr)
+            _exit_or_raise()
+        except ScriptError as error:
+            print("Script error:", error, file=sys.stderr)
             _exit_or_raise()
         except SubmitError as error:
             print("Submission error:", error, file=sys.stderr)

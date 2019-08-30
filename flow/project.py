@@ -1078,12 +1078,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             else:
                 template = 'status.jinja'
 
-
         if eligible_jobs_max_lines is None:
             eligible_jobs_max_lines = flow_config.get_config_value('eligible_jobs_max_lines')
-
-        if skip_active:
-            raise NotImplementedError("The deprecated --skip-active option is no longer supported.")
 
         # initialize jinja2 template evnronment and necessary filters
         template_environment = self._template_environment()

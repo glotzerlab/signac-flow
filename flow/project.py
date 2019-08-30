@@ -1,19 +1,9 @@
-# Copyright (c) 2018 The Regents of the University of Michigan
+# Copyright (c) 2019 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 """Workflow definition with the FlowProject.
 
-The FlowProject is a signac Project, that allows the user to define
-a workflow based on job classification and job operations.
-
-A job may be classified based on its metadata and data in the form
-of str labels. These str-labels are yielded in the classify() method.
-
-
-Based on the classification a "next operation" may be identified, that
-should be executed next to further the workflow. While the user is free
-to choose any method for the determination of the "next operation", one
-option is to use a FlowGraph.
+The FlowProject is a signac Project that allows the user to define a workflow.
 """
 from __future__ import print_function
 import sys
@@ -29,6 +19,7 @@ import inspect
 import functools
 import contextlib
 import random
+from deprecation import deprecated
 from collections import defaultdict
 from collections import OrderedDict
 from itertools import islice
@@ -740,16 +731,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             pass
     """
 
-    NAMES = {
-        'next_operation': 'next_op',
-    }
-    "Simple translation table for output strings."
-
-    @classmethod
-    def _tr(cls, x):
-        "Use name translation table for x."
-        return cls.NAMES.get(x, x)
-
     ALIASES = dict(
         unknown='U',
         registered='R',
@@ -769,6 +750,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             return x
 
     @classmethod
+    @deprecated(deprecated_in="0.8", removed_in="1.0")
     def update_aliases(cls, aliases):
         "Update the ALIASES table for this class."
         cls.ALIASES.update(aliases)
@@ -882,10 +864,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             else:
                 raise
         try:
-            result['labels'] = sorted(set(self.classify(job)))
+            result['labels'] = sorted(set(self.labels(job)))
             result['_labels_error'] = None
         except Exception as error:
-            logger.debug("Error while classifying job '{}': '{}'.".format(job, error))
+            logger.debug("Error while determining labels for job '{}': '{}'.".format(job, error))
             if ignore_errors:
                 result['labels'] = list()
                 result['_labels_error'] = str(error)
@@ -905,7 +887,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             self.document.setdefault('_status', dict())
             scheduler_info = {sjob.name(): sjob.status() for sjob in self.scheduler_jobs(scheduler)}
             status = dict()
-            print(self._tr("Query scheduler..."), file=file)
+            print("Query scheduler...", file=file)
             for job in tqdm(jobs,
                             desc="Fetching operation status",
                             total=len(jobs), file=file):
@@ -1962,7 +1944,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         # Gather all pending operations.
         with self._potentially_buffered():
             operations = (op for op in self._get_pending_operations(jobs, names)
-                          if self.eligible_for_submission(op))
+                          if self._eligible_for_submission(op))
             if num is not None:
                 operations = list(islice(operations, num))
 
@@ -2114,14 +2096,14 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             help="Manually specify all labels that are required for the direct command "
                  "to be considered eligible for execution.")
 
-    def update_stati(self, *args, **kwargs):
-        "This function has been removed as of version 0.6."
-        raise RuntimeError(
-            "The update_stati() method has been removed as of version 0.6.")
-
+    @deprecated(deprecated_in="0.8", removed_in="1.0", details="Use export_job_statuses instead.")
     def export_job_stati(self, collection, stati):
         "Export the job stati to a database collection."
-        for status in stati:
+        self.export_job_statuses(self, collection, stati)
+
+    def export_job_statuses(self, collection, statuses):
+        "Export the job statuses to a database collection."
+        for status in statuses:
             job = self.open_job(id=status['job_id'])
             status['statepoint'] = job.statepoint()
             collection.update_one({'_id': status['job_id']},
@@ -2300,6 +2282,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             raise KeyError("An operation with this identifier is already added.")
         self.operations[name] = FlowOperation(cmd=cmd, pre=pre, post=post, directives=kwargs)
 
+    @deprecated(deprecated_in="0.8", removed_in="1.0", details="Use self.labels(job) instead.")
     def classify(self, job):
         """Generator function which yields labels for job.
 
@@ -2310,7 +2293,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         :type job:
             :class:`~signac.contrib.job.Job`
         :yields:
-            The labels to classify job.
+            The labels for the provided job.
         :yield type:
             str
         """
@@ -2354,6 +2337,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             for op in self._job_operations(job, True):
                 yield op
 
+    @deprecated(deprecated_in="0.8", removed_in="1.0", details="Use next_operations instead.")
     def next_operation(self, job):
         """Determine the next operation for this job.
 
@@ -2456,7 +2440,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         "The dictionary of operations that have been added to the workflow."
         return self._operations
 
-    def eligible_for_submission(self, job_operation):
+    def _eligible_for_submission(self, job_operation):
         """Determine if a job-operation is eligible for submission.
 
         By default, an operation is eligible for submission when it
@@ -2467,6 +2451,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         if job_operation.get_status() >= JobStatus.submitted:
             return False
         return True
+
+    @deprecated(deprecated_in="0.8", removed_in="1.0")
+    def eligible_for_submission(self, job_operation):
+        return self._eligible_for_submission(self, job_operation)
 
     def _main_status(self, args):
         "Print status overview."
@@ -2588,7 +2576,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         # Gather all pending operations ...
         with self._potentially_buffered():
             ops = (op for op in self._get_pending_operations(jobs, args.operation_name)
-                   if self.eligible_for_submission(op))
+                   if self._eligible_for_submission(op))
             ops = list(islice(ops, args.num))
 
         # Bundle operations up, generate the script, and submit to scheduler.

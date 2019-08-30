@@ -63,6 +63,7 @@ from .util.tqdm import tqdm
 from .util.misc import _positive_int
 from .util.misc import _mkdir_p
 from .util.misc import roundrobin
+from .util.misc import to_hashable
 from .util import template_filters as tf
 from .util.misc import add_cwd_to_environment_pythonpath
 from .util.misc import switch_to_directory
@@ -1324,8 +1325,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
         # Optionally expand parameters argument to all varying parameters.
         if parameters is self.PRINT_STATUS_ALL_VARYING_PARAMETERS:
-            parameters = list(sorted({key for job in jobs for key in job.sp.keys()
-                                      if len(set([job.sp.get(key) for job in jobs])) > 1}))
+            parameters = list(
+                sorted({key for job in jobs for key in job.sp.keys() if
+                        len(set([to_hashable(job.sp().get(key)) for job in jobs])) > 1}))
 
         if parameters:
             # get parameters info

@@ -791,10 +791,10 @@ class ExecutionProjectTest(BaseProjectTest):
         def op3(job):
             job.doc.op3 = True
 
-        for project_class, bad_ops, good_ops in zip(
+        all_ops = set(['op1', 'op2', 'op3'])
+        for project_class, bad_ops in zip(
                 [A, B, C],
-                [['op1'], ['op2', 'op3'], ['op1', 'op3']],
-                [['op2', 'op3'], ['op1'], ['op2']]):
+                [['op1'], ['op2', 'op3'], ['op1', 'op3']]):
 
             self.project_class = project_class
             for job in self.project.find_jobs():
@@ -806,6 +806,7 @@ class ExecutionProjectTest(BaseProjectTest):
                         for op in bad_ops
                         for job in project])
             # All good operations do run
+            good_ops = all_ops.difference(bad_ops)
             assert all([job.doc.get(op, False)
                         for op in good_ops
                         for job in project])

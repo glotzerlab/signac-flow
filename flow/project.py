@@ -972,7 +972,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
     def print_status(self, jobs=None, overview=True, overview_max_lines=None,
                      detailed=False, parameters=None,
-                     skip_active=False, param_max_width=None,
+                     param_max_width=None,
                      expand=False, all_ops=False, only_incomplete=False, dump_json=False,
                      unroll=True, compact=False, pretty=False,
                      file=None, err=None, ignore_errors=False,
@@ -1001,10 +1001,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             Print the value of the specified parameters.
         :type parameters:
             list of str
-        :param skip_active:
-            Only print jobs that are currently inactive.
-        :type skip_active:
-            bool
         :param param_max_width:
             Limit the number of characters of parameter columns,
             see also: :py:meth:`~.update_aliases`.
@@ -1076,9 +1072,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 template = 'status_compact.jinja'
             else:
                 template = 'status.jinja'
-
-        if skip_active:
-            raise NotImplementedError("The deprecated --skip-active option is no longer supported.")
 
         # initialize jinja2 template evnronment and necessary filters
         template_environment = self._template_environment()
@@ -2155,10 +2148,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             dest='only_incomplete',
             action='store_true',
             help="Only show information for jobs with incomplete operations.")
-        view_group.add_argument(
-            '--skip-active',
-            action='store_true',
-            help=argparse.SUPPRESS)
         view_group.add_argument(
             '--stack',
             action='store_false',

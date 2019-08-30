@@ -300,14 +300,14 @@ class JobOperation(object):
         return "{}({})".format(self.name, self.job)
 
     def __repr__(self):
-        return "{type}(name='{name}', operations='{operations}', "
-        "job='{job}', cmd={cmd}, directives={directives})".format(
-            type=type(self).__name__,
-            name=self.name,
-            operations=self.operations.keys(),
-            job=str(self.job),
-            cmd=repr(self._run_cmd),
-            directives=self.directives)
+        return "{type}(name='{name}', operations='{operations}', " \
+               "job='{job}', cmd={cmd}, directives={directives})".format(
+                   type=type(self).__name__,
+                   name=self.name,
+                   operations=self.operations.keys(),
+                   job=str(self.job),
+                   cmd=repr(self._run_cmd),
+                   directives=self.directives)
 
     def __hash__(self):
         return int(sha1(self.id.encode('utf-8')).hexdigest(), 16)

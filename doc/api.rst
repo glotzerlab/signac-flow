@@ -73,7 +73,24 @@ The FlowProject
     :members:
     :exclude-members: pre,post
 
-.. autoattribute:: FlowProject.pre
+
+.. automethod:: flow.FlowProject.post
+
+.. automethod:: flow.FlowProject.post.always
+
+.. automethod:: flow.FlowProject.post.copy_from
+
+.. automethod:: flow.FlowProject.post.false
+
+.. automethod:: flow.FlowProject.post.isfile
+
+.. automethod:: flow.FlowProject.post.never
+
+.. automethod:: flow.FlowProject.post.not_
+
+.. automethod:: flow.FlowProject.post.true
+
+.. automethod:: flow.FlowProject.pre
 
 .. automethod:: flow.FlowProject.pre.after
 
@@ -90,22 +107,6 @@ The FlowProject
 .. automethod:: flow.FlowProject.pre.not_
 
 .. automethod:: flow.FlowProject.pre.true
-
-.. autoattribute:: FlowProject.post
-
-.. automethod:: flow.FlowProject.post.always
-
-.. automethod:: flow.FlowProject.post.copy_from
-
-.. automethod:: flow.FlowProject.post.false
-
-.. automethod:: flow.FlowProject.post.isfile
-
-.. automethod:: flow.FlowProject.post.never
-
-.. automethod:: flow.FlowProject.post.not_
-
-.. automethod:: flow.FlowProject.post.true
 
 
 @flow.cmd

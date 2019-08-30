@@ -435,66 +435,93 @@ class _FlowProjectClass(type):
 
         # Give the class a pre and post class that are aware of the class they
         # are in.
-        cls.pre = cls._setup_pre_conditions_class(cls)
-        cls.post = cls._setup_post_conditions_class(cls)
+        cls.pre = cls._setup_pre_conditions_class(parent_class=cls)
+        cls.post = cls._setup_post_conditions_class(parent_class=cls)
         return cls
 
     @staticmethod
-    def _setup_pre_conditions_class(child_class):
+    def _setup_pre_conditions_class(parent_class):
 
-        class _pre(_condition):
+        class pre(_condition):
+            """Specify a function of job that must be true for this operation to
+            be eligible for execution. For example:
 
-            owner_class = child_class
+            .. code-block:: python
+
+                @Project.operation
+                @Project.pre(lambda job: not job.doc.get('hello'))
+                def hello(job):
+                    print('hello', job)
+                    job.doc.hello = True
+
+            The *hello*-operation would only execute if the 'hello' key in the job
+            document does not evaluate to True.
+            """
+
+            _parent_class = parent_class
 
             def __init__(self, condition):
                 self.condition = condition
 
             def __call__(self, func):
-                self.owner_class._OPERATION_PRE_CONDITIONS[func].insert(0, self.condition)
+                self._parent_class._OPERATION_PRE_CONDITIONS[func].insert(0, self.condition)
                 return func
 
             @classmethod
             def copy_from(cls, *other_funcs):
-                "True if and only if all pre conditions of other function(s) are met."
+                "True if and only if all pre conditions of other operation-function(s) are met."
                 def metacondition(job):
                     return all(c(job)
                                for other_func in other_funcs
-                               for c in cls.owner_class._collect_pre_conditions()[other_func])
+                               for c in cls._parent_class._collect_pre_conditions()[other_func])
                 return cls(metacondition)
 
             @classmethod
             def after(cls, *other_funcs):
-                "True if and only if all post conditions of other function(s) are met."
+                "True if and only if all post conditions of other operation-function(s) are met."
                 def metacondition(job):
                     return all(c(job)
                                for other_func in other_funcs
-                               for c in cls.owner_class._collect_post_conditions()[other_func])
+                               for c in cls._parent_class._collect_post_conditions()[other_func])
                 return cls(metacondition)
-        return _pre
+        return pre
 
     @staticmethod
-    def _setup_post_conditions_class(child_class):
+    def _setup_post_conditions_class(parent_class):
 
-        class _post(_condition):
+        class post(_condition):
+            """Specify a function of job that must evaluate to True for this operation
+            to be considered complete. For example:
 
-            owner_class = child_class
+            .. code-block:: python
+
+                @Project.operation
+                @Project.post(lambda job: job.doc.get('bye'))
+                def bye(job):
+                    print('bye' job)
+                    job.doc.bye = True
+
+            The *bye*-operation would be considered complete and therefore no longer
+            eligible for execution once the 'bye' key in the job document evaluates to True.
+            """
+            _parent_class = parent_class
 
             def __init__(self, condition):
                 self.condition = condition
 
             def __call__(self, func):
-                self.owner_class._OPERATION_POST_CONDITIONS[func].insert(0, self.condition)
+                self._parent_class._OPERATION_POST_CONDITIONS[func].insert(0, self.condition)
                 return func
 
             @classmethod
             def copy_from(cls, *other_funcs):
-                "True if and only if all post conditions of other function(s) are met."
+                "True if and only if all post conditions of other operation-function(s) are met."
                 def metacondition(job):
                     return all(c(job)
                                for other_func in other_funcs
-                               for c in cls.owner_class._collect_post_conditions()[other_func])
+                               for c in cls._parent_class._collect_post_conditions()[other_func])
                 return cls(metacondition)
-        return _post
+        return post
 
 
 class FlowProject(six.with_metaclass(_FlowProjectClass,

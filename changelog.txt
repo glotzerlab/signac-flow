@@ -100,7 +100,7 @@ Major changes
 ---------------------------------------------
 
  1. The generation of execution and submission scripts is now based on the jinja2_ templating system.
- 2. The new :ref:`decorator API <workflow-definition>` for the definition of a :class:`~.flow.FlowProject` class largely reduces the amount of boiler plate code needed to implement FlowProjects.
+ 2. The new decorator API for the definition of a :class:`~.flow.FlowProject` class largely reduces the amount of boiler plate code needed to implement FlowProjects.
     It also removes the necessity to have at least two modules, *e.g.*, one ``project.py`` and one ``operations.py`` module.
  3. Serial execution is now the default for all project sub commands, that includes ``run``, ``script``, and ``submit``.
     Parallel execution must be explicitly enabled with the ``--parallel`` option.
@@ -122,7 +122,7 @@ That means that if you overloaded any of these functions, the new templating sys
 
 If you decide to migrate to the new API, those are the steps you most likely have to take:
 
- 1. Replace all ``write_script*()`` methods and replace them with a :ref:`custom template script <templates>`, *e.g.*, `templates/script.sh` within your project root directory.
+ 1. Replace all ``write_script*()`` methods and replace them with a custom template script, *e.g.*, `templates/script.sh` within your project root directory.
  2. Optionally, use the new decorator API instead of ``FlowProject.add_operation`` to add operations to your FlowProject.
  3. Optionally, use the new decorator API to define label functions for your FlowProject.
  4. Execute your project with the Python ``-w`` option to make DeprecationWarnings visible and address all issues.

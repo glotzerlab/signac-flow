@@ -436,11 +436,11 @@ class _FlowProjectClass(type):
         return cls
 
     @staticmethod
-    def _setup_pre_conditions_class(cls):
+    def _setup_pre_conditions_class(child_class):
 
         class _pre(_condition):
 
-            owner_class = cls
+            owner_class = child_class
 
             def __init__(self, condition):
                 self.condition = condition
@@ -469,11 +469,11 @@ class _FlowProjectClass(type):
         return _pre
 
     @staticmethod
-    def _setup_post_conditions_class(cls):
+    def _setup_post_conditions_class(child_class):
 
         class _post(_condition):
 
-            owner_class = cls
+            owner_class = child_class
 
             def __init__(self, condition):
                 self.condition = condition

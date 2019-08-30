@@ -169,9 +169,12 @@ class BaseProjectTest(unittest.TestCase):
         project = self.project_class.get_project(root=self._tmp_dir.name)
         for a in range(3):
             if heterogeneous:
-                project.open_job(dict(a=a)).init()   # heterogeneous
+                # Add jobs with only the `a` key without `b`.
+                project.open_job(dict(a=a)).init()
+                project.open_job(dict(a=dict(a=a))).init()
             for b in range(3):
                 project.open_job(dict(a=a, b=b)).init()
+                project.open_job(dict(a=dict(a=a), b=b)).init()
         return project
 
 

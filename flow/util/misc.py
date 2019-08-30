@@ -216,3 +216,18 @@ def roundrobin(*iterables):
             # Remove the iterator we just exhausted from the cycle.
             num_active -= 1
             nexts = cycle(islice(nexts, num_active))
+
+
+class _hashable_dict(dict):
+    def __hash__(self):
+        return hash(tuple(sorted(self.items())))
+
+
+def to_hashable(l):
+    # if isinstance(l, Sequence):
+    if type(l) == list:
+        return tuple(to_hashable(_) for _ in l)
+    elif type(l) == dict:
+        return _hashable_dict(l)
+    else:
+        return l

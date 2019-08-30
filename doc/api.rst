@@ -29,8 +29,6 @@ The FlowProject
 
     FlowProject.ALIASES
     FlowProject.NAMES
-    FlowProject.OPERATION_STATUS_SYMBOLS
-    FlowProject.PRETTY_OPERATION_STATUS_SYMBOLS
     FlowProject.add_operation
     FlowProject.classify
     FlowProject.completed_operations
@@ -40,13 +38,27 @@ The FlowProject
     FlowProject.label
     FlowProject.labels
     FlowProject.main
-    FlowProject.map_scheduler_jobs
     FlowProject.next_operation
     FlowProject.next_operations
     FlowProject.operation
     FlowProject.operations
     FlowProject.post
+    FlowProject.post.always
+    FlowProject.post.copy_from
+    FlowProject.post.false
+    FlowProject.post.isfile
+    FlowProject.post.never
+    FlowProject.post.not_
+    FlowProject.post.true
     FlowProject.pre
+    FlowProject.pre.after
+    FlowProject.pre.always
+    FlowProject.pre.copy_from
+    FlowProject.pre.false
+    FlowProject.pre.isfile
+    FlowProject.pre.never
+    FlowProject.pre.not_
+    FlowProject.pre.true
     FlowProject.run
     FlowProject.run_operations
     FlowProject.scheduler_jobs
@@ -59,7 +71,42 @@ The FlowProject
 .. autoclass:: FlowProject
     :show-inheritance:
     :members:
-    :undoc-members: pre,post
+    :exclude-members: pre,post
+
+
+.. automethod:: flow.FlowProject.post
+
+.. automethod:: flow.FlowProject.post.always
+
+.. automethod:: flow.FlowProject.post.copy_from
+
+.. automethod:: flow.FlowProject.post.false
+
+.. automethod:: flow.FlowProject.post.isfile
+
+.. automethod:: flow.FlowProject.post.never
+
+.. automethod:: flow.FlowProject.post.not_
+
+.. automethod:: flow.FlowProject.post.true
+
+.. automethod:: flow.FlowProject.pre
+
+.. automethod:: flow.FlowProject.pre.after
+
+.. automethod:: flow.FlowProject.pre.always
+
+.. automethod:: flow.FlowProject.pre.copy_from
+
+.. automethod:: flow.FlowProject.pre.false
+
+.. automethod:: flow.FlowProject.pre.isfile
+
+.. automethod:: flow.FlowProject.pre.never
+
+.. automethod:: flow.FlowProject.pre.not_
+
+.. automethod:: flow.FlowProject.pre.true
 
 
 @flow.cmd

@@ -1914,7 +1914,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         :type num:
             int
         :param parallel:
-            Execute all bundled operations in parallel. Has no effect without bundling.
+            Execute all bundled operations in parallel. Does nothing with the
+            default behavior or `bundle_size=1`.
         :type parallel:
             bool
         :param force:
@@ -2073,13 +2074,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             const=0,
             default=1,
             dest='bundle_size',
-            help="Bundle multiple operations for execution. When this "
-                 "option is provided without argument, all pending operations "
-                 "are aggregated into one bundle.")
+            help="Bundle multiple operations for execution in a single "
+            "scheduler job. When this option is provided without argument, "
+            " all pending operations are aggregated into one bundle.")
         bundling_group.add_argument(
             '-p', '--parallel',
             action='store_true',
-            help="Execute all (bundled) operations in parallel.")
+            help="Execute all operations within a single bundle in parallel.")
 
     @classmethod
     def _add_direct_cmd_arg_group(cls, parser):

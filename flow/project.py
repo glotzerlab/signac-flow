@@ -958,16 +958,17 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
                 t = time.time()
                 num_jobs = len(jobs)
-                status_interval = 0.2
                 statuses = []
                 for i, job in enumerate(jobs):
                     time.sleep(0.01)
                     statuses.append(_get_job_status(job))
-                    if time.time() - t > status_interval:
-                        print('Collecting job status info: {}/{}'.format(i+1, num_jobs), end='\r')
+                    if time.time() - t > 0.2:  # status interval
+                        print(
+                            'Collecting job status info: {}/{}'.format(i+1, num_jobs),
+                            end='\r', file=err)
                         t = time.time()
                 # Always print the completed progressbar.
-                print('Collecting job status info: {}/{}'.format(i+1, num_jobs))
+                print('Collecting job status info: {}/{}'.format(i+1, num_jobs), file=err)
                 return statuses
 
     PRINT_STATUS_ALL_VARYING_PARAMETERS = True

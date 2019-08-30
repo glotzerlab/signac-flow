@@ -1,19 +1,9 @@
-# Copyright (c) 2018 The Regents of the University of Michigan
+# Copyright (c) 2019 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 """Workflow definition with the FlowProject.
 
-The FlowProject is a signac Project, that allows the user to define
-a workflow based on job classification and job operations.
-
-A job may be classified based on its metadata and data in the form
-of str labels. These str-labels are yielded in the classify() method.
-
-
-Based on the classification a "next operation" may be identified, that
-should be executed next to further the workflow. While the user is free
-to choose any method for the determination of the "next operation", one
-option is to use a FlowGraph.
+The FlowProject is a signac Project that allows the user to define a workflow.
 """
 from __future__ import print_function
 import sys
@@ -887,7 +877,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             result['labels'] = sorted(set(self.labels(job)))
             result['_labels_error'] = None
         except Exception as error:
-            logger.debug("Error while classifying job '{}': '{}'.".format(job, error))
+            logger.debug("Error while determining labels for job '{}': '{}'.".format(job, error))
             if ignore_errors:
                 result['labels'] = list()
                 result['_labels_error'] = str(error)
@@ -2302,7 +2292,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             raise KeyError("An operation with this identifier is already added.")
         self.operations[name] = FlowOperation(cmd=cmd, pre=pre, post=post, directives=kwargs)
 
-    @deprecated(deprecated_in="0.8", removed_in="1.0", details="Use self.labels instead.")
+    @deprecated(deprecated_in="0.8", removed_in="1.0", details="Use self.labels(job) instead.")
     def classify(self, job):
         """Generator function which yields labels for job.
 
@@ -2313,7 +2303,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         :type job:
             :class:`~signac.contrib.job.Job`
         :yields:
-            The labels to classify job.
+            The labels for the provided job.
         :yield type:
             str
         """

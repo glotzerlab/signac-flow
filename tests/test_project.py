@@ -309,6 +309,52 @@ class ProjectClassTest(BaseProjectTest):
         self.assertEqual(len(b._label_functions), 2)
         self.assertEqual(len(c._label_functions), 1)
 
+    def test_conditions_with_inheritance(self):
+        """
+        Tests the inheritance of pre/post conditions.
+
+        Class A should only have one pre/post condition, while class C that
+        inherits from A should have three, and class B should just have two
+        explicitly defined. Proper execution is tested in the
+        ExecutionProjectTest.
+        """
+        class A(FlowProject):
+            pass
+
+        class B(FlowProject):
+            pass
+
+        class C(A):
+            pass
+
+        @A.pre.always
+        @C.pre.always
+        @C.pre.always
+        @B.pre.always
+        @B.pre.always
+        @A.operation
+        @B.operation
+        def op1(job):
+            pass
+
+        self.assertEqual(len(A._collect_pre_conditions()[op1]), 1)
+        self.assertEqual(len(B._collect_pre_conditions()[op1]), 2)
+        self.assertEqual(len(C._collect_pre_conditions()[op1]), 3)
+
+        @A.post.always
+        @C.post.always
+        @C.post.always
+        @B.post.always
+        @B.post.always
+        @A.operation
+        @B.operation
+        def op2(job):
+            pass
+
+        self.assertEqual(len(A._collect_post_conditions()[op2]), 1)
+        self.assertEqual(len(B._collect_post_conditions()[op2]), 2)
+        self.assertEqual(len(C._collect_post_conditions()[op2]), 3)
+
     def test_with_job_decorator(self):
 
         class A(FlowProject):
@@ -705,6 +751,73 @@ class ExecutionProjectTest(BaseProjectTest):
                 self.assertTrue(job.isfile('world.txt'))
             else:
                 self.assertFalse(job.isfile('world.txt'))
+
+    def test_run_condition_inheritance(self):
+
+        # This assignment is necessary to use the `mock_project` function on
+        # classes A, B, and C. Otherwise, the self.project_class reassignment
+        # would break future tests.
+        _project = getattr(self, 'project_class', None)
+
+        class A(FlowProject):
+            pass
+
+        class B(FlowProject):
+            pass
+
+        class C(A):
+            pass
+
+        # Never post conditions are to prevent warnings on operations without
+        # post conditions
+        @A.pre.never
+        @B.pre.always
+        @A.post.never
+        @B.post.never
+        @A.operation
+        @B.operation
+        def op1(job):
+            job.doc.op1 = True
+
+        @A.pre.always
+        @B.pre.never
+        @A.post.never
+        @B.post.never
+        @A.operation
+        @B.operation
+        def op2(job):
+            job.doc.op2 = True
+
+        @A.pre.always
+        @C.pre.never
+        @B.pre.never
+        @A.post.never
+        @B.post.never
+        @A.operation
+        @B.operation
+        def op3(job):
+            job.doc.op3 = True
+
+        all_ops = set(['op1', 'op2', 'op3'])
+        for project_class, bad_ops in zip(
+                [A, B, C],
+                [['op1'], ['op2', 'op3'], ['op1', 'op3']]):
+
+            self.project_class = project_class
+            for job in self.project.find_jobs():
+                job.remove()
+            project = self.mock_project()
+            project.run()
+            # All bad operations do not run
+            assert all([not job.doc.get(op, False)
+                        for op in bad_ops
+                        for job in project])
+            # All good operations do run
+            good_ops = all_ops.difference(bad_ops)
+            assert all([job.doc.get(op, False)
+                        for op in good_ops
+                        for job in project])
+        self.project_class = _project
 
     def test_submit_operations(self):
         MockScheduler.reset()

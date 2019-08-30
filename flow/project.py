@@ -1083,6 +1083,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             else:
                 template = 'status.jinja'
 
+        if eligible_jobs_max_lines is None:
+            eligible_jobs_max_lines = flow_config.get_config_value('eligible_jobs_max_lines')
+
         if skip_active:
             raise NotImplementedError("The deprecated --skip-active option is no longer supported.")
 
@@ -1443,6 +1446,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 if v['eligible']:
                     op_counter[k] += 1
         context['op_counter'] = op_counter.most_common(eligible_jobs_max_lines)
+        n = len(op_counter) - len(context['op_counter'])
+        if n > 0:
+            context['op_counter'].append(('[{} more operations omitted]'.format(n), ''))
 
         print(template.render(**context), file=file)
 

@@ -17,6 +17,11 @@ class ConfigKeyError(KeyError):
     pass
 
 
+class ScriptError(RuntimeError):
+    "Indicates an error during scribt generation."
+    pass
+
+
 class SubmitError(RuntimeError):
     "Indicates an error during cluster job submission."
     pass

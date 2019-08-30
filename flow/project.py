@@ -56,6 +56,7 @@ from .environment import get_environment
 from .scheduling.base import ClusterJob
 from .scheduling.base import JobStatus
 from .scheduling.status import update_status
+from .errors import ScriptError
 from .errors import SubmitError
 from .errors import ConfigKeyError
 from .errors import NoSchedulerError
@@ -219,9 +220,6 @@ class JobOperation(object):
         The id of this JobOperation instance. The id should be unique.
     :type id:
         str
-    :param id:
-        The name of the JobOperation instance. Generally this will be the name
-        of the FlowGroup or FlowOperation that the JobOperation is derived from.
     :type name:
         str
     :param job:
@@ -303,14 +301,14 @@ class JobOperation(object):
         return "{}({})".format(self.name, self.job)
 
     def __repr__(self):
-        return "{type}(name='{name}', operations='{operations}', "
-        "job='{job}', cmd={cmd}, directives={directives})".format(
-            type=type(self).__name__,
-            name=self.name,
-            operations=self.operations.keys(),
-            job=str(self.job),
-            cmd=repr(self._run_cmd),
-            directives=self.directives)
+        return "{type}(name='{name}', operations='{operations}', " \
+               "job='{job}', cmd={cmd}, directives={directives})".format(
+                   type=type(self).__name__,
+                   name=self.name,
+                   operations=self.operations.keys(),
+                   job=str(self.job),
+                   cmd=repr(self._run_cmd),
+                   directives=self.directives)
 
     def __hash__(self):
         return int(sha1(self.id.encode('utf-8')).hexdigest(), 16)
@@ -438,8 +436,8 @@ class BaseFlowOperation(object):
 class FlowCmdOperation(BaseFlowOperation):
 
     def __init__(self, cmd, pre=None, post=None):
-        self._cmd = cmd
         super(FlowCmdOperation, self).__init__(pre=pre, post=post)
+        self._cmd = cmd
 
     def __str__(self):
         return "{type}(cmd='{cmd}')".format(type=type(self).__name__, cmd=self._cmd)
@@ -454,8 +452,8 @@ class FlowCmdOperation(BaseFlowOperation):
 class FlowOperation(BaseFlowOperation):
 
     def __init__(self, name, pre=None, post=None):
-        self.name = name
         super(FlowOperation, self).__init__(pre=pre, post=post)
+        self.name = name
 
     def __str__(self):
         return "{type}(name='{name}')".format(type=type(self).__name__, name=self.name)
@@ -497,6 +495,9 @@ class FlowGroup(object):
 
     MAX_LEN_ID = 100
 
+    class ExecCommandError(RuntimeError):
+        pass
+
     def __init__(self, name, path, operations=None, run_cmd=None, exec_cmd=None,
                  directives=None, options=None):
         self.name = name
@@ -518,37 +519,31 @@ class FlowGroup(object):
 
         if run_cmd is None:
             def cmd(operations, directives, job=None):
-                try:
-                    executable = directives['executable']
-                    if executable == '':
-                        executable = sys.executable
-                except (KeyError, TypeError):
-                    executable = sys.executable
+                executable = directives.get('executable', sys.executable)
 
                 if callable(executable):
                     if job is None:
-                        raise ValueError("Executable cannot be callable if"
-                                         "job is not set.")
+                        raise ValueError(
+                            "Executable cannot be callable if job is not set.")
                     else:
-                        return '{} {} run -o {}'.format(executable(job), self.path, name)
-                else:
-                    if job is None:
-                        return "{} {} run -o {}".format(executable,
-                                                        self.path,
-                                                        ' '.join(list(operations.keys()))
-                                                        )
-                    return "{} {} run -j {} -o {}".format(executable,
-                                                          self.path,
-                                                          job,
-                                                          ' '.join(list(operations.keys()))
-                                                          )
+                        executable = executable(job)
+
+                cmd = "{} {} run -o {}".format(executable, self.path, name)
+                if job is not None:
+                    cmd += ' -j {}'.format(job)
+                return cmd.lstrip()
+
             self._run_cmd = cmd
         else:
             self._run_cmd = run_cmd
 
         if exec_cmd is None:
             def cmd(operations, directives, job=None):
-                op = list(operations.values())[0]
+                if len(self.operations) > 1:
+                    # Cannot use exec mode with more than one operation.
+                    raise self.ExecCommandError
+                else:
+                    op = list(operations.values())[0]
 
                 if isinstance(op, FlowCmdOperation):
                     return op(job).lstrip()
@@ -566,7 +561,7 @@ class FlowGroup(object):
             self._exec_cmd = exec_cmd
 
     def __call__(self, job=None, mode='run'):
-        # Get string form of command
+        "Return the string forming the command for the execution of this group."
         if mode == 'run':
             if callable(self._run_cmd):
                 return self._run_cmd(self.operations,
@@ -575,13 +570,12 @@ class FlowGroup(object):
             else:
                 return self._run_cmd.format(self.operations, job) + ' ' + self.options
         elif mode == 'exec':
-            if len(self.operations) > 1:
-                raise SubmitError("FlowGroups of more than one operation are not "
-                                  "eligible for running in exec mode.")
             if callable(self._exec_cmd):
                 return self._exec_cmd(self.operations, self.directives, job)
             else:
                 return self._exec_cmd.format(self.operations, job)
+        else:
+            raise ValueError("Unknown mode '{}'.".format(mode))
 
     def __iter__(self):
         for op in self.operations.values():
@@ -640,22 +634,11 @@ class FlowGroup(object):
 
     def create_job_operation(self, job, mode='run', index=0):
         """Create a JobOperation object from the FlowGroup."""
-        # A copy is made to prevent unused directives warnings that are used in
-        # the creation of the command.
-        new_directives = dict(self.directives)
-        # If 'executable' is '' then is must have been set to prevent the
-        # inclusion of sys.executable for a command line operation
-        try:
-            if new_directives['executable'] == '':
-                del new_directives['executable']
-        except KeyError:
-            pass
-
         return JobOperation(self._generate_id(job, index=index),
                             self.name,
                             job,
-                            self.__call__(job, mode),
-                            new_directives,
+                            self(job, mode),
+                            dict(self.directives),
                             job._project)
 
 
@@ -2927,8 +2910,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 operations = self._generate_operations(args.cmd, jobs, args.requires)
             else:
                 names = args.operation_name if args.operation_name else None
-                operations = self._get_submission_operations(jobs, names, mode)
-            operations = list(islice(operations, args.num))
+                try:
+                    operations = self._get_submission_operations(jobs, names, mode)
+                    operations = list(islice(operations, args.num))
+                except FlowGroup.ExecCommandError:
+                    raise ScriptError(
+                        "A FlowGroup with more than one operation cannot be added "
+                        "to a script in exec mode.")
         # Generate the script and print to screen.
         print(self.script(
             operations=operations, parallel=args.parallel,
@@ -2950,9 +2938,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         # Gather all pending operations ...
         with self._potentially_buffered():
             names = args.operation_name if args.operation_name else None
-            operations = self._get_submission_operations(jobs, names, mode)
-            # Unspecified group or operationss
-        operations = list(islice(operations, args.num))
+            try:
+                operations = self._get_submission_operations(jobs, names, mode)
+                operations = list(islice(operations, args.num))
+            except FlowGroup.ExecCommandError:
+                raise SubmitError(
+                    "A FlowGroup with more than operation cannot be "
+                    "submitted in exec mode.")
         # Bundle operations up, generate the script, and submit to scheduler.
         for bundle in make_bundles(operations, args.bundle_size):
             status = self.submit_operations(operations=bundle, **kwargs)
@@ -3202,6 +3194,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             print("ERROR: {}".format(error),
                   "Consider to use the 'script' command to generate an execution script instead.",
                   file=sys.stderr)
+            _exit_or_raise()
+        except ScriptError as error:
+            print("Script error:", error, file=sys.stderr)
             _exit_or_raise()
         except SubmitError as error:
             print("Submission error:", error, file=sys.stderr)

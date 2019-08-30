@@ -7,7 +7,6 @@ http://www.doeleadershipcomputing.org/
 """
 from ..environment import DefaultLSFEnvironment, DefaultTorqueEnvironment
 
-import math
 from fractions import gcd
 
 
@@ -54,16 +53,16 @@ class SummitEnvironment(DefaultLSFEnvironment):
         # separate OMP threads (per resource sets) from tasks
         np //= cpus_per_task
 
-        np_per_task = max(1,np//ntasks)
+        np_per_task = max(1, np//ntasks)
         ngpu = operation.directives.get('ngpu', 0)
-        g = gcd(ngpu,ntasks)
+        g = gcd(ngpu, ntasks)
         if ngpu >= ntasks:
             nsets = ngpu // (ngpu // g)
         else:
             nsets = ntasks // (ntasks // g)
 
         tasks_per_set = max(ntasks // nsets, 1)
-        tasks_per_set = max(tasks_per_set,operation.directives.get('rs_tasks',1))
+        tasks_per_set = max(tasks_per_set, operation.directives.get('rs_tasks', 1))
 
         gpus_per_set = ngpu // nsets
         cpus_per_set = tasks_per_set*cpus_per_task*np_per_task

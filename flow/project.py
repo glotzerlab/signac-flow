@@ -1,19 +1,9 @@
-# Copyright (c) 2018 The Regents of the University of Michigan
+# Copyright (c) 2019 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 """Workflow definition with the FlowProject.
 
-The FlowProject is a signac Project, that allows the user to define
-a workflow based on job classification and job operations.
-
-A job may be classified based on its metadata and data in the form
-of str labels. These str-labels are yielded in the classify() method.
-
-
-Based on the classification a "next operation" may be identified, that
-should be executed next to further the workflow. While the user is free
-to choose any method for the determination of the "next operation", one
-option is to use a FlowGraph.
+The FlowProject is a signac Project that allows the user to define a workflow.
 """
 from __future__ import print_function
 import sys
@@ -29,6 +19,7 @@ import inspect
 import functools
 import contextlib
 import random
+from deprecation import deprecated
 from collections import defaultdict
 from collections import OrderedDict
 from collections import Counter
@@ -64,6 +55,7 @@ from .util.tqdm import tqdm
 from .util.misc import _positive_int
 from .util.misc import _mkdir_p
 from .util.misc import roundrobin
+from .util.misc import to_hashable
 from .util import template_filters as tf
 from .util.misc import add_cwd_to_environment_pythonpath
 from .util.misc import switch_to_directory
@@ -136,54 +128,6 @@ class _condition(object):
     @classmethod
     def not_(cls, condition):
         return cls(lambda job: not condition(job))
-
-
-class _pre(_condition):
-
-    def __call__(self, func):
-        pre_conditions = getattr(func, '_flow_pre', list())
-        pre_conditions.insert(0, self.condition)
-        func._flow_pre = pre_conditions
-        return func
-
-    @classmethod
-    def copy_from(cls, *other_funcs):
-        "True if and only if all pre conditions of other function(s) are met."
-        def metacondition(job):
-            return all(c(job)
-                       for other_func in other_funcs
-                       for c in getattr(other_func, '_flow_pre', list()))
-        return cls(metacondition)
-
-    @classmethod
-    def after(cls, *other_funcs):
-        "True if and only if all post conditions of other function(s) are met."
-        def metacondition(job):
-            return all(c(job)
-                       for other_func in other_funcs
-                       for c in getattr(other_func, '_flow_post', list()))
-        return cls(metacondition)
-
-
-class _post(_condition):
-
-    def __init__(self, condition):
-        self.condition = condition
-
-    def __call__(self, func):
-        post_conditions = getattr(func, '_flow_post', list())
-        post_conditions.insert(0, self.condition)
-        func._flow_post = post_conditions
-        return func
-
-    @classmethod
-    def copy_from(cls, *other_funcs):
-        "True if and only if all post conditions of other function(s) are met."
-        def metacondition(job):
-            return all(c(job)
-                       for other_func in other_funcs
-                       for c in getattr(other_func, '_flow_post', list()))
-        return cls(metacondition)
 
 
 def make_bundles(operations, size=None):
@@ -463,21 +407,88 @@ class FlowOperation(object):
 
 class _FlowProjectClass(type):
     """Metaclass for the FlowProject class."""
-
     def __new__(metacls, name, bases, namespace, **kwargs):
         cls = type.__new__(metacls, name, bases, dict(namespace))
 
         # All operation functions are registered with the operation() classmethod, which is
         # intended to be used as decorator function. The _OPERATION_FUNCTIONS dict maps the
-        # the operation name to the operation function.
-        cls._OPERATION_FUNCTIONS = list()
+        # the operation name to the operation function. In addition, pre and
+        # post conditions are registered with the class.
 
+        cls._OPERATION_FUNCTIONS = list()
+        cls._OPERATION_PRE_CONDITIONS = defaultdict(list)
+        cls._OPERATION_POST_CONDITIONS = defaultdict(list)
+
+        cls._OPERATION_FUNCTIONS = list()
+        cls._OPERATION_PRECONDITIONS = dict()
+        cls._OPERATION_POSTCONDITIONS = dict()
         # All label functions are registered with the label() classmethod, which is intendeded
         # to be used as decorator function. The _LABEL_FUNCTIONS dict contains the function as
         # key and the label name as value, or None to use the default label name.
         cls._LABEL_FUNCTIONS = OrderedDict()
 
+        # Give the class a pre and post class that are aware of the class they
+        # are in.
+        cls.pre = cls._setup_pre_conditions_class(cls)
+        cls.post = cls._setup_post_conditions_class(cls)
         return cls
+
+    @staticmethod
+    def _setup_pre_conditions_class(child_class):
+
+        class _pre(_condition):
+
+            owner_class = child_class
+
+            def __init__(self, condition):
+                self.condition = condition
+
+            def __call__(self, func):
+                self.owner_class._OPERATION_PRE_CONDITIONS[func].insert(0, self.condition)
+                return func
+
+            @classmethod
+            def copy_from(cls, *other_funcs):
+                "True if and only if all pre conditions of other function(s) are met."
+                def metacondition(job):
+                    return all(c(job)
+                               for other_func in other_funcs
+                               for c in cls.owner_class._collect_pre_conditions()[other_func])
+                return cls(metacondition)
+
+            @classmethod
+            def after(cls, *other_funcs):
+                "True if and only if all post conditions of other function(s) are met."
+                def metacondition(job):
+                    return all(c(job)
+                               for other_func in other_funcs
+                               for c in cls.owner_class._collect_post_conditions()[other_func])
+                return cls(metacondition)
+        return _pre
+
+    @staticmethod
+    def _setup_post_conditions_class(child_class):
+
+        class _post(_condition):
+
+            owner_class = child_class
+
+            def __init__(self, condition):
+                self.condition = condition
+
+            def __call__(self, func):
+                self.owner_class._OPERATION_POST_CONDITIONS[func].insert(0, self.condition)
+                return func
+
+            @classmethod
+            def copy_from(cls, *other_funcs):
+                "True if and only if all post conditions of other function(s) are met."
+                def metacondition(job):
+                    return all(c(job)
+                               for other_func in other_funcs
+                               for c in cls.owner_class._collect_post_conditions()[other_func])
+                return cls(metacondition)
+        return _post
 
 
 class FlowProject(six.with_metaclass(_FlowProjectClass,
@@ -675,7 +686,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         for cls in type(self).__mro__:
             self._label_functions.update(getattr(cls, '_LABEL_FUNCTIONS', dict()))
 
-    pre = _pre
     """Decorator to add a pre-condition function for an operation function.
 
     Use a label function (or any function of :code:`job`) as a condition:
@@ -715,7 +725,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             pass
     """
 
-    post = _post
     """Decorator to add a post-condition function for an operation function.
 
     Use a label function (or any function of :code:`job`) as a condition:
@@ -741,16 +750,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             pass
     """
 
-    NAMES = {
-        'next_operation': 'next_op',
-    }
-    "Simple translation table for output strings."
-
-    @classmethod
-    def _tr(cls, x):
-        "Use name translation table for x."
-        return cls.NAMES.get(x, x)
-
     ALIASES = dict(
         unknown='U',
         registered='R',
@@ -770,6 +769,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             return x
 
     @classmethod
+    @deprecated(deprecated_in="0.8", removed_in="1.0")
     def update_aliases(cls, aliases):
         "Update the ALIASES table for this class."
         cls.ALIASES.update(aliases)
@@ -883,10 +883,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             else:
                 raise
         try:
-            result['labels'] = sorted(set(self.classify(job)))
+            result['labels'] = sorted(set(self.labels(job)))
             result['_labels_error'] = None
         except Exception as error:
-            logger.debug("Error while classifying job '{}': '{}'.".format(job, error))
+            logger.debug("Error while determining labels for job '{}': '{}'.".format(job, error))
             if ignore_errors:
                 result['labels'] = list()
                 result['_labels_error'] = str(error)
@@ -906,7 +906,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             self.document.setdefault('_status', dict())
             scheduler_info = {sjob.name(): sjob.status() for sjob in self.scheduler_jobs(scheduler)}
             status = dict()
-            print(self._tr("Query scheduler..."), file=file)
+            print("Query scheduler...", file=file)
             for job in tqdm(jobs,
                             desc="Fetching operation status",
                             total=len(jobs), file=file):
@@ -1333,8 +1333,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
         # Optionally expand parameters argument to all varying parameters.
         if parameters is self.PRINT_STATUS_ALL_VARYING_PARAMETERS:
-            parameters = list(sorted({key for job in jobs for key in job.sp.keys()
-                                      if len(set([job.sp.get(key) for job in jobs])) > 1}))
+            parameters = list(
+                sorted({key for job in jobs for key in job.sp.keys() if
+                        len(set([to_hashable(job.sp().get(key)) for job in jobs])) > 1}))
 
         if parameters:
             # get parameters info
@@ -1953,7 +1954,8 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         :type num:
             int
         :param parallel:
-            Execute all bundled operations in parallel. Has no effect without bundling.
+            Execute all bundled operations in parallel. Does nothing with the
+            default behavior or `bundle_size=1`.
         :type parallel:
             bool
         :param force:
@@ -1983,7 +1985,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         # Gather all pending operations.
         with self._potentially_buffered():
             operations = (op for op in self._get_pending_operations(jobs, names)
-                          if self.eligible_for_submission(op))
+                          if self._eligible_for_submission(op))
             if num is not None:
                 operations = list(islice(operations, num))
 
@@ -2112,13 +2114,13 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             const=0,
             default=1,
             dest='bundle_size',
-            help="Bundle multiple operations for execution. When this "
-                 "option is provided without argument, all pending operations "
-                 "are aggregated into one bundle.")
+            help="Bundle multiple operations for execution in a single "
+            "scheduler job. When this option is provided without argument, "
+            " all pending operations are aggregated into one bundle.")
         bundling_group.add_argument(
             '-p', '--parallel',
             action='store_true',
-            help="Execute all (bundled) operations in parallel.")
+            help="Execute all operations within a single bundle in parallel.")
 
     @classmethod
     def _add_direct_cmd_arg_group(cls, parser):
@@ -2135,14 +2137,14 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             help="Manually specify all labels that are required for the direct command "
                  "to be considered eligible for execution.")
 
-    def update_stati(self, *args, **kwargs):
-        "This function has been removed as of version 0.6."
-        raise RuntimeError(
-            "The update_stati() method has been removed as of version 0.6.")
-
+    @deprecated(deprecated_in="0.8", removed_in="1.0", details="Use export_job_statuses instead.")
     def export_job_stati(self, collection, stati):
         "Export the job stati to a database collection."
-        for status in stati:
+        self.export_job_statuses(self, collection, stati)
+
+    def export_job_statuses(self, collection, statuses):
+        "Export the job statuses to a database collection."
+        for status in statuses:
             job = self.open_job(id=status['job_id'])
             status['statepoint'] = job.statepoint()
             collection.update_one({'_id': status['job_id']},
@@ -2325,6 +2327,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             raise KeyError("An operation with this identifier is already added.")
         self.operations[name] = FlowOperation(cmd=cmd, pre=pre, post=post, directives=kwargs)
 
+    @deprecated(deprecated_in="0.8", removed_in="1.0", details="Use self.labels(job) instead.")
     def classify(self, job):
         """Generator function which yields labels for job.
 
@@ -2335,7 +2338,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         :type job:
             :class:`~signac.contrib.job.Job`
         :yields:
-            The labels to classify job.
+            The labels for the provided job.
         :yield type:
             str
         """
@@ -2379,6 +2382,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             for op in self._job_operations(job, True):
                 yield op
 
+    @deprecated(deprecated_in="0.8", removed_in="1.0", details="Use next_operations instead.")
     def next_operation(self, job):
         """Determine the next operation for this job.
 
@@ -2439,11 +2443,38 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         cls._OPERATION_FUNCTIONS.append((name, func))
         return func
 
+    @classmethod
+    def _collect_operations(cls):
+        "Collect all operations that were add via decorator."
+        operations = []
+        for parent_class in cls.__mro__:
+            operations.extend(getattr(parent_class, '_OPERATION_FUNCTIONS', []))
+        return operations
+
+    @classmethod
+    def _collect_conditions(cls, attr):
+        "Collect conditions from attr using the mro hierarchy."
+        ret = defaultdict(list)
+        for parent_class in cls.__mro__:
+            for func, conds in getattr(parent_class, attr, dict()).items():
+                ret[func].extend(conds)
+        return ret
+
+    @classmethod
+    def _collect_pre_conditions(cls):
+        "Collect all pre-conditions that were add via decorator."
+        return cls._collect_conditions('_OPERATION_PRE_CONDITIONS')
+
+    @classmethod
+    def _collect_post_conditions(cls):
+        "Collect all post-conditions that were add via decorator."
+        return cls._collect_conditions('_OPERATION_POST_CONDITIONS')
+
     def _register_operations(self):
         "Register all operation functions registered with this class and its parent classes."
-        operations = []
-        for cls in type(self).__mro__:
-            operations.extend(getattr(cls, '_OPERATION_FUNCTIONS', []))
+        operations = self._collect_operations()
+        pre_conditions = self._collect_pre_conditions()
+        post_conditions = self._collect_post_conditions()
 
         def _guess_cmd(func, name, **kwargs):
             try:
@@ -2465,8 +2496,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                     "Repeat definition of operation with name '{}'.".format(name))
 
             # Extract pre/post conditions and directives from function:
-            params = {key: getattr(func, '_flow_{}'.format(key), None)
-                      for key in ('pre', 'post', 'directives')}
+            params = {
+                'pre': pre_conditions.get(func, None),
+                'post': post_conditions.get(func, None),
+                'directives': getattr(func, '_flow_directives', None)}
 
             # Construct FlowOperation:
             if getattr(func, '_flow_cmd', False):
@@ -2481,7 +2514,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         "The dictionary of operations that have been added to the workflow."
         return self._operations
 
-    def eligible_for_submission(self, job_operation):
+    def _eligible_for_submission(self, job_operation):
         """Determine if a job-operation is eligible for submission.
 
         By default, an operation is eligible for submission when it
@@ -2492,6 +2525,10 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         if job_operation.get_status() >= JobStatus.submitted:
             return False
         return True
+
+    @deprecated(deprecated_in="0.8", removed_in="1.0")
+    def eligible_for_submission(self, job_operation):
+        return self._eligible_for_submission(self, job_operation)
 
     def _main_status(self, args):
         "Print status overview."
@@ -2613,7 +2650,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         # Gather all pending operations ...
         with self._potentially_buffered():
             ops = (op for op in self._get_pending_operations(jobs, args.operation_name)
-                   if self.eligible_for_submission(op))
+                   if self._eligible_for_submission(op))
             ops = list(islice(ops, args.num))
 
         # Bundle operations up, generate the script, and submit to scheduler.

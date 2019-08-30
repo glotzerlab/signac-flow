@@ -404,6 +404,7 @@ class FlowOperation(object):
 
 
 class _FlowProjectClass(type):
+    """Metaclass for the FlowProject class."""
     def __new__(metacls, name, bases, namespace, **kwargs):
         cls = type.__new__(metacls, name, bases, dict(namespace))
 

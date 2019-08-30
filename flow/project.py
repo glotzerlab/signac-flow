@@ -960,7 +960,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                 num_jobs = len(jobs)
                 statuses = []
                 for i, job in enumerate(jobs):
-                    time.sleep(0.01)
                     statuses.append(_get_job_status(job))
                     if time.time() - t > 0.2:  # status interval
                         print(

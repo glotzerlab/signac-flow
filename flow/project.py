@@ -2988,6 +2988,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         if flow_group is None or job is None:
             return False
+        if flow_group._get_status(job) >= JobStatus.submitted:
+            return False
         group_ops = set(flow_group.operations.values())
         for other_group in self._groups.values():
             if group_ops & set(other_group.operations.values()):

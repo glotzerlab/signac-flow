@@ -1116,18 +1116,18 @@ class GroupProjectTest(BaseProjectTest):
             script = project.script(job_ops)
             if job.sp.b % 2 == 0:
                 self.assertIn(str(job), script)
-                self.assertIn('run -j {} -o op1'.format(job), script)
-                self.assertIn('run -j {} -o op2'.format(job), script)
+                self.assertIn('run -o op1 -j {}'.format(job), script)
+                self.assertIn('run -o op2 -j {}'.format(job), script)
             else:
                 self.assertIn(str(job), script)
-                self.assertNotIn('run -j {} -o op1'.format(job), script)
-                self.assertIn('run -j {} -o op2'.format(job), script)
+                self.assertNotIn('run -o op1 -j {}'.format(job), script)
+                self.assertIn('run -o op2 -j {}'.format(job), script)
 
         # For multiple operation groups and options
         for job in project:
             job_op1 = project.groups['group1'].create_job_operation(job)
             script1 = project.script([job_op1])
-            self.assertIn('run -j {} -o op1 op2'.format(job), script1)
+            self.assertIn('run -o group1 -j {}'.format(job), script1)
             job_op2 = project.groups['group2'].create_job_operation(job)
             script2 = project.script([job_op2])
             self.assertIn('--num-passes=2'.format(job), script2)
@@ -1303,7 +1303,7 @@ class GroupProjectMainInterfaceTest(BaseProjectTest):
                 'script -j {} -o group1'.format(job)
             ).decode().splitlines()
             self.assertIn(job.get_id(), '\n'.join(script_output))
-            self.assertIn('-o op1 op2', '\n'.join(script_output))
+            self.assertIn('-o group1', '\n'.join(script_output))
             script_output = self.call_subcmd(
                 'script -j {} -o group2'.format(job)
             ).decode().splitlines()
@@ -1314,19 +1314,13 @@ class GroupProjectMainInterfaceTest(BaseProjectTest):
         # Assert that correct output for group submission is given
         for job in self.project:
             submit_output = self.call_subcmd(
-                'submit -j {} -o group1 --pretend'.format(job.get_id())
-            ).decode().splitlines()
+                'submit -j {} -o group1 --pretend'.format(job)).decode().splitlines()
             output_string = '\n'.join(submit_output)
-            self.assertIn('run -j {} -o'.format(job.get_id()),
-                          output_string)
-            self.assertIn('op1'.format(job.get_id()),
-                          output_string)
-            self.assertIn('op2'.format(job.get_id()),
-                          output_string)
+            self.assertIn('run -o group1 -j {}'.format(job), output_string)
             submit_output = self.call_subcmd(
-                'submit -j {} -o group2 --pretend'.format(job.get_id())
+                'submit -j {} -o group2 --pretend'.format(job)
             ).decode().splitlines()
-            self.assertIn('run -j {} -o op3 --num-passes=2'.format(job.get_id()),
+            self.assertIn('run -o group2 -j {} --num-passes=2'.format(job),
                           '\n'.join(submit_output))
 
 

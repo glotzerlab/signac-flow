@@ -776,8 +776,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Save the path of the module that instantiates this object. This path is used
         # to construct the execution and run commands later.
-        self._path = os.path.abspath(inspect.stack()[1][1])
-
+        frames = inspect.stack()
+        while frames[-1].function != '__init__':
+            filename = frames.pop().filename
+        self._path = os.path.abspath(filename)
         # Associate this class with a compute environment.
         self._environment = environment or get_environment()
 

@@ -71,10 +71,6 @@ jobs:
           path: test-reports
           destination: test-reports
 
-  test-3.7-signac-0.9.5:
-    <<: *test-template
-    environment:
-      SIGNAC_VERSION: "v0.9.5"
   test-3.7-signac-1.0.0:
     <<: *test-template
     environment:
@@ -99,10 +95,6 @@ jobs:
     <<: *test-template
     docker:
       - image: circleci/python:2.7
-  test-2.7-signac-0.9.5:
-    <<: *test-template-27
-    environment:
-      SIGNAC_VERSION: "v0.9.5"
   test-2.7-signac-1.0.0:
     <<: *test-template-27
     environment:
@@ -153,9 +145,6 @@ workflows:
       - test-2.7:
           requires:
             - pre-test-checks
-      - test-2.7-signac-0.9.5:
-          requires:
-            - test-2.7
       - test-2.7-signac-1.0.0:
           requires:
             - test-2.7
@@ -174,9 +163,6 @@ workflows:
       - test-3.7:
           requires:
             - pre-test-checks
-      - test-3.7-signac-0.9.5:
-          requires:
-            - test-3.7
       - test-3.7-signac-1.0.0:
           requires:
             - test-3.7
@@ -192,14 +178,12 @@ workflows:
               only: /release\/.*/
           requires:
             - test-2.7
-            - test-2.7-signac-0.9.5
             - test-2.7-signac-1.0.0
             - test-2.7-signac-1.1.0
             - test-2.7-signac-1.2.0
             - test-3.5
             - test-3.6
             - test-3.7
-            - test-3.7-signac-0.9.5
             - test-3.7-signac-1.0.0
             - test-3.7-signac-1.1.0
             - test-3.7-signac-1.2.0

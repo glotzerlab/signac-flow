@@ -196,9 +196,6 @@ class JobOperation(object):
         The id of this JobOperation instance. The id should be unique.
     :type id:
         str
-    :param id:
-        The name of the JobOperation instance. Generally this will be the name
-        of the FlowGroup or FlowOperation that the JobOperation is derived from.
     :type name:
         str
     :param job:

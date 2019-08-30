@@ -951,19 +951,24 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
                     # This may fail on systems that don't allow threads.
                     return list(tqdm(
                         iterable=_map(_get_job_status, jobs),
-                        desc="Collect job status info", total=len(jobs), file=err))
+                        desc="Collecting job status info", total=len(jobs), file=err))
             except RuntimeError as error:
                 if "can't start new thread" not in error.args:
                     raise   # unrelated error
-                # The parallelized status determination has failed and we fall
-                # back to a serial approach.
-                logger.warning(
-                    "A parallelized status update failed due to error ('{}'). "
-                    "Entering serial mode with fallback progress indicator. The "
-                    "status update may take longer than ususal.".format(error))
-                return list(tqdm(
-                    iterable=map(_get_job_status, jobs),
-                    desc='Collect job status info:', total=len(jobs), file=err))
+
+                t = time.time()
+                num_jobs = len(jobs)
+                status_interval = 0.2
+                statuses = []
+                for i, job in enumerate(jobs):
+                    time.sleep(0.01)
+                    statuses.append(_get_job_status(job))
+                    if time.time() - t > status_interval:
+                        print('Collecting job status info: {}/{}'.format(i+1, num_jobs), end='\r')
+                        t = time.time()
+                # Always print the completed progressbar.
+                print('Collecting job status info: {}/{}'.format(i+1, num_jobs))
+                return statuses
 
     PRINT_STATUS_ALL_VARYING_PARAMETERS = True
     """This constant can be used to signal that the print_status() method is supposed

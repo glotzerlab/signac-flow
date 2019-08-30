@@ -435,8 +435,8 @@ class BaseFlowOperation(object):
 class FlowCmdOperation(BaseFlowOperation):
 
     def __init__(self, cmd, pre=None, post=None):
-        self._cmd = cmd
         super(FlowCmdOperation, self).__init__(pre=pre, post=post)
+        self._cmd = cmd
 
     def __str__(self):
         return "{type}(cmd='{cmd}')".format(type=type(self).__name__, cmd=self._cmd)
@@ -451,8 +451,8 @@ class FlowCmdOperation(BaseFlowOperation):
 class FlowOperation(BaseFlowOperation):
 
     def __init__(self, name, pre=None, post=None):
-        self.name = name
         super(FlowOperation, self).__init__(pre=pre, post=post)
+        self.name = name
 
     def __str__(self):
         return "{type}(name='{name}')".format(type=type(self).__name__, name=self.name)

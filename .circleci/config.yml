@@ -95,10 +95,6 @@ jobs:
     <<: *test-template
     docker:
       - image: circleci/python:3.5
-  test-3.4:
-    <<: *test-template
-    docker:
-      - image: circleci/python:3.4
   test-2.7: &test-template-27
     <<: *test-template
     docker:
@@ -169,9 +165,6 @@ workflows:
       - test-2.7-signac-1.2.0:
           requires:
             - test-2.7
-      - test-3.4:
-          requires:
-            - pre-test-checks
       - test-3.5:
           requires:
             - pre-test-checks
@@ -203,7 +196,6 @@ workflows:
             - test-2.7-signac-1.0.0
             - test-2.7-signac-1.1.0
             - test-2.7-signac-1.2.0
-            - test-3.4
             - test-3.5
             - test-3.6
             - test-3.7

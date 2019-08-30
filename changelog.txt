@@ -19,6 +19,7 @@ next
 - Add show_traceback to config options (#61, #144).
 - The support for Python version 3.4 has been dropped.
 - Support for signac 0.9 has been dropped.
+- Ensure default parameter range detection in status printing succeeds for nested statepoints (#154).
 
 Fixes
 +++++

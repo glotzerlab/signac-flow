@@ -1,6 +1,5 @@
 {# The following variables are available to all scripts. #}
 {% if overview or detailed %}
-{% set column_width_operation = [column_width_operation, 5] | max %}
 {% set field_operation = ("%%-%ss %%3s  " | format(column_width_operation)) %}
 {% set field_operation_title = ("%%-%ss  " | format(column_width_operation+4)) %}
 {% set ns = namespace(dash='', field_parameters='') %}

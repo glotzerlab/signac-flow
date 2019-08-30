@@ -7,7 +7,6 @@ http://www.doeleadershipcomputing.org/
 """
 from ..environment import DefaultLSFEnvironment, DefaultTorqueEnvironment
 
-import math
 from fractions import gcd
 
 
@@ -48,26 +47,26 @@ class SummitEnvironment(DefaultLSFEnvironment):
     @staticmethod
     def guess_resource_sets(operation, cores_per_node, gpus_per_node):
         ntasks = max(operation.directives.get('nranks', 1), 1)
+        np = operation.directives.get('np', ntasks)
+
         cpus_per_task = max(operation.directives.get('omp_num_threads', 1), 1)
-        np = operation.directives.get('np', ntasks * cpus_per_task)
+        # separate OMP threads (per resource sets) from tasks
+        np //= cpus_per_task
+
+        np_per_task = max(1, np//ntasks)
         ngpu = operation.directives.get('ngpu', 0)
-        if np % cores_per_node != 0 and (ngpu == 0 or ngpu == np):
-            # fill the nodes using small resource sets
-            # threads are never split across resource sets
-            nsets = np//cpus_per_task
+        g = gcd(ngpu, ntasks)
+        if ngpu >= ntasks:
+            nsets = ngpu // (ngpu // g)
         else:
-            nsets = max(math.ceil(np / cores_per_node),
-                        math.ceil(ngpu / gpus_per_node), 1)
-        cpus_per_set = max(np // nsets, 1)
+            nsets = ntasks // (ntasks // g)
+
+        tasks_per_set = max(ntasks // nsets, 1)
+        tasks_per_set = max(tasks_per_set, operation.directives.get('rs_tasks', 1))
+
         gpus_per_set = ngpu // nsets
-        tasks_per_set = max(ntasks // nsets, 1)  # Require at least one task per set
-        factor = gcd(tasks_per_set, gcd(gpus_per_set, cpus_per_set))
-        min_tasks_per_set = operation.directives.get('rs_tasks', 1)
-        factor = max(1, factor//min_tasks_per_set)
-        nsets *= factor
-        tasks_per_set //= factor
-        cpus_per_set //= factor
-        gpus_per_set //= factor
+        cpus_per_set = tasks_per_set*cpus_per_task*np_per_task
+
         return nsets, tasks_per_set, cpus_per_set, gpus_per_set
 
     @staticmethod

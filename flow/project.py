@@ -2161,7 +2161,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             help="Manually specify all labels that are required for the direct command "
                  "to be considered eligible for execution.")
 
-    @deprecated(deprecated_in="0.8", removed_in="1.0", details="Use export_job_statuses instead.")
+    @deprecated(deprecated_in="0.8", removed_in="1.0", details="Use export_job_statuses() instead.")
     def export_job_stati(self, collection, stati):
         "Export the job stati to a database collection."
         self.export_job_statuses(self, collection, stati)
@@ -2347,7 +2347,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             raise KeyError("An operation with this identifier is already added.")
         self.operations[name] = FlowOperation(cmd=cmd, pre=pre, post=post, directives=kwargs)
 
-    @deprecated(deprecated_in="0.8", removed_in="1.0", details="Use self.labels(job) instead.")
+    @deprecated(deprecated_in="0.8", removed_in="1.0", details="Use labels() instead.")
     def classify(self, job):
         """Generator function which yields labels for job.
 
@@ -2402,7 +2402,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             for op in self._job_operations(job, True):
                 yield op
 
-    @deprecated(deprecated_in="0.8", removed_in="1.0", details="Use next_operations instead.")
+    @deprecated(deprecated_in="0.8", removed_in="1.0", details="Use next_operations() instead.")
     def next_operation(self, job):
         """Determine the next operation for this job.
 

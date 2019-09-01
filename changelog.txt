@@ -45,6 +45,9 @@ Changed
     + ``eligible_for_submission`` (removed without replacement)
     + ``update_aliases`` (removed without replacement)
 
+- The support for Python version 2.7 is deprecated.
+
+
 Removed
 +++++++
 

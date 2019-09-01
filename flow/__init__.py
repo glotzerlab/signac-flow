@@ -26,10 +26,15 @@ from .template import init
 from .util.misc import redirect_log
 from .operations import with_job
 
+from signac.common import six
 # Import packaged environments unless disabled in config:
 from .util.config import get_config_value
 if get_config_value('import_packaged_environments', default=True):
     from . import environments  # noqa:F401
+
+
+if six.PY2:
+    raise RuntimeError("Python 2 is not supported by this version of signac-flow!")
 
 
 __version__ = '0.8.0'

@@ -18,6 +18,7 @@ import inspect
 import functools
 import contextlib
 import random
+import subprocess
 from deprecation import deprecated
 from collections import defaultdict
 from collections import OrderedDict
@@ -52,18 +53,14 @@ from .errors import NoSchedulerError
 from .errors import TemplateError
 from .util.tqdm import tqdm
 from .util.misc import _positive_int
-from .util.misc import _mkdir_p
 from .util.misc import roundrobin
 from .util.misc import to_hashable
 from .util import template_filters as tf
 from .util.misc import add_cwd_to_environment_pythonpath
 from .util.misc import switch_to_directory
 from .util.misc import TrackGetItemDict
-from .util.misc import fullmatch
 from .util.translate import abbreviate
 from .util.translate import shorten
-from .util.execution import fork
-from .util.execution import TimeoutExpired
 from .labels import label
 from .labels import staticlabel
 from .labels import classlabel
@@ -838,7 +835,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             h = '.'.join(op.get_id() for op in operations)
             bid = '{}/bundle/{}'.format(self, sha1(h.encode('utf-8')).hexdigest())
             fn_bundle = self._fn_bundle(bid)
-            _mkdir_p(os.path.dirname(fn_bundle))
+            os.makedirs(os.path.dirname(fn_bundle), exist_ok=True)
             with open(fn_bundle, 'w') as file:
                 for operation in operations:
                     file.write(operation.get_id() + '\n')
@@ -1517,10 +1514,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         :type progess:
             bool
         """
-        if six.PY2 and timeout is not None:
-            logger.warning(
-                "The timeout argument for run() is not supported for "
-                "Python 2.7 and will be ignored!")
         if timeout is not None and timeout < 0:
             timeout = None
         if operations is None:
@@ -1607,7 +1600,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             logger.debug("Able to optimize execution of operation '{}'.".format(operation))
             self._operation_functions[operation.name](operation.job)
         else:   # need to fork
-            fork(cmd=operation.cmd, timeout=timeout)
+            subprocess.call(operation.cmd, shell=True, timeout=timeout)
 
     def run(self, jobs=None, names=None, pretend=False, np=None, timeout=None, num=None,
             num_passes=1, progress=False, order=None):
@@ -1792,7 +1785,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         "Get all pending operations for the given selection."
         assert not isinstance(operation_names, six.string_types)
         for op in self.next_operations(* jobs):
-            if operation_names is None or any(fullmatch(n, op.name) for n in operation_names):
+            if operation_names is None or any(re.fullmatch(n, op.name) for n in operation_names):
                 yield op
 
     @contextlib.contextmanager
@@ -2693,7 +2686,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
                 def operation_function(job):
                     cmd = operation(job).format(job=job)
-                    fork(cmd=cmd)
+                    subprocess.call(cmd, shell=True)
 
         except KeyError:
             raise KeyError("Unknown operation '{}'.".format(args.operation))
@@ -2931,7 +2924,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         except SubmitError as error:
             print("Submission error:", error, file=sys.stderr)
             _exit_or_raise()
-        except (TimeoutError, TimeoutExpired):
+        except (TimeoutError, subprocess.TimeoutExpired):
             print("Error: Failed to complete execution due to "
                   "timeout ({}s).".format(args.timeout), file=sys.stderr)
             _exit_or_raise()

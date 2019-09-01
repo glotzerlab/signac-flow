@@ -11,7 +11,7 @@ import sys
 import inspect
 import subprocess
 import tempfile
-from contextlib import contextmanager
+from contextlib import contextmanager, redirect_stdout, redirect_stderr
 from distutils.version import StrictVersion
 from itertools import groupby
 
@@ -35,36 +35,6 @@ if six.PY2:
     from tempdir import TemporaryDirectory
 else:
     from tempfile import TemporaryDirectory
-
-
-# Need to implement context managers below while supporting
-# Python versions 2.7 and 3.4. These managers are both part
-# of the the standard library as of Python version 3.5.
-
-@contextmanager
-def redirect_stdout(new_target=None):
-    "Temporarily redirect all output to stdout to new_target."
-    if new_target is None:
-        new_target = StringIO()
-    old_target = sys.stdout
-    try:
-        sys.stdout = new_target
-        yield
-    finally:
-        sys.stdout = old_target
-
-
-@contextmanager
-def redirect_stderr(new_target=None):
-    "Temporarily redirect all output to stderr to new_target."
-    if new_target is None:
-        new_target = StringIO()
-    old_target = sys.stderr
-    try:
-        sys.stderr = new_target
-        yield
-    finally:
-        sys.stderr = old_target
 
 
 @contextmanager
@@ -369,7 +339,7 @@ class ProjectClassTest(BaseProjectTest):
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
                 starting_dir = os.getcwd()
-                with redirect_stderr():
+                with redirect_stderr(StringIO()):
                     A().run()
                 self.assertTrue(os.getcwd(), starting_dir)
 
@@ -400,7 +370,7 @@ class ProjectClassTest(BaseProjectTest):
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
                 starting_dir = os.getcwd()
-                with redirect_stderr():
+                with redirect_stderr(StringIO()):
                     A().run()
                 self.assertEqual(os.getcwd(), starting_dir)
                 for job in project:
@@ -421,7 +391,7 @@ class ProjectClassTest(BaseProjectTest):
             with switch_to_directory(project.root_directory()):
                 starting_dir = os.getcwd()
                 with self.assertRaises(Exception):
-                    with redirect_stderr():
+                    with redirect_stderr(StringIO()):
                         A().run()
                 self.assertEqual(os.getcwd(), starting_dir)
 
@@ -440,7 +410,7 @@ class ProjectClassTest(BaseProjectTest):
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
                 starting_dir = os.getcwd()
-                with redirect_stderr():
+                with redirect_stderr(StringIO()):
                     A().run()
                 self.assertEqual(os.getcwd(), starting_dir)
 
@@ -600,15 +570,15 @@ class ProjectTest(BaseProjectTest):
     def test_project_status_homogeneous_schema(self):
         project = self.mock_project()
         for parameters in (None, True, ['a'], ['b'], ['a', 'b']):
-            with redirect_stdout():
-                with redirect_stderr():
+            with redirect_stdout(StringIO()):
+                with redirect_stderr(StringIO()):
                     project.print_status(parameters=parameters, detailed=True)
 
     def test_project_status_heterogeneous_schema(self):
         project = self.mock_project(heterogeneous=True)
         for parameters in (None, True, ['a'], ['b'], ['a', 'b']):
-            with redirect_stdout():
-                with redirect_stderr():
+            with redirect_stdout(StringIO()):
+                with redirect_stderr(StringIO()):
                     project.print_status(parameters=parameters, detailed=True)
 
     def test_script(self):
@@ -934,7 +904,6 @@ class ExecutionProjectTest(BaseProjectTest):
                     job_status['operations'][op]['scheduler_status'],
                     (JobStatus.unknown, JobStatus.inactive))
 
-    @unittest.skipIf(six.PY2, 'logger output not caught for Python 2.7')
     def test_submit_operations_bad_directive(self):
         MockScheduler.reset()
         project = self.mock_project()
@@ -954,14 +923,13 @@ class ExecutionProjectTest(BaseProjectTest):
     def test_condition_evaluation(self):
         project = self.mock_project()
 
-        # Can't use the 'nonlocal' keyword with Python 2.7.
-        nonlocal_ = dict(evaluated=0)
+        evaluated = 0
         state = None
 
         def make_cond(cond):
             def cond_func(job):
-                # Would prefer to use 'nonlocal' keyword, but not available for Python 2.7.
-                nonlocal_['evaluated'] |= cond
+                nonlocal evaluated
+                evaluated |= cond
                 return cond & state
             return cond_func
 
@@ -998,9 +966,9 @@ class ExecutionProjectTest(BaseProjectTest):
                                        # are met, need to evaluate all.
                     (0b1111, 0b1111),  # All conditions met, need to evaluate all.
             ]:
-                nonlocal_['evaluated'] = 0
+                evaluated = 0
                 project.run()
-                self.assertEqual(nonlocal_['evaluated'], expected_evaluation)
+                self.assertEqual(evaluated, expected_evaluation)
 
 
 class BufferedExecutionProjectTest(ExecutionProjectTest):

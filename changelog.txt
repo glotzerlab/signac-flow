@@ -5,6 +5,12 @@ Changes
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 The numbers in brackets denote the related GitHub issue and/or pull request.
 
+next
+----
+
+- Drop support for Python version 2.7.
+
+
 Version 0.8
 ===========
 

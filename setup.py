@@ -35,7 +35,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name='signac-flow',
-    version='0.7.1',
+    version='0.8.0',
     packages=find_packages(),
     include_package_data=True,
     zip_safe=True,

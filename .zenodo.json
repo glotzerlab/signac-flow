@@ -16,7 +16,7 @@
         },
         {
             "affiliation": "University of Michigan",
-            "name": "Timothy Moore",
+            "name": "Timothy C. Moore",
             "orcid": "0000-0002-5709-7259"
         },
         {
@@ -41,12 +41,27 @@
         {
             "affiliation": "University of Michigan",
             "name": "Yannah Melle"
-        }
+        },
         {
             "affiliation": "University of Michigan",
             "name": "Pengji Zhou",
             "orcid": "0000-0002-1409-9633"
         },
+        {
+            "affiliation": "Vanderbilt University",
+            "name": "Gilmer Justin",
+            "orcid": "0000-0002-6915-5591"
+        },
+        {
+            "affiliation": "University of Michigan",
+            "name": "Alyssa Travitz",
+            "orcid": "0000-0001-5953-8807"
+        },
+        {
+            "affiliation": "University of Michigan",
+            "name": "Corwin Kerr",
+            "orcid": "0000-0003-0776-2596"
+        }
     ],
     "creators": [
         {
@@ -92,5 +107,5 @@
         "id": "http://www.opensource.org/licenses/BSD-3-Clause"
     },
     "title": "signac-flow",
-    "version": "0.7.1"
+    "version": "0.8.0"
 }

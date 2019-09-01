@@ -41,6 +41,11 @@ class Contributor:
             ret['orcid'] = self.orcid.lstrip('https://orcid.org/')
         return ret
 
+    def as_zenodo_contributor(self):
+        ret = self.as_zenodo_creator()
+        ret['type'] = 'Other'
+        return ret
+
 
 @click.command()
 @click.pass_context
@@ -65,7 +70,7 @@ def sync(ctx, in_place=False, check=True):
         zenodo = json.loads(file.read())
         zenodo_updated = zenodo.copy()
         zenodo_updated['creators'] = [a.as_zenodo_creator() for a in authors]
-        zenodo_updated['contributors'] = [c.as_zenodo_creator()
+        zenodo_updated['contributors'] = [c.as_zenodo_contributor()
                                           for c in contributors if c not in authors]
         for key in ('version', 'keywords'):
             zenodo_updated[key] = citation[key]

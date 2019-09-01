@@ -3,64 +3,77 @@
         {
             "affiliation": "University of Michigan",
             "name": "Benjamin Swerdlow",
-            "orcid": "0000-0001-6240-1430"
+            "orcid": "0000-0001-6240-1430",
+            "type": "Other"
         },
         {
             "affiliation": "University of Michigan",
-            "name": "Joshua A. Anderson"
+            "name": "Joshua A. Anderson",
+            "type": "Other"
         },
         {
             "affiliation": "University of Michigan",
             "name": "Jens Glaser",
-            "orcid": "0000-0003-1852-3849"
+            "orcid": "0000-0003-1852-3849",
+            "type": "Other"
         },
         {
             "affiliation": "University of Michigan",
             "name": "Timothy C. Moore",
-            "orcid": "0000-0002-5709-7259"
+            "orcid": "0000-0002-5709-7259",
+            "type": "Other"
         },
         {
             "affiliation": "University of Michigan",
             "name": "Rose Cersonsky",
-            "orcid": "0000-0003-4515-3441"
+            "orcid": "0000-0003-4515-3441",
+            "type": "Other"
         },
         {
             "affiliation": "University of Michigan",
-            "name": "Yuan Zhou"
+            "name": "Yuan Zhou",
+            "type": "Other"
         },
         {
             "affiliation": "Vanderbilt University",
             "name": "Matthew  W. Thompson",
-            "orcid": "0000-0002-1460-3983"
+            "orcid": "0000-0002-1460-3983",
+            "type": "Other"
         },
         {
             "affiliation": "University of Michigan",
             "name": "Shannon Moran",
-            "orcid": "0000-0002-3579-3149"
+            "orcid": "0000-0002-3579-3149",
+            "type": "Other"
         },
         {
             "affiliation": "University of Michigan",
-            "name": "Yannah Melle"
+            "name": "Yannah Melle",
+            "type": "Other"
         },
         {
             "affiliation": "University of Michigan",
             "name": "Pengji Zhou",
-            "orcid": "0000-0002-1409-9633"
+            "orcid": "0000-0002-1409-9633",
+            "type": "Other"
         },
         {
             "affiliation": "Vanderbilt University",
             "name": "Gilmer Justin",
-            "orcid": "0000-0002-6915-5591"
+            "orcid": "0000-0002-6915-5591",
+            "type": "Other"
         },
         {
             "affiliation": "University of Michigan",
             "name": "Alyssa Travitz",
-            "orcid": "0000-0001-5953-8807"
+            "orcid": "0000-0001-5953-8807",
+            "type": "Other"
         },
         {
             "affiliation": "University of Michigan",
             "name": "Corwin Kerr",
-            "orcid": "0000-0003-0776-2596"
+            "orcid": "0000-0003-0776-2596",
+            "type": "Other"
         }
     ],
     "creators": [
@@ -103,8 +116,11 @@
         "workflow",
         "scientific computing"
     ],
+    "upload_type": "software",
     "license": {
-        "id": "http://www.opensource.org/licenses/BSD-3-Clause"
+        "id": "BSD-3-Clause",
+        "title": "3-Clause BSD License",
+        "url": "https://opensource.org/licenses/BSD-3-Clause"
     },
     "title": "signac-flow",
     "version": "0.8.0"

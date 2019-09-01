@@ -3,40 +3,56 @@ Changes
 =======
 
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
+The numbers in brackets denote the related GitHub issue and/or pull request.
 
-next
-----
+Version 0.8
+===========
 
-- Add full launcher support for job submission on XSEDE Stampede2 for large parallel single processor jobs (#85, #91).
-- Show submission error messages in combination with a TORQUE scheduler (#103, #104).
-- Fix issue that caused the "Fetching operation status" progressbar to be inaccurate (#108).
-- Rewrite print status function using Jinja2 templates.
+[0.8.0] -- 2019-09-01
+---------------------
+
+Added
++++++
+
+- Add feature for integrated profiling of status updates (``status --profile``) to aid with the optimization of a FlowProject implementation (#107, #110).
+- The status view is generated with Jinja2 templates and thus more easily customizable (#67, #111).
+- Automatically show an overview of the number of eligible jobs for each operation in status view (#134).
 - Allow the provision of multiple operation-functions to the ``pre.after`` and ``*.copy_from`` conditions (#120).
 - Add option to specify the operation execution order (#121).
-- Fix erroneous line in the torque submission template (#126).
 - Add a testing module to easily initialize a test project (#130).
-- Add feature for integrated profiling of status updates to aid with the optimization of the FlowProject imlementation (#107, #110).
-- Add show_traceback to config options (#61, #144).
-- The support for Python version 3.4 has been dropped.
-- Support for signac 0.9 has been dropped.
-- Ensure default parameter range detection in status printing succeeds for nested statepoints (#154).
-- Print number of eligible jobs for each operation in status view (#134)
-- Fix issue with the resource set calculcation on INCITE Summit (#101).
+- Enable option to always show the full traceback with ``show_traceback = on`` within the ``[flow]`` section of the signac configuration (#61, #144).
+- Add full launcher support for job submission on XSEDE Stampede2 for large parallel single processor jobs (#85, #91).
 
 Fixes
 +++++
 
-- Both the ``nranks`` and ``omp_num_threads`` directives properly support callables.
+- Both the ``nranks`` and ``omp_num_threads`` directives properly support callables (#118).
+- Show submission error messages in combination with a TORQUE scheduler (#103, #104).
+- Fix issue that caused the "Fetching operation status" progress bar to be inaccurate (#108).
+- Fix erroneous line in the torque submission template (#126).
+- Ensure default parameter range detection in status printing succeeds for nested state points (#154).
+- Fix issue with the resource set calculation on INCITE Summit (#101).
 
 Changed
 +++++++
 
-- Packaged environments are now available by default. Set "import_packaged_environments = off" within the signac configuration "[flow]" section to revert to previous behavior.
+- Packaged environments are now available by default. Set ``import_packaged_environments = off`` within the ``[flow]`` section of the signac configuration to revert to previous behavior.
+- The following methods of the ``FlowProject`` class have been deprecated and will trigger a ``DeprecationWarning`` upon use until their removal:
+
+    + ``classify`` (use ``labels()`` instead)
+    + ``next_operation`` (use ``next_operations()`` instead)
+    + ``export_job_stati`` (replaced by ``export_job_statuses``)
+    + ``eligible_for_submission`` (removed without replacement)
+    + ``update_aliases`` (removed without replacement)
+
+Removed
++++++++
+
+- The support for Python version 3.4 has been dropped.
+- Support for signac version 0.9 has been dropped.
 
 Version 0.7
 ===========
-
-*The numbers in brackets denote the related GitHub issue or pull request.*
 
 [0.7.1] -- 2019-03-25
 ---------------------

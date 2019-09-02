@@ -91,22 +91,6 @@ jobs:
     <<: *test-template
     docker:
       - image: circleci/python:3.5
-  test-2.7: &test-template-27
-    <<: *test-template
-    docker:
-      - image: circleci/python:2.7
-  test-2.7-signac-1.0.0:
-    <<: *test-template-27
-    environment:
-      SIGNAC_VERSION: "v1.0.0"
-  test-2.7-signac-1.1.0:
-    <<: *test-template-27
-    environment:
-      SIGNAC_VERSION: "v1.1.0"
-  test-2.7-signac-1.2.0:
-    <<: *test-template-27
-    environment:
-      SIGNAC_VERSION: "v1.2.0"
 
   test-deploy-pypi:
     docker:
@@ -142,18 +126,6 @@ workflows:
             branches:
               only: /release\/.*/
       - pre-test-checks
-      - test-2.7:
-          requires:
-            - pre-test-checks
-      - test-2.7-signac-1.0.0:
-          requires:
-            - test-2.7
-      - test-2.7-signac-1.1.0:
-          requires:
-            - test-2.7
-      - test-2.7-signac-1.2.0:
-          requires:
-            - test-2.7
       - test-3.5:
           requires:
             - pre-test-checks
@@ -177,10 +149,6 @@ workflows:
             branches:
               only: /release\/.*/
           requires:
-            - test-2.7
-            - test-2.7-signac-1.0.0
-            - test-2.7-signac-1.1.0
-            - test-2.7-signac-1.2.0
             - test-3.5
             - test-3.6
             - test-3.7

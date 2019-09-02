@@ -17,10 +17,9 @@ import socket
 import logging
 import importlib
 from collections import OrderedDict
+import importlib.machinery
 
 from signac.common import config
-from signac.common import six
-from signac.common.six import with_metaclass
 
 from .scheduling.base import JobStatus
 from .scheduling.lsf import LSFScheduler
@@ -31,14 +30,8 @@ from .scheduling.fakescheduler import FakeScheduler
 from .util import config as flow_config
 from .errors import NoSchedulerError
 
-if six.PY2:
-    import imp
-else:
-    import importlib.machinery
 
 logger = logging.getLogger(__name__)
-if six.PY2:
-    logger.addHandler(logging.NullHandler())
 
 
 # Global variable can be used to override detected environment
@@ -96,7 +89,7 @@ class ComputeEnvironmentType(type):
         return super(ComputeEnvironmentType, cls).__init__(name, bases, dct)
 
 
-class ComputeEnvironment(with_metaclass(ComputeEnvironmentType)):
+class ComputeEnvironment(metaclass=ComputeEnvironmentType):
     """Define computational environments.
 
     The ComputeEnvironment class allows us to automatically determine
@@ -342,10 +335,7 @@ class GPUEnvironment(ComputeEnvironment):
 
 
 def _import_module(fn):
-    if six.PY2:
-        return imp.load_source(os.path.splitext(fn)[0], fn)
-    else:
-        return importlib.machinery.SourceFileLoader(fn, fn).load_module()
+    return importlib.machinery.SourceFileLoader(fn, fn).load_module()
 
 
 def _import_modules(prefix):

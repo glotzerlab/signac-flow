@@ -75,9 +75,8 @@ def calc_tasks(operations, name, parallel=False, allow_mixed=False):
                         op.directives.get('processor_fraction', 1) for op in operations]
     if identical(processing_units) or allow_mixed:
         if len(processing_units) > 0:
-            # need to cast int for python2
-            sum_processing_units = int(round(sum(processing_units)))
-            max_processing_units = int(round(max(processing_units)))
+            sum_processing_units = round(sum(processing_units))
+            max_processing_units = round(max(processing_units))
             return sum_processing_units if parallel else max_processing_units
         else:
             return 0    # empty set

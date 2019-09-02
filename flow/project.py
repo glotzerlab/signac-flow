@@ -36,7 +36,6 @@ from multiprocessing.pool import ThreadPool
 from multiprocessing import Event
 
 import signac
-from signac.common import six
 from signac.contrib.hashing import calc_id
 from signac.contrib.filterparse import parse_filter_arg
 
@@ -70,8 +69,6 @@ from .util import config as flow_config
 
 
 logger = logging.getLogger(__name__)
-if six.PY2:
-    logger.addHandler(logging.NullHandler())
 
 
 # The TEMPLATE_HELP can be shown with the --template-help option available to all
@@ -221,7 +218,7 @@ class JobOperation(object):
         def evaluate(value):
             if value and callable(value):
                 return value(job)
-            elif isinstance(value, six.string_types):
+            elif isinstance(value, str):
                 return value.format(job=job)
             else:
                 return value
@@ -521,8 +518,7 @@ class _FlowProjectClass(type):
         return post
 
 
-class FlowProject(six.with_metaclass(_FlowProjectClass,
-                                     signac.contrib.Project)):
+class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     """A signac project class specialized for workflow management.
 
     This class provides a command line interface for the definition, execution, and
@@ -592,8 +588,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             try:
                 extra_packages.append(jinja2.PackageLoader(env, 'templates'))
             except ImportError as error:
-                name = str(error) if six.PY2 else error.name
-                logger.warning("Unable to load template from package '{}'.".format(name))
+                logger.warning("Unable to load template from package '{}'.".format(error.name))
 
         load_envs = ([jinja2.FileSystemLoader(self._template_dir)] +
                      extra_packages +
@@ -1534,7 +1529,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             with contextlib.closing(Pool(processes=cpu_count() if np < 0 else np)) as pool:
                 logger.debug("Parallelized execution of {} operation(s).".format(len(operations)))
                 try:
-                    from six.moves import cPickle as pickle
+                    import pickle
                     self._run_operations_in_parallel(pool, pickle, operations, progress, timeout)
                     logger.debug("Used cPickle module for serialization.")
                 except Exception as error:
@@ -1688,7 +1683,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             num = None
 
         # The 'names' argument must be a sequence, not a string.
-        if isinstance(names, six.string_types):
+        if isinstance(names, str):
             raise ValueError(
                 "The names argument of FlowProject.run() must be a sequence of strings, "
                 "not a string.")
@@ -1783,7 +1778,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
     def _get_pending_operations(self, jobs, operation_names=None):
         "Get all pending operations for the given selection."
-        assert not isinstance(operation_names, six.string_types)
+        assert not isinstance(operation_names, str)
         for op in self.next_operations(* jobs):
             if operation_names is None or any(re.fullmatch(n, op.name) for n in operation_names):
                 yield op
@@ -1985,7 +1980,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         # Regular argument checks and expansion
         if jobs is None:
             jobs = self  # select all jobs
-        if isinstance(names, six.string_types):
+        if isinstance(names, str):
             raise ValueError(
                 "The 'names' argument must be a sequence of strings, however you "
                 "provided a single string: {}.".format(names))
@@ -2266,7 +2261,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
             label_name = getattr(label_func, '_label_name', label_func.__name__)
             assert label_name is not None
-            if isinstance(label_value, six.string_types):
+            if isinstance(label_value, str):
                 yield label_value
             elif bool(label_value) is True:
                 yield label_name
@@ -2427,7 +2422,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
         .. versionadded:: 0.6
         """
-        if isinstance(func, six.string_types):
+        if isinstance(func, str):
             return lambda op: cls.operation(op, name=func)
 
         if name is None:
@@ -2437,20 +2432,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             raise ValueError(
                 "An operation with name '{}' is already registered.".format(name))
 
-        if six.PY2:
-            signature = inspect.getargspec(func)
-            if len(signature.args) > 1:
-                if signature.defaults is None or len(signature.defaults) + 1 < len(signature.args):
-                    raise ValueError(
-                        "Only the first argument in an operation argument may not have "
-                        "a default value! ({})".format(name))
-        else:
-            signature = inspect.signature(func)
-            for i, (k, v) in enumerate(signature.parameters.items()):
-                if i and v.default is inspect.Parameter.empty:
-                    raise ValueError(
-                        "Only the first argument in an operation argument may not have "
-                        "a default value! ({})".format(name))
+        signature = inspect.signature(func)
+        for i, (k, v) in enumerate(signature.parameters.items()):
+            if i and v.default is inspect.Parameter.empty:
+                raise ValueError(
+                    "Only the first argument in an operation argument may not have "
+                    "a default value! ({})".format(name))
 
         # Append the name and function to the class registry
         cls._OPERATION_FUNCTIONS.append((name, func))

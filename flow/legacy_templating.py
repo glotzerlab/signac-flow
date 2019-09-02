@@ -9,8 +9,6 @@ from __future__ import print_function
 import io
 import warnings
 import functools
-
-from signac.common import six
 import deprecation
 
 
@@ -231,10 +229,7 @@ class JobScript(io.StringIO):
         return self.read()
 
     def write(self, s):
-        if six.PY2:
-            super(JobScript, self).write(unicode(s))  # noqa
-        else:
-            super(JobScript, self).write(s)
+        super(JobScript, self).write(s)
 
     def writeline(self, line=''):
         "Write one line to the job script."

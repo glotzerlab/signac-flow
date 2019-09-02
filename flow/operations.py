@@ -16,7 +16,6 @@ from multiprocessing import Pool
 from functools import wraps
 
 from signac import get_project
-from signac.common import six
 
 from .util.tqdm import tqdm
 
@@ -134,10 +133,7 @@ def _get_operations(include_private=False):
         if not include_private and name.startswith('_'):
             continue
         if inspect.isfunction(obj):
-            if six.PY2:
-                signature = inspect.getargspec(obj)
-            else:
-                signature = inspect.getfullargspec(obj)
+            signature = inspect.getfullargspec(obj)
             if len(signature.args) == 1:
                 yield name
 

@@ -4,19 +4,19 @@
 from __future__ import print_function
 import unittest
 import logging
-import io
 import uuid
 import os
 import sys
 import inspect
 import subprocess
 import tempfile
-from contextlib import contextmanager
+from contextlib import contextmanager, redirect_stdout, redirect_stderr
 from distutils.version import StrictVersion
+from io import StringIO
 from itertools import groupby
+from tempfile import TemporaryDirectory
 
 import signac
-from signac.common import six
 import flow
 from flow import FlowProject, cmd, with_job, directives
 from flow.scheduling.base import Scheduler
@@ -31,41 +31,6 @@ from flow import init
 from define_test_project import TestProject
 from define_test_project import TestDynamicProject
 
-if six.PY2:
-    from tempdir import TemporaryDirectory
-else:
-    from tempfile import TemporaryDirectory
-
-
-# Need to implement context managers below while supporting
-# Python versions 2.7 and 3.4. These managers are both part
-# of the the standard library as of Python version 3.5.
-
-@contextmanager
-def redirect_stdout(new_target=None):
-    "Temporarily redirect all output to stdout to new_target."
-    if new_target is None:
-        new_target = StringIO()
-    old_target = sys.stdout
-    try:
-        sys.stdout = new_target
-        yield
-    finally:
-        sys.stdout = old_target
-
-
-@contextmanager
-def redirect_stderr(new_target=None):
-    "Temporarily redirect all output to stderr to new_target."
-    if new_target is None:
-        new_target = StringIO()
-    old_target = sys.stderr
-    try:
-        sys.stderr = new_target
-        yield
-    finally:
-        sys.stderr = old_target
-
 
 @contextmanager
 def suspend_logging():
@@ -74,16 +39,6 @@ def suspend_logging():
         yield
     finally:
         logging.disable(logging.NOTSET)
-
-
-class StringIO(io.StringIO):
-    "PY27 compatibility layer."
-
-    def write(self, s):
-        if six.PY2:
-            super(StringIO, self).write(unicode(s))  # noqa
-        else:
-            super(StringIO, self).write(s)
 
 
 class MockScheduler(Scheduler):
@@ -125,13 +80,8 @@ class MockScheduler(Scheduler):
                         with tempfile.NamedTemporaryFile() as tmpfile:
                             tmpfile.write(cls._scripts[cid].encode('utf-8'))
                             tmpfile.flush()
-                            if six.PY2:
-                                with open(os.devnull, 'w') as devnull:
-                                    subprocess.check_call(
-                                        ['/bin/bash', tmpfile.name], stderr=devnull)
-                            else:
-                                subprocess.check_call(
-                                    ['/bin/bash', tmpfile.name], stderr=subprocess.DEVNULL)
+                            subprocess.check_call(
+                                ['/bin/bash', tmpfile.name], stderr=subprocess.DEVNULL)
                     except Exception:
                         job._status = JobStatus.error
                         raise
@@ -178,7 +128,6 @@ class BaseProjectTest(unittest.TestCase):
         return project
 
 
-@unittest.skipIf(six.PY2, 'Only check performance on Python 3')
 class ProjectStatusPerformanceTest(BaseProjectTest):
 
     class Project(FlowProject):
@@ -206,7 +155,7 @@ class ProjectStatusPerformanceTest(BaseProjectTest):
         MockScheduler.reset()
 
         time = timeit.timeit(
-            lambda: project._fetch_status(project, io.StringIO(),
+            lambda: project._fetch_status(project, StringIO(),
                                           ignore_errors=False, no_parallelize=False), number=10)
 
         self.assertTrue(time < 10)
@@ -369,7 +318,7 @@ class ProjectClassTest(BaseProjectTest):
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
                 starting_dir = os.getcwd()
-                with redirect_stderr():
+                with redirect_stderr(StringIO()):
                     A().run()
                 self.assertTrue(os.getcwd(), starting_dir)
 
@@ -400,7 +349,7 @@ class ProjectClassTest(BaseProjectTest):
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
                 starting_dir = os.getcwd()
-                with redirect_stderr():
+                with redirect_stderr(StringIO()):
                     A().run()
                 self.assertEqual(os.getcwd(), starting_dir)
                 for job in project:
@@ -421,7 +370,7 @@ class ProjectClassTest(BaseProjectTest):
             with switch_to_directory(project.root_directory()):
                 starting_dir = os.getcwd()
                 with self.assertRaises(Exception):
-                    with redirect_stderr():
+                    with redirect_stderr(StringIO()):
                         A().run()
                 self.assertEqual(os.getcwd(), starting_dir)
 
@@ -440,7 +389,7 @@ class ProjectClassTest(BaseProjectTest):
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
                 starting_dir = os.getcwd()
-                with redirect_stderr():
+                with redirect_stderr(StringIO()):
                     A().run()
                 self.assertEqual(os.getcwd(), starting_dir)
 
@@ -600,15 +549,15 @@ class ProjectTest(BaseProjectTest):
     def test_project_status_homogeneous_schema(self):
         project = self.mock_project()
         for parameters in (None, True, ['a'], ['b'], ['a', 'b']):
-            with redirect_stdout():
-                with redirect_stderr():
+            with redirect_stdout(StringIO()):
+                with redirect_stderr(StringIO()):
                     project.print_status(parameters=parameters, detailed=True)
 
     def test_project_status_heterogeneous_schema(self):
         project = self.mock_project(heterogeneous=True)
         for parameters in (None, True, ['a'], ['b'], ['a', 'b']):
-            with redirect_stdout():
-                with redirect_stderr():
+            with redirect_stdout(StringIO()):
+                with redirect_stderr(StringIO()):
                     project.print_status(parameters=parameters, detailed=True)
 
     def test_script(self):
@@ -669,7 +618,6 @@ class ExecutionProjectTest(BaseProjectTest):
         jobs_order_none = [job._id for job, _ in groupby(ops, key=lambda op: op.job)]
         self.assertEqual(len(jobs_order_none), len(set(jobs_order_none)))
 
-    @unittest.skipIf(six.PY2, 'requires python 3')
     def test_run(self):
         with self.subTest(order='invalid-order'):
             with self.assertRaises(ValueError):
@@ -934,7 +882,6 @@ class ExecutionProjectTest(BaseProjectTest):
                     job_status['operations'][op]['scheduler_status'],
                     (JobStatus.unknown, JobStatus.inactive))
 
-    @unittest.skipIf(six.PY2, 'logger output not caught for Python 2.7')
     def test_submit_operations_bad_directive(self):
         MockScheduler.reset()
         project = self.mock_project()
@@ -954,14 +901,13 @@ class ExecutionProjectTest(BaseProjectTest):
     def test_condition_evaluation(self):
         project = self.mock_project()
 
-        # Can't use the 'nonlocal' keyword with Python 2.7.
-        nonlocal_ = dict(evaluated=0)
+        evaluated = 0
         state = None
 
         def make_cond(cond):
             def cond_func(job):
-                # Would prefer to use 'nonlocal' keyword, but not available for Python 2.7.
-                nonlocal_['evaluated'] |= cond
+                nonlocal evaluated
+                evaluated |= cond
                 return cond & state
             return cond_func
 
@@ -998,9 +944,9 @@ class ExecutionProjectTest(BaseProjectTest):
                                        # are met, need to evaluate all.
                     (0b1111, 0b1111),  # All conditions met, need to evaluate all.
             ]:
-                nonlocal_['evaluated'] = 0
+                evaluated = 0
                 project.run()
-                self.assertEqual(nonlocal_['evaluated'], expected_evaluation)
+                self.assertEqual(evaluated, expected_evaluation)
 
 
 class BufferedExecutionProjectTest(ExecutionProjectTest):
@@ -1042,11 +988,7 @@ class ProjectMainInterfaceTest(BaseProjectTest):
         try:
             with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
                 with switch_to_directory(self.project.root_directory()):
-                    if six.PY2:
-                        with open(os.devnull, 'w') as devnull:
-                            return subprocess.check_output(_cmd.split(), stderr=devnull)
-                    else:
-                        return subprocess.check_output(_cmd.split(), stderr=subprocess.DEVNULL)
+                    return subprocess.check_output(_cmd.split(), stderr=subprocess.DEVNULL)
         except subprocess.CalledProcessError as error:
             print(error, file=sys.stderr)
             print(error.output, file=sys.stderr)

@@ -12,8 +12,6 @@ requirements = [
     'jinja2>=2.8',
     # To enable the parallelized execution of operations across processes.
     'cloudpickle',
-    # To define IntEnum in flow/scheduling/base.py.
-    'enum34;python_version<"3.4"',
     # Deprecation management
     'deprecation>=2',
 ]
@@ -53,7 +51,6 @@ setup(
         "Intended Audience :: Developers",
         "License :: OSI Approved :: BSD License",
         "Topic :: Scientific/Engineering :: Physics",
-        "Programming Language :: Python :: 2.7",
         "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
@@ -70,5 +67,5 @@ setup(
 
     install_requires=requirements,
 
-    python_requires='>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, <4',
+    python_requires='>=3.5, <4',
 )

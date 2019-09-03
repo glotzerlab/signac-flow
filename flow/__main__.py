@@ -13,7 +13,6 @@ import argparse
 import logging
 import sys
 
-from signac.common import six
 from signac import init_project
 from signac import get_project
 
@@ -91,8 +90,6 @@ def main():
 
     if args.debug:
         logging.basicConfig(level=logging.DEBUG)
-    elif six.PY2:
-        logging.basicConfig(level=logging.WARNING)
     if not hasattr(args, 'func'):
         parser.print_usage()
         sys.exit(2)

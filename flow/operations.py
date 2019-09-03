@@ -11,14 +11,13 @@ import sys
 import argparse
 import logging
 import inspect
+import subprocess
 from multiprocessing import Pool
 from functools import wraps
 
 from signac import get_project
-from signac.common import six
 
 from .util.tqdm import tqdm
-from .util.execution import fork
 
 
 logger = logging.getLogger(__name__)
@@ -134,10 +133,7 @@ def _get_operations(include_private=False):
         if not include_private and name.startswith('_'):
             continue
         if inspect.isfunction(obj):
-            if six.PY2:
-                signature = inspect.getargspec(obj)
-            else:
-                signature = inspect.getfullargspec(obj)
+            signature = inspect.getfullargspec(obj)
             if len(signature.args) == 1:
                 yield name
 
@@ -240,7 +236,7 @@ def run(parser=None):
 
         def operation(job):
             cmd = operation_func(job).format(job=job)
-            fork(cmd=cmd, timeout=args.timeout)
+            subprocess.call(cmd, shell=True, timeout=args.timeout)
     else:
         operation = operation_func
 
@@ -250,17 +246,6 @@ def run(parser=None):
             logger.warning("A timeout has no effect in serial execution!")
         for job in tqdm(jobs) if args.progress else jobs:
             operation(job)
-
-    # Parallel execution
-    elif six.PY2:
-        # Due to Python 2.7 issue #8296 (http://bugs.python.org/issue8296) we
-        # always need to provide a timeout to avoid issues with "hanging"
-        # processing pools.
-        timeout = sys.maxint if args.timeout is None else args.timeout
-        pool = Pool(args.np)
-        result = pool.imap_unordered(operation, jobs)
-        for _ in tqdm(jobs) if args.progress else jobs:
-            result.next(timeout)
     else:
         with Pool(args.np) as pool:
             result = pool.imap_unordered(operation, jobs)

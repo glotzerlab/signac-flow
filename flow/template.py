@@ -12,7 +12,6 @@ import sys
 import errno
 import logging
 
-from signac.common import six
 try:
     import jinja2
     from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
@@ -29,8 +28,6 @@ from .util.misc import _is_identifier
 
 
 logger = logging.getLogger(__name__)
-if six.PY2:
-    logger.addHandler(logging.NullHandler())
 
 
 TEMPLATES = {
@@ -87,15 +84,8 @@ def init(alias=None, template=None, root=None, out=None):
         try:
             if root is not None:
                 fn = os.path.join(root, fn)
-            if six.PY2:
-                # Adapted from: http://stackoverflow.com/questions/10978869/
-                flags = os.O_CREAT | os.O_WRONLY | os.O_EXCL
-                fd = os.open(fn, flags)
-                with os.fdopen(fd, 'w') as file:
-                    file.write(code + '\n')
-            else:
-                with open(fn, 'x') as fw:
-                    fw.write(code + '\n')
+            with open(fn, 'x') as fw:
+                fw.write(code + '\n')
         except OSError as e:
             if e.errno == errno.EEXIST:
                 logger.error(

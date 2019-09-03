@@ -18,6 +18,7 @@ import inspect
 import functools
 import contextlib
 import random
+import subprocess
 from deprecation import deprecated
 from collections import defaultdict
 from collections import OrderedDict
@@ -35,7 +36,6 @@ from multiprocessing.pool import ThreadPool
 from multiprocessing import Event
 
 import signac
-from signac.common import six
 from signac.contrib.hashing import calc_id
 from signac.contrib.filterparse import parse_filter_arg
 
@@ -52,18 +52,14 @@ from .errors import NoSchedulerError
 from .errors import TemplateError
 from .util.tqdm import tqdm
 from .util.misc import _positive_int
-from .util.misc import _mkdir_p
 from .util.misc import roundrobin
 from .util.misc import to_hashable
 from .util import template_filters as tf
 from .util.misc import add_cwd_to_environment_pythonpath
 from .util.misc import switch_to_directory
 from .util.misc import TrackGetItemDict
-from .util.misc import fullmatch
 from .util.translate import abbreviate
 from .util.translate import shorten
-from .util.execution import fork
-from .util.execution import TimeoutExpired
 from .labels import label
 from .labels import staticlabel
 from .labels import classlabel
@@ -73,8 +69,6 @@ from .util import config as flow_config
 
 
 logger = logging.getLogger(__name__)
-if six.PY2:
-    logger.addHandler(logging.NullHandler())
 
 
 # The TEMPLATE_HELP can be shown with the --template-help option available to all
@@ -224,7 +218,7 @@ class JobOperation(object):
         def evaluate(value):
             if value and callable(value):
                 return value(job)
-            elif isinstance(value, six.string_types):
+            elif isinstance(value, str):
                 return value.format(job=job)
             else:
                 return value
@@ -524,8 +518,7 @@ class _FlowProjectClass(type):
         return post
 
 
-class FlowProject(six.with_metaclass(_FlowProjectClass,
-                                     signac.contrib.Project)):
+class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     """A signac project class specialized for workflow management.
 
     This class provides a command line interface for the definition, execution, and
@@ -595,8 +588,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             try:
                 extra_packages.append(jinja2.PackageLoader(env, 'templates'))
             except ImportError as error:
-                name = str(error) if six.PY2 else error.name
-                logger.warning("Unable to load template from package '{}'.".format(name))
+                logger.warning("Unable to load template from package '{}'.".format(error.name))
 
         load_envs = ([jinja2.FileSystemLoader(self._template_dir)] +
                      extra_packages +
@@ -838,7 +830,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             h = '.'.join(op.get_id() for op in operations)
             bid = '{}/bundle/{}'.format(self, sha1(h.encode('utf-8')).hexdigest())
             fn_bundle = self._fn_bundle(bid)
-            _mkdir_p(os.path.dirname(fn_bundle))
+            os.makedirs(os.path.dirname(fn_bundle), exist_ok=True)
             with open(fn_bundle, 'w') as file:
                 for operation in operations:
                     file.write(operation.get_id() + '\n')
@@ -1517,10 +1509,6 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         :type progess:
             bool
         """
-        if six.PY2 and timeout is not None:
-            logger.warning(
-                "The timeout argument for run() is not supported for "
-                "Python 2.7 and will be ignored!")
         if timeout is not None and timeout < 0:
             timeout = None
         if operations is None:
@@ -1541,7 +1529,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             with contextlib.closing(Pool(processes=cpu_count() if np < 0 else np)) as pool:
                 logger.debug("Parallelized execution of {} operation(s).".format(len(operations)))
                 try:
-                    from six.moves import cPickle as pickle
+                    import pickle
                     self._run_operations_in_parallel(pool, pickle, operations, progress, timeout)
                     logger.debug("Used cPickle module for serialization.")
                 except Exception as error:
@@ -1607,7 +1595,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             logger.debug("Able to optimize execution of operation '{}'.".format(operation))
             self._operation_functions[operation.name](operation.job)
         else:   # need to fork
-            fork(cmd=operation.cmd, timeout=timeout)
+            subprocess.call(operation.cmd, shell=True, timeout=timeout)
 
     def run(self, jobs=None, names=None, pretend=False, np=None, timeout=None, num=None,
             num_passes=1, progress=False, order=None):
@@ -1695,7 +1683,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             num = None
 
         # The 'names' argument must be a sequence, not a string.
-        if isinstance(names, six.string_types):
+        if isinstance(names, str):
             raise ValueError(
                 "The names argument of FlowProject.run() must be a sequence of strings, "
                 "not a string.")
@@ -1790,9 +1778,9 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
     def _get_pending_operations(self, jobs, operation_names=None):
         "Get all pending operations for the given selection."
-        assert not isinstance(operation_names, six.string_types)
+        assert not isinstance(operation_names, str)
         for op in self.next_operations(* jobs):
-            if operation_names is None or any(fullmatch(n, op.name) for n in operation_names):
+            if operation_names is None or any(re.fullmatch(n, op.name) for n in operation_names):
                 yield op
 
     @contextlib.contextmanager
@@ -1992,7 +1980,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         # Regular argument checks and expansion
         if jobs is None:
             jobs = self  # select all jobs
-        if isinstance(names, six.string_types):
+        if isinstance(names, str):
             raise ValueError(
                 "The 'names' argument must be a sequence of strings, however you "
                 "provided a single string: {}.".format(names))
@@ -2273,7 +2261,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
             label_name = getattr(label_func, '_label_name', label_func.__name__)
             assert label_name is not None
-            if isinstance(label_value, six.string_types):
+            if isinstance(label_value, str):
                 yield label_value
             elif bool(label_value) is True:
                 yield label_name
@@ -2434,7 +2422,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
         .. versionadded:: 0.6
         """
-        if isinstance(func, six.string_types):
+        if isinstance(func, str):
             return lambda op: cls.operation(op, name=func)
 
         if name is None:
@@ -2444,20 +2432,12 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
             raise ValueError(
                 "An operation with name '{}' is already registered.".format(name))
 
-        if six.PY2:
-            signature = inspect.getargspec(func)
-            if len(signature.args) > 1:
-                if signature.defaults is None or len(signature.defaults) + 1 < len(signature.args):
-                    raise ValueError(
-                        "Only the first argument in an operation argument may not have "
-                        "a default value! ({})".format(name))
-        else:
-            signature = inspect.signature(func)
-            for i, (k, v) in enumerate(signature.parameters.items()):
-                if i and v.default is inspect.Parameter.empty:
-                    raise ValueError(
-                        "Only the first argument in an operation argument may not have "
-                        "a default value! ({})".format(name))
+        signature = inspect.signature(func)
+        for i, (k, v) in enumerate(signature.parameters.items()):
+            if i and v.default is inspect.Parameter.empty:
+                raise ValueError(
+                    "Only the first argument in an operation argument may not have "
+                    "a default value! ({})".format(name))
 
         # Append the name and function to the class registry
         cls._OPERATION_FUNCTIONS.append((name, func))
@@ -2693,7 +2673,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
 
                 def operation_function(job):
                     cmd = operation(job).format(job=job)
-                    fork(cmd=cmd)
+                    subprocess.call(cmd, shell=True)
 
         except KeyError:
             raise KeyError("Unknown operation '{}'.".format(args.operation))
@@ -2931,7 +2911,7 @@ class FlowProject(six.with_metaclass(_FlowProjectClass,
         except SubmitError as error:
             print("Submission error:", error, file=sys.stderr)
             _exit_or_raise()
-        except (TimeoutError, TimeoutExpired):
+        except (TimeoutError, subprocess.TimeoutExpired):
             print("Error: Failed to complete execution due to "
                   "timeout ({}s).".format(args.timeout), file=sys.stderr)
             _exit_or_raise()

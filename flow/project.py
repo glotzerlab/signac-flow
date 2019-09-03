@@ -1947,7 +1947,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             # engine and warn about those that have not been.
             keys_unused = {
                 key for op in operations for key in
-                op.directives._keys_set_by_user.difference(op.directives.keys_used)}
+                op.directives._keys_set_by_user.difference(op.directives.keys_used)
+                if key not in ('fork', )  # whitelist
+            }
             if keys_unused:
                 logger.warning(
                     "Some of the keys provided as part of the directives were not used by "

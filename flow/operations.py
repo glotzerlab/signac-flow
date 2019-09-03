@@ -106,7 +106,7 @@ class directives(object):
     such as the number of processes required for execution of parallelized operations.
 
     In addition, you can use the `@directives(fork=True)` directive to enforce that a
-    particular  operation is always executed within a subprocess and not within the
+    particular operation is always executed within a subprocess and not within the
     Python interpreter's process even if there are no other reasons that would prevent that.
     """
 

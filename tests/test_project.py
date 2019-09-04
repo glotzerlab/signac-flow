@@ -130,6 +130,8 @@ class BaseProjectTest(unittest.TestCase):
             for b in range(3):
                 project.open_job(dict(a=a, b=b)).init()
                 project.open_job(dict(a=dict(a=a), b=b)).init()
+        if hasattr(self, 'path'):
+            project.path = self.path
         return project
 
 
@@ -410,7 +412,7 @@ class ProjectClassTest(BaseProjectTest):
         def test_context(job):
             return 'exit 1'
 
-        project = A(self.mock_project().config)
+        project = A(self.mock_project().config, path='')
         for job in project:
             job.doc.np = 3
             next_op = project.next_operation(job)
@@ -428,7 +430,7 @@ class ProjectClassTest(BaseProjectTest):
         def a(job):
             return 'hello!'
 
-        project = A(self.mock_project().config)
+        project = A(self.mock_project().config, entrypoint='python')
 
         # test setting neither nranks nor omp_num_threads
         for job in project:
@@ -514,6 +516,7 @@ class ProjectClassTest(BaseProjectTest):
 
 class ProjectTest(BaseProjectTest):
     project_class = TestProject
+    path = os.path.realpath('tests/define_test_project.py')
 
     def test_instance(self):
         self.assertTrue(isinstance(self.project, FlowProject))
@@ -611,6 +614,7 @@ class ProjectTest(BaseProjectTest):
 class ExecutionProjectTest(BaseProjectTest):
     project_class = TestProject
     expected_number_of_steps = 4
+    path = os.path.realpath('tests/define_test_project.py')
 
     def test_pending_operations_order(self):
         # The execution order of local runs is internally assumed to be
@@ -994,6 +998,7 @@ class BufferedExecutionDynamicProjectTest(BufferedExecutionProjectTest,
 
 class ProjectMainInterfaceTest(BaseProjectTest):
     project_class = TestProject
+    path = 'tests/define_test_project'
 
     def switch_to_cwd(self):
         os.chdir(self.cwd)
@@ -1053,10 +1058,11 @@ class ProjectMainInterfaceTest(BaseProjectTest):
         self.assertTrue(len(self.project))
         status_output = self.call_subcmd('--debug status --detailed').decode('utf-8').splitlines()
         lines = iter(status_output)
+        project = self.mock_project()
         for line in lines:
-            for job in self.project:
+            for job in project:
                 if job.get_id() in line:
-                    for op in self.project.next_operations(job):
+                    for op in project.next_operations(job):
                         self.assertIn(op.name, line)
                         try:
                             line = next(lines)
@@ -1103,6 +1109,7 @@ class ProjectDagDetectionTest(BaseProjectTest):
 # Tests for multiple operation groups or groups with options
 class GroupProjectTest(BaseProjectTest):
     project_class = GTestProject
+    path = os.path.realpath('tests/define_group_test_project.py')
 
     def test_instance(self):
         self.assertTrue(isinstance(self.project, FlowProject))
@@ -1124,16 +1131,19 @@ class GroupProjectTest(BaseProjectTest):
 
         # For multiple operation groups and options
         for job in project:
-            job_op1 = project.groups['group1'].create_job_operation(job)
+            job_op1 = project.groups['group1'].create_job_operation(job,
+                                                                    project.path)
             script1 = project.script([job_op1])
             self.assertIn('run -o group1 -j {}'.format(job), script1)
-            job_op2 = project.groups['group2'].create_job_operation(job)
+            job_op2 = project.groups['group2'].create_job_operation(job,
+                                                                    project.path)
             script2 = project.script([job_op2])
             self.assertIn('--num-passes=2'.format(job), script2)
 
 
 class GroupExecutionProjectTest(BaseProjectTest):
     project_class = GTestProject
+    path = os.path.realpath('tests/define_group_test_project.py')
     expected_number_of_steps = 4
 
     def test_run_with_operation_selection(self):
@@ -1174,7 +1184,8 @@ class GroupExecutionProjectTest(BaseProjectTest):
     def test_submit_groups(self):
         MockScheduler.reset()
         project = self.mock_project()
-        operations = [project.groups['group1'].create_job_operation(job)
+        operations = [project.groups['group1'].create_job_operation(job,
+                                                                    project.path)
                       for job in project]
         self.assertEqual(len(list(MockScheduler.jobs())), 0)
         cluster_job_id = project._store_bundled(operations)
@@ -1253,6 +1264,7 @@ class GroupBufferedExecutionDynamicProjectTest(GroupBufferedExecutionProjectTest
 
 class GroupProjectMainInterfaceTest(BaseProjectTest):
     project_class = GTestProject
+    path = 'tests/define_group_test_project'
 
     def switch_to_cwd(self):
         os.chdir(self.cwd)

@@ -218,15 +218,11 @@ class JobOperation(object):
         :py:class:`signac.Project`
     """
 
-    def __init__(self, id, name, job, cmd, directives=None, project=None):
+    def __init__(self, id, name, job, cmd, directives=None):
         self.id = id
         self.name = name
         self.job = job
         self.cmd = cmd
-        if project is None:
-            self.project = job._project
-        else:
-            self.project = project
 
         if directives is None:
             directives = dict()  # default argument
@@ -295,8 +291,7 @@ class JobOperation(object):
 
     def set_status(self, value):
         "Store the operation's status."
-        self.job._project.document.setdefault('_status', dict())
-        self.job._project.document._status[self.id] = int(value)
+        self.job._project.document.setdefault('_status', dict())[self.id] = int(value)
 
     def get_status(self):
         "Retrieve the operation's last known status."
@@ -458,11 +453,17 @@ class FlowGroup(object):
         group.
     :type operations:
         :class:`dict` keys of :class:`str` and values of :class:`FlowOperation`
-    :param cmd:
-        The command to execute group; should be a function of job, and
-        operations.
-    :type cmd:
-        str or callable
+    :param run_cmd:
+        The command to execute group using flow's `run` function; should be a
+        function of an entrypoint and optionally a job.
+    :type run_cmd:
+        callable
+    :param exec_cmd:
+        The command to execute a group using flow's `exec` function;
+        should be a function of an entrypoint and a job. Limited to singleton
+        groups.
+    :type exec_cmd:
+        callable
     :param directives:
         A dictionary of additional parameters that provide instructions on how
         to execute this operation, e.g., specifically required resources.
@@ -480,10 +481,9 @@ class FlowGroup(object):
     class ExecCommandError(RuntimeError):
         pass
 
-    def __init__(self, name, path, operations=None, run_cmd=None, exec_cmd=None,
+    def __init__(self, name, operations=None, run_cmd=None, exec_cmd=None,
                  directives=None, options=None):
         self.name = name
-        self.path = path
         if options is None:
             self.options = ""
         else:
@@ -500,62 +500,57 @@ class FlowGroup(object):
             self.directives = directives
 
         if run_cmd is None:
-            def cmd(operations, directives, job=None):
-                executable = directives.get('executable', sys.executable)
-
-                if callable(executable):
-                    if job is None:
-                        raise ValueError(
-                            "Executable cannot be callable if job is not set.")
-                    else:
-                        executable = executable(job)
-
-                cmd = "{} {} run -o {}".format(executable, self.path, name)
-                if job is not None:
-                    cmd += ' -j {}'.format(job)
-                return cmd.lstrip()
-
-            self._run_cmd = cmd
+            self._run_cmd = self._default_run_cmd
         else:
             self._run_cmd = run_cmd
 
         if exec_cmd is None:
-            def cmd(operations, directives, job=None):
-                if len(self.operations) > 1:
-                    # Cannot use exec mode with more than one operation.
-                    raise self.ExecCommandError
-                else:
-                    op = list(operations.values())[0]
-
-                if isinstance(op, FlowCmdOperation):
-                    return op(job).lstrip()
-                else:
-                    try:
-                        executable = directives['executable']
-                        if callable(executable):
-                            executable = executable(job)
-                    except (KeyError, TypeError):
-                        executable = sys.executable
-                    return '{} {} exec {} {}'.format(executable, self.path, op.name, job).lstrip()
-
-            self._exec_cmd = cmd
+            self._exec_cmd = self._default_exec_cmd
         else:
             self._exec_cmd = exec_cmd
 
-    def __call__(self, job=None, mode='run'):
+    def _find_entrypoint(self, path, possible_entrypoint, job):
+        if possible_entrypoint is not None:
+            return possible_entrypoint
+        else:
+            if path is None:
+                raise ValueError("Either entrypoint or path must be set.")
+            executable = self.directives.get('executable', sys.executable)
+            if callable(executable):
+                if job is None:
+                    raise ValueError("Executable cannot be callable if job is not set.")
+                else:
+                    executable = executable(job)
+            return "{} {}".format(executable, path)
+
+    def _default_run_cmd(self, entrypoint, job=None):
+        cmd = "{} run -o {}".format(entrypoint, self.name)
+        if job is not None:
+            cmd += ' -j {}'.format(job)
+        return cmd.lstrip()
+
+    def _default_exec_cmd(self, entrypoint, job):
+        if len(self.operations) > 1:
+            # Cannot use exec mode with more than one operation.
+            raise self.ExecCommandError
+        else:
+            op = list(self)[0]
+
+        if job is None:
+            raise ValueError("Exec mode requires a job.")
+
+        if isinstance(op, FlowCmdOperation):
+            return op(job).lstrip()
+        else:
+            return '{} exec {} {}'.format(entrypoint, op.name, job).lstrip()
+
+    def __call__(self, path=None, entrypoint=None, job=None, mode='run'):
         "Return the string forming the command for the execution of this group."
+        entrypoint = self._find_entrypoint(path, entrypoint, job)
         if mode == 'run':
-            if callable(self._run_cmd):
-                return self._run_cmd(self.operations,
-                                     self.directives,
-                                     job) + ' ' + self.options
-            else:
-                return self._run_cmd.format(self.operations, job) + ' ' + self.options
+            return self._run_cmd(self, entrypoint, job) + ' ' + self.options
         elif mode == 'exec':
-            if callable(self._exec_cmd):
-                return self._exec_cmd(self.operations, self.directives, job)
-            else:
-                return self._exec_cmd.format(self.operations, job)
+            return self._exec_cmd(self, entrypoint, job)
         else:
             raise ValueError("Unknown mode '{}'.".format(mode))
 
@@ -574,8 +569,8 @@ class FlowGroup(object):
     def add_operation(self, name, operation):
         self.operations[name] = operation
 
-    def compatible(self, group):
-        return not set(self).intersection(group)
+    def intersects(self, group):
+        return bool(set(self).intersection(group))
 
     def _generate_id(self, job, index=0):
         "Return a name, which identifies this job-group."
@@ -614,14 +609,15 @@ class FlowGroup(object):
         except KeyError:
             return JobStatus.unknown
 
-    def create_job_operation(self, job, mode='run', index=0):
+    def create_job_operation(self, job, path=None, entrypoint=None,
+                             mode='run', index=0):
         """Create a JobOperation object from the FlowGroup."""
         return JobOperation(self._generate_id(job, index=index),
                             self.name,
                             job,
-                            self(job, mode),
-                            dict(self.directives),
-                            job._project)
+                            cmd=self(path, entrypoint, job, mode),
+                            directives=dict(self.directives),
+                            project=job._project)
 
 
 class _FlowProjectClass(type):
@@ -774,12 +770,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def __init__(self, config=None, environment=None):
         super(FlowProject, self).__init__(config=config)
 
-        # Save the path of the module that instantiates this object. This path is used
-        # to construct the execution and run commands later.
-        frames = inspect.stack()
-        while frames[-1].function != '__init__':
-            filename = frames.pop().filename
-        self._path = os.path.abspath(filename)
         # Associate this class with a compute environment.
         self._environment = environment or get_environment()
 
@@ -1753,8 +1743,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if profiling_results:
             print('\n' + '\n'.join(profiling_results), file=file)
 
-    def run_operations(self, operations=None, pretend=False, np=None,
-                       timeout=None, progress=False):
+    def run_operations(self, operations=None, pretend=False, np=None, timeout=None, progress=False):
         """Execute the next operations as specified by the project's workflow.
 
         See also: :meth:`~.run`
@@ -1973,6 +1962,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Change group names to their constituent operations
         extended_names = []
         if names is not None:
+            if isinstance(names, str):
+                raise ValueError(
+                    "The names argument of FlowProject.run() must be a sequence of strings, "
+                    "not a string.")
+
             groups = self._gather_FlowGroups(names)
             for group in groups:
                 extended_names.extend(list(group.operations.keys()))
@@ -2086,7 +2080,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if name in operations.keys():
                 continue
             groups = [group for gname, group in self.groups.items() if
-                      fullmatch(name, gname)]
+                      re.fullmatch(name, gname)]
             if groups != list():
                 for group in groups:
                     operations[group.name] = group
@@ -2113,11 +2107,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         "Get all pending operations for the given selection."
         assert not isinstance(operation_names, str)
         for op in self.next_operations(* jobs):
-            if operation_names is None or any(fullmatch(n, op.name) for n in operation_names):
+            if operation_names is None or any(re.fullmatch(n, op.name) for n in operation_names):
                 yield op
 
     def _verify_group_compatibility(self, groups):
-        return all(a.compatible(b) for a, b in combinations(groups, 2))
+        return all(not a.intersects(b) for a, b in combinations(groups, 2))
 
     @contextlib.contextmanager
     def _potentially_buffered(self):
@@ -2320,7 +2314,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Regular argument checks and expansion
         if jobs is None:
             jobs = self  # select all jobs
-        if isinstance(names, six.string_types):
+        if isinstance(names, str):
             raise ValueError(
                 "The 'names' argument must be a sequence of strings, however you "
                 "provided a single string: {}.".format(names))
@@ -2335,7 +2329,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     raise
 
         # Gather all pending operations.
-        operations = self._get_submission_operations(jobs, names, mode)
+        with self._potentially_buffered():
+            operations = self._get_submission_operations(jobs, names, mode)
         if num is not None:
             operations = list(islice(operations, num))
 
@@ -2622,7 +2617,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             elif bool(label_value) is True:
                 yield label_name
 
-    def add_operation(self, name, cmd, pre=None, post=None):
+    def add_operation(self, name, cmd, pre=None, post=None, **kwargs):
         """
         Add an operation to the workflow.
 
@@ -2771,8 +2766,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type mode:
             str
         """
-        for operation in self.next_operations(job):
-            return operation
+        for op in self.next_operations(job):
+            return op
 
     @classmethod
     def operation(cls, func, name=None):
@@ -2860,8 +2855,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             params = {
                 'pre': pre_conditions.get(func, None),
                 'post': post_conditions.get(func, None)}
-            path = getattr(func, '_flow_path',
-                           inspect.getsourcefile(inspect.getmodule(func)))
 
             # Construct FlowOperation:
             if getattr(func, '_flow_cmd', False):
@@ -2881,14 +2874,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         def add_to_group(func):
             if hasattr(func, '_flow_group'):
                 if add_to_group.group_name in func._flow_group:
-                    raise ValueError("Can't specify the same operation "
-                                     "for a group twice.")
+                    raise ValueError("Attempt repeat registration of "
+                                     "function {} into group {}".format(func.__name__,
+                                                                        add_to_group.group_name))
                 func._flow_group.append(add_to_group.group_name)
             else:
                 func._flow_group = [add_to_group.group_name]
-            add_to_group._flow_post.extend([pc for pc in func._flow_post])
             return func
-        # Specify group name
+
         add_to_group.group_name = name
         return add_to_group
 
@@ -2907,7 +2900,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     "Repeat definition of group with name " +
                     "'{}'.".format(group['name']))
 
-            self._groups[group['name']] = FlowGroup(path=self._path, **group)
+            self._groups[group['name']] = FlowGroup(**group)
 
         # Add operations to group
         # Currently recreating operation list. There may be a better way to do
@@ -2927,20 +2920,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             except (AttributeError):
                 pass
 
-    def _get_operation_path(self, op_name):
-        operations = []
-        for cls in type(self).__mro__:
-            operations.extend(getattr(cls, '_OPERATION_FUNCTIONS', []))
-        func = [f for n, f in operations if n == op_name]
-        if func == list():
-            raise ValueError("{} not found in OPERATION_FUNCTIONS : "
-                             "{}".format(op_name,
-                                         ' '.join([name for name, _ in
-                                                   self._OPERATION_FUNCTIONS]))
-                             )
-        return getattr(func[0], '_flow_path',
-                       inspect.getsourcefile(inspect.getmodule(func[0])))
-
     @property
     def operations(self):
         "The dictionary of operations that have been added to the workflow."
@@ -2950,6 +2929,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def groups(self):
         return self._groups
 
+    @deprecated(
+        deprecated_in="0.8", removed_in="1.0",
+        current_version=__version__)
     def eligible_for_submission(self, flow_group, job):
         """Determine if a flow_group is eligible for submission wrt a given job.
 
@@ -2960,18 +2942,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             return False
         if flow_group._get_status(job) >= JobStatus.submitted:
             return False
-        group_ops = set(flow_group.operations.values())
+        group_ops = set(flow_group)
         for other_group in self._groups.values():
-            if group_ops & set(other_group.operations.values()):
+            if group_ops & set(other_group):
                 if other_group._get_status(job) >= JobStatus.submitted:
                     return False
         return True
-
-    @deprecated(
-        deprecated_in="0.8", removed_in="1.0",
-        current_version=__version__)
-    def eligible_for_submission(self, job_operation):
-        return self._eligible_for_submission(self, job_operation)
 
     def _main_status(self, args):
         "Print status overview."

@@ -131,7 +131,7 @@ class BaseProjectTest(unittest.TestCase):
                 project.open_job(dict(a=a, b=b)).init()
                 project.open_job(dict(a=dict(a=a), b=b)).init()
         if hasattr(self, 'path'):
-            project.path = self.path
+            project._entrypoint.setdefault('path', self.path)
         return project
 
 
@@ -1131,12 +1131,12 @@ class GroupProjectTest(BaseProjectTest):
 
         # For multiple operation groups and options
         for job in project:
-            job_op1 = project.groups['group1'].create_job_operation(job,
-                                                                    project.path)
+            job_op1 = project.groups['group1'].create_job_operation(project._entrypoint,
+                                                                    job)
             script1 = project.script([job_op1])
             self.assertIn('run -o group1 -j {}'.format(job), script1)
-            job_op2 = project.groups['group2'].create_job_operation(job,
-                                                                    project.path)
+            job_op2 = project.groups['group2'].create_job_operation(project._entrypoint,
+                                                                    job)
             script2 = project.script([job_op2])
             self.assertIn('--num-passes=2'.format(job), script2)
 
@@ -1184,8 +1184,8 @@ class GroupExecutionProjectTest(BaseProjectTest):
     def test_submit_groups(self):
         MockScheduler.reset()
         project = self.mock_project()
-        operations = [project.groups['group1'].create_job_operation(job,
-                                                                    project.path)
+        operations = [project.groups['group1'].create_job_operation(project._entrypoint,
+                                                                    job)
                       for job in project]
         self.assertEqual(len(list(MockScheduler.jobs())), 0)
         cluster_job_id = project._store_bundled(operations)

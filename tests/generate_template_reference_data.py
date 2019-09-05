@@ -163,7 +163,7 @@ def get_masked_flowproject(p):
     root_directory and project_dir elements after creation."""
     sys.executable = '/usr/local/bin/python'
     fp = TestProject.get_project(root=p.root_directory())
-    fp.path = 'generate_template_reference_data.py'
+    fp._entrypoint.setdefault('path', 'generate_template_reference_data.py')
     fp.root_directory = lambda: PROJECT_DIRECTORY
     fp.config.project_dir = PROJECT_DIRECTORY
     return fp

@@ -504,19 +504,14 @@ class FlowGroup(object):
         else:
             self._exec_cmd = exec_cmd
 
-    def _find_entrypoint(self, path, possible_entrypoint, job):
-        if possible_entrypoint is not None:
-            return possible_entrypoint
+    def _determine_entrypoint(self, entrypoint, job):
+        entrypoint = entrypoint.copy()
+        entrypoint.setdefault('executable', self.directives.get('executable', sys.executable))
+        entrypoint.setdefault('path', self.directives.get('path'))
+        if entrypoint['path'] is None:
+            raise RuntimeError("Entrypoint path not set.")
         else:
-            if path is None:
-                raise ValueError("Either entrypoint or path must be set.")
-            executable = self.directives.get('executable', sys.executable)
-            if callable(executable):
-                if job is None:
-                    raise ValueError("Executable cannot be callable if job is not set.")
-                else:
-                    executable = executable(job)
-            return "{} {}".format(executable, path)
+            return "{} {}".format(entrypoint['executable'], entrypoint['path']).lstrip()
 
     def _default_run_cmd(self, entrypoint, job=None):
         cmd = "{} run -o {}".format(entrypoint, self.name)
@@ -539,9 +534,9 @@ class FlowGroup(object):
         else:
             return '{} exec {} {}'.format(entrypoint, op.name, job).lstrip()
 
-    def __call__(self, path=None, entrypoint=None, job=None, mode='run'):
+    def __call__(self, entrypoint=None, job=None, mode='run'):
         "Return the string forming the command for the execution of this group."
-        entrypoint = self._find_entrypoint(path, entrypoint, job)
+        entrypoint = self._determine_entrypoint(entrypoint, job)
         if mode == 'run':
             return self._run_cmd(entrypoint, job) + ' ' + self.options
         elif mode == 'exec':
@@ -613,13 +608,12 @@ class FlowGroup(object):
         except KeyError:
             return JobStatus.unknown
 
-    def create_job_operation(self, job, path=None, entrypoint=None,
-                             mode='run', index=0):
+    def create_job_operation(self, entrypoint, job, mode='run', index=0):
         """Create a JobOperation object from the FlowGroup."""
         return JobOperation(self._generate_id(job, index=index),
                             self.name,
                             job,
-                            cmd=self(path, entrypoint, job, mode),
+                            cmd=self(entrypoint, job, mode),
                             directives=dict(self.directives))
 
 
@@ -768,28 +762,24 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         from the environment.
     :type config:
         A signac config object.
-    :param path:
-        A filepath location that points to a file calling `FlowProject.main()`.
-        Does not need to be set unless not using the `main` interface.
-    :type path:
-        str
     :param entrypoint:
-        The executable python interpreter appended with a filepath that points
-        to a file calling `FlowProject.main()`.  Does not need to be set unless
-        not using the `main` interface.
+        A dictionary with two possible keys: executable and path. Path
+        represents the filepath location of the script file (the script file
+        must call `main`). Executable represents the location to the python
+        interpreter used for the executable of `FlowOperation` that are Python
+        functions.
     :type entrypoint:
-        str
+        dict
     """
 
-    def __init__(self, config=None, environment=None, path=None, entrypoint=None):
+    def __init__(self, config=None, environment=None, entrypoint=None):
         super(FlowProject, self).__init__(config=config)
 
         # Associate this class with a compute environment.
         self._environment = environment or get_environment()
 
         # Assign variables that give script location information
-        self.path = path
-        self.entrypoint = entrypoint
+        self._entrypoint = dict() if entrypoint is None else entrypoint
 
         # The standard local template directory is a directory called 'templates' within
         # the project root directory. This directory may be specified with the 'template_dir'
@@ -2124,8 +2114,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             for group in self._gather_flow_groups(names):
                 if group.eligible(job) and self.eligible_for_submission(group,
                                                                         job):
-                    yield group.create_job_operation(job, path=self.path,
-                                                     entrypoint=self.entrypoint,
+                    yield group.create_job_operation(entrypoint=self._entrypoint, job=job,
                                                      mode=mode, index=0)
 
     def _get_pending_operations(self, jobs, operation_names=None):
@@ -2754,8 +2743,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             group = self._groups[name]
             if only_eligible and not group.eligible(job):
                 continue
-            yield group.create_job_operation(job=job, path=self.path,
-                                             entrypoint=self.entrypoint,
+            yield group.create_job_operation(entrypoint=self._entrypoint, job=job,
                                              mode='exec', index=0)
 
     def next_operations(self, *jobs):
@@ -3185,9 +3173,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             $ python my_project.py --help
         """
         # Find file that main is called in
-        if self.entrypoint is None:
-            if self.path is None:
-                self.path = os.path.realpath(inspect.stack()[-1].filename)
+        self._entrypoint.setdefault('path', os.path.realpath(inspect.stack()[-1].filename))
 
         if parser is None:
             parser = argparse.ArgumentParser()

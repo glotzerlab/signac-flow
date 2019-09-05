@@ -2928,9 +2928,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Add operations to group
         # Currently recreating operation list. There may be a better way to do
         # this.
-        operations = []
-        for cls in type(self).__mro__:
-            operations.extend(getattr(cls, '_OPERATION_FUNCTIONS', []))
+        operations = self._collect_operations()
         for (name, func) in operations:
             if hasattr(func, '_flow_group'):
                 for group in func._flow_group:

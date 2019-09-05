@@ -274,11 +274,10 @@ class JobOperation(object):
         return "{}({})".format(self.name, self.job)
 
     def __repr__(self):
-        return "{type}(name='{name}', operations='{operations}', " \
-               "job='{job}', cmd={cmd}, directives={directives})".format(
+        return "{type}(name='{name}', job='{job}', " \
+               "cmd={cmd}, directives={directives})".format(
                    type=type(self).__name__,
                    name=self.name,
-                   operations=self.operations.keys(),
                    job=str(self.job),
                    cmd=repr(self._run_cmd),
                    directives=self.directives)
@@ -557,6 +556,15 @@ class FlowGroup(object):
     def __iter__(self):
         for op in self.operations.values():
             yield op
+
+    def __repr__(self):
+        return "{type}(name='{name}', operations='{operations}', " \
+               "directives={directives}, options={options})".format(
+                   type=type(self).__name__,
+                   name=self.name,
+                   operations=' '.join(list(self.operations.keys())),
+                   directives=self.directives,
+                   options=self.options)
 
     def eligible(self, job):
         """Eligible, when at least one FlowOperation is eligible."""

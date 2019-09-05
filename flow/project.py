@@ -2781,10 +2781,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             An instance of JobOperation to execute next or `None`, if no operation is eligible.
         :rtype:
             `:py:class:`~.JobOperation` or `NoneType`
-        :param mode:
-            The executation style within the groups paradigm.
-        :type mode:
-            str
         """
         for op in self.next_operations(job):
             return op

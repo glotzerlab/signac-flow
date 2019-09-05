@@ -514,10 +514,15 @@ class FlowGroup(object):
         else:
             self._exec_cmd = exec_cmd
 
+    def _set_entrypoint_item(self, entrypoint, job, key, default):
+        entrypoint.setdefault(key, self.directives.get(key, default))
+        if callable(entrypoint[key]):
+            entrypoint[key] = entrypoint[key](job)
+
     def _determine_entrypoint(self, entrypoint, job):
         entrypoint = entrypoint.copy()
-        entrypoint.setdefault('executable', self.directives.get('executable', sys.executable))
-        entrypoint.setdefault('path', self.directives.get('path'))
+        self._set_entrypoint_item(entrypoint, job, 'executable', sys.executable)
+        self._set_entrypoint_item(entrypoint, job, 'path', None)
         if entrypoint['path'] is None:
             raise RuntimeError("Entrypoint path not set.")
         else:

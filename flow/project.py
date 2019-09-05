@@ -1097,7 +1097,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if len(operations) == 1:
             return operations[0].id
         else:
-            h = '.'.join(op.get_id() for op in operations)
+            h = '.'.join(op.id for op in operations)
             bid = '{}/bundle/{}'.format(self, sha1(h.encode('utf-8')).hexdigest())
             fn_bundle = self._fn_bundle(bid)
             os.makedirs(os.path.dirname(fn_bundle), exist_ok=True)

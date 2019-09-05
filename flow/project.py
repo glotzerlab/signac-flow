@@ -1168,8 +1168,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                             'completed': completed
                             }
 
-        for status in status_dict.items():
-            yield status
+        for key in sorted(status_dict.keys()):
+            yield key, status_dict[key]
 
     def get_job_status(self, job, ignore_errors=False, cached_status=None):
         "Return a dict with detailed information about the status of a job."

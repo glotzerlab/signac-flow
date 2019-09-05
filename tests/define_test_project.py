@@ -1,3 +1,4 @@
+import os
 import flow
 from flow import FlowProject
 
@@ -38,10 +39,15 @@ def op1(job):
     return 'echo "hello" > {job.ws}/world.txt'
 
 
+def _need_to_fork(job):
+    return job.doc.get('fork')
+
+
 @TestProject.operation
+@flow.directives(fork=_need_to_fork)
 @TestProject.post.true('test')
 def op2(job):
-    job.document.test = True
+    job.document.test = os.getpid()
 
 
 class TestDynamicProject(TestProject):

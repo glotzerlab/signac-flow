@@ -212,10 +212,6 @@ class JobOperation(object):
         to execute this operation, e.g., specifically required resources.
     :type directives:
         :class:`dict`
-    :param project:
-        The :py:class:`signac.Project` associated with the job.
-    :type project:
-        :py:class:`signac.Project`
     """
 
     def __init__(self, id, name, job, cmd, directives=None):

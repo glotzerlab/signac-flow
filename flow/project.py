@@ -1094,17 +1094,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :rtype:
             str
         """
-        op_ids = [op.id for op in operations]
-        if len(op_ids) == 1:
-            return op_ids[0]
+        if len(operations) == 1:
+            return operations[0].id
         else:
-            h = '.'.join(op_ids)
+            h = '.'.join(op.get_id() for op in operations)
             bid = '{}/bundle/{}'.format(self, sha1(h.encode('utf-8')).hexdigest())
             fn_bundle = self._fn_bundle(bid)
             os.makedirs(os.path.dirname(fn_bundle), exist_ok=True)
             with open(fn_bundle, 'w') as file:
-                for op_id in op_ids:
-                    file.write(op_id + '\n')
+                for operation in operations:
+                    file.write(operation.id + '\n')
             return bid
 
     def _expand_bundled_jobs(self, scheduler_jobs):

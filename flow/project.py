@@ -545,8 +545,7 @@ class FlowGroup(object):
             raise ValueError("Unknown mode '{}'.".format(mode))
 
     def __iter__(self):
-        for op in self.operations.values():
-            yield op
+        yield from self.operations.values()
 
     def __repr__(self):
         return "{type}(name='{name}', operations='{operations}', " \

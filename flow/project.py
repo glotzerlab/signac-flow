@@ -2701,7 +2701,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         if name in self.operations:
             raise KeyError("An operation with this identifier is already added.")
-        self.operations[name] = FlowOperation(cmd=cmd, pre=pre, post=post)
+        op = self.operations[name] = FlowOperation(cmd=cmd, pre=pre, post=post)
+        if name in self._groups:
+            raise KeyError("A group with this identifier is already added.")
+        self._groups[name] = FlowGroup(name, operations={name: op}, directives=kwargs)
 
     @deprecated(
         deprecated_in="0.8", removed_in="1.0",

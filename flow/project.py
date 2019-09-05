@@ -289,8 +289,10 @@ class JobOperation(object):
     def cmd(self):
         if callable(self._cmd):
             return self._cmd()
-        else:
+        elif isinstance(self._cmd, str):
             return self._cmd
+        else:
+            raise TypeError("JobOperation cmd must be string or callable.")
 
     def set_status(self, value):
         "Store the operation's status."

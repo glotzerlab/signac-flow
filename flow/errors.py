@@ -18,7 +18,7 @@ class ConfigKeyError(KeyError):
 
 
 class ScriptError(RuntimeError):
-    "Indicates an error during scribt generation."
+    "Indicates an error during script generation."
     pass
 
 

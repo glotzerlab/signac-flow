@@ -477,6 +477,7 @@ class ProjectClassTest(BaseProjectTest):
         def op4(job):
             job.doc.d = True
 
+        _prev_project = self.project_class
         self.project_class = A
         project = self.mock_project()
         op3_ = project.operations['op3']
@@ -504,6 +505,7 @@ class ProjectClassTest(BaseProjectTest):
             self.assertTrue(job.doc.a)
             self.assertTrue(job.doc.b)
             self.assertTrue(job.doc.c)
+        self.project_class = _prev_project
 
 
 class ProjectTest(BaseProjectTest):

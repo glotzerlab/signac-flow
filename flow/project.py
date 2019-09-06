@@ -2095,7 +2095,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             yield JobOperation(name=cmd_.replace(' ', '-'), cmd=cmd_, job=job)
 
     def _gather_flow_groups(self, names=None):
-        operations = {}
+        operations = OrderedDict()
         # if no names are selected try all singleton groups
         names = names if names is not None else self._operations.keys()
         for name in names:

@@ -966,8 +966,9 @@ class ExecutionProjectTest(BaseProjectTest):
 
 class BufferedExecutionProjectTest(ExecutionProjectTest):
 
-    def mock_project(self):
-        project = super(BufferedExecutionProjectTest, self).mock_project()
+    def mock_project(self, project_class=None):
+        project = super(BufferedExecutionProjectTest,
+                        self).mock_project(project_class=project_class)
         project._use_buffered_mode = True
         return project
 

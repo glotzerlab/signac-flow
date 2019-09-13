@@ -1135,7 +1135,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             assert value >= 0 and total > 0
             ratio = ' %0.2f%%' % (100 * value / total)
             n = int(value / total * width)
-            return '|' + ''.join(['#'] * n) + ''.join(['-'] * (width - n)) + '|' + ratio
+            return '\|' + ''.join(['#'] * n) + ''.join(['-'] * (width - n)) + '\|' + ratio
 
         def job_filter(job_op, scheduler_status_code, all_ops):
             """filter eligible jobs for status print.

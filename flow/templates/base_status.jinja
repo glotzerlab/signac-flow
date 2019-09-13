@@ -3,13 +3,13 @@
 {% set ns = namespace(field_parameters='', dash='') %}
 {% endif %}
 {% if overview %}
-{% set field_progress_bar = "| %s | %s |"%}
+{% set field_progress_bar = '| %s | %s |'%}
 {% endif %}
 {% if detailed %}
 {% if parameters %}
 {% for para in parameters %}
-{% set ns.dash = ns.dash + "- | " %}
-{% set ns.field_parameters = ns.field_parameters + "%s | " %}
+{% set ns.dash = ns.dash + '- | ' %}
+{% set ns.field_parameters = ns.field_parameters + '%s | ' %}
 {% endfor %}
 {% set para_head = ns.field_parameters | format(*parameters) %}
 {% endif %}
@@ -51,9 +51,9 @@
 {% endif %}
 {% for key, value in job['operations'].items() if value | job_filter(scheduler_status_code, all_ops) %}
 {% if loop.first %}
-{{ '| %s | ' | format(job['job_id']) }}{{ "%s  %s | " | highlight(value['eligible']) | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }}{{para_output}}{{ '%s |' | format(job['labels'] | join(', ')) }}
+{{ '| %s | ' | format(job['job_id']) }}{{ '%s  %s | ' | highlight(value['eligible']) | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }}{{para_output}}{{ '%s |' | format(job['labels'] | join(', ')) }}
 {% else %}
-{{ '| %s |' | format('')}}{{ "%s  %s | " | highlight(value['eligible']) | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }}{{para_output}}{{ '%s |' | format(job['labels'] | join(', ')) }}
+{{ '| %s |' | format('')}}{{ '%s  %s | ' | highlight(value['eligible']) | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }}{{para_output}}{{ '%s |' | format(job['labels'] | join(', ')) }}
 {% endif %}
 {% endfor %}
 {% endfor %}

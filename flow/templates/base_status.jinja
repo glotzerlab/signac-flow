@@ -1,5 +1,6 @@
 {# The following variables are available to all scripts. #}
 {% if overview or detailed %}
+{% set field_operation = ("%%-%ss %%3s | " | format(column_width_operation)) %}
 {% set ns = namespace(field_parameters='', dash='') %}
 {% endif %}
 {% if overview %}
@@ -51,9 +52,9 @@
 {% endif %}
 {% for key, value in job['operations'].items() if value | job_filter(scheduler_status_code, all_ops) %}
 {% if loop.first %}
-{{ '| %s | ' | format(job['job_id']) }}{{ '%s  %s | ' | highlight(value['eligible']) | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }}{{para_output}}{{ '%s |' | format(job['labels'] | join(', ')) }}
+{{ '| %s | ' | format(job['job_id']) }}{{ field_operation | highlight(value['eligible']) | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }}{{para_output}}{{ '%s |' | format(job['labels'] | join(', ')) }}
 {% else %}
-{{ '| %s |' | format('')}}{{ '%s  %s | ' | highlight(value['eligible']) | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }}{{para_output}}{{ '%s |' | format(job['labels'] | join(', ')) }}
+{{ '| %s |' | format('')}}{{ field_operation | highlight(value['eligible']) | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }}{{para_output}}{{ '%s |' | format(job['labels'] | join(', ')) }}
 {% endif %}
 {% endfor %}
 {% endfor %}

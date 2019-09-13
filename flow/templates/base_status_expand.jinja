@@ -8,14 +8,13 @@
 {% block detailed %}
 {{ super () }}
 ## Operations:
-{% set field_operation = ("%%-%ss  " | format(column_width_operation)) %}
-{% set field_op_table = field_job_id + field_operation + '%-8s  ' + '%-14s  ' %}
+{% set field_op_table = '| %s | %s | %s | %s |' %}
 {{ field_op_table | format('job_id', 'operation', 'eligible', 'cluster_status') }}
-{{ field_op_table | format('-' * column_width_id, '-' * column_width_operation, '-' * 8, '-' * 14) }}
+{{ field_op_table | format('-', '-', '-', '-') }}
 {% for job in jobs %}
 {% for key, value in job['operations'].items() %}
 {% if (scheduler_status_code[value['scheduler_status']] != 'U' or value['eligible']) or all_ops%}
-{{ field_job_id | format(job['job_id']) }}{{ field_operation | highlight(value['eligible']) | format(key) }}{{ '%-8s  ' | format(alias_bool[value['eligible']])}}{{ '%-14s  ' | format(scheduler_status_code[value['scheduler_status']])}}
+{{ '| %s | ' | format(job['job_id']) }}{{ '%s | ' | highlight(value['eligible']) | format(key) }}{{ '%s | ' | format(alias_bool[value['eligible']])}}{{ '%s |' | format(scheduler_status_code[value['scheduler_status']])}}
 {% endif %}
 {% endfor %}
 {% endfor %}

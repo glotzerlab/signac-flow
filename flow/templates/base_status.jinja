@@ -13,7 +13,6 @@
 {% endfor %}
 {% set para_head = ns.field_parameters | format(*parameters) %}
 {% endif %}
-{% set field_detailed = '| %s | %s | %s%s |' %}
 {% endif %}
 
 {% block overview %}
@@ -42,6 +41,7 @@
 
 {% block detailed %}
 {% if detailed %}
+{% set field_detailed = '| %s | %s | %s%s |' %}
 {{ '\# Detailed View: ' }}
 {{ field_detailed | format('job_id', 'operation', para_head, 'labels') }}
 {{ field_detailed | format('-' , '-' , ns.dash, '-' ) }}

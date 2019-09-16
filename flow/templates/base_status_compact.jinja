@@ -2,7 +2,7 @@
 {% block detailed %}
 {% set field_operation = ('%%-%ss %%3s %%-%ss | ' | format(column_width_operation, column_width_operations_count)) %}
 {% set field_head = '| %s | %s | %s%s |'  %}
-# Detailed View:
+{{ 'Detailed View: \n' }}
 {{ field_head | format('job_id', 'operation', para_head, 'labels') }}
 {{ field_head | format('-' , '-' , ns.dash, '-' ) }}
 {% for job in jobs %}

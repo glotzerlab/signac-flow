@@ -7,7 +7,7 @@
 {% endif %}
 {% block detailed %}
 {{ super () }}
-## Operations:
+{{ 'Operations: \n' }}
 {% set field_op_table = '| %s | %s | %s | %s |' %}
 {{ field_op_table | format('job_id', 'operation', 'eligible', 'cluster_status') }}
 {{ field_op_table | format('-', '-', '-', '-') }}

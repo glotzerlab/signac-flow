@@ -18,8 +18,7 @@
 
 {% block overview %}
 {% if overview %}
-{{ '\# Overview: ' }}
-
+{{ 'Overview: \n' }}
 {{ 'Total # of jobs: %s ' | format(jobs | length) }}
 
 {% block progress %}
@@ -44,7 +43,7 @@
 {% block detailed %}
 {% if detailed %}
 {% set field_detailed = '| %s | %s | %s%s |' %}
-{{ '\# Detailed View: ' }}
+{{ 'Detailed View: \n' }}
 {{ field_detailed | format('job_id', 'operation', para_head, 'labels') }}
 {{ field_detailed | format('-' , '-' , ns.dash, '-' ) }}
 {% for job in jobs %}
@@ -59,6 +58,7 @@
 {% endif %}
 {% endfor %}
 {% endfor %}
+
 {{ status_legend }}
 {% endif %}
 {% endblock %}

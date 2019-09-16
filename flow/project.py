@@ -1391,7 +1391,21 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if n > 0:
             context['op_counter'].append(('[{} more operations omitted]'.format(n), ''))
 
-        print(template.render(**context), file=file)
+        status_output = template.render(**context)
+        print(status_output, file=file)
+
+        import mistune
+        html_output = mistune.markdown(template.render(**context))
+        print(html_output, file=file)
+        # import html2text
+        # status_output = html2text.html2text(status_output)
+
+        import mdv
+        # config like this:
+        # mdv.term_columns = 60
+        # calling like this (all CLI options supported, check def main
+        terminal_output = mdv.main(status_output)
+        print(terminal_output, file=file)
 
         # Show profiling results (if enabled)
         if profiling_results:

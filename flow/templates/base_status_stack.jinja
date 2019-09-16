@@ -1,7 +1,7 @@
 {% extends "base_status.jinja" %}
 {% block detailed %}
 {% set field_detailed = '| %s | %s%s |' %}
-{{ '\# Detailed View: ' }}
+{{ 'Detailed View: \n' }}
 {{ field_detailed | format('job_id', para_head, 'labels') }}
 {{ field_detailed | format('-' , ns.dash, '-' ) }}
 {% set field_operation = ('| %%1s %%-%ss %%3s |' | format(column_width_operation)) %}

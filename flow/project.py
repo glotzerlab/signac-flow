@@ -34,6 +34,8 @@ from multiprocessing import cpu_count
 from multiprocessing import TimeoutError
 from multiprocessing.pool import ThreadPool
 from multiprocessing import Event
+import mistune
+import mdv
 
 import signac
 from signac.contrib.hashing import calc_id
@@ -1071,7 +1073,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             assert value >= 0 and total > 0
             ratio = ' %0.2f%%' % (100 * value / total)
             n = int(value / total * width)
-            return '&#124;' + ''.join(['#'] * n) + ''.join(['-'] * (width - n)) + '&#124;' + ratio
+            return '[' + ''.join(['#'] * n) + ''.join(['-'] * (width - n)) + ']' + ratio
 
         def job_filter(job_op, scheduler_status_code, all_ops):
             """filter eligible jobs for status print.
@@ -1392,18 +1394,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             context['op_counter'].append(('[{} more operations omitted]'.format(n), ''))
 
         status_output = template.render(**context)
-        print(status_output, file=file)
 
-        import mistune
-        html_output = mistune.markdown(template.render(**context))
-        print(html_output, file=file)
-        # import html2text
-        # status_output = html2text.html2text(status_output)
+        # add logic for html output here
+        # html_output = mistune.markdown(template.render(**context))
 
-        import mdv
-        # config like this:
-        # mdv.term_columns = 60
-        # calling like this (all CLI options supported, check def main
         terminal_output = mdv.main(status_output)
         print(terminal_output, file=file)
 

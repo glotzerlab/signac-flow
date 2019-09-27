@@ -14,6 +14,9 @@ requirements = [
     'cloudpickle',
     # Deprecation management
     'deprecation>=2',
+    # For status view markdown rendering
+    'mistune'
+    'mdv'
 ]
 
 description = "Simple workflow management for signac projects."

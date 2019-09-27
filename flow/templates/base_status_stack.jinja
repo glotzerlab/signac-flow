@@ -14,6 +14,7 @@
 {{ field_operation | highlight(value['eligible']) | format(value | get_operation_status(operation_status_symbols), key, '['+scheduler_status_code[value['scheduler_status']]+']') }}
 {% endfor %}
 {% endfor %}
+
 {{ operation_status_legend }}
 {{ status_legend }}
 {% endblock %}

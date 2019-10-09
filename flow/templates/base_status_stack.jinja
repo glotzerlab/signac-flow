@@ -4,14 +4,14 @@
 {{ 'Detailed View: \n' }}
 {{ field_detailed | format('job_id', para_head, 'labels') }}
 {{ field_detailed | format('-' , ns.dash, '-' ) }}
-{% set field_operation = ('| %%1s %%-%ss %%3s |' | format(column_width_operation)) %}
+{% set field_operation = ('%%1s %%-%ss %%3s' | format(column_width_operation)) %}
 {% for job in jobs %}
 {% if parameters %}
 {% set para_output = ns.field_parameters | format(*job['parameters'].values()) %}
 {% endif %}
 {{ '| %s | ' | format(job['job_id']) }}{{para_output}}{{ '%s |' | format(job['labels'] | join(', ')) }}
 {% for key, value in job['operations'].items() if value | job_filter(scheduler_status_code, all_ops) %}
-{{ field_operation | highlight(value['eligible']) | format(value | get_operation_status(operation_status_symbols), key, '['+scheduler_status_code[value['scheduler_status']]+']') }}
+{{'|'}}{{ field_operation | highlight(value['eligible']) | format(value | get_operation_status(operation_status_symbols), key, '['+scheduler_status_code[value['scheduler_status']]+']') }}{{'|'}}
 {% endfor %}
 {% endfor %}
 

@@ -1138,7 +1138,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     Boolean
                 """
                 if eligible:
-                    return '\033[1m' + s + '\033[0m'
+                    return '**' + s + '**'
                 else:
                     return s
         else:
@@ -1393,12 +1393,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if n > 0:
             context['op_counter'].append(('[{} more operations omitted]'.format(n), ''))
 
-        status_output = template.render(**context)
-
+        markdown_output = template.render(**context)
+        # print(markdown_output, file=file)
         # add logic for html output here
-        # html_output = mistune.markdown(template.render(**context))
-
-        terminal_output = mdv.main(status_output)
+        # html_output = mistune.markdown(markdown_output)
+        # print(html_output, file=file)
+        terminal_output = mdv.main(markdown_output)
         print(terminal_output, file=file)
 
         # Show profiling results (if enabled)

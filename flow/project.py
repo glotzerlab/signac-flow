@@ -34,8 +34,6 @@ from multiprocessing import cpu_count
 from multiprocessing import TimeoutError
 from multiprocessing.pool import ThreadPool
 from multiprocessing import Event
-import mistune
-import mdv
 
 import signac
 from signac.contrib.hashing import calc_id

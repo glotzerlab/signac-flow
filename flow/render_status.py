@@ -1,7 +1,7 @@
 # make separate python class for render_status
 import mistune
 import mdv
-
+from .scheduling.base import JobStatus
 
 class _render_status:
 
@@ -24,7 +24,8 @@ class _render_status:
         self.html_output = mistune.markdown(self.markdown_output)
         # print(self.html_output, file=file)
 
-    def render(self, template, template_environment, context, file, detailed, expand, unroll, compact, pretty, option):
+    def render(self, template, template_environment, context, file, detailed, expand,
+               unroll, compact, pretty, option):
 
         # use Jinja2 template for status output
         if template is None:

@@ -1,14 +1,7 @@
 # make separate python class for render_status
-
-import sys
-import signac
-
 import mistune
 import mdv
 
-import jinja2
-from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
-from .util import config as flow_config
 
 class _render_status:
 

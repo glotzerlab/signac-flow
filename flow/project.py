@@ -1274,8 +1274,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             context['op_counter'].append(('[{} more operations omitted]'.format(n), ''))
 
         render_result = render_status._render_status()
-        render_output = render_result.render(template, template_environment, context, file, detailed, expand, unroll, compact, pretty, option)
-
+        render_output = render_result.render(template, template_environment, context, file,
+                                             detailed, expand, unroll, compact, pretty, option)
 
         # Show profiling results (if enabled)
         if profiling_results:

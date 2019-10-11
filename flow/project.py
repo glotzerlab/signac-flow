@@ -1251,7 +1251,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 context['operation_status_symbols'] = OPERATION_STATUS_SYMBOLS
 
         def _add_dummy_operation(job):
-            job['operations'][''] = {
+            job['operations']['None'] = {
                 'completed': False,
                 'eligible': True,
                 'scheduler_status': JobStatus.dummy}

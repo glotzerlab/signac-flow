@@ -1283,7 +1283,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         op_counter = Counter()
         for job in context['jobs']:
-            for k , v in job['operations'].items():
+            for k, v in job['operations'].items():
                 if k != 'None' and v['eligible']:
                     op_counter[k] += 1
         context['op_counter'] = op_counter.most_common(eligible_jobs_max_lines)

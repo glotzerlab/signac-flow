@@ -1540,7 +1540,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             logger.debug(
                 "Forking to execute operation '{}' with "
                 "cmd '{}'.".format(operation, operation.cmd))
-            subprocess.call(operation.cmd, shell=True, timeout=timeout)
+            returncode = subprocess.call(operation.cmd, shell=True, timeout=timeout)
+            if returncode != 0:
+                logger.warning("Operation '{}' called via subprocess returned "
+                               "nonzero code: {}.".format(
+                                   operation, returncode))
         else:
             # ... executing operation in interpreter process as function:
             logger.debug(

@@ -1,6 +1,5 @@
 # make separate python class for render_status
 import mistune
-import mdv
 from .scheduling.base import JobStatus
 
 
@@ -60,7 +59,7 @@ class _render_status:
             ratio = ' %0.2f%%' % (100 * value / total)
             n = int(value / total * width)
             return escape + '|' + ''.join(['#'] * n) + ''.join(['-'] * (width - n)) \
-                   + escape + '|' + ratio
+                          + escape + '|' + ratio
 
         def job_filter(job_op, scheduler_status_code, all_ops):
             """filter eligible jobs for status print.

@@ -155,9 +155,7 @@ class _render_status:
             return self.terminal_output
         elif option == 'html':
             self.generate_html_output(template, context)
-            print(self.html_output, file=file)
             return self.html_output
         elif option == 'md' or 'markdown':
             self.generate_markdown_output(template, context)
-            print(self.markdown_output, file=file)
             return self.markdown_output

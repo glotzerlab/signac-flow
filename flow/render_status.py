@@ -11,34 +11,35 @@ class _render_status:
         self.terminal_output = None
         self.html_output = None
 
-    def generate_markdown(self, template, context):
+    def generate_markdown_output(self, template, context):
         self.markdown_output = template.render(**context)
-        # print(self.markdown_output)
 
     def generate_terminal_output(self, template, context):
-        self.generate_markdown(template, context)
-        self.terminal_output = mdv.main(self.markdown_output)
+        self.terminal_output = template.render(**context)
 
     def generate_html_output(self, template, context):
-        self.generate_markdown(template, context)
+        self.generate_markdown_output(template, context)
         self.html_output = mistune.markdown(self.markdown_output)
-        # print(self.html_output, file=file)
 
     def render(self, template, template_environment, context, file, detailed, expand,
                unroll, compact, pretty, option):
 
         # use Jinja2 template for status output
+        if option == 'terminal':
+            prefix = 'terminal_'
+        else:
+            prefix = 'md_'
         if template is None:
             if detailed and expand:
-                template = 'status_expand.jinja'
+                template = prefix + 'status_expand.jinja'
             elif detailed and not unroll:
-                template = 'status_stack.jinja'
+                template = prefix + 'status_stack.jinja'
             elif detailed and compact:
-                template = 'status_compact.jinja'
+                template = prefix + 'status_compact.jinja'
             else:
-                template = 'status.jinja'
+                template = prefix + 'status.jinja'
 
-        def draw_progressbar(value, total, width=40):
+        def draw_progressbar(value, total, escape='', width=40):
             """Visualize progess with a progress bar.
 
             :param value:
@@ -58,7 +59,7 @@ class _render_status:
             assert value >= 0 and total > 0
             ratio = ' %0.2f%%' % (100 * value / total)
             n = int(value / total * width)
-            return '[' + ''.join(['#'] * n) + ''.join(['-'] * (width - n)) + ']' + ratio
+            return escape + '|' + ''.join(['#'] * n) + ''.join(['-'] * (width - n)) + escape + '|' + ratio
 
         def job_filter(job_op, scheduler_status_code, all_ops):
             """filter eligible jobs for status print.
@@ -110,7 +111,7 @@ class _render_status:
             return symbols[op_status]
 
         if pretty:
-            def highlight(s, eligible):
+            def highlight(s, eligible, prefix_str, suffix_str):
                 """Change font to bold within jinja2 template
 
                 :param s:
@@ -123,11 +124,11 @@ class _render_status:
                     Boolean
                 """
                 if eligible:
-                    return '**' + s + '**'
+                    return prefix_str + s + suffix_str
                 else:
                     return s
         else:
-            def highlight(s, eligible):
+            def highlight(s, eligible, prefix_str, suffix_str):
                 """Change font to bold within jinja2 template
 
                 :param s:
@@ -154,5 +155,9 @@ class _render_status:
             return self.terminal_output
         elif option == 'html':
             self.generate_html_output(template, context)
-            # print(self.html_output, file=file)
+            print(self.html_output, file=file)
             return self.html_output
+        elif option == 'md' or 'markdown':
+            self.generate_markdown_output(template, context)
+            print(self.markdown_output, file=file)
+            return self.markdown_output

@@ -25,7 +25,7 @@
 {{ field_progress_bar | format('label', 'ratio') }}
 {{ field_progress_bar | format('-' , '-') }}
 {% for label in progress_sorted %}
-{{ field_progress_bar | format(label[0], label[1] | draw_progressbar(jobs | length)) }}
+{{ field_progress_bar | format(label[0], label[1] | draw_progressbar(jobs | length, '\\')) }}
 {% endfor %}
 {% endblock%}
 
@@ -52,9 +52,9 @@
 {% endif %}
 {% for key, value in job['operations'].items() if value | job_filter(scheduler_status_code, all_ops) %}
 {% if loop.first %}
-{{ '| %s | ' | format(job['job_id']) }}{{ field_operation | highlight(value['eligible']) | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }}{{' | '}}{{para_output}}{{ '%s |' | format(job['labels'] | join(', ')) }}
+{{ '| %s | ' | format(job['job_id']) }}{{ field_operation | highlight(value['eligible'], '**', '**') | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }}{{' | '}}{{para_output}}{{ '%s |' | format(job['labels'] | join(', ')) }}
 {% else %}
-{{ '| %s |' | format('')}}{{ field_operation | highlight(value['eligible']) | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }}{{para_output}}{{' | '}}{{ '%s |' | format(job['labels'] | join(', ')) }}
+{{ '| %s |' | format('')}}{{ field_operation | highlight(value['eligible'], '**', '**') | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }}{{para_output}}{{' | '}}{{ '%s |' | format(job['labels'] | join(', ')) }}
 {% endif %}
 {% endfor %}
 {% endfor %}

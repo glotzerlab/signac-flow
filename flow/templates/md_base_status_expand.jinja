@@ -1,9 +1,9 @@
 {% if compact %}
-{% extends "base_status_compact.jinja" %}
+{% extends "md_base_status_compact.jinja" %}
 {% elif not unroll %}
-{% extends "base_status_stack.jinja" %}
+{% extends "md_base_status_stack.jinja" %}
 {% else %}
-{% extends "base_status.jinja" %}
+{% extends "md_base_status.jinja" %}
 {% endif %}
 {% block detailed %}
 {{ super () }}
@@ -14,7 +14,7 @@
 {% for job in jobs %}
 {% for key, value in job['operations'].items() %}
 {% if (scheduler_status_code[value['scheduler_status']] != 'U' or value['eligible']) or all_ops%}
-{{ '| %s | ' | format(job['job_id']) }}{{ '%s | ' | highlight(value['eligible']) | format(key) }}{{ '%s | ' | format(alias_bool[value['eligible']])}}{{ '%s |' | format(scheduler_status_code[value['scheduler_status']])}}
+{{ '| %s | ' | format(job['job_id']) }}{{ '%s | ' | highlight(value['eligible'], '**', '**') | format(key) }}{{ '%s | ' | format(alias_bool[value['eligible']])}}{{ '%s |' | format(scheduler_status_code[value['scheduler_status']])}}
 {% endif %}
 {% endfor %}
 {% endfor %}

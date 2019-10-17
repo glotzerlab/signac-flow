@@ -1,4 +1,4 @@
-{% extends "base_status.jinja" %}
+{% extends "md_base_status.jinja" %}
 {% block detailed %}
 {% set field_detailed = '| %s | %s%s |' %}
 {{ 'Detailed View: \n' }}
@@ -11,7 +11,7 @@
 {% endif %}
 {{ '| %s | ' | format(job['job_id']) }}{{para_output}}{{ '%s |' | format(job['labels'] | join(', ')) }}
 {% for key, value in job['operations'].items() if value | job_filter(scheduler_status_code, all_ops) %}
-{{'|'}}{{ field_operation | highlight(value['eligible']) | format(value | get_operation_status(operation_status_symbols), key, '['+scheduler_status_code[value['scheduler_status']]+']') }}{{'|'}}
+{{'|'}}{{ field_operation | highlight(value['eligible'], '**', '**') | format(value | get_operation_status(operation_status_symbols), key, '['+scheduler_status_code[value['scheduler_status']]+']') }}{{'|'}}
 {% endfor %}
 {% endfor %}
 

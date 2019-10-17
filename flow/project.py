@@ -1158,6 +1158,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         if overview:
             # get overview info:
+            column_width_bar = 50
+            column_width_label = 5
+            for key, value in self._label_functions.items():
+                column_width_label = max(column_width_label, len(key.__name__))
             progress = defaultdict(int)
             for status in statuses.values():
                 for label in status['labels']:
@@ -1174,6 +1178,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         if parameters:
             # get parameters info
+            column_width_parameters = list([0]*len(parameters))
+            for i, para in enumerate(parameters):
+                column_width_parameters[i] = len(para)
 
             def _add_parameters(status):
                 sp = self.open_job(id=status['job_id']).statepoint()
@@ -1190,6 +1197,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 status['parameters'] = OrderedDict()
                 for i, k in enumerate(parameters):
                     v = shorten(str(self._alias(get(k, sp))))
+                    column_width_parameters[i] = max(column_width_parameters[i], len(v))
                     status['parameters'][k] = v
 
             for status in statuses.values():
@@ -1201,7 +1209,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         if detailed:
             # get detailed view info
+            column_width_id = 32
+            column_width_total_label = 6
             status_legend = ' '.join('[{}]:{}'.format(v, k) for k, v in self.ALIASES.items())
+
+            for job in tmp:
+                column_width_total_label = max(
+                    column_width_total_label, len(', '.join(job['labels'])))
 
             if compact:
                 num_operations = len(self._operations)
@@ -1237,12 +1251,18 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         context['unroll'] = unroll
         if overview:
             context['progress_sorted'] = progress_sorted
+            context['column_width_bar'] = column_width_bar
+            context['column_width_label'] = column_width_label
             context['column_width_operation'] = column_width_operation
         if detailed:
+            context['column_width_id'] = column_width_id
             context['column_width_operation'] = column_width_operation
+            context['column_width_total_label'] = column_width_total_label
             context['alias_bool'] = {True: 'T', False: 'U'}
             context['scheduler_status_code'] = _FMT_SCHEDULER_STATUS
             context['status_legend'] = status_legend
+            if parameters:
+                context['column_width_parameters'] = column_width_parameters
             if compact:
                 context['extra_num_operations'] = max(num_operations-1, 0)
                 context['column_width_operations_count'] = column_width_operations_count
@@ -1263,8 +1283,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         op_counter = Counter()
         for job in context['jobs']:
-            for k, v in job['operations'].items():
-                if v['eligible']:
+            for k , v in job['operations'].items():
+                if k != 'None' and v['eligible']:
                     op_counter[k] += 1
         context['op_counter'] = op_counter.most_common(eligible_jobs_max_lines)
         n = len(op_counter) - len(context['op_counter'])

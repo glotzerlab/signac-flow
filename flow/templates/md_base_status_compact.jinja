@@ -1,4 +1,4 @@
-{% extends "base_status.jinja" %}
+{% extends "md_base_status.jinja" %}
 {% block detailed %}
 {% set field_operation = ('%%-%ss %%3s %%-%ss' | format(column_width_operation, column_width_operations_count)) %}
 {% set field_head = '| %s | %s | %s%s |'  %}
@@ -11,7 +11,7 @@
 {% endif %}
 {% if all_ops %}
 {% set key, value = job['operations'].items() | first() %}
-{{ '| %s | ' | format(job['job_id']) }}{{ field_operation | highlight(value['eligible']) | format(key, '[' + scheduler_status_code[value['scheduler_status']] + ']', '+(' + extra_num_operations | string() + ')') }}{{' |'}}{{para_output}}{{ '%s |' | format(job['labels'] | join(', ')) }}
+{{ '| %s | ' | format(job['job_id']) }}{{ field_operation | highlight(value['eligible'], '**', '**') | format(key, '[' + scheduler_status_code[value['scheduler_status']] + ']', '+(' + extra_num_operations | string() + ')') }}{{' |'}}{{para_output}}{{ '%s |' | format(job['labels'] | join(', ')) }}
 {% else %}
 {% set ns.extra_num_operation = -1 %}
 {% set ns.if_first_eligible_operation = True %}
@@ -22,7 +22,7 @@
 {% set ns.first_operation_value = value %}
 {% endif %}
 {% endfor %}
-{{ '| %s | ' | format(job['job_id']) }}{{ field_operation | highlight(ns.first_operation_value['eligible']) | format(ns.first_operation_key, '['+scheduler_status_code[ns.first_operation_value['scheduler_status']]+']', '+('+ns.extra_num_operation | string()+')') }}{{' |'}}{{para_output}}{{ '%s' | format(job['labels'] | join(', ')) }}
+{{ '| %s | ' | format(job['job_id']) }}{{ field_operation | highlight(ns.first_operation_value['eligible'], '**', '**') | format(ns.first_operation_key, '['+scheduler_status_code[ns.first_operation_value['scheduler_status']]+']', '+('+ns.extra_num_operation | string()+')') }}{{' |'}}{{para_output}}{{ '%s' | format(job['labels'] | join(', ')) }}
 {% endif %}
 {% endfor %}
 

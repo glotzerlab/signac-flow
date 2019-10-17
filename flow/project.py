@@ -19,6 +19,7 @@ import functools
 import contextlib
 import random
 import subprocess
+import traceback
 from deprecation import deprecated
 from collections import defaultdict
 from collections import OrderedDict
@@ -1546,7 +1547,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             logger.debug(
                 "Executing operation '{}' with current interpreter "
                 "process ({}).".format(operation, os.getpid()))
-            self._operation_functions[operation.name](operation.job)
+            try:
+                self._operation_functions[operation.name](operation.job)
+            except Exception:
+                traceback.print_exc()
+                raise
 
     def run(self, jobs=None, names=None, pretend=False, np=None, timeout=None, num=None,
             num_passes=1, progress=False, order=None):

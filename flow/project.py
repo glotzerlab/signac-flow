@@ -1188,8 +1188,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if parameters:
             # get parameters info
             column_width_parameters = list([0]*len(parameters))
-            for i, para in enumerate(parameters):
-                column_width_parameters[i] = len(shorten(self._alias(str(para)), param_max_width))
 
             def _add_parameters(status):
                 sp = self.open_job(id=status['job_id']).statepoint()
@@ -1208,9 +1206,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     v = shorten(str(self._alias(get(k, sp))), param_max_width)
                     column_width_parameters[i] = max(column_width_parameters[i], len(v))
                     status['parameters'][k] = v
+                    print(status['parameters'])
 
             for status in statuses.values():
                 _add_parameters(status)
+
+            for i, para in enumerate(parameters):
+                parameters[i] = shorten(self._alias(str(para)), param_max_width)
+                column_width_parameters[i] = max(column_width_parameters[i], len(parameters[i]))
 
         column_width_operation = 5
         for op_name in self._operations:

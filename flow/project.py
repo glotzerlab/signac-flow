@@ -1027,7 +1027,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type profile:
             bool
         :param eligible_jobs_max_lines:
-            Limit the number of eligible jobs that are printed in the overview.
+            Limit the number of operations and its eligible job count printed in the overview.
         :type eligible_jobs_max_lines:
             int
         :param option:

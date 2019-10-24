@@ -13,6 +13,10 @@ Added
 
 - Add "fork" directive to enforce the execution of operations within a subprocess.
 
+Changed
++++++++
+- Raise errors if a forked process or ``@cmd`` operation returns a non-zero exit code. (#170, #172).
+
 Removed
 +++++++
 - Drop support for Python version 2.7.

@@ -115,8 +115,9 @@ class BaseProjectTest(unittest.TestCase):
             name='FlowTestProject',
             root=self._tmp_dir.name)
 
-    def mock_project(self, heterogeneous=False):
-        project = self.project_class.get_project(root=self._tmp_dir.name)
+    def mock_project(self, project_class=None, heterogeneous=False):
+        project_class = project_class if project_class else self.project_class
+        project = project_class.get_project(root=self._tmp_dir.name)
         for a in range(3):
             if heterogeneous:
                 # Add jobs with only the `a` key without `b`.
@@ -478,8 +479,7 @@ class ProjectClassTest(BaseProjectTest):
         def op4(job):
             job.doc.d = True
 
-        self.project_class = A
-        project = self.mock_project()
+        project = self.mock_project(project_class=A)
         op3_ = project.operations['op3']
         op4_ = project.operations['op4']
         for job in project:
@@ -706,7 +706,6 @@ class ExecutionProjectTest(BaseProjectTest):
         # This assignment is necessary to use the `mock_project` function on
         # classes A, B, and C. Otherwise, the self.project_class reassignment
         # would break future tests.
-        _project = getattr(self, 'project_class', None)
 
         class A(FlowProject):
             pass
@@ -752,10 +751,9 @@ class ExecutionProjectTest(BaseProjectTest):
                 [A, B, C],
                 [['op1'], ['op2', 'op3'], ['op1', 'op3']]):
 
-            self.project_class = project_class
             for job in self.project.find_jobs():
                 job.remove()
-            project = self.mock_project()
+            project = self.mock_project(project_class=project_class)
             project.run()
             # All bad operations do not run
             assert all([not job.doc.get(op, False)
@@ -766,7 +764,6 @@ class ExecutionProjectTest(BaseProjectTest):
             assert all([job.doc.get(op, False)
                         for op in good_ops
                         for job in project])
-        self.project_class = _project
 
     def test_run_fork(self):
         project = self.mock_project()
@@ -970,8 +967,9 @@ class ExecutionProjectTest(BaseProjectTest):
 
 class BufferedExecutionProjectTest(ExecutionProjectTest):
 
-    def mock_project(self):
-        project = super(BufferedExecutionProjectTest, self).mock_project()
+    def mock_project(self, project_class=None):
+        project = super(BufferedExecutionProjectTest,
+                        self).mock_project(project_class=project_class)
         project._use_buffered_mode = True
         return project
 

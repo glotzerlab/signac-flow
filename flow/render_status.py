@@ -4,6 +4,12 @@ from .scheduling.base import JobStatus
 
 
 class _render_status:
+    """A class for rendering status in different format.
+
+    This class provides method and string output for rendering status output in different format,
+    currently supports: print in terminal, markdown and html format provided in string
+
+    """
 
     def __init__(self):
         self.markdown_output = None
@@ -22,6 +28,50 @@ class _render_status:
 
     def render(self, template, template_environment, context, file, detailed, expand,
                unroll, compact, pretty, option):
+        """render the status in different format for print_status.
+
+        :param template:
+            user provided Jinja2 template file.
+        :type template:
+            str
+        :param template_environment:
+            template environment.
+        :type template_environment:
+            FlowProject._template_environment
+        :param context:
+            context that includes all the information for rendering status output.
+        :type context:
+            dict
+        :param file:
+            Redirect all output to this file, defaults to sys.stdout.
+        :type file:
+            str
+        :param detailed:
+            Print a detailed status of each job.
+        :type detailed:
+            bool
+        :param expand:
+            Present labels and operations in two separate tables.
+        :type expand:
+            bool
+        :param unroll:
+            Separate columns for jobs and the corresponding operations.
+        :type unroll:
+            bool
+        :param compact:
+            Print a compact version of the output.
+        :type compact:
+            bool
+        :param pretty:
+            Prettify the output.
+        :type pretty:
+            bool
+        :param option:
+            options for rendering format, currently supports:
+            'terminal'(default), 'markdown' and 'html'
+        :type option:
+            str
+        """
 
         # use Jinja2 template for status output
         if option == 'terminal':

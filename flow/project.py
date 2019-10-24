@@ -947,7 +947,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                      eligible_jobs_max_lines=None, option='terminal'):
         """Print the status of the project.
 
-        .. versionchanged:: 0.6
+        .. versionchanged:: 0.9
 
         :param jobs:
             Only execute operations for the given jobs, or all if the argument is omitted.
@@ -960,10 +960,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :param overview_max_lines:
             Limit the number of overview lines.
         :type overview_max_lines:
-            int
-        :param eligible_jobs_max_lines:
-            Limit the number of eligible jobs that are printed in the overview.
-        :type eligible_jobs_max_lines:
             int
         :param detailed:
             Print a detailed status of each job.
@@ -1025,6 +1021,19 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :param template:
             user provided Jinja2 template file.
         :type template:
+            str
+        :param profile:
+            show profile result.
+        :type profile:
+            bool
+        :param eligible_jobs_max_lines:
+            Limit the number of eligible jobs that are printed in the overview.
+        :type eligible_jobs_max_lines:
+            int
+        :param option:
+            options for rendering format, currently supports:
+            'terminal'(default), 'markdown' and 'html'
+        :type option:
             str
         """
         if file is None:
@@ -1180,7 +1189,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             # get parameters info
             column_width_parameters = list([0]*len(parameters))
             for i, para in enumerate(parameters):
-                column_width_parameters[i] = len(para)
+                column_width_parameters[i] = len(shorten(self._alias(str(para)), param_max_width))
 
             def _add_parameters(status):
                 sp = self.open_job(id=status['job_id']).statepoint()
@@ -1196,7 +1205,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
                 status['parameters'] = OrderedDict()
                 for i, k in enumerate(parameters):
-                    v = shorten(str(self._alias(get(k, sp))))
+                    v = shorten(str(self._alias(get(k, sp))), param_max_width)
                     column_width_parameters[i] = max(column_width_parameters[i], len(v))
                     status['parameters'][k] = v
 

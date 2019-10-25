@@ -1540,7 +1540,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             logger.debug(
                 "Forking to execute operation '{}' with "
                 "cmd '{}'.".format(operation, operation.cmd))
-            subprocess.call(operation.cmd, shell=True, timeout=timeout)
+            subprocess.run(operation.cmd, shell=True, timeout=timeout, check=True)
         else:
             # ... executing operation in interpreter process as function:
             logger.debug(
@@ -2626,7 +2626,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
                 def operation_function(job):
                     cmd = operation(job).format(job=job)
-                    subprocess.call(cmd, shell=True)
+                    subprocess.run(cmd, shell=True, check=True)
 
         except KeyError:
             raise KeyError("Unknown operation '{}'.".format(args.operation))

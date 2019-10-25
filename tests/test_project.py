@@ -390,8 +390,9 @@ class ProjectClassTest(BaseProjectTest):
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
                 starting_dir = os.getcwd()
-                with redirect_stderr(StringIO()):
-                    A().run()
+                with self.assertRaises(subprocess.CalledProcessError):
+                    with redirect_stderr(StringIO()):
+                        A().run()
                 self.assertEqual(os.getcwd(), starting_dir)
 
     def test_function_in_directives(self):

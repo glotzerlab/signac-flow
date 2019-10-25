@@ -244,7 +244,7 @@ def run(parser=None):
 
         def operation(job):
             cmd = operation_func(job).format(job=job)
-            subprocess.call(cmd, shell=True, timeout=args.timeout)
+            subprocess.run(cmd, shell=True, timeout=args.timeout, check=True)
     else:
         operation = operation_func
 

@@ -397,8 +397,9 @@ class ProjectClassTest(BaseProjectTest):
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
                 starting_dir = os.getcwd()
-                with redirect_stderr(StringIO()):
-                    A(entrypoint=self.entrypoint).run()
+                with self.assertRaises(Exception):
+                    with redirect_stderr(StringIO()):
+                        A(entrypoint=self.entrypoint).run()
                 self.assertEqual(os.getcwd(), starting_dir)
 
     def test_function_in_directives(self):

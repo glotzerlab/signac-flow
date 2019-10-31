@@ -183,7 +183,7 @@ def make_bundles(operations, size=None):
 class JobOperation(object):
     """This class represents the information needed to execute one group for one job.
 
-    An group function in this context is a shell command, which should be a
+    A group function in this context is a shell command, which should be a
     string with one and only one signac job.
 
     .. note::
@@ -197,6 +197,8 @@ class JobOperation(object):
         The id of this JobOperation instance. The id should be unique.
     :type id:
         str
+    :param name:
+        The name of the JobOperation.
     :type name:
         str
     :param job:
@@ -416,6 +418,11 @@ class BaseFlowOperation(object):
 
 
 class FlowCmdOperation(BaseFlowOperation):
+    """A FlowOperation that holds a shell executable command.
+
+    When an operation has the ``@cmd`` directive specified, it is instantiated
+    as a FlowCmdOperation.
+    """
 
     def __init__(self, cmd, pre=None, post=None):
         super(FlowCmdOperation, self).__init__(pre=pre, post=post)
@@ -432,6 +439,10 @@ class FlowCmdOperation(BaseFlowOperation):
 
 
 class FlowOperation(BaseFlowOperation):
+    """FlowOperation is a python executable function.
+
+    All operations without the ``@cmd`` directive use this class.
+    """
 
     def __init__(self, name, pre=None, post=None):
         super(FlowOperation, self).__init__(pre=pre, post=post)
@@ -442,12 +453,12 @@ class FlowOperation(BaseFlowOperation):
 
 
 class FlowGroup(object):
-    """A FlowGroup represents a subset of a workflow for any given job.
+    """A FlowGroup represents a subset of a workflow for a project.
 
-    Any :class:`FlowGroup` is associated with a group of
-    :class:`FlowOperation`s. The command (cmd) is by default a modified
-    :func:`run` command, but can be overwritten with any function that takes a
-    job and operations argument.
+    Any :py:class:`FlowGroup` is associated with a group of
+    :py:class:`FlowOperation`s. The command :py:param:`cmd` is a
+    :py:func:`FlowProject.run` command, but can be overwritten with any function
+    that takes job and operations arguments.
 
     :param name:
         The name of the group to be used when calling from the commandline.
@@ -572,17 +583,47 @@ class FlowGroup(object):
                    options=self.options)
 
     def eligible(self, job):
-        """Eligible, when at least one FlowOperation is eligible."""
+        """Eligible, when at least one BaseFlowOperation is eligible.
+
+        :param job:
+            A signac.Job from the signac workspace.
+        :type job:
+            signac.Job
+        """
         return any(op.eligible(job) for op in self)
 
     def complete(self, job):
-        "True when all FlowOperation post-conditions are met"
+        """True when all BaseFlowOperation post-conditions are met
+
+        :param job:
+            A signac.Job from the signac workspace.
+        :type job:
+            signac.Job
+        """
         return all(op.complete(job) for op in self)
 
     def add_operation(self, name, operation):
+        """Add an operation to the FlowGroup.
+
+        :param name:
+            The name of the operation.
+        :type name:
+            str
+        :param operation:
+            The workflow operation to add to the FlowGroup.
+        :type operation:
+            :py:class:`BaseFlowOperation`
+        """
         self.operations[name] = operation
 
     def intersects(self, group):
+        """Returns whether two groups contains any common operations.
+
+        :param group:
+            The other FlowGroup to compare to.
+        :type group:
+            :py:class:`flow.FlowGroup`
+        """
         return bool(set(self).intersection(group))
 
     def _generate_id(self, job, index=0):
@@ -616,6 +657,7 @@ class FlowGroup(object):
         return readable_name + job_op_id
 
     def _get_status(self, job):
+        """For a given job check the groups submission status."""
         try:
             return JobStatus(job._project.document['_status'].get(self._generate_id(job),
                                                                   JobStatus.unknown))
@@ -623,7 +665,25 @@ class FlowGroup(object):
             return JobStatus.unknown
 
     def create_job_operation(self, entrypoint, job, mode='run', index=0):
-        """Create a JobOperation object from the FlowGroup."""
+        """Create a JobOperation object from the FlowGroup.
+
+        :param entrypoint:
+            The path and executable, if applicable, to point to for execution
+        :type entrypoint:
+            dict
+        :param job:
+            The job that the JobOperation is based on.
+        :type job:
+            signac.Job
+        :param mode:
+            The executation mode which the JobOperation runs in.
+        :type mode:
+            str
+        :param index:
+            Index for the JopOperation.
+        :type index:
+            int
+        """
         uneval_cmd = functools.partial(self._cmd, entrypoint=entrypoint, job=job, mode=mode)
         return JobOperation(self._generate_id(job, index=index),
                             self.name,
@@ -2095,6 +2155,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             yield JobOperation(name=cmd_.replace(' ', '-'), cmd=cmd_, job=job)
 
     def _gather_flow_groups(self, names=None):
+        """Grabs FlowGroups that match names"""
         operations = OrderedDict()
         # if no names are selected try all singleton groups
         names = names if names is not None else self._operations.keys()
@@ -2119,6 +2180,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return operations
 
     def _get_submission_operations(self, jobs, names=None, mode='run'):
+        """Grabs JobOperations that are eligible to run from FlowGroups."""
         for job in jobs:
             for group in self._gather_flow_groups(names):
                 if group.eligible(job) and self.eligible_for_submission(group,
@@ -2134,6 +2196,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 yield op
 
     def _verify_group_compatibility(self, groups):
+        """Verifies that all selected groups can be submitted together."""
         return all(not a.intersects(b) for a, b in combinations(groups, 2))
 
     @contextlib.contextmanager
@@ -2888,6 +2951,43 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @classmethod
     def make_group(cls, name, run_cmd=None, exec_cmd=None, directives=None, options=None):
+        """Make a FlowGroup named ``name``. And return a decorator to make groups.
+
+        .. code-block:: python
+            example_group = FlowProject.make_group('example')
+
+            @example_group
+            @FlowProject.operation
+            def foo(job):
+                return "hello world"
+
+        FlowGroups group operations together for running and submitting
+        JobOperations.
+
+        :param name:
+            The name of the FlowGroup.
+        :type name:
+            str
+        :param run_cmd:
+            The command to run when run mode is chosen for submission. The
+            function should be a function of a job and operations.
+        :type run_cmd:
+            function or formatted string
+        :param exec_cmd:
+            The command to run when exec mode is chosen for submission. The
+            function should be a function of a job and operations.
+        :type exec_cmd:
+            function or formatted string
+        :param directives:
+            Execution options like MPI and resource requests like number of
+            GPUs.
+        :type directives:
+            dict
+        :param options:
+            A strng to append to run mode commands.
+        :type options:
+            str
+        """
         # Gets the relative filepath of the function caller
         cls._GROUPS.append({'name': name, 'run_cmd': run_cmd,
                             'exec_cmd': exec_cmd, 'directives': directives,

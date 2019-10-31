@@ -58,6 +58,7 @@ The FlowProject
     FlowProject.pre.never
     FlowProject.pre.not_
     FlowProject.pre.true
+    FlowProject.make_group
     FlowProject.run
     FlowProject.run_operations
     FlowProject.scheduler_jobs

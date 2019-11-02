@@ -96,25 +96,25 @@ class _condition(object):
 
     def __init__(self, condition, tags=None):
         # Add tag to differentiate built-in conditions during graph detection.
-        condition._flow_tags = tags
+        condition._flow_tag = tags
         self.condition = condition
 
     @classmethod
     def isfile(cls, filename):
         "True if the specified file exists for this job."
-        return cls(lambda job: job.isfile(filename), (filename, ))
+        return cls(lambda job: job.isfile(filename), filename)
 
     @classmethod
     def true(cls, key):
         """True if the specified key is present in the job document and
         evaluates to True."""
-        return cls(lambda job: job.document.get(key, False), (key, ))
+        return cls(lambda job: job.document.get(key, False), key)
 
     @classmethod
     def false(cls, key):
         """True if the specified key is present in the job document and
         evaluates to False."""
-        return cls(lambda job: not job.document.get(key, False), (key, ))
+        return cls(lambda job: not job.document.get(key, False), key)
 
     @classmethod
     def always(cls, func):
@@ -758,7 +758,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     callbacks = callbacks.union(
                         unpack_conditions(cf._composed_of))
                 else:
-                    callbacks.add((cf._flow_tags, cf.__code__.co_code))
+                    callbacks.add((cf._flow_tag, cf.__code__.co_code))
 
             return callbacks
 

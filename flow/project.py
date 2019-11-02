@@ -86,7 +86,7 @@ The available template variables are:
 {template_vars}
 
 Filter functions can be used to format template variables in a specific way.
-For example: {{ project.get_id() | captialize }}.
+For example: {{ project.get_id() | capitalize }}.
 
 The available filters are:
 {filters}"""
@@ -100,19 +100,25 @@ class _condition(object):
     @classmethod
     def isfile(cls, filename):
         "True if the specified file exists for this job."
-        return cls(lambda job: job.isfile(filename))
+        cond = lambda job: job.isfile(filename)
+        cond._flow_tags = (filename, )
+        return cls(cond)
 
     @classmethod
     def true(cls, key):
         """True if the specified key is present in the job document and
         evaluates to True."""
-        return cls(lambda job: job.document.get(key, False))
+        cond = lambda job: job.document.get(key, False)
+        cond._flow_tags = (key, )
+        return cls(cond)
 
     @classmethod
     def false(cls, key):
         """True if the specified key is present in the job document and
         evaluates to False."""
-        return cls(lambda job: not job.document.get(key, False))
+        cond = lambda job: not job.document.get(key, False)
+        cond._flow_tags = (key, )
+        return cls(cond)
 
     @classmethod
     def always(cls, func):
@@ -408,10 +414,6 @@ class FlowOperation(object):
 def _create_metacondition(condition_dict, *other_funcs):
     """Standard method for generating metaconditions with appropriate
     information for graph detection."""
-    # print("In create metadata for funcs: ", other_funcs)
-    # print("Dict: ", condition_dict)
-    # for f in other_funcs:
-        # print("Conditions for {}: {}".format(f, condition_dict[f]))
     condition_list = [c for f in other_funcs for c in condition_dict[f]]
 
     def _flow_metacondition(job):
@@ -762,7 +764,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     callbacks = callbacks.union(
                         unpack_conditions(cf._composed_of))
                 else:
-                    callbacks.add(cf.__code__.co_code)
+                    callbacks.add((getattr(cf, '_flow_tags', None), cf.__code__.co_code))
 
             return callbacks
 
@@ -772,16 +774,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 postconds2 = unpack_conditions(to_callbacks(op2._postconds))
                 prereqs1 = unpack_conditions(to_callbacks(op1._prereqs))
                 prereqs2 = unpack_conditions(to_callbacks(op2._prereqs))
-                # conds = postconds1 | prereqs1 | postconds2 | prereqs2
-                # if any(getattr(cond, '_is_lambda', False) for cond in conds):
-                    # raise ValueError("The graph detection algorithm depends on "
-                                     # "exactly equality of callables to determine whether "
-                                     # "or not the pre- and post-conditions for two "
-                                     # "operations are equal. As a result, the algorithm "
-                                     # "will not work with anonymous lambda functions. To "
-                                     # "use this feature, define your conditions as "
-                                     # "functions and use those functions as your "
-                                     # "conditions.")
                 if postconds1.intersection(prereqs2):
                     mat[i][j+i] = 1
                 elif prereqs1.intersection(postconds2):

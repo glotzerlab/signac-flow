@@ -93,45 +93,51 @@ The available filters are:
 
 
 class _condition(object):
+    # Random tag id used to ensure that "always" and "never" conditions never
+    # match each other.
+    rand_tag_id = 0
 
-    def __init__(self, condition, tag_func=None):
+    def __init__(self, condition, tag=None):
         # Add tag to differentiate built-in conditions during graph detection.
-        if tag_func is None:
-            tag_func = lambda _: condition.__code__.co_code
-        condition._tag_func = tag_func
+        if tag is None:
+            tag = condition.__code__.co_code
+        condition._flow_tag = tag
         self.condition = condition
 
     @classmethod
     def isfile(cls, filename):
         "True if the specified file exists for this job."
-        return cls(lambda job: job.isfile(filename), filename)
+        return cls(lambda job: job.isfile(filename), 'isfile_' + filename)
 
     @classmethod
     def true(cls, key):
         """True if the specified key is present in the job document and
         evaluates to True."""
-        return cls(lambda job: job.document.get(key, False), key)
+        return cls(lambda job: job.document.get(key, False), 'true_' + key)
 
     @classmethod
     def false(cls, key):
         """True if the specified key is present in the job document and
         evaluates to False."""
-        return cls(lambda job: not job.document.get(key, False), key)
+        return cls(lambda job: not job.document.get(key, False), 'false_' + key)
 
     @classmethod
     def always(cls, func):
         "Returns True."
-        return cls(lambda _: True)(func)
+        cls.rand_tag_id += 1
+        return cls(lambda _: True, str(rand_tag_id))(func)
 
     @classmethod
     def never(cls, func):
         "Returns False."
-        return cls(lambda _: False)(func)
+        cls.rand_tag_id += 1
+        return cls(lambda _: False, str(rand_tag_id))(func)
 
     @classmethod
     def not_(cls, condition):
         "Returns ``not condition(job)`` for the provided condition function."
-        return cls(lambda job: not condition(job))
+        return cls(lambda job: not condition(job),
+                   'not_'.encode() + condition.__code__.co_code)
 
 
 def make_bundles(operations, size=None):
@@ -470,8 +476,8 @@ class _FlowProjectClass(type):
 
             _parent_class = parent_class
 
-            def __init__(self, condition, tag_func=None):
-                super(pre, self).__init__(condition, tag_func)
+            def __init__(self, condition, tag=None):
+                super(pre, self).__init__(condition, tag)
 
             def __call__(self, func):
                 self._parent_class._OPERATION_PRE_CONDITIONS[func].insert(0, self.condition)
@@ -511,8 +517,8 @@ class _FlowProjectClass(type):
             """
             _parent_class = parent_class
 
-            def __init__(self, condition, tag_func=None):
-                super(post, self).__init__(condition, tag_func)
+            def __init__(self, condition, tag=None):
+                super(post, self).__init__(condition, tag)
 
             def __call__(self, func):
                 self._parent_class._OPERATION_POST_CONDITIONS[func].insert(0, self.condition)
@@ -760,7 +766,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     callbacks = callbacks.union(
                         unpack_conditions(cf._composed_of))
                 else:
-                    callbacks.add(cf._tag_func)
+                    callbacks.add(cf._flow_tag)
 
             return callbacks
 

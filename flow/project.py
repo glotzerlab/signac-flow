@@ -94,31 +94,27 @@ The available filters are:
 
 class _condition(object):
 
-    def __init__(self, condition):
+    def __init__(self, condition, tags=None):
+        # Add tag to differentiate built-in conditions during graph detection.
+        condition._flow_tags = tags
         self.condition = condition
 
     @classmethod
     def isfile(cls, filename):
         "True if the specified file exists for this job."
-        cond = lambda job: job.isfile(filename)
-        cond._flow_tags = (filename, )
-        return cls(cond)
+        return cls(lambda job: job.isfile(filename), (filename, ))
 
     @classmethod
     def true(cls, key):
         """True if the specified key is present in the job document and
         evaluates to True."""
-        cond = lambda job: job.document.get(key, False)
-        cond._flow_tags = (key, )
-        return cls(cond)
+        return cls(lambda job: job.document.get(key, False), (key, ))
 
     @classmethod
     def false(cls, key):
         """True if the specified key is present in the job document and
         evaluates to False."""
-        cond = lambda job: not job.document.get(key, False)
-        cond._flow_tags = (key, )
-        return cls(cond)
+        return cls(lambda job: not job.document.get(key, False), (key, ))
 
     @classmethod
     def always(cls, func):
@@ -472,8 +468,8 @@ class _FlowProjectClass(type):
 
             _parent_class = parent_class
 
-            def __init__(self, condition):
-                self.condition = condition
+            def __init__(self, condition, tags=None):
+                super(pre, self).__init__(condition, tags)
 
             def __call__(self, func):
                 self._parent_class._OPERATION_PRE_CONDITIONS[func].insert(0, self.condition)
@@ -513,8 +509,8 @@ class _FlowProjectClass(type):
             """
             _parent_class = parent_class
 
-            def __init__(self, condition):
-                self.condition = condition
+            def __init__(self, condition, tags=None):
+                super(post, self).__init__(condition, tags)
 
             def __call__(self, func):
                 self._parent_class._OPERATION_POST_CONDITIONS[func].insert(0, self.condition)
@@ -746,8 +742,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
             plt.show()
         """
-        ops = list(self.operations.items())
-        mat = [[0 for _ in range(len(ops))] for _ in range(len(ops))]
 
         def to_callbacks(conditions):
             """Get the actual callables associated with FlowConditions."""
@@ -764,9 +758,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     callbacks = callbacks.union(
                         unpack_conditions(cf._composed_of))
                 else:
-                    callbacks.add((getattr(cf, '_flow_tags', None), cf.__code__.co_code))
+                    callbacks.add((cf._flow_tags, cf.__code__.co_code))
 
             return callbacks
+
+        ops = list(self.operations.items())
+        mat = [[0 for _ in range(len(ops))] for _ in range(len(ops))]
 
         for i, (name1, op1) in enumerate(ops):
             for j, (name2, op2) in enumerate(ops[i:]):

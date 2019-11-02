@@ -405,6 +405,22 @@ class FlowOperation(object):
             return self._cmd.format(job=job)
 
 
+def _create_metacondition(condition_dict, *other_funcs):
+    """Standard method for generating metaconditions with appropriate
+    information for graph detection."""
+    # print("In create metadata for funcs: ", other_funcs)
+    # print("Dict: ", condition_dict)
+    # for f in other_funcs:
+        # print("Conditions for {}: {}".format(f, condition_dict[f]))
+    condition_list = [c for f in other_funcs for c in condition_dict[f]]
+
+    def _flow_metacondition(job):
+        return all(c(job) for c in condition_list)
+
+    _flow_metacondition._composed_of = condition_list
+    return _flow_metacondition
+
+
 class _FlowProjectClass(type):
     """Metaclass for the FlowProject class."""
     def __new__(metacls, name, bases, namespace, **kwargs):
@@ -464,20 +480,15 @@ class _FlowProjectClass(type):
             @classmethod
             def copy_from(cls, *other_funcs):
                 "True if and only if all pre conditions of other operation-function(s) are met."
-                def metacondition(job):
-                    return all(c(job)
-                               for other_func in other_funcs
-                               for c in cls._parent_class._collect_pre_conditions()[other_func])
-                return cls(metacondition)
+                return cls(_create_metacondition(cls._parent_class._collect_pre_conditions(),
+                                                  *other_funcs))
 
             @classmethod
             def after(cls, *other_funcs):
                 "True if and only if all post conditions of other operation-function(s) are met."
-                def metacondition(job):
-                    return all(c(job)
-                               for other_func in other_funcs
-                               for c in cls._parent_class._collect_post_conditions()[other_func])
-                return cls(metacondition)
+                return cls(_create_metacondition(cls._parent_class._collect_post_conditions(),
+                                                  *other_funcs))
+
         return pre
 
     @staticmethod
@@ -510,11 +521,9 @@ class _FlowProjectClass(type):
             @classmethod
             def copy_from(cls, *other_funcs):
                 "True if and only if all post conditions of other operation-function(s) are met."
-                def metacondition(job):
-                    return all(c(job)
-                               for other_func in other_funcs
-                               for c in cls._parent_class._collect_post_conditions()[other_func])
-                return cls(metacondition)
+                return cls(_create_metacondition(cls._parent_class._collect_post_conditions(),
+                                                  *other_funcs))
+
         return post
 
 
@@ -686,6 +695,99 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             return func
 
         return label_func
+
+    def detect_operation_graph(self):
+        """Determine the directed acyclic graph defined by operation pre- and
+        post- conditions.
+
+        In general, executing a given operation registered with a FlowProject
+        just involves checking the operation's pre- and post-conditions to
+        determine eligibility. More generally, however, the pre- and
+        post-conditions define a directed acyclic graph that governs the
+        execution of all operations. Visualizing this graph can be useful for
+        finding logic errors in the specified conditions, and having this graph
+        computed also enables additional execution modes. For example, using
+        this graph it is possible to determine exactly what operations need to
+        be executed in order to make the operation eligible so that the task of
+        executing all necessary operations can be automated.
+
+        The graph is determined by iterating over all pairs of operations and
+        checking for equality of pre- and post-conditions. The algorithm builds
+        an adjacency matrix based on whether the pre-conditions for one
+        operation match the post-conditions for another. To ensure robustness,
+        the comparison is relatively strict, requiring that the conditions be
+        the same callable. This means that, for instance, two equivalent (but
+        distinct) lambda functions will not match under this criterion.
+
+        Given a FlowProject subclass defined in a module `project.py`, the
+        output graph could be visualized using Matplotlib and NetworkX with the
+        following code:
+
+        .. code-block:: python
+
+            import numpy as np
+            from matplotlib import pyplot as plt
+            import networkx as nx
+
+            from project import Project
+
+            p = Project()
+            ops = p.operations.keys()
+            adj = np.asarray(p.detect_operation_graph())
+
+            plt.figure()
+            g = nx.DiGraph(adj)
+            pos = nx.spring_layout(g)
+            nx.draw(g, pos)
+            nx.draw_networkx_labels(g, pos,
+                labels={key: name for (key, name) in zip(range(len(ops)), [o for o in ops])})
+
+            plt.show()
+        """
+        ops = list(self.operations.items())
+        mat = [[0 for _ in range(len(ops))] for _ in range(len(ops))]
+
+        def to_callbacks(conditions):
+            """Get the actual callables associated with FlowConditions."""
+            return [condition._callback for condition in conditions]
+
+        def unpack_conditions(condition_functions):
+            """Identify any metaconditions in the list and reduce them to the
+            functions they're composed of. The callbacks argument is used
+            in recursive calls to the function and appended to directly, but
+            only returned at the end."""
+            callbacks = set()
+            for cf in condition_functions:
+                if cf.__name__ == "_flow_metacondition":
+                    callbacks = callbacks.union(
+                        unpack_conditions(cf._composed_of))
+                else:
+                    callbacks.add(cf.__code__.co_code)
+
+            return callbacks
+
+        for i, (name1, op1) in enumerate(ops):
+            for j, (name2, op2) in enumerate(ops[i:]):
+                postconds1 = unpack_conditions(to_callbacks(op1._postconds))
+                postconds2 = unpack_conditions(to_callbacks(op2._postconds))
+                prereqs1 = unpack_conditions(to_callbacks(op1._prereqs))
+                prereqs2 = unpack_conditions(to_callbacks(op2._prereqs))
+                # conds = postconds1 | prereqs1 | postconds2 | prereqs2
+                # if any(getattr(cond, '_is_lambda', False) for cond in conds):
+                    # raise ValueError("The graph detection algorithm depends on "
+                                     # "exactly equality of callables to determine whether "
+                                     # "or not the pre- and post-conditions for two "
+                                     # "operations are equal. As a result, the algorithm "
+                                     # "will not work with anonymous lambda functions. To "
+                                     # "use this feature, define your conditions as "
+                                     # "functions and use those functions as your "
+                                     # "conditions.")
+                if postconds1.intersection(prereqs2):
+                    mat[i][j+i] = 1
+                elif prereqs1.intersection(postconds2):
+                    mat[j+i][i] = 1
+        return mat
+
 
     def _register_class_labels(self):
         """This function registers all label functions, which are part of the class definition.

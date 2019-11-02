@@ -125,13 +125,13 @@ class _condition(object):
     def always(cls, func):
         "Returns True."
         cls.rand_tag_id += 1
-        return cls(lambda _: True, str(rand_tag_id))(func)
+        return cls(lambda _: True, str(cls.rand_tag_id))(func)
 
     @classmethod
     def never(cls, func):
         "Returns False."
         cls.rand_tag_id += 1
-        return cls(lambda _: False, str(rand_tag_id))(func)
+        return cls(lambda _: False, str(cls.rand_tag_id))(func)
 
     @classmethod
     def not_(cls, condition):
@@ -487,13 +487,13 @@ class _FlowProjectClass(type):
             def copy_from(cls, *other_funcs):
                 "True if and only if all pre conditions of other operation-function(s) are met."
                 return cls(_create_metacondition(cls._parent_class._collect_pre_conditions(),
-                                                  *other_funcs))
+                                                 *other_funcs))
 
             @classmethod
             def after(cls, *other_funcs):
                 "True if and only if all post conditions of other operation-function(s) are met."
                 return cls(_create_metacondition(cls._parent_class._collect_post_conditions(),
-                                                  *other_funcs))
+                                                 *other_funcs))
 
         return pre
 
@@ -528,7 +528,7 @@ class _FlowProjectClass(type):
             def copy_from(cls, *other_funcs):
                 "True if and only if all post conditions of other operation-function(s) are met."
                 return cls(_create_metacondition(cls._parent_class._collect_post_conditions(),
-                                                  *other_funcs))
+                                                 *other_funcs))
 
         return post
 
@@ -784,7 +784,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 elif prereqs1.intersection(postconds2):
                     mat[j+i][i] = 1
         return mat
-
 
     def _register_class_labels(self):
         """This function registers all label functions, which are part of the class definition.

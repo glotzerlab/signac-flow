@@ -94,9 +94,11 @@ The available filters are:
 
 class _condition(object):
 
-    def __init__(self, condition, tags=None):
+    def __init__(self, condition, tag_func=None):
         # Add tag to differentiate built-in conditions during graph detection.
-        condition._flow_tag = tags
+        if tag_func is None:
+            tag_func = lambda _: condition.__code__.co_code
+        condition._tag_func = tag_func
         self.condition = condition
 
     @classmethod
@@ -468,8 +470,8 @@ class _FlowProjectClass(type):
 
             _parent_class = parent_class
 
-            def __init__(self, condition, tags=None):
-                super(pre, self).__init__(condition, tags)
+            def __init__(self, condition, tag_func=None):
+                super(pre, self).__init__(condition, tag_func)
 
             def __call__(self, func):
                 self._parent_class._OPERATION_PRE_CONDITIONS[func].insert(0, self.condition)
@@ -509,8 +511,8 @@ class _FlowProjectClass(type):
             """
             _parent_class = parent_class
 
-            def __init__(self, condition, tags=None):
-                super(post, self).__init__(condition, tags)
+            def __init__(self, condition, tag_func=None):
+                super(post, self).__init__(condition, tag_func)
 
             def __call__(self, func):
                 self._parent_class._OPERATION_POST_CONDITIONS[func].insert(0, self.condition)
@@ -758,7 +760,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     callbacks = callbacks.union(
                         unpack_conditions(cf._composed_of))
                 else:
-                    callbacks.add((cf._flow_tag, cf.__code__.co_code))
+                    callbacks.add(cf._tag_func)
 
             return callbacks
 

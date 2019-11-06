@@ -14,8 +14,6 @@ requirements = [
     'cloudpickle',
     # Deprecation management
     'deprecation>=2',
-    # For status view markdown rendering
-    'mistune'
 ]
 
 description = "Simple workflow management for signac projects."
@@ -68,6 +66,10 @@ setup(
     ],
 
     install_requires=requirements,
+
+    extras_require={
+        'Markdown_HTML': ['mistune'],  # For status view markdown rendering
+    },
 
     python_requires='>=3.5, <4',
 )

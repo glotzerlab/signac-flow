@@ -28,18 +28,18 @@ class _render_status:
 
     def render(self, template, template_environment, context, file, detailed, expand,
                unroll, compact, pretty, option):
-        """render the status in different format for print_status.
+        """Render the status in different format for print_status.
 
         :param template:
-            user provided Jinja2 template file.
+            User provided Jinja2 template file.
         :type template:
             str
         :param template_environment:
-            template environment.
+            template environment
         :type template_environment:
-            FlowProject._template_environment
+            :class:'FlowProject._template_environment'
         :param context:
-            context that includes all the information for rendering status output.
+            Context that includes all the information for rendering status output.
         :type context:
             dict
         :param file:
@@ -67,8 +67,8 @@ class _render_status:
         :type pretty:
             bool
         :param option:
-            options for rendering format, currently supports:
-            'terminal'(default), 'markdown' and 'html'
+            Options for rendering format, currently supports:
+            'terminal'(default), 'markdown' and 'html'.
         :type option:
             str
         """
@@ -138,11 +138,11 @@ class _render_status:
             """Determine the status of an operation.
 
             :param operation_info:
-                Dicionary containing operation information
+                Dictionary containing operation information
             :type operation_info:
                 Dictionary
             :param symbols:
-                Dicionary containing code for different job status
+                Dictionary containing code for different job status
             :type symbols:
                 Dictionary
             """

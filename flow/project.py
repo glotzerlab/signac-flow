@@ -1206,7 +1206,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     v = shorten(str(self._alias(get(k, sp))), param_max_width)
                     column_width_parameters[i] = max(column_width_parameters[i], len(v))
                     status['parameters'][k] = v
-                    print(status['parameters'])
 
             for status in statuses.values():
                 _add_parameters(status)
@@ -1283,7 +1282,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 context['operation_status_symbols'] = OPERATION_STATUS_SYMBOLS
 
         def _add_dummy_operation(job):
-            job['operations']['None'] = {
+            job['operations'][''] = {
                 'completed': False,
                 'eligible': True,
                 'scheduler_status': JobStatus.dummy}
@@ -1296,7 +1295,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         op_counter = Counter()
         for job in context['jobs']:
             for k, v in job['operations'].items():
-                if k != 'None' and v['eligible']:
+                if k != '' and v['eligible']:
                     op_counter[k] += 1
         context['op_counter'] = op_counter.most_common(eligible_jobs_max_lines)
         n = len(op_counter) - len(context['op_counter'])

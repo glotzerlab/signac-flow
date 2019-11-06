@@ -415,9 +415,10 @@ class FlowOperation(object):
             return self._cmd.format(job=job)
 
 
-def _create_metacondition(condition_dict, *other_funcs):
-    """Standard method for generating metaconditions with appropriate
-    information for graph detection."""
+def _create_all_metacondition(condition_dict, *other_funcs):
+    """Standard function for generating aggregate metaconditions that require
+    *all* provided conditions to be met. The resulting metacondition is
+    constructed with appropriate information for graph detection."""
     condition_list = [c for f in other_funcs for c in condition_dict[f]]
 
     def _flow_metacondition(job):
@@ -472,6 +473,11 @@ class _FlowProjectClass(type):
 
             The *hello*-operation would only execute if the 'hello' key in the job
             document does not evaluate to True.
+
+            An optional tag may be associated with the condition. These tags
+            are used by :meth:`~.detect_operation_graph` when comparing
+            conditions for equality. The tag defaults to the bytecode of the
+            function.
             """
 
             _parent_class = parent_class
@@ -486,14 +492,14 @@ class _FlowProjectClass(type):
             @classmethod
             def copy_from(cls, *other_funcs):
                 "True if and only if all pre conditions of other operation-function(s) are met."
-                return cls(_create_metacondition(cls._parent_class._collect_pre_conditions(),
-                                                 *other_funcs))
+                return cls(_create_all_metacondition(cls._parent_class._collect_pre_conditions(),
+                                                     *other_funcs))
 
             @classmethod
             def after(cls, *other_funcs):
                 "True if and only if all post conditions of other operation-function(s) are met."
-                return cls(_create_metacondition(cls._parent_class._collect_post_conditions(),
-                                                 *other_funcs))
+                return cls(_create_all_metacondition(cls._parent_class._collect_post_conditions(),
+                                                     *other_funcs))
 
         return pre
 
@@ -514,6 +520,11 @@ class _FlowProjectClass(type):
 
             The *bye*-operation would be considered complete and therefore no longer
             eligible for execution once the 'bye' key in the job document evaluates to True.
+
+            An optional tag may be associated with the condition. These tags
+            are used by :meth:`~.detect_operation_graph` when comparing
+            conditions for equality. The tag defaults to the bytecode of the
+            function.
             """
             _parent_class = parent_class
 
@@ -527,8 +538,8 @@ class _FlowProjectClass(type):
             @classmethod
             def copy_from(cls, *other_funcs):
                 "True if and only if all post conditions of other operation-function(s) are met."
-                return cls(_create_metacondition(cls._parent_class._collect_post_conditions(),
-                                                 *other_funcs))
+                return cls(_create_all_metacondition(cls._parent_class._collect_post_conditions(),
+                                                     *other_funcs))
 
         return post
 
@@ -720,10 +731,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         The graph is determined by iterating over all pairs of operations and
         checking for equality of pre- and post-conditions. The algorithm builds
         an adjacency matrix based on whether the pre-conditions for one
-        operation match the post-conditions for another. To ensure robustness,
-        the comparison is relatively strict, requiring that the conditions be
-        the same callable. This means that, for instance, two equivalent (but
-        distinct) lambda functions will not match under this criterion.
+        operation match the post-conditions for another. The comparison of
+        operations is conservative; by default, conditions must be composed of
+        identical code to be identified as equal (technically, they must be
+        bytecode equivalent i.e. `cond1.__code__.co_code ==
+        cond2.__code__.co_code`). Users can specify that conditions should be
+        treated as equal by providing tags to the operations.
 
         Given a FlowProject subclass defined in a module `project.py`, the
         output graph could be visualized using Matplotlib and NetworkX with the

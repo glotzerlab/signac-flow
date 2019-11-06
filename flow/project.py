@@ -704,7 +704,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def detect_operation_graph(self):
         """Determine the directed acyclic graph defined by operation pre- and
-        post- conditions.
+        post-conditions.
 
         In general, executing a given operation registered with a FlowProject
         just involves checking the operation's pre- and post-conditions to
@@ -732,21 +732,23 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         .. code-block:: python
 
             import numpy as np
-            from matplotlib import pyplot as plt
             import networkx as nx
+            from matplotlib import pyplot as plt
 
             from project import Project
 
-            p = Project()
-            ops = p.operations.keys()
-            adj = np.asarray(p.detect_operation_graph())
+            project = Project()
+            ops = project.operations.keys()
+            adj = np.asarray(project.detect_operation_graph())
 
             plt.figure()
             g = nx.DiGraph(adj)
             pos = nx.spring_layout(g)
             nx.draw(g, pos)
-            nx.draw_networkx_labels(g, pos,
-                labels={key: name for (key, name) in zip(range(len(ops)), [o for o in ops])})
+            nx.draw_networkx_labels(
+                g, pos,
+                labels={key: name for (key, name) in
+                        zip(range(len(ops)), [o for o in ops])})
 
             plt.show()
         """
@@ -757,7 +759,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         def unpack_conditions(condition_functions):
             """Identify any metaconditions in the list and reduce them to the
-            functions they're composed of. The callbacks argument is used
+            functions that they are composed of. The callbacks argument is used
             in recursive calls to the function and appended to directly, but
             only returned at the end."""
             callbacks = set()

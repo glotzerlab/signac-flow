@@ -11,7 +11,8 @@ next
 Added
 +++++
 
-- Add "fork" directive to enforce the execution of operations within a subprocess.
+- Add "fork" directive to enforce the execution of operations within a subprocess (#159).
+- Operation graph detection based on function comparison (#178).
 
 Changed
 +++++++

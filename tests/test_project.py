@@ -30,6 +30,7 @@ from flow import init
 
 from define_test_project import TestProject
 from define_test_project import TestDynamicProject
+from define_dag_test_project import DagTestProject
 
 
 @contextmanager
@@ -1069,6 +1070,25 @@ class ProjectMainInterfaceTest(BaseProjectTest):
 
 class DynamicProjectMainInterfaceTest(ProjectMainInterfaceTest):
     project_class = TestDynamicProject
+
+
+class ProjectDagDetectionTest(BaseProjectTest):
+    """Tests of operation DAG detection."""
+    project_class = DagTestProject
+
+    def test_dag(self):
+        project = self.mock_project()
+        adj = project.detect_operation_graph()
+
+        adj_correct = [[0, 1, 1, 0, 1, 0, 0],
+                       [0, 0, 0, 1, 0, 0, 0],
+                       [0, 0, 0, 1, 0, 1, 1],
+                       [0, 0, 0, 0, 0, 0, 1],
+                       [0, 0, 0, 0, 0, 1, 0],
+                       [0, 0, 0, 0, 0, 0, 0],
+                       [0, 0, 0, 0, 0, 0, 0]]
+
+        self.assertEqual(adj, adj_correct)
 
 
 if __name__ == '__main__':

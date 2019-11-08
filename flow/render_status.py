@@ -3,7 +3,7 @@ import mistune
 from .scheduling.base import JobStatus
 
 
-class _render_status:
+class renderer:
     """A class for rendering status in different format.
 
     This class provides method and string output for rendering status output in different format,
@@ -201,11 +201,13 @@ class _render_status:
 
         if option == 'terminal':
             self.generate_terminal_output(template, context)
-            print(self.terminal_output, file=file)
             return self.terminal_output
         elif option == 'html':
             self.generate_html_output(template, context)
             return self.html_output
-        elif option == 'md' or 'markdown':
+        elif option == 'md' or option == 'markdown':
             self.generate_markdown_output(template, context)
             return self.markdown_output
+        else:
+            raise ValueError('Option not supported, valid option format:'
+                             'termial, html and markdown/md')

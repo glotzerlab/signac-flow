@@ -1032,7 +1032,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             int
         :param option:
             options for rendering format, currently supports:
-            'terminal'(default), 'markdown' and 'html'
+            'terminal'(default), 'markdown'/'md' and 'html'
         :type option:
             str
         """
@@ -1302,15 +1302,17 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if n > 0:
             context['op_counter'].append(('[{} more operations omitted]'.format(n), ''))
 
-        render_result = render_status._render_status()
+        render_result = render_status.renderer()
         render_output = render_result.render(template, template_environment, context, file,
                                              detailed, expand, unroll, compact, pretty, option)
+
+        print(render_output, file=file)
 
         # Show profiling results (if enabled)
         if profiling_results:
             print('\n' + '\n'.join(profiling_results), file=file)
 
-        return render_output
+        return render_result
 
     def run_operations(self, operations=None, pretend=False, np=None, timeout=None, progress=False):
         """Execute the next operations as specified by the project's workflow.
@@ -2093,7 +2095,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             '-op', '--option',
             type=str,
             default='terminal',
-            help="define rendering format.")
+            help="Define rendering format.")
 
     def labels(self, job):
         """Yields all labels for the given ``job``.

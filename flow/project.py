@@ -1284,7 +1284,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         def _add_dummy_operation(job):
             job['operations'][''] = {
                 'completed': False,
-                'eligible': True,
+                'eligible': False,
                 'scheduler_status': JobStatus.dummy}
 
         for job in context['jobs']:

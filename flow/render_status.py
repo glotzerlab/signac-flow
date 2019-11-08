@@ -174,9 +174,9 @@ class renderer:
                     Boolean
                 """
                 if eligible:
-                    return prefix_str + s + suffix_str
+                    return prefix_str + s + suffix_str + '  '
                 else:
-                    return s
+                    return s + '  '
         else:
             def highlight(s, eligible, prefix_str, suffix_str):
                 """Change font to bold within jinja2 template
@@ -190,7 +190,7 @@ class renderer:
                 :type eligible:
                     boolean
                 """
-                return s
+                return s + '  '
 
         template_environment.filters['highlight'] = highlight
         template_environment.filters['draw_progressbar'] = draw_progressbar

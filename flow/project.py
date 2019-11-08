@@ -1260,6 +1260,22 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         context['parameters'] = parameters
         context['compact'] = compact
         context['unroll'] = unroll
+
+        if option == 'terminal':
+            table_string = ''
+            bold_prefix = '\033[1m'
+            bold_suffix = '\033[0m'
+            escape_string = ''
+        else:
+            table_string = '|'
+            bold_prefix = '**'
+            bold_suffix = '**'
+            escape_string = '\\'
+        context['table_string'] = table_string
+        context['bold_prefix'] = bold_prefix
+        context['bold_suffix'] = bold_suffix
+        context['escape_string'] = escape_string
+
         if overview:
             context['progress_sorted'] = progress_sorted
             context['column_width_bar'] = column_width_bar

@@ -1,23 +1,23 @@
 {# The following variables are available to all scripts. #}
 {% if overview or detailed %}
-{% set field_operation = ("%%-%ss %%3s  " | format(column_width_operation)) %}
-{% set field_operation_title = ("%%-%ss  " | format(column_width_operation+4)) %}
+{% set field_operation = ('%%-%ss %%3s' | format(column_width_operation)) %}
+{% set field_operation_title = ('%%-%ss  ' | format(column_width_operation+4)) %}
 {% set ns = namespace(dash='', field_parameters='') %}
 {% endif %}
 {% if overview %}
-{% set field_progress_bar = ("%%-%ss  %%-%ss " | format(column_width_label, column_width_bar)) %}
+{% set field_progress_bar = ((table_string + '%%-%ss  ' + table_string + '%%-%ss' + table_string) | format(column_width_label, column_width_bar)) %}
 {% endif %}
 {% if detailed %}
-{% set field_job_id = ("%%-%ss  " | format(column_width_id)) %}
-{% set field_label = ("%%-%ss" | format(column_width_total_label)) %}
+{% set field_job_id = ('%%-%ss  ' | format(column_width_id)) %}
+{% set field_label = ('%%-%ss' | format(column_width_total_label)) %}
 {% if parameters %}
 {% for para in parameters %}
-{% set ns.dash = ns.dash + ("%s  " | format('-' * column_width_parameters[loop.index0])) %}
-{% set ns.field_parameters = ns.field_parameters + ("%%-%ss  " | format(column_width_parameters[loop.index0])) %}
+{% set ns.dash = ns.dash + ('%s  ' | format('-' * column_width_parameters[loop.index0])) + table_string %}
+{% set ns.field_parameters = ns.field_parameters + ('%%-%ss  ' | format(column_width_parameters[loop.index0])) + table_string %}
 {% endfor %}
 {% set para_head = ns.field_parameters | format(*parameters) %}
 {% endif %}
-{% set detail_field_head = field_job_id + field_operation_title + '%s' + field_label %}
+{% set detail_field_head = table_string + field_job_id + table_string + field_operation_title + table_string + '%s' + field_label + table_string %}
 {% endif %}
 
 {% block overview %}
@@ -29,17 +29,17 @@
 {{ field_progress_bar | format('label', 'ratio') }}
 {{ field_progress_bar | format('-' * column_width_label, '-' * column_width_bar) }}
 {% for label in progress_sorted %}
-{{ field_progress_bar | format(label[0], label[1] | draw_progressbar(jobs | length)) }}
+{{ field_progress_bar | format(label[0], label[1] | draw_progressbar(jobs | length, escape_string)) }}
 {% endfor %}
 {% endblock%}
 
 {% block operation_summary %}
-{% set field_head = field_operation_title + '%s' %}
+{% set field_head = table_string + field_operation_title + table_string + '%s' + table_string %}
 {{ field_head | format('operation', 'number of eligible jobs') }}
 {{ field_head | format('-' * (column_width_operation+4), '-' * 23) }}
 {% for op, n_jobs in op_counter %}
 {% set op_len = op | length %}
-{{ op }}{{ ' ' * (column_width_operation+2-op_len+4) }}{{ n_jobs }}
+{{table_string}}{{ op }}{{table_string}}{{ ' ' * (column_width_operation+2-op_len+4) }}{{ n_jobs }}{{table_string}}
 {% endfor %}
 {% endblock %}
 {% endif %}
@@ -56,9 +56,9 @@
 {% endif %}
 {% for key, value in job['operations'].items() if value | job_filter(scheduler_status_code, all_ops) %}
 {% if loop.first %}
-{{ field_job_id | format(job['job_id']) }}{{ field_operation | highlight(value['eligible'], '\033[1m', '\033[0m') | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }}{{para_output}}{{ '%s' | format(job['labels'] | join(', ')) }}
+{{table_string}}{{ field_job_id | format(job['job_id']) }}{{table_string}}{{ field_operation | highlight(value['eligible'], bold_prefix, bold_suffix) | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }}{{table_string}}{{para_output}}{{ '%s' | format(job['labels'] | join(', ')) }}{{table_string}}
 {% else %}
-{{ field_job_id | format('')}}{{ field_operation | highlight(value['eligible'], '\033[1m', '\033[0m') | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }}{{para_output}}{{ '%s' | format(job['labels'] | join(', ')) }}
+{{table_string}}{{ field_job_id | format('')}}{{table_string}}{{ field_operation | highlight(value['eligible'], '\033[1m', '\033[0m') | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }}{{table_string}}{{para_output}}{{ '%s' | format(job['labels'] | join(', ')) }}{{table_string}}
 {% endif %}
 {% endfor %}
 {% endfor %}

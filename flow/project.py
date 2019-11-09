@@ -97,7 +97,7 @@ class _condition(object):
     # condition is created, and the value should be used as the tag for that
     # condition to ensure that no pair of "always" and "never" conditions
     # are found to be equal by the graph detection algorithm.
-    tag_id_counter = 0
+    current_arbitrary_tag = 0
 
     def __init__(self, condition, tag=None):
         # Add tag to differentiate built-in conditions during graph detection.
@@ -126,14 +126,14 @@ class _condition(object):
     @classmethod
     def always(cls, func):
         "Returns True."
-        cls.tag_id_counter += 1
-        return cls(lambda _: True, str(cls.tag_id_counter))(func)
+        cls.current_arbitrary_tag += 1
+        return cls(lambda _: True, str(cls.current_arbitrary_tag))(func)
 
     @classmethod
     def never(cls, func):
         "Returns False."
-        cls.tag_id_counter += 1
-        return cls(lambda _: False, str(cls.tag_id_counter))(func)
+        cls.current_arbitrary_tag += 1
+        return cls(lambda _: False, str(cls.current_arbitrary_tag))(func)
 
     @classmethod
     def not_(cls, condition):

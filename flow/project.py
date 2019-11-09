@@ -86,16 +86,18 @@ The available template variables are:
 {template_vars}
 
 Filter functions can be used to format template variables in a specific way.
-For example: {{ project.get_id() | capitalize }}.
+For example: {{ project.get_id() | captialize }}.
 
 The available filters are:
 {filters}"""
 
 
 class _condition(object):
-    # Random tag id used to ensure that "always" and "never" conditions never
-    # match each other.
-    rand_tag_id = 0
+    # This counter should be incremented each time an "always" or "never"
+    # condition is created, and the value should be used as the tag for that
+    # condition to ensure that no pair of "always" and "never" conditions
+    # are found to be equal by the graph detection algorithm.
+    tag_id_counter = 0
 
     def __init__(self, condition, tag=None):
         # Add tag to differentiate built-in conditions during graph detection.
@@ -124,14 +126,14 @@ class _condition(object):
     @classmethod
     def always(cls, func):
         "Returns True."
-        cls.rand_tag_id += 1
-        return cls(lambda _: True, str(cls.rand_tag_id))(func)
+        cls.tag_id_counter += 1
+        return cls(lambda _: True, str(cls.tag_id_counter))(func)
 
     @classmethod
     def never(cls, func):
         "Returns False."
-        cls.rand_tag_id += 1
-        return cls(lambda _: False, str(cls.rand_tag_id))(func)
+        cls.tag_id_counter += 1
+        return cls(lambda _: False, str(cls.tag_id_counter))(func)
 
     @classmethod
     def not_(cls, condition):

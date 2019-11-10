@@ -115,6 +115,7 @@ class _condition(object):
         return cls(lambda job: not job.document.get(key, False))
 
     @classmethod
+    @deprecated(deprecated_in="0.9", removed_in="1.0")
     def always(cls, func):
         "Returns True."
         return cls(lambda _: True)(func)

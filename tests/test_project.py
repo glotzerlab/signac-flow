@@ -27,6 +27,7 @@ from flow.util.misc import add_path_to_environment_pythonpath
 from flow.util.misc import add_cwd_to_environment_pythonpath
 from flow.util.misc import switch_to_directory
 from flow import init
+from deprecation import fail_if_not_removed
 
 from define_test_project import TestProject
 from define_test_project import TestDynamicProject
@@ -513,6 +514,7 @@ class ProjectTest(BaseProjectTest):
     def test_instance(self):
         self.assertTrue(isinstance(self.project, FlowProject))
 
+    @fail_if_not_removed
     def test_labels(self):
         project = self.mock_project()
         for job in project:
@@ -860,6 +862,7 @@ class ExecutionProjectTest(BaseProjectTest):
             project.submit(bundle_size=0)
             self.assertEqual(len(list(MockScheduler.jobs())), 1)
 
+    @fail_if_not_removed
     def test_submit_status(self):
         MockScheduler.reset()
         project = self.mock_project()
@@ -914,6 +917,7 @@ class ExecutionProjectTest(BaseProjectTest):
                       'used by the template script, including: bad_directive\n',
                       stderr.getvalue())
 
+    @fail_if_not_removed
     def test_condition_evaluation(self):
         project = self.mock_project()
 

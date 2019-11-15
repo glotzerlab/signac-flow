@@ -50,5 +50,5 @@ __all__ = [
     'get_environment',
     'with_job',
     'testing',
-    '__version__'
+    '__version__',
     ]

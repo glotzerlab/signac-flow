@@ -125,6 +125,9 @@ class _condition(object):
         return cls(lambda job: not job.document.get(key, False), 'false_' + key)
 
     @classmethod
+    @deprecated(
+        deprecated_in="0.9", removed_in="1.0",
+        details="This condition decorator is obsolete.")
     def always(cls, func):
         "Returns True."
         cls.current_arbitrary_tag += 1

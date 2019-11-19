@@ -68,7 +68,7 @@ setup(
     install_requires=requirements,
 
     extras_require={
-        'Markdown_HTML': ['mistune'],  # For status view markdown rendering
+        'Markdown_HTML': ['mistune>=0.8.4'],  # For status view markdown rendering
     },
 
     python_requires='>=3.5, <4',

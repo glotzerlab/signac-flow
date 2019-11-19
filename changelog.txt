@@ -12,6 +12,7 @@ Added
 +++++
 
 - Add "fork" directive to enforce the execution of operations within a subprocess.
+- Exceptions raised during operations always show tracebacks of user code (#169, #171).
 
 Removed
 +++++++

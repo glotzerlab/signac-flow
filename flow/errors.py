@@ -27,6 +27,11 @@ class NoSchedulerError(AttributeError):
     pass
 
 
+class UserOperationError(RuntimeError):
+    "Indicates an error during execution of an operation."
+    pass
+
+
 if JINJA2:
 
     class TemplateError(Jinja2Extension):

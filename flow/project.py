@@ -68,6 +68,7 @@ from .labels import classlabel
 from .labels import _is_label_func
 from . import legacy
 from .util import config as flow_config
+from .version import __version__
 
 
 logger = logging.getLogger(__name__)
@@ -95,41 +96,56 @@ The available filters are:
 
 
 class _condition(object):
+    # This counter should be incremented each time an "always" or "never"
+    # condition is created, and the value should be used as the tag for that
+    # condition to ensure that no pair of "always" and "never" conditions
+    # are found to be equal by the graph detection algorithm.
+    current_arbitrary_tag = 0
 
-    def __init__(self, condition):
+    def __init__(self, condition, tag=None):
+        # Add tag to differentiate built-in conditions during graph detection.
+        if tag is None:
+            tag = condition.__code__.co_code
+        condition._flow_tag = tag
         self.condition = condition
 
     @classmethod
     def isfile(cls, filename):
         "True if the specified file exists for this job."
-        return cls(lambda job: job.isfile(filename))
+        return cls(lambda job: job.isfile(filename), 'isfile_' + filename)
 
     @classmethod
     def true(cls, key):
         """True if the specified key is present in the job document and
         evaluates to True."""
-        return cls(lambda job: job.document.get(key, False))
+        return cls(lambda job: job.document.get(key, False), 'true_' + key)
 
     @classmethod
     def false(cls, key):
         """True if the specified key is present in the job document and
         evaluates to False."""
-        return cls(lambda job: not job.document.get(key, False))
+        return cls(lambda job: not job.document.get(key, False), 'false_' + key)
 
     @classmethod
+    @deprecated(
+        deprecated_in="0.9", removed_in="1.0",
+        details="This condition decorator is obsolete.")
     def always(cls, func):
         "Returns True."
-        return cls(lambda _: True)(func)
+        cls.current_arbitrary_tag += 1
+        return cls(lambda _: True, str(cls.current_arbitrary_tag))(func)
 
     @classmethod
     def never(cls, func):
         "Returns False."
-        return cls(lambda _: False)(func)
+        cls.current_arbitrary_tag += 1
+        return cls(lambda _: False, str(cls.current_arbitrary_tag))(func)
 
     @classmethod
     def not_(cls, condition):
         "Returns ``not condition(job)`` for the provided condition function."
-        return cls(lambda job: not condition(job))
+        return cls(lambda job: not condition(job),
+                   'not_'.encode() + condition.__code__.co_code)
 
 
 def make_bundles(operations, size=None):
@@ -407,6 +423,19 @@ class FlowOperation(object):
             return self._cmd.format(job=job)
 
 
+def _create_all_metacondition(condition_dict, *other_funcs):
+    """Standard function for generating aggregate metaconditions that require
+    *all* provided conditions to be met. The resulting metacondition is
+    constructed with appropriate information for graph detection."""
+    condition_list = [c for f in other_funcs for c in condition_dict[f]]
+
+    def _flow_metacondition(job):
+        return all(c(job) for c in condition_list)
+
+    _flow_metacondition._composed_of = condition_list
+    return _flow_metacondition
+
+
 class _FlowProjectClass(type):
     """Metaclass for the FlowProject class."""
     def __new__(metacls, name, bases, namespace, **kwargs):
@@ -452,12 +481,17 @@ class _FlowProjectClass(type):
 
             The *hello*-operation would only execute if the 'hello' key in the job
             document does not evaluate to True.
+
+            An optional tag may be associated with the condition. These tags
+            are used by :meth:`~.detect_operation_graph` when comparing
+            conditions for equality. The tag defaults to the bytecode of the
+            function.
             """
 
             _parent_class = parent_class
 
-            def __init__(self, condition):
-                self.condition = condition
+            def __init__(self, condition, tag=None):
+                super(pre, self).__init__(condition, tag)
 
             def __call__(self, func):
                 self._parent_class._OPERATION_PRE_CONDITIONS[func].insert(0, self.condition)
@@ -466,20 +500,15 @@ class _FlowProjectClass(type):
             @classmethod
             def copy_from(cls, *other_funcs):
                 "True if and only if all pre conditions of other operation-function(s) are met."
-                def metacondition(job):
-                    return all(c(job)
-                               for other_func in other_funcs
-                               for c in cls._parent_class._collect_pre_conditions()[other_func])
-                return cls(metacondition)
+                return cls(_create_all_metacondition(cls._parent_class._collect_pre_conditions(),
+                                                     *other_funcs))
 
             @classmethod
             def after(cls, *other_funcs):
                 "True if and only if all post conditions of other operation-function(s) are met."
-                def metacondition(job):
-                    return all(c(job)
-                               for other_func in other_funcs
-                               for c in cls._parent_class._collect_post_conditions()[other_func])
-                return cls(metacondition)
+                return cls(_create_all_metacondition(cls._parent_class._collect_post_conditions(),
+                                                     *other_funcs))
+
         return pre
 
     @staticmethod
@@ -499,11 +528,16 @@ class _FlowProjectClass(type):
 
             The *bye*-operation would be considered complete and therefore no longer
             eligible for execution once the 'bye' key in the job document evaluates to True.
+
+            An optional tag may be associated with the condition. These tags
+            are used by :meth:`~.detect_operation_graph` when comparing
+            conditions for equality. The tag defaults to the bytecode of the
+            function.
             """
             _parent_class = parent_class
 
-            def __init__(self, condition):
-                self.condition = condition
+            def __init__(self, condition, tag=None):
+                super(post, self).__init__(condition, tag)
 
             def __call__(self, func):
                 self._parent_class._OPERATION_POST_CONDITIONS[func].insert(0, self.condition)
@@ -512,11 +546,9 @@ class _FlowProjectClass(type):
             @classmethod
             def copy_from(cls, *other_funcs):
                 "True if and only if all post conditions of other operation-function(s) are met."
-                def metacondition(job):
-                    return all(c(job)
-                               for other_func in other_funcs
-                               for c in cls._parent_class._collect_post_conditions()[other_func])
-                return cls(metacondition)
+                return cls(_create_all_metacondition(cls._parent_class._collect_post_conditions(),
+                                                     *other_funcs))
+
         return post
 
 
@@ -689,6 +721,93 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         return label_func
 
+    def detect_operation_graph(self):
+        """Determine the directed acyclic graph defined by operation pre- and
+        post-conditions.
+
+        In general, executing a given operation registered with a FlowProject
+        just involves checking the operation's pre- and post-conditions to
+        determine eligibility. More generally, however, the pre- and
+        post-conditions define a directed acyclic graph that governs the
+        execution of all operations. Visualizing this graph can be useful for
+        finding logic errors in the specified conditions, and having this graph
+        computed also enables additional execution modes. For example, using
+        this graph it is possible to determine exactly what operations need to
+        be executed in order to make the operation eligible so that the task of
+        executing all necessary operations can be automated.
+
+        The graph is determined by iterating over all pairs of operations and
+        checking for equality of pre- and post-conditions. The algorithm builds
+        an adjacency matrix based on whether the pre-conditions for one
+        operation match the post-conditions for another. The comparison of
+        operations is conservative; by default, conditions must be composed of
+        identical code to be identified as equal (technically, they must be
+        bytecode equivalent i.e. `cond1.__code__.co_code ==
+        cond2.__code__.co_code`). Users can specify that conditions should be
+        treated as equal by providing tags to the operations.
+
+        Given a FlowProject subclass defined in a module `project.py`, the
+        output graph could be visualized using Matplotlib and NetworkX with the
+        following code:
+
+        .. code-block:: python
+
+            import numpy as np
+            import networkx as nx
+            from matplotlib import pyplot as plt
+
+            from project import Project
+
+            project = Project()
+            ops = project.operations.keys()
+            adj = np.asarray(project.detect_operation_graph())
+
+            plt.figure()
+            g = nx.DiGraph(adj)
+            pos = nx.spring_layout(g)
+            nx.draw(g, pos)
+            nx.draw_networkx_labels(
+                g, pos,
+                labels={key: name for (key, name) in
+                        zip(range(len(ops)), [o for o in ops])})
+
+            plt.show()
+        """
+
+        def to_callbacks(conditions):
+            """Get the actual callables associated with FlowConditions."""
+            return [condition._callback for condition in conditions]
+
+        def unpack_conditions(condition_functions):
+            """Identify any metaconditions in the list and reduce them to the
+            functions that they are composed of. The callbacks argument is used
+            in recursive calls to the function and appended to directly, but
+            only returned at the end."""
+            callbacks = set()
+            for cf in condition_functions:
+                if cf.__name__ == "_flow_metacondition":
+                    callbacks = callbacks.union(
+                        unpack_conditions(cf._composed_of))
+                else:
+                    callbacks.add(cf._flow_tag)
+
+            return callbacks
+
+        ops = list(self.operations.items())
+        mat = [[0 for _ in range(len(ops))] for _ in range(len(ops))]
+
+        for i, (name1, op1) in enumerate(ops):
+            for j, (name2, op2) in enumerate(ops[i:]):
+                postconds1 = unpack_conditions(to_callbacks(op1._postconds))
+                postconds2 = unpack_conditions(to_callbacks(op2._postconds))
+                prereqs1 = unpack_conditions(to_callbacks(op1._prereqs))
+                prereqs2 = unpack_conditions(to_callbacks(op2._prereqs))
+                if postconds1.intersection(prereqs2):
+                    mat[i][j+i] = 1
+                elif prereqs1.intersection(postconds2):
+                    mat[j+i][i] = 1
+        return mat
+
     def _register_class_labels(self):
         """This function registers all label functions, which are part of the class definition.
 
@@ -732,7 +851,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             return x
 
     @classmethod
-    @deprecated(deprecated_in="0.8", removed_in="1.0")
+    @deprecated(
+        deprecated_in="0.8", removed_in="1.0",
+        current_version=__version__)
     def update_aliases(cls, aliases):
         "Update the ALIASES table for this class."
         cls.ALIASES.update(aliases)
@@ -1542,7 +1663,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             logger.debug(
                 "Forking to execute operation '{}' with "
                 "cmd '{}'.".format(operation, operation.cmd))
-            subprocess.call(operation.cmd, shell=True, timeout=timeout)
+            subprocess.run(operation.cmd, shell=True, timeout=timeout, check=True)
         else:
             # ... executing operation in interpreter process as function:
             logger.debug(
@@ -2109,7 +2230,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             help="Manually specify all labels that are required for the direct command "
                  "to be considered eligible for execution.")
 
-    @deprecated(deprecated_in="0.8", removed_in="1.0", details="Use export_job_statuses() instead.")
+    @deprecated(
+        deprecated_in="0.8", removed_in="1.0",
+        current_version=__version__,
+        details="Use export_job_statuses() instead.")
     def export_job_stati(self, collection, stati):
         "Export the job stati to a database collection."
         self.export_job_statuses(self, collection, stati)
@@ -2295,7 +2419,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             raise KeyError("An operation with this identifier is already added.")
         self.operations[name] = FlowOperation(cmd=cmd, pre=pre, post=post, directives=kwargs)
 
-    @deprecated(deprecated_in="0.8", removed_in="1.0", details="Use labels() instead.")
+    @deprecated(
+        deprecated_in="0.8", removed_in="1.0",
+        current_version=__version__,
+        details="Use labels() instead.")
     def classify(self, job):
         """Generator function which yields labels for job.
 
@@ -2350,7 +2477,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             for op in self._job_operations(job, True):
                 yield op
 
-    @deprecated(deprecated_in="0.8", removed_in="1.0", details="Use next_operations() instead.")
+    @deprecated(
+        deprecated_in="0.8", removed_in="1.0",
+        current_version=__version__,
+        details="Use next_operations() instead.")
     def next_operation(self, job):
         """Determine the next operation for this job.
 
@@ -2486,7 +2616,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             return False
         return True
 
-    @deprecated(deprecated_in="0.8", removed_in="1.0")
+    @deprecated(
+        deprecated_in="0.8", removed_in="1.0",
+        current_version=__version__)
     def eligible_for_submission(self, job_operation):
         return self._eligible_for_submission(self, job_operation)
 
@@ -2633,7 +2765,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
                 def operation_function(job):
                     cmd = operation(job).format(job=job)
-                    subprocess.call(cmd, shell=True)
+                    subprocess.run(cmd, shell=True, check=True)
 
         except KeyError:
             raise KeyError("Unknown operation '{}'.".format(args.operation))

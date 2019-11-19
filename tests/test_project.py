@@ -27,9 +27,11 @@ from flow.util.misc import add_path_to_environment_pythonpath
 from flow.util.misc import add_cwd_to_environment_pythonpath
 from flow.util.misc import switch_to_directory
 from flow import init
+from deprecation import fail_if_not_removed
 
 from define_test_project import TestProject
 from define_test_project import TestDynamicProject
+from define_dag_test_project import DagTestProject
 
 
 @contextmanager
@@ -115,8 +117,9 @@ class BaseProjectTest(unittest.TestCase):
             name='FlowTestProject',
             root=self._tmp_dir.name)
 
-    def mock_project(self, heterogeneous=False):
-        project = self.project_class.get_project(root=self._tmp_dir.name)
+    def mock_project(self, project_class=None, heterogeneous=False):
+        project_class = project_class if project_class else self.project_class
+        project = project_class.get_project(root=self._tmp_dir.name)
         for a in range(3):
             if heterogeneous:
                 # Add jobs with only the `a` key without `b`.
@@ -389,8 +392,9 @@ class ProjectClassTest(BaseProjectTest):
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
                 starting_dir = os.getcwd()
-                with redirect_stderr(StringIO()):
-                    A().run()
+                with self.assertRaises(subprocess.CalledProcessError):
+                    with redirect_stderr(StringIO()):
+                        A().run()
                 self.assertEqual(os.getcwd(), starting_dir)
 
     def test_function_in_directives(self):
@@ -477,8 +481,7 @@ class ProjectClassTest(BaseProjectTest):
         def op4(job):
             job.doc.d = True
 
-        self.project_class = A
-        project = self.mock_project()
+        project = self.mock_project(project_class=A)
         op3_ = project.operations['op3']
         op4_ = project.operations['op4']
         for job in project:
@@ -512,6 +515,7 @@ class ProjectTest(BaseProjectTest):
     def test_instance(self):
         self.assertTrue(isinstance(self.project, FlowProject))
 
+    @fail_if_not_removed
     def test_labels(self):
         project = self.mock_project()
         for job in project:
@@ -705,7 +709,6 @@ class ExecutionProjectTest(BaseProjectTest):
         # This assignment is necessary to use the `mock_project` function on
         # classes A, B, and C. Otherwise, the self.project_class reassignment
         # would break future tests.
-        _project = getattr(self, 'project_class', None)
 
         class A(FlowProject):
             pass
@@ -751,10 +754,9 @@ class ExecutionProjectTest(BaseProjectTest):
                 [A, B, C],
                 [['op1'], ['op2', 'op3'], ['op1', 'op3']]):
 
-            self.project_class = project_class
             for job in self.project.find_jobs():
                 job.remove()
-            project = self.mock_project()
+            project = self.mock_project(project_class=project_class)
             project.run()
             # All bad operations do not run
             assert all([not job.doc.get(op, False)
@@ -765,7 +767,6 @@ class ExecutionProjectTest(BaseProjectTest):
             assert all([job.doc.get(op, False)
                         for op in good_ops
                         for job in project])
-        self.project_class = _project
 
     def test_run_fork(self):
         project = self.mock_project()
@@ -862,6 +863,7 @@ class ExecutionProjectTest(BaseProjectTest):
             project.submit(bundle_size=0)
             self.assertEqual(len(list(MockScheduler.jobs())), 1)
 
+    @fail_if_not_removed
     def test_submit_status(self):
         MockScheduler.reset()
         project = self.mock_project()
@@ -916,6 +918,7 @@ class ExecutionProjectTest(BaseProjectTest):
                       'used by the template script, including: bad_directive\n',
                       stderr.getvalue())
 
+    @fail_if_not_removed
     def test_condition_evaluation(self):
         project = self.mock_project()
 
@@ -969,8 +972,9 @@ class ExecutionProjectTest(BaseProjectTest):
 
 class BufferedExecutionProjectTest(ExecutionProjectTest):
 
-    def mock_project(self):
-        project = super(BufferedExecutionProjectTest, self).mock_project()
+    def mock_project(self, project_class=None):
+        project = super(BufferedExecutionProjectTest,
+                        self).mock_project(project_class=project_class)
         project._use_buffered_mode = True
         return project
 
@@ -1070,6 +1074,25 @@ class ProjectMainInterfaceTest(BaseProjectTest):
 
 class DynamicProjectMainInterfaceTest(ProjectMainInterfaceTest):
     project_class = TestDynamicProject
+
+
+class ProjectDagDetectionTest(BaseProjectTest):
+    """Tests of operation DAG detection."""
+    project_class = DagTestProject
+
+    def test_dag(self):
+        project = self.mock_project()
+        adj = project.detect_operation_graph()
+
+        adj_correct = [[0, 1, 1, 0, 1, 0, 0],
+                       [0, 0, 0, 1, 0, 0, 0],
+                       [0, 0, 0, 1, 0, 1, 1],
+                       [0, 0, 0, 0, 0, 0, 1],
+                       [0, 0, 0, 0, 0, 1, 0],
+                       [0, 0, 0, 0, 0, 0, 0],
+                       [0, 0, 0, 0, 0, 0, 0]]
+
+        self.assertEqual(adj, adj_correct)
 
 
 if __name__ == '__main__':

@@ -11,6 +11,7 @@ import warnings
 import functools
 import deprecation
 
+from .version import __version__
 
 NUM_NODES_WARNING = """Unable to determine the reqired number of nodes (nn) for this submission.
 Either provide this value directly with '--nn' or provide the number of processors
@@ -259,6 +260,7 @@ def deprecated_since_06(func):
 
     return deprecation.deprecated(
         deprecated_in=0.6, removed_in=0.8,
+        current_version=__version__,
         details="This function is part of the legacy templating system.")(func)
 
 

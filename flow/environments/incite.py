@@ -72,7 +72,8 @@ class SummitEnvironment(DefaultLSFEnvironment):
     @staticmethod
     def jsrun_options(resource_set):
         nsets, tasks, cpus, gpus = resource_set
-        return '-n {} -a {} -c {} -g {}'.format(nsets, tasks, cpus, gpus)
+        cuda_aware_mpi = "--smpiargs='-gpu'" if (nsets > 0 or tasks > 0) and gpus > 0 else ""
+        return '-n {} -a {} -c {} -g {} {}'.format(nsets, tasks, cpus, gpus, cuda_aware_mpi)
 
     @staticmethod
     def jsrun_extra_args(operation):

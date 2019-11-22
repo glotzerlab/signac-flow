@@ -63,11 +63,7 @@ rm {{ launcher_file }}
 export OMP_NUM_THREADS={{ operation.directives.omp_num_threads }}
 {% endif %}
 {% if operation.directives.nranks %}
-{% if parallel %}
-{% set mpi_prefix = "ibrun -n %d -o %d task_affinity "|format(operation.directives.nranks, operation.directives.np_offset) %}
-{% else %}
-{% set mpi_prefix = "ibrun -n %d "|format(operation.directives.nranks) %}
-{% endif %}
+{% set mpi_prefix = operation.directives.nranks|generate_mpi_prefix(np_offset, parallel) %}
 {% endif %}
 {{ mpi_prefix }}{{ cmd_prefix }}{{ operation.cmd }}{{ cmd_suffix }}
 {% endfor %}

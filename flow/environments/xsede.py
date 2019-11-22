@@ -76,15 +76,19 @@ class Stampede2Environment(DefaultSlurmEnvironment):
                   '(slurm default is "slurm-%%j.out").'))
 
     @staticmethod
-    def generate_mpi_prefix(nranks):
+    def generate_mpi_prefix(nranks, np_offset, parallel=False):
         """Template filter for generating mpi_prefix based on environment and proper directives
 
         :param:
             TBD
         """
         # complicated
+        if parallel:
+            return 'ibrun -n {} -o {} task_affinity'.format(nranks, np_offset)
+        else:
+            return 'ibrun -n {} '.format(nranks)
 
-        return '{} -n {} '.format('ibrun', nranks)
+    filters = {'generate_mpi_prefix': generate_mpi_prefix.__func__}
 
 
 class BridgesEnvironment(DefaultSlurmEnvironment):
@@ -112,6 +116,8 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
             TBD
         """
         return '{} -n {} '.format('mpirun', nranks)
+
+    filters = {'generate_mpi_prefix': generate_mpi_prefix.__func__}
 
 
 __all__ = ['CometEnvironment', 'BridgesEnvironment', 'Stampede2Environment']

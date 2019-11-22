@@ -116,6 +116,8 @@ class TitanEnvironment(DefaultTorqueEnvironment):
 
         return '{} -n {} '.format('aprun', nranks)
 
+    filters = {'generate_mpi_prefix': generate_mpi_prefix.__func__}
+
 
 class EosEnvironment(DefaultTorqueEnvironment):
     """Environment profile for the eos super computer.
@@ -135,6 +137,8 @@ class EosEnvironment(DefaultTorqueEnvironment):
         """
         # complicated
         return '{} -n {} '.format('aprun', nranks)
+
+    filters = {'generate_mpi_prefix': generate_mpi_prefix.__func__}
 
 
 __all__ = ['TitanEnvironment', 'EosEnvironment']

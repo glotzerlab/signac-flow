@@ -42,11 +42,11 @@ class CometEnvironment(DefaultSlurmEnvironment):
                   '(slurm default is "slurm-%%j.out").'))
 
     @staticmethod
-    def generate_mpi_prefix(env, nranks):
+    def generate_mpi_prefix(nranks):
         """Template filter for generating mpi_prefix based on environment and proper directives
 
         :param:
-            TBD
+            operation.directives.nranks
         """
 
         return '{} -n {} '.format('ibrun', nranks)
@@ -91,7 +91,7 @@ class Stampede2Environment(DefaultSlurmEnvironment):
         """
         # complicated
         if parallel:
-            return 'ibrun -n {} -o {} task_affinity'.format(nranks, np_offset)
+            return 'ibrun -n {} -o {} task_affinity '.format(nranks, np_offset)
         else:
             return 'ibrun -n {} '.format(nranks)
 
@@ -117,11 +117,11 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
           help="Specify the partition to submit to.")
 
     @staticmethod
-    def generate_mpi_prefix(self, nranks):
+    def generate_mpi_prefix(nranks):
         """Template filter for generating mpi_prefix based on environment and proper directives
 
         :param:
-            TBD
+            operation.directives.nranks
         """
         return '{} -n {} '.format('mpirun', nranks)
 

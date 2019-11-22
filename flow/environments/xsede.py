@@ -89,7 +89,7 @@ class Stampede2Environment(DefaultSlurmEnvironment):
         :param:
             parallel
         """
-        # complicated
+
         if parallel:
             return 'ibrun -n {} -o {} task_affinity '.format(nranks, np_offset)
         else:

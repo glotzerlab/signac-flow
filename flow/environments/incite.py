@@ -137,7 +137,7 @@ class EosEnvironment(DefaultTorqueEnvironment):
         :param:
             operation.directives.nranks
         """
-        # complicated
+
         return '{} -n {} '.format('aprun', nranks)
 
     filters = {'generate_mpi_prefix': generate_mpi_prefix.__func__}

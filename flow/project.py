@@ -1659,16 +1659,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             or operation.directives.get('executable', sys.executable) != sys.executable
         ):
             # ... need to fork:
+            mpi_prefix = self._environment.generate_mpi_prefix(operation)
             logger.debug(
                 "Forking to execute operation '{}' with "
-                "cmd '{}'.".format(operation, operation.cmd))
-            # try:
-            #     mpi_prefix = env.mpi_prefix(nranks, ...)
-            # except:
-            #     mpi_prefix = tf.mpi_prefix(nranks, ...)
-            #
-            # subprocess.run(mpi_prefix + operation.cmd, shell=True, timeout=timeout, check=True)
-            # # here add mpi ....
+                "cmd '{}'.".format(operation, mpi_prefix + operation.cmd))
+
+            subprocess.run(mpi_prefix + operation.cmd, shell=True, timeout=timeout, check=True)
         else:
             # ... executing operation in interpreter process as function:
             logger.debug(

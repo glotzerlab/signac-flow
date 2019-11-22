@@ -18,9 +18,7 @@
 {% block body %}
 {% set cmd_suffix = cmd_suffix|default('') ~ (' &' if parallel else '') %}
 {% for operation in operations %}
-{% set extra_args = operation|jsrun_extra_args %}
-{% set mpi_prefix = "jsrun " ~ operation|guess_resource_sets(cores_per_node, gpus_per_node)|jsrun_options ~ " -d packed -b rs " ~ (extra_args ~ ' ' if extra_args else '') %}
-
+{% set mpi_prefix =  operation|generate_mpi_prefix(cores_per_node, gpus_per_node) %}
 # {{ "%s"|format(operation) }}
 {% if operation.directives.omp_num_threads %}
 export OMP_NUM_THREADS={{ operation.directives.omp_num_threads }}

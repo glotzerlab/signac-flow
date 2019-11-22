@@ -41,6 +41,7 @@ class CometEnvironment(DefaultSlurmEnvironment):
                   'If omitted, uses the system default '
                   '(slurm default is "slurm-%%j.out").'))
 
+    @staticmethod
     def generate_mpi_prefix(env, nranks):
         """Template filter for generating mpi_prefix based on environment and proper directives
 
@@ -49,6 +50,8 @@ class CometEnvironment(DefaultSlurmEnvironment):
         """
 
         return '{} -n {} '.format('ibrun', nranks)
+
+    filters = {'generate_mpi_prefix': generate_mpi_prefix.__func__}
 
 
 class Stampede2Environment(DefaultSlurmEnvironment):
@@ -109,6 +112,7 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
           default='RM-shared',
           help="Specify the partition to submit to.")
 
+    @staticmethod
     def generate_mpi_prefix(self, nranks):
         """Template filter for generating mpi_prefix based on environment and proper directives
 

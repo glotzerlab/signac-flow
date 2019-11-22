@@ -76,24 +76,22 @@ class SummitEnvironment(DefaultLSFEnvironment):
         return '-n {} -a {} -c {} -g {} {}'.format(nsets, tasks, cpus, gpus, cuda_aware_mpi)
 
     @staticmethod
-    def jsrun_extra_args(operation):
-        return str(operation.directives.get('extra_jsrun_args', ''))
-
-    @staticmethod
-    def generate_mpi_prefix(nranks):
+    def generate_mpi_prefix(operation, cores_per_node, gpus_per_node):
         """Template filter for generating mpi_prefix based on environment and proper directives
 
         :param:
             TBD
         """
-        # complicated
-
-        return '{} -n {} '.format('jsrun', nranks)
+        extra_args = str(operation.directives.get('extra_jsrun_args', ''))
+        resource_set = SummitEnvironment.guess_resource_sets(
+                       operation, cores_per_node, gpus_per_node)
+        mpi_prefix = 'jsrun' + SummitEnvironment.jsrun_options(resource_set)
+        mpi_prefix += ' -d packed -b rs ' + extra_args + (' ' if extra_args else '')
+        return mpi_prefix
 
     filters = {'calc_num_nodes': calc_num_nodes.__func__,
                'guess_resource_sets': guess_resource_sets.__func__,
                'jsrun_options': jsrun_options.__func__,
-               'jsrun_extra_args': jsrun_extra_args.__func__,
                'generate_mpi_prefix': generate_mpi_prefix.__func__}
 
 

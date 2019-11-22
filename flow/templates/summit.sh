@@ -1,5 +1,4 @@
 {# Templated in accordance with: https://www.olcf.ornl.gov/for-users/system-user-guides/summit/running-jobs/ #}
-{% set mpiexec = "jsrun" %}
 {% extends "lsf.sh" %}
 {% set cores_per_node = 42 %}
 {% set gpus_per_node = 6 %}

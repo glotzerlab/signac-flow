@@ -1662,7 +1662,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             or operation.directives.get('executable', sys.executable) != sys.executable
         ):
             # ... need to fork:
-            mpi_prefix = self._environment.generate_mpi_prefix(operation)
+            if operation.directives['nranks']:
+                mpi_prefix = self._environment.generate_mpi_prefix(operation)
+            else:
+                mpi_prefix = ''
             logger.debug(
                 "Forking to execute operation '{}' with "
                 "cmd '{}'.".format(operation, mpi_prefix + operation.cmd))

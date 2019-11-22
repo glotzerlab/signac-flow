@@ -49,7 +49,7 @@ class CometEnvironment(DefaultSlurmEnvironment):
             operation
         """
 
-        return '{} -n {} '.format('ibrun', operation.directives.nranks)
+        return '{} -n {} '.format('ibrun', operation.directives['nranks'])
 
     filters = {'generate_mpi_prefix': generate_mpi_prefix.__func__}
 
@@ -90,9 +90,9 @@ class Stampede2Environment(DefaultSlurmEnvironment):
 
         if parallel:
             return '{} -n {} -o {} task_affinity '.format(
-                   'ibrun', operation.directives.nranks, operation.directives.np_offset)
+                   'ibrun', operation.directives['nranks'], operation.directives['np_offset'])
         else:
-            return '{} -n {} '.format('ibrun', operation.directives.nranks)
+            return '{} -n {} '.format('ibrun', operation.directives['nranks'])
 
     filters = {'generate_mpi_prefix': generate_mpi_prefix.__func__}
 
@@ -122,7 +122,8 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
         :param:
             operation
         """
-        return '{} -n {} '.format('mpirun', operation.directives.nranks)
+
+        return '{} -n {} '.format('mpirun', operation.directives['nranks'])
 
     filters = {'generate_mpi_prefix': generate_mpi_prefix.__func__}
 

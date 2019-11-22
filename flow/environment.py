@@ -199,7 +199,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
             operation
         """
 
-        return '{} -n {} '.format('mpiexec', operation.directives.nranks)
+        return '{} -n {} '.format('mpiexec', operation.directives['nranks'])
 
     filters = {'generate_mpi_prefix': generate_mpi_prefix.__func__}
 

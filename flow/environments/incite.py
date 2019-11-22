@@ -115,7 +115,7 @@ class TitanEnvironment(DefaultTorqueEnvironment):
             operation
         """
 
-        return '{} -n {} '.format('aprun', operation.directives.nranks)
+        return '{} -n {} '.format('aprun', operation.directives['nranks'])
 
     filters = {'generate_mpi_prefix': generate_mpi_prefix.__func__}
 
@@ -137,7 +137,7 @@ class EosEnvironment(DefaultTorqueEnvironment):
             operation
         """
 
-        return '{} -n {} '.format('aprun', operation.directives.nranks)
+        return '{} -n {} '.format('aprun', operation.directives['nranks'])
 
     filters = {'generate_mpi_prefix': generate_mpi_prefix.__func__}
 

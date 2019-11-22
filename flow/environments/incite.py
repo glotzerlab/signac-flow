@@ -80,7 +80,11 @@ class SummitEnvironment(DefaultLSFEnvironment):
         """Template filter for generating mpi_prefix based on environment and proper directives
 
         :param:
-            TBD
+            operation
+        :param:
+            cores_per_node
+        :param:
+            gpus_per_node
         """
         extra_args = str(operation.directives.get('extra_jsrun_args', ''))
         resource_set = SummitEnvironment.guess_resource_sets(
@@ -109,7 +113,7 @@ class TitanEnvironment(DefaultTorqueEnvironment):
         """Template filter for generating mpi_prefix based on environment and proper directives
 
         :param:
-            TBD
+            operation.directives.nranks
         """
 
         return '{} -n {} '.format('aprun', nranks)
@@ -131,7 +135,7 @@ class EosEnvironment(DefaultTorqueEnvironment):
         """Template filter for generating mpi_prefix based on environment and proper directives
 
         :param:
-            TBD
+            operation.directives.nranks
         """
         # complicated
         return '{} -n {} '.format('aprun', nranks)

@@ -1,5 +1,4 @@
 {# Templated in accordance with: https://www.olcf.ornl.gov/for-users/system-user-guides/titan/running-jobs/ #}
-{% set mpiexec = "aprun" %}
 {% extends "torque.sh" %}
 {% block tasks %}
 {% set threshold = 0 if force else 0.9 %}

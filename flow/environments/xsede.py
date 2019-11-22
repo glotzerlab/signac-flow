@@ -83,7 +83,11 @@ class Stampede2Environment(DefaultSlurmEnvironment):
         """Template filter for generating mpi_prefix based on environment and proper directives
 
         :param:
-            TBD
+            operation.directives.nranks
+        :param:
+            operation.directives.np_offset
+        :param:
+            parallel
         """
         # complicated
         if parallel:

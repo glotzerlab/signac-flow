@@ -175,7 +175,7 @@ def generate_mpi_prefix(nranks):
     """Template filter for generating mpi_prefix based on environment and proper directives
 
     :param:
-        TBD
+        operation.directives.nranks
     """
 
     return '{} -n {} '.format('mpiexec', nranks)

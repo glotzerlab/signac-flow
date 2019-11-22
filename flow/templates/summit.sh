@@ -19,6 +19,7 @@
 {% set cmd_suffix = cmd_suffix|default('') ~ (' &' if parallel else '') %}
 {% for operation in operations %}
 {% set mpi_prefix =  operation|generate_mpi_prefix(cores_per_node, gpus_per_node) %}
+{{'test ' ~ 'plus ' ~ 'as'}}
 # {{ "%s"|format(operation) }}
 {% if operation.directives.omp_num_threads %}
 export OMP_NUM_THREADS={{ operation.directives.omp_num_threads }}

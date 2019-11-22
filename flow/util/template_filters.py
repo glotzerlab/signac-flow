@@ -178,7 +178,7 @@ def generate_mpi_prefix(nranks):
         TBD
     """
 
-    return '{} -n {} '.format('mpirun', nranks)
+    return '{} -n {} '.format('mpiexec', nranks)
 
 
 _GET_ACCOUNT_NAME_MESSAGES_SHOWN = set()

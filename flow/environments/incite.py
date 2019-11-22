@@ -85,7 +85,7 @@ class SummitEnvironment(DefaultLSFEnvironment):
         extra_args = str(operation.directives.get('extra_jsrun_args', ''))
         resource_set = SummitEnvironment.guess_resource_sets(
                        operation, cores_per_node, gpus_per_node)
-        mpi_prefix = 'jsrun' + SummitEnvironment.jsrun_options(resource_set)
+        mpi_prefix = 'jsrun ' + SummitEnvironment.jsrun_options(resource_set)
         mpi_prefix += ' -d packed -b rs ' + extra_args + (' ' if extra_args else '')
         return mpi_prefix
 

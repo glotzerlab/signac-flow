@@ -79,10 +79,22 @@ class SummitEnvironment(DefaultLSFEnvironment):
     def jsrun_extra_args(operation):
         return str(operation.directives.get('extra_jsrun_args', ''))
 
+    @staticmethod
+    def generate_mpi_prefix(nranks):
+        """Template filter for generating mpi_prefix based on environment and proper directives
+
+        :param:
+            TBD
+        """
+        # complicated
+
+        return '{} -n {} '.format('jsrun', nranks)
+
     filters = {'calc_num_nodes': calc_num_nodes.__func__,
                'guess_resource_sets': guess_resource_sets.__func__,
                'jsrun_options': jsrun_options.__func__,
-               'jsrun_extra_args': jsrun_extra_args.__func__}
+               'jsrun_extra_args': jsrun_extra_args.__func__,
+               'generate_mpi_prefix': generate_mpi_prefix.__func__}
 
 
 class TitanEnvironment(DefaultTorqueEnvironment):
@@ -94,6 +106,16 @@ class TitanEnvironment(DefaultTorqueEnvironment):
     template = 'titan.sh'
     cores_per_node = 16
 
+    @staticmethod
+    def generate_mpi_prefix(nranks):
+        """Template filter for generating mpi_prefix based on environment and proper directives
+
+        :param:
+            TBD
+        """
+
+        return '{} -n {} '.format('aprun', nranks)
+
 
 class EosEnvironment(DefaultTorqueEnvironment):
     """Environment profile for the eos super computer.
@@ -103,6 +125,16 @@ class EosEnvironment(DefaultTorqueEnvironment):
     hostname_pattern = 'eos'
     template = 'eos.sh'
     cores_per_node = 32
+
+    @staticmethod
+    def generate_mpi_prefix(nranks):
+        """Template filter for generating mpi_prefix based on environment and proper directives
+
+        :param:
+            TBD
+        """
+        # complicated
+        return '{} -n {} '.format('aprun', nranks)
 
 
 __all__ = ['TitanEnvironment', 'EosEnvironment']

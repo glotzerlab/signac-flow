@@ -171,16 +171,6 @@ def print_warning(msg):
     return ''
 
 
-def generate_mpi_prefix(nranks):
-    """Template filter for generating mpi_prefix based on environment and proper directives
-
-    :param:
-        operation.directives.nranks
-    """
-
-    return '{} -n {} '.format('mpiexec', nranks)
-
-
 _GET_ACCOUNT_NAME_MESSAGES_SHOWN = set()
 
 

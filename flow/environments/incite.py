@@ -28,24 +28,27 @@ class SummitEnvironment(DefaultLSFEnvironment):
     """
     hostname_pattern = r'.*\.summit\.olcf\.ornl\.gov'
     template = 'summit.sh'
+    cores_per_node = 42
+    gpus_per_node = 6
 
     @staticmethod
-    def calc_num_nodes(resource_sets, cores_per_node, gpus_per_node):
+    def calc_num_nodes(resource_sets):
         cores_used = gpus_used = nodes_used = 0
         for nsets, tasks, cpus_per_task, gpus in resource_sets:
             for _ in range(nsets):
                 cores_used += tasks * cpus_per_task
                 gpus_used += gpus
-                if cores_used > cores_per_node or gpus_used > gpus_per_node:
+                if (cores_used > SummitEnvironment.cores_per_node or
+                        gpus_used > SummitEnvironment.gpus_per_node):
                     nodes_used += 1
-                    cores_used = max(0, cores_used - cores_per_node)
-                    gpus_used = max(0, gpus_used - gpus_per_node)
+                    cores_used = max(0, cores_used - SummitEnvironment.cores_per_node)
+                    gpus_used = max(0, gpus_used - SummitEnvironment.gpus_per_node)
         if cores_used > 0 or gpus_used > 0:
             nodes_used += 1
         return nodes_used
 
     @staticmethod
-    def guess_resource_sets(operation, cores_per_node, gpus_per_node):
+    def guess_resource_sets(operation):
         ntasks = max(operation.directives.get('nranks', 1), 1)
         np = operation.directives.get('np', ntasks)
 
@@ -76,19 +79,15 @@ class SummitEnvironment(DefaultLSFEnvironment):
         return '-n {} -a {} -c {} -g {} {}'.format(nsets, tasks, cpus, gpus, cuda_aware_mpi)
 
     @staticmethod
-    def generate_mpi_prefix(operation, cores_per_node, gpus_per_node):
+    def generate_mpi_prefix(operation):
         """Template filter for generating mpi_prefix based on environment and proper directives
 
         :param:
             operation
-        :param:
-            cores_per_node
-        :param:
-            gpus_per_node
         """
         extra_args = str(operation.directives.get('extra_jsrun_args', ''))
         resource_set = SummitEnvironment.guess_resource_sets(
-                       operation, cores_per_node, gpus_per_node)
+                       operation)
         mpi_prefix = 'jsrun ' + SummitEnvironment.jsrun_options(resource_set)
         mpi_prefix += ' -d packed -b rs ' + extra_args + (' ' if extra_args else '')
         return mpi_prefix
@@ -109,14 +108,14 @@ class TitanEnvironment(DefaultTorqueEnvironment):
     cores_per_node = 16
 
     @staticmethod
-    def generate_mpi_prefix(nranks):
+    def generate_mpi_prefix(operation):
         """Template filter for generating mpi_prefix based on environment and proper directives
 
         :param:
-            operation.directives.nranks
+            operation
         """
 
-        return '{} -n {} '.format('aprun', nranks)
+        return '{} -n {} '.format('aprun', operation.directives.nranks)
 
     filters = {'generate_mpi_prefix': generate_mpi_prefix.__func__}
 
@@ -131,14 +130,14 @@ class EosEnvironment(DefaultTorqueEnvironment):
     cores_per_node = 32
 
     @staticmethod
-    def generate_mpi_prefix(nranks):
+    def generate_mpi_prefix(operation):
         """Template filter for generating mpi_prefix based on environment and proper directives
 
         :param:
-            operation.directives.nranks
+            operation
         """
 
-        return '{} -n {} '.format('aprun', nranks)
+        return '{} -n {} '.format('aprun', operation.directives.nranks)
 
     filters = {'generate_mpi_prefix': generate_mpi_prefix.__func__}
 

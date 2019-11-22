@@ -214,6 +214,8 @@ class JobOperation(object):
         directives.setdefault('omp_num_threads', 0)
         directives.setdefault('processor_fraction', 1)
 
+        # directives info here
+
         # Evaluate strings and callables for job:
         def evaluate(value):
             if value and callable(value):
@@ -1718,6 +1720,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "Executing {} operation(s) (Pass # {:02d})...".format(len(operations), i_pass))
             self.run_operations(operations, pretend=pretend,
                                 np=np, timeout=timeout, progress=progress)
+            # place of changes
 
     def _generate_operations(self, cmd, jobs, requires=None):
         "Generate job-operations for a given 'direct' command."

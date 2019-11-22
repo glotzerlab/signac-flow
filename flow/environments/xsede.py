@@ -41,6 +41,15 @@ class CometEnvironment(DefaultSlurmEnvironment):
                   'If omitted, uses the system default '
                   '(slurm default is "slurm-%%j.out").'))
 
+    def generate_mpi_prefix(env, nranks):
+        """Template filter for generating mpi_prefix based on environment and proper directives
+
+        :param:
+            TBD
+        """
+
+        return '{} -n {} '.format('ibrun', nranks)
+
 
 class Stampede2Environment(DefaultSlurmEnvironment):
     """Environment profile for the Stampede2 supercomputer.
@@ -66,6 +75,17 @@ class Stampede2Environment(DefaultSlurmEnvironment):
                   'If omitted, uses the system default '
                   '(slurm default is "slurm-%%j.out").'))
 
+    @staticmethod
+    def generate_mpi_prefix(nranks):
+        """Template filter for generating mpi_prefix based on environment and proper directives
+
+        :param:
+            TBD
+        """
+        # complicated
+
+        return '{} -n {} '.format('ibrun', nranks)
+
 
 class BridgesEnvironment(DefaultSlurmEnvironment):
     """Environment profile for the Bridges super computer.
@@ -84,6 +104,14 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
           choices=['RM', 'RM-shared', 'RM-small', 'GPU', 'GPU-shared', 'LM'],
           default='RM-shared',
           help="Specify the partition to submit to.")
+
+    def generate_mpi_prefix(self, nranks):
+        """Template filter for generating mpi_prefix based on environment and proper directives
+
+        :param:
+            TBD
+        """
+        return '{} -n {} '.format('mpirun', nranks)
 
 
 __all__ = ['CometEnvironment', 'BridgesEnvironment', 'Stampede2Environment']

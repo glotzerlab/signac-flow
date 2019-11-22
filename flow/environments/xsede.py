@@ -42,14 +42,14 @@ class CometEnvironment(DefaultSlurmEnvironment):
                   '(slurm default is "slurm-%%j.out").'))
 
     @staticmethod
-    def generate_mpi_prefix(nranks):
+    def generate_mpi_prefix(operation):
         """Template filter for generating mpi_prefix based on environment and proper directives
 
         :param:
-            operation.directives.nranks
+            operation
         """
 
-        return '{} -n {} '.format('ibrun', nranks)
+        return '{} -n {} '.format('ibrun', operation.directives['nranks'])
 
     filters = {'generate_mpi_prefix': generate_mpi_prefix.__func__}
 
@@ -79,21 +79,20 @@ class Stampede2Environment(DefaultSlurmEnvironment):
                   '(slurm default is "slurm-%%j.out").'))
 
     @staticmethod
-    def generate_mpi_prefix(nranks, np_offset, parallel=False):
+    def generate_mpi_prefix(operation, parallel=False):
         """Template filter for generating mpi_prefix based on environment and proper directives
 
         :param:
-            operation.directives.nranks
-        :param:
-            operation.directives.np_offset
+            operation
         :param:
             parallel
         """
 
         if parallel:
-            return 'ibrun -n {} -o {} task_affinity '.format(nranks, np_offset)
+            return '{} -n {} -o {} task_affinity '.format(
+                   'ibrun', operation.directives['nranks'], operation.directives['np_offset'])
         else:
-            return 'ibrun -n {} '.format(nranks)
+            return '{} -n {} '.format('ibrun', operation.directives['nranks'])
 
     filters = {'generate_mpi_prefix': generate_mpi_prefix.__func__}
 
@@ -117,13 +116,14 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
           help="Specify the partition to submit to.")
 
     @staticmethod
-    def generate_mpi_prefix(nranks):
+    def generate_mpi_prefix(operation):
         """Template filter for generating mpi_prefix based on environment and proper directives
 
         :param:
-            operation.directives.nranks
+            operation
         """
-        return '{} -n {} '.format('mpirun', nranks)
+
+        return '{} -n {} '.format('mpirun', operation.directives['nranks'])
 
     filters = {'generate_mpi_prefix': generate_mpi_prefix.__func__}
 

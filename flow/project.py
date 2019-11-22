@@ -645,7 +645,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             flow_config.require_config_value
         template_environment.filters['get_account_name'] = tf.get_account_name
         template_environment.filters['print_warning'] = tf.print_warning
-        template_environment.filters['generate_mpi_prefix'] = tf.generate_mpi_prefix
         if 'max' not in template_environment.filters:    # for jinja2 < 2.10
             template_environment.filters['max'] = max
         if 'min' not in template_environment.filters:    # for jinja2 < 2.10

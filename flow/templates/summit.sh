@@ -1,10 +1,8 @@
 {# Templated in accordance with: https://www.olcf.ornl.gov/for-users/system-user-guides/summit/running-jobs/ #}
 {% extends "lsf.sh" %}
-{% set cores_per_node = 42 %}
-{% set gpus_per_node = 6 %}
 {% block tasks %}
 {% set threshold = 0 if force else 0.9 %}
-{% set nn = operations|map('guess_resource_sets', cores_per_node, gpus_per_node)|calc_num_nodes(cores_per_node, gpus_per_node) %}
+{% set nn = operations|map('guess_resource_sets')|calc_num_nodes %}
 #BSUB -nnodes {{ nn }}
 {% endblock %}
 {% block header %}
@@ -17,7 +15,7 @@
 {% block body %}
 {% set cmd_suffix = cmd_suffix|default('') ~ (' &' if parallel else '') %}
 {% for operation in operations %}
-{% set mpi_prefix =  operation|generate_mpi_prefix(cores_per_node, gpus_per_node) %}
+{% set mpi_prefix =  operation|generate_mpi_prefix %}
 
 # {{ "%s"|format(operation) }}
 {% if operation.directives.omp_num_threads %}

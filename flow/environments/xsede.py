@@ -46,9 +46,9 @@ class CometEnvironment(DefaultSlurmEnvironment):
         """Template filter for getting mpi_prefix based on environment and proper directives.
         Template filter for Comet supercomputers.
 
-        :param operation: 
+        :param operation:
             The operation for which to add mpi_prefix.
-        :return mpi_prefix: 
+        :return mpi_prefix:
             The mpi_prefix should be added for the operation.
         :type mpi_prefix:
             str
@@ -87,15 +87,15 @@ class Stampede2Environment(DefaultSlurmEnvironment):
         """Template filter for getting mpi_prefix based on environment and proper directives.
         Template filter for Stampede2 supercomputers.
 
-        :param operation: 
+        :param operation:
             The operation for which to add mpi_prefix.
-        :param parallel: 
+        :param parallel:
             If True, operations are assumed to be executed in parallel, which means
             that the number of total tasks is the sum of all tasks instead of the
             maximum number of tasks. Default is set to False.
         :type parallel:
             bool
-        :return mpi_prefix: 
+        :return mpi_prefix:
             The mpi_prefix should be added for the operation.
         :type mpi_prefix:
             str
@@ -132,9 +132,9 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
         """Template filter for getting mpi_prefix based on environment and proper directives.
         Template filter for Bridges supercomputers.
  
-        :param operation: 
+        :param operation:
             The operation for which to add mpi_prefix.
-        :return mpi_prefix: 
+        :return mpi_prefix:
             The mpi_prefix should be added for the operation.
         :type mpi_prefix:
             str

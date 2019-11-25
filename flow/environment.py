@@ -180,14 +180,14 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         be specific to this environment definition. For example, a
         key should be 'account', not 'MyEnvironment.account`.
 
-        :param key: 
+        :param key:
             The environment specific configuration key.
         :type key:
             str
         :param default:
             A default value in case the key cannot be found within the
             user's configuration.
-        :type key: 
+        :type key:
             str
         :return:
             The value or default value.
@@ -200,11 +200,11 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
     @staticmethod
     def get_mpi_prefix(operation):
         """Template filter for getting mpi_prefix based on environment and proper directives.
-        Template filter for compute environment.
- 
-        :param operation: 
+        Template filter for computing environment.
+
+        :param operation:
             The operation for which to add mpi_prefix.
-        :return mpi_prefix: 
+        :return mpi_prefix:
             The mpi_prefix should be added for the operation.
         :type mpi_prefix: str
         """

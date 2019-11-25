@@ -83,7 +83,7 @@ class SummitEnvironment(DefaultLSFEnvironment):
         """Template filter for getting mpi_prefix based on environment and proper directives.
         Template filter for Summit supercomputers.
 
-        :param operation: 
+        :param operation:
             The operation for which to add mpi_prefix.
         :return mpi_prefix:
             The mpi_prefix should be added for the operation.

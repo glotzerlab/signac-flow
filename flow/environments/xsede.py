@@ -42,7 +42,7 @@ class CometEnvironment(DefaultSlurmEnvironment):
                   '(slurm default is "slurm-%%j.out").'))
 
     @staticmethod
-    def generate_mpi_prefix(operation):
+    def get_mpi_prefix(operation):
         """Template filter for generating mpi_prefix based on environment and proper directives
 
         :param:
@@ -51,7 +51,7 @@ class CometEnvironment(DefaultSlurmEnvironment):
 
         return '{} -n {} '.format('ibrun', operation.directives['nranks'])
 
-    filters = {'generate_mpi_prefix': generate_mpi_prefix.__func__}
+    filters = {'get_mpi_prefix': get_mpi_prefix.__func__}
 
 
 class Stampede2Environment(DefaultSlurmEnvironment):
@@ -79,7 +79,7 @@ class Stampede2Environment(DefaultSlurmEnvironment):
                   '(slurm default is "slurm-%%j.out").'))
 
     @staticmethod
-    def generate_mpi_prefix(operation, parallel=False):
+    def get_mpi_prefix(operation, parallel=False):
         """Template filter for generating mpi_prefix based on environment and proper directives
 
         :param:
@@ -94,7 +94,7 @@ class Stampede2Environment(DefaultSlurmEnvironment):
         else:
             return '{} -n {} '.format('ibrun', operation.directives['nranks'])
 
-    filters = {'generate_mpi_prefix': generate_mpi_prefix.__func__}
+    filters = {'get_mpi_prefix': get_mpi_prefix.__func__}
 
 
 class BridgesEnvironment(DefaultSlurmEnvironment):
@@ -116,7 +116,7 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
           help="Specify the partition to submit to.")
 
     @staticmethod
-    def generate_mpi_prefix(operation):
+    def get_mpi_prefix(operation):
         """Template filter for generating mpi_prefix based on environment and proper directives
 
         :param:
@@ -125,7 +125,7 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
 
         return '{} -n {} '.format('mpirun', operation.directives['nranks'])
 
-    filters = {'generate_mpi_prefix': generate_mpi_prefix.__func__}
+    filters = {'get_mpi_prefix': get_mpi_prefix.__func__}
 
 
 __all__ = ['CometEnvironment', 'BridgesEnvironment', 'Stampede2Environment']

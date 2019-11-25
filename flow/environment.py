@@ -192,7 +192,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         return flow_config.require_config_value(key, ns=cls.__name__, default=default)
 
     @staticmethod
-    def generate_mpi_prefix(operation):
+    def get_mpi_prefix(operation):
         """Template filter for generating mpi_prefix based on environment and proper directives
 
         :param:
@@ -201,7 +201,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
         return '{} -n {} '.format('mpiexec', operation.directives['nranks'])
 
-    filters = {'generate_mpi_prefix': generate_mpi_prefix.__func__}
+    filters = {'get_mpi_prefix': get_mpi_prefix.__func__}
 
 
 class StandardEnvironment(ComputeEnvironment):

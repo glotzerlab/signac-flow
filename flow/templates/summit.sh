@@ -15,7 +15,7 @@
 {% block body %}
 {% set cmd_suffix = cmd_suffix|default('') ~ (' &' if parallel else '') %}
 {% for operation in operations %}
-{% set mpi_prefix =  operation|generate_mpi_prefix %}
+{% set mpi_prefix =  operation|get_mpi_prefix %}
 
 # {{ "%s"|format(operation) }}
 {% if operation.directives.omp_num_threads %}

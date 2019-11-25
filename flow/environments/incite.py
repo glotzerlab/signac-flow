@@ -79,7 +79,7 @@ class SummitEnvironment(DefaultLSFEnvironment):
         return '-n {} -a {} -c {} -g {} {}'.format(nsets, tasks, cpus, gpus, cuda_aware_mpi)
 
     @staticmethod
-    def generate_mpi_prefix(operation):
+    def get_mpi_prefix(operation):
         """Template filter for generating mpi_prefix based on environment and proper directives
 
         :param:
@@ -95,7 +95,7 @@ class SummitEnvironment(DefaultLSFEnvironment):
     filters = {'calc_num_nodes': calc_num_nodes.__func__,
                'guess_resource_sets': guess_resource_sets.__func__,
                'jsrun_options': jsrun_options.__func__,
-               'generate_mpi_prefix': generate_mpi_prefix.__func__}
+               'get_mpi_prefix': get_mpi_prefix.__func__}
 
 
 class TitanEnvironment(DefaultTorqueEnvironment):
@@ -108,7 +108,7 @@ class TitanEnvironment(DefaultTorqueEnvironment):
     cores_per_node = 16
 
     @staticmethod
-    def generate_mpi_prefix(operation):
+    def get_mpi_prefix(operation):
         """Template filter for generating mpi_prefix based on environment and proper directives
 
         :param:
@@ -117,7 +117,7 @@ class TitanEnvironment(DefaultTorqueEnvironment):
 
         return '{} -n {} '.format('aprun', operation.directives['nranks'])
 
-    filters = {'generate_mpi_prefix': generate_mpi_prefix.__func__}
+    filters = {'get_mpi_prefix': get_mpi_prefix.__func__}
 
 
 class EosEnvironment(DefaultTorqueEnvironment):
@@ -130,7 +130,7 @@ class EosEnvironment(DefaultTorqueEnvironment):
     cores_per_node = 32
 
     @staticmethod
-    def generate_mpi_prefix(operation):
+    def get_mpi_prefix(operation):
         """Template filter for generating mpi_prefix based on environment and proper directives
 
         :param:
@@ -139,7 +139,7 @@ class EosEnvironment(DefaultTorqueEnvironment):
 
         return '{} -n {} '.format('aprun', operation.directives['nranks'])
 
-    filters = {'generate_mpi_prefix': generate_mpi_prefix.__func__}
+    filters = {'get_mpi_prefix': get_mpi_prefix.__func__}
 
 
 __all__ = ['TitanEnvironment', 'EosEnvironment']

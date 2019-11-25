@@ -17,7 +17,7 @@ cd {{ project.config.project_dir }}
 {% set cmd_suffix = cmd_suffix|default('') ~ (' &' if parallel else '') %}
 {% for operation in operations %}
 {% if operation.directives.nranks and not mpi_prefix %}
-{% set mpi_prefix = operation|generate_mpi_prefix %}
+{% set mpi_prefix = operation|get_mpi_prefix %}
 {% endif %}
 
 # {{ "%s"|format(operation) }}

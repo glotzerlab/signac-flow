@@ -62,8 +62,8 @@ rm {{ launcher_file }}
 {% if operation.directives.omp_num_threads %}
 export OMP_NUM_THREADS={{ operation.directives.omp_num_threads }}
 {% endif %}
-{% if operation.directives.nranks %}
-{% set mpi_prefix = operation|generate_mpi_prefix(parallel) %}
+{% if operation.directives.nranks and not mpi_prefix %}
+{% set mpi_prefix = operation|get_mpi_prefix(parallel) %}
 {% endif %}
 {{ mpi_prefix }}{{ cmd_prefix }}{{ operation.cmd }}{{ cmd_suffix }}
 {% endfor %}

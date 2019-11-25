@@ -105,4 +105,4 @@ class EosEnvironment(DefaultTorqueEnvironment):
     cores_per_node = 32
 
 
-__all__ = ['TitanEnvironment', 'EosEnvironment']
+__all__ = ['SummitEnvironment', 'TitanEnvironment', 'EosEnvironment']

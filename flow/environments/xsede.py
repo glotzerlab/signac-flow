@@ -131,7 +131,7 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
     def get_mpi_prefix(operation):
         """Template filter for getting mpi_prefix based on environment and proper directives.
         Template filter for Bridges supercomputers.
- 
+
         :param operation:
             The operation for which to add mpi_prefix.
         :return mpi_prefix:

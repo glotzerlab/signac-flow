@@ -180,25 +180,34 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         be specific to this environment definition. For example, a
         key should be 'account', not 'MyEnvironment.account`.
 
-        :param key: The environment specific configuration key.
-        :type key: str
-        :param default: A default value in case the key cannot be found
-            within the user's configuration.
-        :type key: str
-        :return: The value or default value.
-        :raises SubmitError: If the key is not in the user's configuration
-            and no default value is provided.
+        :param key: 
+            The environment specific configuration key.
+        :type key:
+            str
+        :param default:
+            A default value in case the key cannot be found within the
+            user's configuration.
+        :type key: 
+            str
+        :return:
+            The value or default value.
+        :raises SubmitError:
+            If the key is not in the user's configuration and no default
+            value is provided.
         """
         return flow_config.require_config_value(key, ns=cls.__name__, default=default)
 
     @staticmethod
     def get_mpi_prefix(operation):
-        """Template filter for generating mpi_prefix based on environment and proper directives
-
-        :param:
-            operation
+        """Template filter for getting mpi_prefix based on environment and proper directives.
+        Template filter for compute environment.
+ 
+        :param operation: 
+            The operation for which to add mpi_prefix.
+        :return mpi_prefix: 
+            The mpi_prefix should be added for the operation.
+        :type mpi_prefix: str
         """
-
         return '{} -n {} '.format('mpiexec', operation.directives['nranks'])
 
     filters = {'get_mpi_prefix': get_mpi_prefix.__func__}

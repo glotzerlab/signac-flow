@@ -43,12 +43,16 @@ class CometEnvironment(DefaultSlurmEnvironment):
 
     @staticmethod
     def get_mpi_prefix(operation):
-        """Template filter for generating mpi_prefix based on environment and proper directives
+        """Template filter for getting mpi_prefix based on environment and proper directives.
+        Template filter for Comet supercomputers.
 
-        :param:
-            operation
+        :param operation: 
+            The operation for which to add mpi_prefix.
+        :return mpi_prefix: 
+            The mpi_prefix should be added for the operation.
+        :type mpi_prefix:
+            str
         """
-
         return '{} -n {} '.format('ibrun', operation.directives['nranks'])
 
     filters = {'get_mpi_prefix': get_mpi_prefix.__func__}
@@ -80,14 +84,22 @@ class Stampede2Environment(DefaultSlurmEnvironment):
 
     @staticmethod
     def get_mpi_prefix(operation, parallel=False):
-        """Template filter for generating mpi_prefix based on environment and proper directives
+        """Template filter for getting mpi_prefix based on environment and proper directives.
+        Template filter for Stampede2 supercomputers.
 
-        :param:
-            operation
-        :param:
-            parallel
+        :param operation: 
+            The operation for which to add mpi_prefix.
+        :param parallel: 
+            If True, operations are assumed to be executed in parallel, which means
+            that the number of total tasks is the sum of all tasks instead of the
+            maximum number of tasks. Default is set to False.
+        :type parallel:
+            bool
+        :return mpi_prefix: 
+            The mpi_prefix should be added for the operation.
+        :type mpi_prefix:
+            str
         """
-
         if parallel:
             return '{} -n {} -o {} task_affinity '.format(
                    'ibrun', operation.directives['nranks'], operation.directives['np_offset'])
@@ -117,10 +129,15 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
 
     @staticmethod
     def get_mpi_prefix(operation):
-        """Template filter for generating mpi_prefix based on environment and proper directives
-
-        :param:
-            operation
+        """Template filter for getting mpi_prefix based on environment and proper directives.
+        Template filter for Bridges supercomputers.
+ 
+        :param operation: 
+            The operation for which to add mpi_prefix.
+        :return mpi_prefix: 
+            The mpi_prefix should be added for the operation.
+        :type mpi_prefix:
+            str
         """
 
         return '{} -n {} '.format('mpirun', operation.directives['nranks'])

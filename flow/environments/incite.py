@@ -80,10 +80,15 @@ class SummitEnvironment(DefaultLSFEnvironment):
 
     @staticmethod
     def get_mpi_prefix(operation):
-        """Template filter for generating mpi_prefix based on environment and proper directives
+        """Template filter for getting mpi_prefix based on environment and proper directives.
+        Template filter for Summit supercomputers.
 
-        :param:
-            operation
+        :param operation: 
+            The operation for which to add mpi_prefix.
+        :return mpi_prefix:
+            The mpi_prefix should be added for the operation.
+        :type mpi_prefix:
+            str
         """
         extra_args = str(operation.directives.get('extra_jsrun_args', ''))
         resource_set = SummitEnvironment.guess_resource_sets(
@@ -109,12 +114,16 @@ class TitanEnvironment(DefaultTorqueEnvironment):
 
     @staticmethod
     def get_mpi_prefix(operation):
-        """Template filter for generating mpi_prefix based on environment and proper directives
+        """Template filter for getting mpi_prefix based on environment and proper directives.
+        Template filter for Titan supercomputers.
 
-        :param:
-            operation
+        :param operation:
+            The operation for which to add mpi_prefix.
+        :return mpi_prefix:
+            The mpi_prefix should be added for the operation.
+        :type mpi_prefix:
+            str
         """
-
         return '{} -n {} '.format('aprun', operation.directives['nranks'])
 
     filters = {'get_mpi_prefix': get_mpi_prefix.__func__}
@@ -131,12 +140,16 @@ class EosEnvironment(DefaultTorqueEnvironment):
 
     @staticmethod
     def get_mpi_prefix(operation):
-        """Template filter for generating mpi_prefix based on environment and proper directives
+        """Template filter for getting mpi_prefix based on environment and proper directives.
+        Template filter for Eos supercomputers.
 
-        :param:
-            operation
+        :param operation:
+            The operation for which to add mpi_prefix.
+        :return mpi_prefix:
+            The mpi_prefix should be added for the operation.
+        :type mpi_prefix:
+            str
         """
-
         return '{} -n {} '.format('aprun', operation.directives['nranks'])
 
     filters = {'get_mpi_prefix': get_mpi_prefix.__func__}

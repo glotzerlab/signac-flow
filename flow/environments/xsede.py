@@ -53,7 +53,11 @@ class CometEnvironment(DefaultSlurmEnvironment):
         :type mpi_prefix:
             str
         """
-        return '{} -n {} '.format('ibrun', operation.directives['nranks'])
+
+        if operation.directives.get('nranks'):
+            return '{} -n {} '.format('ibrun', operation.directives['nranks'])
+        else:
+            return ''
 
     filters = {'get_mpi_prefix': get_mpi_prefix.__func__}
 
@@ -100,11 +104,15 @@ class Stampede2Environment(DefaultSlurmEnvironment):
         :type mpi_prefix:
             str
         """
-        if parallel:
-            return '{} -n {} -o {} task_affinity '.format(
-                   'ibrun', operation.directives['nranks'], operation.directives['np_offset'])
+
+        if operation.directives.get('nranks'):
+            if parallel:
+                return '{} -n {} -o {} task_affinity '.format(
+                       'ibrun', operation.directives['nranks'], operation.directives['np_offset'])
+            else:
+                return '{} -n {} '.format('ibrun', operation.directives['nranks'])
         else:
-            return '{} -n {} '.format('ibrun', operation.directives['nranks'])
+            return ''
 
     filters = {'get_mpi_prefix': get_mpi_prefix.__func__}
 
@@ -140,7 +148,10 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
             str
         """
 
-        return '{} -n {} '.format('mpirun', operation.directives['nranks'])
+        if operation.directives.get('nranks'):
+            return '{} -n {} '.format('mpirun', operation.directives['nranks'])
+        else:
+            return ''
 
     filters = {'get_mpi_prefix': get_mpi_prefix.__func__}
 

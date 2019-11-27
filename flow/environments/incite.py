@@ -90,6 +90,7 @@ class SummitEnvironment(DefaultLSFEnvironment):
         :type mpi_prefix:
             str
         """
+
         extra_args = str(operation.directives.get('extra_jsrun_args', ''))
         resource_set = SummitEnvironment.guess_resource_sets(
                        operation)
@@ -124,7 +125,11 @@ class TitanEnvironment(DefaultTorqueEnvironment):
         :type mpi_prefix:
             str
         """
-        return '{} -n {} '.format('aprun', operation.directives['nranks'])
+
+        if operation.directives.get('nranks'):
+            return '{} -n {} '.format('aprun', operation.directives['nranks'])
+        else:
+            return ''
 
     filters = {'get_mpi_prefix': get_mpi_prefix.__func__}
 
@@ -150,7 +155,11 @@ class EosEnvironment(DefaultTorqueEnvironment):
         :type mpi_prefix:
             str
         """
-        return '{} -n {} '.format('aprun', operation.directives['nranks'])
+
+        if operation.directives.get('nranks'):
+            return '{} -n {} '.format('aprun', operation.directives['nranks'])
+        else:
+            return ''
 
     filters = {'get_mpi_prefix': get_mpi_prefix.__func__}
 

@@ -206,9 +206,14 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
             The operation for which to add mpi_prefix.
         :return mpi_prefix:
             The mpi_prefix should be added for the operation.
-        :type mpi_prefix: str
+        :type mpi_prefix:
+            str
         """
-        return '{} -n {} '.format('mpiexec', operation.directives['nranks'])
+
+        if operation.directives.get('nranks'):
+            return '{} -n {} '.format('mpiexec', operation.directives['nranks'])
+        else:
+            return ''
 
     filters = {'get_mpi_prefix': get_mpi_prefix.__func__}
 

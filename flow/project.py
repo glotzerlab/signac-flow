@@ -50,6 +50,7 @@ from .scheduling.status import update_status
 from .errors import SubmitError
 from .errors import ConfigKeyError
 from .errors import NoSchedulerError
+from .errors import UserConditionError
 from .errors import UserOperationError
 from .errors import TemplateError
 from .util.tqdm import tqdm
@@ -323,7 +324,13 @@ class FlowCondition(object):
     def __call__(self, job):
         if self._callback is None:
             return True
-        return self._callback(job)
+        try:
+            return self._callback(job)
+        except Exception as e:
+            raise UserConditionError(
+                'An exception was raised while evaluating the condition {name} '
+                'for job {job}.'.format(name=self._callback.__name__, job=job)) from e
+
 
     def __hash__(self):
         return hash(self._callback)
@@ -2640,13 +2647,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             self.print_status(jobs=jobs, **args)
         except NoSchedulerError:
             self.print_status(jobs=jobs, **args)
-        except Exception:
+        except Exception as error:
             logger.error(
-                "Error occured during status update. Use '--show-traceback' to "
+                "Error during status update: {}\nUse '--show-traceback' to "
                 "show the full traceback or '--ignore-errors' to complete the "
-                "update anyways.")
-            if show_traceback:
-                raise
+                "update anyways.".format(str(error)))
+
+            # Always show the user traceback cause
+            if not show_traceback:
+                error = error.__cause__
+            traceback.print_exception(type(error), error, error.__traceback__)
         else:
             # Use small offset to account for overhead with few jobs
             delta_t = (time.time() - start - 0.5) / max(len(jobs), 1)

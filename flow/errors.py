@@ -27,8 +27,13 @@ class NoSchedulerError(AttributeError):
     pass
 
 
+class UserConditionError(RuntimeError):
+    "Indicates an error during evaluation of a FlowCondition."
+    pass
+
+
 class UserOperationError(RuntimeError):
-    "Indicates an error during execution of an operation."
+    "Indicates an error during execution of a FlowOperation."
     pass
 
 

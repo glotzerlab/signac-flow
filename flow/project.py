@@ -331,7 +331,6 @@ class FlowCondition(object):
                 'An exception was raised while evaluating the condition {name} '
                 'for job {job}.'.format(name=self._callback.__name__, job=job)) from e
 
-
     def __hash__(self):
         return hash(self._callback)
 

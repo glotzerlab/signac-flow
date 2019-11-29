@@ -2997,7 +2997,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Set verbosity level according to the `-v` argument.
         logging.basicConfig(level=max(0, logging.WARNING - 10 * args.verbose))
 
-        def _show_tb_and_exit(error):
+        def _show_traceback_and_exit(error):
             if args.show_traceback:
                 traceback.print_exception(type(error), error, error.__traceback__)
             sys.exit(1)
@@ -3008,23 +3008,23 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             print("ERROR: {}".format(error),
                   "Consider to use the 'script' command to generate an execution script instead.",
                   file=sys.stderr)
-            _show_tb_and_exit(error)
+            _show_traceback_and_exit(error)
         except SubmitError as error:
             print("Submission error:", error, file=sys.stderr)
-            _show_tb_and_exit(error)
+            _show_traceback_and_exit(error)
         except (TimeoutError, subprocess.TimeoutExpired) as error:
             print("Error: Failed to complete execution due to "
                   "timeout ({}s).".format(args.timeout), file=sys.stderr)
-            _show_tb_and_exit(error)
+            _show_traceback_and_exit(error)
         except Jinja2TemplateNotFound as error:
             print("Did not find template script '{}'.".format(error), file=sys.stderr)
-            _show_tb_and_exit(error)
+            _show_traceback_and_exit(error)
         except AssertionError as error:
             if not args.show_traceback:
                 print("ERROR: Encountered internal error during program execution. "
                       "Execute with '--show-traceback' or '--debug' to get more "
                       "information.", file=sys.stderr)
-            _show_tb_and_exit(error)
+            _show_traceback_and_exit(error)
         except UserOperationError as error:
             if not args.debug:
                 if str(error):
@@ -3040,7 +3040,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if not args.show_traceback:
                 error = error.__cause__
             args.show_traceback = True
-            _show_tb_and_exit(error)
+            _show_traceback_and_exit(error)
         except Exception as error:
             if not args.debug:
                 if str(error):
@@ -3051,7 +3051,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     print("ERROR: Encountered error during program execution.\n"
                           "Execute with '--show-traceback' or '--debug' to get "
                           "more information.", file=sys.stderr)
-            _show_tb_and_exit(error)
+            _show_traceback_and_exit(error)
 
 
 def _execute_serialized_operation(loads, project, operation):

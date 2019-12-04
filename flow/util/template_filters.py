@@ -17,7 +17,7 @@ def identical(iterable):
 
 
 def format_timedelta(delta, style='HH:MM:SS'):
-    """Format a time delta for interpretation by schedulers."""
+    "Format a time delta for interpretation by schedulers."
     if isinstance(delta, int) or isinstance(delta, float):
         import datetime
         delta = datetime.timedelta(hours=delta)
@@ -33,23 +33,13 @@ def format_timedelta(delta, style='HH:MM:SS'):
 
 
 def homogeneous_openmp_mpi_config(operations):
-    """Check whether operations have identical OpenMP and MPI specification.
-    :param operations:
-        The operations for which to calculate the total number of required tasks.
-    :return:
-        True for all the operations have identical OpenMP and MPI specification while False for not.
-    """
+    """Check whether operations have identical OpenMP and MPI specification."""
     return len({(op.directives.get('nranks'), op.directives.get('omp_num_threads'))
                 for op in operations}) == 1
 
 
 def with_np_offset(operations):
-    """Add the np_offset variable to the operations' directives.
-    :param operations:
-        The operations for whose directives to add np_offset.
-    :return operations:
-        The operations for whose directives have been added with np_offset.
-    """
+    """Add the np_offset variable to the operations' directives."""
     offset = 0
     for operation in operations:
         operation.directives.setdefault('np_offset', offset)

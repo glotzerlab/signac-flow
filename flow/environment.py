@@ -198,7 +198,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         return flow_config.require_config_value(key, ns=cls.__name__, default=default)
 
     @staticmethod
-    def get_mpi_prefix(operation):
+    def get_prefix(operation):
         """Template filter for getting mpi_prefix based on environment and proper directives.
         Template filter for computing environment.
 
@@ -215,7 +215,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         else:
             return ''
 
-    filters = {'get_mpi_prefix': get_mpi_prefix.__func__}
+    filters = {'get_prefix': get_prefix.__func__}
 
 
 class StandardEnvironment(ComputeEnvironment):

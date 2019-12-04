@@ -79,7 +79,7 @@ class SummitEnvironment(DefaultLSFEnvironment):
         return '-n {} -a {} -c {} -g {} {}'.format(nsets, tasks, cpus, gpus, cuda_aware_mpi)
 
     @staticmethod
-    def get_mpi_prefix(operation):
+    def get_prefix(operation):
         """Template filter for getting mpi_prefix based on environment and proper directives.
         Template filter for Summit supercomputers.
 
@@ -101,7 +101,7 @@ class SummitEnvironment(DefaultLSFEnvironment):
     filters = {'calc_num_nodes': calc_num_nodes.__func__,
                'guess_resource_sets': guess_resource_sets.__func__,
                'jsrun_options': jsrun_options.__func__,
-               'get_mpi_prefix': get_mpi_prefix.__func__}
+               'get_prefix': get_prefix.__func__}
 
 
 class TitanEnvironment(DefaultTorqueEnvironment):
@@ -114,7 +114,7 @@ class TitanEnvironment(DefaultTorqueEnvironment):
     cores_per_node = 16
 
     @staticmethod
-    def get_mpi_prefix(operation):
+    def get_prefix(operation):
         """Template filter for getting mpi_prefix based on environment and proper directives.
         Template filter for Titan supercomputers.
 
@@ -131,7 +131,7 @@ class TitanEnvironment(DefaultTorqueEnvironment):
         else:
             return ''
 
-    filters = {'get_mpi_prefix': get_mpi_prefix.__func__}
+    filters = {'get_prefix': get_prefix.__func__}
 
 
 class EosEnvironment(DefaultTorqueEnvironment):
@@ -144,7 +144,7 @@ class EosEnvironment(DefaultTorqueEnvironment):
     cores_per_node = 32
 
     @staticmethod
-    def get_mpi_prefix(operation):
+    def get_prefix(operation):
         """Template filter for getting mpi_prefix based on environment and proper directives.
         Template filter for Eos supercomputers.
 
@@ -161,7 +161,7 @@ class EosEnvironment(DefaultTorqueEnvironment):
         else:
             return ''
 
-    filters = {'get_mpi_prefix': get_mpi_prefix.__func__}
+    filters = {'get_prefix': get_prefix.__func__}
 
 
 __all__ = ['TitanEnvironment', 'EosEnvironment']

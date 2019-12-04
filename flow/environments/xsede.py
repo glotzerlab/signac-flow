@@ -42,7 +42,7 @@ class CometEnvironment(DefaultSlurmEnvironment):
                   '(slurm default is "slurm-%%j.out").'))
 
     @staticmethod
-    def get_mpi_prefix(operation):
+    def get_prefix(operation):
         """Template filter for getting mpi_prefix based on environment and proper directives.
         Template filter for Comet supercomputers.
 
@@ -59,7 +59,7 @@ class CometEnvironment(DefaultSlurmEnvironment):
         else:
             return ''
 
-    filters = {'get_mpi_prefix': get_mpi_prefix.__func__}
+    filters = {'get_prefix': get_prefix.__func__}
 
 
 class Stampede2Environment(DefaultSlurmEnvironment):
@@ -87,7 +87,7 @@ class Stampede2Environment(DefaultSlurmEnvironment):
                   '(slurm default is "slurm-%%j.out").'))
 
     @staticmethod
-    def get_mpi_prefix(operation, parallel=False):
+    def get_prefix(operation, parallel=False):
         """Template filter for getting mpi_prefix based on environment and proper directives.
         Template filter for Stampede2 supercomputers.
 
@@ -114,7 +114,7 @@ class Stampede2Environment(DefaultSlurmEnvironment):
         else:
             return ''
 
-    filters = {'get_mpi_prefix': get_mpi_prefix.__func__}
+    filters = {'get_prefix': get_prefix.__func__}
 
 
 class BridgesEnvironment(DefaultSlurmEnvironment):
@@ -136,7 +136,7 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
           help="Specify the partition to submit to.")
 
     @staticmethod
-    def get_mpi_prefix(operation):
+    def get_prefix(operation):
         """Template filter for getting mpi_prefix based on environment and proper directives.
         Template filter for Bridges supercomputers.
 
@@ -153,7 +153,7 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
         else:
             return ''
 
-    filters = {'get_mpi_prefix': get_mpi_prefix.__func__}
+    filters = {'get_prefix': get_prefix.__func__}
 
 
 __all__ = ['CometEnvironment', 'BridgesEnvironment', 'Stampede2Environment']

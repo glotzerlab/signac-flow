@@ -21,7 +21,7 @@ cd {{ project.config.project_dir }}
 {% if operation.directives.omp_num_threads %}
 export OMP_NUM_THREADS={{ operation.directives.omp_num_threads }}
 {% endif %}
-{{ mpi_prefix|default(operation|get_mpi_prefix) }}{{ cmd_prefix }}{{ operation.cmd }}{{ cmd_suffix }}
+{{ mpi_prefix|default(operation|get_prefix) }}{{ cmd_prefix }}{{ operation.cmd }}{{ cmd_suffix }}
 {% endfor %}
 {% endblock %}
 {% block footer %}

@@ -20,7 +20,7 @@ class renderer:
         self.markdown_output = template.render(**context)
 
     def generate_terminal_output(self, template, context):
-        self.terminal_output = template.render(**context)
+        self.terminal_output = mistune.text(template.render(**context))
 
     def generate_html_output(self, template, context):
         self.generate_markdown_output(template, context)

@@ -732,7 +732,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             return  # no hooks configured
         for entry in hooks_config:
             try:
-                m = re.match('^(?P<class_path>[\w.]+?)(\((?P<constructor>.*)\))?$', entry)
+                m = re.match(r'^(?P<class_path>[\w.]+?)(\((?P<constructor>.*)\))?$', entry)
                 if m:
                     name_module, name_class = m.groupdict()['class_path'].rsplit('.', 1)
                     nodes = [c.rpartition('=') for c in m.groupdict('')['constructor'].split(',')]
@@ -1747,7 +1747,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             logger.debug(
                 "Forking to execute operation '{}' with "
                 "cmd '{}'.".format(operation, operation.cmd))
-            with _run_with_hooks(operation):
+            with self._run_with_hooks(operation):
                 subprocess.run(operation.cmd, shell=True, timeout=timeout, check=True)
         else:
             # ... executing operation in interpreter process as function:
@@ -2505,12 +2505,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             raise KeyError("An operation with this identifier is already added.")
         if hooks:
             self._operation_hooks[name].update(Hooks.from_dict(hooks))
-            if not kwargs.get('fork', False):
-                raise RuntimeError("Hooks require forking!")
-        if kwargs.get('fork', False):
-            raise NotImplementedError()
-        else:
-            self.operations[name] = FlowOperation(cmd=cmd, pre=pre, post=post, directives=kwargs)
+        self.operations[name] = FlowOperation(cmd=cmd, pre=pre, post=post, directives=kwargs)
 
     @deprecated(
         deprecated_in="0.8", removed_in="1.0",
@@ -2685,37 +2680,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 'post': post_conditions.get(func, None),
                 'directives': getattr(func, '_flow_directives', None)}
 
-            # Add default executable to directives.
-            params['directives'] = params['directives'] or dict()
-            params['directives'].setdefault('executable', sys.executable)
-            params['directives'].setdefault('fork', False)
-
             # Update operation hooks
             self._operation_hooks[name].update(Hooks.from_dict(self.hook[func]))
 
             # Construct FlowOperation:
-            cmd = getattr(func, '_flow_cmd', False)
-            _fork = params['directives']['fork']
-
-            if cmd:
-                if _fork:
-                    self._operations[name] = FlowOperation(
-                        cmd=_guess_cmd(func, name, **params), **params)
-
-                    def operation_function(job):
-                        # TODO: Instead of defining a function here, we should rather check the
-                        #       directives during execution; not sure.
-                        cmd = func(job).format(job=job)
-                        job_op = JobOperation(name=name, cmd=cmd, job=job)
-                        with self._run_with_hooks(job_op):
-                            fork(cmd)
-
-                    self._operation_functions[name] = operation_function
-
-                else:
-                    if self._operation_hooks[name] or self.hooks:
-                        raise RuntimeError("Hooks require forking!")
-                    self._operations[name] = FlowOperation(cmd=func, **params)
+            if getattr(func, '_flow_cmd', False):
+                self._operations[name] = FlowOperation(cmd=func, **params)
             else:
                 self._operations[name] = FlowOperation(
                     cmd=_guess_cmd(func, name, **params), **params)

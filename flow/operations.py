@@ -128,10 +128,6 @@ class directives(object):
         return func
 
 
-def fork(func):
-    return directives(fork=True)(func)
-
-
 def _get_operations(include_private=False):
     """"Yields the name of all functions that qualify as an operation function.
 

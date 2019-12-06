@@ -181,20 +181,14 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         be specific to this environment definition. For example, a
         key should be 'account', not 'MyEnvironment.account`.
 
-        :param key:
-            The environment specific configuration key.
-        :type key:
-            str
-        :param default:
-            A default value in case the key cannot be found within the
-            user's configuration.
-        :type key:
-            str
-        :return:
-            The value or default value.
-        :raises SubmitError:
-            If the key is not in the user's configuration and no default
-            value is provided.
+        :param key: The environment specific configuration key.
+        :type key: str
+        :param default: A default value in case the key cannot be found
+            within the user's configuration.
+        :type key: str
+        :return: The value or default value.
+        :raises SubmitError: If the key is not in the user's configuration
+            and no default value is provided.
         """
         return flow_config.require_config_value(key, ns=cls.__name__, default=default)
 

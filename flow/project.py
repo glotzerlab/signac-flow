@@ -601,7 +601,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         except KeyError:
             self._use_buffered_mode = False
 
-    def _setup_template_environment(self):
+    def _setup_template_environment(self, environment=None):
         """Setup the jinja2 template environemnt.
 
         The templating system is used to generate templated scripts for the script()
@@ -650,13 +650,17 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if 'min' not in template_environment.filters:    # for jinja2 < 2.10
             template_environment.filters['min'] = min
 
+        template_environment.filters['get_prefix'] = \
+            lambda operation, parallel=False: \
+            environment.get_prefix(operation, parallel, environment.mpi_cmd_string)
+
         return template_environment
 
     def _template_environment(self, environment=None):
         if environment is None:
             environment = self._environment
         if environment not in self._template_environment_:
-            template_environment = self._setup_template_environment()
+            template_environment = self._setup_template_environment(environment)
             # Add environment-specific custom filters:
             for filter_name, filter_function in getattr(environment, 'filters', {}).items():
                 template_environment.filters[filter_name] = filter_function

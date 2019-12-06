@@ -105,6 +105,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
     hostname_pattern = None
     submit_flags = None
     template = 'base_script.sh'
+    mpi_cmd_string = 'mpiexec'
 
     @classmethod
     def is_present(cls):
@@ -198,7 +199,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         return flow_config.require_config_value(key, ns=cls.__name__, default=default)
 
     @staticmethod
-    def get_prefix(operation):
+    def get_prefix(operation, parallel=False, mpi_cmd_string='mpiexec'):
         """Template filter for getting mpi_prefix based on environment and proper directives.
         Template filter for computing environment.
 
@@ -211,11 +212,9 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         """
 
         if operation.directives.get('nranks'):
-            return '{} -n {} '.format('mpiexec', operation.directives['nranks'])
+            return '{} -n {} '.format(mpi_cmd_string, operation.directives['nranks'])
         else:
             return ''
-
-    filters = {'get_prefix': get_prefix.__func__}
 
 
 class StandardEnvironment(ComputeEnvironment):

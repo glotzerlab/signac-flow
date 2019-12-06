@@ -28,6 +28,7 @@ class SummitEnvironment(DefaultLSFEnvironment):
     """
     hostname_pattern = r'.*\.summit\.olcf\.ornl\.gov'
     template = 'summit.sh'
+    mpi_cmd_string = 'jsrun'
     cores_per_node = 42
     gpus_per_node = 6
 
@@ -79,7 +80,7 @@ class SummitEnvironment(DefaultLSFEnvironment):
         return '-n {} -a {} -c {} -g {} {}'.format(nsets, tasks, cpus, gpus, cuda_aware_mpi)
 
     @staticmethod
-    def get_prefix(operation):
+    def get_prefix(operation, parallel=False, mpi_cmd_string='mpiexec'):
         """Template filter for getting mpi_prefix based on environment and proper directives.
         Template filter for Summit supercomputers.
 
@@ -94,14 +95,13 @@ class SummitEnvironment(DefaultLSFEnvironment):
         extra_args = str(operation.directives.get('extra_jsrun_args', ''))
         resource_set = SummitEnvironment.guess_resource_sets(
                        operation)
-        mpi_prefix = 'jsrun ' + SummitEnvironment.jsrun_options(resource_set)
+        mpi_prefix = mpi_cmd_string + ' ' + SummitEnvironment.jsrun_options(resource_set)
         mpi_prefix += ' -d packed -b rs ' + extra_args + (' ' if extra_args else '')
         return mpi_prefix
 
     filters = {'calc_num_nodes': calc_num_nodes.__func__,
                'guess_resource_sets': guess_resource_sets.__func__,
-               'jsrun_options': jsrun_options.__func__,
-               'get_prefix': get_prefix.__func__}
+               'jsrun_options': jsrun_options.__func__}
 
 
 class TitanEnvironment(DefaultTorqueEnvironment):
@@ -112,26 +112,7 @@ class TitanEnvironment(DefaultTorqueEnvironment):
     hostname_pattern = 'titan'
     template = 'titan.sh'
     cores_per_node = 16
-
-    @staticmethod
-    def get_prefix(operation):
-        """Template filter for getting mpi_prefix based on environment and proper directives.
-        Template filter for Titan supercomputers.
-
-        :param operation:
-            The operation for which to add mpi_prefix.
-        :return mpi_prefix:
-            The mpi_prefix should be added for the operation.
-        :type mpi_prefix:
-            str
-        """
-
-        if operation.directives.get('nranks'):
-            return '{} -n {} '.format('aprun', operation.directives['nranks'])
-        else:
-            return ''
-
-    filters = {'get_prefix': get_prefix.__func__}
+    mpi_cmd_string = 'aprun'
 
 
 class EosEnvironment(DefaultTorqueEnvironment):
@@ -142,26 +123,7 @@ class EosEnvironment(DefaultTorqueEnvironment):
     hostname_pattern = 'eos'
     template = 'eos.sh'
     cores_per_node = 32
-
-    @staticmethod
-    def get_prefix(operation):
-        """Template filter for getting mpi_prefix based on environment and proper directives.
-        Template filter for Eos supercomputers.
-
-        :param operation:
-            The operation for which to add mpi_prefix.
-        :return mpi_prefix:
-            The mpi_prefix should be added for the operation.
-        :type mpi_prefix:
-            str
-        """
-
-        if operation.directives.get('nranks'):
-            return '{} -n {} '.format('aprun', operation.directives['nranks'])
-        else:
-            return ''
-
-    filters = {'get_prefix': get_prefix.__func__}
+    mpi_cmd_string = 'aprun'
 
 
 __all__ = ['TitanEnvironment', 'EosEnvironment']

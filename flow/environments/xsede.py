@@ -19,6 +19,7 @@ class CometEnvironment(DefaultSlurmEnvironment):
     hostname_pattern = 'comet'
     template = 'comet.sh'
     cores_per_node = 24
+    mpi_cmd_string = 'ibrun'
 
     @classmethod
     def add_args(cls, parser):
@@ -41,26 +42,6 @@ class CometEnvironment(DefaultSlurmEnvironment):
                   'If omitted, uses the system default '
                   '(slurm default is "slurm-%%j.out").'))
 
-    @staticmethod
-    def get_prefix(operation):
-        """Template filter for getting mpi_prefix based on environment and proper directives.
-        Template filter for Comet supercomputers.
-
-        :param operation:
-            The operation for which to add mpi_prefix.
-        :return mpi_prefix:
-            The mpi_prefix should be added for the operation.
-        :type mpi_prefix:
-            str
-        """
-
-        if operation.directives.get('nranks'):
-            return '{} -n {} '.format('ibrun', operation.directives['nranks'])
-        else:
-            return ''
-
-    filters = {'get_prefix': get_prefix.__func__}
-
 
 class Stampede2Environment(DefaultSlurmEnvironment):
     """Environment profile for the Stampede2 supercomputer.
@@ -70,6 +51,7 @@ class Stampede2Environment(DefaultSlurmEnvironment):
     hostname_pattern = '.*stampede2'
     template = 'stampede2.sh'
     cores_per_node = 48
+    mpi_cmd_string = 'ibrun'
 
     @classmethod
     def add_args(cls, parser):
@@ -87,7 +69,7 @@ class Stampede2Environment(DefaultSlurmEnvironment):
                   '(slurm default is "slurm-%%j.out").'))
 
     @staticmethod
-    def get_prefix(operation, parallel=False):
+    def get_prefix(operation, parallel=False, mpi_cmd_string='mpiexec'):
         """Template filter for getting mpi_prefix based on environment and proper directives.
         Template filter for Stampede2 supercomputers.
 
@@ -108,13 +90,12 @@ class Stampede2Environment(DefaultSlurmEnvironment):
         if operation.directives.get('nranks'):
             if parallel:
                 return '{} -n {} -o {} task_affinity '.format(
-                       'ibrun', operation.directives['nranks'], operation.directives['np_offset'])
+                       mpi_cmd_string, operation.directives['nranks'],
+                       operation.directives['np_offset'])
             else:
-                return '{} -n {} '.format('ibrun', operation.directives['nranks'])
+                return '{} -n {} '.format(mpi_cmd_string, operation.directives['nranks'])
         else:
             return ''
-
-    filters = {'get_prefix': get_prefix.__func__}
 
 
 class BridgesEnvironment(DefaultSlurmEnvironment):
@@ -125,6 +106,7 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
     hostname_pattern = r'.*\.bridges\.psc\.edu$'
     template = 'bridges.sh'
     cores_per_node = 28
+    mpi_cmd_string = 'mpirun'
 
     @classmethod
     def add_args(cls, parser):
@@ -134,26 +116,6 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
           choices=['RM', 'RM-shared', 'RM-small', 'GPU', 'GPU-shared', 'LM'],
           default='RM-shared',
           help="Specify the partition to submit to.")
-
-    @staticmethod
-    def get_prefix(operation):
-        """Template filter for getting mpi_prefix based on environment and proper directives.
-        Template filter for Bridges supercomputers.
-
-        :param operation:
-            The operation for which to add mpi_prefix.
-        :return mpi_prefix:
-            The mpi_prefix should be added for the operation.
-        :type mpi_prefix:
-            str
-        """
-
-        if operation.directives.get('nranks'):
-            return '{} -n {} '.format('mpirun', operation.directives['nranks'])
-        else:
-            return ''
-
-    filters = {'get_prefix': get_prefix.__func__}
 
 
 __all__ = ['CometEnvironment', 'BridgesEnvironment', 'Stampede2Environment']

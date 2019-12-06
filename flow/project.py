@@ -1755,7 +1755,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "Executing operation '{}' with current interpreter "
                 "process ({}).".format(operation, os.getpid()))
             try:
-                with _run_with_hooks(operation):
+                with self._run_with_hooks(operation):
                     self._operation_functions[operation.name](operation.job)
             except Exception as e:
                 raise UserOperationError(

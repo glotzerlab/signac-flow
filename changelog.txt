@@ -13,6 +13,7 @@ Added
 
 - Add "fork" directive to enforce the execution of operations within a subprocess (#159).
 - Operation graph detection based on function comparison (#178).
+- Exceptions raised during operations always show tracebacks of user code (#169, #171).
 
 Changed
 +++++++

@@ -19,6 +19,7 @@ import functools
 import contextlib
 import random
 import subprocess
+import traceback
 from deprecation import deprecated
 from collections import defaultdict
 from collections import OrderedDict
@@ -49,6 +50,8 @@ from .scheduling.status import update_status
 from .errors import SubmitError
 from .errors import ConfigKeyError
 from .errors import NoSchedulerError
+from .errors import UserConditionError
+from .errors import UserOperationError
 from .errors import TemplateError
 from .util.tqdm import tqdm
 from .util.misc import _positive_int
@@ -321,7 +324,12 @@ class FlowCondition(object):
     def __call__(self, job):
         if self._callback is None:
             return True
-        return self._callback(job)
+        try:
+            return self._callback(job)
+        except Exception as e:
+            raise UserConditionError(
+                'An exception was raised while evaluating the condition {name} '
+                'for job {job}.'.format(name=self._callback.__name__, job=job)) from e
 
     def __hash__(self):
         return hash(self._callback)
@@ -1667,7 +1675,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             logger.debug(
                 "Executing operation '{}' with current interpreter "
                 "process ({}).".format(operation, os.getpid()))
-            self._operation_functions[operation.name](operation.job)
+            try:
+                self._operation_functions[operation.name](operation.job)
+            except Exception as e:
+                raise UserOperationError(
+                    'An exception was raised during operation {operation.name} '
+                    'for job {operation.job}.'.format(operation=operation)) from e
 
     def run(self, jobs=None, names=None, pretend=False, np=None, timeout=None, num=None,
             num_passes=1, progress=False, order=None):
@@ -2633,13 +2646,18 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             self.print_status(jobs=jobs, **args)
         except NoSchedulerError:
             self.print_status(jobs=jobs, **args)
-        except Exception:
-            logger.error(
-                "Error occured during status update. Use '--show-traceback' to "
-                "show the full traceback or '--ignore-errors' to complete the "
-                "update anyways.")
+        except Exception as error:
             if show_traceback:
-                raise
+                logger.error(
+                    "Error during status update: {}\nUse '--ignore-errors' to "
+                    "complete the update anyways.".format(str(error)))
+            else:
+                logger.error(
+                    "Error during status update: {}\nUse '--ignore-errors' to "
+                    "complete the update anyways or '--show-traceback' to show "
+                    "the full traceback.".format(str(error)))
+                error = error.__cause__  # Always show the user traceback cause.
+            traceback.print_exception(type(error), error, error.__traceback__)
         else:
             # Use small offset to account for overhead with few jobs
             delta_t = (time.time() - start - 0.5) / max(len(jobs), 1)
@@ -2980,11 +2998,19 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Set verbosity level according to the `-v` argument.
         logging.basicConfig(level=max(0, logging.WARNING - 10 * args.verbose))
 
-        def _exit_or_raise():
+        def _show_traceback_and_exit(error):
             if args.show_traceback:
-                raise
+                traceback.print_exception(type(error), error, error.__traceback__)
+            elif isinstance(error, (UserOperationError, UserConditionError)):
+                # Always show the user traceback cause.
+                error = error.__cause__
+                traceback.print_exception(type(error), error, error.__traceback__)
+                print("Execute with '--show-traceback' or '--debug' to show the "
+                      "full traceback.", file=sys.stderr)
             else:
-                sys.exit(1)
+                print("Execute with '--show-traceback' or '--debug' to get more "
+                      "information.", file=sys.stderr)
+            sys.exit(1)
 
         try:
             args.func(args)
@@ -2992,34 +3018,37 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             print("ERROR: {}".format(error),
                   "Consider to use the 'script' command to generate an execution script instead.",
                   file=sys.stderr)
-            _exit_or_raise()
+            _show_traceback_and_exit(error)
         except SubmitError as error:
             print("Submission error:", error, file=sys.stderr)
-            _exit_or_raise()
-        except (TimeoutError, subprocess.TimeoutExpired):
+            _show_traceback_and_exit(error)
+        except (TimeoutError, subprocess.TimeoutExpired) as error:
             print("Error: Failed to complete execution due to "
                   "timeout ({}s).".format(args.timeout), file=sys.stderr)
-            _exit_or_raise()
+            _show_traceback_and_exit(error)
         except Jinja2TemplateNotFound as error:
             print("Did not find template script '{}'.".format(error), file=sys.stderr)
-            _exit_or_raise()
-        except AssertionError:
+            _show_traceback_and_exit(error)
+        except AssertionError as error:
             if not args.show_traceback:
-                print("ERROR: Encountered internal error during program execution. "
-                      "Execute with '--show-traceback' or '--debug' to get more "
-                      "information.", file=sys.stderr)
-            _exit_or_raise()
+                print("ERROR: Encountered internal error during program execution.",
+                      file=sys.stderr)
+            _show_traceback_and_exit(error)
+        except (UserOperationError, UserConditionError) as error:
+            if str(error):
+                print("ERROR: {}\n".format(error), file=sys.stderr)
+            else:
+                print("ERROR: Encountered error during program execution.\n",
+                      file=sys.stderr)
+            _show_traceback_and_exit(error)
         except Exception as error:
-            if not args.debug:
-                if str(error):
-                    print("ERROR: Encountered error during program execution: '{}'\n"
-                          "Execute with '--show-traceback' or '--debug' to get "
-                          "more information.".format(error), file=sys.stderr)
-                else:
-                    print("ERROR: Encountered error during program execution.\n"
-                          "Execute with '--show-traceback' or '--debug' to get "
-                          "more information.", file=sys.stderr)
-            _exit_or_raise()
+            if str(error):
+                print("ERROR: Encountered error during program execution: "
+                      "'{}'\n".format(error), file=sys.stderr)
+            else:
+                print("ERROR: Encountered error during program execution.\n",
+                      file=sys.stderr)
+            _show_traceback_and_exit(error)
 
 
 def _execute_serialized_operation(loads, project, operation):

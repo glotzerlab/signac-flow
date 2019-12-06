@@ -2647,14 +2647,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         except NoSchedulerError:
             self.print_status(jobs=jobs, **args)
         except Exception as error:
-            logger.error(
-                "Error during status update: {}\nUse '--show-traceback' to "
-                "show the full traceback or '--ignore-errors' to complete the "
-                "update anyways.".format(str(error)))
-
-            # Always show the user traceback cause
-            if not show_traceback:
-                error = error.__cause__
+            if show_traceback:
+                logger.error(
+                    "Error during status update: {}\nUse '--ignore-errors' to "
+                    "complete the update anyways.".format(str(error)))
+            else:
+                logger.error(
+                    "Error during status update: {}\nUse '--ignore-errors' to "
+                    "complete the update anyways or '--show-traceback' to show "
+                    "the full traceback.".format(str(error)))
+                error = error.__cause__  # Always show the user traceback cause.
             traceback.print_exception(type(error), error, error.__traceback__)
         else:
             # Use small offset to account for overhead with few jobs
@@ -2999,6 +3001,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         def _show_traceback_and_exit(error):
             if args.show_traceback:
                 traceback.print_exception(type(error), error, error.__traceback__)
+            elif isinstance(error, (UserOperationError, UserConditionError)):
+                # Always show the user traceback cause.
+                error = error.__cause__
+                traceback.print_exception(type(error), error, error.__traceback__)
+                print("Execute with '--show-traceback' or '--debug' to show the "
+                      "full traceback.", file=sys.stderr)
+            else:
+                print("Execute with '--show-traceback' or '--debug' to get more "
+                      "information.", file=sys.stderr)
             sys.exit(1)
 
         try:
@@ -3020,36 +3031,23 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             _show_traceback_and_exit(error)
         except AssertionError as error:
             if not args.show_traceback:
-                print("ERROR: Encountered internal error during program execution. "
-                      "Execute with '--show-traceback' or '--debug' to get more "
-                      "information.", file=sys.stderr)
+                print("ERROR: Encountered internal error during program execution.",
+                      file=sys.stderr)
             _show_traceback_and_exit(error)
-        except UserOperationError as error:
-            if not args.debug:
-                if str(error):
-                    print("ERROR: {}\n"
-                          "Execute with '--show-traceback' or '--debug' to get "
-                          "more information.".format(error), file=sys.stderr)
-                else:
-                    print("ERROR: Encountered error during program execution.\n"
-                          "Execute with '--show-traceback' or '--debug' to get "
-                          "more information.", file=sys.stderr)
-
-            # Always show the user traceback cause
-            if not args.show_traceback:
-                error = error.__cause__
-            args.show_traceback = True
+        except (UserOperationError, UserConditionError) as error:
+            if str(error):
+                print("ERROR: {}\n".format(error), file=sys.stderr)
+            else:
+                print("ERROR: Encountered error during program execution.\n",
+                      file=sys.stderr)
             _show_traceback_and_exit(error)
         except Exception as error:
-            if not args.debug:
-                if str(error):
-                    print("ERROR: Encountered error during program execution: '{}'\n"
-                          "Execute with '--show-traceback' or '--debug' to get "
-                          "more information.".format(error), file=sys.stderr)
-                else:
-                    print("ERROR: Encountered error during program execution.\n"
-                          "Execute with '--show-traceback' or '--debug' to get "
-                          "more information.", file=sys.stderr)
+            if str(error):
+                print("ERROR: Encountered error during program execution: "
+                      "'{}'\n".format(error), file=sys.stderr)
+            else:
+                print("ERROR: Encountered error during program execution.\n",
+                      file=sys.stderr)
             _show_traceback_and_exit(error)
 
 

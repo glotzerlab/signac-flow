@@ -6,7 +6,7 @@ import logging
 
 class LogOperations(object):
 
-    def __init__(self, fn_logfile='operations.log'):
+    def __init__(self, fn_logfile='.operations.log'):
         self._fn_logfile = fn_logfile
         self._loggers = dict()
 

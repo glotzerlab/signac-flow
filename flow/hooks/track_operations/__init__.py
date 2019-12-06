@@ -13,7 +13,7 @@ else:
     GIT = True
 
 
-FN_LOGFILE = 'operations_log.txt'
+FN_LOGFILE = '.operations_log.txt'
 
 
 class TrackOperations(object):

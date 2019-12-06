@@ -734,7 +734,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             try:
                 m = re.match(r'^(?P<path>[\w.]+?)(\((?P<constructor>.*)\))?$', entry)
                 if m:
-                    print(m.groupdict())
                     name_module, name_installer = m.groupdict()['path'].rsplit('.', 1)
                     nodes = [c.rpartition('=') for c in m.groupdict('')['constructor'].split(',')]
                     kwargs = {k: ast.literal_eval(v) for k, _, v in nodes if k}

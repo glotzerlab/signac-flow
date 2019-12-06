@@ -87,6 +87,16 @@ class SummitEnvironment(DefaultLSFEnvironment):
 
         :param operation:
             The operation for which to add prefix.
+        :param mpi_prefix:
+            User defined mpi_prefix string.Default is set to None.
+        :param cmd_prefix:
+            User defined cmd_prefix string.Default is set to None.
+        :param parallel:
+            If True, operations are assumed to be executed in parallel, which means
+            that the number of total tasks is the sum of all tasks instead of the
+            maximum number of tasks. Default is set to False.
+        :param mpi_cmd:
+            Cluster system specific mpi cmd string. Default is set to 'mpiexec'.
         :return prefix:
             The prefix should be added for the operation.
         :type prefix:

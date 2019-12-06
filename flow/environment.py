@@ -193,7 +193,8 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         return flow_config.require_config_value(key, ns=cls.__name__, default=default)
 
     @staticmethod
-    def get_prefix(operation, parallel=False, mpi_cmd_string='mpiexec'):
+    def get_prefix(operation, mpi_prefix=None, cmd_prefix=None, parallel=False,
+                   mpi_cmd_string='mpiexec'):
         """Template filter for getting prefix based on environment and proper directives.
         Template filter for computing environment.
 
@@ -208,8 +209,12 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         prefix = ''
         if operation.directives.get('omp_num_threads'):
             prefix += 'export OMP_NUM_THREADS={}\n'.format(operation.directives['omp_num_threads'])
-        if operation.directives.get('nranks'):
+        if mpi_prefix:
+            prefix += mpi_prefix
+        elif operation.directives.get('nranks'):
             prefix += '{} -n {} '.format(mpi_cmd_string, operation.directives['nranks'])
+        if cmd_prefix:
+            prefix += cmd_prefix
         return prefix
 
 

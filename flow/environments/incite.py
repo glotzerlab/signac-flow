@@ -80,7 +80,8 @@ class SummitEnvironment(DefaultLSFEnvironment):
         return '-n {} -a {} -c {} -g {} {}'.format(nsets, tasks, cpus, gpus, cuda_aware_mpi)
 
     @staticmethod
-    def get_prefix(operation, parallel=False, mpi_cmd_string='mpiexec'):
+    def get_prefix(operation, mpi_prefix=None, cmd_prefix=None, parallel=False,
+                   mpi_cmd_string='mpiexec'):
         """Template filter for getting prefix based on environment and proper directives.
         Template filter for Summit supercomputers.
 
@@ -95,11 +96,16 @@ class SummitEnvironment(DefaultLSFEnvironment):
         prefix = ''
         if operation.directives.get('omp_num_threads'):
             prefix += 'export OMP_NUM_THREADS={}\n'.format(operation.directives['omp_num_threads'])
-        extra_args = str(operation.directives.get('extra_jsrun_args', ''))
-        resource_set = SummitEnvironment.guess_resource_sets(
-                       operation)
-        prefix += mpi_cmd_string + ' ' + SummitEnvironment.jsrun_options(resource_set)
-        prefix += ' -d packed -b rs ' + extra_args + (' ' if extra_args else '')
+        if mpi_prefix:
+            prefix += mpi_prefix
+        else:
+            extra_args = str(operation.directives.get('extra_jsrun_args', ''))
+            resource_set = SummitEnvironment.guess_resource_sets(
+                           operation)
+            prefix += mpi_cmd_string + ' ' + SummitEnvironment.jsrun_options(resource_set)
+            prefix += ' -d packed -b rs ' + extra_args + (' ' if extra_args else '')
+        if cmd_prefix:
+            prefix += cmd_prefix
         return prefix
 
     filters = {'calc_num_nodes': calc_num_nodes.__func__,

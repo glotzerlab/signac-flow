@@ -81,23 +81,23 @@ class SummitEnvironment(DefaultLSFEnvironment):
 
     @staticmethod
     def get_prefix(operation, parallel=False, mpi_cmd_string='mpiexec'):
-        """Template filter for getting mpi_prefix based on environment and proper directives.
+        """Template filter for getting prefix based on environment and proper directives.
         Template filter for Summit supercomputers.
 
         :param operation:
-            The operation for which to add mpi_prefix.
-        :return mpi_prefix:
-            The mpi_prefix should be added for the operation.
-        :type mpi_prefix:
+            The operation for which to add prefix.
+        :return prefix:
+            The prefix should be added for the operation.
+        :type prefix:
             str
         """
 
         extra_args = str(operation.directives.get('extra_jsrun_args', ''))
         resource_set = SummitEnvironment.guess_resource_sets(
                        operation)
-        mpi_prefix = mpi_cmd_string + ' ' + SummitEnvironment.jsrun_options(resource_set)
-        mpi_prefix += ' -d packed -b rs ' + extra_args + (' ' if extra_args else '')
-        return mpi_prefix
+        prefix = mpi_cmd_string + ' ' + SummitEnvironment.jsrun_options(resource_set)
+        prefix += ' -d packed -b rs ' + extra_args + (' ' if extra_args else '')
+        return prefix
 
     filters = {'calc_num_nodes': calc_num_nodes.__func__,
                'guess_resource_sets': guess_resource_sets.__func__,

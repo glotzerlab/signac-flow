@@ -200,14 +200,14 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
     @staticmethod
     def get_prefix(operation, parallel=False, mpi_cmd_string='mpiexec'):
-        """Template filter for getting mpi_prefix based on environment and proper directives.
+        """Template filter for getting prefix based on environment and proper directives.
         Template filter for computing environment.
 
         :param operation:
-            The operation for which to add mpi_prefix.
-        :return mpi_prefix:
-            The mpi_prefix should be added for the operation.
-        :type mpi_prefix:
+            The operation for which to add prefix.
+        :return prefix:
+            The prefix should be added for the operation.
+        :type prefix:
             str
         """
 

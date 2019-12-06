@@ -205,10 +205,12 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
             str
         """
 
+        prefix = ''
+        if operation.directives.get('omp_num_threads'):
+            prefix += 'export OMP_NUM_THREADS={}\n'.format(operation.directives['omp_num_threads'])
         if operation.directives.get('nranks'):
-            return '{} -n {} '.format(mpi_cmd_string, operation.directives['nranks'])
-        else:
-            return ''
+            prefix += '{} -n {} '.format(mpi_cmd_string, operation.directives['nranks'])
+        return prefix
 
 
 class StandardEnvironment(ComputeEnvironment):

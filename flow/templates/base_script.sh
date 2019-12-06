@@ -18,9 +18,6 @@ cd {{ project.config.project_dir }}
 {% for operation in operations %}
 
 # {{ "%s"|format(operation) }}
-{% if operation.directives.omp_num_threads %}
-export OMP_NUM_THREADS={{ operation.directives.omp_num_threads }}
-{% endif %}
 {{ mpi_prefix|default(operation|get_prefix) }}{{ cmd_prefix }}{{ operation.cmd }}{{ cmd_suffix }}
 {% endfor %}
 {% endblock %}

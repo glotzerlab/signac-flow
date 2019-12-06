@@ -92,10 +92,13 @@ class SummitEnvironment(DefaultLSFEnvironment):
             str
         """
 
+        prefix = ''
+        if operation.directives.get('omp_num_threads'):
+            prefix += 'export OMP_NUM_THREADS={}\n'.format(operation.directives['omp_num_threads'])
         extra_args = str(operation.directives.get('extra_jsrun_args', ''))
         resource_set = SummitEnvironment.guess_resource_sets(
                        operation)
-        prefix = mpi_cmd_string + ' ' + SummitEnvironment.jsrun_options(resource_set)
+        prefix += mpi_cmd_string + ' ' + SummitEnvironment.jsrun_options(resource_set)
         prefix += ' -d packed -b rs ' + extra_args + (' ' if extra_args else '')
         return prefix
 

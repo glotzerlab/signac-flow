@@ -95,12 +95,6 @@ class TrackWorkspaceWithGit(object):
         self._per_job = per_job
         self._warnings = defaultdict(set)
 
-    def install_hooks(self, project):
-        project.hooks.on_start.append(self.commit_before)
-        project.hooks.on_success.append(self.commit_after)
-        project.hooks.on_fail.append(self.commit_after)
-        return project
-
     def _get_repo(self, operation):
         if self._per_job:
             return _get_or_init_git_repo(root=operation.job.workspace())
@@ -125,3 +119,11 @@ class TrackWorkspaceWithGit(object):
                           "with error '{}'.".format(operation, error), metadata)
         else:
             _commit(repo, "Executed operation {}.".format(operation), metadata)
+
+    def install_hooks(self, project):
+        project.hooks.on_start.append(self.commit_before)
+        project.hooks.on_success.append(self.commit_after)
+        project.hooks.on_fail.append(self.commit_after)
+        return project
+
+    __call__ = install_hooks

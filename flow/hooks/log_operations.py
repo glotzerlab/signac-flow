@@ -34,3 +34,5 @@ class LogOperations(object):
         project.hooks.on_success.append(self.log_operation)
         project.hooks.on_fail.append(self.log_operation)
         return project
+
+    __call__ = install_hooks

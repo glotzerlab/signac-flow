@@ -52,3 +52,5 @@ class TrackOperations(object):
     def install_hooks(self, project):
         project.hooks.on_start.append(self.log_operation(stage='prior'))
         return project
+
+    __call__ = install_hooks

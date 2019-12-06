@@ -100,3 +100,5 @@ class SnapshotProject(object):
     def install_hooks(self, project):
         project.hooks.on_start.append(self.archive_project)
         return project
+
+    __call__ = install_hooks

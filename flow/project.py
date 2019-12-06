@@ -732,17 +732,21 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             return  # no hooks configured
         for entry in hooks_config:
             try:
-                m = re.match(r'^(?P<class_path>[\w.]+?)(\((?P<constructor>.*)\))?$', entry)
+                m = re.match(r'^(?P<path>[\w.]+?)(\((?P<constructor>.*)\))?$', entry)
                 if m:
-                    name_module, name_class = m.groupdict()['class_path'].rsplit('.', 1)
+                    print(m.groupdict())
+                    name_module, name_installer = m.groupdict()['path'].rsplit('.', 1)
                     nodes = [c.rpartition('=') for c in m.groupdict('')['constructor'].split(',')]
                     kwargs = {k: ast.literal_eval(v) for k, _, v in nodes if k}
-                    hook_class = getattr(importlib.import_module(name_module), name_class)
-                    hook_class(** kwargs).install_hooks(self)
+                    hook = getattr(importlib.import_module(name_module), name_installer)
+                    if inspect.isclass(hook):
+                        hook(** kwargs)(self)
+                    else:
+                        hook(self)
                 else:
                     raise ValueError("The hook configuration entry '{}' is invalid.".format(entry))
             except (ImportError, AttributeError, ValueError, TypeError) as error:
-                raise RuntimeError("Unable to install hook '{}': {}".format(entry, error))
+                raise RuntimeError("Unable to install '{}': {}".format(entry, error))
 
     @classmethod
     def label(cls, label_name_or_func=None):

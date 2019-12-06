@@ -8,7 +8,7 @@ from .track_operations import TrackOperations
 from .snapshots import SnapshotProject
 try:
     from .git_workspace_tracking import TrackWorkspaceWithGit
-except ImportError as error:
+except ImportError:
 
     class TrackWorkspaceWithGit(object):
         def __init__(self, *args, **kwargs):

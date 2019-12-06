@@ -19,7 +19,7 @@ class CometEnvironment(DefaultSlurmEnvironment):
     hostname_pattern = 'comet'
     template = 'comet.sh'
     cores_per_node = 24
-    mpi_cmd_string = 'ibrun'
+    mpi_cmd = 'ibrun'
 
     @classmethod
     def add_args(cls, parser):
@@ -51,7 +51,7 @@ class Stampede2Environment(DefaultSlurmEnvironment):
     hostname_pattern = '.*stampede2'
     template = 'stampede2.sh'
     cores_per_node = 48
-    mpi_cmd_string = 'ibrun'
+    mpi_cmd = 'ibrun'
 
     @classmethod
     def add_args(cls, parser):
@@ -70,7 +70,7 @@ class Stampede2Environment(DefaultSlurmEnvironment):
 
     @staticmethod
     def get_prefix(operation, mpi_prefix=None, cmd_prefix=None, parallel=False,
-                   mpi_cmd_string='mpiexec'):
+                   mpi_cmd='mpiexec'):
         """Template filter for getting prefix based on environment and proper directives.
         Template filter for Stampede2 supercomputers.
 
@@ -96,10 +96,10 @@ class Stampede2Environment(DefaultSlurmEnvironment):
         elif operation.directives.get('nranks'):
             if parallel:
                 prefix += '{} -n {} -o {} task_affinity '.format(
-                       mpi_cmd_string, operation.directives['nranks'],
+                       mpi_cmd, operation.directives['nranks'],
                        operation.directives['np_offset'])
             else:
-                prefix += '{} -n {} '.format(mpi_cmd_string, operation.directives['nranks'])
+                prefix += '{} -n {} '.format(mpi_cmd, operation.directives['nranks'])
         if cmd_prefix:
             prefix += cmd_prefix
         return prefix
@@ -113,7 +113,7 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
     hostname_pattern = r'.*\.bridges\.psc\.edu$'
     template = 'bridges.sh'
     cores_per_node = 28
-    mpi_cmd_string = 'mpirun'
+    mpi_cmd = 'mpirun'
 
     @classmethod
     def add_args(cls, parser):

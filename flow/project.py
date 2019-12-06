@@ -651,9 +651,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             template_environment.filters['min'] = min
 
         template_environment.filters['get_prefix'] = \
-            lambda operation, mpi_prefix, cmd_prefix, parallel=False: \
-            environment.get_prefix(operation, mpi_prefix, cmd_prefix, parallel,
-                                   environment.mpi_cmd_string)
+            lambda operation, mpi_prefix, cmd_prefix, parallel=False, mpi_cmd=environment.mpi_cmd: \
+            environment.get_prefix(operation, mpi_prefix, cmd_prefix, parallel, mpi_cmd)
 
         return template_environment
 

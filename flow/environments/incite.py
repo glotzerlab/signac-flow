@@ -28,7 +28,7 @@ class SummitEnvironment(DefaultLSFEnvironment):
     """
     hostname_pattern = r'.*\.summit\.olcf\.ornl\.gov'
     template = 'summit.sh'
-    mpi_cmd_string = 'jsrun'
+    mpi_cmd = 'jsrun'
     cores_per_node = 42
     gpus_per_node = 6
 
@@ -81,7 +81,7 @@ class SummitEnvironment(DefaultLSFEnvironment):
 
     @staticmethod
     def get_prefix(operation, mpi_prefix=None, cmd_prefix=None, parallel=False,
-                   mpi_cmd_string='mpiexec'):
+                   mpi_cmd='mpiexec'):
         """Template filter for getting prefix based on environment and proper directives.
         Template filter for Summit supercomputers.
 
@@ -102,7 +102,7 @@ class SummitEnvironment(DefaultLSFEnvironment):
             extra_args = str(operation.directives.get('extra_jsrun_args', ''))
             resource_set = SummitEnvironment.guess_resource_sets(
                            operation)
-            prefix += mpi_cmd_string + ' ' + SummitEnvironment.jsrun_options(resource_set)
+            prefix += mpi_cmd + ' ' + SummitEnvironment.jsrun_options(resource_set)
             prefix += ' -d packed -b rs ' + extra_args + (' ' if extra_args else '')
         if cmd_prefix:
             prefix += cmd_prefix
@@ -121,7 +121,7 @@ class TitanEnvironment(DefaultTorqueEnvironment):
     hostname_pattern = 'titan'
     template = 'titan.sh'
     cores_per_node = 16
-    mpi_cmd_string = 'aprun'
+    mpi_cmd = 'aprun'
 
 
 class EosEnvironment(DefaultTorqueEnvironment):
@@ -132,7 +132,7 @@ class EosEnvironment(DefaultTorqueEnvironment):
     hostname_pattern = 'eos'
     template = 'eos.sh'
     cores_per_node = 32
-    mpi_cmd_string = 'aprun'
+    mpi_cmd = 'aprun'
 
 
 __all__ = ['TitanEnvironment', 'EosEnvironment']

@@ -14,15 +14,9 @@ from .git_util import collect_metadata_with_git as collect_metadata
 
 logger = logging.getLogger('git_tracking')
 
-METADATA_DELIMITER = '-' * 10
-
 GIT_COMMIT_MSG = """{title}
 
-{metadata_delimiter}
-{metadata}
-{metadata_delimiter}
-
-This commit was auto-generated.
+*This commit was auto-generated.*
 """
 
 
@@ -47,23 +41,14 @@ def _get_or_init_git_repo(root):
         return git.Repo.init(root)
 
 
-def _commit(repo, title, metadata):
+def _commit(repo, title):
     try:
-        repo.git.commit('-m', GIT_COMMIT_MSG.format(
-            title=title, metadata=json.dumps(metadata, indent=2),
-            metadata_delimiter=METADATA_DELIMITER))
+        repo.git.commit('-m', GIT_COMMIT_MSG.format(title=title))
     except git.exc.GitCommandError as error:
         if "nothing to commit, working tree clean" in str(error):
             pass
         else:
             raise
-
-
-def _get_commit_metadata(commit_msg):
-    lines = commit_msg.splitlines()
-    start = lines.index(METADATA_DELIMITER) + 1
-    stop = lines.index(METADATA_DELIMITER, start)
-    return json.loads('\n'.join(lines[start:stop]))
 
 
 def get_project_source_git_metadata(project, strict=False):
@@ -91,7 +76,7 @@ def get_project_source_git_metadata(project, strict=False):
 
 class TrackWorkspaceWithGit(object):
 
-    def __init__(self, per_job=True, metadata_delimiter=METADATA_DELIMITER):
+    def __init__(self, per_job=True):
         self._per_job = per_job
         self._warnings = defaultdict(set)
 
@@ -106,7 +91,7 @@ class TrackWorkspaceWithGit(object):
         metadata['stage'] = 'prior'
         repo = self._get_repo(operation)
         repo.git.add(A=True)
-        _commit(repo, "Before executing operation {}.".format(operation), metadata)
+        _commit(repo, "Before executing operation {}.".format(operation))
 
     def commit_after(self, operation, error=None):
         metadata = collect_metadata(operation)
@@ -116,9 +101,10 @@ class TrackWorkspaceWithGit(object):
         repo.git.add(A=True)
         if error:
             _commit(repo, "Executed operation {}.\n\nThe execution failed "
-                          "with error '{}'.".format(operation, error), metadata)
+                          "with error '{}'.".format(operation, error))
         else:
-            _commit(repo, "Executed operation {}.".format(operation), metadata)
+            _commit(repo, "Executed operation {}.".format(operation))
+        repo.git.notes('append', repo.commit(), '-m', 'signac:' + json.dumps(metadata))
 
     def install_hooks(self, project):
         project.hooks.on_start.append(self.commit_before)

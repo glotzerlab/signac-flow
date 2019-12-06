@@ -6,7 +6,7 @@ import time
 
 def collect_metadata(operation):
     return {
-        '_metadata_schema_version': 1,
+        '_schema_version': 1,
         'time': time.time(),
         'project': {
             'path': operation.job._project.root_directory(),

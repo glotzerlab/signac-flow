@@ -3,9 +3,6 @@
 {% set field_operation = "%s %s" %}
 {% set ns = namespace(field_parameters='', dash='') %}
 {% endif %}
-{% if overview %}
-{% set field_progress_bar = '| %s | %s |'%}
-{% endif %}
 {% if detailed %}
 {% if parameters %}
 {% for para in parameters %}
@@ -22,19 +19,18 @@
 {{ 'Total # of jobs: %s ' | format(jobs | length) }}
 
 {% block progress %}
-{{ field_progress_bar | format('label', 'ratio') }}
-{{ field_progress_bar | format('-' , '-') }}
+| label | ratio |
+| ----- | ----- |
 {% for label in progress_sorted %}
-{{ field_progress_bar | format(label[0], label[1] | draw_progressbar(jobs | length, '\\')) }}
+| {{ label[0] }} | {{ label[1]|draw_progressbar(jobs | length, '\\') }} |
 {% endfor %}
 {% endblock%}
 
 {% block operation_summary %}
-{% set field_operation = '| %s | %s |' %}
-{{ field_operation | format('operation', 'number of eligible jobs') }}
-{{ field_operation | format('-' , '-') }}
+| operation | number of eligible jobs |
+| --------- | ----------------------- |
 {% for op, n_jobs in op_counter %}
-{{ field_operation | format(op , n_jobs) }}
+| {{ op }} | {{ n_jobs }} |
 {% endfor %}
 {% endblock %}
 {% endif %}
@@ -42,23 +38,21 @@
 
 {% block detailed %}
 {% if detailed %}
-{% set field_detailed = '| %s | %s | %s%s |' %}
 {{ 'Detailed View: \n' }}
-{{ field_detailed | format('job_id', 'operation', para_head, 'labels') }}
-{{ field_detailed | format('-' , '-' , ns.dash, '-' ) }}
+| job_id | operation | {{ para_head }}labels |
+| ------ | --------- | {{ ns.dash }}-------- |
 {% for job in jobs %}
 {% if parameters %}
 {% set para_output = ns.field_parameters | format(*job['parameters'].values()) %}
 {% endif %}
 {% for key, value in job['operations'].items() if value | job_filter(scheduler_status_code, all_ops) %}
 {% if loop.first %}
-{{ '| %s | ' | format(job['job_id']) }}{{ field_operation | highlight(value['eligible'], '**', '**') | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }}{{' | '}}{{para_output}}{{ '%s |' | format(job['labels'] | join(', ')) }}
+| {{job['job_id']}} | {{ field_operation | highlight(value['eligible']) | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }} | {{ para_output }}{{ job['labels'] | join(', ') }} |
 {% else %}
-{{ '| %s |' | format('')}}{{ field_operation | highlight(value['eligible'], '**', '**') | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }}{{para_output}}{{' | '}}{{ '%s |' | format(job['labels'] | join(', ')) }}
+|  | {{ field_operation | highlight(value['eligible']) | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }} | {{ para_output }}{{ job['labels'] | join(', ') }} |
 {% endif %}
 {% endfor %}
 {% endfor %}
-
 {{ status_legend }}
 {% endif %}
 {% endblock %}

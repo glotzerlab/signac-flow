@@ -157,7 +157,7 @@ class renderer:
             return symbols[op_status]
 
         if pretty:
-            def highlight(s, eligible, prefix_str, suffix_str):
+            def highlight(s, eligible, prefix_str='**', suffix_str='**'):
                 """Change font to bold within jinja2 template
 
                 :param s:
@@ -168,13 +168,21 @@ class renderer:
                     Boolean value for job eligibility
                 :type eligible:
                     Boolean
+                :param prefix_str:
+                    String prefix for bold syntax
+                :type prefix_str:
+                    String
+                :param suffix_str:
+                    String prefix for bold syntax
+                :type suffix_str:
+                    String
                 """
                 if eligible:
                     return prefix_str + s + suffix_str
                 else:
                     return s
         else:
-            def highlight(s, eligible, prefix_str, suffix_str):
+            def highlight(s, eligible, prefix_str='**', suffix_str='**'):
                 """Change font to bold within jinja2 template
 
                 :param s:
@@ -185,6 +193,14 @@ class renderer:
                     Boolean value for job eligibility
                 :type eligible:
                     boolean
+                :param prefix_str:
+                    String prefix for bold syntax
+                :type prefix_str:
+                    String
+                :param suffix_str:
+                    String prefix for bold syntax
+                :type suffix_str:
+                    String
                 """
                 return s
 

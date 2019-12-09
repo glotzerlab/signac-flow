@@ -74,15 +74,19 @@ class renderer:
         """
 
         # use Jinja2 template for status output
+        if option == 'terminal':
+            prefix = 'terminal_'
+        else:
+            prefix = 'md_'
         if template is None:
             if detailed and expand:
-                template = 'status_expand.jinja'
+                template = prefix + 'status_expand.jinja'
             elif detailed and not unroll:
-                template = 'status_stack.jinja'
+                template = prefix + 'status_stack.jinja'
             elif detailed and compact:
-                template = 'status_compact.jinja'
+                template = prefix + 'status_compact.jinja'
             else:
-                template = 'status.jinja'
+                template = prefix + 'status.jinja'
 
         def draw_progressbar(value, total, escape='', width=40):
             """Visualize progess with a progress bar.

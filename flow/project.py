@@ -2068,7 +2068,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             '-op', '--option',
             type=str,
             default='terminal',
-            help="Define rendering format.")
+            help="Define rendering format, currently support termial, html and markdown/md'")
 
     def labels(self, job):
         """Yields all labels for the given ``job``.

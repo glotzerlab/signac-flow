@@ -16,14 +16,10 @@ class renderer:
         self.terminal_output = None
         self.html_output = None
 
-    def generate_markdown_output(self, template, context):
-        self.markdown_output = template.render(**context)
+    def generate_terminal_output(self):
+        self.terminal_output = mistune.text(self.markdown_output)
 
-    def generate_terminal_output(self, template, context):
-        self.terminal_output = mistune.text(template.render(**context))
-
-    def generate_html_output(self, template, context):
-        self.generate_markdown_output(template, context)
+    def generate_html_output(self):
         self.html_output = mistune.markdown(self.markdown_output)
 
     def render(self, template, template_environment, context, file, detailed, expand,
@@ -210,15 +206,14 @@ class renderer:
         template_environment.filters['job_filter'] = job_filter
 
         template = template_environment.get_template(template)
-
+        self.markdown_output = template.render(**context)
         if option == 'terminal':
-            self.generate_terminal_output(template, context)
+            self.generate_terminal_output()
             return self.terminal_output
         elif option == 'html':
-            self.generate_html_output(template, context)
+            self.generate_html_output()
             return self.html_output
         elif option == 'md' or option == 'markdown':
-            self.generate_markdown_output(template, context)
             return self.markdown_output
         else:
             raise ValueError('Option not supported, valid option format:'

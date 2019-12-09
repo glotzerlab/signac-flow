@@ -1,6 +1,6 @@
 {# The following variables are available to all scripts. #}
 {% if overview or detailed %}
-{% set field_operation = ("%%-%ss %%3s" | format(column_width_operation)) %}
+{% set field_operation = "%s %s" %}
 {% set ns = namespace(field_parameters='', dash='') %}
 {% endif %}
 {% if overview %}

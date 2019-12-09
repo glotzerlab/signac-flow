@@ -4,7 +4,7 @@
 {{ 'Detailed View: \n' }}
 {{ field_detailed | format('job_id', para_head, 'labels') }}
 {{ field_detailed | format('-' , ns.dash, '-' ) }}
-{% set field_operation = ('%%1s %%-%ss %%3s' | format(column_width_operation)) %}
+{% set field_operation = '%s %s %s' %}
 {% for job in jobs %}
 {% if parameters %}
 {% set para_output = ns.field_parameters | format(*job['parameters'].values()) %}

@@ -20,7 +20,7 @@ class renderer:
         self.markdown_output = template.render(**context)
 
     def generate_terminal_output(self, template, context):
-        self.terminal_output = template.render(**context)
+        self.terminal_output = mistune.text(template.render(**context))
 
     def generate_html_output(self, template, context):
         self.generate_markdown_output(template, context)
@@ -74,19 +74,15 @@ class renderer:
         """
 
         # use Jinja2 template for status output
-        if option == 'terminal':
-            prefix = 'terminal_'
-        else:
-            prefix = 'md_'
         if template is None:
             if detailed and expand:
-                template = prefix + 'status_expand.jinja'
+                template = 'status_expand.jinja'
             elif detailed and not unroll:
-                template = prefix + 'status_stack.jinja'
+                template = 'status_stack.jinja'
             elif detailed and compact:
-                template = prefix + 'status_compact.jinja'
+                template = 'status_compact.jinja'
             else:
-                template = prefix + 'status.jinja'
+                template = 'status.jinja'
 
         def draw_progressbar(value, total, escape='', width=40):
             """Visualize progess with a progress bar.

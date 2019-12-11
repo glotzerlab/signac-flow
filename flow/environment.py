@@ -208,8 +208,6 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
             If True, operations are assumed to be executed in parallel, which means
             that the number of total tasks is the sum of all tasks instead of the
             maximum number of tasks. Default is set to False.
-        :param mpi_cmd:
-            Cluster system specific mpi cmd string. Default is set to 'mpiexec'.
         :return prefix:
             The prefix should be added for the operation.
         :type prefix:

@@ -82,14 +82,13 @@ class SummitEnvironment(DefaultLSFEnvironment):
     @classmethod
     def get_prefix(cls, operation, mpi_prefix=None, cmd_prefix=None, parallel=False):
         """Template filter for getting prefix based on environment and proper directives.
-        Template filter for Summit supercomputers.
 
         :param operation:
             The operation for which to add prefix.
         :param mpi_prefix:
-            User defined mpi_prefix string.Default is set to None.
+            User defined mpi_prefix string. Default is set to None.
         :param cmd_prefix:
-            User defined cmd_prefix string.Default is set to None.
+            User defined cmd_prefix string. Default is set to None.
         :param parallel:
             If True, operations are assumed to be executed in parallel, which means
             that the number of total tasks is the sum of all tasks instead of the
@@ -99,7 +98,6 @@ class SummitEnvironment(DefaultLSFEnvironment):
         :type prefix:
             str
         """
-
         prefix = ''
         if operation.directives.get('omp_num_threads'):
             prefix += 'export OMP_NUM_THREADS={}\n'.format(operation.directives['omp_num_threads'])

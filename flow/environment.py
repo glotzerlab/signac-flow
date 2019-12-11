@@ -105,7 +105,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
     hostname_pattern = None
     submit_flags = None
     template = 'base_script.sh'
-    mpi_cmd = 'mpiexec'
+    mpi_cmd_string = 'mpiexec'
 
     @classmethod
     def is_present(cls):
@@ -194,9 +194,8 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
     # set to static method currently to allow jinja filter access
     # can be moved to class method for future
-    @staticmethod
-    def get_prefix(operation, mpi_prefix=None, cmd_prefix=None, parallel=False,
-                   mpi_cmd='mpiexec'):
+    @classmethod
+    def get_prefix(cls, operation, mpi_prefix=None, cmd_prefix=None, parallel=False):
         """Template filter for getting prefix based on environment and proper directives.
         Template filter for computing environment.
 
@@ -224,7 +223,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         if mpi_prefix:
             prefix += mpi_prefix
         elif operation.directives.get('nranks'):
-            prefix += '{} -n {} '.format(mpi_cmd, operation.directives['nranks'])
+            prefix += '{} -n {} '.format(cls.mpi_cmd_string, operation.directives['nranks'])
         if cmd_prefix:
             prefix += cmd_prefix
         # if cmd_prefix and if mpi_prefix for backwards compatibility

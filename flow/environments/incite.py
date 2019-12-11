@@ -28,7 +28,7 @@ class SummitEnvironment(DefaultLSFEnvironment):
     """
     hostname_pattern = r'.*\.summit\.olcf\.ornl\.gov'
     template = 'summit.sh'
-    mpi_cmd = 'jsrun'
+    mpi_cmd_string = 'jsrun'
     cores_per_node = 42
     gpus_per_node = 6
 
@@ -73,15 +73,14 @@ class SummitEnvironment(DefaultLSFEnvironment):
 
         return nsets, tasks_per_set, cpus_per_set, gpus_per_set
 
-    @staticmethod
-    def jsrun_options(resource_set):
+    @classmethod
+    def jsrun_options(cls, resource_set):
         nsets, tasks, cpus, gpus = resource_set
         cuda_aware_mpi = "--smpiargs='-gpu'" if (nsets > 0 or tasks > 0) and gpus > 0 else ""
         return '-n {} -a {} -c {} -g {} {}'.format(nsets, tasks, cpus, gpus, cuda_aware_mpi)
 
-    @staticmethod
-    def get_prefix(operation, mpi_prefix=None, cmd_prefix=None, parallel=False,
-                   mpi_cmd='mpiexec'):
+    @classmethod
+    def get_prefix(cls, operation, mpi_prefix=None, cmd_prefix=None, parallel=False):
         """Template filter for getting prefix based on environment and proper directives.
         Template filter for Summit supercomputers.
 
@@ -95,8 +94,6 @@ class SummitEnvironment(DefaultLSFEnvironment):
             If True, operations are assumed to be executed in parallel, which means
             that the number of total tasks is the sum of all tasks instead of the
             maximum number of tasks. Default is set to False.
-        :param mpi_cmd:
-            Cluster system specific mpi cmd string. Default is set to 'mpiexec'.
         :return prefix:
             The prefix should be added for the operation.
         :type prefix:
@@ -112,15 +109,14 @@ class SummitEnvironment(DefaultLSFEnvironment):
             extra_args = str(operation.directives.get('extra_jsrun_args', ''))
             resource_set = SummitEnvironment.guess_resource_sets(
                            operation)
-            prefix += mpi_cmd + ' ' + SummitEnvironment.jsrun_options(resource_set)
+            prefix += cls.mpi_cmd_string + ' ' + SummitEnvironment.jsrun_options(resource_set)
             prefix += ' -d packed -b rs ' + extra_args + (' ' if extra_args else '')
         if cmd_prefix:
             prefix += cmd_prefix
         return prefix
 
     filters = {'calc_num_nodes': calc_num_nodes.__func__,
-               'guess_resource_sets': guess_resource_sets.__func__,
-               'jsrun_options': jsrun_options.__func__}
+               'guess_resource_sets': guess_resource_sets.__func__}
 
 
 class TitanEnvironment(DefaultTorqueEnvironment):
@@ -131,7 +127,7 @@ class TitanEnvironment(DefaultTorqueEnvironment):
     hostname_pattern = 'titan'
     template = 'titan.sh'
     cores_per_node = 16
-    mpi_cmd = 'aprun'
+    mpi_cmd_string = 'aprun'
 
 
 class EosEnvironment(DefaultTorqueEnvironment):
@@ -142,7 +138,7 @@ class EosEnvironment(DefaultTorqueEnvironment):
     hostname_pattern = 'eos'
     template = 'eos.sh'
     cores_per_node = 32
-    mpi_cmd = 'aprun'
+    mpi_cmd_string = 'aprun'
 
 
 __all__ = ['TitanEnvironment', 'EosEnvironment']

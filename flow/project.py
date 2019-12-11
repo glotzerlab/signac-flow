@@ -944,7 +944,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                      unroll=True, compact=False, pretty=False,
                      file=None, err=None, ignore_errors=False,
                      no_parallelize=False, template=None, profile=False,
-                     eligible_jobs_max_lines=None, option='terminal'):
+                     eligible_jobs_max_lines=None, output_format='terminal'):
         """Print the status of the project.
 
         .. versionchanged:: 0.9
@@ -1030,8 +1030,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Limit the number of operations and its eligible job count printed in the overview.
         :type eligible_jobs_max_lines:
             int
-        :param option:
-            options for rendering format, currently supports:
+        :param output_format:
+            status output format, currently supports:
             'terminal'(default), 'markdown'/'md' and 'html'
         :type option:
             str
@@ -1277,7 +1277,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         render_result = render_status.renderer()
         render_output = render_result.render(template, template_environment, context, file,
-                                             detailed, expand, unroll, compact, pretty, option)
+                                             detailed, expand, unroll, compact, pretty,
+                                             output_format)
 
         print(render_output, file=file)
 
@@ -2065,10 +2066,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             action='store_true',
             help="Do not parallelize the status determination.")
         view_group.add_argument(
-            '-op', '--option',
+            '-o', '--output-format',
             type=str,
             default='terminal',
-            help="Define rendering format, currently support termial, html and markdown/md'")
+            help="Define status output format, currently support termial, html and markdown/md'")
 
     def labels(self, job):
         """Yields all labels for the given ``job``.

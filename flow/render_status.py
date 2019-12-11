@@ -7,7 +7,7 @@ class renderer:
     """A class for rendering status in different format.
 
     This class provides method and string output for rendering status output in different format,
-    currently supports: print in terminal, markdown and html format provided in string
+    currently supports: terminal, markdown and html
 
     """
 

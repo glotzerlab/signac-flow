@@ -660,8 +660,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if environment not in self._template_environment_:
             template_environment = self._setup_template_environment(environment)
             # Add environment-specific custom filters:
-            for filter_name, filter_function in getattr(environment, 'filters', {}).items():
-                template_environment.filters[filter_name] = filter_function
+            for filter_name in getattr(environment, 'filters', []):
+                exec('template_environment.filters[filter_name] '
+                     '= environment.{}'.format(filter_name))
             self._template_environment_[environment] = template_environment
         return self._template_environment_[environment]
 

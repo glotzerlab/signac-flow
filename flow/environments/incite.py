@@ -32,24 +32,24 @@ class SummitEnvironment(DefaultLSFEnvironment):
     cores_per_node = 42
     gpus_per_node = 6
 
-    @staticmethod
-    def calc_num_nodes(resource_sets):
+    @classmethod
+    def calc_num_nodes(cls, resource_sets):
         cores_used = gpus_used = nodes_used = 0
         for nsets, tasks, cpus_per_task, gpus in resource_sets:
             for _ in range(nsets):
                 cores_used += tasks * cpus_per_task
                 gpus_used += gpus
-                if (cores_used > SummitEnvironment.cores_per_node or
-                        gpus_used > SummitEnvironment.gpus_per_node):
+                if (cores_used > cls.cores_per_node or
+                        gpus_used > cls.gpus_per_node):
                     nodes_used += 1
-                    cores_used = max(0, cores_used - SummitEnvironment.cores_per_node)
-                    gpus_used = max(0, gpus_used - SummitEnvironment.gpus_per_node)
+                    cores_used = max(0, cores_used - cls.cores_per_node)
+                    gpus_used = max(0, gpus_used - cls.gpus_per_node)
         if cores_used > 0 or gpus_used > 0:
             nodes_used += 1
         return nodes_used
 
-    @staticmethod
-    def guess_resource_sets(operation):
+    @classmethod
+    def guess_resource_sets(cls, operation):
         ntasks = max(operation.directives.get('nranks', 1), 1)
         np = operation.directives.get('np', ntasks)
 
@@ -105,16 +105,15 @@ class SummitEnvironment(DefaultLSFEnvironment):
             prefix += mpi_prefix
         else:
             extra_args = str(operation.directives.get('extra_jsrun_args', ''))
-            resource_set = SummitEnvironment.guess_resource_sets(
+            resource_set = cls.guess_resource_sets(
                            operation)
-            prefix += cls.mpi_cmd_string + ' ' + SummitEnvironment.jsrun_options(resource_set)
+            prefix += cls.mpi_cmd_string + ' ' + cls.jsrun_options(resource_set)
             prefix += ' -d packed -b rs ' + extra_args + (' ' if extra_args else '')
         if cmd_prefix:
             prefix += cmd_prefix
         return prefix
 
-    filters = {'calc_num_nodes': calc_num_nodes.__func__,
-               'guess_resource_sets': guess_resource_sets.__func__}
+    filters = ['calc_num_nodes', 'guess_resource_sets']
 
 
 class TitanEnvironment(DefaultTorqueEnvironment):

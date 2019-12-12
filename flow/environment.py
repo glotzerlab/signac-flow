@@ -89,6 +89,12 @@ class ComputeEnvironmentType(type):
         return super(ComputeEnvironmentType, cls).__init__(name, bases, dct)
 
 
+def template_filter(func):
+    "Mark the function as a ComputeEnvironment template filter."
+    setattr(func, '_flow_template_filter', True)
+    return classmethod(func)
+
+
 class ComputeEnvironment(metaclass=ComputeEnvironmentType):
     """Define computational environments.
 

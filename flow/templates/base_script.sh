@@ -16,15 +16,9 @@ cd {{ project.config.project_dir }}
 {% block body %}
 {% set cmd_suffix = cmd_suffix|default('') ~ (' &' if parallel else '') %}
 {% for operation in operations %}
-{% if operation.directives.nranks and not mpi_prefix %}
-{% set mpi_prefix = operation|generate_mpi_prefix %}
-{% endif %}
 
 # {{ "%s"|format(operation) }}
-{% if operation.directives.omp_num_threads %}
-export OMP_NUM_THREADS={{ operation.directives.omp_num_threads }}
-{% endif %}
-{{ mpi_prefix }}{{ cmd_prefix }}{{ operation.cmd }}{{ cmd_suffix }}
+{{ operation|get_prefix(mpi_prefix=mpi_prefix, cmd_prefix=cmd_prefix) }}{{ operation.cmd }}{{ cmd_suffix }}
 {% endfor %}
 {% endblock %}
 {% block footer %}

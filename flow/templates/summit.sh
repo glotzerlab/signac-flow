@@ -12,15 +12,3 @@
 #BSUB -P {{ account }}
 {% endif %}
 {% endblock %}
-{% block body %}
-{% set cmd_suffix = cmd_suffix|default('') ~ (' &' if parallel else '') %}
-{% for operation in operations %}
-{% set mpi_prefix =  operation|generate_mpi_prefix %}
-
-# {{ "%s"|format(operation) }}
-{% if operation.directives.omp_num_threads %}
-export OMP_NUM_THREADS={{ operation.directives.omp_num_threads }}
-{% endif %}
-{{ mpi_prefix }}{{ cmd_prefix }}{{ operation.cmd }}{{ cmd_suffix }}
-{% endfor %}
-{% endblock %}

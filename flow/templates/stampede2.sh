@@ -59,13 +59,7 @@ rm {{ launcher_file }}
 {% for operation in (operations|with_np_offset) %}
 
 # {{ "%s"|format(operation) }}
-{% if operation.directives.omp_num_threads %}
-export OMP_NUM_THREADS={{ operation.directives.omp_num_threads }}
-{% endif %}
-{% if operation.directives.nranks %}
-{% set mpi_prefix = operation|generate_mpi_prefix(parallel) %}
-{% endif %}
-{{ mpi_prefix }}{{ cmd_prefix }}{{ operation.cmd }}{{ cmd_suffix }}
+{{ operation|get_prefix(mpi_prefix=mpi_prefix, cmd_prefix=cmd_prefix, parallel=parallel) }}{{ operation.cmd }}{{ cmd_suffix }}
 {% endfor %}
 {% endif %}
 {% endblock %}

@@ -113,7 +113,7 @@ class SummitEnvironment(DefaultLSFEnvironment):
             prefix += cmd_prefix
         return prefix
 
-    filters = ['calc_num_nodes', 'guess_resource_sets']
+    filters = [calc_num_nodes, guess_resource_sets]
 
 
 class TitanEnvironment(DefaultTorqueEnvironment):

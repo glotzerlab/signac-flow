@@ -1665,7 +1665,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             or operation.directives.get('omp_num_threads', 1) > 1
         ):
             # ... need to fork:
-<<<<<<< HEAD
             if operation.directives['nranks']:
                 prefix = self._environment.get_prefix(operation)
             else:
@@ -1675,14 +1674,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "cmd '{}'.".format(operation, prefix + operation.cmd))
 
             subprocess.run(prefix + operation.cmd, shell=True, timeout=timeout, check=True)
-=======
-            mpi_prefix = self._environment.generate_mpi_prefix(operation)
-            logger.debug(
-                "Forking to execute operation '{}' with "
-                "cmd '{}'.".format(operation, mpi_prefix + operation.cmd))
-
-            subprocess.run(mpi_prefix + operation.cmd, shell=True, timeout=timeout, check=True)
->>>>>>> add mpi_prefix info to run
         else:
             # ... executing operation in interpreter process as function:
             logger.debug(

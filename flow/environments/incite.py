@@ -6,6 +6,7 @@
 http://www.doeleadershipcomputing.org/
 """
 from ..environment import DefaultLSFEnvironment, DefaultTorqueEnvironment
+from ..environment import template_filter
 
 from fractions import gcd
 
@@ -32,7 +33,7 @@ class SummitEnvironment(DefaultLSFEnvironment):
     cores_per_node = 42
     gpus_per_node = 6
 
-    @classmethod
+    @template_filter
     def calc_num_nodes(cls, resource_sets):
         cores_used = gpus_used = nodes_used = 0
         for nsets, tasks, cpus_per_task, gpus in resource_sets:
@@ -48,7 +49,7 @@ class SummitEnvironment(DefaultLSFEnvironment):
             nodes_used += 1
         return nodes_used
 
-    @classmethod
+    @template_filter
     def guess_resource_sets(cls, operation):
         ntasks = max(operation.directives.get('nranks', 1), 1)
         np = operation.directives.get('np', ntasks)
@@ -73,13 +74,13 @@ class SummitEnvironment(DefaultLSFEnvironment):
 
         return nsets, tasks_per_set, cpus_per_set, gpus_per_set
 
-    @classmethod
+    @template_filter
     def jsrun_options(cls, resource_set):
         nsets, tasks, cpus, gpus = resource_set
         cuda_aware_mpi = "--smpiargs='-gpu'" if (nsets > 0 or tasks > 0) and gpus > 0 else ""
         return '-n {} -a {} -c {} -g {} {}'.format(nsets, tasks, cpus, gpus, cuda_aware_mpi)
 
-    @classmethod
+    @template_filter
     def get_prefix(cls, operation, mpi_prefix=None, cmd_prefix=None, parallel=False):
         """Template filter for getting prefix based on environment and proper directives.
 
@@ -112,8 +113,6 @@ class SummitEnvironment(DefaultLSFEnvironment):
         if cmd_prefix:
             prefix += cmd_prefix
         return prefix
-
-    filters = ['calc_num_nodes', 'guess_resource_sets']
 
 
 class TitanEnvironment(DefaultTorqueEnvironment):

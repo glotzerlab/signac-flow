@@ -6,6 +6,7 @@ from __future__ import print_function
 import logging
 
 from ..environment import DefaultSlurmEnvironment
+from ..environment import template_filter
 
 
 logger = logging.getLogger(__name__)
@@ -68,7 +69,7 @@ class Stampede2Environment(DefaultSlurmEnvironment):
                   'If omitted, uses the system default '
                   '(slurm default is "slurm-%%j.out").'))
 
-    @classmethod
+    @template_filter
     def get_prefix(cls, operation, mpi_prefix=None, cmd_prefix=None, parallel=False):
         """Template filter for getting prefix based on environment and proper directives.
 

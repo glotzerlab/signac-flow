@@ -650,8 +650,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if 'min' not in template_environment.filters:    # for jinja2 < 2.10
             template_environment.filters['min'] = min
 
-        template_environment.filters['get_prefix'] = environment.get_prefix
-
         return template_environment
 
     def _template_environment(self, environment=None):

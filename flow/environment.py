@@ -198,7 +198,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         """
         return flow_config.require_config_value(key, ns=cls.__name__, default=default)
 
-    @classmethod
+    @template_filter
     def get_prefix(cls, operation, mpi_prefix=None, cmd_prefix=None, parallel=False):
         """Template filter for getting prefix based on environment and proper directives.
 

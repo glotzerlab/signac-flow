@@ -601,7 +601,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         except KeyError:
             self._use_buffered_mode = False
 
-    def _setup_template_environment(self, environment=None):
+    def _setup_template_environment(self):
         """Setup the jinja2 template environemnt.
 
         The templating system is used to generate templated scripts for the script()
@@ -656,7 +656,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if environment is None:
             environment = self._environment
         if environment not in self._template_environment_:
-            template_environment = self._setup_template_environment(environment)
+            template_environment = self._setup_template_environment()
 
             # Add environment-specific custom filters:
             for name, member in inspect.getmembers(environment):

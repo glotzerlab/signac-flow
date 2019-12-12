@@ -1663,14 +1663,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         ):
             # ... need to fork:
             if operation.directives['nranks']:
-                mpi_prefix = self._environment.generate_mpi_prefix(operation)
+                prefix = self._environment.get_prefix(operation)
             else:
-                mpi_prefix = ''
+                prefix = ''
             logger.debug(
                 "Forking to execute operation '{}' with "
-                "cmd '{}'.".format(operation, mpi_prefix + operation.cmd))
+                "cmd '{}'.".format(operation, prefix + operation.cmd))
 
-            subprocess.run(mpi_prefix + operation.cmd, shell=True, timeout=timeout, check=True)
+            subprocess.run(prefix + operation.cmd, shell=True, timeout=timeout, check=True)
         else:
             # ... executing operation in interpreter process as function:
             logger.debug(

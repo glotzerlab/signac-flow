@@ -103,9 +103,19 @@ class _condition(object):
     current_arbitrary_tag = 0
 
     def __init__(self, condition, tag=None):
-        # Add tag to differentiate built-in conditions during graph detection.
+        '''Add tag to differentiate built-in conditions during graph detection.
+
+        Will raise a ``RuntimeError`` if tag is not set and does not have a code
+        object.
+        :raises: RuntimeError
+        '''
         if tag is None:
-            tag = condition.__code__.co_code
+            try:
+                tag = condition.__code__.co_code
+            except AttributeError:
+                raise RuntimeError("Condition could not be tagged "
+                                   "automatically. Must manually set tag on "
+                                   "condition decorator.")
         condition._flow_tag = tag
         self.condition = condition
 

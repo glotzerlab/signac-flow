@@ -199,21 +199,21 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         return flow_config.require_config_value(key, ns=cls.__name__, default=default)
 
     @template_filter
-    def get_prefix(cls, operation, mpi_prefix=None, cmd_prefix=None, parallel=False):
+    def get_prefix(cls, operation, parallel=False, mpi_prefix=None, cmd_prefix=None):
         """Template filter for getting the prefix based on proper directives.
 
         :param operation:
             The operation for which to add prefix.
+        :param parallel:
+            If True, operations are assumed to be executed in parallel, which means
+            that the number of total tasks is the sum of all tasks instead of the
+            maximum number of tasks. Default is set to False.
         :param mpi_prefix:
             User defined mpi_prefix string. Default is set to None.
             This will be deprecated and removed in the future.
         :param cmd_prefix:
             User defined cmd_prefix string. Default is set to None.
             This will be deprecated and removed in the future.
-        :param parallel:
-            If True, operations are assumed to be executed in parallel, which means
-            that the number of total tasks is the sum of all tasks instead of the
-            maximum number of tasks. Default is set to False.
         :return prefix:
             The prefix should be added for the operation.
         :type prefix:

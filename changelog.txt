@@ -17,6 +17,7 @@ Added
 
 Changed
 +++++++
+- Only call ``inspect.getsourcefile`` in ``guess_cmd`` if ``_flow_path`` is not set (#197).
 - Raise errors if a forked process or ``@cmd`` operation returns a non-zero exit code. (#170, #172).
 
 Removed

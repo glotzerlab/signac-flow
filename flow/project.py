@@ -2578,7 +2578,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             except (KeyError, TypeError):
                 executable = sys.executable
 
-            path = getattr(func, '_flow_path', inspect.getsourcefile(inspect.getmodule(func)))
+            if hasattr(func, '_flow_path'):
+                path = func._flow_path
+            else:
+                try:
+                    path = inspect.getsourcefile(inspect.getmodule(func))
+                except TypeError:
+                    raise RuntimeError("Cannot find file associated with "
+                                       "function {}. Specify `_func_path` "
+                                       "to use.".format(name))
             cmd_str = "{} {} exec {} {{job._id}}"
 
             if callable(executable):

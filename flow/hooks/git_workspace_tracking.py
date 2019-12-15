@@ -51,29 +51,6 @@ def _commit(repo, title):
             raise
 
 
-def get_project_source_git_metadata(project, strict=False):
-    repo = git.Repo(project.root_directory())
-    wd_rel = os.path.relpath(project.workspace(), project.root_directory())
-    for path in repo.untracked_files:
-        if os.path.commonprefix((wd_rel, path)):
-            if project.workspace() not in _WARNINGS['workspace_not_ignored']:
-                logger.warn("Skipping workspace directory for project '{}'.".format(project))
-                _WARNINGS['workspace_not_ignored'].add(project.workspace())
-            break
-    if repo.is_dirty():
-        if strict:
-            raise RuntimeError(
-                "Unable to get project source git commit id, repository is dirty.")
-        else:
-            if project.root_directory() not in _WARNINGS['git_dirty']:
-                logger.warn("Unable to get project source git commit id, repository is dirty.")
-                _WARNINGS['git_dirty'].add(project.root_directory())
-    return {
-        'commit_id': str(repo.commit()),
-        'dirty': repo.is_dirty(),
-    }
-
-
 class TrackWorkspaceWithGit(object):
 
     def __init__(self, per_job=True):

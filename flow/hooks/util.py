@@ -1,14 +1,14 @@
 # Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 def collect_metadata(operation):
     return {
         # the metadata schema version:
         '_schema_version': "1",
-        'time': datetime.now().isoformat(),
+        'time': datetime.now(timezone.utc).isoformat(),
         'project': {
             'path': operation.job._project.root_directory(),
             # the project schema version:

@@ -19,7 +19,7 @@ except ImportError:
 
 
 DEFAULT_TIME_FORMAT = "%Y-%m-%dT%H_%M_%S.%f"
-DEFAULT_SNAPSHOTS_DIRECTORY = '.snapshots'
+DEFAULT_SNAPSHOTS_DIRECTORY = '.signac_snapshots'
 DEFAULT_FILENAME_OPERATION_METADATA = 'operation.json'
 
 logger = logging.getLogger('snapshot')

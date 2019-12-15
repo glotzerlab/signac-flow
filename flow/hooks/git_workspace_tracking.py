@@ -9,6 +9,7 @@ from collections import defaultdict
 import git
 
 from .git_util import collect_metadata_with_git as collect_metadata
+from .snapshots import DEFAULT_SNAPSHOTS_DIRECTORY
 
 
 logger = logging.getLogger('git_tracking')
@@ -22,22 +23,21 @@ GIT_COMMIT_MSG = """{title}
 _WARNINGS = defaultdict(set)
 
 
-def _ignore_hidden_files(root):
+def _git_ignore(root, entries):
     "Do not commit hidden files to the git repository."
-    with open(os.path.join(root, '.gitignore'), mode='a+') as file:
-        file.seek(0)
-        if '.*\n' not in file.readlines():
-            file.write('.*\n')
+    fn_ignore = os.path.join(root, '.gitignore')
+    with open(fn_ignore, mode='a+') as file:
+        lines = file.readlines()
+        for entry in entries:
+            if entry not in lines:
+                logger.info("Adding  '{}' to '{}'.".format(entry, fn_ignore))
+                file.write(entry + '\n')
 
 
-def _get_or_init_git_repo(root):
-    "Return the git repository for root and initialize it if necessary."
-    try:
-        return git.Repo(root)
-    except git.exc.InvalidGitRepositoryError:
-        logger.info("Initializing git repo for '{}'".format(root))
-        _ignore_hidden_files(root)
-        return git.Repo.init(root)
+def _git_ignored(root):
+    fn_ignore = os.path.join(root, '.gitignore')
+    with open(fn_ignore, mode='r') as file:
+        return file.readlines()
 
 
 def _commit(repo, title):
@@ -52,15 +52,24 @@ def _commit(repo, title):
 
 class TrackWorkspaceWithGit(object):
 
-    def __init__(self, per_job=True):
+    def __init__(self, per_job=True, ignore=[DEFAULT_SNAPSHOTS_DIRECTORY]):
         self._per_job = per_job
+        self._ignore = ignore
         self._warnings = defaultdict(set)
 
     def _get_repo(self, operation):
         if self._per_job:
-            return _get_or_init_git_repo(root=operation.job.workspace())
+            root = operation.job.workspace()
         else:
-            return _get_or_init_git_repo(root=operation.job._project.workspace())
+            root = operation.job._project.workspace()
+
+        try:
+            return git.Repo(root)
+        except git.exc.InvalidGitRepositoryError:
+            logger.info("Initializing git repo for '{}'".format(root))
+            if self._ignore:
+                _git_ignore(root, self._ignore)
+            return git.Repo.init(root)
 
     def commit_before(self, operation):
         metadata = collect_metadata(operation)

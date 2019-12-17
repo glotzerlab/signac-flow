@@ -2585,7 +2585,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     path = inspect.getsourcefile(inspect.getmodule(func))
                 except TypeError:
                     raise RuntimeError("Cannot find file associated with "
-                                       "function {}. Specify `_func_path` "
+                                       "function {}. Specify `_flow_path` "
                                        "to use.".format(name))
             cmd_str = "{} {} exec {} {{job._id}}"
 

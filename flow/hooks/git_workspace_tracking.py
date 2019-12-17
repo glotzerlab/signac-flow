@@ -9,7 +9,6 @@ from collections import defaultdict
 import git
 
 from .git_util import collect_metadata_with_git as collect_metadata
-from .snapshots import DEFAULT_SNAPSHOTS_DIRECTORY
 
 
 logger = logging.getLogger('git_tracking')
@@ -52,7 +51,7 @@ def _commit(repo, title):
 
 class TrackWorkspaceWithGit(object):
 
-    def __init__(self, per_job=True, ignore=[DEFAULT_SNAPSHOTS_DIRECTORY]):
+    def __init__(self, per_job=True, ignore=None):
         self._per_job = per_job
         self._ignore = ignore
         self._warnings = defaultdict(set)

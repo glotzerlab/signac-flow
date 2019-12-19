@@ -113,9 +113,8 @@ class _condition(object):
             try:
                 tag = condition.__code__.co_code
             except AttributeError:
-                raise RuntimeError("Condition could not be tagged "
-                                   "automatically. Must manually set tag on "
-                                   "condition decorator.")
+                logger.warning("Condition {} could not autogenerate "
+                               "tag.".format(condition))
         condition._flow_tag = tag
         self.condition = condition
 
@@ -800,10 +799,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             only returned at the end."""
             callbacks = set()
             for cf in condition_functions:
-                if cf.__name__ == "_flow_metacondition":
+                # condition may not have __name__ attribute
+                if hasattr(cf, '__name__') and cf.__name__ == "_flow_metacondition":
                     callbacks = callbacks.union(
                         unpack_conditions(cf._composed_of))
                 else:
+                    if cf._flow_tag is None:
+                        raise RuntimeError("Condition {} was not tagged. "
+                                           "To create graph ensure each base "
+                                           "condition has a __code__ attr or "
+                                           "manuel tag.".format(cf))
                     callbacks.add(cf._flow_tag)
 
             return callbacks

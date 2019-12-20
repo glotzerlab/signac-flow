@@ -7,7 +7,7 @@ This module provides the ComputeEnvironment class, which can be
 subclassed to automatically detect specific computational environments.
 
 This enables the user to adjust their workflow based on the present
-environment, e.g. for the adjustemt of scheduler submission scripts.
+environment, e.g. for the adjustment of scheduler submission scripts.
 """
 from __future__ import print_function
 from __future__ import division

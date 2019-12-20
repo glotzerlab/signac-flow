@@ -98,8 +98,8 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
     The default method for the detection of a specific environemnt is to
     provide a regular expression matching the environment's hostname.
-    For example, if the hostname is my_server.com, one could identify the
-    environment by setting the hostname_pattern to 'my_server'.
+    For example, if the hostname is my-server.com, one could identify the
+    environment by setting the hostname_pattern to 'my-server'.
     """
     scheduler_type = None
     hostname_pattern = None

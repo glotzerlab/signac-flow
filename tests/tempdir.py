@@ -1,8 +1,6 @@
 # Copyright (c) 2017 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-from __future__ import print_function
-
 import warnings as _warnings
 import os as _os
 import sys as _sys

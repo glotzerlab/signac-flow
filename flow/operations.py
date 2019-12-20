@@ -6,7 +6,6 @@ a regular Python module with a command line interface, which can be used
 to execute functions defined within the same module, that operate on a
 signac data space.
 """
-from __future__ import print_function
 import sys
 import argparse
 import logging

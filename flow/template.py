@@ -6,7 +6,6 @@
 These templates can be initialized via the init() function defined
 in this module and the main 'flow' command line interface.
 """
-from __future__ import print_function
 import os
 import sys
 import errno

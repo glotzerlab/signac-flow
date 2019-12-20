@@ -5,7 +5,6 @@
 
 The FlowProject is a signac Project that allows the user to define a workflow.
 """
-from __future__ import print_function
 import sys
 import os
 import re

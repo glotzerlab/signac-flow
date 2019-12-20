@@ -62,10 +62,4 @@ def get_config_value(key, ns=None, default=None):
         within the user's configuration.
     :return: The value if found, None if not found.
     """
-    try:
-        if ns is None:
-            return config.load_config()['flow'][key]
-        else:
-            return config.load_config()['flow'][ns][key]
-    except KeyError:
-        return default
+    return require_config_value(key=key, ns=ns, default=default)

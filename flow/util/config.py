@@ -31,7 +31,7 @@ def require_config_value(key, ns=None, default=_GET_CONFIG_VALUE_NONE):
     :param key: The environment specific configuration key.
     :type key: str
     :param ns: The namespace in which to look for the key.
-    :type key: str
+    :type ns: str
     :param default: A default value in case the key cannot be found
         within the user's configuration.
     :return: The value or default value.
@@ -57,7 +57,7 @@ def get_config_value(key, ns=None, default=None):
     :param key: The configuration key.
     :type key: str
     :param ns: The namespace in which to look for the key.
-    :type key: str
+    :type ns: str
     :param default: A default value in case the key cannot be found
         within the user's configuration.
     :return: The value if found, None if not found.

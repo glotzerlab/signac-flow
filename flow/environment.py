@@ -169,7 +169,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         """Request a value from the user's configuration.
 
         This method should be used whenever values need to be provided
-        that are specific to a users's environment. A good example are
+        that are specific to a user's environment. A good example are
         account names.
 
         When a key is not configured and no default value is provided,

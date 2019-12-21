@@ -6,7 +6,7 @@
 The signac-flow package provides the basic infrastructure to easily
 configure and implement a workflow to operate on a signac_ data space.
 
-.. _signac: https://glotzerlab.engin.umich.edu/signac
+.. _signac: https://signac.io/
 """
 from __future__ import absolute_import
 from . import environment
@@ -37,6 +37,7 @@ __all__ = [
     'environment',
     'scheduling',
     'errors',
+    'testing',
     'FlowProject',
     'JobOperation',
     'label',
@@ -45,10 +46,9 @@ __all__ = [
     'cmd',
     'directives',
     'run',
+    'get_environment',
     'init',
     'redirect_log',
-    'get_environment',
     'with_job',
-    'testing',
     '__version__',
     ]

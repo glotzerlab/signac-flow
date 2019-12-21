@@ -1,12 +1,12 @@
 .. _umich:
 
-University of Michigan Flux
-===========================
+University of Michigan Great Lakes
+==================================
 
-`Link to official documentation <http://arc-ts.umich.edu/flux-user-guide/>`_
+`Link to official documentation <https://arc-ts.umich.edu/greatlakes/user-guide/>`_
 
-.. autoclass:: flow.environments.umich.FluxEnvironment
+.. autoclass:: flow.environments.umich.GreatLakesEnvironment
 
-.. literalinclude:: ../../flow/templates/umich-flux.sh
+.. literalinclude:: ../../flow/templates/umich-greatlakes.sh
    :language: jinja
-   :caption: umich-flux.sh
+   :caption: umich-greatlakes.sh

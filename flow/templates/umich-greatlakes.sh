@@ -6,17 +6,17 @@
 {% if gpu_tasks and 'gpu' not in partition and not force %}
 {% raise "Requesting GPUs requires a gpu partition!" %}
 {% endif %}
-{% set nn_cpu = cpu_tasks|calc_num_nodes(24) %}
-{% set nn_gpu = gpu_tasks|calc_num_nodes(4) if 'gpu' in partition else 0 %}
+{% set nn_cpu = cpu_tasks|calc_num_nodes(36) if 'gpu' not in partition else cpu_tasks|calc_num_nodes(40) %}
+{% set nn_gpu = gpu_tasks|calc_num_nodes(2) if 'gpu' in partition else 0 %}
 {% set nn = nn|default((nn_cpu, nn_gpu)|max, true) %}
 {% if partition == 'gpu' %}
-#SBATCH --nodes={{ nn|default(1, true)|check_utilization(gpu_tasks, 1, threshold, 'GPU') }}
+#SBATCH --nodes={{ nn|default(1, true)|check_utilization(gpu_tasks, 2, threshold, 'GPU') }}
 #SBATCH --ntasks-per-node={{ (gpu_tasks, cpu_tasks)|max }}
 #SBATCH --gres=gpu:{{ gpu_tasks }}
 {% else %}{# standard compute partition #}
 #SBATCH --partition=standard
-#SBATCH --nodes={{ nn|check_utilization(cpu_tasks, 24, threshold, 'CPU') }}
-#SBATCH --ntasks-per-node={{ (24, cpu_tasks)|min }}
+#SBATCH --nodes={{ nn|check_utilization(cpu_tasks, 36, threshold, 'CPU') }}
+#SBATCH --ntasks-per-node={{ (36, cpu_tasks)|min }}
 {% endif %}
 {% endblock tasks %}
 {% block header %}

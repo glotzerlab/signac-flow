@@ -7,7 +7,7 @@ This module provides the ComputeEnvironment class, which can be
 subclassed to automatically detect specific computational environments.
 
 This enables the user to adjust their workflow based on the present
-environment, e.g. for the adjustemt of scheduler submission scripts.
+environment, e.g. for the adjustment of scheduler submission scripts.
 """
 from __future__ import print_function
 from __future__ import division
@@ -98,8 +98,8 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
     The default method for the detection of a specific environemnt is to
     provide a regular expression matching the environment's hostname.
-    For example, if the hostname is my_server.com, one could identify the
-    environment by setting the hostname_pattern to 'my_server'.
+    For example, if the hostname is my-server.com, one could identify the
+    environment by setting the hostname_pattern to 'my-server'.
     """
     scheduler_type = None
     hostname_pattern = None
@@ -169,7 +169,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         """Request a value from the user's configuration.
 
         This method should be used whenever values need to be provided
-        that are specific to a users's environment. A good example are
+        that are specific to a user's environment. A good example are
         account names.
 
         When a key is not configured and no default value is provided,
@@ -178,13 +178,13 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
         Please note, that the key will be automatically expanded to
         be specific to this environment definition. For example, a
-        key should be 'account', not 'MyEnvironment.account`.
+        key should be ``'account'``, not ``'MyEnvironment.account'``.
 
         :param key: The environment specific configuration key.
         :type key: str
         :param default: A default value in case the key cannot be found
             within the user's configuration.
-        :type key: str
+        :type default: str
         :return: The value or default value.
         :raises SubmitError: If the key is not in the user's configuration
             and no default value is provided.

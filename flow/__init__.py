@@ -8,7 +8,6 @@ configure and implement a workflow to operate on a signac_ data space.
 
 .. _signac: https://signac.io/
 """
-from __future__ import absolute_import
 from . import environment
 from . import scheduling
 from . import errors

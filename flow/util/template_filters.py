@@ -2,7 +2,6 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 """Provide jinja2 template environment filter functions."""
-from __future__ import division, print_function
 import sys
 from math import ceil
 

@@ -8,7 +8,6 @@ initialize FlowProject class definitions directly from the command line.
 
 Execute `flow --help` for more information.
 """
-from __future__ import print_function
 import argparse
 import logging
 import sys

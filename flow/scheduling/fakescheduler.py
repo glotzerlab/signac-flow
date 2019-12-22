@@ -6,7 +6,6 @@
 The FakeScheduler class can be used in place of a real scheduler to test
 the cluster job submission workflow.
 """
-from __future__ import print_function
 import logging
 
 from .base import Scheduler

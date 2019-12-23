@@ -23,6 +23,8 @@ Removed
 +++++++
 - Drop support for Python version 2.7.
 - The "always" condition has been deprecated and will trigger a ``DeprecationWarning`` upon use until removed.
+- Removed legacy compatibility layers for Python 2, signac < 1.0, and soft dependencies.
+- Removed deprecated support for implied operation names with the ``run`` command.
 
 
 Version 0.8

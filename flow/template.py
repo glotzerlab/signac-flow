@@ -23,8 +23,6 @@ except ImportError:
 else:
     JINJA2 = True
 
-from .util.misc import _is_identifier
-
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +41,7 @@ def init(alias=None, template=None, root=None, out=None):
 
     if alias is None:
         alias = 'project'
-    elif not _is_identifier(alias):
+    elif not alias.isidentifier():
         raise ValueError(
             "The alias '{}' is not a valid Python identifier and therefore "
             "not be used as a FlowProject alias.".format(alias))

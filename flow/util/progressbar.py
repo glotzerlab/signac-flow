@@ -8,7 +8,7 @@ from deprecation import deprecated
 from .version import __version__
 
 
-@deprecated(deprecated_in="0.8", removed_in="1.0", current_version=__version__)
+@deprecated(deprecated_in="0.8", removed_in="0.10", current_version=__version__)
 def with_progressbar(iterable, total=None, width=120, desc='',
                      percentage=True, file=None):
     if file is None:

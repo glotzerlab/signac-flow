@@ -128,7 +128,7 @@ class _condition(object):
 
     @classmethod
     @deprecated(
-        deprecated_in="0.9", removed_in="1.0",
+        deprecated_in="0.9", removed_in="0.11",
         details="This condition decorator is obsolete.")
     def always(cls, func):
         "Returns True."
@@ -857,7 +857,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @classmethod
     @deprecated(
-        deprecated_in="0.8", removed_in="1.0",
+        deprecated_in="0.8", removed_in="0.10",
         current_version=__version__)
     def update_aliases(cls, aliases):
         "Update the ALIASES table for this class."
@@ -2236,7 +2236,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                  "to be considered eligible for execution.")
 
     @deprecated(
-        deprecated_in="0.8", removed_in="1.0",
+        deprecated_in="0.8", removed_in="0.10",
         current_version=__version__,
         details="Use export_job_statuses() instead.")
     def export_job_stati(self, collection, stati):
@@ -2425,7 +2425,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         self.operations[name] = FlowOperation(cmd=cmd, pre=pre, post=post, directives=kwargs)
 
     @deprecated(
-        deprecated_in="0.8", removed_in="1.0",
+        deprecated_in="0.8", removed_in="0.10",
         current_version=__version__,
         details="Use labels() instead.")
     def classify(self, job):
@@ -2483,7 +2483,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 yield op
 
     @deprecated(
-        deprecated_in="0.8", removed_in="1.0",
+        deprecated_in="0.8", removed_in="0.10",
         current_version=__version__,
         details="Use next_operations() instead.")
     def next_operation(self, job):
@@ -2622,7 +2622,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return True
 
     @deprecated(
-        deprecated_in="0.8", removed_in="1.0",
+        deprecated_in="0.8", removed_in="0.10",
         current_version=__version__)
     def eligible_for_submission(self, job_operation):
         return self._eligible_for_submission(self, job_operation)

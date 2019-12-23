@@ -29,7 +29,7 @@ class SummitEnvironment(DefaultLSFEnvironment):
     """
     hostname_pattern = r'.*\.summit\.olcf\.ornl\.gov'
     template = 'summit.sh'
-    mpi_cmd_string = 'jsrun'
+    mpi_cmd = 'jsrun'
     cores_per_node = 42
     gpus_per_node = 6
 
@@ -109,7 +109,7 @@ class SummitEnvironment(DefaultLSFEnvironment):
         else:
             extra_args = str(operation.directives.get('extra_jsrun_args', ''))
             resource_set = cls.guess_resource_sets(operation)
-            prefix += cls.mpi_cmd_string + ' ' + cls.jsrun_options(resource_set)
+            prefix += cls.mpi_cmd + ' ' + cls.jsrun_options(resource_set)
             prefix += ' -d packed -b rs ' + extra_args + (' ' if extra_args else '')
         if cmd_prefix:
             prefix += cmd_prefix
@@ -124,7 +124,7 @@ class TitanEnvironment(DefaultTorqueEnvironment):
     hostname_pattern = 'titan'
     template = 'titan.sh'
     cores_per_node = 16
-    mpi_cmd_string = 'aprun'
+    mpi_cmd = 'aprun'
 
 
 class EosEnvironment(DefaultTorqueEnvironment):
@@ -135,7 +135,7 @@ class EosEnvironment(DefaultTorqueEnvironment):
     hostname_pattern = 'eos'
     template = 'eos.sh'
     cores_per_node = 32
-    mpi_cmd_string = 'aprun'
+    mpi_cmd = 'aprun'
 
 
 __all__ = ['TitanEnvironment', 'EosEnvironment']

@@ -111,7 +111,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
     hostname_pattern = None
     submit_flags = None
     template = 'base_script.sh'
-    mpi_cmd_string = 'mpiexec'
+    mpi_cmd = 'mpiexec'
 
     @classmethod
     def is_present(cls):
@@ -225,7 +225,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         if mpi_prefix:
             prefix += mpi_prefix
         elif operation.directives.get('nranks'):
-            prefix += '{} -n {} '.format(cls.mpi_cmd_string, operation.directives['nranks'])
+            prefix += '{} -n {} '.format(cls.mpi_cmd, operation.directives['nranks'])
         if cmd_prefix:
             prefix += cmd_prefix
         # if cmd_prefix and if mpi_prefix for backwards compatibility

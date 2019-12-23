@@ -40,5 +40,5 @@ To use these environment profiles, make sure to add the following line to your `
 
        import flow.environments
 
-We develop environment profiles on a *per need* basis.
+We develop environment profiles on an as-needed basis.
 Please `contact us <mailto:signac-support@umich.edu>`_ if you have trouble running **signac-flow** on your local cluster or need assistance in writing a profile.

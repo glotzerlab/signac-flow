@@ -6,7 +6,7 @@ Signac-flow package documentation
     This is documentation for the **signac-flow** package, which is part of the signac_ framework.
     See `here <signac-docs_>`_ for a comprehensive introduction to the **signac** *framework*.
 
-.. _signac: http://www.signac.io/
+.. _signac: https://www.signac.io/
 .. _signac-docs: https://docs.signac.io/
 
 Contents

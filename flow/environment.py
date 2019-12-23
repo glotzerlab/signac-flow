@@ -40,9 +40,9 @@ def setup(py_modules, **attrs):
     """Setup function for environment modules.
 
     Use this function in place of setuptools.setup to not only install
-    a environments module, but also register it with the global signac
-    configuration. Once registered, is automatically imported when the
-    get_environment() function is called.
+    a environment's module, but also register it with the global signac
+    configuration. Once registered, the environment is automatically
+    imported when the get_environment() function is called.
     """
     import setuptools
     from setuptools.command.install import install
@@ -73,9 +73,9 @@ def setup(py_modules, **attrs):
 
 
 class ComputeEnvironmentType(type):
-    """Meta class for the definition of ComputeEnvironments.
+    """Metaclass for the definition of ComputeEnvironments.
 
-    This meta class automatically registers ComputeEnvironment definitions,
+    This metaclass automatically registers ComputeEnvironment definitions,
     which enables the automatic determination of the present environment.
     """
 
@@ -91,10 +91,10 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
     """Define computational environments.
 
     The ComputeEnvironment class allows us to automatically determine
-    specific environments in order to programatically adjust workflows
+    specific environments in order to programmatically adjust workflows
     in different environments.
 
-    The default method for the detection of a specific environemnt is to
+    The default method for the detection of a specific environment is to
     provide a regular expression matching the environment's hostname.
     For example, if the hostname is my-server.com, one could identify the
     environment by setting the hostname_pattern to 'my-server'.
@@ -123,7 +123,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
     @classmethod
     def get_scheduler(cls):
-        """Return a environment specific scheduler driver.
+        """Return an environment-specific scheduler driver.
 
         The returned scheduler class provides a standardized interface to
         different scheduler implementations.
@@ -167,8 +167,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         """Request a value from the user's configuration.
 
         This method should be used whenever values need to be provided
-        that are specific to a user's environment. A good example are
-        account names.
+        that are specific to a user's environment, e.g. account names.
 
         When a key is not configured and no default value is provided,
         a :py:class:`~.errors.SubmitError` will be raised and the user will

@@ -39,7 +39,7 @@ def main_init(args):
         return template.init(alias=args.alias, template=args.template)
     except OSError as e:
         raise RuntimeError(
-            "Error occured while trying to initialize a flow project: {}".format(e))
+            "Error occurred while trying to initialize a flow project: {}".format(e))
 
 
 def main():

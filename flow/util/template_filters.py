@@ -111,13 +111,13 @@ def check_utilization(nn, np, ppn, threshold=0.9, name=None):
     if not (0 <= threshold <= 1.0):
         raise ValueError("The value for 'threshold' must be between 0 and 1.")
 
-    # Zero nodes are just returned and possible utilization or validiation checks
-    # must be performed elswhere.
+    # Zero nodes are just returned and possible utilization or validation checks
+    # must be performed elsewhere.
     if nn == 0:
         return 0
 
     # The utilization is the number of processing units (np) required divided by the
-    # number of nodes (nn) multiplied with the number of processing units per node (ppn).
+    # product of the number of nodes (nn) and number of processing units per node (ppn).
     utilization = np / (nn * ppn)
 
     # Raise RuntimeError if the utilization is below the specified threshold.
@@ -159,7 +159,7 @@ def calc_num_nodes(np, ppn=1, threshold=0, name=None):
 
 
 def print_warning(msg):
-    """Print warning message within jinja2 template
+    """Print warning message within jinja2 template.
 
     :param:
         The warning message as a string
@@ -176,7 +176,7 @@ _GET_ACCOUNT_NAME_MESSAGES_SHOWN = set()
 def get_account_name(environment, required=False):
     """Get account name for environment with user-friendly messages on failure.
 
-    :param:
+    :param environment:
         The environment for which to obtain the account variable.
     :param required:
         Specify whether the account name is required instead of optional.

@@ -405,12 +405,9 @@ class FlowOperation(object):
     def __str__(self):
         return "{type}(cmd='{cmd}')".format(type=type(self).__name__, cmd=self._cmd)
 
-    def eligible(self, job, ignore_conditions=False, ignore_pre_conditions=False,
+    def eligible(self, job, ignore_pre_conditions=False,
                  ignore_post_conditions=False):
         "Eligible, when all pre-conditions are true and at least one post-condition is false."
-        if ignore_conditions:
-            return True
-
         pre = ignore_pre_conditions or all(cond(job) for cond in self._prereqs)
         if pre and len(self._postconds):
             post = ignore_post_conditions or any(not cond(job) for cond in self._postconds)
@@ -1864,10 +1861,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             cmd_ = cmd.format(job=job)
             yield JobOperation(name=cmd_.replace(' ', '-'), cmd=cmd_, job=job)
 
-    def _get_pending_operations(self, jobs, operation_names=None):
+    def _get_pending_operations(self, jobs, operation_names=None, only_eligible=True,
+                                ignore_pre_conditions=False, ignore_post_conditions=False):
         "Get all pending operations for the given selection."
         assert not isinstance(operation_names, str)
-        for op in self.next_operations(* jobs):
+        for op in self.next_operations(* jobs, only_eligible, ignore_pre_conditions,
+                                       ignore_post_conditions):
             if operation_names is None or any(re.fullmatch(n, op.name) for n in operation_names):
                 yield op
 
@@ -2034,7 +2033,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 return env.submit(_id=_id, script=script, flags=flags, **kwargs)
 
     def submit(self, bundle_size=1, jobs=None, names=None, num=None, parallel=False,
-               force=False, walltime=None, env=None, **kwargs):
+               force=False, walltime=None, env=None, ignore_condition=False,
+               ignore_pre_conditions=False, ignore_post_conditions=False, **kwargs):
         """Submit function for the project's main submit interface.
 
         .. versionchanged:: 0.6
@@ -2086,7 +2086,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Gather all pending operations.
         with self._potentially_buffered():
-            operations = (op for op in self._get_pending_operations(jobs, names)
+            operations = (op for op in
+                          self._get_pending_operations(jobs, names,
+                                                       only_eligible=not ignore_condition,
+                                                       ignore_pre_conditions=False,
+                                                       ignore_post_conditions=False)
                           if self._eligible_for_submission(op))
             if num is not None:
                 operations = list(islice(operations, num))
@@ -2465,14 +2469,17 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if op.complete(job):
                 yield name
 
-    def _job_operations(self, job, only_eligible):
+    def _job_operations(self, job, only_eligible=True, ignore_pre_conditions=False,
+                        ignore_post_conditions=False):
         "Yield instances of JobOperation constructed for specific jobs."
         for name, op in self.operations.items():
-            if only_eligible and not op.eligible(job):
+            if only_eligible and not op.eligible(job, ignore_pre_conditions,
+                                                 ignore_post_conditions):
                 continue
             yield JobOperation(name=name, job=job, cmd=op(job), directives=op.directives)
 
-    def next_operations(self, *jobs):
+    def next_operations(self, *jobs, only_eligible=True, ignore_pre_conditions=False,
+                        ignore_post_conditions=False):
         """Determine the next eligible operations for jobs.
 
         :param jobs:
@@ -2483,7 +2490,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             All instances of :class:`~.JobOperation` jobs are eligible for.
         """
         for job in jobs:
-            for op in self._job_operations(job, True):
+            for op in self._job_operations(job, only_eligible, ignore_pre_conditions,
+                                           ignore_post_conditions):
                 yield op
 
     @deprecated(

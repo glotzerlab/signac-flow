@@ -61,7 +61,7 @@ def init(project):
     # bundling and parallelism must exist in the same test. The goal is to
     # construct a minimal covering set of all test cases.
     environments = {
-        'environment.UnknownEnvironment': [],
+        'environment.StandardEnvironment': [],
         'environments.xsede.CometEnvironment': [
             {
                 'partition': ['compute', 'shared', 'gpu'],

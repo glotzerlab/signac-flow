@@ -202,15 +202,6 @@ class StandardEnvironment(ComputeEnvironment):
         return 'mpirun -np {np} {cmd}'.format(np=np, cmd=cmd)
 
 
-class UnknownEnvironment(StandardEnvironment):
-    "Deprecated 'standard' environment, replaced by 'StandardEnvironment.'"
-
-    def __init__(self, *args, **kwargs):
-        raise RuntimeError(
-            "The 'flow.environment.UnknownEnvironment' class has been replaced by the "
-            "'flow.environment.StandardEnvironment' class.")
-
-
 class TestEnvironment(ComputeEnvironment):
     """This is a test environment.
 

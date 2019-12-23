@@ -105,24 +105,6 @@ def init(project):
                 'bundle': [['mpi_op', 'omp_op']],
             }
         ],
-        'environments.incite.TitanEnvironment': [
-            {
-                'walltime': [None, 1],
-            },
-            {
-                'parallel': [False, True],
-                'bundle': [['mpi_op', 'omp_op']],
-            }
-        ],
-        'environments.incite.EosEnvironment': [
-            {
-                'walltime': [None, 1],
-            },
-            {
-                'parallel': [False, True],
-                'bundle': [['mpi_op', 'omp_op']],
-            }
-        ],
         'environments.incite.SummitEnvironment': [
             {
                 'walltime': [None, 1],

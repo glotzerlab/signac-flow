@@ -34,14 +34,13 @@ from multiprocessing import cpu_count
 from multiprocessing import TimeoutError
 from multiprocessing.pool import ThreadPool
 from multiprocessing import Event
+import jinja2
+from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
 
 import signac
 from signac.contrib.hashing import calc_id
 from signac.contrib.filterparse import parse_filter_arg
 from signac.contrib.project import JobsCursor
-
-import jinja2
-from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
 
 from .environment import get_environment
 from .scheduling.base import ClusterJob

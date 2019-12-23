@@ -10,18 +10,7 @@ import os
 import sys
 import errno
 import logging
-
-try:
-    import jinja2
-    from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
-except ImportError:
-    # Mock exception, which will never be raised.
-    class Jinja2TemplateNotFound(Exception):
-        pass
-
-    JINJA2 = False
-else:
-    JINJA2 = True
+import jinja2
 
 
 logger = logging.getLogger(__name__)
@@ -36,9 +25,6 @@ TEMPLATES = {
 
 def init(alias=None, template=None, root=None, out=None):
     "Initialize a templated FlowProject module."
-    if not JINJA2:
-        raise ValueError("The init() function requires the 'jinja2' package.")
-
     if alias is None:
         alias = 'project'
     elif not alias.isidentifier():

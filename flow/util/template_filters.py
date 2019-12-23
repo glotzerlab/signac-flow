@@ -116,8 +116,9 @@ def check_utilization(nn, np, ppn, threshold=0.9, name=None):
     if nn == 0:
         return 0
 
-    # The utilization is the number of processing units (np) required divided by the
-    # product of the number of nodes (nn) and number of processing units per node (ppn).
+    # The utilization is the number of processing units (np) required divided
+    # by the product of the number of nodes (nn) and the number of processing
+    # units per node (ppn).
     utilization = np / (nn * ppn)
 
     # Raise RuntimeError if the utilization is below the specified threshold.

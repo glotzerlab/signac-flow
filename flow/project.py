@@ -1686,9 +1686,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             num_passes=1, progress=False, order=None):
         """Execute all pending operations for the given selection.
 
-        This function will run in an infinite loop until all pending operations
-        have been executed or the total number of passes per operation or the total
-        number of executions have been reached.
+        This function will run in an infinite loop until executing all pending
+        operations, unless it reaches the maximum number of passes per
+        operation or the maximum number of executions.
 
         By default there is no limit on the total number of executions, but a specific
         operation will only be executed once per job. This is to avoid accidental

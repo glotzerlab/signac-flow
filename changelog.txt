@@ -23,6 +23,7 @@ Removed
 +++++++
 - Drop support for Python version 2.7.
 - The "always" condition has been deprecated and will trigger a ``DeprecationWarning`` upon use until removed.
+- Remove support for the legacy Python-based submission script generation.
 
 
 Version 0.8

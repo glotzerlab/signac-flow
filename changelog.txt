@@ -23,7 +23,8 @@ Removed
 +++++++
 - Drop support for Python version 2.7.
 - The "always" condition has been deprecated and will trigger a ``DeprecationWarning`` upon use until removed.
-
+- Removed deprecated ``UnknownEnvironment`` in favor of ``StandardEnvironment``.
+- Removed support for decommissioned INCITE Titan and Eos computers.
 
 Version 0.8
 ===========

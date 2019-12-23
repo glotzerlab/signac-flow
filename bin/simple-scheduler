@@ -142,7 +142,7 @@ def _process_queue(args, db):
         with open(fn_out, 'w') as outfile:
             with open(fn_err, 'w') as errfile:
                 check_call(cmd, shell=True, stdout=outfile, stderr=errfile)
-    except CalledProcessError as error:
+    except CalledProcessError:
         logger.warning("Error while executing job '{}'.".format(doc['_id']))
     finally:
         os.chdir(cwd)

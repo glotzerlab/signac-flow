@@ -405,11 +405,15 @@ class FlowOperation(object):
     def __str__(self):
         return "{type}(cmd='{cmd}')".format(type=type(self).__name__, cmd=self._cmd)
 
-    def eligible(self, job):
+    def eligible(self, job, ignore_conditions=False, ignore_pre_conditions=False,
+                 ignore_post_conditions=False):
         "Eligible, when all pre-conditions are true and at least one post-condition is false."
-        pre = all(cond(job) for cond in self._prereqs)
+        if ignore_conditions:
+            return True
+
+        pre = ignore_pre_conditions or all(cond(job) for cond in self._prereqs)
         if pre and len(self._postconds):
-            post = any(not cond(job) for cond in self._postconds)
+            post = ignore_post_conditions or any(not cond(job) for cond in self._postconds)
         else:
             post = True
         return pre and post

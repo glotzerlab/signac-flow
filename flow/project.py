@@ -1238,15 +1238,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             """
 
             if operation_info['scheduler_status'] >= JobStatus.active:
-                op_status = u'running'
+                op_status = 'running'
             elif operation_info['scheduler_status'] > JobStatus.inactive:
-                op_status = u'active'
+                op_status = 'active'
             elif operation_info['completed']:
-                op_status = u'completed'
+                op_status = 'completed'
             elif operation_info['eligible']:
-                op_status = u'eligible'
+                op_status = 'eligible'
             else:
-                op_status = u'ineligible'
+                op_status = 'ineligible'
 
             return symbols[op_status]
 
@@ -1470,20 +1470,20 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
             if pretty:
                 OPERATION_STATUS_SYMBOLS = OrderedDict([
-                    ('ineligible', u'\u25cb'),   # open circle
-                    ('eligible', u'\u25cf'),     # black circle
-                    ('active', u'\u25b9'),       # open triangle
-                    ('running', u'\u25b8'),      # black triangle
-                    ('completed', u'\u2714'),    # check mark
+                    ('ineligible', '\u25cb'),   # open circle
+                    ('eligible', '\u25cf'),     # black circle
+                    ('active', '\u25b9'),       # open triangle
+                    ('running', '\u25b8'),      # black triangle
+                    ('completed', '\u2714'),    # check mark
                 ])
                 "Pretty (unicode) symbols denoting the execution status of operations."
             else:
                 OPERATION_STATUS_SYMBOLS = OrderedDict([
-                    ('ineligible', u'-'),
-                    ('eligible', u'+'),
-                    ('active', u'*'),
-                    ('running', u'>'),
-                    ('completed', u'X')
+                    ('ineligible', '-'),
+                    ('eligible', '+'),
+                    ('active', '*'),
+                    ('running', '>'),
+                    ('completed', 'X')
                 ])
                 "Symbols denoting the execution status of operations."
             operation_status_legend = ' '.join('[{}]:{}'.format(v, k)

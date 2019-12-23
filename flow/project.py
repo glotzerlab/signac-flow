@@ -38,6 +38,7 @@ from multiprocessing import Event
 import signac
 from signac.contrib.hashing import calc_id
 from signac.contrib.filterparse import parse_filter_arg
+from signac.contrib.project import JobsCursor
 
 import jinja2
 from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
@@ -66,7 +67,6 @@ from .labels import label
 from .labels import staticlabel
 from .labels import classlabel
 from .labels import _is_label_func
-from . import legacy
 from .util import config as flow_config
 from .version import __version__
 
@@ -2797,7 +2797,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         else:
             filter_ = parse_filter_arg(args.filter)
             doc_filter = parse_filter_arg(args.doc_filter)
-            return legacy.JobsCursorWrapper(self, filter_, doc_filter)
+            return JobsCursor(self, filter_, doc_filter)
 
     def main(self, parser=None):
         """Call this function to use the main command line interface.

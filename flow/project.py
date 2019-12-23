@@ -174,8 +174,6 @@ class JobOperation(object):
         This class is used by the :class:`~.FlowProject` class for the execution and
         submission process and should not be instantiated by users themselves.
 
-    .. versionchanged:: 0.6
-
     :param name:
         The name of this JobOperation instance. The name is arbitrary,
         but helps to concisely identify the operation in various contexts.
@@ -712,8 +710,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Finally, you can specify a different default label name by providing it as the first
         argument to the ``label()`` decorator.
-
-        .. versionadded:: 0.6
         """
         if callable(label_name_or_func):
             cls._LABEL_FUNCTIONS[label_name_or_func] = None
@@ -1070,8 +1066,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                      no_parallelize=False, template=None, profile=False,
                      eligible_jobs_max_lines=None):
         """Print the status of the project.
-
-        .. versionchanged:: 0.6
 
         :param jobs:
             Only execute operations for the given jobs, or all if the argument is omitted.
@@ -1545,8 +1539,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         See also: :meth:`~.run`
 
-        .. versionadded:: 0.6
-
         :param operations:
             The operations to execute (optional).
         :type operations:
@@ -1690,8 +1682,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         infinite loops when no or faulty post conditions are provided.
 
         See also: :meth:`~.run_operations`
-
-        .. versionchanged:: 0.6
 
         :param jobs:
             Only execute operations for the given jobs, or all if the argument is omitted.
@@ -1936,8 +1926,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                           show_template_help=False, **kwargs):
         r"""Submit a sequence of operations to the scheduler.
 
-        .. versionchanged:: 0.6
-
         :param operations:
             The operations to submit.
         :type operations:
@@ -2028,8 +2016,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def submit(self, bundle_size=1, jobs=None, names=None, num=None, parallel=False,
                force=False, walltime=None, env=None, **kwargs):
         """Submit function for the project's main submit interface.
-
-        .. versionchanged:: 0.6
 
         :param bundle_size:
             Specify the number of operations to be bundled into one submission, defaults to 1.
@@ -2510,8 +2496,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 print('Hello', job)
 
         See also: :meth:`~.flow.FlowProject.add_operation`.
-
-        .. versionadded:: 0.6
         """
         if isinstance(func, str):
             return lambda op: cls.operation(op, name=func)

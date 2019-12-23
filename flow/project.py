@@ -84,12 +84,12 @@ variable, for example in the project configuration file. The current template di
 {template_dir}
 
 All template variables can be placed within a template using the standard jinja2
-syntax, e.g., the project root directory can be written like this: {{ project._rd }}.
+syntax, e.g., the project root directory can be written like this: {{{{ project._rd }}}}.
 The available template variables are:
 {template_vars}
 
 Filter functions can be used to format template variables in a specific way.
-For example: {{ project.get_id() | captialize }}.
+For example: {{{{ project.get_id() | capitalize }}}}.
 
 The available filters are:
 {filters}"""
@@ -314,7 +314,7 @@ class FlowCondition(object):
     :param callback:
         A function with one positional argument (the job)
     :type callback:
-        :py:class:`~signac.contrib.job.Job`
+        function(:py:class:`~signac.contrib.job.Job`)
     """
 
     def __init__(self, callback):
@@ -701,9 +701,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         The ``foo-label-text`` label will now show up in the status view for each job,
         where the ``foo`` key evaluates true.
 
-        If instead of a ``str``, the label functions returns any other type, the label
-        name will be the name of the function if and only if the return value evaluates
-        to ``True``, for example:
+        If the label functions returns any type other than ``str``, the label
+        name will be the name of the function if and only if the return value
+        evaluates to ``True``, for example:
 
         .. code-block:: python
 
@@ -870,14 +870,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _store_bundled(self, operations):
         """Store operation-ids as part of a bundle and return bundle id.
 
-        The operation identifiers are stored in a  text within a file
-        determined by the _fn_bundle() method.
-
-        This may be used to idenfity the status of individual operations
-        root directory. This is necessary to be able to identify each
-
-        A single operation will not be stored, but instead the operation's
-        id is directly returned.
+        The operation identifiers are stored in a text file whose name is
+        determined by the _fn_bundle() method. This may be used to identify
+        the status of individual operations from the bundle id. A single
+        operation will not be stored, but instead the operation's id is
+        directly returned.
 
         :param operations:
             The operations to bundle.
@@ -1211,11 +1208,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             :param scheduler_status_code:
                 Dictionary information for status code
             :type scheduler_status_code:
-                Dictionary
+                dict
             :param all_ops:
                 Boolean value indicate if all operations should be displayed
             :type all_ops:
-                Boolean
+                bool
             """
 
             if scheduler_status_code[job_op['scheduler_status']] != 'U' or \
@@ -1230,11 +1227,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             :param operation_info:
                 Dictionary containing operation information.
             :type operation_info:
-                Dictionary
+                dict
             :param symbols:
                 Dictionary containing code for different job status.
             :type symbols:
-                Dictionary
+                dict
             """
 
             if operation_info['scheduler_status'] >= JobStatus.active:
@@ -1261,7 +1258,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 :param eligible:
                     Boolean value for job eligibility
                 :type eligible:
-                    Boolean
+                    bool
                 """
                 if eligible:
                     return '\033[1m' + s + '\033[0m'
@@ -1278,7 +1275,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 :param eligible:
                     Boolean value for job eligibility
                 :type eligible:
-                    boolean
+                    bool
                 """
                 return s
 
@@ -2061,7 +2058,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type force:
             bool
         :param walltime:
-            Specify the walltime in hours or as instance of datetime.timedelta.
+            Specify the walltime in hours or as instance of :py:class:`datetime.timedelta`.
         """
         # Regular argument checks and expansion
         if jobs is None:

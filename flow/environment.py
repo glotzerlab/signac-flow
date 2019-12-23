@@ -368,7 +368,7 @@ def get_environment(test=False, import_configured=True):
     True.
 
     :param test:
-        Return the TestEnvironment
+        Whether to return the TestEnvironment.
     :type test:
         bool
     :returns:

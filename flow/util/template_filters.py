@@ -11,12 +11,12 @@ from ..errors import SubmitError
 
 
 def identical(iterable):
-    """Check that all elements of an iterator are identical"""
+    """Check that all elements of an iterator are identical."""
     return len(set(iterable)) <= 1
 
 
 def format_timedelta(delta, style='HH:MM:SS'):
-    "Format a time delta for interpretation by schedulers."
+    """Format a time delta for interpretation by schedulers."""
     if isinstance(delta, int) or isinstance(delta, float):
         import datetime
         delta = datetime.timedelta(hours=delta)
@@ -95,7 +95,7 @@ def check_utilization(nn, np, ppn, threshold=0.9, name=None):
     :param nn:
         Number of requested nodes.
     :param np:
-        Number of required processing units (CPU/GPUs etc.).
+        Number of required processing units (e.g. CPUs, GPUs).
     :param ppn:
         Number of processing units available per node.
     :param threshold:
@@ -139,7 +139,7 @@ def calc_num_nodes(np, ppn=1, threshold=0, name=None):
     """Calculate the number of required nodes with optional utilization check.
 
     :param np:
-        Number of required processing units (CPU/GPU etc.).
+        Number of required processing units (e.g. CPUs, GPUs).
     :param ppn:
         Number of processing units available per node.
     :param threshold:

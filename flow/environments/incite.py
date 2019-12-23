@@ -5,7 +5,7 @@
 
 http://www.doeleadershipcomputing.org/
 """
-from ..environment import DefaultLSFEnvironment, DefaultTorqueEnvironment
+from ..environment import DefaultLSFEnvironment
 
 from fractions import gcd
 
@@ -85,24 +85,4 @@ class SummitEnvironment(DefaultLSFEnvironment):
                'jsrun_extra_args': jsrun_extra_args.__func__}
 
 
-class TitanEnvironment(DefaultTorqueEnvironment):
-    """Environment profile for the titan super computer.
-
-    https://www.olcf.ornl.gov/titan/
-    """
-    hostname_pattern = 'titan'
-    template = 'titan.sh'
-    cores_per_node = 16
-
-
-class EosEnvironment(DefaultTorqueEnvironment):
-    """Environment profile for the eos super computer.
-
-    https://www.olcf.ornl.gov/computing-resources/eos/
-    """
-    hostname_pattern = 'eos'
-    template = 'eos.sh'
-    cores_per_node = 32
-
-
-__all__ = ['SummitEnvironment', 'TitanEnvironment', 'EosEnvironment']
+__all__ = ['SummitEnvironment']

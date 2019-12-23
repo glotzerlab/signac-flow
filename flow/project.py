@@ -148,10 +148,10 @@ class _condition(object):
                    'not_'.encode() + condition.__code__.co_code)
 
 
-def make_bundles(operations, size=None):
+def _make_bundles(operations, size=None):
     """Utility function for the generation of bundles.
 
-    This function splits an iterable of operations into  equally
+    This function splits an iterable of operations into equally
     sized bundles and a possibly smaller final bundle.
     """
     n = None if size == 0 else size
@@ -162,6 +162,16 @@ def make_bundles(operations, size=None):
             yield b
         else:
             break
+
+
+@deprecated(deprecated_in="0.9", removed_in="0.11", current_version=__version__)
+def make_bundles(operations, size=None):
+    """Utility function for the generation of bundles.
+
+    This function splits an iterable of operations into equally
+    sized bundles and a possibly smaller final bundle.
+    """
+    return _make_bundles(operations, size)
 
 
 class JobOperation(object):
@@ -2088,7 +2098,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 operations = list(islice(operations, num))
 
         # Bundle them up and submit.
-        for bundle in make_bundles(operations, bundle_size):
+        for bundle in _make_bundles(operations, bundle_size):
             status = self.submit_operations(
                 operations=bundle, env=env, parallel=parallel,
                 force=force, walltime=walltime, **kwargs)
@@ -2756,7 +2766,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             ops = list(islice(ops, args.num))
 
         # Bundle operations up, generate the script, and submit to scheduler.
-        for bundle in make_bundles(ops, args.bundle_size):
+        for bundle in _make_bundles(ops, args.bundle_size):
             status = self.submit_operations(operations=bundle, **kwargs)
             if status is not None:
                 for op in bundle:

@@ -40,9 +40,9 @@ def setup(py_modules, **attrs):
     """Setup function for environment modules.
 
     Use this function in place of setuptools.setup to not only install
-    a environment's module, but also register it with the global signac
+    an environment's module, but also register it with the global signac
     configuration. Once registered, the environment is automatically
-    imported when the get_environment() function is called.
+    imported when the :py:meth:`~.get_environment` function is called.
     """
     import setuptools
     from setuptools.command.install import install
@@ -362,10 +362,10 @@ def registered_environments(import_configured=True):
 def get_environment(test=False, import_configured=True):
     """Attempt to detect the present environment.
 
-    This function iterates through all defined ComputeEnvironment
-    classes in reversed order of definition and and returns the
-    first EnvironmentClass where the is_present() method returns
-    True.
+    This function iterates through all defined :py:class:`~.ComputeEnvironment`
+    classes in reversed order of definition and and returns the first
+    environment where the :py:meth:`~.ComputeEnvironment.is_present` method
+    returns True.
 
     :param test:
         Whether to return the TestEnvironment.

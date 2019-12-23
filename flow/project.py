@@ -309,9 +309,9 @@ class FlowCondition(object):
     This can be used to build a graph of conditions and operations.
 
     :param callback:
-        A function with one positional argument (the job)
+        A callable with one positional argument (the job).
     :type callback:
-        function(:py:class:`~signac.contrib.job.Job`)
+        callable
     """
 
     def __init__(self, callback):
@@ -352,7 +352,7 @@ class FlowOperation(object):
         op = FlowOperation('hello', cmd='hello {job._id}')
         op = FlowOperation('hello', cmd=lambda 'hello {}'.format(job._id))
 
-    Here is another example of possible string substitutions:
+    Here is another example of a possible string substitution:
 
     .. code-block:: python
 
@@ -710,6 +710,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Finally, you can specify a different default label name by providing it as the first
         argument to the ``label()`` decorator.
+
+        :param label_name_or_func:
+            A label name or callable.
+        :type label_name_or_func:
+            str or callable
         """
         if callable(label_name_or_func):
             cls._LABEL_FUNCTIONS[label_name_or_func] = None

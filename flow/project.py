@@ -128,7 +128,7 @@ class _condition(object):
 
     @classmethod
     @deprecated(
-        deprecated_in="0.9", removed_in="0.11",
+        deprecated_in="0.9", removed_in="0.11", current_version=__version__,
         details="This condition decorator is obsolete.")
     def always(cls, func):
         "Returns True."

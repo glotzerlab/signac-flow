@@ -1865,8 +1865,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                 ignore_pre_conditions=False, ignore_post_conditions=False):
         "Get all pending operations for the given selection."
         assert not isinstance(operation_names, str)
-        for op in self.next_operations(* jobs, only_eligible, ignore_pre_conditions,
-                                       ignore_post_conditions):
+        for op in self.next_operations(* jobs, only_eligible=only_eligible,
+                                       ignore_pre_conditions=ignore_pre_conditions,
+                                       ignore_post_conditions=ignore_post_conditions):
             if operation_names is None or any(re.fullmatch(n, op.name) for n in operation_names):
                 yield op
 

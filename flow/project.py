@@ -340,11 +340,13 @@ class FlowCondition(object):
 class FlowOperation(object):
     """A FlowOperation represents a data space operation, operating on any job.
 
-    Any FlowOperation is associated with a specific command, which should be
-    a function of :py:class:`~signac.contrib.job.Job`. The command (cmd) can
-    be stated as function, either by using string substitution based on a job's
-    attributes, or by providing a unary callable, which expects an instance
-    of job as its first and only positional argument.
+    Every FlowOperation is associated with a specific command which should be
+    a function of :py:class:`~signac.contrib.job.Job`. The command (cmd) may
+    either be a unary callable that expects an instance of
+    :class:`~signac.contrib.job.Job` as its only positional argument and returns
+    a string containing valid shell commands, or the string of commands itself.
+    In either case, the resulting string may contain any attributes of the job placed
+    in curly braces, which will then be substituted by Python string formatting.
 
     For example, if we wanted to define a command for a program called 'hello',
     which expects a job id as its first argument, we could construct the following
@@ -1686,8 +1688,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             num_passes=1, progress=False, order=None):
         """Execute all pending operations for the given selection.
 
-        This function will run in an infinite loop until executing all pending
-        operations, unless it reaches the maximum number of passes per
+        This function will run in an infinite loop until all pending operations
+        are executed, unless it reaches the maximum number of passes per
         operation or the maximum number of executions.
 
         By default there is no limit on the total number of executions, but a specific

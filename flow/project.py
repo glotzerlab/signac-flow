@@ -103,18 +103,13 @@ class _condition(object):
     current_arbitrary_tag = 0
 
     def __init__(self, condition, tag=None):
-        """Add tag to differentiate built-in conditions during graph detection.
+        """Add tag to differentiate built-in conditions during graph detection."""
 
-        Will raise a ``RuntimeError`` if tag is not set and does not have a code
-        object.
-        :raises: RuntimeError
-        '''
         if tag is None:
             try:
                 tag = condition.__code__.co_code
             except AttributeError:
-                logger.warning("Condition {} could not autogenerate "
-                               "tag.".format(condition))
+                logger.warning("Condition {} could not autogenerate tag.".format(condition))
         condition._flow_tag = tag
         self.condition = condition
 
@@ -764,6 +759,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         output graph could be visualized using Matplotlib and NetworkX with the
         following code:
 
+        Raises a ``RuntimeError`` if a condition does not have a tag. This can
+        occur when using ``functools.partial``, and a manual condition tag has
+        not been set.
+
+        :raises: RuntimeError
+
         .. code-block:: python
 
             import numpy as np
@@ -799,15 +800,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             only returned at the end."""
             callbacks = set()
             for cf in condition_functions:
-                # condition may not have __name__ attribute
+                # condition may not have __name__ attribute in cases where functools is used
+                # for condition creation
                 if hasattr(cf, '__name__') and cf.__name__ == "_flow_metacondition":
-                    callbacks = callbacks.union(
-                        unpack_conditions(cf._composed_of))
+                    callbacks = callbacks.union(unpack_conditions(cf._composed_of))
                 else:
                     if cf._flow_tag is None:
-                        raise RuntimeError("Condition {} was not tagged. "
-                                           "To create graph ensure each base "
-                                           "condition has a __code__ attr or "
+                        raise RuntimeError("Condition {} was not tagged.  To create graph ensure "
+                                           "each base condition has a ``__code__`` attr or "
                                            "manuel tag.".format(cf))
                     callbacks.add(cf._flow_tag)
 

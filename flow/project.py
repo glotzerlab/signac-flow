@@ -103,7 +103,7 @@ class _condition(object):
     current_arbitrary_tag = 0
 
     def __init__(self, condition, tag=None):
-        '''Add tag to differentiate built-in conditions during graph detection.
+        """Add tag to differentiate built-in conditions during graph detection.
 
         Will raise a ``RuntimeError`` if tag is not set and does not have a code
         object.

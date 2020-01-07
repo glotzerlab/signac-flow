@@ -37,13 +37,15 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     zip_safe=True,
-
-    author='Carl Simon Adorf',
+    maintainer='signac Developers',
+    maintainer_email='signac-support@umich.edu',
+    author='Carl Simon Adorf et al.',
     author_email='csadorf@umich.edu',
     description=description,
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://signac.io",
+    download_url="https://pypi.org/project/signac-flow/",
     keywords='workflow management signac framework database',
 
     classifiers=[

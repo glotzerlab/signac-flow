@@ -197,10 +197,6 @@ class StandardEnvironment(ComputeEnvironment):
     def is_present(cls):
         return True
 
-    @classmethod
-    def mpi_cmd(cls, cmd, np):
-        return 'mpirun -np {np} {cmd}'.format(np=np, cmd=cmd)
-
 
 class UnknownEnvironment(StandardEnvironment):
     "Deprecated 'standard' environment, replaced by 'StandardEnvironment.'"

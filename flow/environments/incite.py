@@ -81,8 +81,8 @@ class SummitEnvironment(DefaultLSFEnvironment):
         return '-n {} -a {} -c {} -g {} {}'.format(nsets, tasks, cpus, gpus, cuda_aware_mpi)
 
     @template_filter
-    def get_prefix(cls, operation,  parallel=False, mpi_prefix=None, cmd_prefix=None):
-        """Template filter for getting the prefix based on proper directives.
+    def _get_mpi_prefix(cls, operation, parallel):
+        """Template filter for getting the mpi prefix based on proper directives.
 
         :param operation:
             The operation for which to add prefix.
@@ -90,30 +90,16 @@ class SummitEnvironment(DefaultLSFEnvironment):
             If True, operations are assumed to be executed in parallel, which means
             that the number of total tasks is the sum of all tasks instead of the
             maximum number of tasks. Default is set to False.
-        :param mpi_prefix:
-            User defined mpi_prefix string. Default is set to None.
-            This will be deprecated and removed in the future.
-        :param cmd_prefix:
-            User defined cmd_prefix string. Default is set to None.
-            This will be deprecated and removed in the future.
-        :return prefix:
+        :return mpi_prefix:
             The prefix should be added for the operation.
-        :type prefix:
+        :type mpi_prefix:
             str
         """
-        prefix = ''
-        if operation.directives.get('omp_num_threads'):
-            prefix += 'export OMP_NUM_THREADS={}\n'.format(operation.directives['omp_num_threads'])
-        if mpi_prefix:
-            prefix += mpi_prefix
-        else:
-            extra_args = str(operation.directives.get('extra_jsrun_args', ''))
-            resource_set = cls.guess_resource_sets(operation)
-            prefix += cls.mpi_cmd + ' ' + cls.jsrun_options(resource_set)
-            prefix += ' -d packed -b rs ' + extra_args + (' ' if extra_args else '')
-        if cmd_prefix:
-            prefix += cmd_prefix
-        return prefix
+        extra_args = str(operation.directives.get('extra_jsrun_args', ''))
+        resource_set = cls.guess_resource_sets(operation)
+        mpi_prefix = cls.mpi_cmd + ' ' + cls.jsrun_options(resource_set)
+        mpi_prefix += ' -d packed -b rs ' + extra_args + (' ' if extra_args else '')
+        return mpi_prefix
 
 
 class TitanEnvironment(DefaultTorqueEnvironment):

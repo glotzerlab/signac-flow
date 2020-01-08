@@ -199,6 +199,30 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         return flow_config.require_config_value(key, ns=cls.__name__, default=default)
 
     @template_filter
+    def _get_omp_prefix(cls, operation):
+        return 'export OMP_NUM_THREADS={}\n'.format(operation.directives['omp_num_threads'])
+
+    @template_filter
+    def _get_mpi_prefix(cls, operation, parallel):
+        """Template filter for getting the mpi prefix based on proper directives.
+
+        :param operation:
+            The operation for which to add prefix.
+        :param parallel:
+            If True, operations are assumed to be executed in parallel, which means
+            that the number of total tasks is the sum of all tasks instead of the
+            maximum number of tasks. Default is set to False.
+        :return mpi_prefix:
+            The prefix should be added for the operation.
+        :type mpi_prefix:
+            str
+        """
+        if operation.directives.get('nranks'):
+            return '{} -n {} '.format(cls.mpi_cmd, operation.directives['nranks'])
+        else:
+            return ''
+
+    @template_filter
     def get_prefix(cls, operation, parallel=False, mpi_prefix=None, cmd_prefix=None):
         """Template filter for getting the prefix based on proper directives.
 
@@ -221,11 +245,11 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         """
         prefix = ''
         if operation.directives.get('omp_num_threads'):
-            prefix += 'export OMP_NUM_THREADS={}\n'.format(operation.directives['omp_num_threads'])
+            prefix += cls._get_omp_prefix(operation)
         if mpi_prefix:
             prefix += mpi_prefix
-        elif operation.directives.get('nranks'):
-            prefix += '{} -n {} '.format(cls.mpi_cmd, operation.directives['nranks'])
+        else:
+            prefix += cls._get_mpi_prefix(operation, parallel)
         if cmd_prefix:
             prefix += cmd_prefix
         # if cmd_prefix and if mpi_prefix for backwards compatibility

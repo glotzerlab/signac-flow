@@ -70,8 +70,8 @@ class Stampede2Environment(DefaultSlurmEnvironment):
                   '(slurm default is "slurm-%%j.out").'))
 
     @template_filter
-    def get_prefix(cls, operation, parallel=False, mpi_prefix=None, cmd_prefix=None):
-        """Template filter for getting the prefix based on proper directives.
+    def _get_mpi_prefix(cls, operation, parallel):
+        """Template filter for getting the mpi prefix based on proper directives.
 
         :param operation:
             The operation for which to add prefix.
@@ -79,32 +79,20 @@ class Stampede2Environment(DefaultSlurmEnvironment):
             If True, operations are assumed to be executed in parallel, which means
             that the number of total tasks is the sum of all tasks instead of the
             maximum number of tasks. Default is set to False.
-        :param mpi_prefix:
-            User defined mpi_prefix string. Default is set to None.
-            This will be deprecated and removed in the future.
-        :param cmd_prefix:
-            User defined cmd_prefix string. Default is set to None.
-            This will be deprecated and removed in the future.
-        :return prefix:
+        :return mpi_prefix:
             The prefix should be added for the operation.
-        :type prefix:
+        :type mpi_prefix:
             str
         """
-        prefix = ''
-        if operation.directives.get('omp_num_threads'):
-            prefix += 'export OMP_NUM_THREADS={}\n'.format(operation.directives['omp_num_threads'])
-        if mpi_prefix:
-            prefix += mpi_prefix
-        elif operation.directives.get('nranks'):
+        if operation.directives.get('nranks'):
             if parallel:
-                prefix += '{} -n {} -o {} task_affinity '.format(
+                return '{} -n {} -o {} task_affinity '.format(
                        cls.mpi_cmd, operation.directives['nranks'],
                        operation.directives['np_offset'])
             else:
-                prefix += '{} -n {} '.format(cls.mpi_cmd, operation.directives['nranks'])
-        if cmd_prefix:
-            prefix += cmd_prefix
-        return prefix
+                return '{} -n {} '.format(cls.mpi_cmd, operation.directives['nranks'])
+        else:
+            return ''
 
 
 class BridgesEnvironment(DefaultSlurmEnvironment):

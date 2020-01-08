@@ -6,7 +6,6 @@ from __future__ import print_function
 import logging
 
 from ..environment import DefaultSlurmEnvironment
-from ..environment import template_filter
 
 
 logger = logging.getLogger(__name__)
@@ -69,9 +68,9 @@ class Stampede2Environment(DefaultSlurmEnvironment):
                   'If omitted, uses the system default '
                   '(slurm default is "slurm-%%j.out").'))
 
-    @template_filter
+    @classmethod
     def _get_mpi_prefix(cls, operation, parallel):
-        """Template filter for getting the mpi prefix based on proper directives.
+        """function for getting the mpi prefix based on proper directives.
 
         :param operation:
             The operation for which to add prefix.

@@ -74,15 +74,15 @@ class SummitEnvironment(DefaultLSFEnvironment):
 
         return nsets, tasks_per_set, cpus_per_set, gpus_per_set
 
-    @template_filter
+    @classmethod
     def jsrun_options(cls, resource_set):
         nsets, tasks, cpus, gpus = resource_set
         cuda_aware_mpi = "--smpiargs='-gpu'" if (nsets > 0 or tasks > 0) and gpus > 0 else ""
         return '-n {} -a {} -c {} -g {} {}'.format(nsets, tasks, cpus, gpus, cuda_aware_mpi)
 
-    @template_filter
+    @classmethod
     def _get_mpi_prefix(cls, operation, parallel):
-        """Template filter for getting the mpi prefix based on proper directives.
+        """function for getting the mpi prefix based on proper directives.
 
         :param operation:
             The operation for which to add prefix.

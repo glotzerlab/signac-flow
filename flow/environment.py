@@ -198,9 +198,9 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         """
         return flow_config.require_config_value(key, ns=cls.__name__, default=default)
 
-    @template_filter
+    @classmethod
     def _get_omp_prefix(cls, operation):
-        """Template filter for getting the omp prefix based on proper directives.
+        """function for getting the omp prefix based on proper directives.
 
         :param operation:
             The operation for which to add prefix.
@@ -211,9 +211,9 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         """
         return 'export OMP_NUM_THREADS={}\n'.format(operation.directives['omp_num_threads'])
 
-    @template_filter
+    @classmethod
     def _get_mpi_prefix(cls, operation, parallel):
-        """Template filter for getting the mpi prefix based on proper directives.
+        """function for getting the mpi prefix based on proper directives.
 
         :param operation:
             The operation for which to add prefix.

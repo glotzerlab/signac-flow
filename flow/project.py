@@ -759,12 +759,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         output graph could be visualized using Matplotlib and NetworkX with the
         following code:
 
-        Raises a ``RuntimeError`` if a condition does not have a tag. This can
-        occur when using ``functools.partial``, and a manual condition tag has
-        not been set.
-
-        :raises: RuntimeError
-
         .. code-block:: python
 
             import numpy as np
@@ -787,6 +781,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         zip(range(len(ops)), [o for o in ops])})
 
             plt.show()
+
+        Raises a ``RuntimeError`` if a condition does not have a tag. This can
+        occur when using ``functools.partial``, and a manually specified
+        condition tag has not been set.
+
+        :raises: RuntimeError
+
         """
 
         def to_callbacks(conditions):
@@ -806,9 +807,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     callbacks = callbacks.union(unpack_conditions(cf._composed_of))
                 else:
                     if cf._flow_tag is None:
-                        raise RuntimeError("Condition {} was not tagged.  To create graph ensure "
-                                           "each base condition has a ``__code__`` attr or "
-                                           "manuel tag.".format(cf))
+                        raise RuntimeError("Condition {} was not tagged. To create a graph, ensure "
+                                           "each base condition has a ``__code__`` attribute or "
+                                           "manually specified tag.".format(cf))
                     callbacks.add(cf._flow_tag)
 
             return callbacks

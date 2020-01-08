@@ -200,6 +200,15 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
     @template_filter
     def _get_omp_prefix(cls, operation):
+        """Template filter for getting the omp prefix based on proper directives.
+
+        :param operation:
+            The operation for which to add prefix.
+        :return omp_prefix:
+            The prefix should be added for the operation.
+        :type omp_prefix:
+            str
+        """
         return 'export OMP_NUM_THREADS={}\n'.format(operation.directives['omp_num_threads'])
 
     @template_filter

@@ -22,10 +22,11 @@ Changed
 
 Removed
 +++++++
-- Drop support for Python version 2.7.
-- The "always" condition has been deprecated and will trigger a ``DeprecationWarning`` upon use until removed.
-- Remove support for the legacy Python-based submission script generation.
-
+- Drop support for Python version 2.7 (#157, #158, #201).
+- The "always" condition has been deprecated and will trigger a ``DeprecationWarning`` upon use until removed (#179).
+- Removed deprecated ``UnknownEnvironment`` in favor of ``StandardEnvironment`` (#204).
+- Removed support for decommissioned INCITE Titan and Eos computers (#204).
+- Remove support for the legacy Python-based submission script generation (#200).
 
 Version 0.8
 ===========
@@ -68,7 +69,6 @@ Changed
     + ``update_aliases`` (removed without replacement)
 
 - The support for Python version 2.7 is deprecated.
-
 
 Removed
 +++++++

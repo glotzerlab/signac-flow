@@ -128,7 +128,7 @@ class _condition(object):
 
     @classmethod
     @deprecated(
-        deprecated_in="0.9", removed_in="1.0",
+        deprecated_in="0.9", removed_in="0.11", current_version=__version__,
         details="This condition decorator is obsolete.")
     def always(cls, func):
         "Returns True."
@@ -148,10 +148,10 @@ class _condition(object):
                    'not_'.encode() + condition.__code__.co_code)
 
 
-def make_bundles(operations, size=None):
+def _make_bundles(operations, size=None):
     """Utility function for the generation of bundles.
 
-    This function splits an iterable of operations into  equally
+    This function splits an iterable of operations into equally
     sized bundles and a possibly smaller final bundle.
     """
     n = None if size == 0 else size
@@ -162,6 +162,16 @@ def make_bundles(operations, size=None):
             yield b
         else:
             break
+
+
+@deprecated(deprecated_in="0.9", removed_in="0.11", current_version=__version__)
+def make_bundles(operations, size=None):
+    """Utility function for the generation of bundles.
+
+    This function splits an iterable of operations into equally
+    sized bundles and a possibly smaller final bundle.
+    """
+    return _make_bundles(operations, size)
 
 
 class JobOperation(object):
@@ -857,7 +867,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @classmethod
     @deprecated(
-        deprecated_in="0.8", removed_in="1.0",
+        deprecated_in="0.8", removed_in="0.10",
         current_version=__version__)
     def update_aliases(cls, aliases):
         "Update the ALIASES table for this class."
@@ -2088,7 +2098,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 operations = list(islice(operations, num))
 
         # Bundle them up and submit.
-        for bundle in make_bundles(operations, bundle_size):
+        for bundle in _make_bundles(operations, bundle_size):
             status = self.submit_operations(
                 operations=bundle, env=env, parallel=parallel,
                 force=force, walltime=walltime, **kwargs)
@@ -2236,7 +2246,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                  "to be considered eligible for execution.")
 
     @deprecated(
-        deprecated_in="0.8", removed_in="1.0",
+        deprecated_in="0.8", removed_in="0.10",
         current_version=__version__,
         details="Use export_job_statuses() instead.")
     def export_job_stati(self, collection, stati):
@@ -2425,7 +2435,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         self.operations[name] = FlowOperation(cmd=cmd, pre=pre, post=post, directives=kwargs)
 
     @deprecated(
-        deprecated_in="0.8", removed_in="1.0",
+        deprecated_in="0.8", removed_in="0.10",
         current_version=__version__,
         details="Use labels() instead.")
     def classify(self, job):
@@ -2483,7 +2493,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 yield op
 
     @deprecated(
-        deprecated_in="0.8", removed_in="1.0",
+        deprecated_in="0.8", removed_in="0.10",
         current_version=__version__,
         details="Use next_operations() instead.")
     def next_operation(self, job):
@@ -2622,7 +2632,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return True
 
     @deprecated(
-        deprecated_in="0.8", removed_in="1.0",
+        deprecated_in="0.8", removed_in="0.10",
         current_version=__version__)
     def eligible_for_submission(self, job_operation):
         return self._eligible_for_submission(self, job_operation)
@@ -2756,7 +2766,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             ops = list(islice(ops, args.num))
 
         # Bundle operations up, generate the script, and submit to scheduler.
-        for bundle in make_bundles(ops, args.bundle_size):
+        for bundle in _make_bundles(ops, args.bundle_size):
             status = self.submit_operations(operations=bundle, **kwargs)
             if status is not None:
                 for op in bundle:

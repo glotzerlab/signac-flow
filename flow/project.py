@@ -103,9 +103,13 @@ class _condition(object):
     current_arbitrary_tag = 0
 
     def __init__(self, condition, tag=None):
-        # Add tag to differentiate built-in conditions during graph detection.
+        """Add tag to differentiate built-in conditions during graph detection."""
+
         if tag is None:
-            tag = condition.__code__.co_code
+            try:
+                tag = condition.__code__.co_code
+            except AttributeError:
+                logger.warning("Condition {} could not autogenerate tag.".format(condition))
         condition._flow_tag = tag
         self.condition = condition
 
@@ -787,6 +791,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         zip(range(len(ops)), [o for o in ops])})
 
             plt.show()
+
+        Raises a ``RuntimeError`` if a condition does not have a tag. This can
+        occur when using ``functools.partial``, and a manually specified
+        condition tag has not been set.
+
+        :raises: RuntimeError
+
         """
 
         def to_callbacks(conditions):
@@ -800,10 +811,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             only returned at the end."""
             callbacks = set()
             for cf in condition_functions:
-                if cf.__name__ == "_flow_metacondition":
-                    callbacks = callbacks.union(
-                        unpack_conditions(cf._composed_of))
+                # condition may not have __name__ attribute in cases where functools is used
+                # for condition creation
+                if hasattr(cf, '__name__') and cf.__name__ == "_flow_metacondition":
+                    callbacks = callbacks.union(unpack_conditions(cf._composed_of))
                 else:
+                    if cf._flow_tag is None:
+                        raise RuntimeError("Condition {} was not tagged. To create a graph, ensure "
+                                           "each base condition has a ``__code__`` attribute or "
+                                           "manually specified tag.".format(cf))
                     callbacks.add(cf._flow_tag)
 
             return callbacks

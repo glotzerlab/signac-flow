@@ -42,7 +42,7 @@ from signac.contrib.filterparse import parse_filter_arg
 import jinja2
 from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
 
-from enum import Flag
+from enum import IntEnum
 
 from .environment import get_environment
 from .scheduling.base import ClusterJob
@@ -97,7 +97,7 @@ The available filters are:
 {filters}"""
 
 
-class Ignore_condition(Flag):
+class Ignore_condition(IntEnum):
     NONE = 0
     PRE = 1
     POST = 2

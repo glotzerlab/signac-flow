@@ -5,8 +5,11 @@ Changes
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 The numbers in brackets denote the related GitHub issue and/or pull request.
 
-next
-----
+Version 0.9
+===========
+
+[0.9.0] -- 2020-01-10
+---------------------
 
 Added
 +++++
@@ -144,7 +147,7 @@ Version 0.6
 ===========
 
 Major changes
----------------------------------------------
+-------------
 
  1. The generation of execution and submission scripts is now based on the jinja2_ templating system.
  2. The new decorator API for the definition of a :class:`~.flow.FlowProject` class largely reduces the amount of boiler plate code needed to implement FlowProjects.
@@ -160,7 +163,7 @@ See the full :ref:`changelog <0.6.0>` below for detailed information on all chan
 .. _jinja2: http://jinja.pocoo.org/
 
 How to migrate existing projects
---------------------------------------------------------------------------------------------------------------------------------
+--------------------------------
 
 If your project runs with flow 0.5 without any DeprecationWarnings (that means no messages when running Python with the -W flag), then you don't *have* to do anything. Version 0.6 is mostly backwards compatible to 0.5, with the execption of custom script templating.
 

@@ -1660,12 +1660,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             or operation.name not in self._operation_functions
             # The specified executable is not the same as the interpreter instance:
             or operation.directives.get('executable', sys.executable) != sys.executable
+            # the operation requires MPI or OpenMP
+            or operation.directives.get('nranks', 1) > 1
+            or operation.directives.get('omp_num_threads', 1) > 1
         ):
             # ... need to fork:
+            prefix = self._environment.get_prefix(operation)
             logger.debug(
                 "Forking to execute operation '{}' with "
-                "cmd '{}'.".format(operation, operation.cmd))
-            subprocess.run(operation.cmd, shell=True, timeout=timeout, check=True)
+                "cmd '{}'.".format(operation, prefix + ' ' + operation.cmd))
+            subprocess.run(prefix + ' ' + operation.cmd, shell=True, timeout=timeout, check=True)
         else:
             # ... executing operation in interpreter process as function:
             logger.debug(

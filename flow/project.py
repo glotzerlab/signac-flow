@@ -1668,7 +1668,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             prefix = self._environment.get_prefix(operation)
             logger.debug(
                 "Forking to execute operation '{}' with "
-                "cmd '{}'.".format(operation, prefix + operation.cmd))
+                "cmd '{}'.".format(operation, prefix + ' ' + operation.cmd))
             subprocess.run(prefix + ' ' + operation.cmd, shell=True, timeout=timeout, check=True)
         else:
             # ... executing operation in interpreter process as function:

@@ -46,7 +46,6 @@ def draw_progressbar(value, total, width=40):
     :type width:
         int
     """
-    "Helper function for the visualization of progress."
     assert value >= 0 and total > 0
     n = int(value / total * width)
     return '|' + ''.join(['#'] * n) + ''.join(['-'] * (width - n)) + '|'

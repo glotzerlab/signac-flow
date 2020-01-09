@@ -29,7 +29,7 @@ from .version import __version__
 # Import packaged environments unless disabled in config:
 from .util.config import get_config_value
 if get_config_value('import_packaged_environments', default=True):
-    from . import environments  # noqa:F401
+    from . import environments  # noqa: F401
 
 
 __all__ = [

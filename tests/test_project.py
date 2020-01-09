@@ -150,7 +150,7 @@ class ProjectStatusPerformanceTest(BaseProjectTest):
         return project
 
     def test_status_performance(self):
-        '''Ensure that status updates take less than 1 second for a data space of 1000 jobs'''
+        """Ensure that status updates take less than 1 second for a data space of 1000 jobs."""
         import timeit
 
         project = self.mock_project()
@@ -262,8 +262,7 @@ class ProjectClassTest(BaseProjectTest):
         self.assertEqual(len(c._label_functions), 1)
 
     def test_conditions_with_inheritance(self):
-        """
-        Tests the inheritance of pre/post conditions.
+        """Tests the inheritance of pre/post conditions.
 
         Class A should only have one pre/post condition, while class C that
         inherits from A should have three, and class B should just have two

@@ -59,7 +59,7 @@
         },
         {
             "affiliation": "Vanderbilt University",
-            "name": "Gilmer Justin",
+            "name": "Justin Gilmer",
             "orcid": "0000-0002-6915-5591",
             "type": "Other"
         },
@@ -73,6 +73,12 @@
             "affiliation": "University of Michigan",
             "name": "Corwin Kerr",
             "orcid": "0000-0003-0776-2596",
+            "type": "Other"
+        },
+        {
+            "affiliation": "University of Michigan",
+            "name": "Brandon Butler",
+            "orcid": "0000-0001-7739-7796",
             "type": "Other"
         }
     ],
@@ -116,12 +122,12 @@
         "workflow",
         "scientific computing"
     ],
-    "upload_type": "software",
     "license": {
         "id": "BSD-3-Clause",
         "title": "3-Clause BSD License",
         "url": "https://opensource.org/licenses/BSD-3-Clause"
     },
     "title": "signac-flow",
-    "version": "0.8.0"
+    "upload_type": "software",
+    "version": "0.9.0"
 }

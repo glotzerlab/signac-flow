@@ -102,9 +102,13 @@ class _condition(object):
     current_arbitrary_tag = 0
 
     def __init__(self, condition, tag=None):
-        # Add tag to differentiate built-in conditions during graph detection.
+        """Add tag to differentiate built-in conditions during graph detection."""
+
         if tag is None:
-            tag = condition.__code__.co_code
+            try:
+                tag = condition.__code__.co_code
+            except AttributeError:
+                logger.warning("Condition {} could not autogenerate tag.".format(condition))
         condition._flow_tag = tag
         self.condition = condition
 
@@ -127,7 +131,7 @@ class _condition(object):
 
     @classmethod
     @deprecated(
-        deprecated_in="0.9", removed_in="1.0",
+        deprecated_in="0.9", removed_in="0.11", current_version=__version__,
         details="This condition decorator is obsolete.")
     def always(cls, func):
         "Returns True."
@@ -147,7 +151,7 @@ class _condition(object):
                    'not_'.encode() + condition.__code__.co_code)
 
 
-def make_bundles(operations, size=None):
+def _make_bundles(operations, size=None):
     """Utility function for the generation of bundles.
 
     This function splits an iterable of operations into equally
@@ -161,6 +165,16 @@ def make_bundles(operations, size=None):
             yield b
         else:
             break
+
+
+@deprecated(deprecated_in="0.9", removed_in="0.11", current_version=__version__)
+def make_bundles(operations, size=None):
+    """Utility function for the generation of bundles.
+
+    This function splits an iterable of operations into equally
+    sized bundles and a possibly smaller final bundle.
+    """
+    return _make_bundles(operations, size)
 
 
 class JobOperation(object):
@@ -337,11 +351,13 @@ class FlowCondition(object):
 class FlowOperation(object):
     """A FlowOperation represents a data space operation, operating on any job.
 
-    Any FlowOperation is associated with a specific command, which should be
-    a function of :py:class:`~signac.contrib.job.Job`. The command (cmd) can
-    be stated as function, either by using string substitution based on a job's
-    attributes, or by providing a unary callable, which expects an instance
-    of job as its first and only positional argument.
+    Every FlowOperation is associated with a specific command which should be
+    a function of :py:class:`~signac.contrib.job.Job`. The command (cmd) may
+    either be a unary callable that expects an instance of
+    :class:`~signac.contrib.job.Job` as its only positional argument and returns
+    a string containing valid shell commands, or the string of commands itself.
+    In either case, the resulting string may contain any attributes of the job placed
+    in curly braces, which will then be substituted by Python string formatting.
 
     For example, if we wanted to define a command for a program called 'hello',
     which expects a job id as its first argument, we could construct the following
@@ -350,7 +366,7 @@ class FlowOperation(object):
     .. code-block:: python
 
         op = FlowOperation('hello', cmd='hello {job._id}')
-        op = FlowOperation('hello', cmd=lambda 'hello {}'.format(job._id))
+         op = FlowOperation('hello', cmd=lambda job: 'hello {}'.format(job._id))
 
     Here is another example of a possible string substitution:
 
@@ -777,6 +793,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         zip(range(len(ops)), [o for o in ops])})
 
             plt.show()
+
+        Raises a ``RuntimeError`` if a condition does not have a tag. This can
+        occur when using ``functools.partial``, and a manually specified
+        condition tag has not been set.
+
+        :raises: RuntimeError
+
         """
 
         def to_callbacks(conditions):
@@ -790,10 +813,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             only returned at the end."""
             callbacks = set()
             for cf in condition_functions:
-                if cf.__name__ == "_flow_metacondition":
-                    callbacks = callbacks.union(
-                        unpack_conditions(cf._composed_of))
+                # condition may not have __name__ attribute in cases where functools is used
+                # for condition creation
+                if hasattr(cf, '__name__') and cf.__name__ == "_flow_metacondition":
+                    callbacks = callbacks.union(unpack_conditions(cf._composed_of))
                 else:
+                    if cf._flow_tag is None:
+                        raise RuntimeError("Condition {} was not tagged. To create a graph, ensure "
+                                           "each base condition has a ``__code__`` attribute or "
+                                           "manually specified tag.".format(cf))
                     callbacks.add(cf._flow_tag)
 
             return callbacks
@@ -857,7 +885,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @classmethod
     @deprecated(
-        deprecated_in="0.8", removed_in="1.0",
+        deprecated_in="0.8", removed_in="0.10",
         current_version=__version__)
     def update_aliases(cls, aliases):
         "Update the ALIASES table for this class."
@@ -1679,8 +1707,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """Execute all pending operations for the given selection.
 
         This function will run in an infinite loop until all pending operations
-        have been executed or the total number of passes per operation or the total
-        number of executions have been reached.
+        are executed, unless it reaches the maximum number of passes per
+        operation or the maximum number of executions.
 
         By default there is no limit on the total number of executions, but a specific
         operation will only be executed once per job. This is to avoid accidental
@@ -2075,7 +2103,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 operations = list(islice(operations, num))
 
         # Bundle them up and submit.
-        for bundle in make_bundles(operations, bundle_size):
+        for bundle in _make_bundles(operations, bundle_size):
             status = self.submit_operations(
                 operations=bundle, env=env, parallel=parallel,
                 force=force, walltime=walltime, **kwargs)
@@ -2223,7 +2251,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                  "to be considered eligible for execution.")
 
     @deprecated(
-        deprecated_in="0.8", removed_in="1.0",
+        deprecated_in="0.8", removed_in="0.10",
         current_version=__version__,
         details="Use export_job_statuses() instead.")
     def export_job_stati(self, collection, stati):
@@ -2412,7 +2440,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         self.operations[name] = FlowOperation(cmd=cmd, pre=pre, post=post, directives=kwargs)
 
     @deprecated(
-        deprecated_in="0.8", removed_in="1.0",
+        deprecated_in="0.8", removed_in="0.10",
         current_version=__version__,
         details="Use labels() instead.")
     def classify(self, job):
@@ -2470,7 +2498,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 yield op
 
     @deprecated(
-        deprecated_in="0.8", removed_in="1.0",
+        deprecated_in="0.8", removed_in="0.10",
         current_version=__version__,
         details="Use next_operations() instead.")
     def next_operation(self, job):
@@ -2607,7 +2635,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return True
 
     @deprecated(
-        deprecated_in="0.8", removed_in="1.0",
+        deprecated_in="0.8", removed_in="0.10",
         current_version=__version__)
     def eligible_for_submission(self, job_operation):
         return self._eligible_for_submission(self, job_operation)
@@ -2729,7 +2757,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             ops = list(islice(ops, args.num))
 
         # Bundle operations up, generate the script, and submit to scheduler.
-        for bundle in make_bundles(ops, args.bundle_size):
+        for bundle in _make_bundles(ops, args.bundle_size):
             status = self.submit_operations(operations=bundle, **kwargs)
             if status is not None:
                 for op in bundle:

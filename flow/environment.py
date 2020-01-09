@@ -196,19 +196,6 @@ class StandardEnvironment(ComputeEnvironment):
     def is_present(cls):
         return True
 
-    @classmethod
-    def mpi_cmd(cls, cmd, np):
-        return 'mpirun -np {np} {cmd}'.format(np=np, cmd=cmd)
-
-
-class UnknownEnvironment(StandardEnvironment):
-    "Deprecated 'standard' environment, replaced by 'StandardEnvironment.'"
-
-    def __init__(self, *args, **kwargs):
-        raise RuntimeError(
-            "The 'flow.environment.UnknownEnvironment' class has been replaced by the "
-            "'flow.environment.StandardEnvironment' class.")
-
 
 class TestEnvironment(ComputeEnvironment):
     """This is a test environment.
@@ -363,7 +350,7 @@ def get_environment(test=False, import_configured=True):
     """Attempt to detect the present environment.
 
     This function iterates through all defined :py:class:`~.ComputeEnvironment`
-    classes in reversed order of definition and and returns the first
+    classes in reversed order of definition and returns the first
     environment where the :py:meth:`~.ComputeEnvironment.is_present` method
     returns True.
 

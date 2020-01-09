@@ -11,7 +11,7 @@ from ..errors import SubmitError
 
 
 def identical(iterable):
-    """Check that all elements of an iterator are identical."""
+    """Check that all elements of an iterable are identical."""
     return len(set(iterable)) <= 1
 
 

@@ -27,8 +27,6 @@ In addition, the package provides specialized submission profiles for the follow
 
 .. toctree::
    supported_environments/summit
-   supported_environments/titan
-   supported_environments/eos
    supported_environments/stampede2
    supported_environments/comet
    supported_environments/bridges

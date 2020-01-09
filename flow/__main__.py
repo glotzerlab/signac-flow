@@ -17,7 +17,6 @@ from signac import get_project
 
 from . import __version__
 from . import template
-from .util.misc import _is_identifier
 
 
 logger = logging.getLogger(__name__)
@@ -25,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 def main_init(args):
     "Initialize a FlowProject from one of the templates defined in the template module."
-    if not _is_identifier(args.alias):
+    if not args.alias.isidentifier():
         raise ValueError(
             "The alias '{}' is not a valid Python identifier and can therefore "
             "not be used as a FlowProject alias.".format(args.alias))

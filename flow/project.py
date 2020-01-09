@@ -34,13 +34,13 @@ from multiprocessing import cpu_count
 from multiprocessing import TimeoutError
 from multiprocessing.pool import ThreadPool
 from multiprocessing import Event
+import jinja2
+from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
 
 import signac
 from signac.contrib.hashing import calc_id
 from signac.contrib.filterparse import parse_filter_arg
-
-import jinja2
-from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
+from signac.contrib.project import JobsCursor
 
 from .environment import get_environment
 from .scheduling.base import ClusterJob
@@ -66,7 +66,6 @@ from .labels import label
 from .labels import staticlabel
 from .labels import classlabel
 from .labels import _is_label_func
-from . import legacy
 from .util import config as flow_config
 from .version import __version__
 
@@ -188,8 +187,6 @@ class JobOperation(object):
 
         This class is used by the :class:`~.FlowProject` class for the execution and
         submission process and should not be instantiated by users themselves.
-
-    .. versionchanged:: 0.6
 
     :param name:
         The name of this JobOperation instance. The name is arbitrary,
@@ -730,7 +727,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         Finally, you can specify a different default label name by providing it as the first
         argument to the ``label()`` decorator.
 
-        .. versionadded:: 0.6
         :param label_name_or_func:
             A label name or callable.
         :type label_name_or_func:
@@ -1103,8 +1099,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                      no_parallelize=False, template=None, profile=False,
                      eligible_jobs_max_lines=None):
         """Print the status of the project.
-
-        .. versionchanged:: 0.6
 
         :param jobs:
             Only execute operations for the given jobs, or all if the argument is omitted.
@@ -1578,8 +1572,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         See also: :meth:`~.run`
 
-        .. versionadded:: 0.6
-
         :param operations:
             The operations to execute (optional).
         :type operations:
@@ -1723,8 +1715,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         infinite loops when no or faulty post conditions are provided.
 
         See also: :meth:`~.run_operations`
-
-        .. versionchanged:: 0.6
 
         :param jobs:
             Only execute operations for the given jobs, or all if the argument is omitted.
@@ -1969,8 +1959,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                           show_template_help=False, **kwargs):
         r"""Submit a sequence of operations to the scheduler.
 
-        .. versionchanged:: 0.6
-
         :param operations:
             The operations to submit.
         :type operations:
@@ -2061,8 +2049,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def submit(self, bundle_size=1, jobs=None, names=None, num=None, parallel=False,
                force=False, walltime=None, env=None, **kwargs):
         """Submit function for the project's main submit interface.
-
-        .. versionchanged:: 0.6
 
         :param bundle_size:
             Specify the number of operations to be bundled into one submission, defaults to 1.
@@ -2543,8 +2529,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 print('Hello', job)
 
         See also: :meth:`~.flow.FlowProject.add_operation`.
-
-        .. versionadded:: 0.6
         """
         if isinstance(func, str):
             return lambda op: cls.operation(op, name=func)
@@ -2710,18 +2694,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _main_run(self, args):
         "Run all (or select) job operations."
-        if args.hidden_operation_name:
-            print(
-                "WARNING: "
-                "The run command expects operation names under the -o/--operation argument "
-                "as of version 0.6.\n         Positional arguments will no longer be "
-                "accepted beginning with version 0.7.",
-                file=sys.stderr)
-            if args.operation_name:
-                args.operation_name.extend(args.hidden_operation_name)
-            else:
-                args.operation_name = args.hidden_operation_name
-
         # Select jobs:
         jobs = self._select_jobs_from_args(args)
 
@@ -2829,7 +2801,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         else:
             filter_ = parse_filter_arg(args.filter)
             doc_filter = parse_filter_arg(args.doc_filter)
-            return legacy.JobsCursorWrapper(self, filter_, doc_filter)
+            return JobsCursor(self, filter_, doc_filter)
 
     def main(self, parser=None):
         """Call this function to use the main command line interface.
@@ -2911,11 +2883,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             'run',
             parents=[base_parser],
         )
-        parser_run.add_argument(          # Hidden positional arguments for backwards-compatibility.
-            'hidden_operation_name',
-            type=str,
-            nargs='*',
-            help=argparse.SUPPRESS)
         self._add_operation_selection_arg_group(parser_run, list(sorted(self._operations)))
 
         execution_group = parser_run.add_argument_group('execution')

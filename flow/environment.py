@@ -363,7 +363,7 @@ def get_environment(test=False, import_configured=True):
     """Attempt to detect the present environment.
 
     This function iterates through all defined :py:class:`~.ComputeEnvironment`
-    classes in reversed order of definition and and returns the first
+    classes in reversed order of definition and returns the first
     environment where the :py:meth:`~.ComputeEnvironment.is_present` method
     returns True.
 

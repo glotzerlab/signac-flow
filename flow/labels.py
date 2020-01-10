@@ -11,10 +11,10 @@ of a FlowProject class definition.
 
 class label(object):
     """Decorate a :class:`~.FlowProject` class function as a label function.
+
     For example:
 
     .. code-block:: python
-
 
         class MyProject(FlowProject):
 

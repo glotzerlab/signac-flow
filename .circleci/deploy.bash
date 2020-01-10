@@ -25,4 +25,9 @@ password: ${PYPI_PASSWORD}
 EOF
 
 python setup.py bdist_wheel
-python -m twine upload --skip-existing --repository testpypi dist/*
+if [[ "$1" == "testpypi" || "$1" == "pypi" ]]; then
+    python -m twine upload --skip-existing --repository $1 dist/*
+else
+    echo "A valid repository must be provided: pypi or testpypi."
+    exit 1
+fi

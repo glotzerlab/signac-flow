@@ -26,6 +26,6 @@
 #SBATCH --account={{ account }}
 {% endif %}
 {% if memory %}
-#SBATCH --mem={{ memory }}GB
+#SBATCH --mem={{ memory }}
 {% endif %}
 {% endblock %}

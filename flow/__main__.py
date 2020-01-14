@@ -8,7 +8,6 @@ initialize FlowProject class definitions directly from the command line.
 
 Execute `flow --help` for more information.
 """
-from __future__ import print_function
 import argparse
 import logging
 import sys
@@ -18,7 +17,6 @@ from signac import get_project
 
 from . import __version__
 from . import template
-from .util.misc import _is_identifier
 
 
 logger = logging.getLogger(__name__)
@@ -26,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 def main_init(args):
     "Initialize a FlowProject from one of the templates defined in the template module."
-    if not _is_identifier(args.alias):
+    if not args.alias.isidentifier():
         raise ValueError(
             "The alias '{}' is not a valid Python identifier and can therefore "
             "not be used as a FlowProject alias.".format(args.alias))
@@ -40,7 +38,7 @@ def main_init(args):
         return template.init(alias=args.alias, template=args.template)
     except OSError as e:
         raise RuntimeError(
-            "Error occured while trying to initialize a flow project: {}".format(e))
+            "Error occurred while trying to initialize a flow project: {}".format(e))
 
 
 def main():

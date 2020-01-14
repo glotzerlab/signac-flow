@@ -6,7 +6,6 @@ a regular Python module with a command line interface, which can be used
 to execute functions defined within the same module, that operate on a
 signac data space.
 """
-from __future__ import print_function
 import sys
 import argparse
 import logging
@@ -151,7 +150,7 @@ def run(parser=None):
 
     Executing this function within a module will start a command line interface,
     that can be used to execute operations defined within the same module.
-    All **top-level unary functions** will be intepreted as executable operation functions.
+    All **top-level unary functions** will be interpreted as executable operation functions.
 
     For example, if we have a module as such:
 

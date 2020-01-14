@@ -7,10 +7,8 @@ This module provides the ComputeEnvironment class, which can be
 subclassed to automatically detect specific computational environments.
 
 This enables the user to adjust their workflow based on the present
-environment, e.g. for the adjustemt of scheduler submission scripts.
+environment, e.g. for the adjustment of scheduler submission scripts.
 """
-from __future__ import print_function
-from __future__ import division
 import os
 import re
 import socket
@@ -42,9 +40,9 @@ def setup(py_modules, **attrs):
     """Setup function for environment modules.
 
     Use this function in place of setuptools.setup to not only install
-    a environments module, but also register it with the global signac
-    configuration. Once registered, is automatically imported when the
-    get_environment() function is called.
+    an environment's module, but also register it with the global signac
+    configuration. Once registered, the environment is automatically
+    imported when the :py:meth:`~.get_environment` function is called.
     """
     import setuptools
     from setuptools.command.install import install
@@ -75,9 +73,9 @@ def setup(py_modules, **attrs):
 
 
 class ComputeEnvironmentType(type):
-    """Meta class for the definition of ComputeEnvironments.
+    """Metaclass for the definition of ComputeEnvironments.
 
-    This meta class automatically registers ComputeEnvironment definitions,
+    This metaclass automatically registers ComputeEnvironment definitions,
     which enables the automatic determination of the present environment.
     """
 
@@ -99,13 +97,13 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
     """Define computational environments.
 
     The ComputeEnvironment class allows us to automatically determine
-    specific environments in order to programatically adjust workflows
+    specific environments in order to programmatically adjust workflows
     in different environments.
 
-    The default method for the detection of a specific environemnt is to
+    The default method for the detection of a specific environment is to
     provide a regular expression matching the environment's hostname.
-    For example, if the hostname is my_server.com, one could identify the
-    environment by setting the hostname_pattern to 'my_server'.
+    For example, if the hostname is my-server.com, one could identify the
+    environment by setting the hostname_pattern to 'my-server'.
     """
     scheduler_type = None
     hostname_pattern = None
@@ -132,7 +130,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
     @classmethod
     def get_scheduler(cls):
-        """Return a environment specific scheduler driver.
+        """Return an environment-specific scheduler driver.
 
         The returned scheduler class provides a standardized interface to
         different scheduler implementations.
@@ -176,8 +174,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         """Request a value from the user's configuration.
 
         This method should be used whenever values need to be provided
-        that are specific to a users's environment. A good example are
-        account names.
+        that are specific to a user's environment, e.g. account names.
 
         When a key is not configured and no default value is provided,
         a :py:class:`~.errors.SubmitError` will be raised and the user will
@@ -185,13 +182,13 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
         Please note, that the key will be automatically expanded to
         be specific to this environment definition. For example, a
-        key should be 'account', not 'MyEnvironment.account`.
+        key should be ``'account'``, not ``'MyEnvironment.account'``.
 
         :param key: The environment specific configuration key.
         :type key: str
         :param default: A default value in case the key cannot be found
             within the user's configuration.
-        :type key: str
+        :type default: str
         :return: The value or default value.
         :raises SubmitError: If the key is not in the user's configuration
             and no default value is provided.
@@ -272,19 +269,6 @@ class StandardEnvironment(ComputeEnvironment):
     @classmethod
     def is_present(cls):
         return True
-
-    @classmethod
-    def mpi_cmd(cls, cmd, np):
-        return 'mpirun -np {np} {cmd}'.format(np=np, cmd=cmd)
-
-
-class UnknownEnvironment(StandardEnvironment):
-    "Deprecated 'standard' environment, replaced by 'StandardEnvironment.'"
-
-    def __init__(self, *args, **kwargs):
-        raise RuntimeError(
-            "The 'flow.environment.UnknownEnvironment' class has been replaced by the "
-            "'flow.environment.StandardEnvironment' class.")
 
 
 class TestEnvironment(ComputeEnvironment):
@@ -439,13 +423,13 @@ def registered_environments(import_configured=True):
 def get_environment(test=False, import_configured=True):
     """Attempt to detect the present environment.
 
-    This function iterates through all defined ComputeEnvironment
-    classes in reversed order of definition and and returns the
-    first EnvironmentClass where the is_present() method returns
-    True.
+    This function iterates through all defined :py:class:`~.ComputeEnvironment`
+    classes in reversed order of definition and returns the first
+    environment where the :py:meth:`~.ComputeEnvironment.is_present` method
+    returns True.
 
     :param test:
-        Return the TestEnvironment
+        Whether to return the TestEnvironment.
     :type test:
         bool
     :returns:

@@ -5,7 +5,7 @@
 
 
 def abbreviate(x, a):
-    "Abbreviate x with a and add to the abbreviation table."
+    """Abbreviate x with a and add to the abbreviation table."""
     if x == a:
         return x
     else:
@@ -16,7 +16,7 @@ abbreviate.table = dict()  # noqa
 
 
 def shorten(x, max_length=None):
-    "Shorten x to max_length and add to abbreviation table."
+    """Shorten x to max_length and add to abbreviation table."""
     if max_length is None:
         return x
     else:

@@ -669,6 +669,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             template_environment.filters['max'] = max
         if 'min' not in template_environment.filters:    # for jinja2 < 2.10
             template_environment.filters['min'] = min
+
         return template_environment
 
     def _template_environment(self, environment=None):
@@ -676,9 +677,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             environment = self._environment
         if environment not in self._template_environment_:
             template_environment = self._setup_template_environment()
+
             # Add environment-specific custom filters:
-            for filter_name, filter_function in getattr(environment, 'filters', {}).items():
-                template_environment.filters[filter_name] = filter_function
+            for name, member in inspect.getmembers(environment):
+                if getattr(member, '_flow_template_filter', False):
+                    template_environment.filters[name] = member
+
             self._template_environment_[environment] = template_environment
         return self._template_environment_[environment]
 
@@ -1684,12 +1688,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             or operation.name not in self._operation_functions
             # The specified executable is not the same as the interpreter instance:
             or operation.directives.get('executable', sys.executable) != sys.executable
+            # The operation requires MPI and/or OpenMP parallelization:
+            or operation.directives.get('nranks', 1) > 1
+            or operation.directives.get('omp_num_threads', 1) > 1
         ):
             # ... need to fork:
+            prefix = self._environment.get_prefix(operation)
             logger.debug(
                 "Forking to execute operation '{}' with "
-                "cmd '{}'.".format(operation, operation.cmd))
-            subprocess.run(operation.cmd, shell=True, timeout=timeout, check=True)
+                "cmd '{}'.".format(operation, prefix + ' ' + operation.cmd))
+            subprocess.run(prefix + ' ' + operation.cmd, shell=True, timeout=timeout, check=True)
         else:
             # ... executing operation in interpreter process as function:
             logger.debug(

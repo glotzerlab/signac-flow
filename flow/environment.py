@@ -87,6 +87,12 @@ class ComputeEnvironmentType(type):
         return super(ComputeEnvironmentType, cls).__init__(name, bases, dct)
 
 
+def template_filter(func):
+    "Mark the function as a ComputeEnvironment template filter."
+    setattr(func, '_flow_template_filter', True)
+    return classmethod(func)
+
+
 class ComputeEnvironment(metaclass=ComputeEnvironmentType):
     """Define computational environments.
 
@@ -103,6 +109,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
     hostname_pattern = None
     submit_flags = None
     template = 'base_script.sh'
+    mpi_cmd = 'mpiexec'
 
     @classmethod
     def is_present(cls):
@@ -187,6 +194,73 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
             and no default value is provided.
         """
         return flow_config.require_config_value(key, ns=cls.__name__, default=default)
+
+    @classmethod
+    def _get_omp_prefix(cls, operation):
+        """Get the OpenMP prefix based on the `omp_num_threads` directive.
+
+        :param operation:
+            The operation for which to add prefix.
+        :return omp_prefix:
+            The prefix should be added for the operation.
+        :type omp_prefix:
+            str
+        """
+        return 'export OMP_NUM_THREADS={}\n'.format(operation.directives['omp_num_threads'])
+
+    @classmethod
+    def _get_mpi_prefix(cls, operation, parallel):
+        """Get the mpi prefix based on proper directives.
+
+        :param operation:
+            The operation for which to add prefix.
+        :param parallel:
+            If True, operations are assumed to be executed in parallel, which means
+            that the number of total tasks is the sum of all tasks instead of the
+            maximum number of tasks. Default is set to False.
+        :return mpi_prefix:
+            The prefix should be added for the operation.
+        :type mpi_prefix:
+            str
+        """
+        if operation.directives.get('nranks'):
+            return '{} -n {} '.format(cls.mpi_cmd, operation.directives['nranks'])
+        else:
+            return ''
+
+    @template_filter
+    def get_prefix(cls, operation, parallel=False, mpi_prefix=None, cmd_prefix=None):
+        """Template filter for getting the prefix based on proper directives.
+
+        :param operation:
+            The operation for which to add prefix.
+        :param parallel:
+            If True, operations are assumed to be executed in parallel, which means
+            that the number of total tasks is the sum of all tasks instead of the
+            maximum number of tasks. Default is set to False.
+        :param mpi_prefix:
+            User defined mpi_prefix string. Default is set to None.
+            This will be deprecated and removed in the future.
+        :param cmd_prefix:
+            User defined cmd_prefix string. Default is set to None.
+            This will be deprecated and removed in the future.
+        :return prefix:
+            The prefix should be added for the operation.
+        :type prefix:
+            str
+        """
+        prefix = ''
+        if operation.directives.get('omp_num_threads'):
+            prefix += cls._get_omp_prefix(operation)
+        if mpi_prefix:
+            prefix += mpi_prefix
+        else:
+            prefix += cls._get_mpi_prefix(operation, parallel)
+        if cmd_prefix:
+            prefix += cmd_prefix
+        # if cmd_prefix and if mpi_prefix for backwards compatibility
+        # Can change to get them from directives for future
+        return prefix
 
 
 class StandardEnvironment(ComputeEnvironment):

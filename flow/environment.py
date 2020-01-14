@@ -200,7 +200,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
     @classmethod
     def _get_omp_prefix(cls, operation):
-        """function for getting the omp prefix based on proper directives.
+        """Get the OpenMP prefix based on the `omp_num_threads` directive.
 
         :param operation:
             The operation for which to add prefix.
@@ -213,7 +213,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
     @classmethod
     def _get_mpi_prefix(cls, operation, parallel):
-        """function for getting the mpi prefix based on proper directives.
+        """Get the mpi prefix based on proper directives.
 
         :param operation:
             The operation for which to add prefix.

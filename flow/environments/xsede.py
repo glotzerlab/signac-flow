@@ -70,7 +70,7 @@ class Stampede2Environment(DefaultSlurmEnvironment):
 
     @classmethod
     def _get_mpi_prefix(cls, operation, parallel):
-        """function for getting the mpi prefix based on proper directives.
+        """Get the mpi prefix based on proper directives.
 
         :param operation:
             The operation for which to add prefix.

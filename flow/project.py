@@ -1660,7 +1660,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             or operation.name not in self._operation_functions
             # The specified executable is not the same as the interpreter instance:
             or operation.directives.get('executable', sys.executable) != sys.executable
-            # the operation requires MPI or OpenMP
+            # The operation requires MPI and/or OpenMP parallelization:
             or operation.directives.get('nranks', 1) > 1
             or operation.directives.get('omp_num_threads', 1) > 1
         ):

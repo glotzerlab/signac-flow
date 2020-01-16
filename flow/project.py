@@ -97,7 +97,7 @@ The available filters are:
 {filters}"""
 
 
-class Ignore_condition(IntEnum):
+class IgnoreConditions(IntEnum):
     NONE = 0
     PRE = 1
     POST = 2
@@ -414,12 +414,12 @@ class FlowOperation(object):
     def __str__(self):
         return "{type}(cmd='{cmd}')".format(type=type(self).__name__, cmd=self._cmd)
 
-    def eligible(self, job, ignore_condition=Ignore_condition.NONE):
+    def eligible(self, job, ignore_conditions=IgnoreConditions.NONE):
         "Eligible, when all pre-conditions are true and at least one post-condition is false."
-        pre = (ignore_condition & Ignore_condition.PRE) \
+        pre = (ignore_conditions & IgnoreConditions.PRE) \
             or all(cond(job) for cond in self._prereqs)
         if pre and len(self._postconds):
-            post = (ignore_condition & Ignore_condition.POST) \
+            post = (ignore_conditions & IgnoreConditions.POST) \
                 or any(not cond(job) for cond in self._postconds)
         else:
             post = True
@@ -951,7 +951,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _get_operations_status(self, job, cached_status):
         "Return a dict with information about job-operations for this job."
-        for job_op in self._job_operations(job, ignore_condition=Ignore_condition.ALL):
+        for job_op in self._job_operations(job, ignore_conditions=IgnoreConditions.ALL):
             flow_op = self.operations[job_op.name]
             completed = flow_op.complete(job)
             eligible = False if completed else flow_op.eligible(job)
@@ -1010,7 +1010,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             for job in tqdm(jobs,
                             desc="Fetching operation status",
                             total=len(jobs), file=file):
-                for op in self._job_operations(job, ignore_condition=Ignore_condition.ALL):
+                for op in self._job_operations(job, ignore_conditions=IgnoreConditions.ALL):
                     status[op.get_id()] = int(scheduler_info.get(op.get_id(), JobStatus.unknown))
             self.document._status.update(status)
         except NoSchedulerError:
@@ -1872,10 +1872,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             yield JobOperation(name=cmd_.replace(' ', '-'), cmd=cmd_, job=job)
 
     def _get_pending_operations(self, jobs, operation_names=None,
-                                ignore_condition=Ignore_condition.NONE):
+                                ignore_conditions=IgnoreConditions.NONE):
         "Get all pending operations for the given selection."
         assert not isinstance(operation_names, str)
-        for op in self.next_operations(* jobs, ignore_condition=ignore_condition):
+        for op in self.next_operations(* jobs, ignore_conditions=ignore_conditions):
             if operation_names is None or any(re.fullmatch(n, op.name) for n in operation_names):
                 yield op
 
@@ -2042,7 +2042,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 return env.submit(_id=_id, script=script, flags=flags, **kwargs)
 
     def submit(self, bundle_size=1, jobs=None, names=None, num=None, parallel=False, force=False,
-               walltime=None, env=None, ignore_condition=Ignore_condition.NONE, **kwargs):
+               walltime=None, env=None, ignore_conditions=IgnoreConditions.NONE, **kwargs):
         """Submit function for the project's main submit interface.
 
         .. versionchanged:: 0.6
@@ -2096,7 +2096,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         with self._potentially_buffered():
             operations = (op for op in
                           self._get_pending_operations(jobs, names,
-                                                       ignore_condition=ignore_condition)
+                                                       ignore_conditions=ignore_conditions)
                           if self._eligible_for_submission(op))
             if num is not None:
                 operations = list(islice(operations, num))
@@ -2475,14 +2475,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if op.complete(job):
                 yield name
 
-    def _job_operations(self, job, ignore_condition=Ignore_condition.NONE):
+    def _job_operations(self, job, ignore_conditions=IgnoreConditions.NONE):
         "Yield instances of JobOperation constructed for specific jobs."
         for name, op in self.operations.items():
-            if not op.eligible(job, ignore_condition):
+            if not op.eligible(job, ignore_conditions):
                 continue
             yield JobOperation(name=name, job=job, cmd=op(job), directives=op.directives)
 
-    def next_operations(self, *jobs, ignore_condition=Ignore_condition.NONE):
+    def next_operations(self, *jobs, ignore_conditions=IgnoreConditions.NONE):
         """Determine the next eligible operations for jobs.
 
         :param jobs:
@@ -2493,7 +2493,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             All instances of :class:`~.JobOperation` jobs are eligible for.
         """
         for job in jobs:
-            for op in self._job_operations(job, ignore_condition):
+            for op in self._job_operations(job, ignore_conditions):
                 yield op
 
     @deprecated(

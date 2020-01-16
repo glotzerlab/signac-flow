@@ -102,6 +102,7 @@ class IgnoreConditions(IntEnum):
     PRE = 1
     POST = 2
     ALL = 3
+    # ALL and None is added here for convinience for now
 
 
 class _condition(object):

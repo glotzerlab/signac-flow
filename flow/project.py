@@ -104,6 +104,16 @@ class IgnoreConditions(IntEnum):
     NONE = ~ ALL
 
 
+class IgnoreConditionsConversion(argparse.Action):
+    def __init__(self, option_strings, dest, nargs=None, **kwargs):
+        if nargs is not None:
+            raise ValueError("nargs not allowed")
+        super(IgnoreConditionsConversion, self).__init__(option_strings, dest, **kwargs)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        setattr(namespace, self.dest, getattr(IgnoreConditions, values.upper()))
+
+
 class _condition(object):
     # This counter should be incremented each time an "always" or "never"
     # condition is created, and the value should be used as the tag for that
@@ -2137,6 +2147,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             type=str,
             choices=['none', 'pre', 'post', 'all'],
             default='none',
+            action=IgnoreConditionsConversion,
             help="Specify conditions to ignore for eligibility check.")
 
         cls._add_operation_selection_arg_group(parser)
@@ -2958,6 +2969,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             type=str,
             choices=['none', 'pre', 'post', 'all'],
             default='none',
+            action=IgnoreConditionsConversion,
             help="Specify conditions to ignore for eligibility check.")
         parser_run.set_defaults(func=self._main_run)
 
@@ -2970,6 +2982,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             type=str,
             choices=['none', 'pre', 'post', 'all'],
             default='none',
+            action=IgnoreConditionsConversion,
             help="Specify conditions to ignore for eligibility check.")
         self._add_script_args(parser_script)
         parser_script.set_defaults(func=self._main_script)

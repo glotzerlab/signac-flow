@@ -1833,7 +1833,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 break
             try:
                 with self._potentially_buffered():
-                    operations = list(filter(select, self._get_pending_operations(jobs, names, ignore_conditions=ignore_conditions)))
+                    operations = list(filter(select, self._get_pending_operations(
+                        jobs, names, ignore_conditions=ignore_conditions)))
             finally:
                 if messages:
                     for msg, level in set(messages):
@@ -2137,7 +2138,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             choices=['none', 'pre', 'post', 'all'],
             default='none',
             help="Specify conditions to ignore for eligibility check.")
-
 
         cls._add_operation_selection_arg_group(parser)
         cls._add_operation_bundling_arg_group(parser)
@@ -2725,7 +2725,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                 jobs=jobs, names=args.operation_name, pretend=args.pretend,
                                 np=args.parallel, timeout=args.timeout, num=args.num,
                                 num_passes=args.num_passes, progress=args.progress,
-                                order=args.order)
+                                order=args.order,
+                                ignore_conditions=args.ignore_conditions)
 
         if args.switch_to_project_root:
             with add_cwd_to_environment_pythonpath():
@@ -2751,7 +2752,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if args.cmd:
                 operations = self._generate_operations(args.cmd, jobs, args.requires)
             else:
-                operations = self._get_pending_operations(jobs, args.operation_name)
+                operations = self._get_pending_operations(jobs, args.operation_name,
+                                                          ignore_conditions=args.ignore_conditions)
             operations = list(islice(operations, args.num))
 
         # Generate the script and print to screen.
@@ -2773,7 +2775,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Gather all pending operations ...
         with self._potentially_buffered():
-            ops = (op for op in self._get_pending_operations(jobs, args.operation_name)
+            ops = (op for op in self._get_pending_operations(jobs, args.operation_name,
+                   ignore_conditions=args.ignore_conditions)
                    if self._eligible_for_submission(op))
             ops = list(islice(ops, args.num))
 
@@ -2962,6 +2965,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             'script',
             parents=[base_parser],
         )
+        parser_script.add_argument(
+            '--ignore-conditions',
+            type=str,
+            choices=['none', 'pre', 'post', 'all'],
+            default='none',
+            help="Specify conditions to ignore for eligibility check.")
         self._add_script_args(parser_script)
         parser_script.set_defaults(func=self._main_script)
 

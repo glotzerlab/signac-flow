@@ -1,4 +1,5 @@
 {% extends "slurm.sh" %}
+{% set partition = partition|default('standard', true) %}
 {% block tasks %}
 {% set threshold = 0 if force else 0.9 %}
 {% set cpu_tasks = operations|calc_tasks('np', parallel, force) %}
@@ -14,7 +15,6 @@
 #SBATCH --ntasks-per-node={{ (gpu_tasks, cpu_tasks)|max }}
 #SBATCH --gres=gpu:{{ gpu_tasks }}
 {% else %}{# standard compute partition #}
-#SBATCH --partition=standard
 #SBATCH --nodes={{ nn }}
 #SBATCH --ntasks-per-node={{ (36, cpu_tasks)|min }}
 {% endif %}

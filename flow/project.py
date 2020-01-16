@@ -2183,8 +2183,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """Grabs JobOperations that are eligible to run from FlowGroups."""
         for job in jobs:
             for group in self._gather_flow_groups(names):
-                if group.eligible(job) and self.eligible_for_submission(group,
-                                                                        job):
+                if group.eligible(job) and self._eligible_for_submission(group,
+                                                                         job):
                     yield group.create_job_operation(entrypoint=self._entrypoint, job=job,
                                                      mode=mode, index=0)
 
@@ -3050,10 +3050,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def groups(self):
         return self._groups
 
-    @deprecated(
-        deprecated_in="0.8", removed_in="1.0",
-        current_version=__version__)
-    def eligible_for_submission(self, flow_group, job):
+    def _eligible_for_submission(self, flow_group, job):
         """Determine if a flow_group is eligible for submission wrt a given job.
 
         By default, an operation is eligible for submission when it

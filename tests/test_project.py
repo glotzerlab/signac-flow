@@ -1333,7 +1333,6 @@ class GroupProjectMainInterfaceTest(BaseProjectTest):
 
 class GroupDynamicProjectMainInterfaceTest(ProjectMainInterfaceTest):
     project_class = TestDynamicProject
->>>>>>> 7fe6e07... Making groups resubmit safe
 
 
 if __name__ == '__main__':

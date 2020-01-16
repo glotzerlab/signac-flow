@@ -98,11 +98,10 @@ The available filters are:
 
 
 class IgnoreConditions(IntEnum):
-    NONE = 0
     PRE = 1
     POST = 2
-    ALL = 3
-    # ALL and None is added here for convinience for now
+    ALL = PRE | POST
+    NONE = ~ ALL
 
 
 class _condition(object):

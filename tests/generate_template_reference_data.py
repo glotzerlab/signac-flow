@@ -96,8 +96,9 @@ def init(project):
                 'bundle': [['mpi_op', 'omp_op']],
             }
         ],
-        'environments.umich.FluxEnvironment': [
+        'environments.umich.GreatLakesEnvironment': [
             {
+                'partition': ['standard', 'gpu'],
                 'walltime': [None, 1],
             },
             {

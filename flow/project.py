@@ -2131,6 +2131,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             '--test',
             action='store_true',
             help="Do not interact with the scheduler, implies --pretend.")
+        parser.add_argument(
+            '--ignore-conditions',
+            type=str,
+            choices=['none', 'pre', 'post', 'all'],
+            default='none',
+            help="Specify conditions to ignore for eligibility check.")
+
+
         cls._add_operation_selection_arg_group(parser)
         cls._add_operation_bundling_arg_group(parser)
         cls._add_template_arg_group(parser)
@@ -2942,6 +2950,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             choices=['none', 'by-job', 'cyclic', 'random'],
             default=None,
             help="Specify the execution order of operations for each execution pass.")
+        execution_group.add_argument(
+            '--ignore-conditions',
+            type=str,
+            choices=['none', 'pre', 'post', 'all'],
+            default='none',
+            help="Specify conditions to ignore for eligibility check.")
         parser_run.set_defaults(func=self._main_run)
 
         parser_script = subparsers.add_parser(

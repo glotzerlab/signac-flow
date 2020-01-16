@@ -416,7 +416,7 @@ class FlowOperation(object):
 
     def eligible(self, job, ignore_conditions=IgnoreConditions.NONE):
         "Eligible, when all pre-conditions are true and at least one post-condition is false."
-        pre = (ignore_conditions & IgnoreConditions.PRE) \
+        pre = ~len(self._postconds) or (ignore_conditions & IgnoreConditions.PRE) \
             or all(cond(job) for cond in self._prereqs)
         if pre and len(self._postconds):
             post = (ignore_conditions & IgnoreConditions.POST) \
@@ -1693,7 +1693,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     'for job {operation.job}.'.format(operation=operation)) from e
 
     def run(self, jobs=None, names=None, pretend=False, np=None, timeout=None, num=None,
-            num_passes=1, progress=False, order=None):
+            num_passes=1, progress=False, order=None, ignore_conditions=IgnoreConditions.NONE):
         """Execute all pending operations for the given selection.
 
         This function will run in an infinite loop until all pending operations
@@ -1833,7 +1833,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 break
             try:
                 with self._potentially_buffered():
-                    operations = list(filter(select, self._get_pending_operations(jobs, names)))
+                    operations = list(filter(select, self._get_pending_operations(jobs, names, ignore_conditions=ignore_conditions)))
             finally:
                 if messages:
                     for msg, level in set(messages):

@@ -61,7 +61,7 @@ def init(project):
     # bundling and parallelism must exist in the same test. The goal is to
     # construct a minimal covering set of all test cases.
     environments = {
-        'environment.UnknownEnvironment': [],
+        'environment.StandardEnvironment': [],
         'environments.xsede.CometEnvironment': [
             {
                 'partition': ['compute', 'shared', 'gpu'],
@@ -96,26 +96,9 @@ def init(project):
                 'bundle': [['mpi_op', 'omp_op']],
             }
         ],
-        'environments.umich.FluxEnvironment': [
+        'environments.umich.GreatLakesEnvironment': [
             {
-                'walltime': [None, 1],
-            },
-            {
-                'parallel': [False, True],
-                'bundle': [['mpi_op', 'omp_op']],
-            }
-        ],
-        'environments.incite.TitanEnvironment': [
-            {
-                'walltime': [None, 1],
-            },
-            {
-                'parallel': [False, True],
-                'bundle': [['mpi_op', 'omp_op']],
-            }
-        ],
-        'environments.incite.EosEnvironment': [
-            {
+                'partition': ['standard', 'gpu'],
                 'walltime': [None, 1],
             },
             {

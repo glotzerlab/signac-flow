@@ -424,7 +424,8 @@ class FlowOperation(object):
 
     def eligible(self, job, ignore_conditions='none'):
         """Eligible, when all pre-conditions are true and at least one post-condition is false,
-        or corresponding conditions are ignored """
+        or corresponding conditions are ignored
+        """
         if ignore_conditions in _IGNORE_CONDITIONS.keys():
             ignore_conditions = _IGNORE_CONDITIONS[ignore_conditions]
         else:

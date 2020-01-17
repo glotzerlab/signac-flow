@@ -117,7 +117,7 @@ class IgnoreConditionsConversion(argparse.Action):
 _IGNORE_CONDITIONS = {
     'pre': IgnoreConditions.PRE,
     'post': IgnoreConditions.POST,
-    'ALL': IgnoreConditions.ALL,
+    'all': IgnoreConditions.ALL,
     'none': IgnoreConditions.NONE
 }
 

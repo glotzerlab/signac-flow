@@ -2128,7 +2128,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # The 'ignore_conditions' argument must a string in 'none', 'pre', 'post' or 'all'
         if ignore_conditions not in _IGNORE_CONDITIONS.keys():
             raise ValueError(
-                "The ignore_conditions argument of FlowProject.run() must be a string in "
+                "The ignore_conditions argument of FlowProject.submit() must be a string in "
                 "'none', 'pre', 'post' or 'all'")
 
         # Gather all pending operations.

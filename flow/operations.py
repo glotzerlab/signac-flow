@@ -150,7 +150,7 @@ def run(parser=None):
 
     Executing this function within a module will start a command line interface,
     that can be used to execute operations defined within the same module.
-    All **top-level unary functions** will be intepreted as executable operation functions.
+    All **top-level unary functions** will be interpreted as executable operation functions.
 
     For example, if we have a module as such:
 

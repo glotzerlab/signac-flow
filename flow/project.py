@@ -34,13 +34,13 @@ from multiprocessing import cpu_count
 from multiprocessing import TimeoutError
 from multiprocessing.pool import ThreadPool
 from multiprocessing import Event
+import jinja2
+from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
 
 import signac
 from signac.contrib.hashing import calc_id
 from signac.contrib.filterparse import parse_filter_arg
-
-import jinja2
-from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
+from signac.contrib.project import JobsCursor
 
 from enum import IntEnum
 
@@ -68,7 +68,6 @@ from .labels import label
 from .labels import staticlabel
 from .labels import classlabel
 from .labels import _is_label_func
-from . import legacy
 from .util import config as flow_config
 from .version import __version__
 
@@ -86,12 +85,12 @@ variable, for example in the project configuration file. The current template di
 {template_dir}
 
 All template variables can be placed within a template using the standard jinja2
-syntax, e.g., the project root directory can be written like this: {{ project._rd }}.
+syntax, e.g., the project root directory can be written like this: {{{{ project._rd }}}}.
 The available template variables are:
 {template_vars}
 
 Filter functions can be used to format template variables in a specific way.
-For example: {{ project.get_id() | captialize }}.
+For example: {{{{ project.get_id() | capitalize }}}}.
 
 The available filters are:
 {filters}"""
@@ -120,9 +119,13 @@ class _condition(object):
     current_arbitrary_tag = 0
 
     def __init__(self, condition, tag=None):
-        # Add tag to differentiate built-in conditions during graph detection.
+        """Add tag to differentiate built-in conditions during graph detection."""
+
         if tag is None:
-            tag = condition.__code__.co_code
+            try:
+                tag = condition.__code__.co_code
+            except AttributeError:
+                logger.warning("Condition {} could not autogenerate tag.".format(condition))
         condition._flow_tag = tag
         self.condition = condition
 
@@ -145,7 +148,7 @@ class _condition(object):
 
     @classmethod
     @deprecated(
-        deprecated_in="0.9", removed_in="1.0",
+        deprecated_in="0.9", removed_in="0.11", current_version=__version__,
         details="This condition decorator is obsolete.")
     def always(cls, func):
         "Returns True."
@@ -165,10 +168,10 @@ class _condition(object):
                    'not_'.encode() + condition.__code__.co_code)
 
 
-def make_bundles(operations, size=None):
+def _make_bundles(operations, size=None):
     """Utility function for the generation of bundles.
 
-    This function splits an iterable of operations into  equally
+    This function splits an iterable of operations into equally
     sized bundles and a possibly smaller final bundle.
     """
     n = None if size == 0 else size
@@ -181,6 +184,16 @@ def make_bundles(operations, size=None):
             break
 
 
+@deprecated(deprecated_in="0.9", removed_in="0.11", current_version=__version__)
+def make_bundles(operations, size=None):
+    """Utility function for the generation of bundles.
+
+    This function splits an iterable of operations into equally
+    sized bundles and a possibly smaller final bundle.
+    """
+    return _make_bundles(operations, size)
+
+
 class JobOperation(object):
     """This class represents the information needed to execute one operation for one job.
 
@@ -191,8 +204,6 @@ class JobOperation(object):
 
         This class is used by the :class:`~.FlowProject` class for the execution and
         submission process and should not be instantiated by users themselves.
-
-    .. versionchanged:: 0.6
 
     :param name:
         The name of this JobOperation instance. The name is arbitrary,
@@ -288,10 +299,10 @@ class JobOperation(object):
         job_op_id = calc_id(full_name)
 
         # The actual job id is then constructed from a readable part and the job_op_id,
-        # ensuring that the job-op is still somewhat identifiable, but guarantueed to
+        # ensuring that the job-op is still somewhat identifiable, but guaranteed to
         # be unique. The readable name is based on the project id, job id, operation name,
         # and the index number. All names and the id itself are restricted in length
-        # to guarantuee that the id does not get too long.
+        # to guarantee that the id does not get too long.
         max_len = self.MAX_LEN_ID - len(job_op_id)
         if max_len < len(job_op_id):
             raise ValueError("Value for MAX_LEN_ID is too small ({}).".format(self.MAX_LEN_ID))
@@ -329,9 +340,9 @@ class FlowCondition(object):
     This can be used to build a graph of conditions and operations.
 
     :param callback:
-        A function with one positional argument (the job)
+        A callable with one positional argument (the job).
     :type callback:
-        :py:class:`~signac.contrib.job.Job`
+        callable
     """
 
     def __init__(self, callback):
@@ -357,22 +368,24 @@ class FlowCondition(object):
 class FlowOperation(object):
     """A FlowOperation represents a data space operation, operating on any job.
 
-    Any FlowOperation is associated with a specific command, which should be
-    a function of :py:class:`~signac.contrib.job.Job`. The command (cmd) can
-    be stated as function, either by using str-substitution based on a job's
-    attributes, or by providing a unary callable, which expects an instance
-    of job as its first and only positional argument.
+    Every FlowOperation is associated with a specific command which should be
+    a function of :py:class:`~signac.contrib.job.Job`. The command (cmd) may
+    either be a unary callable that expects an instance of
+    :class:`~signac.contrib.job.Job` as its only positional argument and returns
+    a string containing valid shell commands, or the string of commands itself.
+    In either case, the resulting string may contain any attributes of the job placed
+    in curly braces, which will then be substituted by Python string formatting.
 
     For example, if we wanted to define a command for a program called 'hello',
-    which expects a job id as its first argument, we could contruct the following
+    which expects a job id as its first argument, we could construct the following
     two equivalent operations:
 
     .. code-block:: python
 
         op = FlowOperation('hello', cmd='hello {job._id}')
-        op = FlowOperation('hello', cmd=lambda 'hello {}'.format(job._id))
+         op = FlowOperation('hello', cmd=lambda job: 'hello {}'.format(job._id))
 
-    Here is another example for possible str-substitutions:
+    Here is another example of a possible string substitution:
 
     .. code-block:: python
 
@@ -485,7 +498,7 @@ class _FlowProjectClass(type):
         cls._OPERATION_FUNCTIONS = list()
         cls._OPERATION_PRECONDITIONS = dict()
         cls._OPERATION_POSTCONDITIONS = dict()
-        # All label functions are registered with the label() classmethod, which is intendeded
+        # All label functions are registered with the label() classmethod, which is intended
         # to be used as decorator function. The _LABEL_FUNCTIONS dict contains the function as
         # key and the label name as value, or None to use the default label name.
         cls._LABEL_FUNCTIONS = OrderedDict()
@@ -601,7 +614,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         FlowProject().main()
 
     :param config:
-        A signac configuaration, defaults to the configuration loaded
+        A signac configuration, defaults to the configuration loaded
         from the environment.
     :type config:
         A signac config object.
@@ -636,11 +649,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             self._use_buffered_mode = False
 
     def _setup_template_environment(self):
-        """Setup the jinja2 template environemnt.
+        """Setup the jinja2 template environment.
 
         The templating system is used to generate templated scripts for the script()
         and submit_operations() / submit() function and the corresponding command line
-        sub commands.
+        subcommands.
         """
         if self._config.get('flow') and self._config['flow'].get('environment_modules'):
             envs = self._config['flow'].as_list('environment_modules')
@@ -683,6 +696,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             template_environment.filters['max'] = max
         if 'min' not in template_environment.filters:    # for jinja2 < 2.10
             template_environment.filters['min'] = min
+
         return template_environment
 
     def _template_environment(self, environment=None):
@@ -690,9 +704,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             environment = self._environment
         if environment not in self._template_environment_:
             template_environment = self._setup_template_environment()
+
             # Add environment-specific custom filters:
-            for filter_name, filter_function in getattr(environment, 'filters', {}).items():
-                template_environment.filters[filter_name] = filter_function
+            for name, member in inspect.getmembers(environment):
+                if getattr(member, '_flow_template_filter', False):
+                    template_environment.filters[name] = member
+
             self._template_environment_[environment] = template_environment
         return self._template_environment_[environment]
 
@@ -728,9 +745,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         The ``foo-label-text`` label will now show up in the status view for each job,
         where the ``foo`` key evaluates true.
 
-        If instead of a ``str``, the label functions returns any other type, the label
-        name will be the name of the function if and only if the return value evaluates
-        to ``True``, for example:
+        If the label functions returns any type other than ``str``, the label
+        name will be the name of the function if and only if the return value
+        evaluates to ``True``, for example:
 
         .. code-block:: python
 
@@ -741,7 +758,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         Finally, you can specify a different default label name by providing it as the first
         argument to the ``label()`` decorator.
 
-        .. versionadded:: 0.6
+        :param label_name_or_func:
+            A label name or callable.
+        :type label_name_or_func:
+            str or callable
         """
         if callable(label_name_or_func):
             cls._LABEL_FUNCTIONS[label_name_or_func] = None
@@ -774,11 +794,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         operation match the post-conditions for another. The comparison of
         operations is conservative; by default, conditions must be composed of
         identical code to be identified as equal (technically, they must be
-        bytecode equivalent i.e. `cond1.__code__.co_code ==
-        cond2.__code__.co_code`). Users can specify that conditions should be
+        bytecode equivalent, i.e. ``cond1.__code__.co_code ==
+        cond2.__code__.co_code``). Users can specify that conditions should be
         treated as equal by providing tags to the operations.
 
-        Given a FlowProject subclass defined in a module `project.py`, the
+        Given a FlowProject subclass defined in a module ``project.py``, the
         output graph could be visualized using Matplotlib and NetworkX with the
         following code:
 
@@ -804,6 +824,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         zip(range(len(ops)), [o for o in ops])})
 
             plt.show()
+
+        Raises a ``RuntimeError`` if a condition does not have a tag. This can
+        occur when using ``functools.partial``, and a manually specified
+        condition tag has not been set.
+
+        :raises: RuntimeError
+
         """
 
         def to_callbacks(conditions):
@@ -817,10 +844,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             only returned at the end."""
             callbacks = set()
             for cf in condition_functions:
-                if cf.__name__ == "_flow_metacondition":
-                    callbacks = callbacks.union(
-                        unpack_conditions(cf._composed_of))
+                # condition may not have __name__ attribute in cases where functools is used
+                # for condition creation
+                if hasattr(cf, '__name__') and cf.__name__ == "_flow_metacondition":
+                    callbacks = callbacks.union(unpack_conditions(cf._composed_of))
                 else:
+                    if cf._flow_tag is None:
+                        raise RuntimeError("Condition {} was not tagged. To create a graph, ensure "
+                                           "each base condition has a ``__code__`` attribute or "
+                                           "manually specified tag.".format(cf))
                     callbacks.add(cf._flow_tag)
 
             return callbacks
@@ -884,7 +916,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @classmethod
     @deprecated(
-        deprecated_in="0.8", removed_in="1.0",
+        deprecated_in="0.8", removed_in="0.10",
         current_version=__version__)
     def update_aliases(cls, aliases):
         "Update the ALIASES table for this class."
@@ -897,21 +929,18 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _store_bundled(self, operations):
         """Store operation-ids as part of a bundle and return bundle id.
 
-        The operation identifiers are stored in a  text within a file
-        determined by the _fn_bundle() method.
-
-        This may be used to idenfity the status of individual operations
-        root directory. This is necessary to be able to identify each
-
-        A single operation will not be stored, but instead the operation's
-        id is directly returned.
+        The operation identifiers are stored in a text file whose name is
+        determined by the _fn_bundle() method. This may be used to identify
+        the status of individual operations from the bundle id. A single
+        operation will not be stored, but instead the operation's id is
+        directly returned.
 
         :param operations:
             The operations to bundle.
         :type operations:
             A sequence of instances of :py:class:`.JobOperation`
         :return:
-            The  bundle id
+            The bundle id.
         :rtype:
             str
         """
@@ -1102,8 +1131,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                      eligible_jobs_max_lines=None):
         """Print the status of the project.
 
-        .. versionchanged:: 0.6
-
         :param jobs:
             Only execute operations for the given jobs, or all if the argument is omitted.
         :type jobs:
@@ -1178,7 +1205,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type no_parallelize:
             bool
         :param template:
-            user provided Jinja2 template file.
+            User provided Jinja2 template file.
         :type template:
             str
         """
@@ -1203,7 +1230,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if eligible_jobs_max_lines is None:
             eligible_jobs_max_lines = flow_config.get_config_value('eligible_jobs_max_lines')
 
-        # initialize jinja2 template evnronment and necessary filters
+        # initialize jinja2 template environment and necessary filters
         template_environment = self._template_environment()
 
         def draw_progressbar(value, total, width=40):
@@ -1238,11 +1265,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             :param scheduler_status_code:
                 Dictionary information for status code
             :type scheduler_status_code:
-                Dictionary
+                dict
             :param all_ops:
                 Boolean value indicate if all operations should be displayed
             :type all_ops:
-                Boolean
+                bool
             """
 
             if scheduler_status_code[job_op['scheduler_status']] != 'U' or \
@@ -1255,25 +1282,25 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             """Determine the status of an operation.
 
             :param operation_info:
-                Dicionary containing operation information
+                Dictionary containing operation information.
             :type operation_info:
-                Dictionary
+                dict
             :param symbols:
-                Dicionary containing code for different job status
+                Dictionary containing code for different job status.
             :type symbols:
-                Dictionary
+                dict
             """
 
             if operation_info['scheduler_status'] >= JobStatus.active:
-                op_status = u'running'
+                op_status = 'running'
             elif operation_info['scheduler_status'] > JobStatus.inactive:
-                op_status = u'active'
+                op_status = 'active'
             elif operation_info['completed']:
-                op_status = u'completed'
+                op_status = 'completed'
             elif operation_info['eligible']:
-                op_status = u'eligible'
+                op_status = 'eligible'
             else:
-                op_status = u'ineligible'
+                op_status = 'ineligible'
 
             return symbols[op_status]
 
@@ -1288,7 +1315,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 :param eligible:
                     Boolean value for job eligibility
                 :type eligible:
-                    Boolean
+                    bool
                 """
                 if eligible:
                     return '\033[1m' + s + '\033[0m'
@@ -1305,7 +1332,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 :param eligible:
                     Boolean value for job eligibility
                 :type eligible:
-                    boolean
+                    bool
                 """
                 return s
 
@@ -1497,20 +1524,20 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
             if pretty:
                 OPERATION_STATUS_SYMBOLS = OrderedDict([
-                    ('ineligible', u'\u25cb'),   # open circle
-                    ('eligible', u'\u25cf'),     # black circle
-                    ('active', u'\u25b9'),       # open triangle
-                    ('running', u'\u25b8'),      # black triangle
-                    ('completed', u'\u2714'),    # check mark
+                    ('ineligible', '\u25cb'),   # open circle
+                    ('eligible', '\u25cf'),     # black circle
+                    ('active', '\u25b9'),       # open triangle
+                    ('running', '\u25b8'),      # black triangle
+                    ('completed', '\u2714'),    # check mark
                 ])
                 "Pretty (unicode) symbols denoting the execution status of operations."
             else:
                 OPERATION_STATUS_SYMBOLS = OrderedDict([
-                    ('ineligible', u'-'),
-                    ('eligible', u'+'),
-                    ('active', u'*'),
-                    ('running', u'>'),
-                    ('completed', u'X')
+                    ('ineligible', '-'),
+                    ('eligible', '+'),
+                    ('active', '*'),
+                    ('running', '>'),
+                    ('completed', 'X')
                 ])
                 "Symbols denoting the execution status of operations."
             operation_status_legend = ' '.join('[{}]:{}'.format(v, k)
@@ -1575,8 +1602,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """Execute the next operations as specified by the project's workflow.
 
         See also: :meth:`~.run`
-
-        .. versionadded:: 0.6
 
         :param operations:
             The operations to execute (optional).
@@ -1690,12 +1715,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             or operation.name not in self._operation_functions
             # The specified executable is not the same as the interpreter instance:
             or operation.directives.get('executable', sys.executable) != sys.executable
+            # The operation requires MPI and/or OpenMP parallelization:
+            or operation.directives.get('nranks', 1) > 1
+            or operation.directives.get('omp_num_threads', 1) > 1
         ):
             # ... need to fork:
+            prefix = self._environment.get_prefix(operation)
             logger.debug(
                 "Forking to execute operation '{}' with "
-                "cmd '{}'.".format(operation, operation.cmd))
-            subprocess.run(operation.cmd, shell=True, timeout=timeout, check=True)
+                "cmd '{}'.".format(operation, prefix + ' ' + operation.cmd))
+            subprocess.run(prefix + ' ' + operation.cmd, shell=True, timeout=timeout, check=True)
         else:
             # ... executing operation in interpreter process as function:
             logger.debug(
@@ -1713,16 +1742,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """Execute all pending operations for the given selection.
 
         This function will run in an infinite loop until all pending operations
-        have been executed or the total number of passes per operation or the total
-        number of exeutions have been reached.
+        are executed, unless it reaches the maximum number of passes per
+        operation or the maximum number of executions.
 
         By default there is no limit on the total number of executions, but a specific
         operation will only be executed once per job. This is to avoid accidental
         infinite loops when no or faulty post conditions are provided.
 
         See also: :meth:`~.run_operations`
-
-        .. versionchanged:: 0.6
 
         :param jobs:
             Only execute operations for the given jobs, or all if the argument is omitted.
@@ -1927,7 +1954,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Sequence of instances of :class:`.JobOperation`
         :param parallel:
             Execute all operations in parallel (default is False).
-        :param parallel:
+        :type parallel:
             bool
         :param template:
             The name of the template to use to generate the script.
@@ -1979,9 +2006,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def submit_operations(self, operations, _id=None, env=None, parallel=False, flags=None,
                           force=False, template='script.sh', pretend=False,
                           show_template_help=False, **kwargs):
-        """Submit a sequence of operations to the scheduler.
-
-        .. versionchanged:: 0.6
+        r"""Submit a sequence of operations to the scheduler.
 
         :param operations:
             The operations to submit.
@@ -2016,10 +2041,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Show information about available template variables and filters and exit.
         :type show_template_help:
             bool
-        :param kwargs:
+        :param \*\*kwargs:
             Additional keyword arguments to be forwarded to the scheduler.
         :return:
-            Return the submission status after successful submission or None.
+            Returns the submission status after successful submission or None.
         """
         if _id is None:
             _id = self._store_bundled(operations)
@@ -2074,8 +2099,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                walltime=None, env=None, ignore_conditions='none', **kwargs):
         """Submit function for the project's main submit interface.
 
-        .. versionchanged:: 0.6
-
         :param bundle_size:
             Specify the number of operations to be bundled into one submission, defaults to 1.
         :type bundle_size:
@@ -2102,7 +2125,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type force:
             bool
         :param walltime:
-            Specify the walltime in hours or as instance of datetime.timedelta.
+            Specify the walltime in hours or as instance of :py:class:`datetime.timedelta`.
         :param ignore_conditions:
             Specify if pre or post conditions check is to be ignored for eligibility check
                 * 'none' (default: all conditions are checked)
@@ -2142,7 +2165,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 operations = list(islice(operations, num))
 
         # Bundle them up and submit.
-        for bundle in make_bundles(operations, bundle_size):
+        for bundle in _make_bundles(operations, bundle_size):
             status = self.submit_operations(
                 operations=bundle, env=env, parallel=parallel,
                 force=force, walltime=walltime, **kwargs)
@@ -2219,7 +2242,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             dest='show_template_help',
             action='store_true',
             help="Show information about the template context, including available variables "
-                 "and filter funtions; then exit.")
+                 "and filter functions; then exit.")
 
     @classmethod
     def _add_job_selection_args(cls, parser):
@@ -2263,7 +2286,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         bundling_group = parser.add_argument_group(
             'bundling',
-            "Bundle mutiple operations for execution, e.g., to submit them "
+            "Bundle multiple operations for execution, e.g., to submit them "
             "all together to a cluster job, or execute them in parallel within "
             "an execution script.")
         bundling_group.add_argument(
@@ -2297,7 +2320,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                  "to be considered eligible for execution.")
 
     @deprecated(
-        deprecated_in="0.8", removed_in="1.0",
+        deprecated_in="0.8", removed_in="0.10",
         current_version=__version__,
         details="Use export_job_statuses() instead.")
     def export_job_stati(self, collection, stati):
@@ -2435,7 +2458,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         of job as its first and only positional argument.
 
         For example, if we wanted to define a command for a program called 'hello',
-        which expects a job id as its first argument, we could contruct the following
+        which expects a job id as its first argument, we could construct the following
         two equivalent operations:
 
         .. code-block:: python
@@ -2460,12 +2483,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         Requirements are always met when the list of requirements is empty and
         post-conditions are never met when the list of post-conditions is empty.
 
-        Please note, eligibility in this contexts refers only to the workflow pipline
+        Please note, eligibility in this contexts refers only to the workflow pipeline
         and not to other contributing factors, such as whether the job-operation is currently
         running or queued.
 
         :param name:
-            A unique identifier for this operation, may be freely choosen.
+            A unique identifier for this operation, which may be freely chosen.
         :type name:
             str
         :param cmd:
@@ -2473,11 +2496,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type cmd:
             str or callable
         :param pre:
-            required conditions
+            Required conditions.
         :type pre:
             sequence of callables
         :param post:
-            post-conditions to determine completion
+            Post-conditions to determine completion.
         :type pre:
             sequence of callables
         """
@@ -2486,7 +2509,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         self.operations[name] = FlowOperation(cmd=cmd, pre=pre, post=post, directives=kwargs)
 
     @deprecated(
-        deprecated_in="0.8", removed_in="1.0",
+        deprecated_in="0.8", removed_in="0.10",
         current_version=__version__,
         details="Use labels() instead.")
     def classify(self, job):
@@ -2544,7 +2567,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 yield op
 
     @deprecated(
-        deprecated_in="0.8", removed_in="1.0",
+        deprecated_in="0.8", removed_in="0.10",
         current_version=__version__,
         details="Use next_operations() instead.")
     def next_operation(self, job):
@@ -2575,8 +2598,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 print('Hello', job)
 
         See also: :meth:`~.flow.FlowProject.add_operation`.
-
-        .. versionadded:: 0.6
         """
         if isinstance(func, str):
             return lambda op: cls.operation(op, name=func)
@@ -2618,12 +2639,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @classmethod
     def _collect_pre_conditions(cls):
-        "Collect all pre-conditions that were add via decorator."
+        "Collect all pre-conditions that were added via decorator."
         return cls._collect_conditions('_OPERATION_PRE_CONDITIONS')
 
     @classmethod
     def _collect_post_conditions(cls):
-        "Collect all post-conditions that were add via decorator."
+        "Collect all post-conditions that were added via decorator."
         return cls._collect_conditions('_OPERATION_POST_CONDITIONS')
 
     def _register_operations(self):
@@ -2683,7 +2704,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return True
 
     @deprecated(
-        deprecated_in="0.8", removed_in="1.0",
+        deprecated_in="0.8", removed_in="0.10",
         current_version=__version__)
     def eligible_for_submission(self, job_operation):
         return self._eligible_for_submission(self, job_operation)
@@ -2726,8 +2747,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if not args['profile'] and delta_t > warn_threshold >= 0:
                 print(
                     "WARNING: "
-                    "The status compilation took more than {}s per job. Consider to "
-                    "use `--profile` to determine bottlenecks within your project "
+                    "The status compilation took more than {}s per job. Consider "
+                    "using `--profile` to determine bottlenecks within your project "
                     "workflow definition.\n"
                     "Execute `signac config set flow.{} VALUE` to specify the "
                     "warning threshold in seconds. Use -1 to completely suppress this "
@@ -2742,18 +2763,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _main_run(self, args):
         "Run all (or select) job operations."
-        if args.hidden_operation_name:
-            print(
-                "WARNING: "
-                "The run command expects operation names under the -o/--operation argument "
-                "as of version 0.6.\n         Positional arguments will no longer be "
-                "accepted beginning with version 0.7.",
-                file=sys.stderr)
-            if args.operation_name:
-                args.operation_name.extend(args.hidden_operation_name)
-            else:
-                args.operation_name = args.hidden_operation_name
-
         # Select jobs:
         jobs = self._select_jobs_from_args(args)
 
@@ -2820,7 +2829,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             ops = list(islice(ops, args.num))
 
         # Bundle operations up, generate the script, and submit to scheduler.
-        for bundle in make_bundles(ops, args.bundle_size):
+        for bundle in _make_bundles(ops, args.bundle_size):
             status = self.submit_operations(operations=bundle, **kwargs)
             if status is not None:
                 for op in bundle:
@@ -2864,7 +2873,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         else:
             filter_ = parse_filter_arg(args.filter)
             doc_filter = parse_filter_arg(args.doc_filter)
-            return legacy.JobsCursorWrapper(self, filter_, doc_filter)
+            return JobsCursor(self, filter_, doc_filter)
 
     def main(self, parser=None):
         """Call this function to use the main command line interface.
@@ -2946,11 +2955,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             'run',
             parents=[base_parser],
         )
-        parser_run.add_argument(          # Hidden positional arguments for backwards-compatibility.
-            'hidden_operation_name',
-            type=str,
-            nargs='*',
-            help=argparse.SUPPRESS)
         self._add_operation_selection_arg_group(parser_run, list(sorted(self._operations)))
 
         execution_group = parser_run.add_argument_group('execution')
@@ -3132,7 +3136,6 @@ def _execute_serialized_operation(loads, project, operation):
     project._execute_operation(project._loads_op(operation))
 
 
-###
 # Status-related helper functions
 
 

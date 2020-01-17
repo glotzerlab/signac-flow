@@ -1,6 +1,5 @@
 {# Templated in accordance with: https://www.psc.edu/bridges/user-guide #}
 {# This template can only be used with P100 GPUs! #}
-{% set mpiexec = "mpirun" %}
 {% extends "slurm.sh" %}
 {% block tasks %}
 {% set threshold = 0 if force else 0.9 %}

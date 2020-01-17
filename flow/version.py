@@ -2,6 +2,6 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 
-__all__ = ['__version__']
+__version__ = '0.9.0'
 
-__version__ = '0.8.0'
+__all__ = ['__version__']

@@ -29,9 +29,8 @@ def b_is_even(job):
 @flow.cmd
 @TestProject.pre(b_is_even)
 @TestProject.post.isfile('world.txt')
-# The submit interface should warn about this explicitly set directive,
-# because it would not be used by the template script:
-# Explicitly set "good" directive.
+# Explicitly set a "bad" directive that is unused by the template.
+# The submit interface should warn about unused directives.
 @flow.directives(bad_directive=0)
 # But not this one:
 @flow.directives(np=1)

@@ -2146,7 +2146,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             '--ignore-conditions',
             type=str,
             choices=['none', 'pre', 'post', 'all'],
-            default='none',
+            default=IgnoreConditions.NONE,
             action=IgnoreConditionsConversion,
             help="Specify conditions to ignore for eligibility check.")
 
@@ -2968,7 +2968,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             '--ignore-conditions',
             type=str,
             choices=['none', 'pre', 'post', 'all'],
-            default='none',
+            default=IgnoreConditions.NONE,
             action=IgnoreConditionsConversion,
             help="Specify conditions to ignore for eligibility check.")
         parser_run.set_defaults(func=self._main_run)
@@ -2981,7 +2981,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             '--ignore-conditions',
             type=str,
             choices=['none', 'pre', 'post', 'all'],
-            default='none',
+            default=IgnoreConditions.NONE,
             action=IgnoreConditionsConversion,
             help="Specify conditions to ignore for eligibility check.")
         self._add_script_args(parser_script)

@@ -445,16 +445,16 @@ class FlowOperation(object):
 
     def eligible(self, job, ignore_conditions=IgnoreConditions.NONE):
         """Eligible, when all pre-conditions are true and at least one post-condition is false,
-        or corresponding conditions are ignored
+        or corresponding conditions are ignored.
         :param job:
             The signac job handles.
         :type job:
             :class:`~signac.contrib.job.Job`
         :param ignore_conditions:
-            Specify if pre and/or post conditions check is to be ignored for eligibility check
-            The default is `IgnoreConditions.NONE`
+            Specify if pre and/or post conditions check is to be ignored for eligibility check.
+            The default is `IgnoreConditions.NONE`.
         :type ignore_conditions:
-            "py:class:`~.IgnoreConditions`
+            py:class:`~.IgnoreConditions`
         """
         if type(ignore_conditions) != IgnoreConditions:
             raise ValueError(
@@ -1816,10 +1816,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             The default value is `none`, which is equivalent to `by-job` in the current
             implementation.
         :param ignore_conditions:
-            Specify if pre and/or post conditions check is to be ignored for eligibility check
-            The default is `IgnoreConditions.NONE`
+            Specify if pre and/or post conditions check is to be ignored for eligibility check.
+            The default is `IgnoreConditions.NONE`.
         :type ignore_conditions:
-            "py:class:`~.IgnoreConditions`
+            py:class:`~.IgnoreConditions`
 
             .. note::
 
@@ -2141,10 +2141,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :param walltime:
             Specify the walltime in hours or as instance of :py:class:`datetime.timedelta`.
         :param ignore_conditions:
-            Specify if pre and/or post conditions check is to be ignored for eligibility check
-            The default is `IgnoreConditions.NONE`
+            Specify if pre and/or post conditions check is to be ignored for eligibility check.
+            The default is `IgnoreConditions.NONE`.
         :type ignore_conditions:
-            "py:class:`~.IgnoreConditions`
+            py:class:`~.IgnoreConditions`
         """
         # Regular argument checks and expansion
         if jobs is None:
@@ -2573,10 +2573,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type job:
             :class:`~signac.contrib.job.Job`
         :param ignore_conditions:
-            Specify if pre and/or post conditions check is to be ignored for eligibility check
-            The default is `IgnoreConditions.NONE`
+            Specify if pre and/or post conditions check is to be ignored for eligibility check.
+            The default is `IgnoreConditions.NONE`.
         :type ignore_conditions:
-            "py:class:`~.IgnoreConditions`
+            py:class:`~.IgnoreConditions`
         :yield:
             All instances of :class:`~.JobOperation` jobs are eligible for.
         """

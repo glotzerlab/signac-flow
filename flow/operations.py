@@ -103,13 +103,15 @@ class directives(object):
 
     Directives can for example be used to provide information about required resources
     such as the number of processes required for execution of parallelized operations.
+    For more information, read about :ref:`signac-docs:directives`.
 
-    In addition, you can use the `@directives(fork=True)` directive to enforce that a
+    In addition, you can use the ``@directives(fork=True)`` directive to enforce that a
     particular operation is always executed within a subprocess and not within the
     Python interpreter's process even if there are no other reasons that would prevent that.
+
     .. note::
 
-        Setting `fork=False` will not prevent forking if there are other reasons for forking,
+        Setting ``fork=False`` will not prevent forking if there are other reasons for forking,
         such as a timeout.
     """
 

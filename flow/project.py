@@ -98,10 +98,10 @@ The available filters are:
 
 class IgnoreConditions(IntEnum):
     """IntEnum class for IgnoreConditions settings when checking job eligibility, setting includes:
-    * IgnonreConditions.PRE: ignore pre conditions
-    * IgnonreConditions.POST: ignore post conditions
-    * IgnonreConditions.ALL: ignore all conditions
-    * IgnonreConditions.NONE: check all conditions
+    * IgnoreConditions.PRE: ignore pre conditions
+    * IgnoreConditions.POST: ignore post conditions
+    * IgnoreConditions.ALL: ignore all conditions
+    * IgnoreConditions.NONE: check all conditions
     """
     PRE = 1
     POST = 2
@@ -454,7 +454,7 @@ class FlowOperation(object):
             Specify if pre and/or post conditions check is to be ignored for eligibility check.
             The default is `IgnoreConditions.NONE`.
         :type ignore_conditions:
-            py:class:`~.IgnoreConditions`
+            :py:class:`~.IgnoreConditions`
         """
         if type(ignore_conditions) != IgnoreConditions:
             raise ValueError(
@@ -1819,7 +1819,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Specify if pre and/or post conditions check is to be ignored for eligibility check.
             The default is `IgnoreConditions.NONE`.
         :type ignore_conditions:
-            py:class:`~.IgnoreConditions`
+            :py:class:`~.IgnoreConditions`
 
             .. note::
 
@@ -2144,7 +2144,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Specify if pre and/or post conditions check is to be ignored for eligibility check.
             The default is `IgnoreConditions.NONE`.
         :type ignore_conditions:
-            py:class:`~.IgnoreConditions`
+            :py:class:`~.IgnoreConditions`
         """
         # Regular argument checks and expansion
         if jobs is None:
@@ -2576,7 +2576,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Specify if pre and/or post conditions check is to be ignored for eligibility check.
             The default is `IgnoreConditions.NONE`.
         :type ignore_conditions:
-            py:class:`~.IgnoreConditions`
+            :py:class:`~.IgnoreConditions`
         :yield:
             All instances of :class:`~.JobOperation` jobs are eligible for.
         """

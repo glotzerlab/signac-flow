@@ -39,7 +39,7 @@ def cmd(func):
 
     .. note::
     The final shell command generated for :meth:`~.FlowProject.run` or :meth:`~.FlowProject.submit`
-    still respects directives and will prepend necessary mpi prefix to the shell command provided
+    still respects directives and will prepend e.g. MPI or OpenMP prefixes to the shell command provided
     here.
     """
     if getattr(func, "_flow_with_job", False):

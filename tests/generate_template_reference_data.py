@@ -87,7 +87,7 @@ def init(project):
         ],
         'environments.xsede.BridgesEnvironment': [
             {
-                'partition': ['RM', 'RM-Shared', 'GPU'],
+                'partition': ['RM', 'RM-Shared', 'GPU', 'GPU-AI'],
                 'walltime': [None, 1],
             },
             {

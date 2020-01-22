@@ -40,7 +40,7 @@
 {% elif partition == 'GPU-AI' %}
 #SBATCH -N {{ nn|default(1, true)|check_utilization(gpu_tasks, 8, threshold, 'GPU') }}
 #SBATCH --ntasks-per-node=40
-#SBATCH --gres=gpu:volta16:{{ gpu_tasks }}
+#SBATCH --gres=gpu:volta16:{{ (gpu_tasks / nn)|round(0, 'ceil')|int }}
 {% elif 'shared' in partition %}
 #SBATCH -N {{ nn|default(1, true) }}
 #SBATCH --ntasks-per-node={{ cpu_tasks }}

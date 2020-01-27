@@ -38,9 +38,14 @@
 #SBATCH --ntasks-per-node=16
 #SBATCH --gres=gpu:p100:{{ 2 if gpu_tasks > 1 else 1 }}
 {% elif partition == 'GPU-AI' %}
+{% set gpus_per_node = (gpu_tasks / nn)|round(0, 'ceil')|int %}
+{% set cpus_per_node = (cpu_tasks / nn)|round(0, 'ceil')|int %}
+{% if cpus_per_node > gpus_per_node * 5 and not force %}
+{% raise "Cannot request more than 5 CPUs per GPU." %}
+{% endif %}
 #SBATCH -N {{ nn|default(1, true)|check_utilization(gpu_tasks, 8, threshold, 'GPU') }}
-#SBATCH --ntasks-per-node=40
-#SBATCH --gres=gpu:volta16:{{ (gpu_tasks / nn)|round(0, 'ceil')|int }}
+#SBATCH --ntasks-per-node={{ cpus_per_node }}
+#SBATCH --gres=gpu:volta16:{{ gpus_per_node }}
 {% elif 'shared' in partition %}
 #SBATCH -N {{ nn|default(1, true) }}
 #SBATCH --ntasks-per-node={{ cpu_tasks }}

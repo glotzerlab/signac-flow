@@ -97,9 +97,9 @@ The available filters are:
 
 
 class IgnoreConditions(IntEnum):
-    """IntEnum class for IgnoreConditions settings when checking job eligibility,
+    """Flags that determine which conditions are used to determine job eligibility.
 
-    Setting includes:
+    The options include:
         * IgnoreConditions.PRE: ignore pre conditions
         * IgnoreConditions.POST: ignore post conditions
         * IgnoreConditions.ALL: ignore all conditions
@@ -1827,7 +1827,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             str, callable, or NoneType
         :param ignore_conditions:
             Specify if pre and/or post conditions check is to be ignored for eligibility check.
-            The default is `IgnoreConditions.NONE`.
+            The default is :class:`~.IgnoreConditions.NONE`.
         :type ignore_conditions:
             :py:class:`~.IgnoreConditions`
         """

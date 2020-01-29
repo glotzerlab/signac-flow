@@ -12,6 +12,7 @@ from . import environment
 from . import scheduling
 from . import errors
 from . import testing
+from .project import IgnoreConditions
 from .project import FlowProject
 from .project import JobOperation
 from .project import label
@@ -37,6 +38,7 @@ __all__ = [
     'scheduling',
     'errors',
     'testing',
+    'IgnoreConditions'
     'FlowProject',
     'JobOperation',
     'label',

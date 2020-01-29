@@ -38,7 +38,7 @@ __all__ = [
     'scheduling',
     'errors',
     'testing',
-    'IgnoreConditions'
+    'IgnoreConditions',
     'FlowProject',
     'JobOperation',
     'label',

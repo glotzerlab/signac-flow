@@ -108,7 +108,8 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
         super(BridgesEnvironment, cls).add_args(parser)
         parser.add_argument(
           '--partition',
-          choices=['RM', 'RM-shared', 'RM-small', 'GPU', 'GPU-shared', 'LM'],
+          choices=['RM', 'RM-shared', 'RM-small', 'LM',
+                   'GPU', 'GPU-shared', 'GPU-small', 'GPU-AI'],
           default='RM-shared',
           help="Specify the partition to submit to.")
 

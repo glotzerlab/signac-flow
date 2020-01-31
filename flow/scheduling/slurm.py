@@ -5,7 +5,6 @@
 
 This module implements the Scheduler and ClusterJob classes for SLURM.
 """
-from __future__ import print_function
 import getpass
 import subprocess
 import tempfile

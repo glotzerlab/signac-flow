@@ -5,7 +5,8 @@
 
 http://www.doeleadershipcomputing.org/
 """
-from ..environment import DefaultLSFEnvironment, DefaultTorqueEnvironment
+from ..environment import DefaultLSFEnvironment
+from ..environment import template_filter
 
 from fractions import gcd
 
@@ -28,24 +29,28 @@ class SummitEnvironment(DefaultLSFEnvironment):
     """
     hostname_pattern = r'.*\.summit\.olcf\.ornl\.gov'
     template = 'summit.sh'
+    mpi_cmd = 'jsrun'
+    cores_per_node = 42
+    gpus_per_node = 6
 
-    @staticmethod
-    def calc_num_nodes(resource_sets, cores_per_node, gpus_per_node):
+    @template_filter
+    def calc_num_nodes(cls, resource_sets):
         cores_used = gpus_used = nodes_used = 0
         for nsets, tasks, cpus_per_task, gpus in resource_sets:
             for _ in range(nsets):
                 cores_used += tasks * cpus_per_task
                 gpus_used += gpus
-                if cores_used > cores_per_node or gpus_used > gpus_per_node:
+                if (cores_used > cls.cores_per_node or
+                        gpus_used > cls.gpus_per_node):
                     nodes_used += 1
-                    cores_used = max(0, cores_used - cores_per_node)
-                    gpus_used = max(0, gpus_used - gpus_per_node)
+                    cores_used = max(0, cores_used - cls.cores_per_node)
+                    gpus_used = max(0, gpus_used - cls.gpus_per_node)
         if cores_used > 0 or gpus_used > 0:
             nodes_used += 1
         return nodes_used
 
-    @staticmethod
-    def guess_resource_sets(operation, cores_per_node, gpus_per_node):
+    @template_filter
+    def guess_resource_sets(cls, operation):
         ntasks = max(operation.directives.get('nranks', 1), 1)
         np = operation.directives.get('np', ntasks)
 
@@ -69,40 +74,32 @@ class SummitEnvironment(DefaultLSFEnvironment):
 
         return nsets, tasks_per_set, cpus_per_set, gpus_per_set
 
-    @staticmethod
-    def jsrun_options(resource_set):
+    @classmethod
+    def jsrun_options(cls, resource_set):
         nsets, tasks, cpus, gpus = resource_set
         cuda_aware_mpi = "--smpiargs='-gpu'" if (nsets > 0 or tasks > 0) and gpus > 0 else ""
         return '-n {} -a {} -c {} -g {} {}'.format(nsets, tasks, cpus, gpus, cuda_aware_mpi)
 
-    @staticmethod
-    def jsrun_extra_args(operation):
-        return str(operation.directives.get('extra_jsrun_args', ''))
+    @classmethod
+    def _get_mpi_prefix(cls, operation, parallel):
+        """Get the mpi prefix based on proper directives.
 
-    filters = {'calc_num_nodes': calc_num_nodes.__func__,
-               'guess_resource_sets': guess_resource_sets.__func__,
-               'jsrun_options': jsrun_options.__func__,
-               'jsrun_extra_args': jsrun_extra_args.__func__}
-
-
-class TitanEnvironment(DefaultTorqueEnvironment):
-    """Environment profile for the titan super computer.
-
-    https://www.olcf.ornl.gov/titan/
-    """
-    hostname_pattern = 'titan'
-    template = 'titan.sh'
-    cores_per_node = 16
-
-
-class EosEnvironment(DefaultTorqueEnvironment):
-    """Environment profile for the eos super computer.
-
-    https://www.olcf.ornl.gov/computing-resources/eos/
-    """
-    hostname_pattern = 'eos'
-    template = 'eos.sh'
-    cores_per_node = 32
+        :param operation:
+            The operation for which to add prefix.
+        :param parallel:
+            If True, operations are assumed to be executed in parallel, which means
+            that the number of total tasks is the sum of all tasks instead of the
+            maximum number of tasks. Default is set to False.
+        :return mpi_prefix:
+            The prefix should be added for the operation.
+        :type mpi_prefix:
+            str
+        """
+        extra_args = str(operation.directives.get('extra_jsrun_args', ''))
+        resource_set = cls.guess_resource_sets(operation)
+        mpi_prefix = cls.mpi_cmd + ' ' + cls.jsrun_options(resource_set)
+        mpi_prefix += ' -d packed -b rs ' + extra_args + (' ' if extra_args else '')
+        return mpi_prefix
 
 
-__all__ = ['SummitEnvironment', 'TitanEnvironment', 'EosEnvironment']
+__all__ = ['SummitEnvironment']

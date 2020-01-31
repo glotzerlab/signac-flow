@@ -187,7 +187,7 @@ def main(args):
                     tmp_out.seek(0)
                     with open(fn, 'w') as f:
                         with redirect_stdout(f):
-                            print(tmp_out.read(), end='')
+                            print(tmp_out.read()+'')
                 else:
                     for op in fp.operations:
                         if 'partition' in parameters:
@@ -212,7 +212,7 @@ def main(args):
                         tmp_out.seek(0)
                         with open(fn, 'w') as f:
                             with redirect_stdout(f):
-                                print(tmp_out.read(), end='')
+                                print(tmp_out.read() + '')
 
         # For compactness, we move the output into an ARCHIVE_DIR then delete the original data.
         fp.export_to(

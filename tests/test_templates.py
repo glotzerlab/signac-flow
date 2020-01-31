@@ -84,7 +84,7 @@ class BaseTemplateTest(object):
                         with open(job.fn('script_{}.sh'.format(op))) as file:
                             reference.extend([msg] + file.read().splitlines())
 
-            self.assertEqual('\n'.join(reference), '\n'.join(generated))
+            assert '\n'.join(reference) == '\n'.join(generated)
 
 
 # TestCase factory

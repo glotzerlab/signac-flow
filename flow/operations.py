@@ -38,9 +38,9 @@ def cmd(func):
             return "echo {job._id}"
 
     .. note::
-    The final shell command generated for :meth:`~.FlowProject.run` or :meth:`~.FlowProject.submit`
-    still respects directives and will prepend e.g. MPI or OpenMP prefixes to the shell command
-    provided here.
+        The final shell command generated for :meth:`~.FlowProject.run` or
+        :meth:`~.FlowProject.submit` still respects directives and will prepend e.g. MPI or OpenMP
+        prefixes to the shell command provided here.
     """
     if getattr(func, "_flow_with_job", False):
         raise RuntimeError("@cmd should appear below the @with_job decorator in your script")

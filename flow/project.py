@@ -94,6 +94,7 @@ The available filters are:
 
 class IgnoreConditions(IntEnum):
     """Flags that determine which conditions are used to determine job eligibility.
+
     The options include:
         * IgnoreConditions.PRE: ignore pre conditions
         * IgnoreConditions.POST: ignore post conditions
@@ -1737,6 +1738,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                             operation used to sort operations)
             The default value is `none`, which is equivalent to `by-job` in the current
             implementation.
+
             .. note::
                 Users are advised to not rely on a specific execution order, as a
                 substitute for defining the workflow in terms of pre- and post-conditions.

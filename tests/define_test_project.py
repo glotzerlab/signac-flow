@@ -3,21 +3,21 @@ import flow
 from flow import FlowProject
 
 
-class TestProject(FlowProject):
+class ProjectTest(FlowProject):
     pass
 
 
-@TestProject.label
+@ProjectTest.label
 def default_label(job):
     return True
 
 
-@TestProject.label
+@ProjectTest.label
 def negative_default_label(job):
     return False
 
 
-@TestProject.label
+@ProjectTest.label
 def b_is_even(job):
     try:
         return job.sp.b % 2 == 0
@@ -25,10 +25,10 @@ def b_is_even(job):
         return False
 
 
-@TestProject.operation
+@ProjectTest.operation
 @flow.cmd
-@TestProject.pre(b_is_even)
-@TestProject.post.isfile('world.txt')
+@ProjectTest.pre(b_is_even)
+@ProjectTest.post.isfile('world.txt')
 # Explicitly set a "bad" directive that is unused by the template.
 # The submit interface should warn about unused directives.
 @flow.directives(bad_directive=0)
@@ -42,23 +42,23 @@ def _need_to_fork(job):
     return job.doc.get('fork')
 
 
-@TestProject.operation
+@ProjectTest.operation
 @flow.directives(fork=_need_to_fork)
-@TestProject.post.true('test')
+@ProjectTest.post.true('test')
 def op2(job):
     job.document.test = os.getpid()
 
 
-class TestDynamicProject(TestProject):
+class DynamicProjectTest(ProjectTest):
     pass
 
 
-@TestDynamicProject.operation
-@TestDynamicProject.pre.after(op1)
-@TestDynamicProject.post.true('dynamic')
+@DynamicProjectTest.operation
+@DynamicProjectTest.pre.after(op1)
+@DynamicProjectTest.post.true('dynamic')
 def op3(job):
     job.sp.dynamic = True   # migration during execution
 
 
 if __name__ == '__main__':
-    TestDynamicProject().main()
+    DynamicProjectTest().main()

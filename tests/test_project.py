@@ -29,9 +29,9 @@ from flow.util.misc import switch_to_directory
 from flow import init
 from deprecation import fail_if_not_removed
 
-from define_test_project import TestProject
-from define_test_project import TestDynamicProject
-from define_dag_test_project import TestDagProject
+from define_test_project import ProjectTest
+from define_test_project import DynamicProjectTest
+from define_dag_test_project import DagTestProject
 
 
 @contextmanager
@@ -108,7 +108,7 @@ class MockEnvironment(ComputeEnvironment):
 
 
 class TestBaseProject():
-    self.project_class = signac.Project
+    project_class = signac.Project
 
     @pytest.fixture(autouse=True)
     def setUp(self,request):
@@ -523,7 +523,7 @@ class TestProjectClass(TestBaseProject):
 
 
 class TestProject(TestBaseProject):
-    project_class = TestProject
+    project_class = ProjectTest
 
     def test_instance(self):
         assert isinstance(self.project, FlowProject)
@@ -647,7 +647,7 @@ class TestProject(TestBaseProject):
 
 
 class TestExecutionProject(TestBaseProject):
-    project_class = TestProject
+    project_class = ProjectTest
     expected_number_of_steps = 4
 
     def test_pending_operations_order(self):
@@ -1020,7 +1020,7 @@ class TestBufferedExecutionProject(TestExecutionProject):
 
 
 class TestExecutionDynamicProject(TestExecutionProject):
-    project_class = TestDynamicProject
+    project_class = DynamicProjectTest
     expected_number_of_steps = 10
 
 
@@ -1030,7 +1030,7 @@ class TestBufferedExecutionDynamicProject(TestBufferedExecutionProject,
 
 
 class TestProjectMainInterface(TestBaseProject):
-    project_class = TestProject
+    project_class = ProjectTest
 
     def switch_to_cwd(self):
         os.chdir(self.cwd)
@@ -1115,12 +1115,12 @@ class TestProjectMainInterface(TestBaseProject):
 
 
 class TestDynamicProjectMainInterface(TestProjectMainInterface):
-    project_class = TestDynamicProject
+    project_class = DynamicProjectTest
 
 
 class TestProjectDagDetection(TestBaseProject):
     """Tests of operation DAG detection."""
-    project_class = TestDagProject
+    project_class = DagTestProject
 
     def test_dag(self):
         project = self.mock_project()

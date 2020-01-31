@@ -91,7 +91,7 @@ class TestBaseTemplate(object):
 for name, env in flow.environment.ComputeEnvironment.registry.items():
     if env.__module__.startswith('flow.environments'):
         name = '{}.{}'.format(env.__module__, env.__name__)[len('flow.'):]
-        test_name = '{}TestTemplate'.format(env.__name__)
+        test_name = '{}TemplateTest'.format(env.__name__)
         test_cls = type(test_name, TestBaseTemplate, dict(env=env))
         locals()[test_name] = test_cls
 

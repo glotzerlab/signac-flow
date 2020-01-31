@@ -559,37 +559,28 @@ class FlowGroup(object):
     def __init__(self, name, operations=None, run_cmd=None, exec_cmd=None,
                  directives=None, options=None):
         self.name = name
-        if options is None:
-            self.options = ""
-        else:
-            self.options = options
-
-        if operations is None:
-            self.operations = dict()
-        else:
-            self.operations = operations
-
-        if directives is None:
-            self.directives = dict()
-        else:
-            self.directives = directives
-
-        if run_cmd is None:
-            self._run_cmd = self._default_run_cmd
-        else:
-            self._run_cmd = run_cmd
-
-        if exec_cmd is None:
-            self._exec_cmd = self._default_exec_cmd
-        else:
-            self._exec_cmd = exec_cmd
+        self.options = "" if options is None else options
+        self.operations = dict() if operations is None else operations
+        self.directives = dict() if directives is None else directives
+        self._run_cmd = self._default_run_cmd if run_cmd is None else run_cmd
+        self._exec_cmd = self._default_exec_cmd if exec_cmd is None else exec_cmd
 
     def _set_entrypoint_item(self, entrypoint, job, key, default):
+        """Set a value (executable, path) for entrypoint in command.
+
+        Order of priority is project specified value, then group directives
+        specified, and finally the default provided to the function.
+        """
         entrypoint.setdefault(key, self.directives.get(key, default))
         if callable(entrypoint[key]):
             entrypoint[key] = entrypoint[key](job)
 
     def _determine_entrypoint(self, entrypoint, job):
+        """Get the entrypoint for creating a JobOperation.
+
+        If path cannot be determined, then raise a RuntimeError since we do not
+        no where to point to.
+        """
         entrypoint = entrypoint.copy()
         self._set_entrypoint_item(entrypoint, job, 'executable', sys.executable)
         self._set_entrypoint_item(entrypoint, job, 'path', None)
@@ -600,8 +591,7 @@ class FlowGroup(object):
 
     def _default_run_cmd(self, entrypoint, job=None):
         cmd = "{} run -o {}".format(entrypoint, self.name)
-        if job is not None:
-            cmd += ' -j {}'.format(job)
+        cmd = cmd if job is None else cmd + ' -j {}'.format(job)
         return cmd.lstrip()
 
     def _default_exec_cmd(self, entrypoint, job):

@@ -670,15 +670,15 @@ class FlowGroup(object):
         """
         self.operations[name] = operation
 
-    def intersects(self, group):
-        """Returns whether two groups contains any common operations.
+    def isdisjoint(self, group):
+        """Returns whether two groups are disjoint (do not share any common operations).
 
         :param group:
             The other FlowGroup to compare to.
         :type group:
             :py:class:`flow.FlowGroup`
         """
-        return bool(set(self).intersection(group))
+        return not bool(set(self).intersection(group))
 
     def _generate_id(self, job, index=0):
         "Return a name, which identifies this job-group."
@@ -2276,7 +2276,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _verify_group_compatibility(self, groups):
         """Verifies that all selected groups can be submitted together."""
-        return all(not a.intersects(b) for a, b in combinations(groups, 2))
+        return all(a.disjoint(b) for a, b in combinations(groups, 2))
 
     @contextlib.contextmanager
     def _potentially_buffered(self):

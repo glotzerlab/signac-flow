@@ -779,6 +779,7 @@ class _FlowProjectClass(type):
         # it returns does. The _GROUPS list records the groups created and their
         # passed parameters for later initialization.
         cls._GROUPS = list()
+        cls._GROUP_NAMES = set()
 
         return cls
 
@@ -3088,6 +3089,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             str
         """
         # Gets the relative filepath of the function caller
+        if name in cls._GROUP_NAMES:
+            raise ValueError("Repeat definition of group with name '{}'.".format(name))
+        else:
+            cls._GROUP_NAMES.add(name)
+
         cls._GROUPS.append({'name': name, 'run_cmd': run_cmd,
                             'exec_cmd': exec_cmd, 'directives': directives,
                             'options': options})
@@ -3116,12 +3122,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Initialize all groups without operations
         for group in groups:
-            # Raise error for duplicate groups
-            if group['name'] in self._groups:
-                raise ValueError(
-                    "Repeat definition of group with name " +
-                    "'{}'.".format(group['name']))
-
             self._groups[group['name']] = FlowGroup(**group)
 
         # Add operations to group

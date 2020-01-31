@@ -1,6 +1,5 @@
 {# Templated in accordance with: http://www.sdsc.edu/support/user_guides/comet.html#running #}
 {# This template can only be used with P100 GPUs! #}
-{% set mpiexec = "ibrun" %}
 {% extends "slurm.sh" %}
 {% block tasks %}
 {% set threshold = 0 if force else 0.9 %}

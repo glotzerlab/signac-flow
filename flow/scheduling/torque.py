@@ -5,7 +5,6 @@
 
 This module implements the Scheduler and ClusterJob classes for TORQUE.
 """
-from __future__ import print_function
 import io
 import errno
 import getpass

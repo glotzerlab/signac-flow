@@ -113,11 +113,11 @@ class renderer:
             :param scheduler_status_code:
                 Dictionary information for status code
             :type scheduler_status_code:
-                Dictionary
+                dict
             :param all_ops:
                 Boolean value indicate if all operations should be displayed
             :type all_ops:
-                Boolean
+                bool
             """
 
             if scheduler_status_code[job_op['scheduler_status']] != 'U' or \
@@ -132,23 +132,23 @@ class renderer:
             :param operation_info:
                 Dictionary containing operation information
             :type operation_info:
-                Dictionary
+                dict
             :param symbols:
                 Dictionary containing code for different job status
             :type symbols:
-                Dictionary
+                dict
             """
 
             if operation_info['scheduler_status'] >= JobStatus.active:
-                op_status = u'running'
+                op_status = 'running'
             elif operation_info['scheduler_status'] > JobStatus.inactive:
-                op_status = u'active'
+                op_status = 'active'
             elif operation_info['completed']:
-                op_status = u'completed'
+                op_status = 'completed'
             elif operation_info['eligible']:
-                op_status = u'eligible'
+                op_status = 'eligible'
             else:
-                op_status = u'ineligible'
+                op_status = 'ineligible'
 
             return symbols[op_status]
 
@@ -163,15 +163,15 @@ class renderer:
                 :param eligible:
                     Boolean value for job eligibility
                 :type eligible:
-                    Boolean
+                    bool
                 :param prefix_str:
                     String prefix for bold syntax
                 :type prefix_str:
-                    String
+                    str
                 :param suffix_str:
                     String prefix for bold syntax
                 :type suffix_str:
-                    String
+                    str
                 """
                 if eligible:
                     return prefix_str + s + suffix_str
@@ -188,15 +188,15 @@ class renderer:
                 :param eligible:
                     Boolean value for job eligibility
                 :type eligible:
-                    boolean
+                    bool
                 :param prefix_str:
                     String prefix for bold syntax
                 :type prefix_str:
-                    String
+                    str
                 :param suffix_str:
                     String prefix for bold syntax
                 :type suffix_str:
-                    String
+                    str
                 """
                 return s
 

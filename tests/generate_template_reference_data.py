@@ -2,8 +2,6 @@
 # Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-from __future__ import print_function
-
 import sys
 import os
 import io
@@ -63,7 +61,7 @@ def init(project):
     # bundling and parallelism must exist in the same test. The goal is to
     # construct a minimal covering set of all test cases.
     environments = {
-        'environment.UnknownEnvironment': [],
+        'environment.StandardEnvironment': [],
         'environments.xsede.CometEnvironment': [
             {
                 'partition': ['compute', 'shared', 'gpu'],
@@ -89,7 +87,7 @@ def init(project):
         ],
         'environments.xsede.BridgesEnvironment': [
             {
-                'partition': ['RM', 'RM-Shared', 'GPU'],
+                'partition': ['RM', 'RM-Shared', 'GPU', 'GPU-AI'],
                 'walltime': [None, 1],
             },
             {
@@ -98,26 +96,9 @@ def init(project):
                 'bundle': [['mpi_op', 'omp_op']],
             }
         ],
-        'environments.umich.FluxEnvironment': [
+        'environments.umich.GreatLakesEnvironment': [
             {
-                'walltime': [None, 1],
-            },
-            {
-                'parallel': [False, True],
-                'bundle': [['mpi_op', 'omp_op']],
-            }
-        ],
-        'environments.incite.TitanEnvironment': [
-            {
-                'walltime': [None, 1],
-            },
-            {
-                'parallel': [False, True],
-                'bundle': [['mpi_op', 'omp_op']],
-            }
-        ],
-        'environments.incite.EosEnvironment': [
-            {
+                'partition': ['standard', 'gpu'],
                 'walltime': [None, 1],
             },
             {

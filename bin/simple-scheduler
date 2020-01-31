@@ -45,7 +45,7 @@ def _get_args(script):
 
 
 def main_submit(args):
-    # Try to parse args, should raise error if anytyhing is wrong or missing
+    # Try to parse args, should raise error if anything is wrong or missing
     with open(args.filename) as script:
         _get_submit_parser().parse_args(list(_get_args(script)))
     dst = os.path.join(args.inbox, str(uuid.uuid4()) + '.sh')
@@ -142,7 +142,7 @@ def _process_queue(args, db):
         with open(fn_out, 'w') as outfile:
             with open(fn_err, 'w') as errfile:
                 check_call(cmd, shell=True, stdout=outfile, stderr=errfile)
-    except CalledProcessError as error:
+    except CalledProcessError:
         logger.warning("Error while executing job '{}'.".format(doc['_id']))
     finally:
         os.chdir(cwd)
@@ -223,11 +223,11 @@ if __name__ == '__main__':
 
     parser_run = subparsers.add_parser(
         'run',
-        description="Execute jobs subitted to the schduler.")
+        description="Execute jobs submitted to the scheduler.")
     parser.add_argument(
         '--polling-period',
         default=10,
-        help="Check the database for new entryies every given seconds.")
+        help="Check the database for new entries every given seconds.")
     parser_run.set_defaults(func=main_run)
 
     args = parser.parse_args()

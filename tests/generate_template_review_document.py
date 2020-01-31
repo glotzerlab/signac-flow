@@ -66,7 +66,12 @@ def main():
 
     if not os.path.exists(DOC_DIR):
         os.makedirs(DOC_DIR)
-    project = signac.get_project(ext.PROJECT_DIR)
+    try:
+        project = signac.get_project(ext.PROJECT_DIR)
+    except LookupError:
+        print('The templates project could not be found. Try running '
+              './extract_templates.py before this script.')
+        raise
 
     sort_keys = list(sorted(project.detect_schema()))
     sort_attrs = ['sp.' + '.'.join(key) for key in sort_keys]

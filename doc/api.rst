@@ -107,6 +107,8 @@ The FlowProject
 
 .. automethod:: flow.FlowProject.pre.true
 
+.. autoclass:: flow.IgnoreConditions
+
 
 @flow.cmd
 ---------

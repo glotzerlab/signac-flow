@@ -97,11 +97,13 @@ The available filters are:
 
 
 class IgnoreConditions(IntEnum):
-    """IntEnum class for IgnoreConditions settings when checking job eligibility, setting includes:
-    * IgnoreConditions.PRE: ignore pre conditions
-    * IgnoreConditions.POST: ignore post conditions
-    * IgnoreConditions.ALL: ignore all conditions
-    * IgnoreConditions.NONE: check all conditions
+    """Flags that determine which conditions are used to determine job eligibility.
+
+    The options include:
+        * IgnoreConditions.PRE: ignore pre conditions
+        * IgnoreConditions.POST: ignore post conditions
+        * IgnoreConditions.ALL: ignore all conditions
+        * IgnoreConditions.NONE: check all conditions
     """
     PRE = 1
     POST = 2
@@ -452,7 +454,7 @@ class FlowOperation(object):
             :class:`~signac.contrib.job.Job`
         :param ignore_conditions:
             Specify if pre and/or post conditions check is to be ignored for eligibility check.
-            The default is `IgnoreConditions.NONE`.
+            The default is :py:class:`IgnoreConditions.NONE`.
         :type ignore_conditions:
             :py:class:`~.IgnoreConditions`
         """
@@ -1638,7 +1640,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             int
         :param progress:
             Show a progress bar during execution.
-        :type progess:
+        :type progress:
             bool
         """
         if timeout is not None and timeout < 0:
@@ -1802,7 +1804,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             int
         :param progress:
             Show a progress bar during execution.
-        :type progess:
+        :type progress:
             bool
         :param order:
             Specify the order of operations, possible values are:
@@ -1815,21 +1817,19 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
             The default value is `none`, which is equivalent to `by-job` in the current
             implementation.
-        :param ignore_conditions:
-            Specify if pre and/or post conditions check is to be ignored for eligibility check.
-            The default is `IgnoreConditions.NONE`.
-        :type ignore_conditions:
-            :py:class:`~.IgnoreConditions`
 
             .. note::
-
                 Users are advised to not rely on a specific execution order, as a
                 substitute for defining the workflow in terms of pre- and post-conditions.
                 However, a specific execution order may be more performant in cases where
                 operations need to access and potentially lock shared resources.
-
         :type order:
             str, callable, or NoneType
+        :param ignore_conditions:
+            Specify if pre and/or post conditions check is to be ignored for eligibility check.
+            The default is :py:class:`IgnoreConditions.NONE`.
+        :type ignore_conditions:
+            :py:class:`~.IgnoreConditions`
         """
         # If no jobs argument is provided, we run operations for all jobs.
         if jobs is None:
@@ -2142,7 +2142,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Specify the walltime in hours or as instance of :py:class:`datetime.timedelta`.
         :param ignore_conditions:
             Specify if pre and/or post conditions check is to be ignored for eligibility check.
-            The default is `IgnoreConditions.NONE`.
+            The default is :py:class:`IgnoreConditions.NONE`.
         :type ignore_conditions:
             :py:class:`~.IgnoreConditions`
         """
@@ -2574,7 +2574,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             :class:`~signac.contrib.job.Job`
         :param ignore_conditions:
             Specify if pre and/or post conditions check is to be ignored for eligibility check.
-            The default is `IgnoreConditions.NONE`.
+            The default is :py:class:`IgnoreConditions.NONE`.
         :type ignore_conditions:
             :py:class:`~.IgnoreConditions`
         :yield:

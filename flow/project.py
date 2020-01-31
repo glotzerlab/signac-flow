@@ -2276,7 +2276,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _verify_group_compatibility(self, groups):
         """Verifies that all selected groups can be submitted together."""
-        return all(a.disjoint(b) for a, b in combinations(groups, 2))
+        return all(a.isdisjoint(b) for a, b in combinations(groups, 2))
 
     @contextlib.contextmanager
     def _potentially_buffered(self):

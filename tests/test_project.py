@@ -2,7 +2,6 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 import unittest
-import pytest
 import logging
 import uuid
 import os
@@ -162,7 +161,7 @@ class ProjectStatusPerformanceTest(BaseProjectTest):
             lambda: project._fetch_status(project, StringIO(),
                                           ignore_errors=False, no_parallelize=False), number=10)
 
-        assert time < 10
+        self.assertTrue(time < 10)
         MockScheduler.reset()
 
 
@@ -197,16 +196,16 @@ class ProjectClassTest(BaseProjectTest):
             b = B.get_project(root=self._tmp_dir.name)
             c = C.get_project(root=self._tmp_dir.name)
 
-        assert len(a.operations) == 2
-        assert len(c.operations) == 1
-        assert len(b.operations) == 3
+        self.assertEqual(len(a.operations), 2)
+        self.assertEqual(len(b.operations), 3)
+        self.assertEqual(len(c.operations), 1)
 
     def test_repeat_operation_definition(self):
 
         class A(FlowProject):
             pass
 
-        with  pytest.raises(ValueError):
+        with self.assertRaises(ValueError):
             @A.operation
             @A.operation
             def op1(job):
@@ -231,7 +230,7 @@ class ProjectClassTest(BaseProjectTest):
         with suspend_logging():
             A.get_project(root=self._tmp_dir.name)
 
-        with  pytest.raises(ValueError):
+        with self.assertRaises(ValueError):
             B.get_project(root=self._tmp_dir.name)
 
     def test_label_definition(self):
@@ -258,9 +257,9 @@ class ProjectClassTest(BaseProjectTest):
         b = B.get_project(root=self._tmp_dir.name)
         c = C.get_project(root=self._tmp_dir.name)
 
-        assert len(a._label_functions) == 1
-        assert len(b._label_functions) == 2
-        assert len(c._label_functions) == 1
+        self.assertEqual(len(a._label_functions), 1)
+        self.assertEqual(len(b._label_functions), 2)
+        self.assertEqual(len(c._label_functions), 1)
 
     def test_conditions_with_inheritance(self):
         """Tests the inheritance of pre/post conditions.
@@ -289,9 +288,9 @@ class ProjectClassTest(BaseProjectTest):
         def op1(job):
             pass
 
-        assert len(A._collect_pre_conditions()[op1]) == 1
-        assert len(B._collect_pre_conditions()[op1]) == 2
-        assert len(C._collect_pre_conditions()[op1]) == 3
+        self.assertEqual(len(A._collect_pre_conditions()[op1]), 1)
+        self.assertEqual(len(B._collect_pre_conditions()[op1]), 2)
+        self.assertEqual(len(C._collect_pre_conditions()[op1]), 3)
 
         @A.post.always
         @C.post.always
@@ -303,9 +302,9 @@ class ProjectClassTest(BaseProjectTest):
         def op2(job):
             pass
 
-        assert len(A._collect_post_conditions()[op2]) ==  1
-        assert len(B._collect_post_conditions()[op2]) ==  2
-        assert len(C._collect_post_conditions()[op2]) ==  3
+        self.assertEqual(len(A._collect_post_conditions()[op2]), 1)
+        self.assertEqual(len(B._collect_post_conditions()[op2]), 2)
+        self.assertEqual(len(C._collect_post_conditions()[op2]), 3)
 
     def test_with_job_decorator(self):
 
@@ -315,7 +314,7 @@ class ProjectClassTest(BaseProjectTest):
         @A.operation
         @with_job
         def test_context(job):
-            assert os.getcwd() == job.ws
+            self.assertEqual(os.getcwd(), job.ws)
 
         project = self.mock_project()
         with add_cwd_to_environment_pythonpath():
@@ -323,14 +322,14 @@ class ProjectClassTest(BaseProjectTest):
                 starting_dir = os.getcwd()
                 with redirect_stderr(StringIO()):
                     A().run()
-                assert (os.getcwd(), starting_dir)
+                self.assertTrue(os.getcwd(), starting_dir)
 
     def test_cmd_with_job_wrong_order(self):
 
         class A(FlowProject):
             pass
 
-        with  pytest.raises(RuntimeError):
+        with self.assertRaises(RuntimeError):
             @A.operation
             @cmd
             @with_job
@@ -354,9 +353,9 @@ class ProjectClassTest(BaseProjectTest):
                 starting_dir = os.getcwd()
                 with redirect_stderr(StringIO()):
                     A().run()
-                assert os.getcwd() == starting_dir
+                self.assertEqual(os.getcwd(), starting_dir)
                 for job in project:
-                    assert (os.path.isfile(job.fn("world.txt")))
+                    self.assertTrue(os.path.isfile(job.fn("world.txt")))
 
     def test_with_job_error_handling(self):
 
@@ -372,10 +371,10 @@ class ProjectClassTest(BaseProjectTest):
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
                 starting_dir = os.getcwd()
-                with  pytest.raises(Exception):
+                with self.assertRaises(Exception):
                     with redirect_stderr(StringIO()):
                         A().run()
-                assert os.getcwd() == starting_dir
+                self.assertEqual(os.getcwd(), starting_dir)
 
     def test_cmd_with_job_error_handling(self):
 
@@ -392,10 +391,10 @@ class ProjectClassTest(BaseProjectTest):
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
                 starting_dir = os.getcwd()
-                with  pytest.raises(subprocess.CalledProcessError):
+                with self.assertRaises(subprocess.CalledProcessError):
                     with redirect_stderr(StringIO()):
                         A().run()
-                assert os.getcwd() == starting_dir
+                self.assertEqual(os.getcwd(), starting_dir)
 
     def test_function_in_directives(self):
 
@@ -411,7 +410,7 @@ class ProjectClassTest(BaseProjectTest):
         for job in project:
             job.doc.np = 3
             next_op = project.next_operation(job)
-            assert 'mpirun -np 3 python' in next_op.cmd
+            self.assertIn('mpirun -np 3 python', next_op.cmd)
             break
 
     def test_callable_directives(self):
@@ -430,20 +429,20 @@ class ProjectClassTest(BaseProjectTest):
         # test setting neither nranks nor omp_num_threads
         for job in project:
             next_op = project.next_operation(job)
-            assert next_op.directives['np'] == 1
+            self.assertEqual(next_op.directives['np'], 1)
 
         # test only setting nranks
         for i, job in enumerate(project):
             job.doc.nranks = i+1
             next_op = project.next_operation(job)
-            assert next_op.directives['np'] == next_op.directives['nranks']
+            self.assertEqual(next_op.directives['np'], next_op.directives['nranks'])
             del job.doc['nranks']
 
         # test only setting omp_num_threads
         for i, job in enumerate(project):
             job.doc.omp_num_threads = i+1
             next_op = project.next_operation(job)
-            assert next_op.directives['np'] == next_op.directives['omp_num_threads']
+            self.assertEqual(next_op.directives['np'], next_op.directives['omp_num_threads'])
             del job.doc['omp_num_threads']
 
         # test setting both nranks and omp_num_threads
@@ -452,7 +451,7 @@ class ProjectClassTest(BaseProjectTest):
             job.doc.nranks = i % 3 + 1
             next_op = project.next_operation(job)
             expected_np = (i + 1) * (i % 3 + 1)
-            assert next_op.directives['np'] == expected_np
+            self.assertEqual(next_op.directives['np'], expected_np)
 
     def test_copy_conditions(self):
 
@@ -485,28 +484,28 @@ class ProjectClassTest(BaseProjectTest):
         op3_ = project.operations['op3']
         op4_ = project.operations['op4']
         for job in project:
-            assert not (op3_.eligible(job))
-            assert not (op4_.eligible(job))
+            self.assertFalse(op3_.eligible(job))
+            self.assertFalse(op4_.eligible(job))
 
         project.run(names=['op1'])
         for job in project:
-            assert (job.doc.a)
-            assert 'b' not in job.doc
-            assert 'c' not in job.doc
-            assert 'd' not in job.doc
-            assert not (op3_.eligible(job))
-            assert not (op4_.eligible(job))
+            self.assertTrue(job.doc.a)
+            self.assertNotIn('b', job.doc)
+            self.assertNotIn('c', job.doc)
+            self.assertNotIn('d', job.doc)
+            self.assertFalse(op3_.eligible(job))
+            self.assertFalse(op4_.eligible(job))
 
         project.run(names=['op2'])
         for job in project:
-            assert (op3_.eligible(job))
-            assert (op4_.eligible(job))
+            self.assertTrue(op3_.eligible(job))
+            self.assertTrue(op4_.eligible(job))
 
         project.run()
         for job in project:
-            assert (job.doc.a)
-            assert (job.doc.b)
-            assert (job.doc.c)
+            self.assertTrue(job.doc.a)
+            self.assertTrue(job.doc.b)
+            self.assertTrue(job.doc.c)
 
     def test_condition_using_functools(self):
         """Tests that error isn't raised when a tag cannot be autogenerated for a condition."""
@@ -526,42 +525,42 @@ class ProjectTest(BaseProjectTest):
     project_class = TestProject
 
     def test_instance(self):
-        assert (isinstance(self.project, FlowProject))
+        self.assertTrue(isinstance(self.project, FlowProject))
 
     @fail_if_not_removed
     def test_labels(self):
         project = self.mock_project()
         for job in project:
             labels = list(project.classify(job))
-            assert len(labels) == 2 - (job.sp.b % 2)
-            assert (all((isinstance(l, str)) for l in labels))
-            assert 'default_label' in labels
-            assert 'negative_default_label' not in labels
+            self.assertEqual(len(labels), 2 - (job.sp.b % 2))
+            self.assertTrue(all((isinstance(l, str)) for l in labels))
+            self.assertIn('default_label', labels)
+            self.assertNotIn('negative_default_label', labels)
 
     def test_next_operations(self):
         project = self.mock_project()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
         for job in project:
             for i, op in enumerate(project.next_operations(job)):
-                assert op.job == job
+                self.assertEqual(op.job, job)
                 if job in even_jobs:
-                    assert op.name == ['op1', 'op2'][i]
+                    self.assertEqual(op.name, ['op1', 'op2'][i])
                 else:
-                    assert op.name == 'op2'
-            assert i == int(job in even_jobs)
+                    self.assertEqual(op.name, 'op2')
+            self.assertEqual(i, int(job in even_jobs))
 
     def test_get_job_status(self):
         project = self.mock_project()
         for job in project:
             status = project.get_job_status(job)
-            assert status['job_id'] == job.id
-            assert len(status['operations']) == len(project.operations)
+            self.assertEqual(status['job_id'], job.get_id())
+            self.assertEqual(len(status['operations']), len(project.operations))
             for op in project.next_operations(job):
-                assert op.name in status['operations']
+                self.assertIn(op.name, status['operations'])
                 op_status = status['operations'][op.name]
-                assert op_status['eligible'] == project.operations[op.name].eligible(job)
-                assert op_status['completed'] == project.operations[op.name].complete(job)
-                assert op_status['scheduler_status'] == JobStatus.unknown
+                self.assertEqual(op_status['eligible'], project.operations[op.name].eligible(job))
+                self.assertEqual(op_status['completed'], project.operations[op.name].complete(job))
+                self.assertEqual(op_status['scheduler_status'], JobStatus.unknown)
 
     def test_project_status_homogeneous_schema(self):
         project = self.mock_project()
@@ -582,13 +581,13 @@ class ProjectTest(BaseProjectTest):
         for job in project:
             script = project.script(project.next_operations(job))
             if job.sp.b % 2 == 0:
-                assert str(job) in script
-                assert 'echo "hello"' in script
-                assert 'exec op2' in script
+                self.assertIn(str(job), script)
+                self.assertIn('echo "hello"', script)
+                self.assertIn('exec op2', script)
             else:
-                assert str(job) in script
-                assert 'echo "hello"' not in script
-                assert 'exec op2' in script
+                self.assertIn(str(job), script)
+                self.assertNotIn('echo "hello"', script)
+                self.assertIn('exec op2', script)
 
     def test_script_with_custom_script(self):
         project = self.mock_project()
@@ -601,21 +600,21 @@ class ProjectTest(BaseProjectTest):
             file.write("{% endblock %}\n")
         for job in project:
             script = project.script(project.next_operations(job))
-            assert "THIS IS A CUSTOM SCRIPT" in script
+            self.assertIn("THIS IS A CUSTOM SCRIPT", script)
             if job.sp.b % 2 == 0:
-                assert str(job) in script
-                assert 'echo "hello"' in script
-                assert 'exec op2' in script
+                self.assertIn(str(job), script)
+                self.assertIn('echo "hello"', script)
+                self.assertIn('exec op2', script)
             else:
-                assert str(job) in script
-                assert 'echo "hello"' not in script
-                assert 'exec op2' in script
+                self.assertIn(str(job), script)
+                self.assertNotIn('echo "hello"', script)
+                self.assertIn('exec op2', script)
 
     def test_init(self):
         with open(os.devnull, 'w') as out:
             for fn in init(root=self._tmp_dir.name, out=out):
                 fn_ = os.path.join(self._tmp_dir.name, fn)
-                assert (os.path.isfile(fn_))
+                self.assertTrue(os.path.isfile(fn_))
 
     def test_graph_detection_error_raising(self):
         """Test failure when condition does not have tag and success when manual tag set."""
@@ -631,7 +630,7 @@ class ProjectTest(BaseProjectTest):
         def op1(job):
             job.doc.a = True
 
-        with  pytest.raises(RuntimeError):
+        with self.assertRaises(RuntimeError):
             self.mock_project(project_class=A).detect_operation_graph()
 
         # Test explicitly setting tag works
@@ -661,16 +660,16 @@ class ExecutionProjectTest(BaseProjectTest):
         # to the length of its set if and only if the operations are grouped
         # by job already:
         jobs_order_none = [job._id for job, _ in groupby(ops, key=lambda op: op.job)]
-        assert len(jobs_order_none) == len(set(jobs_order_none))
+        self.assertEqual(len(jobs_order_none), len(set(jobs_order_none)))
 
     def test_run(self):
         with self.subTest(order='invalid-order'):
-            with  pytest.raises(ValueError):
+            with self.assertRaises(ValueError):
                 project = self.mock_project()
                 self.project.run(order='invalid-order')
 
         def sort_key(op):
-            return op.name, op.job.id
+            return op.name, op.job.get_id()
 
         for order in (None, 'none', 'cyclic', 'by-job', 'random', sort_key):
             for job in self.project.find_jobs():  # clear
@@ -687,9 +686,9 @@ class ExecutionProjectTest(BaseProjectTest):
                 even_jobs = [job for job in project if job.sp.b % 2 == 0]
                 for job in project:
                     if job in even_jobs:
-                        assert (job.isfile('world.txt'))
+                        self.assertTrue(job.isfile('world.txt'))
                     else:
-                        assert not (job.isfile('world.txt'))
+                        self.assertFalse(job.isfile('world.txt'))
 
     def test_run_with_selection(self):
         project = self.mock_project()
@@ -706,28 +705,28 @@ class ExecutionProjectTest(BaseProjectTest):
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
         for job in project:
             if job in even_jobs and job.sp.a == 0:
-                assert (job.isfile('world.txt'))
+                self.assertTrue(job.isfile('world.txt'))
             else:
-                assert not (job.isfile('world.txt'))
+                self.assertFalse(job.isfile('world.txt'))
 
     def test_run_with_operation_selection(self):
         project = self.mock_project()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
-                with  pytest.raises(ValueError):
+                with self.assertRaises(ValueError):
                     # The names argument must be a sequence of strings, not a string.
                     project.run(names='op1')
                 project.run(names=['non-existent-op'])
-                assert not (any(job.isfile('world.txt') for job in even_jobs))
-                assert not (any(job.doc.get('test') for job in project))
+                self.assertFalse(any(job.isfile('world.txt') for job in even_jobs))
+                self.assertFalse(any(job.doc.get('test') for job in project))
                 project.run(names=['op1', 'non-existent-op'])
-                assert (all(job.isfile('world.txt') for job in even_jobs))
-                assert not (any(job.doc.get('test') for job in project))
+                self.assertTrue(all(job.isfile('world.txt') for job in even_jobs))
+                self.assertFalse(any(job.doc.get('test') for job in project))
                 project.run(names=['op[^3]', 'non-existent-op'])
-                assert (all(job.isfile('world.txt') for job in even_jobs))
-                assert (all(job.doc.get('test') for job in project))
-                assert (all('dynamic' not in job.doc for job in project))
+                self.assertTrue(all(job.isfile('world.txt') for job in even_jobs))
+                self.assertTrue(all(job.doc.get('test') for job in project))
+                self.assertTrue(all('dynamic' not in job.doc for job in project))
 
     def test_run_parallel(self):
         project = self.mock_project()
@@ -741,9 +740,9 @@ class ExecutionProjectTest(BaseProjectTest):
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
         for job in project:
             if job in even_jobs:
-                assert (job.isfile('world.txt'))
+                self.assertTrue(job.isfile('world.txt'))
             else:
-                assert not (job.isfile('world.txt'))
+                self.assertFalse(job.isfile('world.txt'))
 
     def test_run_condition_inheritance(self):
 
@@ -823,9 +822,9 @@ class ExecutionProjectTest(BaseProjectTest):
 
         for job in project:
             if job.doc.get('fork'):
-                assert not os.getpid() == job.doc.test
+                self.assertNotEqual(os.getpid(), job.doc.test)
             else:
-                assert os.getpid() == job.doc.test
+                self.assertEqual(os.getpid(), job.doc.test)
 
     def test_submit_operations(self):
         MockScheduler.reset()
@@ -833,52 +832,52 @@ class ExecutionProjectTest(BaseProjectTest):
         operations = []
         for job in project:
             operations.extend(project.next_operations(job))
-        assert len(list(MockScheduler.jobs())) == 0
+        self.assertEqual(len(list(MockScheduler.jobs())), 0)
         cluster_job_id = project._store_bundled(operations)
         with redirect_stderr(StringIO()):
             project.submit_operations(_id=cluster_job_id, operations=operations)
-        assert len(list(MockScheduler.jobs())) == 1
+        self.assertEqual(len(list(MockScheduler.jobs())), 1)
 
     def test_submit(self):
         MockScheduler.reset()
         project = self.mock_project()
-        assert len(list(MockScheduler.jobs())) == 0
+        self.assertEqual(len(list(MockScheduler.jobs())), 0)
         with redirect_stderr(StringIO()):
             project.submit()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
         num_jobs_submitted = len(project) + len(even_jobs)
-        assert len(list(MockScheduler.jobs())) == num_jobs_submitted
+        self.assertEqual(len(list(MockScheduler.jobs())), num_jobs_submitted)
         MockScheduler.reset()
 
     def test_submit_bad_names_argument(self):
         MockScheduler.reset()
         project = self.mock_project()
-        assert len(list(MockScheduler.jobs())) == 0
-        with  pytest.raises(ValueError):
+        self.assertEqual(len(list(MockScheduler.jobs())), 0)
+        with self.assertRaises(ValueError):
             project.submit(names='foo')
         project.submit(names=['foo'])
 
     def test_submit_limited(self):
         MockScheduler.reset()
         project = self.mock_project()
-        assert len(list(MockScheduler.jobs())) == 0
+        self.assertEqual(len(list(MockScheduler.jobs())), 0)
         with redirect_stderr(StringIO()):
             project.submit(num=1)
-        assert len(list(MockScheduler.jobs())) == 1
+        self.assertEqual(len(list(MockScheduler.jobs())), 1)
         with redirect_stderr(StringIO()):
             project.submit(num=1)
-        assert len(list(MockScheduler.jobs())) == 2
+        self.assertEqual(len(list(MockScheduler.jobs())), 2)
 
     def test_resubmit(self):
         MockScheduler.reset()
         project = self.mock_project()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
         num_jobs_submitted = len(project) + len(even_jobs)
-        assert len(list(MockScheduler.jobs())) == 0
+        self.assertEqual(len(list(MockScheduler.jobs())), 0)
         with redirect_stderr(StringIO()):
             # Initial submission
             project.submit()
-            assert len(list(MockScheduler.jobs())) == num_jobs_submitted
+            self.assertEqual(len(list(MockScheduler.jobs())), num_jobs_submitted)
 
             # Resubmit a bunch of times:
             for i in range(1, self.expected_number_of_steps + 3):
@@ -888,21 +887,21 @@ class ExecutionProjectTest(BaseProjectTest):
                     break    # break when there are no jobs left
 
         # Check that the actually required number of steps is equal to the expected number:
-        assert i == self.expected_number_of_steps
+        self.assertEqual(i, self.expected_number_of_steps)
 
     def test_bundles(self):
         MockScheduler.reset()
         project = self.mock_project()
-        assert len(list(MockScheduler.jobs())) == 0
+        self.assertEqual(len(list(MockScheduler.jobs())), 0)
         with redirect_stderr(StringIO()):
             project.submit(bundle_size=2, num=2)
-            assert len(list(MockScheduler.jobs())) == 1
+            self.assertEqual(len(list(MockScheduler.jobs())), 1)
             project.submit(bundle_size=2, num=4)
-            assert len(list(MockScheduler.jobs())) == 3
+            self.assertEqual(len(list(MockScheduler.jobs())), 3)
             MockScheduler.reset()
             project._fetch_scheduler_status(file=StringIO())
             project.submit(bundle_size=0)
-            assert len(list(MockScheduler.jobs())) == 1
+            self.assertEqual(len(list(MockScheduler.jobs())), 1)
 
     @fail_if_not_removed
     def test_submit_status(self):
@@ -914,16 +913,16 @@ class ExecutionProjectTest(BaseProjectTest):
             if job not in even_jobs:
                 continue
             list(project.classify(job))
-            assert project.next_operation(job).name == 'op1'
-            assert project.next_operation(job).job == job
+            self.assertEqual(project.next_operation(job).name, 'op1')
+            self.assertEqual(project.next_operation(job).job, job)
         with redirect_stderr(StringIO()):
             project.submit()
-        assert len(list(MockScheduler.jobs())) == num_jobs_submitted
+        self.assertEqual(len(list(MockScheduler.jobs())), num_jobs_submitted)
 
         for job in project:
             next_op = project.next_operation(job)
-            assert not next_op == None
-            assert next_op.get_status() == JobStatus.submitted
+            self.assertIsNotNone(next_op)
+            self.assertEqual(next_op.get_status(), JobStatus.submitted)
 
         MockScheduler.step()
         MockScheduler.step()
@@ -931,16 +930,16 @@ class ExecutionProjectTest(BaseProjectTest):
 
         for job in project:
             next_op = project.next_operation(job)
-            assert not next_op==True
-            assert next_op.get_status() == JobStatus.queued
+            self.assertIsNotNone(next_op)
+            self.assertEqual(next_op.get_status(), JobStatus.queued)
 
         MockScheduler.step()
         project._fetch_scheduler_status(file=StringIO())
         for job in project:
             job_status = project.get_job_status(job)
             for op in ('op1', 'op2'):
-                assert (
-                    job_status['operations'][op]['scheduler_status'] in
+                self.assertIn(
+                    job_status['operations'][op]['scheduler_status'],
                     (JobStatus.unknown, JobStatus.inactive))
 
     def test_submit_operations_bad_directive(self):
@@ -949,13 +948,15 @@ class ExecutionProjectTest(BaseProjectTest):
         operations = []
         for job in project:
             operations.extend(project.next_operations(job))
-        assert len(list(MockScheduler.jobs())) == 0
+        self.assertEqual(len(list(MockScheduler.jobs())), 0)
         cluster_job_id = project._store_bundled(operations)
         stderr = StringIO()
         with redirect_stderr(stderr):
             project.submit_operations(_id=cluster_job_id, operations=operations)
-        assert len(list(MockScheduler.jobs())) == 1
-        assert 'Some of the keys provided as part of the directives were not used by the template script, including: bad_directive\n' in stderr.getvalue()
+        self.assertEqual(len(list(MockScheduler.jobs())), 1)
+        self.assertIn('Some of the keys provided as part of the directives were not '
+                      'used by the template script, including: bad_directive\n',
+                      stderr.getvalue())
 
     @fail_if_not_removed
     def test_condition_evaluation(self):
@@ -983,7 +984,7 @@ class ExecutionProjectTest(BaseProjectTest):
             pass
 
         project = Project(project.config)
-        assert (len(project))
+        self.assertTrue(len(project))
         with redirect_stderr(StringIO()):
             for state, expected_evaluation in [
                     (0b0000, 0b1000),  # First pre-condition is not met
@@ -1006,7 +1007,7 @@ class ExecutionProjectTest(BaseProjectTest):
             ]:
                 evaluated = 0
                 project.run()
-                assert evaluated == expected_evaluation
+                self.assertEqual(evaluated, expected_evaluation)
 
 
 class BufferedExecutionProjectTest(ExecutionProjectTest):
@@ -1051,8 +1052,8 @@ class ProjectMainInterfaceTest(BaseProjectTest):
                 with switch_to_directory(self.project.root_directory()):
                     return subprocess.check_output(_cmd.split(), stderr=subprocess.DEVNULL)
         except subprocess.CalledProcessError as error:
-            # print(error, sys.stderr)
-            # print(error.output, sys.stderr)
+            print(error, file=sys.stderr)
+            print(error.output, file=sys.stderr)
             raise
 
     def test_main_help(self):
@@ -1060,55 +1061,55 @@ class ProjectMainInterfaceTest(BaseProjectTest):
         self.call_subcmd('--help')
 
     def test_main_exec(self):
-        assert (len(self.project))
+        self.assertTrue(len(self.project))
         for job in self.project:
-            assert not (job.doc.get('test', False))
+            self.assertFalse(job.doc.get('test', False))
         self.call_subcmd('exec op2')
         for job in self.project:
-            assert (job.doc.get('test', False))
+            self.assertTrue(job.doc.get('test', False))
 
     def test_main_run(self):
-        assert (len(self.project))
+        self.assertTrue(len(self.project))
         for job in self.project:
-            assert not job.isfile('world.txt')
+            self.assertFalse(job.isfile('world.txt'))
         self.call_subcmd('run -o op1')
         even_jobs = [job for job in self.project if job.sp.b % 2 == 0]
         for job in self.project:
             if job in even_jobs:
-                assert job.isfile('world.txt')
+                self.assertTrue(job.isfile('world.txt'))
             else:
-                assert not job.isfile('world.txt')
+                self.assertFalse(job.isfile('world.txt'))
 
     def test_main_next(self):
-        assert len(self.project)
+        self.assertTrue(len(self.project))
         jobids = set(self.call_subcmd('next op1').decode().split())
-        even_jobs = [job.id for job in self.project if job.sp.b % 2 == 0]
-        assert jobids == set(even_jobs)
+        even_jobs = [job.get_id() for job in self.project if job.sp.b % 2 == 0]
+        self.assertEqual(jobids, set(even_jobs))
 
     def test_main_status(self):
-        assert len(self.project)
+        self.assertTrue(len(self.project))
         status_output = self.call_subcmd('--debug status --detailed').decode('utf-8').splitlines()
         lines = iter(status_output)
         for line in lines:
             for job in self.project:
-                if job.id in line:
+                if job.get_id() in line:
                     for op in self.project.next_operations(job):
-                        assert op.name in line
+                        self.assertIn(op.name, line)
                         try:
                             line = next(lines)
                         except StopIteration:
                             continue
 
     def test_main_script(self):
-        assert len(self.project)
+        self.assertTrue(len(self.project))
         even_jobs = [job for job in self.project if job.sp.b % 2 == 0]
         for job in self.project:
             script_output = self.call_subcmd('script -j {}'.format(job)).decode().splitlines()
-            assert job.id in '\n'.join(script_output)
+            self.assertIn(job.get_id(), '\n'.join(script_output))
             if job in even_jobs:
-                assert 'echo "hello"' in '\n'.join(script_output)
+                self.assertIn('echo "hello"', '\n'.join(script_output))
             else:
-                assert 'echo "hello"' not in '\n'.join(script_output)
+                self.assertNotIn('echo "hello"', '\n'.join(script_output))
 
 
 class DynamicProjectMainInterfaceTest(ProjectMainInterfaceTest):
@@ -1131,8 +1132,8 @@ class ProjectDagDetectionTest(BaseProjectTest):
                        [0, 0, 0, 0, 0, 0, 0],
                        [0, 0, 0, 0, 0, 0, 0]]
 
-        assert adj == adj_correct
+        self.assertEqual(adj, adj_correct)
 
 
 if __name__ == '__main__':
-    pytest.main()
+    unittest.main()

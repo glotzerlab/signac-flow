@@ -641,15 +641,20 @@ class FlowGroup(object):
                    directives=self.directives,
                    options=self.options)
 
-    def eligible(self, job):
+    def eligible(self, job, ignore_conditions=IgnoreConditions.NONE):
         """Eligible, when at least one BaseFlowOperation is eligible.
 
         :param job:
             A signac.Job from the signac workspace.
         :type job:
             signac.Job
+        :param ignore_conditions:
+            Specify if pre and/or post conditions check is to be ignored for eligibility check.
+            The default is :py:class:`IgnoreConditions.NONE`.
+        :type ignore_conditions:
+            :py:class:`~.IgnoreConditions`
         """
-        return any(op.eligible(job) for op in self)
+        return any(op.eligible(job, ignore_conditions) for op in self)
 
     def complete(self, job):
         """True when all BaseFlowOperation post-conditions are met
@@ -2261,11 +2266,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                              " -o/--operation option.")
         return operations
 
-    def _get_submission_operations(self, jobs, names=None, mode='run'):
+    def _get_submission_operations(self, jobs, names=None, mode='run',
+                                   ignore_conditions=IgnoreConditions.NONE):
         """Grabs JobOperations that are eligible to run from FlowGroups."""
         for job in jobs:
             for group in self._gather_flow_groups(names):
-                if group.eligible(job) and self._eligible_for_submission(group,
+                if group.eligible(job, ignore_conditions) and self._eligible_for_submission(group,
                                                                          job):
                     yield group.create_job_operation(entrypoint=self._entrypoint, job=job,
                                                      mode=mode, index=0)
@@ -2443,7 +2449,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 return env.submit(_id=_id, script=script, flags=flags, **kwargs)
 
     def submit(self, bundle_size=1, jobs=None, names=None, num=None, parallel=False,
-               force=False, walltime=None, env=None, mode='run', ignore_conditions, **kwargs):
+               force=False, walltime=None, env=None, mode='run',
+               ignore_conditions=IgnoreConditions.NONE, **kwargs):
         """Submit function for the project's main submit interface.
 
         :param bundle_size:

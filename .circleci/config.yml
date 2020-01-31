@@ -39,7 +39,7 @@ jobs:
           command: |
             python -m flake8 --show-source flow/
 
-  test-3.8: &test-template
+  test-3.8: & test-template
     environment:
       SIGNAC_VERSION: master
     docker:
@@ -64,7 +64,7 @@ jobs:
           name: run tests
           command: |
             . venv/bin/activate
-            coverage run --source=flow/ -m unittest discover tests/
+            coverage run --source=flow/ -m pytest tests/
             coverage report -i --include="flow*"
 
       - store_artifacts:

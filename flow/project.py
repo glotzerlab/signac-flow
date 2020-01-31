@@ -2272,7 +2272,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for job in jobs:
             for group in self._gather_flow_groups(names):
                 if group.eligible(job, ignore_conditions) and self._eligible_for_submission(group,
-                                                                         job):
+                                                                                            job):
                     yield group.create_job_operation(entrypoint=self._entrypoint, job=job,
                                                      mode=mode, index=0)
 
@@ -3276,7 +3276,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 names = args.operation_name if args.operation_name else None
                 try:
                     operations = self._get_submission_operations(jobs, names, mode,
-                                                                 ignore_conditions)
+                                                                 args.ignore_conditions)
                 except FlowGroup.ExecCommandError:
                     raise ScriptError(
                         "A FlowGroup with more than one operation cannot be added "
@@ -3306,7 +3306,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             names = args.operation_name if args.operation_name else None
             try:
                 operations = self._get_submission_operations(jobs, names, mode,
-                                                             ignore_conditions)
+                                                             args.ignore_conditions)
             except FlowGroup.ExecCommandError:
                 raise SubmitError(
                     "A FlowGroup with more than operation cannot be "

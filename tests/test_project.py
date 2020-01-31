@@ -1,7 +1,7 @@
 # Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-import unittest
+import pytest
 import logging
 import uuid
 import os
@@ -31,8 +31,7 @@ from deprecation import fail_if_not_removed
 
 from define_test_project import TestProject
 from define_test_project import TestDynamicProject
-from define_dag_test_project import DagTestProject
-import pytest
+from define_dag_test_project import TestDagProject
 
 
 @contextmanager
@@ -108,12 +107,13 @@ class MockEnvironment(ComputeEnvironment):
         return True
 
 
-class BaseProjectTest(unittest.TestCase):
-    project_class = signac.Project
+class TestBaseProject():
+    self.project_class = signac.Project
 
-    def setUp(self):
+    @pytest.fixture(autouse=True)
+    def setUp(self,request):
         self._tmp_dir = TemporaryDirectory(prefix='signac-flow_')
-        self.addCleanup(self._tmp_dir.cleanup)
+        request.addfinalizer(self._tmp_dir.cleanup)
         self.project = self.project_class.init_project(
             name='FlowTestProject',
             root=self._tmp_dir.name)
@@ -132,7 +132,7 @@ class BaseProjectTest(unittest.TestCase):
         return project
 
 
-class ProjectStatusPerformanceTest(BaseProjectTest):
+class TestProjectStatusPerformance(TestBaseProject):
 
     class Project(FlowProject):
         pass
@@ -166,7 +166,7 @@ class ProjectStatusPerformanceTest(BaseProjectTest):
         MockScheduler.reset()
 
 
-class ProjectClassTest(BaseProjectTest):
+class TestProjectClass(TestBaseProject):
 
     def test_operation_definition(self):
 
@@ -268,7 +268,7 @@ class ProjectClassTest(BaseProjectTest):
         Class A should only have one pre/post condition, while class C that
         inherits from A should have three, and class B should just have two
         explicitly defined. Proper execution is tested in the
-        ExecutionProjectTest.
+        TestExecutionProject.
         """
         class A(FlowProject):
             pass
@@ -522,7 +522,7 @@ class ProjectClassTest(BaseProjectTest):
             job.doc.a = True
 
 
-class ProjectTest(BaseProjectTest):
+class TestProject(TestBaseProject):
     project_class = TestProject
 
     def test_instance(self):
@@ -646,7 +646,7 @@ class ProjectTest(BaseProjectTest):
         self.mock_project(project_class=B).detect_operation_graph()
 
 
-class ExecutionProjectTest(BaseProjectTest):
+class TestExecutionProject(TestBaseProject):
     project_class = TestProject
     expected_number_of_steps = 4
 
@@ -1010,37 +1010,39 @@ class ExecutionProjectTest(BaseProjectTest):
                 assert evaluated == expected_evaluation
 
 
-class BufferedExecutionProjectTest(ExecutionProjectTest):
+class TestBufferedExecutionProject(TestExecutionProject):
 
     def mock_project(self, project_class=None):
-        project = super(BufferedExecutionProjectTest,
+        project = super(TestBufferedExecutionProject,
                         self).mock_project(project_class=project_class)
         project._use_buffered_mode = True
         return project
 
 
-class ExecutionDynamicProjectTest(ExecutionProjectTest):
+class TestExecutionDynamicProject(TestExecutionProject):
     project_class = TestDynamicProject
     expected_number_of_steps = 10
 
 
-class BufferedExecutionDynamicProjectTest(BufferedExecutionProjectTest,
-                                          ExecutionDynamicProjectTest):
+class TestBufferedExecutionDynamicProject(TestBufferedExecutionProject,
+                                          TestExecutionDynamicProject):
     pass
 
 
-class ProjectMainInterfaceTest(BaseProjectTest):
+class TestProjectMainInterface(TestBaseProject):
     project_class = TestProject
 
     def switch_to_cwd(self):
         os.chdir(self.cwd)
 
-    def setUp(self):
-        super(ProjectMainInterfaceTest, self).setUp()
+    @pytest.fixture(autouse=True)
+    def setUp(self,request):
+        super(TestProjectMainInterface, self).setUp()
         self.project = self.mock_project()
         self.cwd = os.getcwd()
-        self.addCleanup(self.switch_to_cwd)
+        request.addfinalizer(self.switch_to_cwd)
         os.chdir(self._tmp_dir.name)
+        request.addfinalizer(self.return_to_cwd)
 
     def call_subcmd(self, subcmd):
         # Determine path to project module and construct command.
@@ -1112,13 +1114,13 @@ class ProjectMainInterfaceTest(BaseProjectTest):
                 assert 'echo "hello"' not in '\n'.join(script_output)
 
 
-class DynamicProjectMainInterfaceTest(ProjectMainInterfaceTest):
+class TestDynamicProjectMainInterface(TestProjectMainInterface):
     project_class = TestDynamicProject
 
 
-class ProjectDagDetectionTest(BaseProjectTest):
+class TestProjectDagDetection(TestBaseProject):
     """Tests of operation DAG detection."""
-    project_class = DagTestProject
+    project_class = TestDagProject
 
     def test_dag(self):
         project = self.mock_project()
@@ -1134,6 +1136,3 @@ class ProjectDagDetectionTest(BaseProjectTest):
 
         assert adj == adj_correct
 
-
-if __name__ == '__main__':
-    unittest.main()

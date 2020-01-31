@@ -1,17 +1,16 @@
 # Copyright (c) 2017 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-import unittest
+import pytest
 
 from flow import get_environment
 from flow.environment import ComputeEnvironment
 from flow.environment import TestEnvironment
 from flow.errors import ConfigKeyError
 from test_project import StringIO, redirect_stdout
-import pytest
 
 
-class ProjectTest(unittest.TestCase):
+class TestProject():
 
     def test_get_TestEnvironment(self):
         env = get_environment()
@@ -34,5 +33,3 @@ class ProjectTest(unittest.TestCase):
         assert a == 42
 
 
-if __name__ == '__main__':
-    unittest.main()

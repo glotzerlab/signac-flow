@@ -1,7 +1,7 @@
 from flow import FlowProject
 
 
-class DagTestProject(FlowProject):
+class TestDagProject(FlowProject):
     pass
 
 
@@ -9,38 +9,38 @@ def first_complete(job):
     return job.doc.get('first') is not None
 
 
-@DagTestProject.operation
-@DagTestProject.post(first_complete)
+@TestDagProject.operation
+@TestDagProject.post(first_complete)
 def first(job):
     job.doc.first = True
 
 
-@DagTestProject.operation
-@DagTestProject.pre(first_complete)
-@DagTestProject.post.true('second')
-@DagTestProject.post.false('other_condition')
+@TestDagProject.operation
+@TestDagProject.pre(first_complete)
+@TestDagProject.post.true('second')
+@TestDagProject.post.false('other_condition')
 def second(job):
     job.doc.second = True
 
 
-@DagTestProject.operation
-@DagTestProject.pre.after(first)
-@DagTestProject.post.true('third')
+@TestDagProject.operation
+@TestDagProject.pre.after(first)
+@TestDagProject.post.true('third')
 def third(job):
     job.doc.third = True
 
 
-@DagTestProject.operation
-@DagTestProject.pre.true('second')
-@DagTestProject.pre.after(third)
-@DagTestProject.post.true('fourth')
+@TestDagProject.operation
+@TestDagProject.pre.true('second')
+@TestDagProject.pre.after(third)
+@TestDagProject.post.true('fourth')
 def fourth(job):
     job.doc.fourth = True
 
 
-@DagTestProject.operation
-@DagTestProject.pre.copy_from(third)
-@DagTestProject.post.isfile('fifth.txt')
+@TestDagProject.operation
+@TestDagProject.pre.copy_from(third)
+@TestDagProject.post.isfile('fifth.txt')
 def fifth(job):
     import os
 
@@ -51,21 +51,21 @@ def fifth(job):
         touch('fifth.txt')
 
 
-@DagTestProject.operation
-@DagTestProject.pre.after(third)
-@DagTestProject.pre.isfile('fifth.txt')
-@DagTestProject.post.true('sixth')
+@TestDagProject.operation
+@TestDagProject.pre.after(third)
+@TestDagProject.pre.isfile('fifth.txt')
+@TestDagProject.post.true('sixth')
 def sixth(job):
     job.doc.sixth = True
 
 
-@DagTestProject.operation
-@DagTestProject.pre.after(third)
-@DagTestProject.pre.after(fourth)
-@DagTestProject.post.true('seventh')
+@TestDagProject.operation
+@TestDagProject.pre.after(third)
+@TestDagProject.pre.after(fourth)
+@TestDagProject.post.true('seventh')
 def seventh(job):
     job.doc.seventh = True
 
 
 if __name__ == '__main__':
-    DagTestProject().main()
+    TestDagProject().main()

@@ -554,7 +554,7 @@ class TestProject(TestBaseProject):
         project = self.mock_project()
         for job in project:
             status = project.get_job_status(job)
-            assert status['job_id'] == job.get_id()
+            assert status['job_id'] == job.id
             assert len(status['operations']) == len(project.operations)
             for op in project.next_operations(job):
                 assert op.name in status['operations']
@@ -663,19 +663,20 @@ class TestExecutionProject(TestBaseProject):
         jobs_order_none = [job._id for job, _ in groupby(ops, key=lambda op: op.job)]
         assert len(jobs_order_none) == len(set(jobs_order_none))
 
-    def test_run(self):
-        with self.subTest(order='invalid-order'):
+    # @pytest.mark.parameters
+    def test_run(self,subtests):
+        with subtests.test(order='invalid-order'):
             with pytest.raises(ValueError):
                 project = self.mock_project()
                 self.project.run(order='invalid-order')
 
         def sort_key(op):
-            return op.name, op.job.get_id()
+            return op.name, op.job.id
 
         for order in (None, 'none', 'cyclic', 'by-job', 'random', sort_key):
             for job in self.project.find_jobs():  # clear
                 job.remove()
-            with self.subTest(order=order):
+            with subtests.test(order=order):
                 project = self.mock_project()
                 output = StringIO()
                 with add_cwd_to_environment_pythonpath():
@@ -1036,7 +1037,7 @@ class TestProjectMainInterface(TestBaseProject):
         os.chdir(self.cwd)
 
     @pytest.fixture(autouse=True)
-    def setUp(self,request):
+    def setup_main_interface(self,request,setUp):
         super(TestProjectMainInterface, self).setUp()
         self.project = self.mock_project()
         self.cwd = os.getcwd()
@@ -1085,7 +1086,7 @@ class TestProjectMainInterface(TestBaseProject):
     def test_main_next(self):
         assert len(self.project)
         jobids = set(self.call_subcmd('next op1').decode().split())
-        even_jobs = [job.get_id() for job in self.project if job.sp.b % 2 == 0]
+        even_jobs = [job.id for job in self.project if job.sp.b % 2 == 0]
         assert jobids == set(even_jobs)
 
     def test_main_status(self):
@@ -1094,7 +1095,7 @@ class TestProjectMainInterface(TestBaseProject):
         lines = iter(status_output)
         for line in lines:
             for job in self.project:
-                if job.get_id() in line:
+                if job.id in line:
                     for op in self.project.next_operations(job):
                         assert op.name in line
                         try:
@@ -1107,7 +1108,7 @@ class TestProjectMainInterface(TestBaseProject):
         even_jobs = [job for job in self.project if job.sp.b % 2 == 0]
         for job in self.project:
             script_output = self.call_subcmd('script -j {}'.format(job)).decode().splitlines()
-            assert job.get_id() in '\n'.join(script_output)
+            assert job.id in '\n'.join(script_output)
             if job in even_jobs:
                 assert 'echo "hello"' in '\n'.join(script_output)
             else:

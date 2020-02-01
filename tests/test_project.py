@@ -1038,12 +1038,11 @@ class TestProjectMainInterface(TestBaseProject):
 
     @pytest.fixture(autouse=True)
     def setup_main_interface(self,request,setUp):
-        super(TestProjectMainInterface, self).setUp()
+        # super(TestProjectMainInterface, self).setUp()
         self.project = self.mock_project()
         self.cwd = os.getcwd()
-        request.addfinalizer(self.switch_to_cwd)
         os.chdir(self._tmp_dir.name)
-        request.addfinalizer(self.return_to_cwd)
+        request.addfinalizer(self.switch_to_cwd)
 
     def call_subcmd(self, subcmd):
         # Determine path to project module and construct command.

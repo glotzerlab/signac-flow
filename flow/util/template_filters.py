@@ -82,8 +82,10 @@ def calc_tasks(operations, name, parallel=False, allow_mixed=False):
     else:
         raise RuntimeError(
             "Mixed processing units requested warning:\n"
-            "The number of required processing units ({}) differs between different operations."
-            "Use --force to ignore the warning.".format(name))
+            "The number of required processing units ({}) differs between different operations.\n"
+            "Use --force to ignore the warning, but users are encouraged to use --pretend to "
+            "confirm that the submission script allocates processing units for different "
+            "operations properly before force submission".format(name))
 
 
 def check_utilization(nn, np, ppn, threshold=0.9, name=None):
@@ -128,9 +130,10 @@ def check_utilization(nn, np, ppn, threshold=0.9, name=None):
             "Low{name} utilization warning: {util:.0%}\n"
             "Total resources requested would require {nn} node(s), "
             "but each node supports up to {ppn}{name} task(s).\n"
-            "Requesting {np} total{name} task(s) would result "
-            "in node underutilization."
-            "Use --force to ignore the warning.".format(
+            "Requesting {np} total{name} task(s) would result in node underutilization. "
+            "Use --force to ignore the warning, but users are encouraged to use --pretend to "
+            "confirm that the submission script fully utilizes the compute resources before "
+            "force submission" .format(
                 util=utilization, np=np, nn=nn, ppn=ppn,
                 name=' {}'.format(name) if name else ''))
 

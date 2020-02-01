@@ -528,17 +528,6 @@ class FlowGroup(object):
         group.
     :type operations:
         :class:`dict` keys of :class:`str` and values of :class:`FlowOperation`
-    :param run_cmd:
-        The command to execute group using flow's `run` function; should be a
-        function of a FlowGroup, entrypoint, and optionally a job.
-    :type run_cmd:
-        callable
-    :param exec_cmd:
-        The command to execute a group using flow's `exec` function;
-        should be a function of a FlowGroup, entrypoint, and a job. Limited to
-        singleton groups.
-    :type exec_cmd:
-        callable
     :param directives:
         A dictionary of additional parameters that provide instructions on how
         to execute this operation, e.g., specifically required resources.
@@ -556,14 +545,11 @@ class FlowGroup(object):
     class ExecCommandError(RuntimeError):
         pass
 
-    def __init__(self, name, operations=None, run_cmd=None, exec_cmd=None,
-                 directives=None, options=None):
+    def __init__(self, name, operations=None, directives=None, options=None):
         self.name = name
         self.options = "" if options is None else options
         self.operations = dict() if operations is None else operations
         self.directives = dict() if directives is None else directives
-        self._run_cmd = self._default_run_cmd if run_cmd is None else run_cmd
-        self._exec_cmd = self._default_exec_cmd if exec_cmd is None else exec_cmd
 
     def _set_entrypoint_item(self, entrypoint, job, key, default):
         """Set a value (executable, path) for entrypoint in command.
@@ -589,12 +575,12 @@ class FlowGroup(object):
         else:
             return "{} {}".format(entrypoint['executable'], entrypoint['path']).lstrip()
 
-    def _default_run_cmd(self, entrypoint, job=None):
+    def _run_cmd(self, entrypoint, job=None):
         cmd = "{} run -o {}".format(entrypoint, self.name)
         cmd = cmd if job is None else cmd + ' -j {}'.format(job)
         return cmd.lstrip()
 
-    def _default_exec_cmd(self, entrypoint, job):
+    def _exec_cmd(self, entrypoint, job):
         if len(self.operations) > 1:
             # Cannot use exec mode with more than one operation.
             raise self.ExecCommandError
@@ -2990,9 +2976,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Append the name and function to the class registry
         cls._OPERATION_FUNCTIONS.append((name, func))
-        cls._GROUPS.append({'name': name, 'run_cmd': None,
-                            'exec_cmd': None, 'directives': None,
-                            'options': None})
+        cls._GROUPS.append({'name': name, 'directives': None, 'options': None})
         if hasattr(func, '_flow_group'):
             func._flow_group.append(name)
         else:
@@ -3050,7 +3034,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 self._operation_functions[name] = func
 
     @classmethod
-    def make_group(cls, name, run_cmd=None, exec_cmd=None, directives=None, options=None):
+    def make_group(cls, name, directives=None, options=None):
         """Make a FlowGroup named ``name``. And return a decorator to make groups.
 
         .. code-block:: python
@@ -3068,16 +3052,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             The name of the FlowGroup.
         :type name:
             str
-        :param run_cmd:
-            The command to run when run mode is chosen for submission. The
-            function should be a function of a job and operations.
-        :type run_cmd:
-            function or formatted string
-        :param exec_cmd:
-            The command to run when exec mode is chosen for submission. The
-            function should be a function of a job and operations.
-        :type exec_cmd:
-            function or formatted string
         :param directives:
             Execution options like MPI and resource requests like number of
             GPUs.
@@ -3094,9 +3068,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         else:
             cls._GROUP_NAMES.add(name)
 
-        cls._GROUPS.append({'name': name, 'run_cmd': run_cmd,
-                            'exec_cmd': exec_cmd, 'directives': directives,
-                            'options': options})
+        cls._GROUPS.append({'name': name, 'directives': directives, 'options': options})
 
         # Create decorator that adds a _flow_group label to operations.
         def add_to_group(func):

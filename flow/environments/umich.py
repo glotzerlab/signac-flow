@@ -21,7 +21,7 @@ class GreatLakesEnvironment(DefaultSlurmEnvironment):
             '--partition',
             choices=('standard', 'gpu', 'largemem'),
             default='standard',
-            help="Specify whether to submit to the CPU or the GPU queue. "
+            help="Specify the partition to submit to. "
                  "(default=standard)")
         parser.add_argument(
             '--memory',

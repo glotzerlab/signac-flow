@@ -42,8 +42,6 @@ from signac.contrib.hashing import calc_id
 from signac.contrib.filterparse import parse_filter_arg
 from signac.contrib.project import JobsCursor
 
-from enum import IntEnum
-
 from .environment import get_environment
 from .scheduling.base import ClusterJob
 from .scheduling.base import JobStatus
@@ -94,29 +92,6 @@ For example: {{{{ project.get_id() | capitalize }}}}.
 
 The available filters are:
 {filters}"""
-
-
-class IgnoreConditions(IntEnum):
-    """IntEnum class for IgnoreConditions settings when checking job eligibility, setting includes:
-    * IgnoreConditions.PRE: ignore pre conditions
-    * IgnoreConditions.POST: ignore post conditions
-    * IgnoreConditions.ALL: ignore all conditions
-    * IgnoreConditions.NONE: check all conditions
-    """
-    PRE = 1
-    POST = 2
-    ALL = PRE | POST
-    NONE = ~ ALL
-
-
-class _IgnoreConditionsConversion(argparse.Action):
-    def __init__(self, option_strings, dest, nargs=None, **kwargs):
-        if nargs is not None:
-            raise ValueError("nargs not allowed")
-        super(_IgnoreConditionsConversion, self).__init__(option_strings, dest, **kwargs)
-
-    def __call__(self, parser, namespace, values, option_string=None):
-        setattr(namespace, self.dest, getattr(IgnoreConditions, values.upper()))
 
 
 class _condition(object):
@@ -420,7 +395,7 @@ class FlowOperation(object):
         sequence of callables
     :param post:
         post-conditions to determine completion
-    :type post:
+    :type pre:
         sequence of callables
     :param directives:
         A dictionary of additional parameters that provide instructions on how
@@ -443,29 +418,11 @@ class FlowOperation(object):
     def __str__(self):
         return "{type}(cmd='{cmd}')".format(type=type(self).__name__, cmd=self._cmd)
 
-    def eligible(self, job, ignore_conditions=IgnoreConditions.NONE):
-        """Eligible, when all pre-conditions are true and at least one post-condition is false,
-        or corresponding conditions are ignored.
-        :param job:
-            The signac job handles.
-        :type job:
-            :class:`~signac.contrib.job.Job`
-        :param ignore_conditions:
-            Specify if pre and/or post conditions check is to be ignored for eligibility check.
-            The default is `IgnoreConditions.NONE`.
-        :type ignore_conditions:
-            :py:class:`~.IgnoreConditions`
-        """
-        if type(ignore_conditions) != IgnoreConditions:
-            raise ValueError(
-                "The ignore_conditions argument of FlowProject.run() "
-                "must be a member of class IgnoreConditions")
-        # len(self._prereqs) check for speed optimization
-        pre = (not len(self._prereqs)) or (ignore_conditions & IgnoreConditions.PRE) \
-            or all(cond(job) for cond in self._prereqs)
+    def eligible(self, job):
+        "Eligible, when all pre-conditions are true and at least one post-condition is false."
+        pre = all(cond(job) for cond in self._prereqs)
         if pre and len(self._postconds):
-            post = (ignore_conditions & IgnoreConditions.POST) \
-                or any(not cond(job) for cond in self._postconds)
+            post = any(not cond(job) for cond in self._postconds)
         else:
             post = True
         return pre and post
@@ -712,7 +669,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             template_environment.filters['max'] = max
         if 'min' not in template_environment.filters:    # for jinja2 < 2.10
             template_environment.filters['min'] = min
-
         return template_environment
 
     def _template_environment(self, environment=None):
@@ -720,12 +676,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             environment = self._environment
         if environment not in self._template_environment_:
             template_environment = self._setup_template_environment()
-
             # Add environment-specific custom filters:
-            for name, member in inspect.getmembers(environment):
-                if getattr(member, '_flow_template_filter', False):
-                    template_environment.filters[name] = member
-
+            for filter_name, filter_function in getattr(environment, 'filters', {}).items():
+                template_environment.filters[filter_name] = filter_function
             self._template_environment_[environment] = template_environment
         return self._template_environment_[environment]
 
@@ -1012,7 +965,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _get_operations_status(self, job, cached_status):
         "Return a dict with information about job-operations for this job."
-        for job_op in self._job_operations(job, ignore_conditions=IgnoreConditions.ALL):
+        for job_op in self._job_operations(job, False):
             flow_op = self.operations[job_op.name]
             completed = flow_op.complete(job)
             eligible = False if completed else flow_op.eligible(job)
@@ -1071,7 +1024,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             for job in tqdm(jobs,
                             desc="Fetching operation status",
                             total=len(jobs), file=file):
-                for op in self._job_operations(job, ignore_conditions=IgnoreConditions.ALL):
+                for op in self._job_operations(job, only_eligible=False):
                     status[op.get_id()] = int(scheduler_info.get(op.get_id(), JobStatus.unknown))
             self.document._status.update(status)
         except NoSchedulerError:
@@ -1731,16 +1684,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             or operation.name not in self._operation_functions
             # The specified executable is not the same as the interpreter instance:
             or operation.directives.get('executable', sys.executable) != sys.executable
-            # The operation requires MPI and/or OpenMP parallelization:
-            or operation.directives.get('nranks', 1) > 1
-            or operation.directives.get('omp_num_threads', 1) > 1
         ):
             # ... need to fork:
-            prefix = self._environment.get_prefix(operation)
             logger.debug(
                 "Forking to execute operation '{}' with "
-                "cmd '{}'.".format(operation, prefix + ' ' + operation.cmd))
-            subprocess.run(prefix + ' ' + operation.cmd, shell=True, timeout=timeout, check=True)
+                "cmd '{}'.".format(operation, operation.cmd))
+            subprocess.run(operation.cmd, shell=True, timeout=timeout, check=True)
         else:
             # ... executing operation in interpreter process as function:
             logger.debug(
@@ -1754,7 +1703,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     'for job {operation.job}.'.format(operation=operation)) from e
 
     def run(self, jobs=None, names=None, pretend=False, np=None, timeout=None, num=None,
-            num_passes=1, progress=False, order=None, ignore_conditions=IgnoreConditions.NONE):
+            num_passes=1, progress=False, order=None):
         """Execute all pending operations for the given selection.
 
         This function will run in an infinite loop until all pending operations
@@ -1815,11 +1764,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
             The default value is `none`, which is equivalent to `by-job` in the current
             implementation.
-        :param ignore_conditions:
-            Specify if pre and/or post conditions check is to be ignored for eligibility check.
-            The default is `IgnoreConditions.NONE`.
-        :type ignore_conditions:
-            :py:class:`~.IgnoreConditions`
 
             .. note::
 
@@ -1846,11 +1790,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             raise ValueError(
                 "The names argument of FlowProject.run() must be a sequence of strings, "
                 "not a string.")
-
-        if type(ignore_conditions) != IgnoreConditions:
-            raise ValueError(
-                "The ignore_conditions argument of FlowProject.run() "
-                "must be a member of class IgnoreConditions")
 
         messages = list()
 
@@ -1902,8 +1841,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 break
             try:
                 with self._potentially_buffered():
-                    operations = list(filter(select, self._get_pending_operations(
-                        jobs, names, ignore_conditions=ignore_conditions)))
+                    operations = list(filter(select, self._get_pending_operations(jobs, names)))
             finally:
                 if messages:
                     for msg, level in set(messages):
@@ -1941,11 +1879,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             cmd_ = cmd.format(job=job)
             yield JobOperation(name=cmd_.replace(' ', '-'), cmd=cmd_, job=job)
 
-    def _get_pending_operations(self, jobs, operation_names=None,
-                                ignore_conditions=IgnoreConditions.NONE):
+    def _get_pending_operations(self, jobs, operation_names=None):
         "Get all pending operations for the given selection."
         assert not isinstance(operation_names, str)
-        for op in self.next_operations(* jobs, ignore_conditions=ignore_conditions):
+        for op in self.next_operations(* jobs):
             if operation_names is None or any(re.fullmatch(n, op.name) for n in operation_names):
                 yield op
 
@@ -2020,7 +1957,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def submit_operations(self, operations, _id=None, env=None, parallel=False, flags=None,
                           force=False, template='script.sh', pretend=False,
                           show_template_help=False, **kwargs):
-        """Submit a sequence of operations to the scheduler.
+        r"""Submit a sequence of operations to the scheduler.
 
         :param operations:
             The operations to submit.
@@ -2103,14 +2040,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 print(
                     "Some of the keys provided as part of the directives were not used by "
                     "the template script, including: {}".format(
-                        ', '.join(sorted(keys_unused))), file=sys.stderr)
+                        ', '.join(sorted(keys_unused))),file=sys.stderr)
             if pretend:
                 print(script)
             else:
                 return env.submit(_id=_id, script=script, flags=flags, **kwargs)
 
-    def submit(self, bundle_size=1, jobs=None, names=None, num=None, parallel=False, force=False,
-               walltime=None, env=None, ignore_conditions=IgnoreConditions.NONE, **kwargs):
+    def submit(self, bundle_size=1, jobs=None, names=None, num=None, parallel=False,
+               force=False, walltime=None, env=None, **kwargs):
         """Submit function for the project's main submit interface.
 
         :param bundle_size:
@@ -2140,11 +2077,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             bool
         :param walltime:
             Specify the walltime in hours or as instance of :py:class:`datetime.timedelta`.
-        :param ignore_conditions:
-            Specify if pre and/or post conditions check is to be ignored for eligibility check.
-            The default is `IgnoreConditions.NONE`.
-        :type ignore_conditions:
-            :py:class:`~.IgnoreConditions`
         """
         # Regular argument checks and expansion
         if jobs is None:
@@ -2162,16 +2094,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 if str(error) != 'unsupported type for timedelta ' \
                                  'hours component: datetime.timedelta':
                     raise
-        if type(ignore_conditions) != IgnoreConditions:
-            raise ValueError(
-                "The ignore_conditions argument of FlowProject.run() "
-                "must be a member of class IgnoreConditions")
 
         # Gather all pending operations.
         with self._potentially_buffered():
-            operations = (op for op in
-                          self._get_pending_operations(jobs, names,
-                                                       ignore_conditions=ignore_conditions)
+            operations = (op for op in self._get_pending_operations(jobs, names)
                           if self._eligible_for_submission(op))
             if num is not None:
                 operations = list(islice(operations, num))
@@ -2206,14 +2132,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             '--test',
             action='store_true',
             help="Do not interact with the scheduler, implies --pretend.")
-        parser.add_argument(
-            '--ignore-conditions',
-            type=str,
-            choices=['none', 'pre', 'post', 'all'],
-            default=IgnoreConditions.NONE,
-            action=_IgnoreConditionsConversion,
-            help="Specify conditions to ignore for eligibility check.")
-
         cls._add_operation_selection_arg_group(parser)
         cls._add_operation_bundling_arg_group(parser)
         cls._add_template_arg_group(parser)
@@ -2558,30 +2476,25 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if op.complete(job):
                 yield name
 
-    def _job_operations(self, job, ignore_conditions=IgnoreConditions.NONE):
+    def _job_operations(self, job, only_eligible):
         "Yield instances of JobOperation constructed for specific jobs."
         for name, op in self.operations.items():
-            if not op.eligible(job, ignore_conditions):
+            if only_eligible and not op.eligible(job):
                 continue
             yield JobOperation(name=name, job=job, cmd=op(job), directives=op.directives)
 
-    def next_operations(self, *jobs, ignore_conditions=IgnoreConditions.NONE):
+    def next_operations(self, *jobs):
         """Determine the next eligible operations for jobs.
 
         :param jobs:
             The signac job handles.
         :type job:
             :class:`~signac.contrib.job.Job`
-        :param ignore_conditions:
-            Specify if pre and/or post conditions check is to be ignored for eligibility check.
-            The default is `IgnoreConditions.NONE`.
-        :type ignore_conditions:
-            :py:class:`~.IgnoreConditions`
         :yield:
             All instances of :class:`~.JobOperation` jobs are eligible for.
         """
         for job in jobs:
-            for op in self._job_operations(job, ignore_conditions):
+            for op in self._job_operations(job, True):
                 yield op
 
     @deprecated(
@@ -2791,8 +2704,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                 jobs=jobs, names=args.operation_name, pretend=args.pretend,
                                 np=args.parallel, timeout=args.timeout, num=args.num,
                                 num_passes=args.num_passes, progress=args.progress,
-                                order=args.order,
-                                ignore_conditions=args.ignore_conditions)
+                                order=args.order)
 
         if args.switch_to_project_root:
             with add_cwd_to_environment_pythonpath():
@@ -2818,8 +2730,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if args.cmd:
                 operations = self._generate_operations(args.cmd, jobs, args.requires)
             else:
-                operations = self._get_pending_operations(jobs, args.operation_name,
-                                                          ignore_conditions=args.ignore_conditions)
+                operations = self._get_pending_operations(jobs, args.operation_name)
             operations = list(islice(operations, args.num))
 
         # Generate the script and print to screen.
@@ -2841,8 +2752,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Gather all pending operations ...
         with self._potentially_buffered():
-            ops = (op for op in self._get_pending_operations(jobs, args.operation_name,
-                   ignore_conditions=args.ignore_conditions)
+            ops = (op for op in self._get_pending_operations(jobs, args.operation_name)
                    if self._eligible_for_submission(op))
             ops = list(islice(ops, args.num))
 
@@ -3014,26 +2924,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             choices=['none', 'by-job', 'cyclic', 'random'],
             default=None,
             help="Specify the execution order of operations for each execution pass.")
-        execution_group.add_argument(
-            '--ignore-conditions',
-            type=str,
-            choices=['none', 'pre', 'post', 'all'],
-            default=IgnoreConditions.NONE,
-            action=_IgnoreConditionsConversion,
-            help="Specify conditions to ignore for eligibility check.")
         parser_run.set_defaults(func=self._main_run)
 
         parser_script = subparsers.add_parser(
             'script',
             parents=[base_parser],
         )
-        parser_script.add_argument(
-            '--ignore-conditions',
-            type=str,
-            choices=['none', 'pre', 'post', 'all'],
-            default=IgnoreConditions.NONE,
-            action=_IgnoreConditionsConversion,
-            help="Specify conditions to ignore for eligibility check.")
         self._add_script_args(parser_script)
         parser_script.set_defaults(func=self._main_script)
 

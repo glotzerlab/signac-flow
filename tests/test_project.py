@@ -673,7 +673,7 @@ class ExecutionProjectTest(BaseProjectTest):
         with self.subTest(order='invalid-order'):
             with self.assertRaises(ValueError):
                 project = self.mock_project()
-                self.project.run(order='invalid-order')
+                project.run(order='invalid-order')
 
         def sort_key(op):
             return op.name, op.job.get_id()
@@ -1114,13 +1114,13 @@ class ProjectMainInterfaceTest(BaseProjectTest):
         even_jobs = [job for job in self.project if job.sp.b % 2 == 0]
         for job in self.project:
             script_output = self.call_subcmd(
-                'script -j {} --exec'.format(job)
+                'script -j {}'.format(job)
             ).decode().splitlines()
             self.assertIn(job.get_id(), '\n'.join(script_output))
             if job in even_jobs:
-                self.assertIn('echo "hello"', '\n'.join(script_output))
+                self.assertIn('run -o op1', '\n'.join(script_output))
             else:
-                self.assertNotIn('echo "hello"', '\n'.join(script_output))
+                self.assertNotIn('run -o op1', '\n'.join(script_output))
 
 
 class DynamicProjectMainInterfaceTest(ProjectMainInterfaceTest):
@@ -1171,12 +1171,12 @@ class GroupProjectTest(BaseProjectTest):
 
         # For multiple operation groups and options
         for job in project:
-            job_op1 = project.groups['group1'].create_job_operation(project._entrypoint,
-                                                                    job)
+            job_op1 = project.groups['group1'].create_submission_job_operation(project._entrypoint,
+                                                                               job)
             script1 = project.script([job_op1])
             self.assertIn('run -o group1 -j {}'.format(job), script1)
-            job_op2 = project.groups['group2'].create_job_operation(project._entrypoint,
-                                                                    job)
+            job_op2 = project.groups['group2'].create_submission_job_operation(project._entrypoint,
+                                                                               job)
             script2 = project.script([job_op2])
             self.assertIn('--num-passes=2'.format(job), script2)
 
@@ -1224,8 +1224,8 @@ class GroupExecutionProjectTest(BaseProjectTest):
     def test_submit_groups(self):
         MockScheduler.reset()
         project = self.mock_project()
-        operations = [project.groups['group1'].create_job_operation(project._entrypoint,
-                                                                    job)
+        operations = [project.groups['group1'].create_submission_job_operation(project._entrypoint,
+                                                                               job)
                       for job in project]
         self.assertEqual(len(list(MockScheduler.jobs())), 0)
         cluster_job_id = project._store_bundled(operations)

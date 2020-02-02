@@ -49,7 +49,6 @@ from .environment import get_environment
 from .scheduling.base import ClusterJob
 from .scheduling.base import JobStatus
 from .scheduling.status import update_status
-from .errors import ScriptError
 from .errors import SubmitError
 from .errors import ConfigKeyError
 from .errors import NoSchedulerError
@@ -314,7 +313,7 @@ class JobOperation(object):
                    type=type(self).__name__,
                    name=self.name,
                    job=str(self.job),
-                   cmd=repr(self._run_cmd),
+                   cmd=repr(self.cmd),
                    directives=self.directives)
 
     def __hash__(self):
@@ -575,35 +574,18 @@ class FlowGroup(object):
         else:
             return "{} {}".format(entrypoint['executable'], entrypoint['path']).lstrip()
 
-    def _run_cmd(self, entrypoint, job=None):
+    def _submit_cmd(self, entrypoint, job=None):
+        entrypoint = self._determine_entrypoint(entrypoint, job)
         cmd = "{} run -o {}".format(entrypoint, self.name)
         cmd = cmd if job is None else cmd + ' -j {}'.format(job)
-        return cmd.lstrip()
+        return cmd.lstrip() + ' ' + self.options
 
-    def _exec_cmd(self, entrypoint, job):
-        if len(self.operations) > 1:
-            # Cannot use exec mode with more than one operation.
-            raise self.ExecCommandError
-        else:
-            op = list(self)[0]
-
-        if job is None:
-            raise ValueError("Exec mode requires a job.")
-
-        if isinstance(op, FlowCmdOperation):
-            return op(job).lstrip()
-        else:
-            return '{} exec {} {}'.format(entrypoint, op.name, job).lstrip()
-
-    def _cmd(self, entrypoint=None, job=None, mode='run'):
-        "Return the string forming the command for the execution of this group."
+    def _run_cmd(self, entrypoint, operation_name, operation, job):
         entrypoint = self._determine_entrypoint(entrypoint, job)
-        if mode == 'run':
-            return self._run_cmd(entrypoint, job) + ' ' + self.options
-        elif mode == 'exec':
-            return self._exec_cmd(entrypoint, job)
+        if isinstance(operation, FlowCmdOperation):
+            return operation(job).lstrip()
         else:
-            raise ValueError("Unknown mode '{}'.".format(mode))
+            return '{} exec {} {}'.format(entrypoint, operation_name, job).lstrip()
 
     def __iter__(self):
         yield from self.operations.values()
@@ -704,9 +686,10 @@ class FlowGroup(object):
         except KeyError:
             return JobStatus.unknown
 
-    def create_job_operation(self, entrypoint, job, mode='run', index=0):
+    def create_submission_job_operation(self, entrypoint, job, index=0):
         """Create a JobOperation object from the FlowGroup.
 
+        Creates a JobOperation for use in submitting and scripting.
         :param entrypoint:
             The path and executable, if applicable, to point to for execution
         :type entrypoint:
@@ -715,21 +698,43 @@ class FlowGroup(object):
             The job that the JobOperation is based on.
         :type job:
             signac.Job
-        :param mode:
-            The executation mode which the JobOperation runs in.
-        :type mode:
-            str
         :param index:
             Index for the JopOperation.
         :type index:
             int
         """
-        uneval_cmd = functools.partial(self._cmd, entrypoint=entrypoint, job=job, mode=mode)
+        uneval_cmd = functools.partial(self._submit_cmd, entrypoint=entrypoint, job=job)
         return JobOperation(self._generate_id(job, index=index),
                             self.name,
                             job,
                             cmd=uneval_cmd,
                             directives=dict(self.directives))
+
+    def create_run_job_operations(self, entrypoint, job, ignore_conditions=IgnoreConditions.NONE,
+                                  index=0):
+        """Create JobOperation object(s) from the FlowGroup.
+
+        Creates a JobOperation for each contained operation given proper conditions are met.
+        :param entrypoint:
+            The path and executable, if applicable, to point to for execution
+        :type entrypoint:
+            dict
+        :param job:
+            The job that the JobOperation is based on.
+        :type job:
+            signac.Job
+        :param index:
+            Index for the JopOperation.
+        :type index:
+            int
+        """
+        for name, op in self.operations.items():
+            if op.eligible(job, ignore_conditions):
+                uneval_cmd = functools.partial(self._run_cmd, entrypoint=entrypoint,
+                                               operation_name=name, operation=op, job=job)
+                job_op = JobOperation(self._generate_id(job, index=index), name, job,
+                                      cmd=uneval_cmd, directives=dict(self.directives))
+                yield job_op
 
 
 class _FlowProjectClass(type):
@@ -2106,7 +2111,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 raise ValueError(
                     "The names argument of FlowProject.run() must be a sequence of strings, "
                     "not a string.")
-
             groups = self._gather_flow_groups(names)
             for group in groups:
                 extended_names.extend(list(group.operations.keys()))
@@ -2117,12 +2121,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             num_passes = None
         if num and num < 0:
             num = None
-
-        # The 'names' argument must be a sequence, not a string.
-        if isinstance(names, str):
-            raise ValueError(
-                "The names argument of FlowProject.run() must be a sequence of strings, "
-                "not a string.")
 
         if type(ignore_conditions) != IgnoreConditions:
             raise ValueError(
@@ -2243,15 +2241,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                              " -o/--operation option.")
         return operations
 
-    def _get_submission_operations(self, jobs, names=None, mode='run',
+    def _get_submission_operations(self, jobs, names=None,
                                    ignore_conditions=IgnoreConditions.NONE):
         """Grabs JobOperations that are eligible to run from FlowGroups."""
         for job in jobs:
             for group in self._gather_flow_groups(names):
                 if group.eligible(job, ignore_conditions) and self._eligible_for_submission(group,
                                                                                             job):
-                    yield group.create_job_operation(entrypoint=self._entrypoint, job=job,
-                                                     mode=mode, index=0)
+                    yield group.create_submission_job_operation(entrypoint=self._entrypoint,
+                                                                job=job, index=0)
 
     def _get_pending_operations(self, jobs, operation_names=None,
                                 ignore_conditions=IgnoreConditions.NONE):
@@ -2426,7 +2424,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 return env.submit(_id=_id, script=script, flags=flags, **kwargs)
 
     def submit(self, bundle_size=1, jobs=None, names=None, num=None, parallel=False,
-               force=False, walltime=None, env=None, mode='run',
+               force=False, walltime=None, env=None,
                ignore_conditions=IgnoreConditions.NONE, **kwargs):
         """Submit function for the project's main submit interface.
 
@@ -2456,12 +2454,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             bool
         :param walltime:
             Specify the walltime in hours or as instance of :py:class:`datetime.timedelta`.
-        :param mode:
-            Defines the execution mode. 'run' will perform operations using the
-            run command's logic on the compute nodes. 'exec' will perform all
-            pre and post checks on the submit side. Default is 'run'.
-        :type mode:
-            str
         :param ignore_conditions:
             Specify if pre and/or post conditions check is to be ignored for eligibility check.
             The default is :py:class:`IgnoreConditions.NONE`.
@@ -2491,7 +2483,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Gather all pending operations.
         with self._potentially_buffered():
-            operations = self._get_submission_operations(jobs, names, mode, ignore_conditions)
+            operations = self._get_submission_operations(jobs, names, ignore_conditions)
         if num is not None:
             operations = list(islice(operations, num))
 
@@ -2513,13 +2505,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             type=str,
             nargs='*',
             help="Flags to be forwarded to the scheduler.")
-        parser.add_argument(
-            '--exec',
-            default=False,
-            dest='exec_mode',
-            action='store_true',
-            help="Execute operation checks at submit time as opposed to"
-            " runtime.")
         parser.add_argument(
             '--pretend',
             action='store_true',
@@ -2552,13 +2537,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             '-p', '--parallel',
             action='store_true',
             help="Execute all operations in parallel.")
-        execution_group.add_argument(
-            '--exec',
-            default=False,
-            dest='exec_mode',
-            action='store_true',
-            help="Execute operation checks at submit time as opposed to"
-            " runtime.")
         cls._add_direct_cmd_arg_group(parser)
         cls._add_template_arg_group(parser)
 
@@ -2899,10 +2877,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         "Yield instances of JobOperation constructed for specific jobs."
         for name in self.operations.keys():
             group = self._groups[name]
-            if not group.eligible(job, ignore_conditions):
-                continue
-            yield group.create_job_operation(entrypoint=self._entrypoint, job=job,
-                                             mode='exec', index=0)
+            yield from group.create_run_job_operations(entrypoint=self._entrypoint, job=job,
+                                                       ignore_conditions=ignore_conditions,
+                                                       index=0)
 
     def next_operations(self, *jobs, ignore_conditions=IgnoreConditions.NONE):
         """Determine the next eligible operations for jobs.
@@ -3058,7 +3035,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type directives:
             dict
         :param options:
-            A strng to append to run mode commands.
+            A strng to append to submissions can be any valid signac run option.
         :type options:
             str
         """
@@ -3231,18 +3208,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Gather all pending operations or generate them based on a direct command...
         with self._potentially_buffered():
-            mode = 'exec' if args.exec_mode else 'run'
             if args.cmd:
                 operations = self._generate_operations(args.cmd, jobs, args.requires)
             else:
                 names = args.operation_name if args.operation_name else None
-                try:
-                    operations = self._get_submission_operations(jobs, names, mode,
-                                                                 args.ignore_conditions)
-                except FlowGroup.ExecCommandError:
-                    raise ScriptError(
-                        "A FlowGroup with more than one operation cannot be added "
-                        "to a script in exec mode.")
+                operations = self._get_submission_operations(jobs, names, args.ignore_conditions)
             operations = list(islice(operations, args.num))
 
         # Generate the script and print to screen.
@@ -3262,17 +3232,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if not args.test:
             self._fetch_scheduler_status(jobs)
 
-        mode = 'exec' if args.exec_mode else 'run'
         # Gather all pending operations ...
         with self._potentially_buffered():
             names = args.operation_name if args.operation_name else None
-            try:
-                operations = self._get_submission_operations(jobs, names, mode,
-                                                             args.ignore_conditions)
-            except FlowGroup.ExecCommandError:
-                raise SubmitError(
-                    "A FlowGroup with more than operation cannot be "
-                    "submitted in exec mode.")
+            operations = self._get_submission_operations(jobs, names, args.ignore_conditions)
         operations = list(islice(operations, args.num))
         # Bundle operations up, generate the script, and submit to scheduler.
         for bundle in make_bundles(operations, args.bundle_size):

@@ -2103,7 +2103,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 print(
                     "Some of the keys provided as part of the directives were not used by "
                     "the template script, including: {}".format(
-                        ', '.join(sorted(keys_unused))),file = sys.stderr)
+                        ', '.join(sorted(keys_unused))),file=sys.stderr)
             if pretend:
                 print(script)
             else:

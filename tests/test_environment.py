@@ -31,5 +31,3 @@ class TestProject():
 
         a = env.get_config_value('a', 42)
         assert a == 42
-
-

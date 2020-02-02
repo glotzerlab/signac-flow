@@ -1,8 +1,6 @@
 # Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-import pytest
-
 import sys
 import os
 import io
@@ -86,15 +84,12 @@ class TestBaseTemplate(object):
 
             assert '\n'.join(reference) == '\n'.join(generated)
 
+
 # TestCase factory
 for name, env in flow.environment.ComputeEnvironment.registry.items():
     print('hello world')
     if env.__module__.startswith('flow.environments'):
         name = '{}.{}'.format(env.__module__, env.__name__)[len('flow.'):]
         test_name = '{}TemplateTest'.format(env.__name__)
-        test_cls = type(test_name, (TestBaseTemplate,), dict(env = env))
+        test_cls = type(test_name, (TestBaseTemplate,), dict(env=env))
         locals()[test_name] = test_cls
-
-
-
-

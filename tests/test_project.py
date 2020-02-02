@@ -111,7 +111,7 @@ class TestBaseProject():
     project_class = signac.Project
 
     @pytest.fixture(autouse=True)
-    def setUp(self,request):
+    def setUp(self, request):
         self._tmp_dir = TemporaryDirectory(prefix='signac-flow_')
         request.addfinalizer(self._tmp_dir.cleanup)
         self.project = self.project_class.init_project(
@@ -645,6 +645,7 @@ class TestProject(TestBaseProject):
 
         self.mock_project(project_class=B).detect_operation_graph()
 
+
 class TestExecutionProject(TestBaseProject):
     project_class = ProjectTest
     expected_number_of_steps = 4
@@ -663,7 +664,7 @@ class TestExecutionProject(TestBaseProject):
         assert len(jobs_order_none) == len(set(jobs_order_none))
 
     # @pytest.mark.parameters
-    def test_run(self,subtests):
+    def test_run(self, subtests):
         with subtests.test(order='invalid-order'):
             with pytest.raises(ValueError):
                 project = self.mock_project()
@@ -955,7 +956,8 @@ class TestExecutionProject(TestBaseProject):
             project.submit_operations(_id=cluster_job_id, operations=operations)
         print(stderr.getvalue())
         assert len(list(MockScheduler.jobs())) == 1
-        assert 'Some of the keys provided as part of the directives were not used by the template script, including: bad_directive' in stderr.getvalue()
+        assert 'Some of the keys provided as part of the directives were not used by the template '
+        'script, including: bad_directive' in stderr.getvalue()
 
     @fail_if_not_removed
     def test_condition_evaluation(self):
@@ -1035,7 +1037,7 @@ class TestProjectMainInterface(TestBaseProject):
         os.chdir(self.cwd)
 
     @pytest.fixture(autouse=True)
-    def setup_main_interface(self,request,setUp):
+    def setup_main_interface(self, request):
         # super(TestProjectMainInterface, self).setUp()
         self.project = self.mock_project()
         self.cwd = os.getcwd()
@@ -1133,4 +1135,3 @@ class TestProjectDagDetection(TestBaseProject):
                        [0, 0, 0, 0, 0, 0, 0]]
 
         assert adj == adj_correct
-

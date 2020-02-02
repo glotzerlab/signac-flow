@@ -2,7 +2,6 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 """Workflow definition with the FlowProject.
-
 The FlowProject is a signac Project that allows the user to define a workflow.
 """
 import sys
@@ -41,6 +40,8 @@ import signac
 from signac.contrib.hashing import calc_id
 from signac.contrib.filterparse import parse_filter_arg
 from signac.contrib.project import JobsCursor
+
+from enum import IntEnum
 
 from .environment import get_environment
 from .scheduling.base import ClusterJob
@@ -81,17 +82,38 @@ custom templates provided within a project.
 The default template directory can be configured with the 'template_dir' configuration
 variable, for example in the project configuration file. The current template directory is:
 {template_dir}
-
 All template variables can be placed within a template using the standard jinja2
 syntax, e.g., the project root directory can be written like this: {{{{ project._rd }}}}.
 The available template variables are:
 {template_vars}
-
 Filter functions can be used to format template variables in a specific way.
 For example: {{{{ project.get_id() | capitalize }}}}.
-
 The available filters are:
 {filters}"""
+
+
+class IgnoreConditions(IntEnum):
+    """Flags that determine which conditions are used to determine job eligibility.
+    The options include:
+        * IgnoreConditions.PRE: ignore pre conditions
+        * IgnoreConditions.POST: ignore post conditions
+        * IgnoreConditions.ALL: ignore all conditions
+        * IgnoreConditions.NONE: check all conditions
+    """
+    PRE = 1
+    POST = 2
+    ALL = PRE | POST
+    NONE = ~ ALL
+
+
+class _IgnoreConditionsConversion(argparse.Action):
+    def __init__(self, option_strings, dest, nargs=None, **kwargs):
+        if nargs is not None:
+            raise ValueError("nargs not allowed")
+        super(_IgnoreConditionsConversion, self).__init__(option_strings, dest, **kwargs)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        setattr(namespace, self.dest, getattr(IgnoreConditions, values.upper()))
 
 
 class _condition(object):
@@ -153,7 +175,6 @@ class _condition(object):
 
 def _make_bundles(operations, size=None):
     """Utility function for the generation of bundles.
-
     This function splits an iterable of operations into equally
     sized bundles and a possibly smaller final bundle.
     """
@@ -170,7 +191,6 @@ def _make_bundles(operations, size=None):
 @deprecated(deprecated_in="0.9", removed_in="0.11", current_version=__version__)
 def make_bundles(operations, size=None):
     """Utility function for the generation of bundles.
-
     This function splits an iterable of operations into equally
     sized bundles and a possibly smaller final bundle.
     """
@@ -179,15 +199,11 @@ def make_bundles(operations, size=None):
 
 class JobOperation(object):
     """This class represents the information needed to execute one operation for one job.
-
     An operation function in this context is a shell command, which should be a function
     of one and only one signac job.
-
     .. note::
-
         This class is used by the :class:`~.FlowProject` class for the execution and
         submission process and should not be instantiated by users themselves.
-
     :param name:
         The name of this JobOperation instance. The name is arbitrary,
         but helps to concisely identify the operation in various contexts.
@@ -317,11 +333,9 @@ class JobOperation(object):
 
 class FlowCondition(object):
     """A FlowCondition represents a condition as a function of a signac job.
-
     The __call__() function of a FlowCondition object may return either True
     or False, representing whether the condition is met or not.
     This can be used to build a graph of conditions and operations.
-
     :param callback:
         A callable with one positional argument (the job).
     :type callback:
@@ -350,7 +364,6 @@ class FlowCondition(object):
 
 class FlowOperation(object):
     """A FlowOperation represents a data space operation, operating on any job.
-
     Every FlowOperation is associated with a specific command which should be
     a function of :py:class:`~signac.contrib.job.Job`. The command (cmd) may
     either be a unary callable that expects an instance of
@@ -358,33 +371,24 @@ class FlowOperation(object):
     a string containing valid shell commands, or the string of commands itself.
     In either case, the resulting string may contain any attributes of the job placed
     in curly braces, which will then be substituted by Python string formatting.
-
     For example, if we wanted to define a command for a program called 'hello',
     which expects a job id as its first argument, we could construct the following
     two equivalent operations:
-
     .. code-block:: python
-
         op = FlowOperation('hello', cmd='hello {job._id}')
          op = FlowOperation('hello', cmd=lambda job: 'hello {}'.format(job._id))
-
     Here is another example of a possible string substitution:
-
     .. code-block:: python
-
         # Substitute job state point parameters:
         op = FlowOperation('hello', cmd='cd {job.ws}; hello {job.sp.a}')
-
     Pre-requirements (pre) and post-conditions (post) can be used to
     trigger an operation only when certain conditions are met. Conditions are unary
     callables, which expect an instance of job as their first and only positional
     argument and return either True or False.
-
     An operation is considered "eligible" for execution when all pre-requirements
     are met and when at least one of the post-conditions is not met.
     Requirements are always met when the list of requirements is empty and
     post-conditions are never met when the list of post-conditions is empty.
-
     :param cmd:
         The command to execute operation; should be a function of job.
     :type cmd:
@@ -395,7 +399,7 @@ class FlowOperation(object):
         sequence of callables
     :param post:
         post-conditions to determine completion
-    :type pre:
+    :type post:
         sequence of callables
     :param directives:
         A dictionary of additional parameters that provide instructions on how
@@ -418,11 +422,29 @@ class FlowOperation(object):
     def __str__(self):
         return "{type}(cmd='{cmd}')".format(type=type(self).__name__, cmd=self._cmd)
 
-    def eligible(self, job):
-        "Eligible, when all pre-conditions are true and at least one post-condition is false."
-        pre = all(cond(job) for cond in self._prereqs)
+    def eligible(self, job, ignore_conditions=IgnoreConditions.NONE):
+        """Eligible, when all pre-conditions are true and at least one post-condition is false,
+        or corresponding conditions are ignored.
+        :param job:
+            The signac job handles.
+        :type job:
+            :class:`~signac.contrib.job.Job`
+        :param ignore_conditions:
+            Specify if pre and/or post conditions check is to be ignored for eligibility check.
+            The default is :py:class:`IgnoreConditions.NONE`.
+        :type ignore_conditions:
+            :py:class:`~.IgnoreConditions`
+        """
+        if type(ignore_conditions) != IgnoreConditions:
+            raise ValueError(
+                "The ignore_conditions argument of FlowProject.run() "
+                "must be a member of class IgnoreConditions")
+        # len(self._prereqs) check for speed optimization
+        pre = (not len(self._prereqs)) or (ignore_conditions & IgnoreConditions.PRE) \
+            or all(cond(job) for cond in self._prereqs)
         if pre and len(self._postconds):
-            post = any(not cond(job) for cond in self._postconds)
+            post = (ignore_conditions & IgnoreConditions.POST) \
+                or any(not cond(job) for cond in self._postconds)
         else:
             post = True
         return pre and post
@@ -488,18 +510,14 @@ class _FlowProjectClass(type):
         class pre(_condition):
             """Specify a function of job that must be true for this operation to
             be eligible for execution. For example:
-
             .. code-block:: python
-
                 @Project.operation
                 @Project.pre(lambda job: not job.doc.get('hello'))
                 def hello(job):
                     print('hello', job)
                     job.doc.hello = True
-
             The *hello*-operation would only execute if the 'hello' key in the job
             document does not evaluate to True.
-
             An optional tag may be associated with the condition. These tags
             are used by :meth:`~.detect_operation_graph` when comparing
             conditions for equality. The tag defaults to the bytecode of the
@@ -535,18 +553,14 @@ class _FlowProjectClass(type):
         class post(_condition):
             """Specify a function of job that must evaluate to True for this operation
             to be considered complete. For example:
-
             .. code-block:: python
-
                 @Project.operation
                 @Project.post(lambda job: job.doc.get('bye'))
                 def bye(job):
                     print('bye' job)
                     job.doc.bye = True
-
             The *bye*-operation would be considered complete and therefore no longer
             eligible for execution once the 'bye' key in the job document evaluates to True.
-
             An optional tag may be associated with the condition. These tags
             are used by :meth:`~.detect_operation_graph` when comparing
             conditions for equality. The tag defaults to the bytecode of the
@@ -572,20 +586,14 @@ class _FlowProjectClass(type):
 
 class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     """A signac project class specialized for workflow management.
-
     This class provides a command line interface for the definition, execution, and
     submission of workflows based on condition and operation functions.
-
     This is a typical example on how to use this class:
-
     .. code-block:: python
-
         @FlowProject.operation
         def hello(job):
             print('hello', job)
-
         FlowProject().main()
-
     :param config:
         A signac configuration, defaults to the configuration loaded
         from the environment.
@@ -623,7 +631,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _setup_template_environment(self):
         """Setup the jinja2 template environment.
-
         The templating system is used to generate templated scripts for the script()
         and submit_operations() / submit() function and the corresponding command line
         subcommands.
@@ -669,6 +676,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             template_environment.filters['max'] = max
         if 'min' not in template_environment.filters:    # for jinja2 < 2.10
             template_environment.filters['min'] = min
+
         return template_environment
 
     def _template_environment(self, environment=None):
@@ -676,9 +684,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             environment = self._environment
         if environment not in self._template_environment_:
             template_environment = self._setup_template_environment()
+
             # Add environment-specific custom filters:
-            for filter_name, filter_function in getattr(environment, 'filters', {}).items():
-                template_environment.filters[filter_name] = filter_function
+            for name, member in inspect.getmembers(environment):
+                if getattr(member, '_flow_template_filter', False):
+                    template_environment.filters[name] = member
+
             self._template_environment_[environment] = template_environment
         return self._template_environment_[environment]
 
@@ -701,32 +712,23 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     @classmethod
     def label(cls, label_name_or_func=None):
         """Designate a function to be a label function of this class.
-
         For example, we can define a label function like this:
-
         .. code-block:: python
-
             @FlowProject.label
             def foo_label(job):
                 if job.document.get('foo', False):
                     return 'foo-label-text'
-
         The ``foo-label-text`` label will now show up in the status view for each job,
         where the ``foo`` key evaluates true.
-
         If the label functions returns any type other than ``str``, the label
         name will be the name of the function if and only if the return value
         evaluates to ``True``, for example:
-
         .. code-block:: python
-
             @FlowProject.label
             def foo_label(job):
                 return job.document.get('foo', False)
-
         Finally, you can specify a different default label name by providing it as the first
         argument to the ``label()`` decorator.
-
         :param label_name_or_func:
             A label name or callable.
         :type label_name_or_func:
@@ -745,7 +747,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def detect_operation_graph(self):
         """Determine the directed acyclic graph defined by operation pre- and
         post-conditions.
-
         In general, executing a given operation registered with a FlowProject
         just involves checking the operation's pre- and post-conditions to
         determine eligibility. More generally, however, the pre- and
@@ -756,7 +757,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         this graph it is possible to determine exactly what operations need to
         be executed in order to make the operation eligible so that the task of
         executing all necessary operations can be automated.
-
         The graph is determined by iterating over all pairs of operations and
         checking for equality of pre- and post-conditions. The algorithm builds
         an adjacency matrix based on whether the pre-conditions for one
@@ -766,23 +766,17 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         bytecode equivalent, i.e. ``cond1.__code__.co_code ==
         cond2.__code__.co_code``). Users can specify that conditions should be
         treated as equal by providing tags to the operations.
-
         Given a FlowProject subclass defined in a module ``project.py``, the
         output graph could be visualized using Matplotlib and NetworkX with the
         following code:
-
         .. code-block:: python
-
             import numpy as np
             import networkx as nx
             from matplotlib import pyplot as plt
-
             from project import Project
-
             project = Project()
             ops = project.operations.keys()
             adj = np.asarray(project.detect_operation_graph())
-
             plt.figure()
             g = nx.DiGraph(adj)
             pos = nx.spring_layout(g)
@@ -791,15 +785,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 g, pos,
                 labels={key: name for (key, name) in
                         zip(range(len(ops)), [o for o in ops])})
-
             plt.show()
-
         Raises a ``RuntimeError`` if a condition does not have a tag. This can
         occur when using ``functools.partial``, and a manually specified
         condition tag has not been set.
-
         :raises: RuntimeError
-
         """
 
         def to_callbacks(conditions):
@@ -843,7 +833,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _register_class_labels(self):
         """This function registers all label functions, which are part of the class definition.
-
         To register a class method or function as label function, use the generalized label()
         function.
         """
@@ -897,13 +886,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _store_bundled(self, operations):
         """Store operation-ids as part of a bundle and return bundle id.
-
         The operation identifiers are stored in a text file whose name is
         determined by the _fn_bundle() method. This may be used to identify
         the status of individual operations from the bundle id. A single
         operation will not be stored, but instead the operation's id is
         directly returned.
-
         :param operations:
             The operations to bundle.
         :type operations:
@@ -937,13 +924,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def scheduler_jobs(self, scheduler):
         """Fetch jobs from the scheduler.
-
         This function will fetch all scheduler jobs from the scheduler
         and also expand bundled jobs automatically.
-
         However, this function will not automatically filter scheduler
         jobs which are not associated with this project.
-
         :param scheduler:
             The scheduler instance.
         :type scheduler:
@@ -965,7 +949,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _get_operations_status(self, job, cached_status):
         "Return a dict with information about job-operations for this job."
-        for job_op in self._job_operations(job, False):
+        for job_op in self._job_operations(job, ignore_conditions=IgnoreConditions.ALL):
             flow_op = self.operations[job_op.name]
             completed = flow_op.complete(job)
             eligible = False if completed else flow_op.eligible(job)
@@ -1024,7 +1008,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             for job in tqdm(jobs,
                             desc="Fetching operation status",
                             total=len(jobs), file=file):
-                for op in self._job_operations(job, only_eligible=False):
+                for op in self._job_operations(job, ignore_conditions=IgnoreConditions.ALL):
                     status[op.get_id()] = int(scheduler_info.get(op.get_id(), JobStatus.unknown))
             self.document._status.update(status)
         except NoSchedulerError:
@@ -1099,7 +1083,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                      no_parallelize=False, template=None, profile=False,
                      eligible_jobs_max_lines=None):
         """Print the status of the project.
-
         :param jobs:
             Only execute operations for the given jobs, or all if the argument is omitted.
         :type jobs:
@@ -1204,7 +1187,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         def draw_progressbar(value, total, width=40):
             """Visualize progess with a progress bar.
-
             :param value:
                 The current progress as a fraction of total.
             :type value:
@@ -1226,7 +1208,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         def job_filter(job_op, scheduler_status_code, all_ops):
             """filter eligible jobs for status print.
-
             :param job_ops:
                 Operations information for a job.
             :type job_ops:
@@ -1249,7 +1230,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         def get_operation_status(operation_info, symbols):
             """Determine the status of an operation.
-
             :param operation_info:
                 Dictionary containing operation information.
             :type operation_info:
@@ -1276,7 +1256,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if pretty:
             def highlight(s, eligible):
                 """Change font to bold within jinja2 template
-
                 :param s:
                     The string to be printed
                 :type s:
@@ -1293,7 +1272,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         else:
             def highlight(s, eligible):
                 """Change font to bold within jinja2 template
-
                 :param s:
                     The string to be printed
                 :type s:
@@ -1569,9 +1547,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def run_operations(self, operations=None, pretend=False, np=None, timeout=None, progress=False):
         """Execute the next operations as specified by the project's workflow.
-
         See also: :meth:`~.run`
-
         :param operations:
             The operations to execute (optional).
         :type operations:
@@ -1591,7 +1567,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             int
         :param progress:
             Show a progress bar during execution.
-        :type progess:
+        :type progress:
             bool
         """
         if timeout is not None and timeout < 0:
@@ -1651,9 +1627,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _run_operations_in_parallel(self, pool, pickle, operations, progress, timeout):
         """Execute operations in parallel.
-
         This function executes the given list of operations with the provided process pool.
-
         Since pickling of the project instance is likely to fail, we manually pickle the
         project instance and the operations before submitting them to the process pool to
         enable us to try different pool and pickle module combinations.
@@ -1684,12 +1658,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             or operation.name not in self._operation_functions
             # The specified executable is not the same as the interpreter instance:
             or operation.directives.get('executable', sys.executable) != sys.executable
+            # The operation requires MPI and/or OpenMP parallelization:
+            or operation.directives.get('nranks', 1) > 1
+            or operation.directives.get('omp_num_threads', 1) > 1
         ):
             # ... need to fork:
+            prefix = self._environment.get_prefix(operation)
             logger.debug(
                 "Forking to execute operation '{}' with "
-                "cmd '{}'.".format(operation, operation.cmd))
-            subprocess.run(operation.cmd, shell=True, timeout=timeout, check=True)
+                "cmd '{}'.".format(operation, prefix + ' ' + operation.cmd))
+            subprocess.run(prefix + ' ' + operation.cmd, shell=True, timeout=timeout, check=True)
         else:
             # ... executing operation in interpreter process as function:
             logger.debug(
@@ -1703,19 +1681,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     'for job {operation.job}.'.format(operation=operation)) from e
 
     def run(self, jobs=None, names=None, pretend=False, np=None, timeout=None, num=None,
-            num_passes=1, progress=False, order=None):
+            num_passes=1, progress=False, order=None, ignore_conditions=IgnoreConditions.NONE):
         """Execute all pending operations for the given selection.
-
         This function will run in an infinite loop until all pending operations
         are executed, unless it reaches the maximum number of passes per
         operation or the maximum number of executions.
-
         By default there is no limit on the total number of executions, but a specific
         operation will only be executed once per job. This is to avoid accidental
         infinite loops when no or faulty post conditions are provided.
-
         See also: :meth:`~.run_operations`
-
         :param jobs:
             Only execute operations for the given jobs, or all if the argument is omitted.
         :type jobs:
@@ -1751,7 +1725,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             int
         :param progress:
             Show a progress bar during execution.
-        :type progess:
+        :type progress:
             bool
         :param order:
             Specify the order of operations, possible values are:
@@ -1761,19 +1735,20 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 * 'random' (shuffle the execution order randomly)
                 * callable (a callable returning a comparison key for an
                             operation used to sort operations)
-
             The default value is `none`, which is equivalent to `by-job` in the current
             implementation.
-
             .. note::
-
                 Users are advised to not rely on a specific execution order, as a
                 substitute for defining the workflow in terms of pre- and post-conditions.
                 However, a specific execution order may be more performant in cases where
                 operations need to access and potentially lock shared resources.
-
         :type order:
             str, callable, or NoneType
+        :param ignore_conditions:
+            Specify if pre and/or post conditions check is to be ignored for eligibility check.
+            The default is :py:class:`IgnoreConditions.NONE`.
+        :type ignore_conditions:
+            :py:class:`~.IgnoreConditions`
         """
         # If no jobs argument is provided, we run operations for all jobs.
         if jobs is None:
@@ -1790,6 +1765,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             raise ValueError(
                 "The names argument of FlowProject.run() must be a sequence of strings, "
                 "not a string.")
+
+        if type(ignore_conditions) != IgnoreConditions:
+            raise ValueError(
+                "The ignore_conditions argument of FlowProject.run() "
+                "must be a member of class IgnoreConditions")
 
         messages = list()
 
@@ -1841,7 +1821,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 break
             try:
                 with self._potentially_buffered():
-                    operations = list(filter(select, self._get_pending_operations(jobs, names)))
+                    operations = list(filter(select, self._get_pending_operations(
+                        jobs, names, ignore_conditions=ignore_conditions)))
             finally:
                 if messages:
                     for msg, level in set(messages):
@@ -1879,10 +1860,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             cmd_ = cmd.format(job=job)
             yield JobOperation(name=cmd_.replace(' ', '-'), cmd=cmd_, job=job)
 
-    def _get_pending_operations(self, jobs, operation_names=None):
+    def _get_pending_operations(self, jobs, operation_names=None,
+                                ignore_conditions=IgnoreConditions.NONE):
         "Get all pending operations for the given selection."
         assert not isinstance(operation_names, str)
-        for op in self.next_operations(* jobs):
+        for op in self.next_operations(* jobs, ignore_conditions=ignore_conditions):
             if operation_names is None or any(re.fullmatch(n, op.name) for n in operation_names):
                 yield op
 
@@ -1898,7 +1880,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def script(self, operations, parallel=False, template='script.sh', show_template_help=False):
         """Generate a run script to execute given operations.
-
         :param operations:
             The operations to execute.
         :type operations:
@@ -1958,7 +1939,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                           force=False, template='script.sh', pretend=False,
                           show_template_help=False, **kwargs):
         r"""Submit a sequence of operations to the scheduler.
-
         :param operations:
             The operations to submit.
         :type operations:
@@ -2046,10 +2026,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             else:
                 return env.submit(_id=_id, script=script, flags=flags, **kwargs)
 
-    def submit(self, bundle_size=1, jobs=None, names=None, num=None, parallel=False,
-               force=False, walltime=None, env=None, **kwargs):
+    def submit(self, bundle_size=1, jobs=None, names=None, num=None, parallel=False, force=False,
+               walltime=None, env=None, ignore_conditions=IgnoreConditions.NONE, **kwargs):
         """Submit function for the project's main submit interface.
-
         :param bundle_size:
             Specify the number of operations to be bundled into one submission, defaults to 1.
         :type bundle_size:
@@ -2077,6 +2056,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             bool
         :param walltime:
             Specify the walltime in hours or as instance of :py:class:`datetime.timedelta`.
+        :param ignore_conditions:
+            Specify if pre and/or post conditions check is to be ignored for eligibility check.
+            The default is :py:class:`IgnoreConditions.NONE`.
+        :type ignore_conditions:
+            :py:class:`~.IgnoreConditions`
         """
         # Regular argument checks and expansion
         if jobs is None:
@@ -2094,10 +2078,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 if str(error) != 'unsupported type for timedelta ' \
                                  'hours component: datetime.timedelta':
                     raise
+        if type(ignore_conditions) != IgnoreConditions:
+            raise ValueError(
+                "The ignore_conditions argument of FlowProject.run() "
+                "must be a member of class IgnoreConditions")
 
         # Gather all pending operations.
         with self._potentially_buffered():
-            operations = (op for op in self._get_pending_operations(jobs, names)
+            operations = (op for op in
+                          self._get_pending_operations(jobs, names,
+                                                       ignore_conditions=ignore_conditions)
                           if self._eligible_for_submission(op))
             if num is not None:
                 operations = list(islice(operations, num))
@@ -2132,6 +2122,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             '--test',
             action='store_true',
             help="Do not interact with the scheduler, implies --pretend.")
+        parser.add_argument(
+            '--ignore-conditions',
+            type=str,
+            choices=['none', 'pre', 'post', 'all'],
+            default=IgnoreConditions.NONE,
+            action=_IgnoreConditionsConversion,
+            help="Specify conditions to ignore for eligibility check.")
+
         cls._add_operation_selection_arg_group(parser)
         cls._add_operation_bundling_arg_group(parser)
         cls._add_template_arg_group(parser)
@@ -2347,7 +2345,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def labels(self, job):
         """Yields all labels for the given ``job``.
-
         See also: :meth:`~.label`
         """
         for label_func, label_name in self._label_functions.items():
@@ -2373,51 +2370,37 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def add_operation(self, name, cmd, pre=None, post=None, **kwargs):
         """
         Add an operation to the workflow.
-
         This method will add an instance of :py:class:`~.FlowOperation` to the
         operations-dict of this project.
-
         .. seealso::
-
             A Python function may be defined as an operation function directly using
             the :meth:`~.operation` decorator.
-
         Any FlowOperation is associated with a specific command, which should be
         a function of :py:class:`~signac.contrib.job.Job`. The command (cmd) can
         be stated as function, either by using str-substitution based on a job's
         attributes, or by providing a unary callable, which expects an instance
         of job as its first and only positional argument.
-
         For example, if we wanted to define a command for a program called 'hello',
         which expects a job id as its first argument, we could construct the following
         two equivalent operations:
-
         .. code-block:: python
-
             op = FlowOperation('hello', cmd='hello {job._id}')
             op = FlowOperation('hello', cmd=lambda 'hello {}'.format(job._id))
-
         Here are some more useful examples for str-substitutions:
-
         .. code-block:: python
-
             # Substitute job state point parameters:
             op = FlowOperation('hello', cmd='cd {job.ws}; hello {job.sp.a}')
-
         Pre-requirements (pre) and post-conditions (post) can be used to
         trigger an operation only when certain conditions are met. Conditions are unary
         callables, which expect an instance of job as their first and only positional
         argument and return either True or False.
-
         An operation is considered "eligible" for execution when all pre-requirements
         are met and when at least one of the post-conditions is not met.
         Requirements are always met when the list of requirements is empty and
         post-conditions are never met when the list of post-conditions is empty.
-
         Please note, eligibility in this contexts refers only to the workflow pipeline
         and not to other contributing factors, such as whether the job-operation is currently
         running or queued.
-
         :param name:
             A unique identifier for this operation, which may be freely chosen.
         :type name:
@@ -2445,9 +2428,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         details="Use labels() instead.")
     def classify(self, job):
         """Generator function which yields labels for job.
-
         By default, this method yields from the project's labels() method.
-
         :param job:
             The signac job handle.
         :type job:
@@ -2462,7 +2443,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def completed_operations(self, job):
         """Determine which operations have been completed for job.
-
         :param job:
             The signac job handle.
         :type job:
@@ -2476,25 +2456,29 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if op.complete(job):
                 yield name
 
-    def _job_operations(self, job, only_eligible):
+    def _job_operations(self, job, ignore_conditions=IgnoreConditions.NONE):
         "Yield instances of JobOperation constructed for specific jobs."
         for name, op in self.operations.items():
-            if only_eligible and not op.eligible(job):
+            if not op.eligible(job, ignore_conditions):
                 continue
             yield JobOperation(name=name, job=job, cmd=op(job), directives=op.directives)
 
-    def next_operations(self, *jobs):
+    def next_operations(self, *jobs, ignore_conditions=IgnoreConditions.NONE):
         """Determine the next eligible operations for jobs.
-
         :param jobs:
             The signac job handles.
         :type job:
             :class:`~signac.contrib.job.Job`
+        :param ignore_conditions:
+            Specify if pre and/or post conditions check is to be ignored for eligibility check.
+            The default is :py:class:`IgnoreConditions.NONE`.
+        :type ignore_conditions:
+            :py:class:`~.IgnoreConditions`
         :yield:
             All instances of :class:`~.JobOperation` jobs are eligible for.
         """
         for job in jobs:
-            for op in self._job_operations(job, True):
+            for op in self._job_operations(job, ignore_conditions):
                 yield op
 
     @deprecated(
@@ -2503,7 +2487,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         details="Use next_operations() instead.")
     def next_operation(self, job):
         """Determine the next operation for this job.
-
         :param job:
             The signac job handle.
         :type job:
@@ -2519,15 +2502,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     @classmethod
     def operation(cls, func, name=None):
         """Add the function `func` as operation function to the class workflow definition.
-
         This function is designed to be used as a decorator function, for example:
-
         .. code-block:: python
-
             @FlowProject.operation
             def hello(job):
                 print('Hello', job)
-
         See also: :meth:`~.flow.FlowProject.add_operation`.
         """
         if isinstance(func, str):
@@ -2624,7 +2603,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _eligible_for_submission(self, job_operation):
         """Determine if a job-operation is eligible for submission.
-
         By default, an operation is eligible for submission when it
         is not considered active, that means already queued or running.
         """
@@ -2704,7 +2682,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                 jobs=jobs, names=args.operation_name, pretend=args.pretend,
                                 np=args.parallel, timeout=args.timeout, num=args.num,
                                 num_passes=args.num_passes, progress=args.progress,
-                                order=args.order)
+                                order=args.order,
+                                ignore_conditions=args.ignore_conditions)
 
         if args.switch_to_project_root:
             with add_cwd_to_environment_pythonpath():
@@ -2730,7 +2709,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if args.cmd:
                 operations = self._generate_operations(args.cmd, jobs, args.requires)
             else:
-                operations = self._get_pending_operations(jobs, args.operation_name)
+                operations = self._get_pending_operations(jobs, args.operation_name,
+                                                          ignore_conditions=args.ignore_conditions)
             operations = list(islice(operations, args.num))
 
         # Generate the script and print to screen.
@@ -2752,7 +2732,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Gather all pending operations ...
         with self._potentially_buffered():
-            ops = (op for op in self._get_pending_operations(jobs, args.operation_name)
+            ops = (op for op in self._get_pending_operations(jobs, args.operation_name,
+                   ignore_conditions=args.ignore_conditions)
                    if self._eligible_for_submission(op))
             ops = list(islice(ops, args.num))
 
@@ -2805,25 +2786,17 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def main(self, parser=None):
         """Call this function to use the main command line interface.
-
         In most cases one would want to call this function as part of the
         class definition, e.g.:
-
         .. code-block:: python
-
              my_project.py
             from flow import FlowProject
-
             class MyProject(FlowProject):
                 pass
-
             if __name__ == '__main__':
                 MyProject().main()
-
         You can then execute this script on the command line:
-
         .. code-block:: bash
-
             $ python my_project.py --help
         """
         if parser is None:
@@ -2924,12 +2897,26 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             choices=['none', 'by-job', 'cyclic', 'random'],
             default=None,
             help="Specify the execution order of operations for each execution pass.")
+        execution_group.add_argument(
+            '--ignore-conditions',
+            type=str,
+            choices=['none', 'pre', 'post', 'all'],
+            default=IgnoreConditions.NONE,
+            action=_IgnoreConditionsConversion,
+            help="Specify conditions to ignore for eligibility check.")
         parser_run.set_defaults(func=self._main_run)
 
         parser_script = subparsers.add_parser(
             'script',
             parents=[base_parser],
         )
+        parser_script.add_argument(
+            '--ignore-conditions',
+            type=str,
+            choices=['none', 'pre', 'post', 'all'],
+            default=IgnoreConditions.NONE,
+            action=_IgnoreConditionsConversion,
+            help="Specify conditions to ignore for eligibility check.")
         self._add_script_args(parser_script)
         parser_script.set_defaults(func=self._main_script)
 

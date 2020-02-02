@@ -2020,7 +2020,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def submit_operations(self, operations, _id=None, env=None, parallel=False, flags=None,
                           force=False, template='script.sh', pretend=False,
                           show_template_help=False, **kwargs):
-        r"""Submit a sequence of operations to the scheduler.
+        """Submit a sequence of operations to the scheduler.
 
         :param operations:
             The operations to submit.
@@ -2100,10 +2100,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 if key not in ('fork', )  # whitelist
             }
             if keys_unused:
-                logger.warning(
+                print(
                     "Some of the keys provided as part of the directives were not used by "
                     "the template script, including: {}".format(
-                        ', '.join(sorted(keys_unused))))
+                        ', '.join(sorted(keys_unused))),file = sys.stderr)
             if pretend:
                 print(script)
             else:

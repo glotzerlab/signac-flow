@@ -574,11 +574,19 @@ class FlowGroup(object):
         else:
             return "{} {}".format(entrypoint['executable'], entrypoint['path']).lstrip()
 
-    def _submit_cmd(self, entrypoint, job=None):
+    def _submit_cmd(self, entrypoint, ignore_conditions, job=None):
         entrypoint = self._determine_entrypoint(entrypoint, job)
         cmd = "{} run -o {}".format(entrypoint, self.name)
-        cmd = cmd if job is None else cmd + ' -j {}'.format(job)
-        return cmd.lstrip() + ' ' + self.options
+        cmd = cmd if job is None else cmd + ' -j {} {}'.format(job, self.options)
+
+        cond_to_string = {IgnoreConditions.NONE: '',
+                          IgnoreConditions.ALL: 'all',
+                          IgnoreConditions.PRE: 'pre',
+                          IgnoreConditions.POST: 'post'}
+        cond_string = cond_to_string[ignore_conditions]
+        if cond_string != '':
+            cond_string = ' --ignore_conditons=' + cond_string
+        return cmd.lstrip() + cond_string
 
     def _run_cmd(self, entrypoint, operation_name, operation, job):
         entrypoint = self._determine_entrypoint(entrypoint, job)
@@ -686,7 +694,9 @@ class FlowGroup(object):
         except KeyError:
             return JobStatus.unknown
 
-    def create_submission_job_operation(self, entrypoint, job, index=0):
+    def create_submission_job_operation(self, entrypoint, job,
+                                        ignore_conditions_on_submit=IgnoreConditions.NONE,
+                                        index=0):
         """Create a JobOperation object from the FlowGroup.
 
         Creates a JobOperation for use in submitting and scripting.
@@ -698,12 +708,18 @@ class FlowGroup(object):
             The job that the JobOperation is based on.
         :type job:
             signac.Job
+        :param ignore_conditions_on_submit:
+            Specify if pre and/or post conditions check is to be ignored for eligibility check after
+            submitting.  The default is :py:class:`IgnoreConditions.NONE`.
+        :type ignore_conditions:
+            :py:class:`~.IgnoreConditions`
         :param index:
             Index for the JopOperation.
         :type index:
             int
         """
-        uneval_cmd = functools.partial(self._submit_cmd, entrypoint=entrypoint, job=job)
+        uneval_cmd = functools.partial(self._submit_cmd, entrypoint=entrypoint, job=job,
+                                       ignore_conditions=ignore_conditions_on_submit)
         return JobOperation(self._generate_id(job, index=index),
                             self.name,
                             job,
@@ -2242,14 +2258,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return operations
 
     def _get_submission_operations(self, jobs, names=None,
-                                   ignore_conditions=IgnoreConditions.NONE):
+                                   ignore_conditions=IgnoreConditions.NONE,
+                                   ignore_conditions_on_submit=IgnoreConditions.NONE):
         """Grabs JobOperations that are eligible to run from FlowGroups."""
         for job in jobs:
             for group in self._gather_flow_groups(names):
                 if group.eligible(job, ignore_conditions) and self._eligible_for_submission(group,
                                                                                             job):
-                    yield group.create_submission_job_operation(entrypoint=self._entrypoint,
-                                                                job=job, index=0)
+                    yield group.create_submission_job_operation(
+                            entrypoint=self._entrypoint, job=job, index=0,
+                            ignore_conditions_on_submit=ignore_conditions_on_submit)
 
     def _get_pending_operations(self, jobs, operation_names=None,
                                 ignore_conditions=IgnoreConditions.NONE):
@@ -2425,7 +2443,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def submit(self, bundle_size=1, jobs=None, names=None, num=None, parallel=False,
                force=False, walltime=None, env=None,
-               ignore_conditions=IgnoreConditions.NONE, **kwargs):
+               ignore_conditions=IgnoreConditions.NONE,
+               ignore_conditions_on_submit=IgnoreConditions.NONE, **kwargs):
         """Submit function for the project's main submit interface.
 
         :param bundle_size:
@@ -2459,6 +2478,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             The default is :py:class:`IgnoreConditions.NONE`.
         :type ignore_conditions:
             :py:class:`~.IgnoreConditions`
+        :param ignore_conditions_on_submit:
+            Specify if pre and/or post conditions check is to be ignored for eligibility check after
+            submitting.  The default is :py:class:`IgnoreConditions.NONE`.
+        :type ignore_conditions:
+            :py:class:`~.IgnoreConditions`
         """
         # Regular argument checks and expansion
         if jobs is None:
@@ -2483,7 +2507,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Gather all pending operations.
         with self._potentially_buffered():
-            operations = self._get_submission_operations(jobs, names, ignore_conditions)
+            operations = self._get_submission_operations(jobs, names, ignore_conditions,
+                                                         ignore_conditions_on_submit)
         if num is not None:
             operations = list(islice(operations, num))
 
@@ -2524,6 +2549,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             default=IgnoreConditions.NONE,
             action=_IgnoreConditionsConversion,
             help="Specify conditions to ignore for eligibility check.")
+        parser.add_argument(
+            '--ignore-conditions-on-submit',
+            type=str,
+            choices=['none', 'pre', 'post', 'all'],
+            default=IgnoreConditions.NONE,
+            action=_IgnoreConditionsConversion,
+            help="Specify conditions to ignore after submitting. May be useful "
+                 "for conditions that cannot be checked once scheduled.")
 
         cls._add_operation_selection_arg_group(parser)
         cls._add_operation_bundling_arg_group(parser)
@@ -3212,7 +3245,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 operations = self._generate_operations(args.cmd, jobs, args.requires)
             else:
                 names = args.operation_name if args.operation_name else None
-                operations = self._get_submission_operations(jobs, names, args.ignore_conditions)
+                operations = self._get_submission_operations(jobs, names, args.ignore_conditions,
+                                                             args.ignore_conditions_on_submit)
             operations = list(islice(operations, args.num))
 
         # Generate the script and print to screen.
@@ -3235,7 +3269,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Gather all pending operations ...
         with self._potentially_buffered():
             names = args.operation_name if args.operation_name else None
-            operations = self._get_submission_operations(jobs, names, args.ignore_conditions)
+            operations = self._get_submission_operations(jobs, names, args.ignore_conditions,
+                                                         args.ignore_conditions_on_submit)
         operations = list(islice(operations, args.num))
         # Bundle operations up, generate the script, and submit to scheduler.
         for bundle in make_bundles(operations, args.bundle_size):
@@ -3428,6 +3463,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             default=IgnoreConditions.NONE,
             action=_IgnoreConditionsConversion,
             help="Specify conditions to ignore for eligibility check.")
+        parser_script.add_argument(
+            '--ignore-conditions-on-submit',
+            type=str,
+            choices=['none', 'pre', 'post', 'all'],
+            default=IgnoreConditions.NONE,
+            action=_IgnoreConditionsConversion,
+            help="Specify conditions to ignore after submitting. May be useful "
+                 "for conditions that cannot be checked once scheduled.")
         self._add_script_args(parser_script)
         parser_script.set_defaults(func=self._main_script)
 

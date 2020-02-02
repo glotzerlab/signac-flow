@@ -645,7 +645,6 @@ class TestProject(TestBaseProject):
 
         self.mock_project(project_class=B).detect_operation_graph()
 
-
 class TestExecutionProject(TestBaseProject):
     project_class = ProjectTest
     expected_number_of_steps = 4
@@ -954,10 +953,9 @@ class TestExecutionProject(TestBaseProject):
         stderr = StringIO()
         with redirect_stderr(stderr):
             project.submit_operations(_id=cluster_job_id, operations=operations)
+        print(stderr.getvalue())
         assert len(list(MockScheduler.jobs())) == 1
-        assert 'Some of the keys provided as part of the directives were not ' \
-                      'used by the template script, including: bad_directive\n' in \
-                      stderr.getvalue()
+        assert 'Some of the keys provided as part of the directives were not used by the template script, including: bad_directive' in stderr.getvalue()
 
     @fail_if_not_removed
     def test_condition_evaluation(self):

@@ -13,7 +13,7 @@ import flow
 import flow.environments
 
 import generate_template_reference_data as gen
-from test_project import redirect_stdout, redirect_stderr
+from contextlib import redirect_stdout, redirect_stderr
 
 
 class TestBaseTemplate(object):
@@ -86,12 +86,15 @@ class TestBaseTemplate(object):
 
             assert '\n'.join(reference) == '\n'.join(generated)
 
-
 # TestCase factory
 for name, env in flow.environment.ComputeEnvironment.registry.items():
+    print('hello world')
     if env.__module__.startswith('flow.environments'):
         name = '{}.{}'.format(env.__module__, env.__name__)[len('flow.'):]
         test_name = '{}TemplateTest'.format(env.__name__)
         test_cls = type(test_name, (TestBaseTemplate,), dict(env = env))
         locals()[test_name] = test_cls
+
+
+
 

@@ -552,9 +552,6 @@ class FlowGroup(object):
 
     MAX_LEN_ID = 100
 
-    class ExecCommandError(RuntimeError):
-        pass
-
     def __init__(self, name, operations=None, directives=None,
                  operation_directives=None, options=None):
         self.name = name
@@ -3178,10 +3175,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             self._groups[group['name']] = FlowGroup(**group)
 
         # Add operations to group
-        # Currently recreating operation list. There may be a better way to do
-        # this.
-        operations = self._collect_operations()
-        for (name, func) in operations:
+        for (name, op) in self._operations.items():
+            if isinstance(op, FlowCmdOperation):
+                func = op._cmd
+            else:
+                func = self._operation_functions[name]
+
             if hasattr(func, '_flow_group'):
                 directives = getattr(func, '_flow_group_operation_directives', dict())
                 for group in func._flow_group:

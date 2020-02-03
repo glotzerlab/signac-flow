@@ -529,7 +529,18 @@ class FlowGroup(object):
         :class:`dict` keys of :class:`str` and values of :class:`FlowOperation`
     :param directives:
         A dictionary of additional parameters that provide instructions on how
-        to execute this operation, e.g., specifically required resources.
+        to execute this group when submitting. Resource requests should not be
+        put into group directives but the operation specific directives.
+    :type directives:
+        :class:`dict`
+    :param operation_directives:
+        A dictionary of additional parameters that provide instructions on how
+        to execute a particular operation, e.g., specifically required
+        resources.  Operation names are keys and the directive dictionary are
+        values. If an operation does not have directives specified, then the
+        directives of the singleton group containing that operation are used. To
+        prevent this set the directives to an empty dictionary for that
+        operation.
     :type directives:
         :class:`dict`
     :param options:
@@ -544,38 +555,43 @@ class FlowGroup(object):
     class ExecCommandError(RuntimeError):
         pass
 
-    def __init__(self, name, operations=None, directives=None, options=None):
+    def __init__(self, name, operations=None, directives=None,
+                 operation_directives=None, options=None):
         self.name = name
         self.options = "" if options is None else options
         self.operations = dict() if operations is None else operations
         self.directives = dict() if directives is None else directives
+        if operation_directives is None:
+            self.operation_directives = dict()
+        else:
+            self.operation_directives = operation_directives
 
-    def _set_entrypoint_item(self, entrypoint, job, key, default):
+    def _set_entrypoint_item(self, entrypoint, directives, key, default, job):
         """Set a value (executable, path) for entrypoint in command.
 
         Order of priority is project specified value, then group directives
         specified, and finally the default provided to the function.
         """
-        entrypoint.setdefault(key, self.directives.get(key, default))
+        entrypoint.setdefault(key, directives.get(key, default))
         if callable(entrypoint[key]):
             entrypoint[key] = entrypoint[key](job)
 
-    def _determine_entrypoint(self, entrypoint, job):
+    def _determine_entrypoint(self, entrypoint, directives, job):
         """Get the entrypoint for creating a JobOperation.
 
         If path cannot be determined, then raise a RuntimeError since we do not
         no where to point to.
         """
         entrypoint = entrypoint.copy()
-        self._set_entrypoint_item(entrypoint, job, 'executable', sys.executable)
-        self._set_entrypoint_item(entrypoint, job, 'path', None)
+        self._set_entrypoint_item(entrypoint, directives, 'executable', sys.executable, job)
+        self._set_entrypoint_item(entrypoint, directives, 'path', None, job)
         if entrypoint['path'] is None:
             raise RuntimeError("Entrypoint path not set.")
         else:
             return "{} {}".format(entrypoint['executable'], entrypoint['path']).lstrip()
 
     def _submit_cmd(self, entrypoint, ignore_conditions, job=None):
-        entrypoint = self._determine_entrypoint(entrypoint, job)
+        entrypoint = self._determine_entrypoint(entrypoint, self.directives, job)
         cmd = "{} run -o {}".format(entrypoint, self.name)
         cmd = cmd if job is None else cmd + ' -j {} {}'.format(job, self.options)
 
@@ -588,8 +604,8 @@ class FlowGroup(object):
             cond_string = ' --ignore_conditons=' + cond_string
         return cmd.lstrip() + cond_string
 
-    def _run_cmd(self, entrypoint, operation_name, operation, job):
-        entrypoint = self._determine_entrypoint(entrypoint, job)
+    def _run_cmd(self, entrypoint, operation_name, operation, directives, job):
+        entrypoint = self._determine_entrypoint(entrypoint, directives, job)
         if isinstance(operation, FlowCmdOperation):
             return operation(job).lstrip()
         else:
@@ -632,7 +648,7 @@ class FlowGroup(object):
         """
         return all(op.complete(job) for op in self)
 
-    def add_operation(self, name, operation):
+    def add_operation(self, name, operation, directives=None):
         """Add an operation to the FlowGroup.
 
         :param name:
@@ -643,8 +659,14 @@ class FlowGroup(object):
             The workflow operation to add to the FlowGroup.
         :type operation:
             :py:class:`BaseFlowOperation`
+        :param directives:
+            The operation specific directives.
+        :type directives:
+            :py:class:`dict`
         """
         self.operations[name] = operation
+        if directives is not None:
+            self.operation_directives[name] = directives
 
     def isdisjoint(self, group):
         """Returns whether two groups are disjoint (do not share any common operations).
@@ -730,7 +752,7 @@ class FlowGroup(object):
                             directives=dict(self.directives))
 
     def create_run_job_operations(self, entrypoint, job, ignore_conditions=IgnoreConditions.NONE,
-                                  index=0):
+                                  default_directives=None, index=0):
         """Create JobOperation object(s) from the FlowGroup.
 
         Creates a JobOperation for each contained operation given proper conditions are met.
@@ -742,17 +764,34 @@ class FlowGroup(object):
             The job that the JobOperation is based on.
         :type job:
             signac.Job
+        :param default_directives:
+            The default directives to use for the operations. This is to allow for user specified
+            groups to 'inherent' directives from ``default_directives``. If no defaults are desired,
+            the argument can be set to an empty dictionary. This must be done explicitly, however.
+        :type default_directives:
+            :py:class:`dict`
         :param index:
             Index for the JopOperation.
         :type index:
             int
         """
+        default_directives = dict() if default_directives is None else default_directives
         for name, op in self.operations.items():
             if op.eligible(job, ignore_conditions):
+                # favor group set operation directives then provided default directives. If neither
+                # are specified use empty dictionary. This allows us to use the directives provided
+                # in singleton groups if non are provided for a particular operation in the group.
+                directives = self.operation_directives.get(
+                    name, default_directives.get(name, dict()))
                 uneval_cmd = functools.partial(self._run_cmd, entrypoint=entrypoint,
-                                               operation_name=name, operation=op, job=job)
-                job_op = JobOperation(self._generate_id(job, index=index), name, job,
-                                      cmd=uneval_cmd, directives=dict(self.directives))
+                                               operation_name=name, operation=op,
+                                               directives=directives, job=job)
+                # Uses a different id than the groups direct id. Do not use this for submitting
+                # jobs as current implementation prevents checking for resubmission in this case.
+                # The different ids allow for checking whether JobOperations created to run directly
+                # are different.
+                job_op = JobOperation(self._generate_id(job, name, index=index), name, job,
+                                      cmd=uneval_cmd, directives=dict(directives))
                 yield job_op
 
 
@@ -2043,6 +2082,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     'An exception was raised during operation {operation.name} '
                     'for job {operation.job}.'.format(operation=operation)) from e
 
+    def _get_default_directives(self):
+        return {name: self.groups[name].operation_directives.get(name, dict())
+                for name in self.operations.keys()}
+
     def run(self, jobs=None, names=None, pretend=False, np=None, timeout=None, num=None,
             num_passes=1, progress=False, order=None, ignore_conditions=IgnoreConditions.NONE):
         """Execute all pending operations for the given selection.
@@ -2133,6 +2176,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         flow_groups = self._gather_flow_groups(names)
 
+        # Get default directives
+        default_directives = self._get_default_directives()
+
         # Negative values for the execution limits, means 'no limit'.
         if num_passes and num_passes < 0:
             num_passes = None
@@ -2199,7 +2245,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     for flow_group in flow_groups:
                         for job in jobs:
                             operations.extend(flow_group.create_run_job_operations(
-                                self._entrypoint, job, ignore_conditions)
+                                self._entrypoint, job, ignore_conditions, default_directives)
                                               )
 
                     operations = list(filter(select, operations))
@@ -2919,6 +2965,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for name in self.operations.keys():
             group = self._groups[name]
             yield from group.create_run_job_operations(entrypoint=self._entrypoint, job=job,
+                                                       default_directives=dict(),
                                                        ignore_conditions=ignore_conditions,
                                                        index=0)
 
@@ -2953,6 +3000,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             The signac job handle.
         :type job:
             :class:`~signac.contrib.job.Job`
+        :param default_directives:
+            The default directives to use for the operations. This is to allow for user specified
+            groups to 'inherent' directives from ``default_directives``. If no defaults are desired,
+            the argument can be set to an empty dictionary. This must be done explicitly, however.
+        :type default_directives:
+            :py:class:`dict`
         :return:
             An instance of JobOperation to execute next or `None`, if no operation is eligible.
         :rtype:
@@ -3090,18 +3143,25 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         cls._GROUPS.append({'name': name, 'directives': directives, 'options': options})
 
         # Create decorator that adds a _flow_group label to operations.
-        def add_to_group(func):
+        def _default_add_to_group(func, name):
             if hasattr(func, '_flow_group'):
-                if add_to_group.group_name in func._flow_group:
-                    raise ValueError("Attempt repeat registration of "
-                                     "function {} into group {}".format(func.__name__,
-                                                                        add_to_group.group_name))
-                func._flow_group.append(add_to_group.group_name)
+                if name in func._flow_group:
+                    raise ValueError("Attempt repeat registration of {} into group {}"
+                                     "".format(func, name))
+                func._flow_group.append(name)
             else:
-                func._flow_group = [add_to_group.group_name]
+                func._flow_group = [name]
             return func
 
-        add_to_group.group_name = name
+        def add_to_group(func, directives=None):
+            new_func = _default_add_to_group(func, add_to_group.name)
+            if not hasattr(new_func, '_flow_group_operation_directives'):
+                new_func._flow_group_operation_directives = {add_to_group.name: directives}
+            else:
+                new_func._flow_group_operation_directives[add_to_group.name] = directives
+            return new_func
+
+        add_to_group.name = name
         return add_to_group
 
     def _register_groups(self):
@@ -3121,15 +3181,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         operations = self._collect_operations()
         for (name, func) in operations:
             if hasattr(func, '_flow_group'):
+                directives = getattr(func, '_flow_group_operation_directives', dict())
                 for group in func._flow_group:
                     self._groups[group].add_operation(name,
-                                                      self._operations[name])
+                                                      self._operations[name],
+                                                      directives.get(name, None))
 
             # For singleton groups add directives
-            try:
-                self._groups[name].directives = func._flow_directives
-            except (AttributeError):
-                pass
+            self._groups[name].operation_directives[name] = getattr(func,
+                                                                    '_flow_directives',
+                                                                    dict())
 
     @property
     def operations(self):

@@ -3,21 +3,21 @@ import flow
 from flow import FlowProject
 
 
-class ProjectTest(FlowProject):
+class _TestProject(FlowProject):
     pass
 
 
-@ProjectTest.label
+@_TestProject.label
 def default_label(job):
     return True
 
 
-@ProjectTest.label
+@_TestProject.label
 def negative_default_label(job):
     return False
 
 
-@ProjectTest.label
+@_TestProject.label
 def b_is_even(job):
     try:
         return job.sp.b % 2 == 0
@@ -25,10 +25,10 @@ def b_is_even(job):
         return False
 
 
-@ProjectTest.operation
+@_TestProject.operation
 @flow.cmd
-@ProjectTest.pre(b_is_even)
-@ProjectTest.post.isfile('world.txt')
+@_TestProject.pre(b_is_even)
+@_TestProject.post.isfile('world.txt')
 # Explicitly set a "bad" directive that is unused by the template.
 # The submit interface should warn about unused directives.
 @flow.directives(bad_directive=0)
@@ -42,14 +42,14 @@ def _need_to_fork(job):
     return job.doc.get('fork')
 
 
-@ProjectTest.operation
+@_TestProject.operation
 @flow.directives(fork=_need_to_fork)
-@ProjectTest.post.true('test')
+@_TestProject.post.true('test')
 def op2(job):
     job.document.test = os.getpid()
 
 
-class DynamicProjectTest(ProjectTest):
+class DynamicProjectTest(_TestProject):
     pass
 
 

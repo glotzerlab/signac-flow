@@ -29,7 +29,7 @@ from flow.util.misc import switch_to_directory
 from flow import init
 from deprecation import fail_if_not_removed
 
-from define_test_project import ProjectTest
+from define_test_project import _TestProject
 from define_test_project import DynamicProjectTest
 from define_dag_test_project import DagTestProject
 
@@ -107,7 +107,7 @@ class MockEnvironment(ComputeEnvironment):
         return True
 
 
-class TestBaseProject():
+class TestProjectBase():
     project_class = signac.Project
 
     @pytest.fixture(autouse=True)
@@ -132,7 +132,7 @@ class TestBaseProject():
         return project
 
 
-class TestProjectStatusPerformance(TestBaseProject):
+class TestProjectStatusPerformance(TestProjectBase):
 
     class Project(FlowProject):
         pass
@@ -166,7 +166,7 @@ class TestProjectStatusPerformance(TestBaseProject):
         MockScheduler.reset()
 
 
-class TestProjectClass(TestBaseProject):
+class TestProjectClass(TestProjectBase):
 
     def test_operation_definition(self):
 
@@ -323,7 +323,7 @@ class TestProjectClass(TestBaseProject):
                 starting_dir = os.getcwd()
                 with redirect_stderr(StringIO()):
                     A().run()
-                assert os.getcwd(), starting_dir
+                assert os.getcwd() == starting_dir
 
     def test_cmd_with_job_wrong_order(self):
 
@@ -522,8 +522,8 @@ class TestProjectClass(TestBaseProject):
             job.doc.a = True
 
 
-class TestProject(TestBaseProject):
-    project_class = ProjectTest
+class TestProject(TestProjectBase):
+    project_class = _TestProject
 
     def test_instance(self):
         assert isinstance(self.project, FlowProject)
@@ -646,8 +646,8 @@ class TestProject(TestBaseProject):
         self.mock_project(project_class=B).detect_operation_graph()
 
 
-class TestExecutionProject(TestBaseProject):
-    project_class = ProjectTest
+class TestExecutionProject(TestProjectBase):
+    project_class = _TestProject
     expected_number_of_steps = 4
 
     def test_pending_operations_order(self):
@@ -663,7 +663,6 @@ class TestExecutionProject(TestBaseProject):
         jobs_order_none = [job._id for job, _ in groupby(ops, key=lambda op: op.job)]
         assert len(jobs_order_none) == len(set(jobs_order_none))
 
-    # @pytest.mark.parameters
     def test_run(self, subtests):
         with subtests.test(order='invalid-order'):
             with pytest.raises(ValueError):
@@ -954,7 +953,6 @@ class TestExecutionProject(TestBaseProject):
         stderr = StringIO()
         with redirect_stderr(stderr):
             project.submit_operations(_id=cluster_job_id, operations=operations)
-        print(stderr.getvalue())
         assert len(list(MockScheduler.jobs())) == 1
         assert 'Some of the keys provided as part of the directives were not used by the template '
         'script, including: bad_directive' in stderr.getvalue()
@@ -1030,8 +1028,8 @@ class TestBufferedExecutionDynamicProject(TestBufferedExecutionProject,
     pass
 
 
-class TestProjectMainInterface(TestBaseProject):
-    project_class = ProjectTest
+class TestProjectMainInterface(TestProjectBase):
+    project_class = _TestProject
 
     def switch_to_cwd(self):
         os.chdir(self.cwd)
@@ -1118,7 +1116,7 @@ class TestDynamicProjectMainInterface(TestProjectMainInterface):
     project_class = DynamicProjectTest
 
 
-class TestProjectDagDetection(TestBaseProject):
+class TestProjectDagDetection(TestProjectBase):
     """Tests of operation DAG detection."""
     project_class = DagTestProject
 

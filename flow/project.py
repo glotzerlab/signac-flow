@@ -3037,6 +3037,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if (name, func) in cls._OPERATION_FUNCTIONS:
             raise ValueError(
                 "An operation with name '{}' is already registered.".format(name))
+        if name in cls._GROUP_NAMES:
+            raise ValueError("A group with name '{}' is already registered.".format(name))
 
         signature = inspect.signature(func)
         for i, (k, v) in enumerate(signature.parameters.items()):

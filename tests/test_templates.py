@@ -20,7 +20,6 @@ class TestTemplateBase(object):
 
     def env_name(self):
         name = '{}.{}'.format(self.env.__module__, self.env.__name__)
-        print('.'.join(name.split('.')[1:]))
         return '.'.join(name.split('.')[1:])
 
     def get_TestEnvironment(self):
@@ -82,8 +81,6 @@ class TestTemplateBase(object):
 
                         with open(job.fn('script_{}.sh'.format(op))) as file:
                             reference.extend([msg] + file.read().splitlines())
-
-            print('\n'.join(reference) == '\n'.join(generated))
 
             assert '\n'.join(reference) == '\n'.join(generated)
 

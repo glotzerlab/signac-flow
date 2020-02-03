@@ -656,12 +656,15 @@ class FlowGroup(object):
         """
         return not bool(set(self).intersection(group))
 
-    def _generate_id(self, job, index=0):
+    def _generate_id(self, job, operation_name=None, index=0):
         "Return a name, which identifies this job-group."
         project = job._project
 
         # The full name is designed to be truly unique for each job-group.
-        op_string = ''.join(sorted(list(self.operations.keys())))
+        if operation_name is None:
+            op_string = ''.join(sorted(list(self.operations.keys())))
+        else:
+            op_string = operation_name
 
         full_name = '{}%{}%{}%{}'.format(project.root_directory(),
                                          job.get_id(),
@@ -2120,17 +2123,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if jobs is None:
             jobs = self
 
-        # Change group names to their constituent operations
-        extended_names = []
-        if names is not None:
-            if isinstance(names, str):
-                raise ValueError(
-                    "The names argument of FlowProject.run() must be a sequence of strings, "
-                    "not a string.")
-            groups = self._gather_flow_groups(names)
-            for group in groups:
-                extended_names.extend(list(group.operations.keys()))
-            names = set(extended_names)
+        # Get all matching FlowGroups
+        if isinstance(names, str):
+            raise ValueError(
+                "The names argument of FlowProject.run() must be a sequence of strings, "
+                "not a string.")
+        if names is None:
+            names = list(self.operations.keys())
+
+        flow_groups = self._gather_flow_groups(names)
 
         # Negative values for the execution limits, means 'no limit'.
         if num_passes and num_passes < 0:
@@ -2192,9 +2193,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                "there are still operations pending.")
                 break
             try:
+                # Change groups to available run JobOperations
                 with self._potentially_buffered():
-                    operations = list(filter(select, self._get_pending_operations(
-                        jobs, names, ignore_conditions=ignore_conditions)))
+                    operations = []
+                    for flow_group in flow_groups:
+                        for job in jobs:
+                            operations.extend(flow_group.create_run_job_operations(
+                                self._entrypoint, job, ignore_conditions)
+                                              )
+
+                    operations = list(filter(select, operations))
             finally:
                 if messages:
                     for msg, level in set(messages):
@@ -3063,8 +3071,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type name:
             str
         :param directives:
-            Execution options like MPI and resource requests like number of
-            GPUs.
+            Execution options for use when submitting group, not resource
+            requests. Resource requests will be aggregated from member
+            operation directives.
         :type directives:
             dict
         :param options:

@@ -1,6 +1,7 @@
 # Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
+import pytest
 import sys
 import os
 import io
@@ -18,24 +19,31 @@ class TestTemplateBase(object):
     project_class = signac.Project
     env = None
 
-    def env_name(self):
+    def _env_name(self):
         name = '{}.{}'.format(self.env.__module__, self.env.__name__)
         return '.'.join(name.split('.')[1:])
 
-    def get_TestEnvironment(self):
+    def find_envs():
+        for name, env in flow.environment.ComputeEnvironment.registry.items():
+            if env.__module__.startswith('flow.environments'):
+                yield env
+
+    @pytest.mark.parametrize('env', find_envs())
+    def test_env(self, env):
         # Force asserts to show the full file when failures occur.
         # Useful to debug errors that arise.
         self.maxDiff = None
+        self.env = env
 
         # Must import the data into the project.
         with signac.TemporaryProject(name=gen.PROJECT_NAME) as p:
             fp = gen.get_masked_flowproject(p)
             fp.import_from(origin=gen.ARCHIVE_DIR)
-            jobs = fp.find_jobs(dict(environment=self.env_name()))
-
+            jobs = fp.find_jobs(dict(environment=self._env_name()))
             if not len(jobs):
-                raise RuntimeError("No reference data for environment {}!".format(self.env_name()))
-
+                raise RuntimeError(
+                    "No reference data for environment {}!".format(self._env_name())
+                    )
             reference = []
             generated = []
             for job in jobs:
@@ -48,7 +56,7 @@ class TestTemplateBase(object):
                         with redirect_stderr(devnull):
                             with redirect_stdout(tmp_out):
                                 fp.submit(
-                                    env=self.env, jobs=[job], names=bundle, pretend=True,
+                                    env=env, jobs=[job], names=bundle, pretend=True,
                                     force=True, bundle_size=len(bundle), **parameters)
                     tmp_out.seek(0)
                     msg = "---------- Bundled submission of job {}".format(job)
@@ -73,7 +81,7 @@ class TestTemplateBase(object):
                             with redirect_stderr(devnull):
                                 with redirect_stdout(tmp_out):
                                     fp.submit(
-                                        env=self.env, jobs=[job],
+                                        env=env, jobs=[job],
                                         names=[op], pretend=True, force=True, **parameters)
                         tmp_out.seek(0)
                         msg = "---------- Submission of operation {} for job {}.".format(op, job)
@@ -83,10 +91,3 @@ class TestTemplateBase(object):
                             reference.extend([msg] + file.read().splitlines())
 
             assert '\n'.join(reference) == '\n'.join(generated)
-
-    def test_run(self, subtests):
-        with subtests.test():
-            for name, env in flow.environment.ComputeEnvironment.registry.items():
-                if env.__module__.startswith('flow.environments'):
-                    self.env = env
-                    self.get_TestEnvironment()

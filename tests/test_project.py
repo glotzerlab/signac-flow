@@ -30,7 +30,7 @@ from flow import init
 from deprecation import fail_if_not_removed
 
 from define_test_project import _TestProject
-from define_test_project import DynamicProjectTest
+from define_test_project import _DynamicTestProject
 from define_dag_test_project import DagTestProject
 
 
@@ -1019,7 +1019,7 @@ class TestBufferedExecutionProject(TestExecutionProject):
 
 
 class TestExecutionDynamicProject(TestExecutionProject):
-    project_class = DynamicProjectTest
+    project_class = _DynamicTestProject
     expected_number_of_steps = 10
 
 
@@ -1113,7 +1113,7 @@ class TestProjectMainInterface(TestProjectBase):
 
 
 class TestDynamicProjectMainInterface(TestProjectMainInterface):
-    project_class = DynamicProjectTest
+    project_class = _DynamicTestProject
 
 
 class TestProjectDagDetection(TestProjectBase):

@@ -49,16 +49,16 @@ def op2(job):
     job.document.test = os.getpid()
 
 
-class DynamicProjectTest(_TestProject):
+class _DynamicTestProject(_TestProject):
     pass
 
 
-@DynamicProjectTest.operation
-@DynamicProjectTest.pre.after(op1)
-@DynamicProjectTest.post.true('dynamic')
+@_DynamicTestProject.operation
+@_DynamicTestProject.pre.after(op1)
+@_DynamicTestProject.post.true('dynamic')
 def op3(job):
     job.sp.dynamic = True   # migration during execution
 
 
 if __name__ == '__main__':
-    DynamicProjectTest().main()
+    _DynamicTestProject().main()

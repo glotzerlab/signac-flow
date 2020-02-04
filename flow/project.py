@@ -1609,10 +1609,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if progress:
                 operations = tqdm(operations)
             for operation in operations:
-                if pretend:
-                    print(operation.cmd)
-                else:
-                    self._execute_operation(operation, timeout)
+                self._execute_operation(operation, timeout, pretend)
         else:
             logger.debug("Parallelized execution of {} operation(s).".format(len(operations)))
             with contextlib.closing(Pool(processes=cpu_count() if np < 0 else np)) as pool:
@@ -1675,8 +1672,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for result in tqdm(results) if progress else results:
             result.get(timeout=timeout)
 
-    def _execute_operation(self, operation, timeout=None):
-        logger.info("Execute operation '{}'...".format(operation))
+    def _execute_operation(self, operation, timeout=None, pretend=False):
+        if not pretend:
+            logger.info("Execute operation '{}'...".format(operation))
 
         # Check if we need to fork for operation execution...
         if (
@@ -1694,21 +1692,27 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         ):
             # ... need to fork:
             prefix = self._environment.get_prefix(operation)
-            logger.debug(
-                "Forking to execute operation '{}' with "
-                "cmd '{}'.".format(operation, prefix + ' ' + operation.cmd))
-            subprocess.run(prefix + ' ' + operation.cmd, shell=True, timeout=timeout, check=True)
+            if pretend:
+                print(prefix + ' ' + operation.cmd)
+            else:
+                logger.debug(
+                    "Forking to execute operation '{}' with "
+                    "cmd '{}'.".format(operation, prefix + ' ' + operation.cmd))
+                subprocess.run(prefix + ' ' + operation.cmd, shell=True, timeout=timeout, check=True)
         else:
-            # ... executing operation in interpreter process as function:
-            logger.debug(
-                "Executing operation '{}' with current interpreter "
-                "process ({}).".format(operation, os.getpid()))
-            try:
-                self._operation_functions[operation.name](operation.job)
-            except Exception as e:
-                raise UserOperationError(
-                    'An exception was raised during operation {operation.name} '
-                    'for job {operation.job}.'.format(operation=operation)) from e
+            if pretend:
+                print(operation.cmd)
+            else:
+                # ... executing operation in interpreter process as function:
+                logger.debug(
+                    "Executing operation '{}' with current interpreter "
+                    "process ({}).".format(operation, os.getpid()))
+                try:
+                    self._operation_functions[operation.name](operation.job)
+                except Exception as e:
+                    raise UserOperationError(
+                        'An exception was raised during operation {operation.name} '
+                        'for job {operation.job}.'.format(operation=operation)) from e
 
     def run(self, jobs=None, names=None, pretend=False, np=None, timeout=None, num=None,
             num_passes=1, progress=False, order=None):

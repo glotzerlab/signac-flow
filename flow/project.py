@@ -1698,7 +1698,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 logger.debug(
                     "Forking to execute operation '{}' with "
                     "cmd '{}'.".format(operation, prefix + ' ' + operation.cmd))
-                subprocess.run(prefix + ' ' + operation.cmd, shell=True, timeout=timeout, check=True)
+                subprocess.run(prefix + ' ' + operation.cmd,
+                               shell=True, timeout=timeout, check=True)
         else:
             if pretend:
                 print(operation.cmd)

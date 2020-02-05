@@ -2739,6 +2739,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 operations = self._generate_operations(args.cmd, jobs, args.requires)
             else:
                 operations = self._get_pending_operations(jobs, args.operation_name)
+                
+            operations = (op for op in operations if self._eligible_for_submission(op))
             operations = list(islice(operations, args.num))
 
         # Generate the script and print to screen.

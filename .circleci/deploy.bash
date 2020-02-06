@@ -8,7 +8,7 @@ python -m pip install --user -U twine wheel setuptools
 # PYPI_USERNAME - (Required) Username for the publisher's account on PyPI
 # PYPI_PASSWORD - (Required, Secret) Password for the publisher's account on PyPI
 
-cat << EOF >> ~/.pypirc
+cat << EOF > ~/.pypirc
 [distutils]
 index-servers=
     pypi

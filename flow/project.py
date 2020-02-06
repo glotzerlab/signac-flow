@@ -2736,11 +2736,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Gather all pending operations or generate them based on a direct command...
         with self._potentially_buffered():
             if args.cmd:
-                operations = self._generate_operations(args.cmd, jobs, args.requires)
+                operations = (op for op in self._generate_operations(args.cmd, jobs, args.requires)
+                              if self.eligible_for_submission(op))
             else:
                 operations = self._get_pending_operations(jobs, args.operation_name)
-                
-            operations = (op for op in operations if self._eligible_for_submission(op))
+
             operations = list(islice(operations, args.num))
 
         # Generate the script and print to screen.

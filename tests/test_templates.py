@@ -15,17 +15,17 @@ import generate_template_reference_data as gen
 from test_project import redirect_stdout, redirect_stderr
 
 
-project_class = signac.Project
-
 def _env_name(env):
     name = '{}.{}'.format(env.__module__, env.__name__)
     return '.'.join(name.split('.')[1:])
+
 
 def find_envs():
     """Yields the environments to be tested."""
     for name, env in flow.environment.ComputeEnvironment.registry.items():
         if env.__module__.startswith('flow.environments'):
             yield env
+
 
 @pytest.mark.parametrize('env', find_envs())
 def test_env(env):

@@ -1158,7 +1158,7 @@ class GroupProjectTest(BaseProjectTest):
         project = self.mock_project()
         # For run mode single operation groups
         for job in project:
-            job_ops = project._get_submission_operations([job])
+            job_ops = project._get_submission_operations([job], dict())
             script = project.script(job_ops)
             if job.sp.b % 2 == 0:
                 self.assertIn(str(job), script)
@@ -1171,12 +1171,12 @@ class GroupProjectTest(BaseProjectTest):
 
         # For multiple operation groups and options
         for job in project:
-            job_op1 = project.groups['group1'].create_submission_job_operation(project._entrypoint,
-                                                                               job)
+            job_op1 = project.groups['group1'].create_submission_job_operation(
+                    project._entrypoint, dict(), job)
             script1 = project.script([job_op1])
             self.assertIn('run -o group1 -j {}'.format(job), script1)
-            job_op2 = project.groups['group2'].create_submission_job_operation(project._entrypoint,
-                                                                               job)
+            job_op2 = project.groups['group2'].create_submission_job_operation(
+                    project._entrypoint, dict(), job)
             script2 = project.script([job_op2])
             self.assertIn('--num-passes=2'.format(job), script2)
 
@@ -1224,9 +1224,8 @@ class GroupExecutionProjectTest(BaseProjectTest):
     def test_submit_groups(self):
         MockScheduler.reset()
         project = self.mock_project()
-        operations = [project.groups['group1'].create_submission_job_operation(project._entrypoint,
-                                                                               job)
-                      for job in project]
+        operations = [project.groups['group1'].create_submission_job_operation(
+                        project._entrypoint, dict(), job) for job in project]
         self.assertEqual(len(list(MockScheduler.jobs())), 0)
         cluster_job_id = project._store_bundled(operations)
         with redirect_stderr(StringIO()):

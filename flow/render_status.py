@@ -17,10 +17,10 @@ class renderer:
         self.html_output = None
 
     def generate_terminal_output(self):
-        self.terminal_output = mistune.text(self.markdown_output)
+        self.terminal_output = mistune.terminal(self.markdown_output)
 
     def generate_html_output(self):
-        self.html_output = mistune.markdown(self.markdown_output)
+        self.html_output = mistune.html(self.markdown_output)
 
     def render(self, template, template_environment, context, file, detailed, expand,
                unroll, compact, pretty, option):

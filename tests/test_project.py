@@ -534,7 +534,7 @@ class TestProject(TestProjectBase):
         for job in project:
             labels = list(project.classify(job))
             assert len(labels) == 2 - (job.sp.b % 2)
-            assert all((isinstance(l, str)) for l in labels)
+            assert all(isinstance(l, str) for l in labels)
             assert 'default_label' in labels
             assert 'negative_default_label' not in labels
 
@@ -1036,7 +1036,6 @@ class TestProjectMainInterface(TestProjectBase):
 
     @pytest.fixture(autouse=True)
     def setup_main_interface(self, request):
-        # super(TestProjectMainInterface, self).setUp()
         self.project = self.mock_project()
         self.cwd = os.getcwd()
         os.chdir(self._tmp_dir.name)
@@ -1052,8 +1051,8 @@ class TestProjectMainInterface(TestProjectBase):
                 with switch_to_directory(self.project.root_directory()):
                     return subprocess.check_output(_cmd.split(), stderr=subprocess.DEVNULL)
         except subprocess.CalledProcessError as error:
-            print(error, sys.stderr)
-            print(error.output, sys.stderr)
+            print(error, file=sys.stderr)
+            print(error.output, file=sys.stderr)
             raise
 
     def test_main_help(self):

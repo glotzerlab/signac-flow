@@ -3,3 +3,4 @@ jinja2>=2.8
 cloudpickle
 deprecation>=2
 pytest>=3.5.0
+pytest-subtests>=0.3.0

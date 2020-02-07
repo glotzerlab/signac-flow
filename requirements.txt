@@ -2,5 +2,5 @@ signac>=1.0.0
 jinja2>=2.8
 cloudpickle
 deprecation>=2
-pytest>=3.5.0
-pytest-subtests>=0.3.0
+pytest>=4.4
+pytest-subtests

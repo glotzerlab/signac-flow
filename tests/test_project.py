@@ -955,7 +955,7 @@ class TestExecutionProject(TestProjectBase):
             project.submit_operations(_id=cluster_job_id, operations=operations)
         assert len(list(MockScheduler.jobs())) == 1
         assert 'Some of the keys provided as part of the directives were not used by the template '
-        'script, including: bad_directive' in stderr.getvalue()
+        'script, including: bad_directive\n' in stderr.getvalue()
 
     @fail_if_not_removed
     def test_condition_evaluation(self):

@@ -1721,6 +1721,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if not pretend:
             logger.info("Execute operation '{}'...".format(operation))
 
+        prefix = self._environment.get_prefix(operation)
+        if pretend:
+            print(prefix + ' ' + operation.cmd if prefix !=  '' else operation.cmd)
+            return None
         # Check if we need to fork for operation execution...
         if (
             # The 'fork' directive was provided and evaluates to True:
@@ -1731,34 +1735,25 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             or operation.name not in self._operation_functions
             # The specified executable is not the same as the interpreter instance:
             or operation.directives.get('executable', sys.executable) != sys.executable
-            # The operation requires MPI and/or OpenMP parallelization:
-            or operation.directives.get('nranks', 1) > 1
-            or operation.directives.get('omp_num_threads', 1) > 1
+            or prefix != ''
         ):
             # ... need to fork:
-            prefix = self._environment.get_prefix(operation)
-            if pretend:
-                print(prefix + ' ' + operation.cmd)
-            else:
-                logger.debug(
-                    "Forking to execute operation '{}' with "
-                    "cmd '{}'.".format(operation, prefix + ' ' + operation.cmd))
-                subprocess.run(prefix + ' ' + operation.cmd,
-                               shell=True, timeout=timeout, check=True)
+            logger.debug(
+                "Forking to execute operation '{}' with "
+                "cmd '{}'.".format(operation, prefix + ' ' + operation.cmd))
+            subprocess.run(prefix + ' ' + operation.cmd,
+                            shell=True, timeout=timeout, check=True)
         else:
-            if pretend:
-                print(operation.cmd)
-            else:
-                # ... executing operation in interpreter process as function:
-                logger.debug(
-                    "Executing operation '{}' with current interpreter "
-                    "process ({}).".format(operation, os.getpid()))
-                try:
-                    self._operation_functions[operation.name](operation.job)
-                except Exception as e:
-                    raise UserOperationError(
-                        'An exception was raised during operation {operation.name} '
-                        'for job {operation.job}.'.format(operation=operation)) from e
+            # ... executing operation in interpreter process as function:
+            logger.debug(
+                "Executing operation '{}' with current interpreter "
+                "process ({}).".format(operation, os.getpid()))
+            try:
+                self._operation_functions[operation.name](operation.job)
+            except Exception as e:
+                raise UserOperationError(
+                    'An exception was raised during operation {operation.name} '
+                    'for job {operation.job}.'.format(operation=operation)) from e
 
     def run(self, jobs=None, names=None, pretend=False, np=None, timeout=None, num=None,
             num_passes=1, progress=False, order=None, ignore_conditions=IgnoreConditions.NONE):

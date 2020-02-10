@@ -17,6 +17,7 @@ Added
 - Add official support for University of Michigan Great Lakes cluster (#185).
 - Add official support for Bridges AI cluster (#222).
 - Add IgnoreConditions option for submit(), run() and script() (#38).
+- Add pytest support for Testing Framework (#227, #232).
 
 Version 0.9
 ===========

@@ -36,6 +36,11 @@ def cmd(func):
         @flow.cmd
         def hello(job):
             return "echo {job._id}"
+
+    .. note::
+        The final shell command generated for :meth:`~.FlowProject.run` or
+        :meth:`~.FlowProject.submit` still respects directives and will prepend e.g. MPI or OpenMP
+        prefixes to the shell command provided here.
     """
     if getattr(func, "_flow_with_job", False):
         raise RuntimeError("@cmd should appear below the @with_job decorator in your script")
@@ -103,13 +108,15 @@ class directives(object):
 
     Directives can for example be used to provide information about required resources
     such as the number of processes required for execution of parallelized operations.
+    For more information, read about :ref:`signac-docs:directives`.
 
-    In addition, you can use the `@directives(fork=True)` directive to enforce that a
+    In addition, you can use the ``@directives(fork=True)`` directive to enforce that a
     particular operation is always executed within a subprocess and not within the
     Python interpreter's process even if there are no other reasons that would prevent that.
+
     .. note::
 
-        Setting `fork=False` will not prevent forking if there are other reasons for forking,
+        Setting ``fork=False`` will not prevent forking if there are other reasons for forking,
         such as a timeout.
     """
 

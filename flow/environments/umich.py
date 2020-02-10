@@ -18,11 +18,11 @@ class GreatLakesEnvironment(DefaultSlurmEnvironment):
     def add_args(cls, parser):
         super(GreatLakesEnvironment, cls).add_args(parser)
         parser.add_argument(
-            '--mode',
-            choices=('cpu', 'gpu'),
-            default='cpu',
-            help="Specify whether to submit to the CPU or the GPU queue. "
-                 "(default=cpu)")
+            '--partition',
+            choices=('standard', 'gpu', 'largemem'),
+            default='standard',
+            help="Specify the partition to submit to. "
+                 "(default=standard)")
         parser.add_argument(
             '--memory',
             default='4g',

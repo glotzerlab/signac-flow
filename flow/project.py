@@ -2324,7 +2324,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             '--cmd',
             type=str,
             help="Directly specify the command for an operation. "
-                 "For example: --cmd='echo {job._id}'.")
+                 "For example: --cmd='echo {job._id}'. "
+                 "--cmd option is deprecated as of 0.9 and will be removed in 0.11.")
         direct_cmd_group.add_argument(
             '--requires',
             type=str,
@@ -2816,8 +2817,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Gather all pending operations or generate them based on a direct command...
         with self._potentially_buffered():
             if args.cmd:
-                operations = (op for op in self._generate_operations(args.cmd, jobs, args.requires)
-                              if self.eligible_for_submission(op))
+                print("DeprecatedWarning: --cmd option for script is deprecated as of 0.9 "
+                      "and will be removed in 0.11.", file=sys.stderr)
+                operations = self._generate_operations(args.cmd, jobs, args.requires)
             else:
                 operations = self._get_pending_operations(jobs, args.operation_name,
                                                           ignore_conditions=args.ignore_conditions)
@@ -2843,7 +2845,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Gather all pending operations ...
         with self._potentially_buffered():
             ops = (op for op in self._get_pending_operations(jobs, args.operation_name,
-                   ignore_conditions=args.ignore_conditions)
+                                                             ignore_conditions=args.ignore_conditions)
                    if self._eligible_for_submission(op))
             ops = list(islice(ops, args.num))
 

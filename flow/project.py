@@ -1723,7 +1723,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         prefix = self._environment.get_prefix(operation)
         if pretend:
-            print(prefix + ' ' + operation.cmd if prefix !=  '' else operation.cmd)
+            print(prefix + ' ' + operation.cmd if prefix != '' else operation.cmd)
             return None
         # Check if we need to fork for operation execution...
         if (
@@ -1742,7 +1742,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "Forking to execute operation '{}' with "
                 "cmd '{}'.".format(operation, prefix + ' ' + operation.cmd))
             subprocess.run(prefix + ' ' + operation.cmd,
-                            shell=True, timeout=timeout, check=True)
+                           shell=True, timeout=timeout, check=True)
         else:
             # ... executing operation in interpreter process as function:
             logger.debug(

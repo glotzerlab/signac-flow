@@ -588,8 +588,8 @@ class FlowGroup(object):
         else:
             return "{} {}".format(entrypoint['executable'], entrypoint['path']).lstrip()
 
-    def _submit_cmd(self, entrypoint, ignore_conditions, job=None):
-        entrypoint = self._determine_entrypoint(entrypoint, self.directives, job)
+    def _submit_cmd(self, entrypoint, ignore_conditions, directives=None, job=None):
+        entrypoint = self._determine_entrypoint(entrypoint, dict(), job)
         cmd = "{} run -o {}".format(entrypoint, self.name)
         cmd = cmd if job is None else cmd + ' -j {} {}'.format(job, self.options)
 
@@ -792,12 +792,13 @@ class FlowGroup(object):
                 # group.directives.update(operation_directives).  If none are specified use empty
                 # dictionary. This allows us to use the directives provided in singleton groups if
                 # none are provided for a particular operation in the group.
-                directives = deepcopy(self.directives)
-                directives.update(self.operation_directives.get(name,
-                                                                default_directives.get(name,
-                                                                                       dict())
-                                                                )
-                                  )
+                if len(self.directives) != 0:
+                    directives = deepcopy(self.directives)
+                    directives.update(self.operation_directives.get(name, dict()))
+                else:
+                    directives = self.operation_directives.get(name, default_directives.get(name,
+                                                                                            dict())
+                                                               )
                 uneval_cmd = functools.partial(self._run_cmd, entrypoint=entrypoint,
                                                operation_name=name, operation=op,
                                                directives=directives, job=job)
@@ -823,12 +824,13 @@ class FlowGroup(object):
 
         for name in self.operations.keys():
             # get directives for operation
-            op_dir = deepcopy(self.directives)
-            op_dir.update(self.operation_directives.get(name,
-                                                        default_directives.get(name, dict())
-                                                        )
-                          )
-
+            if len(self.directives) != 0:
+                op_dir = deepcopy(self.directives)
+                op_dir.update(self.operation_directives.get(name, dict()))
+            else:
+                op_dir = self.operation_directives.get(name,
+                                                       default_directives.get(name, dict())
+                                                       )
             # if operations are callable handle appropriately with job
             op_dir = dict(ngpus=get_directive(op_dir, 'ngpus', 0, job),
                           nranks=get_directive(op_dir, 'nranks', 0, job),
@@ -3250,9 +3252,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if hasattr(func, '_flow_group'):
                 directives = getattr(func, '_flow_group_operation_directives', dict())
                 for group in func._flow_group:
-                    self._groups[group].add_operation(name,
-                                                      self._operations[name],
-                                                      directives.get(name, None))
+                    self._groups[group].add_operation(name, op, directives.get(group, None))
 
             # For singleton groups add directives
             self._groups[name].operation_directives[name] = getattr(func,

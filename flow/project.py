@@ -1718,13 +1718,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             result.get(timeout=timeout)
 
     def _execute_operation(self, operation, timeout=None, pretend=False):
-        if not pretend:
-            logger.info("Execute operation '{}'...".format(operation))
-
         prefix = self._environment.get_prefix(operation)
         if pretend:
             print(prefix + ' ' + operation.cmd if prefix != '' else operation.cmd)
             return None
+
+        logger.info("Execute operation '{}'...".format(operation))
         # Check if we need to fork for operation execution...
         if (
             # The 'fork' directive was provided and evaluates to True:

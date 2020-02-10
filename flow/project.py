@@ -3220,13 +3220,26 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 func._flow_group = [name]
             return func
 
-        def add_to_group(func, directives=None):
-            new_func = _default_add_to_group(func, add_to_group.name)
-            if not hasattr(new_func, '_flow_group_operation_directives'):
-                new_func._flow_group_operation_directives = {add_to_group.name: directives}
+        def add_to_group(directives=None):
+            '''Decorator for adding operations to groups.
+
+            Abuses the first argument however... directives can be either a function or directives.
+            This needs to be fixed, but should be fixed when registration is refactored.
+            '''
+            if isinstance(directives, dict):
+
+                def new_decorator(func):
+                    new_func = _default_add_to_group(func, add_to_group.name)
+                    if not hasattr(new_func, '_flow_group_operation_directives'):
+                        new_func._flow_group_operation_directives = {add_to_group.name: directives}
+                    else:
+                        new_func._flow_group_operation_directives[add_to_group.name] = directives
+                    return new_func
+
+                return new_decorator
+
             else:
-                new_func._flow_group_operation_directives[add_to_group.name] = directives
-            return new_func
+                return _default_add_to_group(directives, add_to_group.name)
 
         add_to_group.name = name
         return add_to_group

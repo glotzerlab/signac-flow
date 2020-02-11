@@ -22,7 +22,7 @@ Added
 Changed
 +++++++
 
-- The commad line option ``--cmd`` for ``script`` has been deprecated and will trigger a ``DeprecationWarning`` upon use until removed (#243, #218).
+- The command line option ``--cmd`` for ``script`` has been deprecated and will trigger a ``DeprecationWarning`` upon use until removed (#243, #218).
 
 Version 0.9
 ===========

@@ -1935,7 +1935,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _generate_operations(self, cmd, jobs, requires=None):
         "Generate job-operations for a given 'direct' command."
         for job in jobs:
-            if requires and requires.difference(self.labels(job)):
+            if requires and set(requires).difference(self.labels(job)):
                 continue
             cmd_ = cmd.format(job=job)
             yield JobOperation(name=cmd_.replace(' ', '-'), cmd=cmd_, job=job)
@@ -2323,7 +2323,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             '--cmd',
             type=str,
             help="Directly specify the command for an operation. "
-                 "For example: --cmd='echo {job._id}'.")
+                 "For example: --cmd='echo {job._id}'. "
+                 "--cmd option is deprecated as of 0.9 and will be removed in 0.11.")
         direct_cmd_group.add_argument(
             '--requires',
             type=str,
@@ -2815,6 +2816,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Gather all pending operations or generate them based on a direct command...
         with self._potentially_buffered():
             if args.cmd:
+                print("DeprecationWarning: --cmd option for script is deprecated as of 0.9 "
+                      "and will be removed in 0.11.", file=sys.stderr)
                 operations = self._generate_operations(args.cmd, jobs, args.requires)
             else:
                 operations = self._get_pending_operations(jobs, args.operation_name,

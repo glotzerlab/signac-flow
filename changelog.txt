@@ -19,6 +19,11 @@ Added
 - Add IgnoreConditions option for submit(), run() and script() (#38).
 - Add pytest support for Testing Framework (#227, #232).
 
+Changed
++++++++
+
+- The command line option ``--cmd`` for ``script`` has been deprecated and will trigger a ``DeprecationWarning`` upon use until removed (#243, #218).
+
 Version 0.9
 ===========
 

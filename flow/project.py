@@ -593,7 +593,7 @@ class FlowGroup(object):
             directives = deepcopy(self.directives)
             directives.update(self.operation_directives.get(name, dict()))
         else:
-            directives = deepcopy(self.operation_directives.get(name, default.get(name, dict())))
+            directives = deepcopy(self.operation_directives.get(name, defaults.get(name, dict())))
         return directives
 
     def _submit_cmd(self, entrypoint, ignore_conditions, directives=None, job=None):

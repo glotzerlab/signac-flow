@@ -1654,10 +1654,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if progress:
                 operations = tqdm(operations)
             for operation in operations:
-                if pretend:
-                    print(operation.cmd)
-                else:
-                    self._execute_operation(operation, timeout)
+                self._execute_operation(operation, timeout, pretend)
         else:
             logger.debug("Parallelized execution of {} operation(s).".format(len(operations)))
             with contextlib.closing(Pool(processes=cpu_count() if np < 0 else np)) as pool:
@@ -1720,9 +1717,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for result in tqdm(results) if progress else results:
             result.get(timeout=timeout)
 
-    def _execute_operation(self, operation, timeout=None):
-        logger.info("Execute operation '{}'...".format(operation))
+    def _execute_operation(self, operation, timeout=None, pretend=False):
+        prefix = self._environment.get_prefix(operation)
+        if pretend:
+            print(prefix + ' ' + operation.cmd if prefix != '' else operation.cmd)
+            return None
 
+        logger.info("Execute operation '{}'...".format(operation))
         # Check if we need to fork for operation execution...
         if (
             # The 'fork' directive was provided and evaluates to True:
@@ -1733,16 +1734,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             or operation.name not in self._operation_functions
             # The specified executable is not the same as the interpreter instance:
             or operation.directives.get('executable', sys.executable) != sys.executable
-            # The operation requires MPI and/or OpenMP parallelization:
-            or operation.directives.get('nranks', 1) > 1
-            or operation.directives.get('omp_num_threads', 1) > 1
+            or prefix != ''
         ):
             # ... need to fork:
-            prefix = self._environment.get_prefix(operation)
             logger.debug(
                 "Forking to execute operation '{}' with "
                 "cmd '{}'.".format(operation, prefix + ' ' + operation.cmd))
-            subprocess.run(prefix + ' ' + operation.cmd, shell=True, timeout=timeout, check=True)
+            subprocess.run(prefix + ' ' + operation.cmd,
+                           shell=True, timeout=timeout, check=True)
         else:
             # ... executing operation in interpreter process as function:
             logger.debug(

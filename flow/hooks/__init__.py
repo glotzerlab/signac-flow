@@ -5,12 +5,11 @@ import logging
 
 from .log_operations import LogOperations
 from .track_operations import TrackOperations
-from .snapshots import SnapshotProject
 try:
-    from .git_workspace_tracking import TrackWorkspaceWithGit
+    from .git_workspace_tracking import Git
 except ImportError:
 
-    class TrackWorkspaceWithGit(object):
+    class Git:
         def __init__(self, *args, **kwargs):
             raise ImportError("'TrackWorkspaceWithGit' requires GitPython.")
 

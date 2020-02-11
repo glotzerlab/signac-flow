@@ -49,18 +49,20 @@ def _commit(repo, title):
             raise
 
 
-class TrackWorkspaceWithGit(object):
+class GitWorkspace:
+    """Track the workspace state with git.
 
-    def __init__(self, per_job=True, ignore=None):
-        self._per_job = per_job
+    """
+
+    def __init__(self, jointly=True, ignore=None):
+        self._jointly = jointly
         self._ignore = ignore
-        self._warnings = defaultdict(set)
 
     def _get_repo(self, operation):
-        if self._per_job:
-            root = operation.job.workspace()
-        else:
+        if self._jointly:
             root = operation.job._project.workspace()
+        else:
+            root = operation.job.workspace()
 
         try:
             return git.Repo(root)

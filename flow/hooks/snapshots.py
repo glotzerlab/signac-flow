@@ -13,35 +13,30 @@ import re
 from contextlib import contextmanager
 from tempfile import NamedTemporaryFile
 
+from signac import Collection
+
 try:
     from .git_util import collect_metadata_with_git as collect_metadata
 except ImportError:
     from .util import collect_metadata
 
 
-DEFAULT_TIME_FORMAT = "%Y-%m-%dT%H_%M_%S.%f"
 DEFAULT_SNAPSHOTS_DIRECTORY = '.signac/snapshots'
-DEFAULT_FILENAME_OPERATION_METADATA = 'operation.json'
 
 logger = logging.getLogger('snapshot')
 
 
 @contextmanager
-def _archive_project(project,
-                     exclude_workspace=False, exclude_hidden=True, exclude=None):
+def _archive_project(project, workspace, ignore):
     logger.info("Archiving project '{}'...".format(project))
 
     wd = os.path.relpath(project.workspace(), project.root_directory())
 
     def filter(info):
-        if exclude_hidden and os.path.basename(info.name).startswith('.'):
+        if not workspace and info.isdir() and os.path.relpath(info.name, 'project').startswith(wd):
             return
-        if exclude_workspace and info.isdir():
-            if os.path.relpath(info.name, 'project').startswith(wd):
-                return
-        if exclude is not None:
-            if re.match(exclude, info.name):
-                return
+        if ignore is not None and re.match(ignore, info.name):
+            return
         return info
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -51,32 +46,26 @@ def _archive_project(project,
         yield fn_snapshot, tarball
 
 
-class SnapshotProject(object):
-    """Snapshots the project (excluding the workspace by default) before executing an operation.
+class Snapshot:
+    """Track the project source code and/or workspace with snapshot archives.
 
+    :param workspace:
+        If True, include the workspace in the snapshot.
     :param compress:
         Compress the archive containing the snapshot.
-    :param exclude_workspace:
-        Do not copy the workspace into the snapshot archive (default=True).
-    :param exclude_hidden:
-        Ignore all hidden files from the snapshot.
-    :param exclude:
-        Exclude all files that match the provided regular expression.
+    :param ignore:
+        Ignore all files or directories that match the given pattern.
     :param directory:
         Specify the name of the directory where the snapshots will be stored.
     """
 
-    def __init__(self, compress=False,
-                 exclude_workspace=True, exclude_hidden=True, exclude=None,
-                 directory=DEFAULT_SNAPSHOTS_DIRECTORY, time_format=DEFAULT_TIME_FORMAT,
-                 filename_operation_metadata=DEFAULT_FILENAME_OPERATION_METADATA):
+    def __init__(self, workspace=False, ignore=None, compress=False,
+                 directory=DEFAULT_SNAPSHOTS_DIRECTORY):
         self.compress = compress
-        self.exclude_workspace = exclude_workspace
-        self.exclude_hidden = exclude_hidden
-        self.exclude = exclude
+        self.workspace = workspace
+        self.ignore = ignore
 
         self._directory = directory
-        self._fn_operation_metadata = filename_operation_metadata
 
     def archive_project(self, operation):
         project = operation.job._project
@@ -85,10 +74,9 @@ class SnapshotProject(object):
             json.dump(collect_metadata(operation), metadatafile)
             metadatafile.flush()
             os.makedirs(project.fn(self._directory), exist_ok=True)
-            with _archive_project(project=project,
-                                  exclude_workspace=self.exclude_workspace,
-                                  exclude_hidden=self.exclude_hidden,
-                                  exclude=self.exclude) as (fn_tmp, tarball):
+            with _archive_project(
+                    project=project, workspace=self.workspace,
+                    ignore=self.ignore) as (fn_tmp, tarball):
 
                 # Determine snapshot id
                 with open(fn_tmp, 'rb') as archive_file:
@@ -112,8 +100,8 @@ class SnapshotProject(object):
                         shutil.move(fn_tmp, fn_snapshot)
                     logger.info("Created snapshot file '{}'.".format(fn_snapshot))
 
-        metadata['project']['snapshot_id'] = snapshot_id
-        operation.job.doc.setdefault('_snapshots', []).append(metadata)
+        with Collection.open(os.path.join(self._directory, 'metadata.txt')) as c:
+            c[snapshot_id] = metadata
 
     def install_hooks(self, project):
         project.hooks.on_start.append(self.archive_project)

@@ -6,25 +6,24 @@ from signac import Collection
 try:
     import git
 except ImportError:
-    from ..util import collect_metadata
+    from .util import collect_metadata
     GIT = False
 else:
-    from ..git_util import collect_metadata_with_git as collect_metadata
+    from .git_util import collect_metadata_with_git as collect_metadata
     GIT = True
 
 
 FN_LOGFILE = '.operations_log.txt'
 
 
-class TrackOperations(object):
+class TrackOperations:
 
-    def __init__(self, fn_logfile=FN_LOGFILE, strict_git=True):
+    def __init__(self, strict_git=True):
         if strict_git and not GIT:
             raise RuntimeError("Unable to collect git metadata from the repository, "
                                "because the GitPython package is not installed.\n\n"
                                "You can use '{}(strict_git=False)' to ignore this "
                                "error.".format(type(self).__name__))
-        self._fn_logfile = fn_logfile
         self.strict_git = strict_git
 
     def log_operation(self, stage):

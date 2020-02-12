@@ -118,6 +118,7 @@ class TestProjectBase():
             name='FlowTestProject',
             root=self._tmp_dir.name)
 
+    @pytest.mark.filterwarnings("ignore:get_id")
     def mock_project(self, project_class=None, heterogeneous=False):
         project_class = project_class if project_class else self.project_class
         project = project_class.get_project(root=self._tmp_dir.name)
@@ -150,6 +151,7 @@ class TestProjectStatusPerformance(TestProjectBase):
             project.open_job(dict(i=i)).init()
         return project
 
+    @pytest.mark.filterwarnings("ignore:get_id")
     def test_status_performance(self):
         """Ensure that status updates take less than 1 second for a data space of 1000 jobs."""
         import timeit
@@ -157,10 +159,9 @@ class TestProjectStatusPerformance(TestProjectBase):
         project = self.mock_project()
 
         MockScheduler.reset()
-
         time = timeit.timeit(
-            lambda: project._fetch_status(project, StringIO(),
-                                          ignore_errors=False, no_parallelize=False), number=10)
+            lambda: project._fetch_status(
+                project, StringIO(), ignore_errors=False, no_parallelize=False), number=10)
 
         assert time < 10
         MockScheduler.reset()
@@ -307,6 +308,7 @@ class TestProjectClass(TestProjectBase):
         assert len(B._collect_post_conditions()[op2]) == 2
         assert len(C._collect_post_conditions()[op2]) == 3
 
+    @pytest.mark.filterwarnings("ignore:get_id")
     def test_with_job_decorator(self):
 
         class A(FlowProject):
@@ -337,6 +339,7 @@ class TestProjectClass(TestProjectBase):
             def test_cmd(job):
                 pass
 
+    @pytest.mark.filterwarnings("ignore:get_id")
     def test_with_job_works_with_cmd(self):
 
         class A(FlowProject):
@@ -358,6 +361,7 @@ class TestProjectClass(TestProjectBase):
                 for job in project:
                     assert os.path.isfile(job.fn("world.txt"))
 
+    @pytest.mark.filterwarnings("ignore:get_id")
     def test_with_job_error_handling(self):
 
         class A(FlowProject):
@@ -377,6 +381,7 @@ class TestProjectClass(TestProjectBase):
                         A().run()
                 assert os.getcwd() == starting_dir
 
+    @pytest.mark.filterwarnings("ignore:get_id")
     def test_cmd_with_job_error_handling(self):
 
         class A(FlowProject):
@@ -410,8 +415,8 @@ class TestProjectClass(TestProjectBase):
         project = A(self.mock_project().config)
         for job in project:
             job.doc.np = 3
-            next_op = project.next_operation(job)
-            assert 'mpirun -np 3 python' in next_op.cmd
+            next_op = project.next_operations(job)
+            assert 'mpirun -np 3 python' in next(next_op).cmd
             break
 
     def test_callable_directives(self):
@@ -429,20 +434,20 @@ class TestProjectClass(TestProjectBase):
 
         # test setting neither nranks nor omp_num_threads
         for job in project:
-            next_op = project.next_operation(job)
-            assert next_op.directives['np'] == 1
+            next_op = project.next_operations(job)
+            assert next(next_op).directives['np'] == 1
 
         # test only setting nranks
         for i, job in enumerate(project):
             job.doc.nranks = i+1
-            next_op = project.next_operation(job)
+            next_op = next(project.next_operations(job))
             assert next_op.directives['np'] == next_op.directives['nranks']
             del job.doc['nranks']
 
         # test only setting omp_num_threads
         for i, job in enumerate(project):
             job.doc.omp_num_threads = i+1
-            next_op = project.next_operation(job)
+            next_op = next(project.next_operations(job))
             assert next_op.directives['np'] == next_op.directives['omp_num_threads']
             del job.doc['omp_num_threads']
 
@@ -450,10 +455,11 @@ class TestProjectClass(TestProjectBase):
         for i, job in enumerate(project):
             job.doc.omp_num_threads = i+1
             job.doc.nranks = i % 3 + 1
-            next_op = project.next_operation(job)
+            next_op = next(project.next_operations(job))
             expected_np = (i + 1) * (i % 3 + 1)
             assert next_op.directives['np'] == expected_np
 
+    @pytest.mark.filterwarnings("ignore:get_id")
     def test_copy_conditions(self):
 
         class A(FlowProject):
@@ -550,11 +556,12 @@ class TestProject(TestProjectBase):
                     assert op.name == 'op2'
             assert i == int(job in even_jobs)
 
+    @pytest.mark.filterwarnings("ignore:get_id")
     def test_get_job_status(self):
         project = self.mock_project()
         for job in project:
             status = project.get_job_status(job)
-            assert status['job_id'] == job.get_id()
+            assert status['job_id'] == job.id
             assert len(status['operations']) == len(project.operations)
             for op in project.next_operations(job):
                 assert op.name in status['operations']
@@ -563,6 +570,7 @@ class TestProject(TestProjectBase):
                 assert op_status['completed'] == project.operations[op.name].complete(job)
                 assert op_status['scheduler_status'] == JobStatus.unknown
 
+    @pytest.mark.filterwarnings("ignore:get_id")
     def test_project_status_homogeneous_schema(self):
         project = self.mock_project()
         for parameters in (None, True, ['a'], ['b'], ['a', 'b']):
@@ -570,6 +578,7 @@ class TestProject(TestProjectBase):
                 with redirect_stderr(StringIO()):
                     project.print_status(parameters=parameters, detailed=True)
 
+    @pytest.mark.filterwarnings("ignore:get_id")
     def test_project_status_heterogeneous_schema(self):
         project = self.mock_project(heterogeneous=True)
         for parameters in (None, True, ['a'], ['b'], ['a', 'b']):
@@ -663,34 +672,36 @@ class TestExecutionProject(TestProjectBase):
         jobs_order_none = [job._id for job, _ in groupby(ops, key=lambda op: op.job)]
         assert len(jobs_order_none) == len(set(jobs_order_none))
 
+    @pytest.mark.filterwarnings("ignore:get_id")
     def test_run(self, subtests):
         with subtests.test(order='invalid-order'):
             with pytest.raises(ValueError):
                 project = self.mock_project()
                 self.project.run(order='invalid-order')
 
-        def sort_key(op):
-            return op.name, op.job.get_id()
+            def sort_key(op):
+                return op.name, op.job.id
 
-        for order in (None, 'none', 'cyclic', 'by-job', 'random', sort_key):
-            for job in self.project.find_jobs():  # clear
-                job.remove()
-            with subtests.test(order=order):
-                project = self.mock_project()
-                output = StringIO()
-                with add_cwd_to_environment_pythonpath():
-                    with switch_to_directory(project.root_directory()):
-                        with redirect_stderr(output):
-                            project.run(order=order)
-                output.seek(0)
-                output.read()
-                even_jobs = [job for job in project if job.sp.b % 2 == 0]
-                for job in project:
-                    if job in even_jobs:
-                        assert job.isfile('world.txt')
-                    else:
-                        assert not job.isfile('world.txt')
+            for order in (None, 'none', 'cyclic', 'by-job', 'random', sort_key):
+                for job in self.project.find_jobs():  # clear
+                    job.remove()
+                with subtests.test(order=order):
+                    project = self.mock_project()
+                    output = StringIO()
+                    with add_cwd_to_environment_pythonpath():
+                        with switch_to_directory(project.root_directory()):
+                            with redirect_stderr(output):
+                                project.run(order=order)
+                    output.seek(0)
+                    output.read()
+                    even_jobs = [job for job in project if job.sp.b % 2 == 0]
+                    for job in project:
+                        if job in even_jobs:
+                            assert job.isfile('world.txt')
+                        else:
+                            assert not job.isfile('world.txt')
 
+    @pytest.mark.filterwarnings("ignore:get_id")
     def test_run_with_selection(self):
         project = self.mock_project()
         output = StringIO()
@@ -710,6 +721,7 @@ class TestExecutionProject(TestProjectBase):
             else:
                 assert not job.isfile('world.txt')
 
+    @pytest.mark.filterwarnings("ignore:get_id")
     def test_run_with_operation_selection(self):
         project = self.mock_project()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
@@ -729,6 +741,7 @@ class TestExecutionProject(TestProjectBase):
                 assert all(job.doc.get('test') for job in project)
                 assert all('dynamic' not in job.doc for job in project)
 
+    @pytest.mark.filterwarnings("ignore:get_id")
     def test_run_parallel(self):
         project = self.mock_project()
         output = StringIO()
@@ -745,6 +758,7 @@ class TestExecutionProject(TestProjectBase):
             else:
                 assert not job.isfile('world.txt')
 
+    @pytest.mark.filterwarnings("ignore:get_id")
     def test_run_condition_inheritance(self):
 
         # This assignment is necessary to use the `mock_project` function on
@@ -809,6 +823,7 @@ class TestExecutionProject(TestProjectBase):
                         for op in good_ops
                         for job in project])
 
+    @pytest.mark.filterwarnings("ignore:get_id")
     def test_run_fork(self):
         project = self.mock_project()
         output = StringIO()
@@ -827,6 +842,7 @@ class TestExecutionProject(TestProjectBase):
             else:
                 assert os.getpid() == job.doc.test
 
+    @pytest.mark.filterwarnings("ignore:get_id")
     def test_submit_operations(self):
         MockScheduler.reset()
         project = self.mock_project()
@@ -839,6 +855,7 @@ class TestExecutionProject(TestProjectBase):
             project.submit_operations(_id=cluster_job_id, operations=operations)
         assert len(list(MockScheduler.jobs())) == 1
 
+    @pytest.mark.filterwarnings("ignore:get_id")
     def test_submit(self):
         MockScheduler.reset()
         project = self.mock_project()
@@ -858,6 +875,7 @@ class TestExecutionProject(TestProjectBase):
             project.submit(names='foo')
         project.submit(names=['foo'])
 
+    @pytest.mark.filterwarnings("ignore:get_id")
     def test_submit_limited(self):
         MockScheduler.reset()
         project = self.mock_project()
@@ -869,6 +887,7 @@ class TestExecutionProject(TestProjectBase):
             project.submit(num=1)
         assert len(list(MockScheduler.jobs())) == 2
 
+    @pytest.mark.filterwarnings("ignore:get_id")
     def test_resubmit(self):
         MockScheduler.reset()
         project = self.mock_project()
@@ -890,6 +909,7 @@ class TestExecutionProject(TestProjectBase):
         # Check that the actually required number of steps is equal to the expected number:
         assert i == self.expected_number_of_steps
 
+    @pytest.mark.filterwarnings("ignore:get_id")
     def test_bundles(self):
         MockScheduler.reset()
         project = self.mock_project()
@@ -942,6 +962,7 @@ class TestExecutionProject(TestProjectBase):
                 assert job_status['operations'][op]['scheduler_status'] in \
                     (JobStatus.unknown, JobStatus.inactive)
 
+    @pytest.mark.filterwarnings("ignore:get_id")
     def test_submit_operations_bad_directive(self):
         MockScheduler.reset()
         project = self.mock_project()
@@ -1082,7 +1103,7 @@ class TestProjectMainInterface(TestProjectBase):
     def test_main_next(self):
         assert len(self.project)
         jobids = set(self.call_subcmd('next op1').decode().split())
-        even_jobs = [job.get_id() for job in self.project if job.sp.b % 2 == 0]
+        even_jobs = [job.id for job in self.project if job.sp.b % 2 == 0]
         assert jobids == set(even_jobs)
 
     def test_main_status(self):
@@ -1091,7 +1112,7 @@ class TestProjectMainInterface(TestProjectBase):
         lines = iter(status_output)
         for line in lines:
             for job in self.project:
-                if job.get_id() in line:
+                if job.id in line:
                     for op in self.project.next_operations(job):
                         assert op.name in line
                         try:
@@ -1104,7 +1125,7 @@ class TestProjectMainInterface(TestProjectBase):
         even_jobs = [job for job in self.project if job.sp.b % 2 == 0]
         for job in self.project:
             script_output = self.call_subcmd('script -j {}'.format(job)).decode().splitlines()
-            assert job.get_id() in '\n'.join(script_output)
+            assert job.id in '\n'.join(script_output)
             if job in even_jobs:
                 assert 'echo "hello"' in '\n'.join(script_output)
             else:

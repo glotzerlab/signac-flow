@@ -562,7 +562,7 @@ class TestProject(TestProjectBase):
         project = self.mock_project()
         for job in project:
             status = project.get_job_status(job)
-            assert status['job_id'] == job.id
+            assert status['job_id'] == job.get_id()
             assert len(status['operations']) == len(project.operations)
             for op in project.next_operations(job):
                 assert op.name in status['operations']
@@ -681,7 +681,7 @@ class TestExecutionProject(TestProjectBase):
                 self.project.run(order='invalid-order')
 
             def sort_key(op):
-                return op.name, op.job.id
+                return op.name, op.job.get_id()
 
             for order in (None, 'none', 'cyclic', 'by-job', 'random', sort_key):
                 for job in self.project.find_jobs():  # clear
@@ -1102,19 +1102,21 @@ class TestProjectMainInterface(TestProjectBase):
             else:
                 assert not job.isfile('world.txt')
 
+    @pytest.mark.filterwarnings("ignore:get_id")
     def test_main_next(self):
         assert len(self.project)
         jobids = set(self.call_subcmd('next op1').decode().split())
-        even_jobs = [job.id for job in self.project if job.sp.b % 2 == 0]
+        even_jobs = [job.get_id() for job in self.project if job.sp.b % 2 == 0]
         assert jobids == set(even_jobs)
 
+    @pytest.mark.filterwarnings("ignore:get_id")
     def test_main_status(self):
         assert len(self.project)
         status_output = self.call_subcmd('--debug status --detailed').decode('utf-8').splitlines()
         lines = iter(status_output)
         for line in lines:
             for job in self.project:
-                if job.id in line:
+                if job.get_id() in line:
                     for op in self.project.next_operations(job):
                         assert op.name in line
                         try:
@@ -1122,12 +1124,13 @@ class TestProjectMainInterface(TestProjectBase):
                         except StopIteration:
                             continue
 
+    @pytest.mark.filterwarnings("ignore:get_id")
     def test_main_script(self):
         assert len(self.project)
         even_jobs = [job for job in self.project if job.sp.b % 2 == 0]
         for job in self.project:
             script_output = self.call_subcmd('script -j {}'.format(job)).decode().splitlines()
-            assert job.id in '\n'.join(script_output)
+            assert job.get_id() in '\n'.join(script_output)
             if job in even_jobs:
                 assert 'echo "hello"' in '\n'.join(script_output)
             else:

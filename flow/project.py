@@ -818,7 +818,7 @@ class FlowGroup(object):
         No checks are done to midigate inappropriate aggregating of operations.
         This can lead to poor utilization of computing resources.
         """
-        directives = dict(ngpus=0, nranks=0, omp_num_threads=0, np=0)
+        directives = dict(ngpu=0, nranks=0, omp_num_threads=0, np=0)
 
         def get_directive(directives, key, default, job):
             d = directives.get(key, default)
@@ -828,24 +828,27 @@ class FlowGroup(object):
             # get directives for operation
             op_dir = self.resolve_directives(name, default_directives.get(name, dict()))
             # if operations are callable handle appropriately with job
-            op_dir = dict(ngpus=get_directive(op_dir, 'ngpus', 0, job),
+            op_dir.update(dict(ngpu=get_directive(op_dir, 'ngpu', 0, job),
                           nranks=get_directive(op_dir, 'nranks', 0, job),
                           omp_num_threads=get_directive(op_dir, 'omp_num_threads', 0, job)
+                               )
                           )
+            # Find the correct number of processors for operation
+            np = max(max(op_dir['nranks'], 1) * max(op_dir['omp_num_threads'], 1),
+                     op_dir.get('np', 1))
             # In general parallel means add resources
             if parallel:
-                directives['ngpus'] += op_dir['ngpus']
+                directives['ngpu'] += op_dir['ngpu']
                 directives['nranks'] += op_dir['nranks']
                 directives['omp_num_threads'] += op_dir['omp_num_threads']
-                directives['np'] += max(op_dir['nranks'] * op_dir['omp_num_threads'], 1)
+                directives['np'] += np
             # In serial we take the max
             else:
-                directives['ngpus'] = max(directives['ngpus'], op_dir['ngpus'])
+                directives['ngpu'] = max(directives['ngpu'], op_dir['ngpu'])
                 directives['nranks'] = max(directives['nranks'], op_dir['nranks'])
                 directives['omp_num_threads'] = max(directives['omp_num_threads'],
                                                     op_dir['omp_num_threads'])
-                directives['np'] = max(directives['np'],
-                                       max(op_dir['nranks'] * op_dir['omp_num_threads'], 1))
+                directives['np'] = max(directives['np'], np)
         return directives
 
 

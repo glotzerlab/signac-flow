@@ -303,7 +303,7 @@ class JobOperation(object):
 
         # The full name is designed to be truly unique for each job-operation.
         full_name = '{}%{}%{}%{}'.format(
-            project.root_directory(), self.job.get_id(), self.name, index)
+            project.root_directory(), self.job.id, self.name, index)
 
         # The job_op_id is a hash computed from the unique full name.
         job_op_id = calc_id(full_name)

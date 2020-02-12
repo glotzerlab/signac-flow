@@ -24,6 +24,10 @@ Changed
 
 - The command line option ``--cmd`` for ``script`` has been deprecated and will trigger a ``DeprecationWarning`` upon use until removed (#243, #218).
 
+Removed
++++++++
+- Removed vendored ``tqdm`` module and replaced it with a requirement (#247).
+
 Version 0.9
 ===========
 

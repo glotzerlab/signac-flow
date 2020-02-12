@@ -263,6 +263,7 @@ class TestProjectClass(TestProjectBase):
         assert len(b._label_functions) == 2
         assert len(c._label_functions) == 1
 
+    @pytest.mark.filterwarnings("ignore:always")
     def test_conditions_with_inheritance(self):
         """Tests the inheritance of pre/post conditions.
 
@@ -759,6 +760,7 @@ class TestExecutionProject(TestProjectBase):
                 assert not job.isfile('world.txt')
 
     @pytest.mark.filterwarnings("ignore:get_id")
+    @pytest.mark.filterwarnings("ignore:always")
     def test_run_condition_inheritance(self):
 
         # This assignment is necessary to use the `mock_project` function on

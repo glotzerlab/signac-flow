@@ -511,6 +511,34 @@ class FlowOperation(BaseFlowOperation):
         return "{type}(name='{name}')".format(type=type(self).__name__, name=self.name)
 
 
+class FlowGroupEntry(object):
+    def __init__(self, name, options=None):
+        self.name = name
+        self.options = options
+
+    def __call__(self, func):
+        if hasattr(func, '_flow_group'):
+            if self.name in func._flow_group:
+                raise ValueError("Attempt repeat registration of {} into group {}"
+                                 "".format(func, self.name))
+            else:
+                func._flow_group.append(self.name)
+        else:
+            func._flow_group = [self.name]
+
+    def with_directives(self, func, directives=None):
+        directives = dict() if directives is None else directives
+        if hasattr(func, '_flow_group_operation_directives'):
+            if self.name in func._flow_group_operation_directives.keys():
+                raise ValueError("Attempted repeat directives setting of {} in group {}"
+                                 "".format(func, self.name))
+            else:
+                func._flow_group_operation_directives[self.name] = directives
+        else:
+            func._flow_group_operation_directives = {self.name: directives}
+        return self(func)
+
+
 class FlowGroup(object):
     """A FlowGroup represents a subset of a workflow for a project.
 
@@ -3113,7 +3141,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Append the name and function to the class registry
         cls._OPERATION_FUNCTIONS.append((name, func))
-        cls._GROUPS.append({'name': name, 'directives': None, 'options': None})
+        cls._GROUPS.append(FlowGroupEntry(name=name, options=None))
         if hasattr(func, '_flow_group'):
             func._flow_group.append(name)
         else:
@@ -3171,7 +3199,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 self._operation_functions[name] = func
 
     @classmethod
-    def make_group(cls, name, directives=None, options=None):
+    def make_group(cls, name, options=None):
         """Make a FlowGroup named ``name``. And return a decorator to make groups.
 
         .. code-block:: python
@@ -3189,12 +3217,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             The name of the FlowGroup.
         :type name:
             str
-        :param directives:
-            Execution options for use when submitting group, not resource
-            requests. Resource requests will be aggregated from member
-            operation directives.
-        :type directives:
-            dict
         :param options:
             A strng to append to submissions can be any valid signac run option.
         :type options:
@@ -3206,70 +3228,38 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         else:
             cls._GROUP_NAMES.add(name)
 
-        cls._GROUPS.append({'name': name, 'directives': directives, 'options': options})
-
-        # Create decorator that adds a _flow_group label to operations.
-        def _default_add_to_group(func, name):
-            if hasattr(func, '_flow_group'):
-                if name in func._flow_group:
-                    raise ValueError("Attempt repeat registration of {} into group {}"
-                                     "".format(func, name))
-                func._flow_group.append(name)
-            else:
-                func._flow_group = [name]
-            return func
-
-        def add_to_group(directives=None):
-            '''Decorator for adding operations to groups.
-
-            Abuses the first argument however... directives can be either a function or directives.
-            This needs to be fixed, but should be fixed when registration is refactored.
-            '''
-            if isinstance(directives, dict):
-
-                def new_decorator(func):
-                    new_func = _default_add_to_group(func, add_to_group.name)
-                    if not hasattr(new_func, '_flow_group_operation_directives'):
-                        new_func._flow_group_operation_directives = {add_to_group.name: directives}
-                    else:
-                        new_func._flow_group_operation_directives[add_to_group.name] = directives
-                    return new_func
-
-                return new_decorator
-
-            else:
-                return _default_add_to_group(directives, add_to_group.name)
-
-        add_to_group.name = name
-        return add_to_group
+        group_entry = FlowGroupEntry(name, options)
+        cls._GROUPS.append(group_entry)
+        return group_entry
 
     def _register_groups(self):
         "Register all groups and add the correct operations to each."
-        groups = []
+        group_entries = []
         # Gather all groups from class and parent classes.
         for cls in type(self).__mro__:
-            groups.extend(getattr(cls, '_GROUPS', []))
+            group_entries.extend(getattr(cls, '_GROUPS', []))
 
         # Initialize all groups without operations
-        for group in groups:
-            self._groups[group['name']] = FlowGroup(**group)
+        for entry in group_entries:
+            self._groups[entry.name] = FlowGroup(entry.name, options=entry.options)
 
-        # Add operations to group
-        for (name, op) in self._operations.items():
+        # Add operations and directives to group
+        for (op_name, op) in self._operations.items():
             if isinstance(op, FlowCmdOperation):
                 func = op._cmd
             else:
-                func = self._operation_functions[name]
+                func = self._operation_functions[op_name]
 
             if hasattr(func, '_flow_group'):
-                directives = getattr(func, '_flow_group_operation_directives', dict())
-                for group in func._flow_group:
-                    self._groups[group].add_operation(name, op, directives.get(group, None))
+                operation_directives = getattr(func, '_flow_group_operation_directives', dict())
+                for group_name in func._flow_group:
+                    self._groups[group_name].add_operation(
+                        op_name, op, operation_directives.get(group_name, None))
 
             # For singleton groups add directives
-            self._groups[name].operation_directives[name] = getattr(func,
-                                                                    '_flow_directives',
-                                                                    dict())
+            self._groups[op_name].operation_directives[op_name] = getattr(func,
+                                                                          '_flow_directives',
+                                                                          dict())
 
     @property
     def operations(self):

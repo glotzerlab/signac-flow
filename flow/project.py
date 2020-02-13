@@ -512,11 +512,37 @@ class FlowOperation(BaseFlowOperation):
 
 
 class FlowGroupEntry(object):
+    """A FlowGroupEntry registers operations for inclusion into a :py:class:`FlowGroup`.
+
+    Has two methods for adding operations: `self()` and `with_directives`.
+    Using `with_directives` takes one argument directives which get
+    applied to the operation when running through the group. This overrides
+    the default directives specified by `@directives`. Calling the object
+    directly will then use the default directives.
+
+    :param name:
+        The name of the :py:class:`FlowGroup` to be created.
+    :type name:
+        str
+    :param options:
+        The `FlowProject.run` options to pass when submitting the group.
+        These will be inlcuded in all submissions. Submission use run
+        commands to execute.
+    :type options:
+        str
+    """
     def __init__(self, name, options=None):
         self.name = name
         self.options = options
 
     def __call__(self, func):
+        """Decorator that adds the function into the group's operations.
+
+        :param func:
+            The function to decorate.
+        :type func:
+            callable
+        """
         if hasattr(func, '_flow_group'):
             if self.name in func._flow_group:
                 raise ValueError("Attempt repeat registration of {} into group {}"
@@ -526,8 +552,7 @@ class FlowGroupEntry(object):
         else:
             func._flow_group = [self.name]
 
-    def with_directives(self, func, directives=None):
-        directives = dict() if directives is None else directives
+    def _set_directives(self, func, directives):
         if hasattr(func, '_flow_group_operation_directives'):
             if self.name in func._flow_group_operation_directives.keys():
                 raise ValueError("Attempted repeat directives setting of {} in group {}"
@@ -536,7 +561,28 @@ class FlowGroupEntry(object):
                 func._flow_group_operation_directives[self.name] = directives
         else:
             func._flow_group_operation_directives = {self.name: directives}
-        return self(func)
+
+    def with_directives(self, **kwargs):
+        """Returns a decorator that sets group specific directives to the operation.
+
+        :param kwargs:
+            Directives to use for resource requests and running the operation
+            through the group.
+        :type **kwargs:
+            dict
+        :returns:
+            A decorator which registers the function into the group with
+            specified directives.
+        :rtype:
+            function
+        """
+        directives = dict() if len(kwargs) == 0 else kwargs
+
+        def decorator(func):
+            self._set_directives(func, directives)
+            return self(func)
+
+        return decorator
 
 
 class FlowGroup(object):

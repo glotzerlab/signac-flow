@@ -660,6 +660,10 @@ class FlowGroup(object):
             The default is :py:class:`IgnoreConditions.NONE`.
         :type ignore_conditions:
             :py:class:`~.IgnoreConditions`
+        :return:
+            Whether the group is eligible respecting ``ignore_conditions``.
+        :rtype:
+            bool
         """
         return any(op.eligible(job, ignore_conditions) for op in self)
 
@@ -670,6 +674,11 @@ class FlowGroup(object):
             A signac.Job from the signac workspace.
         :type job:
             signac.Job
+        :return:
+            Whether the group is complete (all contained operations are
+            complete.
+        :rtype:
+            bool
         """
         return all(op.complete(job) for op in self)
 
@@ -700,6 +709,11 @@ class FlowGroup(object):
             The other FlowGroup to compare to.
         :type group:
             :py:class:`flow.FlowGroup`
+        :return:
+            Returns ``True`` if ``group`` and ``self`` share not operations,
+            otherwise returns false.
+        :rtype:
+            bool
         """
         return not bool(set(self).intersection(group))
 
@@ -759,14 +773,14 @@ class FlowGroup(object):
             groups to 'inherent' directives from ``default_directives``. If no defaults are desired,
             the argument can be set to an empty dictionary. This must be done explicitly, however.
         :type default_directives:
-            :py:class:`dict`
+            dict
         :param job:
             The job that the JobOperation is based on.
         :type job:
             signac.Job
         :param ignore_conditions_on_submit:
             Specify if pre and/or post conditions check is to be ignored for eligibility check after
-            submitting.  The default is :py:class:`IgnoreConditions.NONE`.
+            submitting.  The default is `IgnoreConditions.NONE`.
         :type ignore_conditions:
             :py:class:`~.IgnoreConditions`
         :param parallel:
@@ -777,6 +791,13 @@ class FlowGroup(object):
             Index for the JopOperation.
         :type index:
             int
+        :return:
+            Returns a :py:class:`JobOperation` for submitting the group. The
+            :py:class:`JobOperation` will have directives that have been collected
+            appropriately from its contained operations based on parallel or serial
+            execution.
+        :rtype:
+            :py:class:`JobOperation`
         """
         uneval_cmd = functools.partial(self._submit_cmd, entrypoint=entrypoint, job=job,
                                        ignore_conditions=ignore_conditions_on_submit)
@@ -796,20 +817,24 @@ class FlowGroup(object):
             The path and executable, if applicable, to point to for execution
         :type entrypoint:
             dict
-        :param job:
-            The job that the JobOperation is based on.
-        :type job:
-            signac.Job
         :param default_directives:
             The default directives to use for the operations. This is to allow for user specified
             groups to 'inherent' directives from ``default_directives``. If no defaults are desired,
             the argument can be set to an empty dictionary. This must be done explicitly, however.
         :type default_directives:
             :py:class:`dict`
+        :param job:
+            The job that the JobOperation is based on.
+        :type job:
+            signac.Job
         :param index:
             Index for the JopOperation.
         :type index:
             int
+        :return:
+            Returns an iterator over eligible :py:class:`JobOperation`s.
+        :rtype:
+            Iterator[JobOperation]
         """
         default_directives = dict() if default_directives is None else default_directives
         for name, op in self.operations.items():

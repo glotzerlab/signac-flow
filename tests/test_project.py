@@ -1177,6 +1177,60 @@ class TestGroupProject(TestProjectBase):
             script2 = project.script([job_op2])
             assert '--num-passes=2'.format(job) in script2
 
+    def test_directives_hierarchy(self):
+        project = self.mock_project()
+        for job in project:
+            # Test submit JobOperations
+            job_ops = project._get_submission_operations([job],
+                                                         project._get_default_directives(),
+                                                         names=['group2'])
+            assert all([job_op.directives.get('ngpu', 0) == 2 for job_op in job_ops])
+            job_ops = project._get_submission_operations([job],
+                                                         project._get_default_directives(),
+                                                         names=['op3'])
+            assert all([job_op.directives.get('ngpu', 0) == 1 for job_op in job_ops])
+            # Test run JobOperations
+            job_ops = project.groups['group2'].create_run_job_operations(
+                        project._entrypoint, project._get_default_directives(), job)
+            assert all([job_op.directives.get('ngpu', 0) == 2 for job_op in job_ops])
+            job_ops = project.groups['op3'].create_run_job_operations(
+                        project._entrypoint, project._get_default_directives(), job)
+            assert all([job_op.directives.get('ngpu', 0) == 1 for job_op in job_ops])
+
+    def test_submission_aggregation(self):
+        class A(flow.FlowProject):
+            pass
+
+        group = A.make_group('group')
+
+        @group.with_directives(ngpu=2, nranks=4)
+        @A.operation
+        def op1(job):
+            pass
+
+        @group.with_directives(ngpu=2, nranks=4)
+        @A.operation
+        def op2(job):
+            pass
+
+        @group
+        @A.operation
+        @flow.directives(nranks=2)
+        def op3(job):
+            pass
+
+        project = self.mock_project(A)
+        group = project.groups['group']
+        job = [j for j in project][0]
+        directives = group._get_submission_directives(project._get_default_directives(),
+                                                      job, parallel=False)
+        assert all([directives['ngpu'] == 2, directives['nranks'] == 4,
+                    directives['np'] == 4])
+        directives = group._get_submission_directives(project._get_default_directives(),
+                                                      job, parallel=True)
+        assert all([directives['ngpu'] == 4, directives['nranks'] == 10,
+                    directives['np'] == 10])
+
 
 class TestGroupExecutionProject(TestProjectBase):
     project_class = GTestProject

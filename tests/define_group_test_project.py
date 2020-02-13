@@ -52,9 +52,10 @@ def op2(job):
     job.document.test = True
 
 
-@group2
+@group2.with_directives(ngpu=2)
 @TestProject.operation
 @TestProject.post.true('test3')
+@flow.directives(ngpu=1)
 def op3(job):
     job.document.test3 = True
 

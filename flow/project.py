@@ -615,10 +615,10 @@ class FlowGroup(object):
         else:
             return deepcopy(defaults.get(name, dict()))
 
-    def _submit_cmd(self, entrypoint, ignore_conditions, directives=None, job=None):
+    def _submit_cmd(self, entrypoint, ignore_conditions, job=None):
         entrypoint = self._determine_entrypoint(entrypoint, dict(), job)
-        cmd = "{} run -o {}".format(entrypoint, self.name)
-        cmd = cmd if job is None else cmd + ' -j {} {}'.format(job, self.options)
+        cmd = "{} run -o {} {} ".format(entrypoint, self.name, self.options)
+        cmd = cmd if job is None else cmd + ' -j {}'.format(job)
 
         cond_to_string = {IgnoreConditions.NONE: '',
                           IgnoreConditions.ALL: 'all',
@@ -887,6 +887,9 @@ class FlowGroup(object):
                 directives['omp_num_threads'] = max(directives['omp_num_threads'],
                                                     op_dir['omp_num_threads'])
                 directives['np'] = max(directives['np'], np)
+        for key in ['ngpu', 'nranks', 'omp_num_threads']:
+            if directives[key] == 0:
+                del directives[key]
         return directives
 
 

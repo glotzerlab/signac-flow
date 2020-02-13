@@ -808,8 +808,8 @@ class FlowGroup(object):
                             cmd=uneval_cmd,
                             directives=submission_directives)
 
-    def create_run_job_operations(self, entrypoint, job, ignore_conditions=IgnoreConditions.NONE,
-                                  default_directives=None, index=0):
+    def create_run_job_operations(self, entrypoint, default_directives, job,
+                                  ignore_conditions=IgnoreConditions.NONE, index=0):
         """Create JobOperation object(s) from the FlowGroup.
 
         Creates a JobOperation for each contained operation given proper conditions are met.
@@ -836,7 +836,6 @@ class FlowGroup(object):
         :rtype:
             Iterator[JobOperation]
         """
-        default_directives = dict() if default_directives is None else default_directives
         for name, op in self.operations.items():
             if op.eligible(job, ignore_conditions):
                 directives = self._resolve_directives(name, default_directives)
@@ -2340,7 +2339,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     for flow_group in flow_groups:
                         for job in jobs:
                             operations.extend(flow_group.create_run_job_operations(
-                                self._entrypoint, job, ignore_conditions, default_directives)
+                                self._entrypoint, default_directives, job, ignore_conditions)
                                               )
 
                     operations = list(filter(select, operations))

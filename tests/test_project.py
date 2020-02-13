@@ -265,6 +265,7 @@ class TestProjectClass(TestProjectBase):
     @pytest.mark.filterwarnings("ignore:always")
     def test_conditions_with_inheritance(self):
         """Tests the inheritance of pre/post conditions.
+        
         Class A should only have one pre/post condition, while class C that
         inherits from A should have three, and class B should just have two
         explicitly defined. Proper execution is tested in the

@@ -663,9 +663,9 @@ class FlowGroup(object):
 
     def _submit_cmd(self, entrypoint, ignore_conditions, job=None):
         entrypoint = self._determine_entrypoint(entrypoint, dict(), job)
-        cmd = "{} run -o {} {} ".format(entrypoint, self.name, self.options)
+        cmd = "{} run -o {}".format(entrypoint, self.name)
         cmd = cmd if job is None else cmd + ' -j {}'.format(job)
-
+        cmd = cmd if self.options is None else cmd + ' ' + self.options
         cond_to_string = {IgnoreConditions.NONE: '',
                           IgnoreConditions.ALL: 'all',
                           IgnoreConditions.PRE: 'pre',

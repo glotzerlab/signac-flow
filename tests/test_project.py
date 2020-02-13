@@ -1407,9 +1407,10 @@ class TestGroupProjectMainInterface(TestProjectBase):
             assert '--num-passes=2' in '\n'.join(script_output)
 
     def test_main_submit(self):
-        assert len(self.project)
+        project = self.mock_project()
+        assert len(project)
         # Assert that correct output for group submission is given
-        for job in self.project:
+        for job in project:
             submit_output = self.call_subcmd(
                 'submit -j {} -o group1 --pretend'.format(job)).decode().splitlines()
             output_string = '\n'.join(submit_output)

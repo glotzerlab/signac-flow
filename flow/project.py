@@ -657,7 +657,7 @@ class FlowGroup(object):
 
     def _resolve_directives(self, name, defaults):
         if name in self.operation_directives.keys():
-            return deepcopy(self.operation_directives['name'])
+            return deepcopy(self.operation_directives[name])
         else:
             return deepcopy(defaults.get(name, dict()))
 
@@ -933,9 +933,6 @@ class FlowGroup(object):
                 directives['omp_num_threads'] = max(directives['omp_num_threads'],
                                                     op_dir['omp_num_threads'])
                 directives['np'] = max(directives['np'], np)
-        for key in ['ngpu', 'nranks', 'omp_num_threads']:
-            if directives[key] == 0:
-                del directives[key]
         return directives
 
 

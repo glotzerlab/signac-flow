@@ -556,12 +556,6 @@ class FlowGroup(object):
         group.
     :type operations:
         :class:`dict` keys of :class:`str` and values of :class:`FlowOperation`
-    :param directives:
-        A set of default directives to use for operations. When operation specific
-        directives are set, the defaults get updated (in the Python sense) with
-        the operation specific directives.
-    :type directives:
-        :class:`dict`
     :param operation_directives:
         A dictionary of additional parameters that provide instructions on how
         to execute a particular operation, e.g., specifically required
@@ -581,12 +575,11 @@ class FlowGroup(object):
 
     MAX_LEN_ID = 100
 
-    def __init__(self, name, operations=None, directives=None,
-                 operation_directives=None, options=None):
+    def __init__(self, name, operations=None, operation_directives=None,
+                 options=None):
         self.name = name
         self.options = "" if options is None else options
         self.operations = dict() if operations is None else operations
-        self.directives = dict() if directives is None else directives
         if operation_directives is None:
             self.operation_directives = dict()
         else:
@@ -616,13 +609,11 @@ class FlowGroup(object):
         else:
             return "{} {}".format(entrypoint['executable'], entrypoint['path']).lstrip()
 
-    def resolve_directives(self, name, defaults):
-        if len(self.directives) != 0:
-            directives = deepcopy(self.directives)
-            directives.update(self.operation_directives.get(name, dict()))
+    def _resolve_directives(self, name, defaults):
+        if name in self.operation_directives.keys():
+            return deepcopy(self.operation_directives['name'])
         else:
-            directives = deepcopy(self.operation_directives.get(name, defaults.get(name, dict())))
-        return directives
+            return deepcopy(defaults.get(name, dict()))
 
     def _submit_cmd(self, entrypoint, ignore_conditions, directives=None, job=None):
         entrypoint = self._determine_entrypoint(entrypoint, dict(), job)
@@ -823,12 +814,7 @@ class FlowGroup(object):
         default_directives = dict() if default_directives is None else default_directives
         for name, op in self.operations.items():
             if op.eligible(job, ignore_conditions):
-                # favor group set operation directives then provided default directives (at the
-                # group or operation level. If the group has directives, then use
-                # group.directives.update(operation_directives).  If none are specified use empty
-                # dictionary. This allows us to use the directives provided in singleton groups if
-                # none are provided for a particular operation in the group.
-                directives = self.resolve_directives(name, default_directives.get(name, dict()))
+                directives = self._resolve_directives(name, default_directives)
                 uneval_cmd = functools.partial(self._run_cmd, entrypoint=entrypoint,
                                                operation_name=name, operation=op,
                                                directives=directives, job=job)
@@ -837,7 +823,7 @@ class FlowGroup(object):
                 # The different ids allow for checking whether JobOperations created to run directly
                 # are different.
                 job_op = JobOperation(self._generate_id(job, name, index=index), name, job,
-                                      cmd=uneval_cmd, directives=dict(directives))
+                                      cmd=uneval_cmd, directives=deepcopy(directives))
                 yield job_op
 
     def _get_submission_directives(self, default_directives, job, parallel=False):
@@ -854,7 +840,7 @@ class FlowGroup(object):
 
         for name in self.operations.keys():
             # get directives for operation
-            op_dir = self.resolve_directives(name, default_directives.get(name, dict()))
+            op_dir = self._resolve_directives(name, default_directives)
             # if operations are callable handle appropriately with job
             op_dir.update(dict(ngpu=get_directive(op_dir, 'ngpu', 0, job),
                           nranks=get_directive(op_dir, 'nranks', 0, job),

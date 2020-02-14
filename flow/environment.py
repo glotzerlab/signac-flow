@@ -153,7 +153,10 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         env_flags = getattr(cls, 'submit_flags', [])
         if env_flags:
             flags.extend(env_flags)
-
+        # parse the flag to check for --job-name
+        for flagi in flags:
+            if '--job-name' in flagi:
+                raise ValueError('Assignment of "--job-name" is not supported.')
         # Hand off the actual submission to the scheduler
         if cls.get_scheduler().submit(script, flags=flags, *args, **kwargs):
             return JobStatus.submitted

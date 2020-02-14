@@ -28,6 +28,10 @@ Removed
 +++++++
 - Removed vendored ``tqdm`` module and replaced it with a requirement (#247).
 
+Changed
++++++++
+- Raises ValueError when --job-name passed by the user because that interferes with status checking (#164, #241).
+
 Version 0.9
 ===========
 

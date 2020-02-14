@@ -172,7 +172,7 @@ def print_warning(msg):
     """
     import logging
     logger = logging.getLogger(__name__)
-    logger.warn(msg)
+    logger.warning(msg)
     return ''
 
 

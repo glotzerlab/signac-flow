@@ -1,5 +1,5 @@
 # make separate python class for render_status
-import mistune
+from .util import mistune
 from .scheduling.base import JobStatus
 
 
@@ -153,7 +153,7 @@ class renderer:
             return symbols[op_status]
 
         if pretty:
-            def highlight(s, eligible, prefix_str='**', suffix_str='**'):
+            def highlight(s, eligible):
                 """Change font to bold within jinja2 template
 
                 :param s:
@@ -174,11 +174,11 @@ class renderer:
                     str
                 """
                 if eligible:
-                    return prefix_str + s + suffix_str
+                    return '**' + s + '**'
                 else:
                     return s
         else:
-            def highlight(s, eligible, prefix_str='**', suffix_str='**'):
+            def highlight(s, eligible):
                 """Change font to bold within jinja2 template
 
                 :param s:

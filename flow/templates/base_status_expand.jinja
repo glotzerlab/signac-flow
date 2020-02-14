@@ -11,9 +11,11 @@
 | job_id | operation | eligible | cluster_status |
 | ------ | --------- | -------- | -------------- |
 {% for job in jobs %}
-{% for key, value in job['operations'].items() %}
-{% if (scheduler_status_code[value['scheduler_status']] != 'U' or value['eligible']) or all_ops%}
-| {{ job['job_id'] }} | {{ '%s' | highlight(value['eligible'], '**', '**') | format(key) }} | {{ alias_bool[value['eligible']] }} | {{ scheduler_status_code[value['scheduler_status']] }} |
+{% for key, value in job['operations'].items() if value | job_filter(scheduler_status_code, all_ops) %}
+{% if loop.first %}
+| {{ job['job_id'] }} | {{ '%s' | highlight(value['eligible']) | format(key) }} | {{ alias_bool[value['eligible']] }} | {{ scheduler_status_code[value['scheduler_status']] }} |
+{% else %}
+|  | {{ '%s' | highlight(value['eligible']) | format(key) }} | {{ alias_bool[value['eligible']] }} | {{ scheduler_status_code[value['scheduler_status']] }} |
 {% endif %}
 {% endfor %}
 {% endfor %}

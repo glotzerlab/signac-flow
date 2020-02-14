@@ -262,7 +262,6 @@ class TestProjectClass(TestProjectBase):
         assert len(b._label_functions) == 2
         assert len(c._label_functions) == 1
 
-    @pytest.mark.filterwarnings("ignore:always")
     def test_conditions_with_inheritance(self):
         """Tests the inheritance of pre/post conditions.
 
@@ -280,29 +279,31 @@ class TestProjectClass(TestProjectBase):
         class C(A):
             pass
 
-        @A.pre.always
-        @C.pre.always
-        @C.pre.always
-        @B.pre.always
-        @B.pre.always
-        @A.operation
-        @B.operation
-        def op1(job):
-            pass
+        with pytest.deprecated_call():
+            @A.pre.always
+            @C.pre.always
+            @C.pre.always
+            @B.pre.always
+            @B.pre.always
+            @A.operation
+            @B.operation
+            def op1(job):
+                pass
 
         assert len(A._collect_pre_conditions()[op1]) == 1
         assert len(B._collect_pre_conditions()[op1]) == 2
         assert len(C._collect_pre_conditions()[op1]) == 3
 
-        @A.post.always
-        @C.post.always
-        @C.post.always
-        @B.post.always
-        @B.post.always
-        @A.operation
-        @B.operation
-        def op2(job):
-            pass
+        with pytest.deprecated_call():
+            @A.post.always
+            @C.post.always
+            @C.post.always
+            @B.post.always
+            @B.post.always
+            @A.operation
+            @B.operation
+            def op2(job):
+                pass
 
         assert len(A._collect_post_conditions()[op2]) == 1
         assert len(B._collect_post_conditions()[op2]) == 2
@@ -752,7 +753,6 @@ class TestExecutionProject(TestProjectBase):
             else:
                 assert not job.isfile('world.txt')
 
-    @pytest.mark.filterwarnings("ignore:always")
     def test_run_condition_inheritance(self):
 
         # This assignment is necessary to use the `mock_project` function on
@@ -770,33 +770,36 @@ class TestExecutionProject(TestProjectBase):
 
         # Never post conditions are to prevent warnings on operations without
         # post conditions
-        @A.pre.never
-        @B.pre.always
-        @A.post.never
-        @B.post.never
-        @A.operation
-        @B.operation
-        def op1(job):
-            job.doc.op1 = True
+        with pytest.deprecated_call():
+            @A.pre.never
+            @B.pre.always
+            @A.post.never
+            @B.post.never
+            @A.operation
+            @B.operation
+            def op1(job):
+                job.doc.op1 = True
 
-        @A.pre.always
-        @B.pre.never
-        @A.post.never
-        @B.post.never
-        @A.operation
-        @B.operation
-        def op2(job):
-            job.doc.op2 = True
+        with pytest.deprecated_call():
+            @A.pre.always
+            @B.pre.never
+            @A.post.never
+            @B.post.never
+            @A.operation
+            @B.operation
+            def op2(job):
+                job.doc.op2 = True
 
-        @A.pre.always
-        @C.pre.never
-        @B.pre.never
-        @A.post.never
-        @B.post.never
-        @A.operation
-        @B.operation
-        def op3(job):
-            job.doc.op3 = True
+        with pytest.deprecated_call():
+            @A.pre.always
+            @C.pre.never
+            @B.pre.never
+            @A.post.never
+            @B.post.never
+            @A.operation
+            @B.operation
+            def op3(job):
+                job.doc.op3 = True
 
         all_ops = set(['op1', 'op2', 'op3'])
         for project_class, bad_ops in zip(

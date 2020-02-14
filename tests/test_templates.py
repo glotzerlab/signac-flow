@@ -28,7 +28,6 @@ def find_envs():
 
 
 @pytest.mark.parametrize('env', find_envs())
-@pytest.mark.filterwarnings("ignore:get_id")
 def test_env(env):
     # Force asserts to show the full file when failures occur.
     # Useful to debug errors that arise.

@@ -553,7 +553,6 @@ class TestProject(TestProjectBase):
                     assert op.name == 'op2'
             assert i == int(job in even_jobs)
 
-    @pytest.mark.filterwarnings("ignore:get_id")
     def test_get_job_status(self):
         project = self.mock_project()
         for job in project:
@@ -668,14 +667,12 @@ class TestExecutionProject(TestProjectBase):
         jobs_order_none = [job._id for job, _ in groupby(ops, key=lambda op: op.job)]
         assert len(jobs_order_none) == len(set(jobs_order_none))
 
-    @pytest.mark.filterwarnings("ignore:get_id")
     def test_run(self, subtests):
         with subtests.test(order='invalid-order'):
             with pytest.raises(ValueError):
                 project = self.mock_project()
                 self.project.run(order='invalid-order')
 
-        @pytest.mark.filterwarnings("ignore:get_id")
         def sort_key(op):
             return op.name, op.job.get_id()
 
@@ -1087,14 +1084,12 @@ class TestProjectMainInterface(TestProjectBase):
             else:
                 assert not job.isfile('world.txt')
 
-    @pytest.mark.filterwarnings("ignore:get_id")
     def test_main_next(self):
         assert len(self.project)
         jobids = set(self.call_subcmd('next op1').decode().split())
         even_jobs = [job.get_id() for job in self.project if job.sp.b % 2 == 0]
         assert jobids == set(even_jobs)
 
-    @pytest.mark.filterwarnings("ignore:get_id")
     def test_main_status(self):
         assert len(self.project)
         status_output = self.call_subcmd('--debug status --detailed').decode('utf-8').splitlines()
@@ -1109,7 +1104,6 @@ class TestProjectMainInterface(TestProjectBase):
                         except StopIteration:
                             continue
 
-    @pytest.mark.filterwarnings("ignore:get_id")
     def test_main_script(self):
         assert len(self.project)
         even_jobs = [job for job in self.project if job.sp.b % 2 == 0]

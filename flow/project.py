@@ -1150,8 +1150,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                      eligible_jobs_max_lines=None, output_format='terminal'):
         """Print the status of the project.
 
-        .. versionchanged:: 0.9
-
         :param jobs:
             Only execute operations for the given jobs, or all if the argument is omitted.
         :type jobs:
@@ -1235,8 +1233,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             int
         :param output_format:
             Status output format, supports:
-            'terminal' (default), 'markdown'/'md' or 'html'.
-        :type option:
+            'terminal' (default), 'markdown' or 'html'.
+        :type output_format:
             str
         """
         if file is None:
@@ -1444,6 +1442,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         context['all_ops'] = all_ops
         context['parameters'] = parameters
         context['compact'] = compact
+        context['pretty'] = pretty
         context['unroll'] = unroll
         if overview:
             context['progress_sorted'] = progress_sorted
@@ -1478,10 +1477,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if n > 0:
             context['op_counter'].append(('[{} more operations omitted]'.format(n), ''))
 
-        render_result = render_status.renderer()
-        render_output = render_result.render(template, template_environment, context, file,
-                                             detailed, expand, unroll, compact, pretty,
-                                             output_format)
+        render_result = render_status.Renderer()
+        render_output = render_result.render(template, template_environment, context, detailed,
+                                             expand, unroll, compact, output_format)
 
         print(render_output, file=file)
 

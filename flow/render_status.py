@@ -21,8 +21,8 @@ class Renderer:
     def generate_html_output(self):
         self.html_output = mistune.html(self.markdown_output)
 
-    def render(self, template, template_environment, context, file, detailed, expand,
-               unroll, compact, pretty, option):
+    def render(self, template, template_environment, context, detailed, expand,
+               unroll, compact, output_format):
         """Render the status in different format for print_status.
 
         :param template:
@@ -37,10 +37,6 @@ class Renderer:
             Context that includes all the information for rendering status output.
         :type context:
             dict
-        :param file:
-            Redirect all output to this file, defaults to sys.stdout.
-        :type file:
-            str
         :param detailed:
             Print a detailed status of each job.
         :type detailed:
@@ -57,14 +53,10 @@ class Renderer:
             Print a compact version of the output.
         :type compact:
             bool
-        :param pretty:
-            Prettify the output.
-        :type pretty:
-            bool
-        :param option:
+        :param output_format:
             Rendering output format, supports:
             'terminal' (default), 'markdown' or 'html'.
-        :type option:
+        :type output_format:
             str
         """
 
@@ -151,52 +143,25 @@ class Renderer:
 
             return symbols[op_status]
 
-        if pretty:
-            def highlight(s, eligible):
-                """Change font to bold within jinja2 template
+        def highlight(s, eligible, pretty):
+            """Change font to bold within jinja2 template
 
-                :param s:
-                    The string to be printed
-                :type s:
-                    str
-                :param eligible:
-                    Boolean value for job eligibility
-                :type eligible:
-                    bool
-                :param prefix_str:
-                    String prefix for bold syntax
-                :type prefix_str:
-                    str
-                :param suffix_str:
-                    String prefix for bold syntax
-                :type suffix_str:
-                    str
-                """
-                if eligible:
-                    return '**' + s + '**'
-                else:
-                    return s
-        else:
-            def highlight(s, eligible):
-                """Change font to bold within jinja2 template
-
-                :param s:
-                    The string to be printed
-                :type s:
-                    str
-                :param eligible:
-                    Boolean value for job eligibility
-                :type eligible:
-                    bool
-                :param prefix_str:
-                    String prefix for bold syntax
-                :type prefix_str:
-                    str
-                :param suffix_str:
-                    String prefix for bold syntax
-                :type suffix_str:
-                    str
-                """
+            :param s:
+                The string to be printed.
+            :type s:
+                str
+            :param eligible:
+                Boolean value for job eligibility.
+            :type eligible:
+                bool
+            :param pretty:
+                Prettify the output.
+            :type pretty:
+                bool
+            """
+            if eligible and pretty:
+                return '**' + s + '**'
+            else:
                 return s
 
         template_environment.filters['highlight'] = highlight
@@ -206,14 +171,14 @@ class Renderer:
 
         template = template_environment.get_template(template)
         self.markdown_output = template.render(**context)
-        if option == 'terminal':
+        if output_format == 'terminal':
             self.generate_terminal_output()
             return self.terminal_output
-        elif option == 'html':
+        elif output_format == 'markdown':
+            return self.markdown_output
+        elif output_format == 'html':
             self.generate_html_output()
             return self.html_output
-        elif option == 'markdown':
-            return self.markdown_output
         else:
             raise ValueError('Output format not supported, valid options are '
                              'terminal, markdown, or html.')

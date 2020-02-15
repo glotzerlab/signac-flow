@@ -1,5 +1,4 @@
 import re
-from .tabulate import tabulate
 
 __all__ = ['plugin_table']
 
@@ -36,7 +35,7 @@ def text_parse_and_render_table(self, m, state):
     tbody = table['children'][1]['children']
     rows = [[cell['text'] for cell in row['children']] for row in tbody]
 
-    return {'type': 'table', 'text': tabulate(rows, headers=headers) + '\n\n'}
+    return {'type': 'table', 'raw': {'headers': headers, 'rows': rows}}
 
 
 def parse_nptable(self, m, state):

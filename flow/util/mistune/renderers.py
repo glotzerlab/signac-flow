@@ -1,4 +1,5 @@
 from .scanner import escape, escape_html
+from .plugins.tabulate import tabulate
 
 
 class BaseRenderer(object):
@@ -251,7 +252,7 @@ class TextRenderer(BaseRenderer):
         return '\n'
 
     def table(self, text):
-        return text
+        return tabulate(text['rows'], headers=text['headers']) + '\n\n'
 
 
 class TerminalRenderer(TextRenderer):
@@ -269,3 +270,13 @@ class TerminalRenderer(TextRenderer):
 
     def strong(self, text):
         return '\033[1m' + text + '\033[0m'
+
+    def modify_strong(self, text):
+        if text.strip('*') == text:
+            return text
+        else:
+            return self.strong(text.strip('*'))
+
+    def table(self, text):
+        rows = [[self.modify_strong(cell) for cell in row] for row in text['rows']]
+        return tabulate(rows, headers=text['headers']) + '\n\n'

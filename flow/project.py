@@ -557,6 +557,9 @@ class _FlowProjectClass(type):
                 super(pre, self).__init__(condition, tag)
 
             def __call__(self, func):
+                for operation_i in self._parent_class._OPERATION_FUNCTIONS:
+                    if self.condition in operation_i:
+                        raise ValueError("Passing operation function is not allowed")
                 self._parent_class._OPERATION_PRE_CONDITIONS[func].insert(0, self.condition)
                 return func
 
@@ -569,6 +572,13 @@ class _FlowProjectClass(type):
             @classmethod
             def after(cls, *other_funcs):
                 "True if and only if all post conditions of other operation-function(s) are met."
+                for condition_i in other_funcs:
+                    check_flag = 0
+                    for operation_i in cls._parent_class._OPERATION_FUNCTIONS:
+                        if condition_i in operation_i:
+                            check_flag = 1
+                    if check_flag != 1:
+                        raise ValueError("Operation function not passed.")
                 return cls(_create_all_metacondition(cls._parent_class._collect_post_conditions(),
                                                      *other_funcs))
 

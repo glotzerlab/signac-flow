@@ -97,9 +97,9 @@ class Renderer:
         def job_filter(job_op, scheduler_status_code, all_ops):
             """Filter eligible jobs for status print.
 
-            :param job_ops:
-                Operations information for a job.
-            :type job_ops:
+            :param job_op:
+                Operation information for a job.
+            :type job_op:
                 OrderedDict
             :param scheduler_status_code:
                 Dictionary information for status code.
@@ -111,11 +111,8 @@ class Renderer:
                 bool
             """
 
-            if scheduler_status_code[job_op['scheduler_status']] != 'U' or \
-               job_op['eligible'] or all_ops:
-                return True
-            else:
-                return False
+            return scheduler_status_code[job_op['scheduler_status']] != 'U' or \
+                job_op['eligible'] or all_ops
 
         def get_operation_status(operation_info, symbols):
             """Determine the status of an operation.

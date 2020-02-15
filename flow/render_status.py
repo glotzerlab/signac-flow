@@ -3,12 +3,11 @@ from .util import mistune
 from .scheduling.base import JobStatus
 
 
-class renderer:
+class Renderer:
     """A class for rendering status in different format.
 
     This class provides method and string output for rendering status output in different format,
     currently supports: terminal, markdown and html
-
     """
 
     def __init__(self):
@@ -31,9 +30,9 @@ class renderer:
         :type template:
             str
         :param template_environment:
-            template environment
+            Template environment.
         :type template_environment:
-            :class:'FlowProject._template_environment'
+            :class:`FlowProject._template_environment`
         :param context:
             Context that includes all the information for rendering status output.
         :type context:
@@ -63,8 +62,8 @@ class renderer:
         :type pretty:
             bool
         :param option:
-            Options for rendering format, currently supports:
-            'terminal'(default), 'markdown' and 'html'.
+            Rendering output format, supports:
+            'terminal' (default), 'markdown' or 'html'.
         :type option:
             str
         """
@@ -81,7 +80,7 @@ class renderer:
                 template = 'status.jinja'
 
         def draw_progressbar(value, total, escape='', width=40):
-            """Visualize progess with a progress bar.
+            """Visualize progress with a progress bar.
 
             :param value:
                 The current progress as a fraction of total.
@@ -104,18 +103,18 @@ class renderer:
                           + escape + '|' + ratio
 
         def job_filter(job_op, scheduler_status_code, all_ops):
-            """filter eligible jobs for status print.
+            """Filter eligible jobs for status print.
 
             :param job_ops:
                 Operations information for a job.
             :type job_ops:
                 OrderedDict
             :param scheduler_status_code:
-                Dictionary information for status code
+                Dictionary information for status code.
             :type scheduler_status_code:
                 dict
             :param all_ops:
-                Boolean value indicate if all operations should be displayed
+                Boolean value indicate if all operations should be displayed.
             :type all_ops:
                 bool
             """
@@ -130,11 +129,11 @@ class renderer:
             """Determine the status of an operation.
 
             :param operation_info:
-                Dictionary containing operation information
+                Dictionary containing operation information.
             :type operation_info:
                 dict
             :param symbols:
-                Dictionary containing code for different job status
+                Dictionary containing code for different job status.
             :type symbols:
                 dict
             """
@@ -213,8 +212,8 @@ class renderer:
         elif option == 'html':
             self.generate_html_output()
             return self.html_output
-        elif option == 'md' or option == 'markdown':
+        elif option == 'markdown':
             return self.markdown_output
         else:
-            raise ValueError('Option not supported, valid option format:'
-                             'termial, html and markdown/md')
+            raise ValueError('Output format not supported, valid options are '
+                             'terminal, markdown, or html.')

@@ -1226,7 +1226,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type template:
             str
         :param profile:
-            show profile result.
+            Show profile result.
         :type profile:
             bool
         :param eligible_jobs_max_lines:
@@ -1234,8 +1234,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type eligible_jobs_max_lines:
             int
         :param output_format:
-            status output format, currently supports:
-            'terminal'(default), 'markdown'/'md' and 'html'
+            Status output format, supports:
+            'terminal' (default), 'markdown'/'md' or 'html'.
         :type option:
             str
         """
@@ -2305,7 +2305,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             '-o', '--output-format',
             type=str,
             default='terminal',
-            help="Define status output format, currently support termial, html and markdown/md'")
+            help="Set status output format: terminal, markdown, or html.")
 
     def labels(self, job):
         """Yields all labels for the given ``job``.

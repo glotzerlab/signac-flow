@@ -252,7 +252,7 @@ class TextRenderer(BaseRenderer):
         return '\n'
 
     def table(self, text):
-        return tabulate(text['rows'], headers=text['headers']) + '\n\n'
+        return tabulate(text['rows'], headers=text['headers']) + self.linebreak() * 2
 
 
 class TerminalRenderer(TextRenderer):
@@ -279,4 +279,4 @@ class TerminalRenderer(TextRenderer):
 
     def table(self, text):
         rows = [[self.modify_strong(cell) for cell in row] for row in text['rows']]
-        return tabulate(rows, headers=text['headers']) + '\n\n'
+        return tabulate(rows, headers=text['headers']) + self.linebreak() * 2

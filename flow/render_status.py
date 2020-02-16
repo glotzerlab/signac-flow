@@ -1,4 +1,5 @@
 # make separate python class for render_status
+from tqdm import tqdm
 from .util import mistune
 from .scheduling.base import JobStatus
 
@@ -89,10 +90,8 @@ class Renderer:
             """
 
             assert value >= 0 and total > 0
-            ratio = ' %0.2f%%' % (100 * value / total)
-            n = int(value / total * width)
-            return escape + '|' + ''.join(['#'] * n) + ''.join(['-'] * (width - n)) \
-                          + escape + '|' + ratio
+            bar_format = escape + '|{{bar:{}}}'.format(width) + escape + '| {percentage:<0.2f}%'
+            return tqdm.format_meter(n=value, total=total, elapsed=0, bar_format=bar_format)
 
         def job_filter(job_op, scheduler_status_code, all_ops):
             """Filter eligible jobs for status print.

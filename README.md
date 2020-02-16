@@ -51,7 +51,7 @@ pip install signac-flow
 
 You can test this package by executing
 
-    $ python -m unittest discover tests/
+    $ python -m pytest tests/
 
 within the repository root directory.
 

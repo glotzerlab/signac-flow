@@ -13,10 +13,9 @@ import inspect
 import subprocess
 from multiprocessing import Pool
 from functools import wraps
+from tqdm import tqdm
 
 from signac import get_project
-
-from .util.tqdm import tqdm
 
 
 logger = logging.getLogger(__name__)

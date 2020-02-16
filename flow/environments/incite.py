@@ -8,7 +8,7 @@ http://www.doeleadershipcomputing.org/
 from ..environment import DefaultLSFEnvironment
 from ..environment import template_filter
 
-from fractions import gcd
+from math import gcd
 
 
 class SummitEnvironment(DefaultLSFEnvironment):

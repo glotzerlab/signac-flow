@@ -36,6 +36,7 @@ from multiprocessing.pool import ThreadPool
 from multiprocessing import Event
 import jinja2
 from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
+from tqdm import tqdm
 
 import signac
 from signac.contrib.hashing import calc_id
@@ -54,7 +55,6 @@ from .errors import NoSchedulerError
 from .errors import UserConditionError
 from .errors import UserOperationError
 from .errors import TemplateError
-from .util.tqdm import tqdm
 from .util.misc import _positive_int
 from .util.misc import roundrobin
 from .util.misc import to_hashable
@@ -1527,10 +1527,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if progress:
                 operations = tqdm(operations)
             for operation in operations:
-                if pretend:
-                    print(operation.cmd)
-                else:
-                    self._execute_operation(operation, timeout)
+                self._execute_operation(operation, timeout, pretend)
         else:
             logger.debug("Parallelized execution of {} operation(s).".format(len(operations)))
             with contextlib.closing(Pool(processes=cpu_count() if np < 0 else np)) as pool:
@@ -1593,9 +1590,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for result in tqdm(results) if progress else results:
             result.get(timeout=timeout)
 
-    def _execute_operation(self, operation, timeout=None):
-        logger.info("Execute operation '{}'...".format(operation))
+    def _execute_operation(self, operation, timeout=None, pretend=False):
+        prefix = self._environment.get_prefix(operation)
+        if pretend:
+            print(prefix + ' ' + operation.cmd if prefix != '' else operation.cmd)
+            return None
 
+        logger.info("Execute operation '{}'...".format(operation))
         # Check if we need to fork for operation execution...
         if (
             # The 'fork' directive was provided and evaluates to True:
@@ -1606,16 +1607,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             or operation.name not in self._operation_functions
             # The specified executable is not the same as the interpreter instance:
             or operation.directives.get('executable', sys.executable) != sys.executable
-            # The operation requires MPI and/or OpenMP parallelization:
-            or operation.directives.get('nranks', 1) > 1
-            or operation.directives.get('omp_num_threads', 1) > 1
+            or prefix != ''
         ):
             # ... need to fork:
-            prefix = self._environment.get_prefix(operation)
             logger.debug(
                 "Forking to execute operation '{}' with "
                 "cmd '{}'.".format(operation, prefix + ' ' + operation.cmd))
-            subprocess.run(prefix + ' ' + operation.cmd, shell=True, timeout=timeout, check=True)
+            subprocess.run(prefix + ' ' + operation.cmd,
+                           shell=True, timeout=timeout, check=True)
         else:
             # ... executing operation in interpreter process as function:
             logger.debug(
@@ -1809,7 +1808,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _generate_operations(self, cmd, jobs, requires=None):
         "Generate job-operations for a given 'direct' command."
         for job in jobs:
-            if requires and requires.difference(self.labels(job)):
+            if requires and set(requires).difference(self.labels(job)):
                 continue
             cmd_ = cmd.format(job=job)
             yield JobOperation(name=cmd_.replace(' ', '-'), cmd=cmd_, job=job)
@@ -2197,7 +2196,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             '--cmd',
             type=str,
             help="Directly specify the command for an operation. "
-                 "For example: --cmd='echo {job._id}'.")
+                 "For example: --cmd='echo {job._id}'. "
+                 "--cmd option is deprecated as of 0.9 and will be removed in 0.11.")
         direct_cmd_group.add_argument(
             '--requires',
             type=str,
@@ -2694,6 +2694,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Gather all pending operations or generate them based on a direct command...
         with self._potentially_buffered():
             if args.cmd:
+                print("DeprecationWarning: --cmd option for script is deprecated as of 0.9 "
+                      "and will be removed in 0.11.", file=sys.stderr)
                 operations = self._generate_operations(args.cmd, jobs, args.requires)
             else:
                 operations = self._get_pending_operations(jobs, args.operation_name,

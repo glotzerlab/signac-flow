@@ -17,6 +17,20 @@ Added
 - Add official support for University of Michigan Great Lakes cluster (#185).
 - Add official support for Bridges AI cluster (#222).
 - Add IgnoreConditions option for submit(), run() and script() (#38).
+- Add pytest support for Testing Framework (#227, #232).
+
+Changed
++++++++
+
+- The command line option ``--cmd`` for ``script`` has been deprecated and will trigger a ``DeprecationWarning`` upon use until removed (#243, #218).
+
+Removed
++++++++
+- Removed vendored ``tqdm`` module and replaced it with a requirement (#247).
+
+Changed
++++++++
+- Raises ValueError when --job-name passed by the user because that interferes with status checking (#164, #241).
 
 Version 0.9
 ===========

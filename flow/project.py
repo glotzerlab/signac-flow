@@ -643,9 +643,9 @@ class FlowGroup(object):
     MAX_LEN_ID = 100
 
     def __init__(self, name, operations=None, operation_directives=None,
-                 options=None):
+                 options=""):
         self.name = name
-        self.options = "" if options is None else options
+        self.options = options
         self.operations = dict() if operations is None else operations
         if operation_directives is None:
             self.operation_directives = dict()

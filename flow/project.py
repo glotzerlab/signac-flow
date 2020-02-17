@@ -27,7 +27,6 @@ from copy import deepcopy
 from itertools import islice
 from itertools import count
 from itertools import groupby
-from itertools import combinations
 from hashlib import sha1
 import multiprocessing
 import threading
@@ -255,7 +254,7 @@ class JobOperation(object):
     """
 
     def __init__(self, id, name, job, cmd, directives=None):
-        self.id = id
+        self._id = id
         self.name = name
         self.job = job
         self._cmd = cmd
@@ -322,6 +321,13 @@ class JobOperation(object):
 
     def __eq__(self, other):
         return self.id == other.id
+
+    def get_id(self):
+        return self._id
+
+    @property
+    def id(self):
+        return self._id
 
     @property
     def cmd(self):

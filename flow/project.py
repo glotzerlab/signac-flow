@@ -3164,7 +3164,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         deprecated_in="0.8", removed_in="0.10",
         current_version=__version__,
         details="Use next_operations() instead.")
-    @deprecated(deprecated_in="0.8", removed_in="1.0", details="Use next_operations() instead.")
     def next_operation(self, job):
         """Determine the next operation for this job.
 

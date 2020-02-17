@@ -271,7 +271,7 @@ class JobOperation(object):
         # script or ill-defined directives. We are therefore keeping track of all
         # keys set by the user and check whether they have been evaluated by the template
         # script engine later.
-        keys_set_by_user = set(directives.keys())
+        keys_set_by_user = set(directives)
 
         nranks = directives.get('nranks', 1)
         nthreads = directives.get('omp_num_threads', 1)
@@ -560,7 +560,7 @@ class FlowGroupEntry(object):
 
     def _set_directives(self, func, directives):
         if hasattr(func, '_flow_group_operation_directives'):
-            if self.name in func._flow_group_operation_directives.keys():
+            if self.name in func._flow_group_operation_directives:
                 raise ValueError("Attempted repeat directives setting of {} in group {}"
                                  "".format(func, self.name))
             else:
@@ -678,7 +678,7 @@ class FlowGroup(object):
             return "{} {}".format(entrypoint['executable'], entrypoint['path']).lstrip()
 
     def _resolve_directives(self, name, defaults):
-        if name in self.operation_directives.keys():
+        if name in self.operation_directives:
             return deepcopy(self.operation_directives[name])
         else:
             return deepcopy(defaults.get(name, dict()))
@@ -712,7 +712,7 @@ class FlowGroup(object):
                "directives={directives}, options={options})".format(
                    type=type(self).__name__,
                    name=self.name,
-                   operations=' '.join(list(self.operations.keys())),
+                   operations=' '.join(list(self.operations)),
                    directives=self.directives,
                    options=self.options)
 
@@ -791,7 +791,7 @@ class FlowGroup(object):
 
         # The full name is designed to be truly unique for each job-group.
         if operation_name is None:
-            op_string = ''.join(sorted(list(self.operations.keys())))
+            op_string = ''.join(sorted(list(self.operations)))
         else:
             op_string = operation_name
 
@@ -932,7 +932,7 @@ class FlowGroup(object):
             d = directives.get(key, default)
             return d(job) if callable(d) else d
 
-        for name in self.operations.keys():
+        for name in self.operations:
             # get directives for operation
             op_dir = self._resolve_directives(name, default_directives)
             # if operations are callable handle appropriately with job
@@ -1506,7 +1506,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             eligible = False if completed else group.eligible(job)
             scheduler_status = cached_status.get(group._generate_id(job),
                                                  JobStatus.unknown)
-            for operation in group.operations.keys():
+            for operation in group.operations:
                 if scheduler_status >= status_dict[operation]['scheduler_status']:
                     status_dict[operation] = {
                             'scheduler_status': scheduler_status,
@@ -2249,7 +2249,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _get_default_directives(self):
         return {name: self.groups[name].operation_directives.get(name, dict())
-                for name in self.operations.keys()}
+                for name in self.operations}
 
     def run(self, jobs=None, names=None, pretend=False, np=None, timeout=None, num=None,
             num_passes=1, progress=False, order=None, ignore_conditions=IgnoreConditions.NONE):
@@ -2337,7 +2337,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "The names argument of FlowProject.run() must be a sequence of strings, "
                 "not a string.")
         if names is None:
-            names = list(self.operations.keys())
+            names = list(self.operations)
 
         flow_groups = self._gather_flow_groups(names)
 
@@ -2457,7 +2457,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # if no names are selected try all singleton groups
         names = names if names is not None else self._operations.keys()
         for name in names:
-            if name in operations.keys():
+            if name in operations:
                 continue
             groups = [group for gname, group in self.groups.items() if
                       re.fullmatch(name, gname)]
@@ -3135,7 +3135,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _job_operations(self, job, ignore_conditions=IgnoreConditions.NONE):
         "Yield instances of JobOperation constructed for specific jobs."
-        for name in self.operations.keys():
+        for name in self.operations:
             group = self._groups[name]
             yield from group.create_run_job_operations(entrypoint=self._entrypoint, job=job,
                                                        default_directives=dict(),

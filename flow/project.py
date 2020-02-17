@@ -246,7 +246,7 @@ class JobOperation(object):
         The command that executes this operation. Can be a function that when
         evaluated returns a string.
     :type cmd:
-        unevaluated function or str
+        callable or str
     :param directives:
         A dictionary of additional parameters that provide instructions on how
         to execute this operation, e.g., specifically required resources.
@@ -526,7 +526,7 @@ class FlowGroupEntry(object):
         str
     :param options:
         The `FlowProject.run` options to pass when submitting the group.
-        These will be inlcuded in all submissions. Submission use run
+        These will be included in all submissions. Submission use run
         commands to execute.
     :type options:
         str
@@ -545,7 +545,7 @@ class FlowGroupEntry(object):
         """
         if hasattr(func, '_flow_group'):
             if self.name in func._flow_group:
-                raise ValueError("Attempt repeat registration of {} into group {}"
+                raise ValueError("Attempted repeat registration of {} into group {}"
                                  "".format(func, self.name))
             else:
                 func._flow_group.append(self.name)
@@ -594,9 +594,9 @@ class FlowGroup(object):
     that takes job and operations arguments.
 
     :param name:
-        The name of the group to be used when calling from the commandline.
+        The name of the group to be used when calling from the command line.
     :type name:
-        :class:`str`
+        str
     :param operations:
         A :class:`dict` of name : :class:`FlowOperation` key, value pairs in the
         group.
@@ -645,7 +645,7 @@ class FlowGroup(object):
         """Get the entrypoint for creating a JobOperation.
 
         If path cannot be determined, then raise a RuntimeError since we do not
-        no where to point to.
+        know where to point to.
         """
         entrypoint = entrypoint.copy()
         self._set_entrypoint_item(entrypoint, directives, 'executable', sys.executable, job)
@@ -698,28 +698,28 @@ class FlowGroup(object):
         """Eligible, when at least one BaseFlowOperation is eligible.
 
         :param job:
-            A signac.Job from the signac workspace.
+            A :class:`signac.Job` from the signac workspace.
         :type job:
-            signac.Job
+            :class:`signac.Job`
         :param ignore_conditions:
             Specify if pre and/or post conditions check is to be ignored for eligibility check.
             The default is :py:class:`IgnoreConditions.NONE`.
         :type ignore_conditions:
             :py:class:`~.IgnoreConditions`
         :return:
-            Whether the group is eligible respecting ``ignore_conditions``.
+            Whether the group is eligible.
         :rtype:
             bool
         """
         return any(op.eligible(job, ignore_conditions) for op in self)
 
     def complete(self, job):
-        """True when all BaseFlowOperation post-conditions are met
+        """True when all BaseFlowOperation post-conditions are met.
 
         :param job:
-            A signac.Job from the signac workspace.
+            A :class:`signac.Job` from the signac workspace.
         :type job:
-            signac.Job
+            :class:`signac.Job`
         :return:
             Whether the group is complete (all contained operations are
             complete.
@@ -742,7 +742,7 @@ class FlowGroup(object):
         :param directives:
             The operation specific directives.
         :type directives:
-            :py:class:`dict`
+            dict
         """
         self.operations[name] = operation
         if directives is not None:
@@ -756,12 +756,12 @@ class FlowGroup(object):
         :type group:
             :py:class:`flow.FlowGroup`
         :return:
-            Returns ``True`` if ``group`` and ``self`` share not operations,
-            otherwise returns false.
+            Returns ``True`` if ``group`` and ``self`` share no operations,
+            otherwise returns ``False``.
         :rtype:
             bool
         """
-        return not bool(set(self).intersection(group))
+        return len(set(self).intersection(group)) == 0
 
     def _generate_id(self, job, operation_name=None, index=0):
         "Return a name, which identifies this job-group."
@@ -781,10 +781,10 @@ class FlowGroup(object):
         job_op_id = calc_id(full_name)
 
         # The actual job id is then constructed from a readable part and the job_op_id,
-        # ensuring that the job-op is still somewhat identifiable, but guarantueed to
+        # ensuring that the job-op is still somewhat identifiable, but guaranteed to
         # be unique. The readable name is based on the project id, job id, operation name,
         # and the index number. All names and the id itself are restricted in length
-        # to guarantuee that the id does not get too long.
+        # to guarantee that the id does not get too long.
         max_len = self.MAX_LEN_ID - len(job_op_id)
         if max_len < len(job_op_id):
             raise ValueError("Value for MAX_LEN_ID is too small ({}).".format(self.MAX_LEN_ID))
@@ -821,9 +821,9 @@ class FlowGroup(object):
         :type default_directives:
             dict
         :param job:
-            The job that the JobOperation is based on.
+            The job that the :class:`~.JobOperation` is based on.
         :type job:
-            signac.Job
+            :class:`signac.Job`
         :param ignore_conditions_on_submit:
             Specify if pre and/or post conditions check is to be ignored for eligibility check after
             submitting.  The default is `IgnoreConditions.NONE`.
@@ -834,12 +834,12 @@ class FlowGroup(object):
         :type parallel:
             bool
         :param index:
-            Index for the JopOperation.
+            Index for the :class:`~.JobOperation`.
         :type index:
             int
         :return:
-            Returns a :py:class:`JobOperation` for submitting the group. The
-            :py:class:`JobOperation` will have directives that have been collected
+            Returns a :py:class:`~.JobOperation` for submitting the group. The
+            :py:class:`~.JobOperation` will have directives that have been collected
             appropriately from its contained operations based on parallel or serial
             execution.
         :rtype:
@@ -866,19 +866,19 @@ class FlowGroup(object):
         :param default_directives:
             The default directives to use for the operations. This is to allow for user specified
             groups to 'inherent' directives from ``default_directives``. If no defaults are desired,
-            the argument can be set to an empty dictionary. This must be done explicitly, however.
+            the argument must be explicitly set to an empty dictionary.
         :type default_directives:
-            :py:class:`dict`
+            dict
         :param job:
-            The job that the JobOperation is based on.
+            The job that the :class:`~.JobOperation` is based on.
         :type job:
-            signac.Job
+            :class:`signac.Job`
         :param index:
-            Index for the JopOperation.
+            Index for the :class:`~.JobOperation`.
         :type index:
             int
         :return:
-            Returns an iterator over eligible :py:class:`JobOperation`s.
+            Returns an iterator over eligible :py:class:`~.JobOperation`s.
         :rtype:
             Iterator[JobOperation]
         """
@@ -899,7 +899,7 @@ class FlowGroup(object):
     def _get_submission_directives(self, default_directives, job, parallel=False):
         """Get the combined resources for submission.
 
-        No checks are done to midigate inappropriate aggregating of operations.
+        No checks are done to mitigate inappropriate aggregating of operations.
         This can lead to poor utilization of computing resources.
         """
         directives = dict(ngpu=0, nranks=0, omp_num_threads=0, np=0)
@@ -964,7 +964,7 @@ class _FlowProjectClass(type):
         cls.post = cls._setup_post_conditions_class(parent_class=cls)
 
         # All groups are registered with the function returned by the make_group
-        # classmethod. In contradistinction to operations and labels, the
+        # classmethod. In contrast to operations and labels, the
         # make_group classmethod does not serve as the decorator, the function
         # it returns does. The _GROUPS list records the groups created and their
         # passed parameters for later initialization.
@@ -2436,7 +2436,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 continue
             groups = [group for gname, group in self.groups.items() if
                       re.fullmatch(name, gname)]
-            if groups != list():
+            if len(groups) > 0:
                 for group in groups:
                     operations[group.name] = group
             else:
@@ -2474,7 +2474,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _verify_group_compatibility(self, groups):
         """Verifies that all selected groups can be submitted together."""
-        return all(a.isdisjoint(b) for a, b in combinations(groups, 2))
+        return all(a.isdisjoint(b) for a in groups for b in groups if a != b)
 
     @contextlib.contextmanager
     def _potentially_buffered(self):
@@ -2859,8 +2859,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         bundling_group.add_argument(
             '-p', '--parallel',
             action='store_true',
-            help="Execute all operations or multi operation groups within "
-                 "a single bundle in parallel. With multi operation groups "
+            help="Execute all operations or multi-operation groups within "
+                 "a single bundle in parallel. With multi-operation groups "
                  "this can lead to large resource requests.")
 
     @classmethod
@@ -3150,7 +3150,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             :class:`~signac.contrib.job.Job`
         :param default_directives:
             The default directives to use for the operations. This is to allow for user specified
-            groups to 'inherent' directives from ``default_directives``. If no defaults are desired,
+            groups to 'inherit' directives from ``default_directives``. If no defaults are desired,
             the argument can be set to an empty dictionary. This must be done explicitly, however.
         :type default_directives:
             :py:class:`dict`
@@ -3256,7 +3256,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @classmethod
     def make_group(cls, name, options=None):
-        """Make a FlowGroup named ``name``. And return a decorator to make groups.
+        """Make a FlowGroup named ``name`` and return a decorator to make groups.
 
         .. code-block:: python
             example_group = FlowProject.make_group('example')
@@ -3270,11 +3270,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         JobOperations.
 
         :param name:
-            The name of the FlowGroup.
+            The name of the :class:`~.FlowGroup`.
         :type name:
             str
         :param options:
-            A strng to append to submissions can be any valid signac run option.
+            A string to append to submissions can be any valid :meth:`FlowOperation.run` option.
         :type options:
             str
         """

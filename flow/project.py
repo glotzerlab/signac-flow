@@ -655,10 +655,10 @@ class FlowGroup(object):
     def _set_entrypoint_item(self, entrypoint, directives, key, default, job):
         """Set a value (executable, path) for entrypoint in command.
 
-        Order of priority is project specified value, then group directives
-        specified, and finally the default provided to the function.
+        Order of priority is the operation directives specified and
+        then the project specified value.
         """
-        entrypoint.setdefault(key, directives.get(key, default))
+        entrypoint[key] = directives.get(key, entrypoint.get(key, default))
         if callable(entrypoint[key]):
             entrypoint[key] = entrypoint[key](job)
 

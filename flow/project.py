@@ -111,6 +111,10 @@ class IgnoreConditions(IntEnum):
     ALL = PRE | POST
     NONE = ~ ALL
 
+    def __str__(self):
+        return {IgnoreConditions.PRE: 'pre', IgnoreConditions.POST: 'post',
+                IgnoreConditions.ALL: 'all', IgnoreConditions.NONE: 'none'}[self]
+
 
 class _IgnoreConditionsConversion(argparse.Action):
     def __init__(self, option_strings, dest, nargs=None, **kwargs):
@@ -687,14 +691,7 @@ class FlowGroup(object):
         cmd = "{} run -o {}".format(entrypoint, self.name)
         cmd = cmd if job is None else cmd + ' -j {}'.format(job)
         cmd = cmd if self.options is None else cmd + ' ' + self.options
-        cond_to_string = {IgnoreConditions.NONE: '',
-                          IgnoreConditions.ALL: 'all',
-                          IgnoreConditions.PRE: 'pre',
-                          IgnoreConditions.POST: 'post'}
-        cond_string = cond_to_string[ignore_conditions]
-        if cond_string != '':
-            cond_string = ' --ignore_conditons=' + cond_string
-        return cmd.lstrip() + cond_string
+        return cmd.lstrip() + '--ignore_conditions=' + str(ignore_conditions)
 
     def _run_cmd(self, entrypoint, operation_name, operation, directives, job):
         entrypoint = self._determine_entrypoint(entrypoint, directives, job)

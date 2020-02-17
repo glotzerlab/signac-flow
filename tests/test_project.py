@@ -284,29 +284,31 @@ class TestProjectClass(TestProjectBase):
         class C(A):
             pass
 
-        @A.pre.always
-        @C.pre.always
-        @C.pre.always
-        @B.pre.always
-        @B.pre.always
-        @A.operation
-        @B.operation
-        def op1(job):
-            pass
+        with pytest.deprecated_call():
+            @A.pre.always
+            @C.pre.always
+            @C.pre.always
+            @B.pre.always
+            @B.pre.always
+            @A.operation
+            @B.operation
+            def op1(job):
+                pass
 
         assert len(A._collect_pre_conditions()[op1]) == 1
         assert len(B._collect_pre_conditions()[op1]) == 2
         assert len(C._collect_pre_conditions()[op1]) == 3
 
-        @A.post.always
-        @C.post.always
-        @C.post.always
-        @B.post.always
-        @B.post.always
-        @A.operation
-        @B.operation
-        def op2(job):
-            pass
+        with pytest.deprecated_call():
+            @A.post.always
+            @C.post.always
+            @C.post.always
+            @B.post.always
+            @B.post.always
+            @A.operation
+            @B.operation
+            def op2(job):
+                pass
 
         assert len(A._collect_post_conditions()[op2]) == 1
         assert len(B._collect_post_conditions()[op2]) == 2
@@ -402,6 +404,7 @@ class TestProjectClass(TestProjectBase):
                         A(entrypoint=self.entrypoint).run()
                 assert os.getcwd() == starting_dir
 
+    @pytest.mark.filterwarnings("ignore:next_operation")
     def test_function_in_directives(self):
 
         class A(FlowProject):
@@ -415,7 +418,8 @@ class TestProjectClass(TestProjectBase):
         project = A(self.mock_project().config, entrypoint=self.entrypoint)
         for job in project:
             job.doc.np = 3
-            next_op = project.next_operation(job)
+            with pytest.deprecated_call():
+                next_op = project.next_operation(job)
             assert 'mpirun -np 3 python' in next_op.cmd
             break
 
@@ -434,20 +438,23 @@ class TestProjectClass(TestProjectBase):
 
         # test setting neither nranks nor omp_num_threads
         for job in project:
-            next_op = project.next_operation(job)
+            with pytest.deprecated_call():
+                next_op = project.next_operation(job)
             assert next_op.directives['np'] == 1
 
         # test only setting nranks
         for i, job in enumerate(project):
             job.doc.nranks = i+1
-            next_op = project.next_operation(job)
+            with pytest.deprecated_call():
+                next_op = project.next_operation(job)
             assert next_op.directives['np'] == next_op.directives['nranks']
             del job.doc['nranks']
 
         # test only setting omp_num_threads
         for i, job in enumerate(project):
             job.doc.omp_num_threads = i+1
-            next_op = project.next_operation(job)
+            with pytest.deprecated_call():
+                next_op = project.next_operation(job)
             assert next_op.directives['np'] == next_op.directives['omp_num_threads']
             del job.doc['omp_num_threads']
 
@@ -455,7 +462,8 @@ class TestProjectClass(TestProjectBase):
         for i, job in enumerate(project):
             job.doc.omp_num_threads = i+1
             job.doc.nranks = i % 3 + 1
-            next_op = project.next_operation(job)
+            with pytest.deprecated_call():
+                next_op = project.next_operation(job)
             expected_np = (i + 1) * (i % 3 + 1)
             assert next_op.directives['np'] == expected_np
 
@@ -769,33 +777,36 @@ class TestExecutionProject(TestProjectBase):
 
         # Never post conditions are to prevent warnings on operations without
         # post conditions
-        @A.pre.never
-        @B.pre.always
-        @A.post.never
-        @B.post.never
-        @A.operation
-        @B.operation
-        def op1(job):
-            job.doc.op1 = True
+        with pytest.deprecated_call():
+            @A.pre.never
+            @B.pre.always
+            @A.post.never
+            @B.post.never
+            @A.operation
+            @B.operation
+            def op1(job):
+                job.doc.op1 = True
 
-        @A.pre.always
-        @B.pre.never
-        @A.post.never
-        @B.post.never
-        @A.operation
-        @B.operation
-        def op2(job):
-            job.doc.op2 = True
+        with pytest.deprecated_call():
+            @A.pre.always
+            @B.pre.never
+            @A.post.never
+            @B.post.never
+            @A.operation
+            @B.operation
+            def op2(job):
+                job.doc.op2 = True
 
-        @A.pre.always
-        @C.pre.never
-        @B.pre.never
-        @A.post.never
-        @B.post.never
-        @A.operation
-        @B.operation
-        def op3(job):
-            job.doc.op3 = True
+        with pytest.deprecated_call():
+            @A.pre.always
+            @C.pre.never
+            @B.pre.never
+            @A.post.never
+            @B.post.never
+            @A.operation
+            @B.operation
+            def op3(job):
+                job.doc.op3 = True
 
         all_ops = set(['op1', 'op2', 'op3'])
         for project_class, bad_ops in zip(
@@ -921,14 +932,16 @@ class TestExecutionProject(TestProjectBase):
             if job not in even_jobs:
                 continue
             list(project.classify(job))
-            assert project.next_operation(job).name == 'op1'
-            assert project.next_operation(job).job == job
+            with pytest.deprecated_call():
+                assert project.next_operation(job).name == 'op1'
+                assert project.next_operation(job).job == job
         with redirect_stderr(StringIO()):
             project.submit()
         assert len(list(MockScheduler.jobs())) == num_jobs_submitted
 
         for job in project:
-            next_op = project.next_operation(job)
+            with pytest.deprecated_call():
+                next_op = project.next_operation(job)
             assert next_op is not None
             assert next_op.get_status() == JobStatus.submitted
 
@@ -937,7 +950,8 @@ class TestExecutionProject(TestProjectBase):
         project._fetch_scheduler_status(file=StringIO())
 
         for job in project:
-            next_op = project.next_operation(job)
+            with pytest.deprecated_call():
+                next_op = project.next_operation(job)
             assert next_op is not None
             assert next_op.get_status() == JobStatus.queued
 

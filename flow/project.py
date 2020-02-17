@@ -37,6 +37,7 @@ from multiprocessing.pool import ThreadPool
 from multiprocessing import Event
 import jinja2
 from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
+from tqdm import tqdm
 
 import signac
 from signac.contrib.hashing import calc_id
@@ -55,7 +56,6 @@ from .errors import NoSchedulerError
 from .errors import UserConditionError
 from .errors import UserOperationError
 from .errors import TemplateError
-from .util.tqdm import tqdm
 from .util.misc import _positive_int
 from .util.misc import roundrobin
 from .util.misc import to_hashable

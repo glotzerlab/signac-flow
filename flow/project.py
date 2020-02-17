@@ -549,14 +549,14 @@ class FlowGroupEntry(object):
         :type func:
             callable
         """
-        if hasattr(func, '_flow_group'):
-            if self.name in func._flow_group:
+        if hasattr(func, '_flow_groups'):
+            if self.name in func._flow_groups:
                 raise ValueError("Attempted repeat registration of {} into group {}"
                                  "".format(func, self.name))
             else:
-                func._flow_group.append(self.name)
+                func._flow_groups.append(self.name)
         else:
-            func._flow_group = [self.name]
+            func._flow_groups = [self.name]
 
     def _set_directives(self, func, directives):
         if hasattr(func, '_flow_group_operation_directives'):
@@ -3223,10 +3223,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Append the name and function to the class registry
         cls._OPERATION_FUNCTIONS.append((name, func))
         cls._GROUPS.append(FlowGroupEntry(name=name, options=None))
-        if hasattr(func, '_flow_group'):
-            func._flow_group.append(name)
+        if hasattr(func, '_flow_groups'):
+            func._flow_groups.append(name)
         else:
-            func._flow_group = [name]
+            func._flow_groups = [name]
         return func
 
     @classmethod
@@ -3331,9 +3331,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             else:
                 func = self._operation_functions[op_name]
 
-            if hasattr(func, '_flow_group'):
+            if hasattr(func, '_flow_groups'):
                 operation_directives = getattr(func, '_flow_group_operation_directives', dict())
-                for group_name in func._flow_group:
+                for group_name in func._flow_groups:
                     self._groups[group_name].add_operation(
                         op_name, op, operation_directives.get(group_name, None))
 

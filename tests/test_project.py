@@ -32,8 +32,8 @@ from deprecation import fail_if_not_removed
 from define_test_project import _TestProject
 from define_test_project import _DynamicTestProject
 from define_dag_test_project import DagTestProject
-from define_group_test_project import TestProject as GTestProject
-from define_group_test_project import TestDynamicProject as GTestDynamicProject
+from define_group_test_project import GroupTestProject
+from define_group_test_project import GroupTestDynamicProject
 
 
 @contextmanager
@@ -1145,7 +1145,7 @@ class TestProjectDagDetection(TestProjectBase):
 
 # Tests for multiple operation groups or groups with options
 class TestGroupProject(TestProjectBase):
-    project_class = GTestProject
+    project_class = GroupTestProject
     entrypoint = dict(path=os.path.realpath('tests/define_group_test_project.py'))
 
     def test_instance(self):
@@ -1233,7 +1233,7 @@ class TestGroupProject(TestProjectBase):
 
 
 class TestGroupExecutionProject(TestProjectBase):
-    project_class = GTestProject
+    project_class = GroupTestProject
     entrypoint = dict(path=os.path.realpath('tests/define_group_test_project.py'))
     expected_number_of_steps = 4
 
@@ -1343,7 +1343,7 @@ class TestGroupBufferedExecutionProject(TestGroupExecutionProject):
 
 
 class TestGroupExecutionDynamicProject(TestGroupExecutionProject):
-    project_class = GTestDynamicProject
+    project_class = GroupTestDynamicProject
     expected_number_of_steps = 4
 
 
@@ -1353,7 +1353,7 @@ class TestGroupBufferedExecutionDynamicProject(TestGroupBufferedExecutionProject
 
 
 class TestGroupProjectMainInterface(TestProjectBase):
-    project_class = GTestProject
+    project_class = GroupTestProject
     entrypoint = dict(path=os.path.realpath('tests/define_group_test_project.py'))
 
     def switch_to_cwd(self):

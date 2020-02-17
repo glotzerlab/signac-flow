@@ -574,7 +574,7 @@ class FlowGroupEntry(object):
         :param kwargs:
             Directives to use for resource requests and running the operation
             through the group.
-        :type **kwargs:
+        :type kwargs:
             dict
         :returns:
             A decorator which registers the function into the group with
@@ -582,10 +582,9 @@ class FlowGroupEntry(object):
         :rtype:
             function
         """
-        directives = dict() if len(kwargs) == 0 else kwargs
 
         def decorator(func):
-            self._set_directives(func, directives)
+            self._set_directives(func, kwargs)
             return self(func)
 
         return decorator

@@ -221,8 +221,10 @@ def make_bundles(operations, size=None):
 class JobOperation(object):
     """This class represents the information needed to execute one group for one job.
 
-    A group function in this context is a shell command, which should be a
-    string with one and only one signac job.
+    The execution or submission of a :py:class:`FlowGroup` uses a passed in command
+    which can either be a string or function with no arguments that returns a a shell
+    executable command.  This won't be used if it is determined that the group can be
+    executed without forking.
 
     .. note::
 
@@ -385,31 +387,9 @@ class FlowCondition(object):
 
 
 class BaseFlowOperation(object):
-    """A FlowOperation represents a data space operation, operating on any job.
+    """A BaseFlowOperation represents a data space operation, operating on any job.
 
-    Every FlowOperation is associated with a specific command which should be
-    a function of :py:class:`~signac.contrib.job.Job`. The command (cmd) may
-    either be a unary callable that expects an instance of
-    :class:`~signac.contrib.job.Job` as its only positional argument and returns
-    a string containing valid shell commands, or the string of commands itself.
-    In either case, the resulting string may contain any attributes of the job placed
-    in curly braces, which will then be substituted by Python string formatting.
-
-    For example, if we wanted to define a command for a program called 'hello',
-    which expects a job id as its first argument, we could construct the following
-    two equivalent operations:
-
-    .. code-block:: python
-
-        op = FlowOperation('hello', cmd='hello {job._id}')
-         op = FlowOperation('hello', cmd=lambda job: 'hello {}'.format(job._id))
-
-    Here is another example of a possible string substitution:
-
-    .. code-block:: python
-
-        # Substitute job state point parameters:
-        op = FlowOperation('hello', cmd='cd {job.ws}; hello {job.sp.a}')
+    Every BaseFlowOperation is associated with a specific command.
 
     Pre-requirements (pre) and post-conditions (post) can be used to
     trigger an operation only when certain conditions are met. Conditions are unary
@@ -420,6 +400,10 @@ class BaseFlowOperation(object):
     are met and when at least one of the post-conditions is not met.
     Requirements are always met when the list of requirements is empty and
     post-conditions are never met when the list of post-conditions is empty.
+
+    .. note::
+        This class should not be instantiated directly. Instead use :class:`FlowOperation`
+        or :class:`FlowCmdOperation`.
 
     :param cmd:
         The command to execute operation; should be a function of job.
@@ -483,10 +467,20 @@ class BaseFlowOperation(object):
 
 
 class FlowCmdOperation(BaseFlowOperation):
-    """A FlowOperation that holds a shell executable command.
+    """A BaseFlowOperation that holds a shell executable command.
 
     When an operation has the ``@cmd`` directive specified, it is instantiated
-    as a FlowCmdOperation.
+    as a FlowCmdOperation. The operation should be a function of
+    :py:class:`~signac.contrib.job.Job`. The command (cmd) may
+    either be a unary callable that expects an instance of
+    :class:`~signac.contrib.job.Job` as its only positional argument and returns
+    a string containing valid shell commands, or the string of commands itself.
+    In either case, the resulting string may contain any attributes of the job placed
+    in curly braces, which will then be substituted by Python string formatting.
+
+    .. note::
+        Given the status of :class:`BaseFlowOperation` and :class:`FlowOperation` being unfit to be
+        instantiated, these should also not be instantiated directly by users.
     """
 
     def __init__(self, cmd, pre=None, post=None):
@@ -504,9 +498,15 @@ class FlowCmdOperation(BaseFlowOperation):
 
 
 class FlowOperation(BaseFlowOperation):
-    """FlowOperation is a python executable function.
+    """FlowOperation holds a python function that does not return a shell executable string.
 
-    All operations without the ``@cmd`` directive use this class.
+    All operations without the ``@cmd`` directive use this class. No command can be specified, and
+    the function is not stored interally (but in an external list) stored by the
+    :class:`FlowProject`.
+
+    .. note::
+        Given the lack of internal function storage and integration with :class:`FlowProject` this
+        also should not be instantiated by users.
     """
 
     def __init__(self, name, pre=None, post=None):
@@ -595,9 +595,7 @@ class FlowGroup(object):
     """A FlowGroup represents a subset of a workflow for a project.
 
     Any :py:class:`FlowGroup` is associated with a group of
-    :py:class:`FlowOperation`s. The command :py:param:`cmd` is a
-    :py:func:`FlowProject.run` command, but can be overwritten with any function
-    that takes job and operations arguments.
+    :py:class:`BaseFlowOperation`s.
 
     :param name:
         The name of the group to be used when calling from the command line.
@@ -623,6 +621,24 @@ class FlowGroup(object):
         This lets options like --num_passes to be given to a group.
     :type options:
         :class:`str`
+
+    ..code:: python
+        group = FlowProject.make_group(name='example_group')
+
+        @group.with_directives(nranks=4)
+        @FlowProject.operation
+        @directives(nranks=2, executable="python3")
+        def op1(job):
+            pass
+
+        @group
+        @FlowProject.operation
+        @directives(nranks=2, executable="python3")
+        def op1(job):
+            pass
+
+        # the directives used will be {'nranks': 4} for op1
+        # and {'nranks': 2, 'executable': 'python3'} for op2
     """
 
     MAX_LEN_ID = 100
@@ -770,7 +786,7 @@ class FlowGroup(object):
         return len(set(self).intersection(group)) == 0
 
     def _generate_id(self, job, operation_name=None, index=0):
-        "Return a name, which identifies this job-group."
+        "Return an id, which identifies this group with respect to this job."
         project = job._project
 
         # The full name is designed to be truly unique for each job-group.
@@ -816,6 +832,7 @@ class FlowGroup(object):
         """Create a JobOperation object from the FlowGroup.
 
         Creates a JobOperation for use in submitting and scripting.
+
         :param entrypoint:
             The path and executable, if applicable, to point to for execution
         :type entrypoint:
@@ -864,7 +881,8 @@ class FlowGroup(object):
                                   ignore_conditions=IgnoreConditions.NONE, index=0):
         """Create JobOperation object(s) from the FlowGroup.
 
-        Creates a JobOperation for each contained operation given proper conditions are met.
+        Yields a JobOperation for each contained operation given proper conditions are met.
+
         :param entrypoint:
             The path and executable, if applicable, to point to for execution
         :type entrypoint:
@@ -973,7 +991,8 @@ class _FlowProjectClass(type):
         # classmethod. In contrast to operations and labels, the
         # make_group classmethod does not serve as the decorator, the function
         # it returns does. The _GROUPS list records the groups created and their
-        # passed parameters for later initialization.
+        # passed parameters for later initialization. The _GROUP_NAMES set stores
+        # whether a group name has already been used.
         cls._GROUPS = list()
         cls._GROUP_NAMES = set()
 

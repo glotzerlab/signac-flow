@@ -691,7 +691,7 @@ class FlowGroup(object):
         cmd = "{} run -o {}".format(entrypoint, self.name)
         cmd = cmd if job is None else cmd + ' -j {}'.format(job)
         cmd = cmd if self.options is None else cmd + ' ' + self.options
-        return cmd.lstrip() + '--ignore_conditions=' + str(ignore_conditions)
+        return cmd.strip() + ' --ignore-conditions=' + str(ignore_conditions)
 
     def _run_cmd(self, entrypoint, operation_name, operation, directives, job):
         entrypoint = self._determine_entrypoint(entrypoint, directives, job)

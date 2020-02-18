@@ -69,7 +69,7 @@ from .labels import staticlabel
 from .labels import classlabel
 from .labels import _is_label_func
 from .util import config as flow_config
-from . import render_status
+from .render_status import Renderer as StatusRenderer
 from .version import __version__
 
 
@@ -1447,7 +1447,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if overview:
             context['progress_sorted'] = progress_sorted
         if detailed:
-            context['alias_bool'] = {True: 'T', False: 'U'}
+            context['alias_bool'] = {True: 'Y', False: 'N'}
             context['scheduler_status_code'] = _FMT_SCHEDULER_STATUS
             context['status_legend'] = status_legend
             if compact:
@@ -1477,9 +1477,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if n > 0:
             context['op_counter'].append(('[{} more operations omitted]'.format(n), ''))
 
-        render_result = render_status.Renderer()
-        render_output = render_result.render(template, template_environment, context, detailed,
-                                             expand, unroll, compact, output_format)
+        status_renderer = StatusRenderer()
+        render_output = status_renderer.render(template, template_environment, context, detailed,
+                                               expand, unroll, compact, output_format)
 
         print(render_output, file=file)
 
@@ -1487,7 +1487,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if profiling_results:
             print('\n' + '\n'.join(profiling_results), file=file)
 
-        return render_result
+        return status_renderer
 
     def run_operations(self, operations=None, pretend=False, np=None, timeout=None, progress=False):
         """Execute the next operations as specified by the project's workflow.

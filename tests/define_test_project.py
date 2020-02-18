@@ -72,18 +72,11 @@ group3 = _DynamicTestProject.make_group(name="group3")
 
 
 @_DynamicTestProject.operation
+@group3
 @_DynamicTestProject.pre.after(op1)
 @_DynamicTestProject.post.true('dynamic')
 def op4(job):
     job.sp.dynamic = True   # migration during execution
-
-
-@_DynamicTestProject.operation
-@group3
-@_DynamicTestProject.pre.after(op1)
-@_DynamicTestProject.post.true('group_dynamic')
-def op5(job):
-    job.sp.group_dynamic = True   # migration during execution
 
 
 if __name__ == '__main__':

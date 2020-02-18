@@ -324,12 +324,12 @@ class TestProjectClass(TestProjectBase):
         def test_context(job):
             assert os.getcwd() == job.ws
 
-        project = self.mock_project()
+        project = self.mock_project(A)
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
                 starting_dir = os.getcwd()
                 with redirect_stderr(StringIO()):
-                    A(entrypoint=self.entrypoint).run()
+                    project.run()
                 assert os.getcwd() == starting_dir
 
     def test_cmd_with_job_wrong_order(self):
@@ -355,12 +355,12 @@ class TestProjectClass(TestProjectBase):
         def test_context(job):
             return "echo 'hello' > world.txt"
 
-        project = self.mock_project()
+        project = self.mock_project(A)
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
                 starting_dir = os.getcwd()
                 with redirect_stderr(StringIO()):
-                    A(entrypoint=self.entrypoint).run()
+                    project.run()
                 assert os.getcwd() == starting_dir
                 for job in project:
                     assert os.path.isfile(job.fn("world.txt"))
@@ -375,13 +375,13 @@ class TestProjectClass(TestProjectBase):
         def test_context(job):
             raise Exception
 
-        project = self.mock_project()
+        project = self.mock_project(A)
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
                 starting_dir = os.getcwd()
                 with pytest.raises(Exception):
                     with redirect_stderr(StringIO()):
-                        A(entrypoint=self.entrypoint).run()
+                        project.run()
                 assert os.getcwd() == starting_dir
 
     def test_cmd_with_job_error_handling(self):
@@ -395,13 +395,13 @@ class TestProjectClass(TestProjectBase):
         def test_context(job):
             return "exit 1"
 
-        project = self.mock_project()
+        project = self.mock_project(A)
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
                 starting_dir = os.getcwd()
                 with pytest.raises(subprocess.CalledProcessError):
                     with redirect_stderr(StringIO()):
-                        A(entrypoint=self.entrypoint).run()
+                        project.run()
                 assert os.getcwd() == starting_dir
 
     @pytest.mark.filterwarnings("ignore:next_operation")
@@ -415,7 +415,7 @@ class TestProjectClass(TestProjectBase):
         def test_context(job):
             return 'exit 1'
 
-        project = A(self.mock_project().config, entrypoint=self.entrypoint)
+        project = self.mock_project(A)
         for job in project:
             job.doc.np = 3
             with pytest.deprecated_call():
@@ -434,7 +434,7 @@ class TestProjectClass(TestProjectBase):
         def a(job):
             return 'hello!'
 
-        project = A(self.mock_project().config, entrypoint=self.entrypoint)
+        project = self.mock_project(A)
 
         # test setting neither nranks nor omp_num_threads
         for job in project:

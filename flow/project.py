@@ -985,7 +985,7 @@ class _FlowProjectClass(type):
 
         # All groups are registered with the function returned by the make_group
         # classmethod. In contrast to operations and labels, the
-        # make_group classmethod does not serve as the decorator, the function
+        # make_group classmethod does not serve as the decorator, the functor
         # it returns does. The _GROUPS list records the groups created and their
         # passed parameters for later initialization. The _GROUP_NAMES set stores
         # whether a group name has already been used.
@@ -2470,7 +2470,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         operations = list(operations.values())
         if not self._verify_group_compatibility(operations):
             raise ValueError("Cannot specify groups or operations that "
-                             "will be listed twice when using the"
+                             "will be included twice when using the"
                              " -o/--operation option.")
         return operations
 

@@ -32,8 +32,8 @@ from deprecation import fail_if_not_removed
 from define_test_project import _TestProject
 from define_test_project import _DynamicTestProject
 from define_dag_test_project import DagTestProject
-from define_group_test_project import GroupTestProject
-from define_group_test_project import GroupTestDynamicProject
+# from define_group_test_project import GroupTestProject
+# from define_group_test_project import GroupTestDynamicProject
 
 
 @contextmanager
@@ -927,7 +927,7 @@ class TestExecutionProject(TestProjectBase):
         MockScheduler.reset()
         project = self.mock_project()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
-        num_jobs_submitted = len(project) + len(even_jobs)
+        num_jobs_submitted = (2 * len(project)) + len(even_jobs)
         for job in project:
             if job not in even_jobs:
                 continue
@@ -1159,7 +1159,7 @@ class TestProjectDagDetection(TestProjectBase):
 
 # Tests for multiple operation groups or groups with options
 class TestGroupProject(TestProjectBase):
-    project_class = GroupTestProject
+    project_class = _TestProject
     entrypoint = dict(path=os.path.realpath('tests/define_group_test_project.py'))
 
     def test_instance(self):
@@ -1247,7 +1247,7 @@ class TestGroupProject(TestProjectBase):
 
 
 class TestGroupExecutionProject(TestProjectBase):
-    project_class = GroupTestProject
+    project_class = _TestProject
     entrypoint = dict(path=os.path.realpath('tests/define_group_test_project.py'))
     expected_number_of_steps = 4
 
@@ -1357,7 +1357,7 @@ class TestGroupBufferedExecutionProject(TestGroupExecutionProject):
 
 
 class TestGroupExecutionDynamicProject(TestGroupExecutionProject):
-    project_class = GroupTestDynamicProject
+    project_class = _DynamicTestProject
     expected_number_of_steps = 4
 
 
@@ -1367,7 +1367,7 @@ class TestGroupBufferedExecutionDynamicProject(TestGroupBufferedExecutionProject
 
 
 class TestGroupProjectMainInterface(TestProjectBase):
-    project_class = GroupTestProject
+    project_class = _TestProject
     entrypoint = dict(path=os.path.realpath('tests/define_group_test_project.py'))
 
     def switch_to_cwd(self):

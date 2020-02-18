@@ -7,6 +7,11 @@ class _TestProject(FlowProject):
     pass
 
 
+group1 = _TestProject.make_group(name="group1")
+group2 = _TestProject.make_group(name="group2",
+                                 options="--num-passes=2")
+
+
 @_TestProject.label
 def default_label(job):
     return True
@@ -28,6 +33,7 @@ def b_is_even(job):
 @_TestProject.operation
 @flow.cmd
 @_TestProject.pre(b_is_even)
+@group1
 @_TestProject.post.isfile('world.txt')
 # Explicitly set a "bad" directive that is unused by the template.
 # The submit interface should warn about unused directives.
@@ -44,20 +50,40 @@ def _need_to_fork(job):
 
 @_TestProject.operation
 @flow.directives(fork=_need_to_fork)
+@group1
 @_TestProject.post.true('test')
 def op2(job):
     job.document.test = os.getpid()
+
+
+@_TestProject.operation
+@group2.with_directives(ngpu=2)
+@_TestProject.post.true('test3')
+@flow.directives(ngpu=1)
+def op3(job):
+    job.document.test3 = True
 
 
 class _DynamicTestProject(_TestProject):
     pass
 
 
+group3 = _DynamicTestProject.make_group(name="group3")
+
+
 @_DynamicTestProject.operation
 @_DynamicTestProject.pre.after(op1)
 @_DynamicTestProject.post.true('dynamic')
-def op3(job):
+def op4(job):
     job.sp.dynamic = True   # migration during execution
+
+
+@_DynamicTestProject.operation
+@group3
+@_DynamicTestProject.pre.after(op1)
+@_DynamicTestProject.post.true('group_dynamic')
+def op5(job):
+    job.sp.group_dynamic = True   # migration during execution
 
 
 if __name__ == '__main__':

@@ -695,10 +695,10 @@ class FlowGroup(object):
         return cmd.strip() + ' --ignore-conditions=' + str(ignore_conditions)
 
     def _run_cmd(self, entrypoint, operation_name, operation, directives, job):
-        entrypoint = self._determine_entrypoint(entrypoint, directives, job)
         if isinstance(operation, FlowCmdOperation):
             return operation(job).lstrip()
         else:
+            entrypoint = self._determine_entrypoint(entrypoint, directives, job)
             return '{} exec {} {}'.format(entrypoint, operation_name, job).lstrip()
 
     def __iter__(self):

@@ -561,8 +561,8 @@ class TestProject(TestProjectBase):
                 if job in even_jobs:
                     assert op.name == ['op1', 'op2', 'op3'][i]
                 else:
-                    assert op.name == 'op2'
-            assert i == int(job in even_jobs)
+                    assert op.name == ['op2', 'op3'][i]
+            assert i == 2 if job in even_jobs else 1
 
     def test_get_job_status(self):
         project = self.mock_project()

@@ -1160,7 +1160,7 @@ class TestProjectDagDetection(TestProjectBase):
 # Tests for multiple operation groups or groups with options
 class TestGroupProject(TestProjectBase):
     project_class = _TestProject
-    entrypoint = dict(path=os.path.realpath('tests/define_group_test_project.py'))
+    entrypoint = dict(path=os.path.realpath('tests/define_test_project.py'))
 
     def test_instance(self):
         assert isinstance(self.project, FlowProject)
@@ -1248,7 +1248,7 @@ class TestGroupProject(TestProjectBase):
 
 class TestGroupExecutionProject(TestProjectBase):
     project_class = _TestProject
-    entrypoint = dict(path=os.path.realpath('tests/define_group_test_project.py'))
+    entrypoint = dict(path=os.path.realpath('tests/define_test_project.py'))
     expected_number_of_steps = 4
 
     def test_run_with_operation_selection(self):
@@ -1368,7 +1368,7 @@ class TestGroupBufferedExecutionDynamicProject(TestGroupBufferedExecutionProject
 
 class TestGroupProjectMainInterface(TestProjectBase):
     project_class = _TestProject
-    entrypoint = dict(path=os.path.realpath('tests/define_group_test_project.py'))
+    entrypoint = dict(path=os.path.realpath('tests/define_test_project.py'))
 
     def switch_to_cwd(self):
         os.chdir(self.cwd)

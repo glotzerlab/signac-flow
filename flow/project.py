@@ -606,10 +606,10 @@ class FlowGroup(object):
     :type name:
         str
     :param operations:
-        A :class:`dict` of name : :class:`FlowOperation` key, value pairs in the
-        group.
+        Name : :class:`FlowOperation` key, value pairs of operations
+        in the group.
     :type operations:
-        :class:`dict` keys of :class:`str` and values of :class:`FlowOperation`
+        dict
     :param operation_directives:
         A dictionary of additional parameters that provide instructions on how
         to execute a particular operation, e.g., specifically required
@@ -619,14 +619,15 @@ class FlowGroup(object):
         prevent this set the directives to an empty dictionary for that
         operation.
     :type operation_directives:
-        :class:`dict`
+        dict
     :param options:
         A string of options to append to the output of the object's call method.
         This lets options like --num_passes to be given to a group.
     :type options:
-        :class:`str`
+        str
 
-    ..code:: python
+    .. code-block:: python
+
         group = FlowProject.make_group(name='example_group')
 
         @group.with_directives(nranks=4)
@@ -836,7 +837,7 @@ class FlowGroup(object):
             dict
         :param default_directives:
             The default directives to use for the operations. This is to allow for user specified
-            groups to 'inherent' directives from ``default_directives``. If no defaults are desired,
+            groups to 'inherit' directives from ``default_directives``. If no defaults are desired,
             the argument can be set to an empty dictionary. This must be done explicitly, however.
         :type default_directives:
             dict

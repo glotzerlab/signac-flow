@@ -140,3 +140,20 @@ flow.get_environment()
 ----------------------
 
 .. autofunction:: get_environment
+
+FlowGroups
+----------
+
+.. autoclass:: flow.project.FlowGroup
+
+.. automethod:: flow.project.FlowGroup.eligible
+
+.. automethod:: flow.project.FlowGroup.complete
+
+.. automethod:: flow.project.FlowGroup.add_operation
+
+.. automethod:: flow.project.FlowGroup.isdisjoint
+
+.. automethod:: flow.project.FlowGroup.create_submission_job_operation
+
+.. automethod:: flow.project.FlowGroup.create_run_job_operations

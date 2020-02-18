@@ -823,7 +823,7 @@ class FlowGroup(object):
             return JobStatus.unknown
 
     def create_submission_job_operation(self, entrypoint, default_directives, job,
-                                        ignore_conditions_on_submit=IgnoreConditions.NONE,
+                                        ignore_conditions_on_execution=IgnoreConditions.NONE,
                                         parallel=False, index=0):
         """Create a JobOperation object from the FlowGroup.
 
@@ -843,10 +843,15 @@ class FlowGroup(object):
             The job that the :class:`~.JobOperation` is based on.
         :type job:
             :class:`signac.Job`
-        :param ignore_conditions_on_submit:
+        :param ignore_conditions:
+            Specify if pre and/or post conditions check is to be ignored for
+            checking submission eligibility. The default is `IgnoreConditions.NONE`.
+        :type ignore_conditions:
+            :py:class:`~.IgnoreConditions`
+        :param ignore_conditions_on_execution:
             Specify if pre and/or post conditions check is to be ignored for eligibility check after
             submitting.  The default is `IgnoreConditions.NONE`.
-        :type ignore_conditions:
+        :type ignore_conditions_on_execution:
             :py:class:`~.IgnoreConditions`
         :param parallel:
             Whether the submission should run its operations in parallel.
@@ -865,7 +870,7 @@ class FlowGroup(object):
             :py:class:`JobOperation`
         """
         uneval_cmd = functools.partial(self._submit_cmd, entrypoint=entrypoint, job=job,
-                                       ignore_conditions=ignore_conditions_on_submit)
+                                       ignore_conditions=ignore_conditions_on_execution)
         submission_directives = self._get_submission_directives(default_directives, job, parallel)
         return JobOperation(self._generate_id(job, index=index),
                             self.name,
@@ -2476,7 +2481,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _get_submission_operations(self, jobs, default_directives, names=None, parallel=False,
                                    ignore_conditions=IgnoreConditions.NONE,
-                                   ignore_conditions_on_submit=IgnoreConditions.NONE):
+                                   ignore_conditions_on_execution=IgnoreConditions.NONE):
         """Grabs JobOperations that are eligible to run from FlowGroups."""
         for job in jobs:
             for group in self._gather_flow_groups(names):
@@ -2485,7 +2490,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     yield group.create_submission_job_operation(
                             entrypoint=self._entrypoint, default_directives=default_directives,
                             job=job, parallel=parallel, index=0,
-                            ignore_conditions_on_submit=ignore_conditions_on_submit)
+                            ignore_conditions_on_execution=ignore_conditions_on_execution)
 
     def _get_pending_operations(self, jobs, operation_names=None,
                                 ignore_conditions=IgnoreConditions.NONE):
@@ -2662,7 +2667,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def submit(self, bundle_size=1, jobs=None, names=None, num=None, parallel=False,
                force=False, walltime=None, env=None, ignore_conditions=IgnoreConditions.NONE,
-               ignore_conditions_on_submit=IgnoreConditions.NONE, **kwargs):
+               ignore_conditions_on_execution=IgnoreConditions.NONE, **kwargs):
         """Submit function for the project's main submit interface.
 
         :param bundle_size:
@@ -2683,7 +2688,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             int
         :param parallel:
             Execute all bundled operations in parallel. Will make both bundles and groups run in
-            parallel. If not careful this can lead to large resource requests per job.
+            parallel.
         :type parallel:
             bool
         :param force:
@@ -2697,7 +2702,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             The default is :py:class:`IgnoreConditions.NONE`.
         :type ignore_conditions:
             :py:class:`~.IgnoreConditions`
-        :param ignore_conditions_on_submit:
+        :param ignore_conditions_on_execution:
             Specify if pre and/or post conditions check is to be ignored for eligibility check after
             submitting.  The default is :py:class:`IgnoreConditions.NONE`.
         :type ignore_conditions:
@@ -2729,7 +2734,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         with self._potentially_buffered():
             operations = self._get_submission_operations(jobs, default_directives, names, parallel,
                                                          ignore_conditions,
-                                                         ignore_conditions_on_submit)
+                                                         ignore_conditions_on_execution)
         if num is not None:
             operations = list(islice(operations, num))
 
@@ -2791,8 +2796,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             '-p', '--parallel',
             action='store_true',
             help="Execute all operations in parallel. This applies to "
-                 "bundling and groups. In combination this can lead to large "
-                 "resource requests.")
+                 "bundling and groups.")
         cls._add_direct_cmd_arg_group(parser)
         cls._add_template_arg_group(parser)
 
@@ -3468,7 +3472,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 default_directives = self._get_default_directives()
                 operations = self._get_submission_operations(jobs, default_directives, names,
                                                              args.parallel, args.ignore_conditions,
-                                                             args.ignore_conditions_on_submit)
+                                                             args.ignore_conditions_on_execution)
             operations = list(islice(operations, args.num))
 
         # Generate the script and print to screen.
@@ -3494,7 +3498,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             default_directives = self._get_default_directives()
             operations = self._get_submission_operations(jobs, default_directives, names,
                                                          args.parallel, args.ignore_conditions,
-                                                         args.ignore_conditions_on_submit)
+                                                         args.ignore_conditions_on_execution)
         operations = list(islice(operations, args.num))
         # Bundle operations up, generate the script, and submit to scheduler.
         for bundle in make_bundles(operations, args.bundle_size):

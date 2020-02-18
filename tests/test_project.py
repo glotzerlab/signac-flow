@@ -559,7 +559,7 @@ class TestProject(TestProjectBase):
             for i, op in enumerate(project.next_operations(job)):
                 assert op.job == job
                 if job in even_jobs:
-                    assert op.name == ['op1', 'op2'][i]
+                    assert op.name == ['op1', 'op2', 'op3'][i]
                 else:
                     assert op.name == 'op2'
             assert i == int(job in even_jobs)
@@ -864,7 +864,7 @@ class TestExecutionProject(TestProjectBase):
         with redirect_stderr(StringIO()):
             project.submit()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
-        num_jobs_submitted = len(project) + len(even_jobs)
+        num_jobs_submitted = (2 * len(project)) + len(even_jobs)
         assert len(list(MockScheduler.jobs())) == num_jobs_submitted
         MockScheduler.reset()
 
@@ -891,7 +891,7 @@ class TestExecutionProject(TestProjectBase):
         MockScheduler.reset()
         project = self.mock_project()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
-        num_jobs_submitted = len(project) + len(even_jobs)
+        num_jobs_submitted = (2 * len(project)) + len(even_jobs)
         assert len(list(MockScheduler.jobs())) == 0
         with redirect_stderr(StringIO()):
             # Initial submission

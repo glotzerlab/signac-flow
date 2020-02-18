@@ -561,6 +561,7 @@ class FlowGroupEntry(object):
                 func._flow_groups.append(self.name)
         else:
             func._flow_groups = [self.name]
+        return func
 
     def _set_directives(self, func, directives):
         if hasattr(func, '_flow_group_operation_directives'):

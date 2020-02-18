@@ -351,8 +351,7 @@ class JobOperation(object):
     def get_status(self):
         "Retrieve the operation's last known status."
         try:
-            return JobStatus(self.job._project.document['_status'].get(self.id,
-                                                                       JobStatus.unknown))
+            return JobStatus(self.job._project.document['_status'][self.id]
         except KeyError:
             return JobStatus.unknown
 
@@ -819,8 +818,7 @@ class FlowGroup(object):
     def _get_status(self, job):
         """For a given job check the groups submission status."""
         try:
-            return JobStatus(job._project.document['_status'].get(self._generate_id(job),
-                                                                  JobStatus.unknown))
+            return JobStatus(job._project.document['_status'][self._generate_id(job)]
         except KeyError:
             return JobStatus.unknown
 

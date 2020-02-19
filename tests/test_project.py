@@ -1119,7 +1119,7 @@ class TestProjectMainInterface(TestProjectBase):
         for line in lines:
             for job in project:
                 if job.get_id() in line:
-                    for op in project.next_operations(job):
+                    for op in sorted(project.next_operations(job), key=lambda x: x.name):
                         assert op.name in line
                         try:
                             line = next(lines)

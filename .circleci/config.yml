@@ -65,8 +65,7 @@ jobs:
           name: run tests
           command: |
             . venv/bin/activate
-            cd ./tests
-            coverage run --source=flow/ -m pytest -v
+            coverage run --source=flow/ -m pytest -v tests/
             coverage report -i --include="flow*"
 
       - store_artifacts:

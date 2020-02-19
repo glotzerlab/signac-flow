@@ -565,8 +565,8 @@ class FlowGroupEntry(object):
     def _set_directives(self, func, directives):
         if hasattr(func, '_flow_group_operation_directives'):
             if self.name in func._flow_group_operation_directives:
-                raise ValueError("Cannot set directives because directives already exist for {} in group {}"
-                                 "".format(func, self.name))
+                raise ValueError("Cannot set directives because directives already exist for {} "
+                                 "in group {}".format(func, self.name))
             else:
                 func._flow_group_operation_directives[self.name] = directives
         else:
@@ -605,8 +605,8 @@ class FlowGroup(object):
     :type name:
         str
     :param operations:
-        Name : :class:`FlowOperation` key, value pairs of operations
-        in the group.
+        A dictionary of operations where the keys are operation names and the
+        values are :py:class:`BaseFlowOperation`s.
     :type operations:
         dict
     :param operation_directives:
@@ -937,22 +937,22 @@ class FlowGroup(object):
             # get directives for operation
             op_dir = self._resolve_directives(name, default_directives)
             # if operations are callable handle appropriately with job
-            op_dir.update(dict(ngpu=get_directive(op_dir, 'ngpu', 0, job),
-                          nranks=get_directive(op_dir, 'nranks', 0, job),
-                          omp_num_threads=get_directive(op_dir, 'omp_num_threads', 0, job)
-                               )
-                          )
+            op_dir.update(dict(
+                ngpu=get_directive(op_dir, 'ngpu', 0, job),
+                nranks=get_directive(op_dir, 'nranks', 0, job),
+                omp_num_threads=get_directive(op_dir, 'omp_num_threads', 0, job)))
+
             # Find the correct number of processors for operation
             np = max(max(op_dir['nranks'], 1) * max(op_dir['omp_num_threads'], 1),
                      op_dir.get('np', 1))
-            # In general parallel means add resources
             if parallel:
+                # In general parallel means add resources
                 directives['ngpu'] += op_dir['ngpu']
                 directives['nranks'] += op_dir['nranks']
                 directives['omp_num_threads'] += op_dir['omp_num_threads']
                 directives['np'] += np
-            # In serial we take the max
             else:
+                # In serial we take the max
                 directives['ngpu'] = max(directives['ngpu'], op_dir['ngpu'])
                 directives['nranks'] = max(directives['nranks'], op_dir['nranks'])
                 directives['omp_num_threads'] = max(directives['omp_num_threads'],
@@ -2466,10 +2466,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 for group in groups:
                     operations[group.name] = group
             else:
-                # remove error for now until desided
-                # raise ValueError("Operation/Group {} is not defined".
-                #                  format(name))
-                pass
+                continue
         operations = list(operations.values())
         if not self._verify_group_compatibility(operations):
             raise ValueError("Cannot specify groups or operations that "
@@ -2685,8 +2682,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type num:
             int
         :param parallel:
-            Execute all bundled operations in parallel. Will make both bundles and groups run in
-            parallel.
+            Execute all bundled operations in parallel. With multiple operation
+            groups, this also will run the operations in a group in parallel.
         :type parallel:
             bool
         :param force:
@@ -2794,7 +2791,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             '-p', '--parallel',
             action='store_true',
             help="Execute all operations in parallel. This applies to "
-                 "bundling and groups.")
+                 "bundled operations and operations within a multi-operation group..")
         cls._add_direct_cmd_arg_group(parser)
         cls._add_template_arg_group(parser)
 
@@ -2861,7 +2858,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         selection_group.add_argument(
             '-n', '--num',
             type=int,
-            help="Limit the total number of operations to be selected.")
+            help="Limit the total number of operations/groups to be selected. A group is "
+                 "considered to be one operation even if it consists of multiple operations.")
 
     @classmethod
     def _add_operation_bundling_arg_group(cls, parser):
@@ -2886,8 +2884,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             '-p', '--parallel',
             action='store_true',
             help="Execute all operations or multi-operation groups within "
-                 "a single bundle in parallel. With multi-operation groups "
-                 "this can lead to large resource requests.")
+                 "a single bundle in parallel. For multi-operation groups "
+                 "operations within a group run in parallel.")
 
     @classmethod
     def _add_direct_cmd_arg_group(cls, parser):
@@ -3303,7 +3301,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type options:
             str
         """
-        # Gets the relative filepath of the function caller
         if name in cls._GROUP_NAMES:
             raise ValueError("Repeat definition of group with name '{}'.".format(name))
         else:

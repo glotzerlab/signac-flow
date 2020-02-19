@@ -1188,11 +1188,11 @@ class TestGroupProject(TestProjectBase):
 
         # For multiple operation groups and options
         for job in project:
-            job_op1 = project.groups['group1'].create_submission_job_operation(
+            job_op1 = project.groups['group1']._create_submission_job_operation(
                     project._entrypoint, dict(), job)
             script1 = project.script([job_op1])
             assert 'run -o group1 -j {}'.format(job) in script1
-            job_op2 = project.groups['group2'].create_submission_job_operation(
+            job_op2 = project.groups['group2']._create_submission_job_operation(
                     project._entrypoint, dict(), job)
             script2 = project.script([job_op2])
             assert '--num-passes=2'.format(job) in script2
@@ -1210,10 +1210,10 @@ class TestGroupProject(TestProjectBase):
                                                          names=['op3'])
             assert all([job_op.directives.get('ngpu', 0) == 1 for job_op in job_ops])
             # Test run JobOperations
-            job_ops = project.groups['group2'].create_run_job_operations(
+            job_ops = project.groups['group2']._create_run_job_operations(
                         project._entrypoint, project._get_default_directives(), job)
             assert all([job_op.directives.get('ngpu', 0) == 2 for job_op in job_ops])
-            job_ops = project.groups['op3'].create_run_job_operations(
+            job_ops = project.groups['op3']._create_run_job_operations(
                         project._entrypoint, project._get_default_directives(), job)
             assert all([job_op.directives.get('ngpu', 0) == 1 for job_op in job_ops])
 
@@ -1297,7 +1297,7 @@ class TestGroupExecutionProject(TestProjectBase):
     def test_submit_groups(self):
         MockScheduler.reset()
         project = self.mock_project()
-        operations = [project.groups['group1'].create_submission_job_operation(
+        operations = [project.groups['group1']._create_submission_job_operation(
                         project._entrypoint, dict(), job) for job in project]
         assert len(list(MockScheduler.jobs())) == 0
         cluster_job_id = project._store_bundled(operations)

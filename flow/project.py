@@ -822,9 +822,9 @@ class FlowGroup(object):
         except KeyError:
             return JobStatus.unknown
 
-    def create_submission_job_operation(self, entrypoint, default_directives, job,
-                                        ignore_conditions_on_execution=IgnoreConditions.NONE,
-                                        parallel=False, index=0):
+    def _create_submission_job_operation(self, entrypoint, default_directives, job,
+                                         ignore_conditions_on_execution=IgnoreConditions.NONE,
+                                         parallel=False, index=0):
         """Create a JobOperation object from the FlowGroup.
 
         Creates a JobOperation for use in submitting and scripting.
@@ -878,8 +878,8 @@ class FlowGroup(object):
                             cmd=uneval_cmd,
                             directives=submission_directives)
 
-    def create_run_job_operations(self, entrypoint, default_directives, job,
-                                  ignore_conditions=IgnoreConditions.NONE, index=0):
+    def _create_run_job_operations(self, entrypoint, default_directives, job,
+                                   ignore_conditions=IgnoreConditions.NONE, index=0):
         """Create JobOperation object(s) from the FlowGroup.
 
         Yields a JobOperation for each contained operation given proper conditions are met.
@@ -2411,10 +2411,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     for flow_group in flow_groups:
                         for job in jobs:
                             operations.extend(
-                                flow_group.create_run_job_operations(
-                                    self._entrypoint, default_directives, job, ignore_conditions
-                                    )
-                                              )
+                                flow_group._create_run_job_operations(
+                                    self._entrypoint, default_directives, job, ignore_conditions))
 
                     operations = list(filter(select, operations))
             finally:
@@ -2487,7 +2485,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             for group in self._gather_flow_groups(names):
                 if group.eligible(job, ignore_conditions) and self._eligible_for_submission(group,
                                                                                             job):
-                    yield group.create_submission_job_operation(
+                    yield group._create_submission_job_operation(
                             entrypoint=self._entrypoint, default_directives=default_directives,
                             job=job, parallel=parallel, index=0,
                             ignore_conditions_on_execution=ignore_conditions_on_execution)
@@ -3140,10 +3138,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         "Yield instances of JobOperation constructed for specific jobs."
         for name in self.operations:
             group = self._groups[name]
-            yield from group.create_run_job_operations(entrypoint=self._entrypoint, job=job,
-                                                       default_directives=dict(),
-                                                       ignore_conditions=ignore_conditions,
-                                                       index=0)
+            yield from group._create_run_job_operations(entrypoint=self._entrypoint, job=job,
+                                                        default_directives=dict(),
+                                                        ignore_conditions=ignore_conditions,
+                                                        index=0)
 
     def next_operations(self, *jobs, ignore_conditions=IgnoreConditions.NONE):
         """Determine the next eligible operations for jobs.

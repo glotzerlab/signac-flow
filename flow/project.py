@@ -2776,7 +2776,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             action=_IgnoreConditionsConversion,
             help="Specify conditions to ignore for eligibility check.")
         parser.add_argument(
-            '--ignore-conditions-on-submit',
+            '--ignore-conditions-on-execution',
             type=str,
             choices=['none', 'pre', 'post', 'all'],
             default=IgnoreConditions.NONE,
@@ -3692,7 +3692,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             action=_IgnoreConditionsConversion,
             help="Specify conditions to ignore for eligibility check.")
         parser_script.add_argument(
-            '--ignore-conditions-on-submit',
+            '--ignore-conditions-on-execution',
             type=str,
             choices=['none', 'pre', 'post', 'all'],
             default=IgnoreConditions.NONE,

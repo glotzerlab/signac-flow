@@ -29,6 +29,7 @@ class UserConditionError(RuntimeError):
 
 class UserOperationError(RuntimeError):
     "Indicates an error during execution of a FlowOperation."
+    pass
 
 
 class TemplateError(Jinja2Extension):

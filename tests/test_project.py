@@ -537,7 +537,7 @@ class TestProject(TestProjectBase):
     project_class = _TestProject
     entrypoint = dict(
         path=os.path.realpath(os.path.join(os.path.dirname(__file__), 'define_test_project.py'))
-        )
+    )
 
     def test_instance(self):
         assert isinstance(self.project, FlowProject)
@@ -665,7 +665,7 @@ class TestExecutionProject(TestProjectBase):
     expected_number_of_steps = 4
     entrypoint = dict(
         path=os.path.realpath(os.path.join(os.path.dirname(__file__), 'define_test_project.py'))
-        )
+    )
 
     def test_pending_operations_order(self):
         # The execution order of local runs is internally assumed to be
@@ -1055,7 +1055,7 @@ class TestProjectMainInterface(TestProjectBase):
     project_class = _TestProject
     entrypoint = dict(
         path=os.path.realpath(os.path.join(os.path.dirname(__file__), 'define_test_project.py'))
-        )
+    )
 
     def switch_to_cwd(self):
         os.chdir(self.cwd)
@@ -1116,15 +1116,18 @@ class TestProjectMainInterface(TestProjectBase):
         status_output = self.call_subcmd('--debug status --detailed').decode('utf-8').splitlines()
         lines = iter(status_output)
         project = self.mock_project()
+        num_ops = len(project.operations)
         for line in lines:
             for job in project:
                 if job.get_id() in line:
-                    for op in sorted(project.next_operations(job), key=lambda x: x.name):
-                        assert op.name in line
+                    op_lines = [line]
+                    for i in range(num_ops - 1):
                         try:
-                            line = next(lines)
+                            op_lines.append(next(lines))
                         except StopIteration:
                             continue
+                    for op in project.next_operations(job):
+                        assert any(op.name in l for l in op_lines)
 
     def test_main_script(self):
         assert len(self.project)
@@ -1166,7 +1169,7 @@ class TestGroupProject(TestProjectBase):
     project_class = _TestProject
     entrypoint = dict(
         path=os.path.realpath(os.path.join(os.path.dirname(__file__), 'define_test_project.py'))
-        )
+    )
 
     def test_instance(self):
         assert isinstance(self.project, FlowProject)
@@ -1189,11 +1192,11 @@ class TestGroupProject(TestProjectBase):
         # For multiple operation groups and options
         for job in project:
             job_op1 = project.groups['group1']._create_submission_job_operation(
-                    project._entrypoint, dict(), job)
+                project._entrypoint, dict(), job)
             script1 = project.script([job_op1])
             assert 'run -o group1 -j {}'.format(job) in script1
             job_op2 = project.groups['group2']._create_submission_job_operation(
-                    project._entrypoint, dict(), job)
+                project._entrypoint, dict(), job)
             script2 = project.script([job_op2])
             assert '--num-passes=2'.format(job) in script2
 
@@ -1211,10 +1214,10 @@ class TestGroupProject(TestProjectBase):
             assert all([job_op.directives.get('ngpu', 0) == 1 for job_op in job_ops])
             # Test run JobOperations
             job_ops = project.groups['group2']._create_run_job_operations(
-                        project._entrypoint, project._get_default_directives(), job)
+                project._entrypoint, project._get_default_directives(), job)
             assert all([job_op.directives.get('ngpu', 0) == 2 for job_op in job_ops])
             job_ops = project.groups['op3']._create_run_job_operations(
-                        project._entrypoint, project._get_default_directives(), job)
+                project._entrypoint, project._get_default_directives(), job)
             assert all([job_op.directives.get('ngpu', 0) == 1 for job_op in job_ops])
 
     def test_submission_aggregation(self):
@@ -1256,7 +1259,7 @@ class TestGroupExecutionProject(TestProjectBase):
     project_class = _TestProject
     entrypoint = dict(
         path=os.path.realpath(os.path.join(os.path.dirname(__file__), 'define_test_project.py'))
-        )
+    )
     expected_number_of_steps = 4
 
     def test_run_with_operation_selection(self):
@@ -1298,7 +1301,7 @@ class TestGroupExecutionProject(TestProjectBase):
         MockScheduler.reset()
         project = self.mock_project()
         operations = [project.groups['group1']._create_submission_job_operation(
-                        project._entrypoint, dict(), job) for job in project]
+            project._entrypoint, dict(), job) for job in project]
         assert len(list(MockScheduler.jobs())) == 0
         cluster_job_id = project._store_bundled(operations)
         with redirect_stderr(StringIO()):
@@ -1378,7 +1381,7 @@ class TestGroupProjectMainInterface(TestProjectBase):
     project_class = _TestProject
     entrypoint = dict(
         path=os.path.realpath(os.path.join(os.path.dirname(__file__), 'define_test_project.py'))
-        )
+    )
 
     def switch_to_cwd(self):
         os.chdir(self.cwd)

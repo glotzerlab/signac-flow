@@ -2461,7 +2461,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """Grabs FlowGroups that match any of a set of names."""
         operations = OrderedDict()
         # if no names are selected try all singleton groups
-        names = names if names is not None else self._operations.keys()
+        if names is None:
+            names = self._operations.keys()
         for name in names:
             if name in operations:
                 continue

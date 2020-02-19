@@ -687,10 +687,11 @@ class FlowGroup(object):
         else:
             return deepcopy(defaults.get(name, dict()))
 
-    def _submit_cmd(self, entrypoint, ignore_conditions, job=None):
+    def _submit_cmd(self, entrypoint, ignore_conditions, parallel, job=None):
         entrypoint = self._determine_entrypoint(entrypoint, dict(), job)
         cmd = "{} run -o {}".format(entrypoint, self.name)
         cmd = cmd if job is None else cmd + ' -j {}'.format(job)
+        cmd = cmd if not parallel else cmd + " --parallel"
         cmd = cmd if self.options is None else cmd + ' ' + self.options
         if ignore_conditions != IgnoreConditions.NONE:
             return cmd.strip() + ' --ignore-conditions=' + str(ignore_conditions)
@@ -873,7 +874,8 @@ class FlowGroup(object):
             :py:class:`JobOperation`
         """
         uneval_cmd = functools.partial(self._submit_cmd, entrypoint=entrypoint, job=job,
-                                       ignore_conditions=ignore_conditions_on_execution)
+                                       ignore_conditions=ignore_conditions_on_execution,
+                                       parallel=parallel)
         submission_directives = self._get_submission_directives(default_directives, job, parallel)
         return JobOperation(self._generate_id(job, index=index),
                             self.name,

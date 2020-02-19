@@ -37,6 +37,7 @@ The FlowProject
     FlowProject.label
     FlowProject.labels
     FlowProject.main
+    FlowProject.make_group
     FlowProject.next_operation
     FlowProject.next_operations
     FlowProject.operation
@@ -58,7 +59,6 @@ The FlowProject
     FlowProject.pre.never
     FlowProject.pre.not_
     FlowProject.pre.true
-    FlowProject.make_group
     FlowProject.run
     FlowProject.run_operations
     FlowProject.scheduler_jobs
@@ -141,19 +141,15 @@ flow.get_environment()
 
 .. autofunction:: get_environment
 
-FlowGroups
+The FlowGroup
 ----------
 
 .. autoclass:: flow.project.FlowGroup
 
-.. automethod:: flow.project.FlowGroup.eligible
+.. automethod:: flow.project.FlowGroup.add_operation
 
 .. automethod:: flow.project.FlowGroup.complete
 
-.. automethod:: flow.project.FlowGroup.add_operation
+.. automethod:: flow.project.FlowGroup.eligible
 
 .. automethod:: flow.project.FlowGroup.isdisjoint
-
-.. automethod:: flow.project.FlowGroup.create_submission_job_operation
-
-.. automethod:: flow.project.FlowGroup.create_run_job_operations

@@ -263,6 +263,8 @@ class JobOperation(object):
         self._id = id
         self.name = name
         self.job = job
+        if not (callable(cmd) or isinstance(cmd, str)):
+            raise ValueError("JobOperation cmd must be a callable or string.")
         self._cmd = cmd
 
         if directives is None:
@@ -339,10 +341,8 @@ class JobOperation(object):
     def cmd(self):
         if callable(self._cmd):
             return self._cmd()
-        elif isinstance(self._cmd, str):
-            return self._cmd
         else:
-            raise TypeError("JobOperation cmd must be string or callable.")
+            return self._cmd
 
     def set_status(self, value):
         "Store the operation's status."

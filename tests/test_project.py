@@ -32,8 +32,6 @@ from deprecation import fail_if_not_removed
 from define_test_project import _TestProject
 from define_test_project import _DynamicTestProject
 from define_dag_test_project import DagTestProject
-# from define_group_test_project import GroupTestProject
-# from define_group_test_project import GroupTestDynamicProject
 
 
 @contextmanager

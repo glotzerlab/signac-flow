@@ -572,13 +572,13 @@ class FlowGroupEntry(object):
         else:
             func._flow_group_operation_directives = {self.name: directives}
 
-    def with_directives(self, **kwargs):
+    def with_directives(self, directives):
         """Returns a decorator that sets group specific directives to the operation.
 
-        :param kwargs:
+        :param directives:
             Directives to use for resource requests and running the operation
             through the group.
-        :type kwargs:
+        :type directives:
             dict
         :returns:
             A decorator which registers the function into the group with
@@ -588,7 +588,7 @@ class FlowGroupEntry(object):
         """
 
         def decorator(func):
-            self._set_directives(func, kwargs)
+            self._set_directives(func, directives)
             return self(func)
 
         return decorator

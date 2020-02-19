@@ -1223,12 +1223,12 @@ class TestGroupProject(TestProjectBase):
 
         group = A.make_group('group')
 
-        @group.with_directives(ngpu=2, nranks=4)
+        @group.with_directives(dict(ngpu=2, nranks=4))
         @A.operation
         def op1(job):
             pass
 
-        @group.with_directives(ngpu=2, nranks=4)
+        @group.with_directives(dict(ngpu=2, nranks=4))
         @A.operation
         def op2(job):
             pass

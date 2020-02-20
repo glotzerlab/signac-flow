@@ -1254,6 +1254,35 @@ class TestGroupProject(TestProjectBase):
         assert all([directives['ngpu'] == 4, directives['nranks'] == 10,
                     directives['np'] == 10])
 
+    def test_flowgroup_repr(self):
+        class A(flow.FlowProject):
+            pass
+
+        group = A.make_group('group')
+
+        @group.with_directives(dict(ngpu=2, nranks=4))
+        @A.operation
+        def op1(job):
+            pass
+
+        @group
+        @A.operation
+        def op2(job):
+            pass
+
+        @group
+        @A.operation
+        @flow.directives(nranks=2)
+        def op3(job):
+            pass
+
+        expected_string = "FlowGroup(name='group', operations='op1 op2 op3', " + \
+                          "operation_directives={'op1': {'ngpu': 2, 'nranks': 4}}, " + \
+                          "options='')"
+
+        project = self.mock_project(A)
+        assert repr(project.groups['group']) == expected_string
+
 
 class TestGroupExecutionProject(TestProjectBase):
     project_class = _TestProject

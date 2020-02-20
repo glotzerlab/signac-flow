@@ -540,7 +540,7 @@ class FlowGroupEntry(object):
     :type options:
         str
     """
-    def __init__(self, name, options=None):
+    def __init__(self, name, options=""):
         self.name = name
         self.options = options
 
@@ -710,11 +710,11 @@ class FlowGroup(object):
 
     def __repr__(self):
         return "{type}(name='{name}', operations='{operations}', " \
-               "directives={directives}, options={options})".format(
+               "operation_directives={directives}, options='{options}')".format(
                    type=type(self).__name__,
                    name=self.name,
                    operations=' '.join(list(self.operations)),
-                   directives=self.directives,
+                   directives=self.operation_directives,
                    options=self.options)
 
     def eligible(self, job, ignore_conditions=IgnoreConditions.NONE):
@@ -3226,7 +3226,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Append the name and function to the class registry
         cls._OPERATION_FUNCTIONS.append((name, func))
-        cls._GROUPS.append(FlowGroupEntry(name=name, options=None))
+        cls._GROUPS.append(FlowGroupEntry(name=name, options=""))
         if hasattr(func, '_flow_groups'):
             func._flow_groups.append(name)
         else:
@@ -3284,7 +3284,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 self._operation_functions[name] = func
 
     @classmethod
-    def make_group(cls, name, options=None):
+    def make_group(cls, name, options=""):
         """Make a FlowGroup named ``name`` and return a decorator to make groups.
 
         .. code-block:: python

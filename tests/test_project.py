@@ -1254,6 +1254,8 @@ class TestGroupProject(TestProjectBase):
         assert all([directives['ngpu'] == 4, directives['nranks'] == 10,
                     directives['np'] == 10])
 
+    @pytest.mark.skipif(sys.version_info <= (3, 5), reason="dictionaries are not ordered in "
+                                                           "CPython 3.5")
     def test_flowgroup_repr(self):
         class A(flow.FlowProject):
             pass

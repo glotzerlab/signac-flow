@@ -557,8 +557,8 @@ class _FlowProjectClass(type):
                 super(pre, self).__init__(condition, tag)
 
             def __call__(self, func):
-                for (name, fun) in self._parent_class._collect_operations():
-                    if self.condition is fun:
+                for (name, _func) in self._parent_class._collect_operations():
+                    if self.condition is _func:
                         raise ValueError("Operation functions cannot be used as preconditions.")
                 self._parent_class._OPERATION_PRE_CONDITIONS[func].insert(0, self.condition)
                 return func
@@ -574,8 +574,8 @@ class _FlowProjectClass(type):
                 "True if and only if all post conditions of other operation-function(s) are met."
                 for condition_i in other_funcs:
                     check_flag = 0
-                    for (name, fun) in cls._parent_class._collect_operations():
-                        if condition_i is fun:
+                    for (name, _func) in cls._parent_class._collect_operations():
+                        if condition_i is _func:
                             check_flag = 1
                     if check_flag != 1:
                         raise ValueError("The argument to pre.after must be an operation function.")

@@ -1236,6 +1236,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             'terminal' (default), 'markdown' or 'html'.
         :type output_format:
             str
+        :return:
+            A Renderer class object that contains the rendered string.
+        :rtype:
+            :py:class:`~.Renderer`
         """
         if file is None:
             file = sys.stdout

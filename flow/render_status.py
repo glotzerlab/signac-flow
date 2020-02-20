@@ -17,10 +17,28 @@ class Renderer:
         self.html_output = None
 
     def generate_terminal_output(self):
+        """Get status string in format for terminal.
+
+        :return:
+            Status string in format for terminal.
+        :rtype:
+            str
+        """
+
         self.terminal_output = mistune.terminal(self.markdown_output)
+        return self.terminal_output
 
     def generate_html_output(self):
+        """Get status string in html format.
+
+        :return:
+            Status string in html format.
+        :rtype:
+            str
+        """
+
         self.html_output = mistune.html(self.markdown_output)
+        return self.html_output
 
     def render(self, template, template_environment, context, detailed, expand,
                unroll, compact, output_format):
@@ -168,13 +186,11 @@ class Renderer:
         template = template_environment.get_template(template)
         self.markdown_output = template.render(**context)
         if output_format == 'terminal':
-            self.generate_terminal_output()
-            return self.terminal_output
+            return self.generate_terminal_output()
         elif output_format == 'markdown':
             return self.markdown_output
         elif output_format == 'html':
-            self.generate_html_output()
-            return self.html_output
+            return self.generate_html_output()
         else:
             raise ValueError('Output format not supported, valid options are '
                              'terminal, markdown, or html.')

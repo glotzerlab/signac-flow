@@ -1254,8 +1254,6 @@ class TestGroupProject(TestProjectBase):
         assert all([directives['ngpu'] == 4, directives['nranks'] == 10,
                     directives['np'] == 10])
 
-    @pytest.mark.skipif(sys.version_info <= (3, 5), reason="dictionaries are not ordered in "
-                                                           "CPython 3.5")
     def test_flowgroup_repr(self):
         class A(flow.FlowProject):
             pass
@@ -1278,13 +1276,13 @@ class TestGroupProject(TestProjectBase):
         def op3(job):
             pass
 
-        expected_string = "FlowGroup(name='group', operations='op1 op2 op3', " + \
-                          "operation_directives={'op1': {'ngpu': 2, 'nranks': 4}}, " + \
-                          "options='')"
-
         project = self.mock_project(A)
-        assert repr(project.groups['group']) == expected_string
-
+        rep_string = repr(project.groups['group'])
+        assert all(op in rep_string for op in ['op1', 'op2', 'op3'])
+        assert "'nranks': 4" in rep_string
+        assert "'ngpu': 2" in rep_string
+        assert "options=''" in rep_string
+        assert "name='group'" in rep_string
 
 class TestGroupExecutionProject(TestProjectBase):
     project_class = _TestProject

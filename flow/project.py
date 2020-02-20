@@ -69,6 +69,7 @@ from .labels import staticlabel
 from .labels import classlabel
 from .labels import _is_label_func
 from .util import config as flow_config
+from .render_status import Renderer as StatusRenderer
 from .version import __version__
 
 
@@ -1146,7 +1147,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                      unroll=True, compact=False, pretty=False,
                      file=None, err=None, ignore_errors=False,
                      no_parallelize=False, template=None, profile=False,
-                     eligible_jobs_max_lines=None):
+                     eligible_jobs_max_lines=None, output_format='terminal'):
         """Print the status of the project.
 
         :param jobs:
@@ -1160,10 +1161,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :param overview_max_lines:
             Limit the number of overview lines.
         :type overview_max_lines:
-            int
-        :param eligible_jobs_max_lines:
-            Limit the number of eligible jobs that are printed in the overview.
-        :type eligible_jobs_max_lines:
             int
         :param detailed:
             Print a detailed status of each job.
@@ -1226,6 +1223,23 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             User provided Jinja2 template file.
         :type template:
             str
+        :param profile:
+            Show profile result.
+        :type profile:
+            bool
+        :param eligible_jobs_max_lines:
+            Limit the number of operations and its eligible job count printed in the overview.
+        :type eligible_jobs_max_lines:
+            int
+        :param output_format:
+            Status output format, supports:
+            'terminal' (default), 'markdown' or 'html'.
+        :type output_format:
+            str
+        :return:
+            A Renderer class object that contains the rendered string.
+        :rtype:
+            :py:class:`~.Renderer`
         """
         if file is None:
             file = sys.stdout
@@ -1234,132 +1248,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if jobs is None:
             jobs = self     # all jobs
 
-        # use Jinja2 template for status output
-        if template is None:
-            if detailed and expand:
-                template = 'status_expand.jinja'
-            elif detailed and not unroll:
-                template = 'status_stack.jinja'
-            elif detailed and compact:
-                template = 'status_compact.jinja'
-            else:
-                template = 'status.jinja'
-
         if eligible_jobs_max_lines is None:
             eligible_jobs_max_lines = flow_config.get_config_value('eligible_jobs_max_lines')
 
         # initialize jinja2 template environment and necessary filters
         template_environment = self._template_environment()
 
-        def draw_progressbar(value, total, width=40):
-            """Visualize progess with a progress bar.
-
-            :param value:
-                The current progress as a fraction of total.
-            :type value:
-                int
-            :param total:
-                The maximum value that 'value' may obtain.
-            :type total:
-                int
-            :param width:
-                The character width of the drawn progress bar.
-            :type width:
-                int
-            """
-
-            assert value >= 0 and total > 0
-            ratio = ' %0.2f%%' % (100 * value / total)
-            n = int(value / total * width)
-            return '|' + ''.join(['#'] * n) + ''.join(['-'] * (width - n)) + '|' + ratio
-
-        def job_filter(job_op, scheduler_status_code, all_ops):
-            """filter eligible jobs for status print.
-
-            :param job_ops:
-                Operations information for a job.
-            :type job_ops:
-                OrderedDict
-            :param scheduler_status_code:
-                Dictionary information for status code
-            :type scheduler_status_code:
-                dict
-            :param all_ops:
-                Boolean value indicate if all operations should be displayed
-            :type all_ops:
-                bool
-            """
-
-            if scheduler_status_code[job_op['scheduler_status']] != 'U' or \
-               job_op['eligible'] or all_ops:
-                return True
-            else:
-                return False
-
-        def get_operation_status(operation_info, symbols):
-            """Determine the status of an operation.
-
-            :param operation_info:
-                Dictionary containing operation information.
-            :type operation_info:
-                dict
-            :param symbols:
-                Dictionary containing code for different job status.
-            :type symbols:
-                dict
-            """
-
-            if operation_info['scheduler_status'] >= JobStatus.active:
-                op_status = 'running'
-            elif operation_info['scheduler_status'] > JobStatus.inactive:
-                op_status = 'active'
-            elif operation_info['completed']:
-                op_status = 'completed'
-            elif operation_info['eligible']:
-                op_status = 'eligible'
-            else:
-                op_status = 'ineligible'
-
-            return symbols[op_status]
-
-        if pretty:
-            def highlight(s, eligible):
-                """Change font to bold within jinja2 template
-
-                :param s:
-                    The string to be printed
-                :type s:
-                    str
-                :param eligible:
-                    Boolean value for job eligibility
-                :type eligible:
-                    bool
-                """
-                if eligible:
-                    return '\033[1m' + s + '\033[0m'
-                else:
-                    return s
-        else:
-            def highlight(s, eligible):
-                """Change font to bold within jinja2 template
-
-                :param s:
-                    The string to be printed
-                :type s:
-                    str
-                :param eligible:
-                    Boolean value for job eligibility
-                :type eligible:
-                    bool
-                """
-                return s
-
-        template_environment.filters['highlight'] = highlight
-        template_environment.filters['draw_progressbar'] = draw_progressbar
-        template_environment.filters['get_operation_status'] = get_operation_status
-        template_environment.filters['job_filter'] = job_filter
-
-        template = template_environment.get_template(template)
         context = self._get_standard_template_context()
 
         # get job status information
@@ -1478,10 +1372,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         if overview:
             # get overview info:
-            column_width_bar = 50
-            column_width_label = 5
-            for key, value in self._label_functions.items():
-                column_width_label = max(column_width_label, len(key.__name__))
             progress = defaultdict(int)
             for status in statuses.values():
                 for label in status['labels']:
@@ -1498,9 +1388,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         if parameters:
             # get parameters info
-            column_width_parameters = list([0]*len(parameters))
-            for i, para in enumerate(parameters):
-                column_width_parameters[i] = len(para)
 
             def _add_parameters(status):
                 sp = self.open_job(id=status['job_id']).statepoint()
@@ -1516,29 +1403,21 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
                 status['parameters'] = OrderedDict()
                 for i, k in enumerate(parameters):
-                    v = shorten(str(self._alias(get(k, sp))))
-                    column_width_parameters[i] = max(column_width_parameters[i], len(v))
+                    v = shorten(str(self._alias(get(k, sp))), param_max_width)
                     status['parameters'][k] = v
 
             for status in statuses.values():
                 _add_parameters(status)
 
-        column_width_operation = 5
-        for op_name in self._operations:
-            column_width_operation = max(column_width_operation, len(op_name))
+            for i, para in enumerate(parameters):
+                parameters[i] = shorten(self._alias(str(para)), param_max_width)
 
         if detailed:
             # get detailed view info
-            column_width_id = 32
-            column_width_total_label = 6
             status_legend = ' '.join('[{}]:{}'.format(v, k) for k, v in self.ALIASES.items())
 
-            for job in tmp:
-                column_width_total_label = max(
-                    column_width_total_label, len(', '.join(job['labels'])))
             if compact:
                 num_operations = len(self._operations)
-                column_width_operations_count = len(str(max(num_operations-1, 0))) + 3
 
             if pretty:
                 OPERATION_STATUS_SYMBOLS = OrderedDict([
@@ -1567,24 +1446,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         context['all_ops'] = all_ops
         context['parameters'] = parameters
         context['compact'] = compact
+        context['pretty'] = pretty
         context['unroll'] = unroll
         if overview:
             context['progress_sorted'] = progress_sorted
-            context['column_width_bar'] = column_width_bar
-            context['column_width_label'] = column_width_label
-            context['column_width_operation'] = column_width_operation
         if detailed:
-            context['column_width_id'] = column_width_id
-            context['column_width_operation'] = column_width_operation
-            context['column_width_total_label'] = column_width_total_label
-            context['alias_bool'] = {True: 'T', False: 'U'}
+            context['alias_bool'] = {True: 'Y', False: 'N'}
             context['scheduler_status_code'] = _FMT_SCHEDULER_STATUS
             context['status_legend'] = status_legend
-            if parameters:
-                context['column_width_parameters'] = column_width_parameters
             if compact:
                 context['extra_num_operations'] = max(num_operations-1, 0)
-                context['column_width_operations_count'] = column_width_operations_count
             if not unroll:
                 context['operation_status_legend'] = operation_status_legend
                 context['operation_status_symbols'] = OPERATION_STATUS_SYMBOLS
@@ -1592,7 +1463,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         def _add_dummy_operation(job):
             job['operations'][''] = {
                 'completed': False,
-                'eligible': True,
+                'eligible': False,
                 'scheduler_status': JobStatus.dummy}
 
         for job in context['jobs']:
@@ -1603,18 +1474,24 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         op_counter = Counter()
         for job in context['jobs']:
             for k, v in job['operations'].items():
-                if v['eligible']:
+                if k != '' and v['eligible']:
                     op_counter[k] += 1
         context['op_counter'] = op_counter.most_common(eligible_jobs_max_lines)
         n = len(op_counter) - len(context['op_counter'])
         if n > 0:
             context['op_counter'].append(('[{} more operations omitted]'.format(n), ''))
 
-        print(template.render(**context), file=file)
+        status_renderer = StatusRenderer()
+        render_output = status_renderer.render(template, template_environment, context, detailed,
+                                               expand, unroll, compact, output_format)
+
+        print(render_output, file=file)
 
         # Show profiling results (if enabled)
         if profiling_results:
             print('\n' + '\n'.join(profiling_results), file=file)
+
+        return status_renderer
 
     def run_operations(self, operations=None, pretend=False, np=None, timeout=None, progress=False):
         """Execute the next operations as specified by the project's workflow.
@@ -2426,6 +2303,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             '--no-parallelize',
             action='store_true',
             help="Do not parallelize the status determination.")
+        view_group.add_argument(
+            '-o', '--output-format',
+            type=str,
+            default='terminal',
+            help="Set status output format: terminal, markdown, or html.")
 
     def labels(self, job):
         """Yields all labels for the given ``job``.

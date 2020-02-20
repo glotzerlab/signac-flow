@@ -340,6 +340,12 @@ class JobOperation(object):
     @property
     def cmd(self):
         if callable(self._cmd):
+            # We allow cmd to be 'lazy' or an unevaluated function because
+            # in cases where a user uses the Python API without specifying
+            # a project entrypoint, running many operations is still valid.
+            # If we need to fork this will fail to generate a command and
+            # error, but not until then. If we don't fork then nothing errors,
+            # and the user gets the expected result.
             return self._cmd()
         else:
             return self._cmd

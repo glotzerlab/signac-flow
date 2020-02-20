@@ -51,7 +51,7 @@ class Renderer:
         :param template_environment:
             Template environment.
         :type template_environment:
-            :class:`FlowProject._template_environment`
+            :class:`jinja2.Environment`
         :param context:
             Context that includes all the information for rendering status output.
         :type context:
@@ -117,7 +117,7 @@ class Renderer:
             :param job_op:
                 Operation information for a job.
             :type job_op:
-                OrderedDict
+                dict
             :param scheduler_status_code:
                 Dictionary information for status code.
             :type scheduler_status_code:

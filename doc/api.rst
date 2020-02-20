@@ -110,7 +110,7 @@ The FlowProject
 .. autoclass:: flow.IgnoreConditions
 
 .. autoclass:: flow.render_status.Renderer
-    :members: generate_terminal_output, generate_html_output
+    :members: generate_terminal_output, generate_html_output, render
 
 
 @flow.cmd

@@ -142,14 +142,7 @@ flow.get_environment()
 .. autofunction:: get_environment
 
 The FlowGroup
-----------
+-------------
 
 .. autoclass:: flow.project.FlowGroup
-
-.. automethod:: flow.project.FlowGroup.add_operation
-
-.. automethod:: flow.project.FlowGroup.complete
-
-.. automethod:: flow.project.FlowGroup.eligible
-
-.. automethod:: flow.project.FlowGroup.isdisjoint
+   :members: add_operation, complete, eligible, isdisjoint

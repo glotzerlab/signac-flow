@@ -330,6 +330,7 @@ class JobOperation(object):
     def __eq__(self, other):
         return self.id == other.id
 
+    @deprecated(deprecated_in="0.9", removed_in="1.0", current_version=__version__)
     def get_id(self):
         return self._id
 
@@ -411,8 +412,7 @@ class BaseFlowOperation(object):
     post-conditions are never met when the list of post-conditions is empty.
 
     .. note::
-        This class should not be instantiated directly. Instead use :class:`FlowOperation`
-        or :class:`FlowCmdOperation`.
+        This class should not be instantiated directly.
 
     :param cmd:
         The command to execute operation; should be a function of job.
@@ -488,8 +488,7 @@ class FlowCmdOperation(BaseFlowOperation):
     in curly braces, which will then be substituted by Python string formatting.
 
     .. note::
-        Given the status of :class:`BaseFlowOperation` and :class:`FlowOperation` being unfit to be
-        instantiated, these should also not be instantiated directly by users.
+        This class should not be instantiated directly.
     """
 
     def __init__(self, cmd, pre=None, post=None):
@@ -514,8 +513,7 @@ class FlowOperation(BaseFlowOperation):
     :class:`FlowProject`.
 
     .. note::
-        Given the lack of internal function storage and integration with :class:`FlowProject` this
-        also should not be instantiated by users.
+        This class should not be instantiated directly.
     """
 
     def __init__(self, name, pre=None, post=None):
@@ -603,33 +601,11 @@ class FlowGroupEntry(object):
 class FlowGroup(object):
     """A FlowGroup represents a subset of a workflow for a project.
 
-    Any :py:class:`FlowGroup` is associated with a group of
-    :py:class:`BaseFlowOperation`s.
+    Any :py:class:`FlowGroup` is associated with one or more instances of
+    :py:class:`BaseFlowOperation`.
 
-    :param name:
-        The name of the group to be used when calling from the command line.
-    :type name:
-        str
-    :param operations:
-        A dictionary of operations where the keys are operation names and the
-        values are :py:class:`BaseFlowOperation`s.
-    :type operations:
-        dict
-    :param operation_directives:
-        A dictionary of additional parameters that provide instructions on how
-        to execute a particular operation, e.g., specifically required
-        resources. Operation names are keys and the dictionaries of directives are
-        values. If an operation does not have directives specified, then the
-        directives of the singleton group containing that operation are used. To
-        prevent this, set the directives to an empty dictionary for that
-        operation.
-    :type operation_directives:
-        dict
-    :param options:
-        A string of options to append to the output of the object's call method.
-        This lets options like ``--num_passes`` to be given to a group.
-    :type options:
-        str
+    In the example below, the directives will be {'nranks': 4} for op1 and
+    {'nranks': 2, 'executable': 'python3'} for op2
 
     .. code-block:: python
 
@@ -647,8 +623,30 @@ class FlowGroup(object):
         def op2(job):
             pass
 
-        # the directives used will be {'nranks': 4} for op1
-        # and {'nranks': 2, 'executable': 'python3'} for op2
+    :param name:
+        The name of the group to be used when calling from the command line.
+    :type name:
+        str
+    :param operations:
+        A dictionary of operations where the keys are operation names and
+        each value is a :py:class:`BaseFlowOperation`.
+    :type operations:
+        dict
+    :param operation_directives:
+        A dictionary of additional parameters that provide instructions on how
+        to execute a particular operation, e.g., specifically required
+        resources. Operation names are keys and the dictionaries of directives are
+        values. If an operation does not have directives specified, then the
+        directives of the singleton group containing that operation are used. To
+        prevent this, set the directives to an empty dictionary for that
+        operation.
+    :type operation_directives:
+        dict
+    :param options:
+        A string of options to append to the output of the object's call method.
+        This lets options like ``--num_passes`` to be given to a group.
+    :type options:
+        str
     """
 
     MAX_LEN_ID = 100
@@ -954,8 +952,8 @@ class FlowGroup(object):
                 omp_num_threads=get_directive(op_dir, 'omp_num_threads', 0, job)))
 
             # Find the correct number of processors for operation
-            np = max(max(op_dir['nranks'], 1) * max(op_dir['omp_num_threads'], 1),
-                     op_dir.get('np', 1))
+            np = op_dir.get('np', max(op_dir['nranks'], 1) * max(op_dir['omp_num_threads'], 1))
+
             if parallel:
                 # In general parallel means add resources
                 directives['ngpu'] += op_dir['ngpu']
@@ -3294,6 +3292,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """Make a FlowGroup named ``name`` and return a decorator to make groups.
 
         .. code-block:: python
+
             example_group = FlowProject.make_group('example')
 
             @example_group

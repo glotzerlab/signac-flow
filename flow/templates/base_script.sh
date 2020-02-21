@@ -18,7 +18,7 @@ cd {{ project.config.project_dir }}
 {% for operation in operations %}
 
 # {{ "%s"|format(operation) }}
-{{ operation|get_prefix(mpi_prefix=mpi_prefix, cmd_prefix=cmd_prefix) }}{{ operation.cmd }}{{ cmd_suffix }}
+{{ operation.cmd }}{{ cmd_suffix }}
 {% endfor %}
 {% endblock %}
 {% block footer %}

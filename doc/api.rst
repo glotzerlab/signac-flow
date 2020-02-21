@@ -37,6 +37,7 @@ The FlowProject
     FlowProject.label
     FlowProject.labels
     FlowProject.main
+    FlowProject.make_group
     FlowProject.next_operation
     FlowProject.next_operations
     FlowProject.operation
@@ -142,3 +143,9 @@ flow.get_environment()
 ----------------------
 
 .. autofunction:: get_environment
+
+The FlowGroup
+-------------
+
+.. autoclass:: flow.project.FlowGroup
+   :members: add_operation, complete, eligible, isdisjoint

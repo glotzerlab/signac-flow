@@ -109,6 +109,7 @@ class MockEnvironment(ComputeEnvironment):
 
 class TestProjectBase():
     project_class = signac.Project
+    entrypoint = dict(path='')
 
     @pytest.fixture(autouse=True)
     def setUp(self, request):
@@ -129,9 +130,11 @@ class TestProjectBase():
             for b in range(3):
                 project.open_job(dict(a=a, b=b)).init()
                 project.open_job(dict(a=dict(a=a), b=b)).init()
+        project._entrypoint = self.entrypoint
         return project
 
 
+# Tests for single operation groups
 class TestProjectStatusPerformance(TestProjectBase):
 
     class Project(FlowProject):
@@ -319,12 +322,12 @@ class TestProjectClass(TestProjectBase):
         def test_context(job):
             assert os.getcwd() == job.ws
 
-        project = self.mock_project()
+        project = self.mock_project(A)
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
                 starting_dir = os.getcwd()
                 with redirect_stderr(StringIO()):
-                    A().run()
+                    project.run()
                 assert os.getcwd() == starting_dir
 
     def test_cmd_with_job_wrong_order(self):
@@ -350,12 +353,12 @@ class TestProjectClass(TestProjectBase):
         def test_context(job):
             return "echo 'hello' > world.txt"
 
-        project = self.mock_project()
+        project = self.mock_project(A)
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
                 starting_dir = os.getcwd()
                 with redirect_stderr(StringIO()):
-                    A().run()
+                    project.run()
                 assert os.getcwd() == starting_dir
                 for job in project:
                     assert os.path.isfile(job.fn("world.txt"))
@@ -370,13 +373,13 @@ class TestProjectClass(TestProjectBase):
         def test_context(job):
             raise Exception
 
-        project = self.mock_project()
+        project = self.mock_project(A)
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
                 starting_dir = os.getcwd()
                 with pytest.raises(Exception):
                     with redirect_stderr(StringIO()):
-                        A().run()
+                        project.run()
                 assert os.getcwd() == starting_dir
 
     def test_cmd_with_job_error_handling(self):
@@ -390,13 +393,13 @@ class TestProjectClass(TestProjectBase):
         def test_context(job):
             return "exit 1"
 
-        project = self.mock_project()
+        project = self.mock_project(A)
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
                 starting_dir = os.getcwd()
                 with pytest.raises(subprocess.CalledProcessError):
                     with redirect_stderr(StringIO()):
-                        A().run()
+                        project.run()
                 assert os.getcwd() == starting_dir
 
     @pytest.mark.filterwarnings("ignore:next_operation")
@@ -410,7 +413,7 @@ class TestProjectClass(TestProjectBase):
         def test_context(job):
             return 'exit 1'
 
-        project = A(self.mock_project().config)
+        project = self.mock_project(A)
         for job in project:
             job.doc.np = 3
             with pytest.deprecated_call():
@@ -429,7 +432,7 @@ class TestProjectClass(TestProjectBase):
         def a(job):
             return 'hello!'
 
-        project = A(self.mock_project().config)
+        project = self.mock_project(A)
 
         # test setting neither nranks nor omp_num_threads
         for job in project:
@@ -532,6 +535,9 @@ class TestProjectClass(TestProjectBase):
 
 class TestProject(TestProjectBase):
     project_class = _TestProject
+    entrypoint = dict(
+        path=os.path.realpath(os.path.join(os.path.dirname(__file__), 'define_test_project.py'))
+    )
 
     def test_instance(self):
         assert isinstance(self.project, FlowProject)
@@ -553,10 +559,10 @@ class TestProject(TestProjectBase):
             for i, op in enumerate(project.next_operations(job)):
                 assert op.job == job
                 if job in even_jobs:
-                    assert op.name == ['op1', 'op2'][i]
+                    assert op.name == ['op1', 'op2', 'op3'][i]
                 else:
-                    assert op.name == 'op2'
-            assert i == int(job in even_jobs)
+                    assert op.name == ['op2', 'op3'][i]
+            assert i == 2 if job in even_jobs else 1
 
     def test_get_job_status(self):
         project = self.mock_project()
@@ -657,6 +663,9 @@ class TestProject(TestProjectBase):
 class TestExecutionProject(TestProjectBase):
     project_class = _TestProject
     expected_number_of_steps = 4
+    entrypoint = dict(
+        path=os.path.realpath(os.path.join(os.path.dirname(__file__), 'define_test_project.py'))
+    )
 
     def test_pending_operations_order(self):
         # The execution order of local runs is internally assumed to be
@@ -675,7 +684,7 @@ class TestExecutionProject(TestProjectBase):
         with subtests.test(order='invalid-order'):
             with pytest.raises(ValueError):
                 project = self.mock_project()
-                self.project.run(order='invalid-order')
+                project.run(order='invalid-order')
 
         def sort_key(op):
             return op.name, op.job.get_id()
@@ -732,7 +741,7 @@ class TestExecutionProject(TestProjectBase):
                 project.run(names=['op1', 'non-existent-op'])
                 assert all(job.isfile('world.txt') for job in even_jobs)
                 assert not any(job.doc.get('test') for job in project)
-                project.run(names=['op[^3]', 'non-existent-op'])
+                project.run(names=['op[^4]', 'non-existent-op'])
                 assert all(job.isfile('world.txt') for job in even_jobs)
                 assert all(job.doc.get('test') for job in project)
                 assert all('dynamic' not in job.doc for job in project)
@@ -857,7 +866,7 @@ class TestExecutionProject(TestProjectBase):
         with redirect_stderr(StringIO()):
             project.submit()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
-        num_jobs_submitted = len(project) + len(even_jobs)
+        num_jobs_submitted = (2 * len(project)) + len(even_jobs)
         assert len(list(MockScheduler.jobs())) == num_jobs_submitted
         MockScheduler.reset()
 
@@ -884,7 +893,7 @@ class TestExecutionProject(TestProjectBase):
         MockScheduler.reset()
         project = self.mock_project()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
-        num_jobs_submitted = len(project) + len(even_jobs)
+        num_jobs_submitted = (2 * len(project)) + len(even_jobs)
         assert len(list(MockScheduler.jobs())) == 0
         with redirect_stderr(StringIO()):
             # Initial submission
@@ -920,7 +929,7 @@ class TestExecutionProject(TestProjectBase):
         MockScheduler.reset()
         project = self.mock_project()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
-        num_jobs_submitted = len(project) + len(even_jobs)
+        num_jobs_submitted = (2 * len(project)) + len(even_jobs)
         for job in project:
             if job not in even_jobs:
                 continue
@@ -1044,6 +1053,9 @@ class TestBufferedExecutionDynamicProject(TestBufferedExecutionProject,
 
 class TestProjectMainInterface(TestProjectBase):
     project_class = _TestProject
+    entrypoint = dict(
+        path=os.path.realpath(os.path.join(os.path.dirname(__file__), 'define_test_project.py'))
+    )
 
     def switch_to_cwd(self):
         os.chdir(self.cwd)
@@ -1103,15 +1115,19 @@ class TestProjectMainInterface(TestProjectBase):
         assert len(self.project)
         status_output = self.call_subcmd('--debug status --detailed').decode('utf-8').splitlines()
         lines = iter(status_output)
+        project = self.mock_project()
+        num_ops = len(project.operations)
         for line in lines:
-            for job in self.project:
+            for job in project:
                 if job.get_id() in line:
-                    for op in self.project.next_operations(job):
-                        assert op.name in line
+                    op_lines = [line]
+                    for i in range(num_ops - 1):
                         try:
-                            line = next(lines)
+                            op_lines.append(next(lines))
                         except StopIteration:
                             continue
+                    for op in project.next_operations(job):
+                        assert any(op.name in l for l in op_lines)
 
     def test_main_script(self):
         assert len(self.project)
@@ -1120,9 +1136,9 @@ class TestProjectMainInterface(TestProjectBase):
             script_output = self.call_subcmd('script -j {}'.format(job)).decode().splitlines()
             assert job.get_id() in '\n'.join(script_output)
             if job in even_jobs:
-                assert 'echo "hello"' in '\n'.join(script_output)
+                assert 'run -o op1' in '\n'.join(script_output)
             else:
-                assert 'echo "hello"' not in '\n'.join(script_output)
+                assert 'run -o op1' not in '\n'.join(script_output)
 
 
 class TestDynamicProjectMainInterface(TestProjectMainInterface):
@@ -1146,3 +1162,320 @@ class TestProjectDagDetection(TestProjectBase):
                        [0, 0, 0, 0, 0, 0, 0]]
 
         assert adj == adj_correct
+
+
+# Tests for multiple operation groups or groups with options
+class TestGroupProject(TestProjectBase):
+    project_class = _TestProject
+    entrypoint = dict(
+        path=os.path.realpath(os.path.join(os.path.dirname(__file__), 'define_test_project.py'))
+    )
+
+    def test_instance(self):
+        assert isinstance(self.project, FlowProject)
+
+    def test_script(self):
+        project = self.mock_project()
+        # For run mode single operation groups
+        for job in project:
+            job_ops = project._get_submission_operations([job], dict())
+            script = project.script(job_ops)
+            if job.sp.b % 2 == 0:
+                assert str(job) in script
+                assert 'run -o op1 -j {}'.format(job) in script
+                assert 'run -o op2 -j {}'.format(job) in script
+            else:
+                assert str(job) in script
+                assert 'run -o op1 -j {}'.format(job) not in script
+                assert 'run -o op2 -j {}'.format(job) in script
+
+        # For multiple operation groups and options
+        for job in project:
+            job_op1 = project.groups['group1']._create_submission_job_operation(
+                project._entrypoint, dict(), job)
+            script1 = project.script([job_op1])
+            assert 'run -o group1 -j {}'.format(job) in script1
+            job_op2 = project.groups['group2']._create_submission_job_operation(
+                project._entrypoint, dict(), job)
+            script2 = project.script([job_op2])
+            assert '--num-passes=2'.format(job) in script2
+
+    def test_directives_hierarchy(self):
+        project = self.mock_project()
+        for job in project:
+            # Test submit JobOperations
+            job_ops = project._get_submission_operations([job],
+                                                         project._get_default_directives(),
+                                                         names=['group2'])
+            assert all([job_op.directives.get('ngpu', 0) == 2 for job_op in job_ops])
+            job_ops = project._get_submission_operations([job],
+                                                         project._get_default_directives(),
+                                                         names=['op3'])
+            assert all([job_op.directives.get('ngpu', 0) == 1 for job_op in job_ops])
+            # Test run JobOperations
+            job_ops = project.groups['group2']._create_run_job_operations(
+                project._entrypoint, project._get_default_directives(), job)
+            assert all([job_op.directives.get('ngpu', 0) == 2 for job_op in job_ops])
+            job_ops = project.groups['op3']._create_run_job_operations(
+                project._entrypoint, project._get_default_directives(), job)
+            assert all([job_op.directives.get('ngpu', 0) == 1 for job_op in job_ops])
+
+    def test_submission_aggregation(self):
+        class A(flow.FlowProject):
+            pass
+
+        group = A.make_group('group')
+
+        @group.with_directives(dict(ngpu=2, nranks=4))
+        @A.operation
+        def op1(job):
+            pass
+
+        @group.with_directives(dict(ngpu=2, nranks=4))
+        @A.operation
+        def op2(job):
+            pass
+
+        @group
+        @A.operation
+        @flow.directives(nranks=2)
+        def op3(job):
+            pass
+
+        project = self.mock_project(A)
+        group = project.groups['group']
+        job = [j for j in project][0]
+        directives = group._get_submission_directives(project._get_default_directives(),
+                                                      job, parallel=False)
+        assert all([directives['ngpu'] == 2, directives['nranks'] == 4,
+                    directives['np'] == 4])
+        directives = group._get_submission_directives(project._get_default_directives(),
+                                                      job, parallel=True)
+        assert all([directives['ngpu'] == 4, directives['nranks'] == 10,
+                    directives['np'] == 10])
+
+    def test_flowgroup_repr(self):
+        class A(flow.FlowProject):
+            pass
+
+        group = A.make_group('group')
+
+        @group.with_directives(dict(ngpu=2, nranks=4))
+        @A.operation
+        def op1(job):
+            pass
+
+        @group
+        @A.operation
+        def op2(job):
+            pass
+
+        @group
+        @A.operation
+        @flow.directives(nranks=2)
+        def op3(job):
+            pass
+
+        project = self.mock_project(A)
+        rep_string = repr(project.groups['group'])
+        assert all(op in rep_string for op in ['op1', 'op2', 'op3'])
+        assert "'nranks': 4" in rep_string
+        assert "'ngpu': 2" in rep_string
+        assert "options=''" in rep_string
+        assert "name='group'" in rep_string
+
+class TestGroupExecutionProject(TestProjectBase):
+    project_class = _TestProject
+    entrypoint = dict(
+        path=os.path.realpath(os.path.join(os.path.dirname(__file__), 'define_test_project.py'))
+    )
+    expected_number_of_steps = 4
+
+    def test_run_with_operation_selection(self):
+        project = self.mock_project()
+        even_jobs = [job for job in project if job.sp.b % 2 == 0]
+        with add_cwd_to_environment_pythonpath():
+            with switch_to_directory(project.root_directory()):
+                with pytest.raises(ValueError):
+                    # The names argument must be a sequence of strings, not a string.
+                    project.run(names='op1')
+                project.run(names=['nonexistent-op'])
+                assert not any(job.isfile('world.txt') for job in even_jobs)
+                assert not any(job.doc.get('test') for job in project)
+                project.run(names=['group1'])
+                assert all(job.isfile('world.txt') for job in even_jobs)
+                assert all(job.doc.get('test') for job in project)
+                project.run(names=['group2'])
+                assert all(job.isfile('world.txt') for job in even_jobs)
+                assert all(job.doc.get('test3') for job in project)
+                assert all('dynamic' not in job.doc for job in project)
+
+    def test_run_parallel(self):
+        project = self.mock_project()
+        output = StringIO()
+        with add_cwd_to_environment_pythonpath():
+            with switch_to_directory(project.root_directory()):
+                with redirect_stderr(output):
+                    project.run(names=['group1'], np=2)
+        output.seek(0)
+        output.read()
+        even_jobs = [job for job in project if job.sp.b % 2 == 0]
+        for job in project:
+            if job in even_jobs:
+                assert job.isfile('world.txt')
+            else:
+                assert not job.isfile('world.txt')
+
+    def test_submit_groups(self):
+        MockScheduler.reset()
+        project = self.mock_project()
+        operations = [project.groups['group1']._create_submission_job_operation(
+            project._entrypoint, dict(), job) for job in project]
+        assert len(list(MockScheduler.jobs())) == 0
+        cluster_job_id = project._store_bundled(operations)
+        with redirect_stderr(StringIO()):
+            project.submit_operations(_id=cluster_job_id, operations=operations)
+        assert len(list(MockScheduler.jobs())) == 1
+
+    def test_submit(self):
+        MockScheduler.reset()
+        project = self.mock_project()
+        assert len(list(MockScheduler.jobs())) == 0
+        with redirect_stderr(StringIO()):
+            project.submit(names=['group1', 'group2'])
+        num_jobs_submitted = 2 * len(project)
+        assert len(list(MockScheduler.jobs())) == num_jobs_submitted
+        MockScheduler.reset()
+
+    def test_group_resubmit(self):
+        MockScheduler.reset()
+        project = self.mock_project()
+        num_jobs_submitted = len(project)
+        assert len(list(MockScheduler.jobs())) == 0
+        with redirect_stderr(StringIO()):
+            # Initial submission
+            project.submit(names=['group1'])
+            assert len(list(MockScheduler.jobs())) == num_jobs_submitted
+
+            # Resubmit a bunch of times:
+            for i in range(1, self.expected_number_of_steps + 3):
+                MockScheduler.step()
+                project.submit(names=['group1'])
+                if len(list(MockScheduler.jobs())) == 0:
+                    break    # break when there are no jobs left
+
+        # Check that the actually required number of steps is equal to the expected number:
+        assert i == self.expected_number_of_steps
+
+    def test_operation_resubmit(self):
+        MockScheduler.reset()
+        project = self.mock_project()
+        num_jobs_submitted = len(project)
+        assert len(list(MockScheduler.jobs())) == 0
+        with redirect_stderr(StringIO()):
+            # Initial submission
+            project.submit(names=['group1'])
+            assert len(list(MockScheduler.jobs())) == num_jobs_submitted
+
+            # Resubmit a bunch of times:
+            for i in range(1, self.expected_number_of_steps + 3):
+                MockScheduler.step()
+                project.submit(names=['op1', 'op2'])
+                if len(list(MockScheduler.jobs())) == 0:
+                    break    # break when there are no jobs left
+
+        # Check that the actually required number of steps is equal to the expected number:
+        assert i == self.expected_number_of_steps
+
+
+class TestGroupBufferedExecutionProject(TestGroupExecutionProject):
+
+    def mock_project(self):
+        project = super(TestGroupBufferedExecutionProject, self).mock_project()
+        project._use_buffered_mode = True
+        return project
+
+
+class TestGroupExecutionDynamicProject(TestGroupExecutionProject):
+    project_class = _DynamicTestProject
+    expected_number_of_steps = 4
+
+
+class TestGroupBufferedExecutionDynamicProject(TestGroupBufferedExecutionProject,
+                                               TestGroupExecutionDynamicProject):
+    pass
+
+
+class TestGroupProjectMainInterface(TestProjectBase):
+    project_class = _TestProject
+    entrypoint = dict(
+        path=os.path.realpath(os.path.join(os.path.dirname(__file__), 'define_test_project.py'))
+    )
+
+    def switch_to_cwd(self):
+        os.chdir(self.cwd)
+
+    @pytest.fixture(autouse=True)
+    def setup_main_interface(self, request):
+        self.project = self.mock_project()
+        self.cwd = os.getcwd()
+        os.chdir(self._tmp_dir.name)
+        request.addfinalizer(self.switch_to_cwd)
+
+    def call_subcmd(self, subcmd):
+        # Determine path to project module and construct command.
+        fn_script = inspect.getsourcefile(type(self.project))
+        _cmd = 'python {} {}'.format(fn_script, subcmd)
+
+        try:
+            with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
+                with switch_to_directory(self.project.root_directory()):
+                    return subprocess.check_output(_cmd.split(), stderr=subprocess.DEVNULL)
+        except subprocess.CalledProcessError as error:
+            print(error, file=sys.stderr)
+            print(error.output, file=sys.stderr)
+            raise
+
+    def test_main_run(self):
+        assert len(self.project)
+        for job in self.project:
+            assert not job.isfile('world.txt')
+        self.call_subcmd('run -o group1')
+        even_jobs = [job for job in self.project if job.sp.b % 2 == 0]
+        for job in self.project:
+            assert job.doc['test']
+            if job in even_jobs:
+                assert job.isfile('world.txt')
+            else:
+                assert not job.isfile('world.txt')
+
+    def test_main_script(self):
+        assert len(self.project)
+        for job in self.project:
+            script_output = self.call_subcmd(
+                'script -j {} -o group1'.format(job)
+            ).decode().splitlines()
+            assert job.get_id() in '\n'.join(script_output)
+            assert '-o group1' in '\n'.join(script_output)
+            script_output = self.call_subcmd(
+                'script -j {} -o group2'.format(job)
+            ).decode().splitlines()
+            assert '--num-passes=2' in '\n'.join(script_output)
+
+    def test_main_submit(self):
+        project = self.mock_project()
+        assert len(project)
+        # Assert that correct output for group submission is given
+        for job in project:
+            submit_output = self.call_subcmd(
+                'submit -j {} -o group1 --pretend'.format(job)).decode().splitlines()
+            output_string = '\n'.join(submit_output)
+            assert 'run -o group1 -j {}'.format(job) in output_string
+            submit_output = self.call_subcmd(
+                'submit -j {} -o group2 --pretend'.format(job)
+            ).decode().splitlines()
+            assert 'run -o group2 -j {} --num-passes=2'.format(job) in '\n'.join(submit_output)
+
+
+class TestGroupDynamicProjectMainInterface(TestProjectMainInterface):
+    project_class = _DynamicTestProject

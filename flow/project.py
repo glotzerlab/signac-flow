@@ -226,7 +226,7 @@ class JobOperation(object):
     """This class represents the information needed to execute one group for one job.
 
     The execution or submission of a :py:class:`FlowGroup` uses a passed in command
-    which can either be a string or function with no arguments that returns a a shell
+    which can either be a string or function with no arguments that returns a shell
     executable command.  This won't be used if it is determined that the group can be
     executed without forking.
 

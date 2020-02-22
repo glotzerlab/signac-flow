@@ -32,10 +32,6 @@ from .errors import NoSchedulerError
 logger = logging.getLogger(__name__)
 
 
-# Global variable can be used to override detected environment
-ENVIRONMENT = None
-
-
 def setup(py_modules, **attrs):
     """Setup function for environment modules.
 
@@ -441,9 +437,6 @@ def get_environment(test=False, import_configured=True):
     if test:
         return TestEnvironment
     else:
-        # Return a globally specified environment
-        if ENVIRONMENT is not None:
-            return ENVIRONMENT
 
         # Obtain a list of all registered environments
         env_types = registered_environments(import_configured=import_configured)

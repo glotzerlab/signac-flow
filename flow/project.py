@@ -977,17 +977,14 @@ class _FlowProjectClass(type):
         cls = type.__new__(metacls, name, bases, dict(namespace))
 
         # All operation functions are registered with the operation() classmethod, which is
-        # intended to be used as decorator function. The _OPERATION_FUNCTIONS dict maps the
-        # the operation name to the operation function. In addition, pre and
-        # post conditions are registered with the class.
+        # intended to be used as a decorator function. _OPERATION_FUNCTIONS is a list of tuples
+        # of the operation name and the operation function. In addition, pre and post conditions
+        # are registered with the class.
 
         cls._OPERATION_FUNCTIONS = list()
         cls._OPERATION_PRE_CONDITIONS = defaultdict(list)
         cls._OPERATION_POST_CONDITIONS = defaultdict(list)
 
-        cls._OPERATION_FUNCTIONS = list()
-        cls._OPERATION_PRECONDITIONS = dict()
-        cls._OPERATION_POSTCONDITIONS = dict()
         # All label functions are registered with the label() classmethod, which is intended
         # to be used as decorator function. The _LABEL_FUNCTIONS dict contains the function as
         # key and the label name as value, or None to use the default label name.

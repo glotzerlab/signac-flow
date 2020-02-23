@@ -2600,7 +2600,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if env is None:
             env = self._environment
         else:
-            print("DeprecationWarning: Providing the env argument to submit and submit_operations is deprecated. Set the environment while constructing a FlowProject", file=sys.stderr)
+            warnings.warn("The env argument is deprecated as of 0.10 and will be removed in 0.12. "
+                          "Instead, set the environment when constructing a FlowProject.",
+                          warnings.DeprecationWarning)
         if walltime is not None:
             try:
                 walltime = datetime.timedelta(hours=walltime)

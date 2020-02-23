@@ -41,6 +41,7 @@ def setup(py_modules, **attrs):
     import setuptools
     from setuptools.command.install import install
 
+
     class InstallAndConfig(install):
 
         def run(self):

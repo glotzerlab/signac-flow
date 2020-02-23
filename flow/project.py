@@ -320,11 +320,11 @@ class JobOperation(object):
 
     def __repr__(self):
         return "{type}(name='{name}', job='{job}', cmd={cmd}, directives={directives})".format(
-            type=type(self).__name__,
-            name=self.name,
-            job=str(self.job),
-            cmd=repr(self.cmd),
-            directives=self.directives)
+                type=type(self).__name__,
+                name=self.name,
+                job=str(self.job),
+                cmd=repr(self.cmd),
+                directives=self.directives)
 
     def __hash__(self):
         return int(sha1(self.id.encode('utf-8')).hexdigest(), 16)
@@ -1521,7 +1521,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                             'scheduler_status': scheduler_status,
                             'eligible': eligible,
                             'completed': completed
-                    }
+                            }
 
         for key in sorted(status_dict):
             yield key, status_dict[key]
@@ -1798,7 +1798,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 profiling_results.append(
                     "{rank:>4} {impact:>6.0%} {code.co_filename}:"
                     "{code.co_firstlineno}:{code.co_name}".format(
-                        rank=i + 1, impact=impact, code=code))
+                        rank=i+1, impact=impact, code=code))
                 if i > 10 or total_impact > 0.8:
                     break
 

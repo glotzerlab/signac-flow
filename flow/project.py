@@ -287,11 +287,11 @@ class JobOperation(object):
             def np_callable(job):
                 nr = nranks(job) if callable(nranks) else nranks
                 nt = nthreads(job) if callable(nthreads) else nthreads
-                return nr * nt
+                return nr*nt
 
             directives.setdefault('np', np_callable)
         else:
-            directives.setdefault('np', nranks * nthreads)
+            directives.setdefault('np', nranks*nthreads)
 
         directives.setdefault('ngpu', 0)
         directives.setdefault('nranks', 0)
@@ -545,7 +545,6 @@ class FlowGroupEntry(object):
     :type options:
         str
     """
-
     def __init__(self, name, options=""):
         self.name = name
         self.options = options
@@ -1379,9 +1378,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 prereqs1 = unpack_conditions(to_callbacks(op1._prereqs))
                 prereqs2 = unpack_conditions(to_callbacks(op2._prereqs))
                 if postconds1.intersection(prereqs2):
-                    mat[i][j + i] = 1
+                    mat[i][j+i] = 1
                 elif prereqs1.intersection(postconds2):
-                    mat[j + i][i] = 1
+                    mat[j+i][i] = 1
         return mat
 
     def _register_class_labels(self):
@@ -1518,9 +1517,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             for operation in group.operations:
                 if scheduler_status >= status_dict[operation]['scheduler_status']:
                     status_dict[operation] = {
-                        'scheduler_status': scheduler_status,
-                        'eligible': eligible,
-                        'completed': completed
+                            'scheduler_status': scheduler_status,
+                            'eligible': eligible,
+                            'completed': completed
                     }
 
         for key in sorted(status_dict):
@@ -1630,11 +1629,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     statuses.append(_get_job_status(job))
                     if time.time() - t > 0.2:  # status interval
                         print(
-                            'Collecting job status info: {}/{}'.format(i + 1, num_jobs),
+                            'Collecting job status info: {}/{}'.format(i+1, num_jobs),
                             end='\r', file=err)
                         t = time.time()
                 # Always print the completed progressbar.
-                print('Collecting job status info: {}/{}'.format(i + 1, num_jobs), file=err)
+                print('Collecting job status info: {}/{}'.format(i+1, num_jobs), file=err)
                 return statuses
 
     PRINT_STATUS_ALL_VARYING_PARAMETERS = True
@@ -1815,7 +1814,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     "\nHits by line for '{}':".format(module_fn))
                 profiling_results.append('-' * len(profiling_results[-1]))
 
-                hits = list(sorted(ft.iterHits(), key=lambda h: 1 / h[2]))
+                hits = list(sorted(ft.iterHits(), key=lambda h: 1/h[2]))
                 for line, code, hits, duration in hits:
                     impact = hits / total_hits
                     total_impact += impact
@@ -1825,7 +1824,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         lines, start = inspect.getsourcelines(code)
                     except OSError:
                         continue
-                    hits_ = [ft.getHitStatsFor(l)[0] for l in range(start, start + len(lines))]
+                    hits_ = [ft.getHitStatsFor(l)[0] for l in range(start, start+len(lines))]
                     profiling_results.extend(
                         ["{:>5} {:>4}: {}".format(h, lineno, l.rstrip())
                          for lineno, (l, h) in enumerate(zip(lines, hits_), start)])
@@ -1956,7 +1955,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             context['scheduler_status_code'] = _FMT_SCHEDULER_STATUS
             context['status_legend'] = status_legend
             if compact:
-                context['extra_num_operations'] = max(num_operations - 1, 0)
+                context['extra_num_operations'] = max(num_operations-1, 0)
             if not unroll:
                 context['operation_status_legend'] = operation_status_legend
                 context['operation_status_symbols'] = OPERATION_STATUS_SYMBOLS
@@ -2368,9 +2367,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 if group.eligible(job, ignore_conditions) and self._eligible_for_submission(group,
                                                                                             job):
                     yield group._create_submission_job_operation(
-                        entrypoint=self._entrypoint, default_directives=default_directives,
-                        job=job, parallel=parallel, index=0,
-                        ignore_conditions_on_execution=ignore_conditions_on_execution)
+                            entrypoint=self._entrypoint, default_directives=default_directives,
+                            job=job, parallel=parallel, index=0,
+                            ignore_conditions_on_execution=ignore_conditions_on_execution)
 
     def _get_pending_operations(self, jobs, operation_names=None,
                                 ignore_conditions=IgnoreConditions.NONE):
@@ -2500,7 +2499,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if env is None:
             env = self._environment
         else:
-            print("DeprecationWarning: Providing the env argument to submit and submit_operations is deprecated. Set the environment while constructing a FlowProject", file=sys.stderr)
+            warnings.warn("The env argument is deprecated as of 0.10 and will be removed in 0.12. "
+                          "Instead, set the environment when constructing a FlowProject.",
+                          warnings.DeprecationWarning)
 
         print("Submitting cluster job '{}':".format(_id), file=sys.stderr)
 

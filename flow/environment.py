@@ -28,9 +28,7 @@ from .scheduling.fakescheduler import FakeScheduler
 from .util import config as flow_config
 from .errors import NoSchedulerError
 
-
 logger = logging.getLogger(__name__)
-
 
 def setup(py_modules, **attrs):
     """Setup function for environment modules.

@@ -2502,7 +2502,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         else:
             warnings.warn("The env argument is deprecated as of 0.10 and will be removed in 0.12. "
                           "Instead, set the environment when constructing a FlowProject.",
-                          warnings.DeprecationWarning)
+                          DeprecationWarning)
 
         print("Submitting cluster job '{}':".format(_id), file=sys.stderr)
 
@@ -2604,7 +2604,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         else:
             warnings.warn("The env argument is deprecated as of 0.10 and will be removed in 0.12. "
                           "Instead, set the environment when constructing a FlowProject.",
-                          warnings.DeprecationWarning)
+                          DeprecationWarning)
         if walltime is not None:
             try:
                 walltime = datetime.timedelta(hours=walltime)

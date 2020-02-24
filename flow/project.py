@@ -320,11 +320,11 @@ class JobOperation(object):
 
     def __repr__(self):
         return "{type}(name='{name}', job='{job}', cmd={cmd}, directives={directives})".format(
-                type=type(self).__name__,
-                name=self.name,
-                job=str(self.job),
-                cmd=repr(self.cmd),
-                directives=self.directives)
+                    type=type(self).__name__,
+                    name=self.name,
+                    job=str(self.job),
+                    cmd=repr(self.cmd),
+                    directives=self.directives)
 
     def __hash__(self):
         return int(sha1(self.id.encode('utf-8')).hexdigest(), 16)

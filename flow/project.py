@@ -3461,6 +3461,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if parser is None:
             parser = argparse.ArgumentParser()
 
+        # Overwrite default conflict_handler to allow redefinition of arguments.
+        parser.conflict_handler = 'resolve'
+
         base_parser = argparse.ArgumentParser(add_help=False)
 
         # The argparse module does not automatically merge options shared between the main

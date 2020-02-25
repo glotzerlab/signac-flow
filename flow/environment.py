@@ -436,7 +436,6 @@ def get_environment(test=False, import_configured=True):
     if test:
         return TestEnvironment
     else:
-
         # Obtain a list of all registered environments
         env_types = registered_environments(import_configured=import_configured)
         logger.debug(

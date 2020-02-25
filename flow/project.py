@@ -3461,9 +3461,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if parser is None:
             parser = argparse.ArgumentParser()
 
-        # Overwrite default conflict_handler to allow redefinition of arguments.
-        parser.conflict_handler = 'resolve'
-
         base_parser = argparse.ArgumentParser(add_help=False)
 
         # The argparse module does not automatically merge options shared between the main
@@ -3593,6 +3590,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         parser_submit = subparsers.add_parser(
             'submit',
             parents=[base_parser],
+            conflict_handler='resolve',
         )
         self._add_submit_args(parser_submit)
         env_group = parser_submit.add_argument_group(

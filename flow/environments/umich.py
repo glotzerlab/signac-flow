@@ -23,10 +23,8 @@ class GreatLakesEnvironment(DefaultSlurmEnvironment):
             default='standard',
             help="Specify the partition to submit to. "
                  "(default=standard)")
-        parser.add_argument(
-            '--memory',
-            default='4g',
-            help="Specify how much memory to reserve per node. (default=4g)")
+        parser.set_defaults(
+            memory='4g')
 
 
 __all__ = ['GreatLakesEnvironment']

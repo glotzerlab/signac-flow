@@ -19,6 +19,7 @@ import contextlib
 import random
 import subprocess
 import traceback
+import warnings
 from deprecation import deprecated
 from collections import defaultdict
 from collections import OrderedDict
@@ -2498,6 +2499,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             _id = self._store_bundled(operations)
         if env is None:
             env = self._environment
+        else:
+            warnings.warn("The env argument is deprecated as of 0.10 and will be removed in 0.12. "
+                          "Instead, set the environment when constructing a FlowProject.",
+                          DeprecationWarning)
 
         print("Submitting cluster job '{}':".format(_id), file=sys.stderr)
 
@@ -2596,6 +2601,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "provided a single string: {}.".format(names))
         if env is None:
             env = self._environment
+        else:
+            warnings.warn("The env argument is deprecated as of 0.10 and will be removed in 0.12. "
+                          "Instead, set the environment when constructing a FlowProject.",
+                          DeprecationWarning)
         if walltime is not None:
             try:
                 walltime = datetime.timedelta(hours=walltime)
@@ -3351,8 +3360,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Gather all pending operations or generate them based on a direct command...
         with self._potentially_buffered():
             if args.cmd:
-                print("DeprecationWarning: --cmd option for script is deprecated as of 0.9 "
-                      "and will be removed in 0.11.", file=sys.stderr)
+                warnings.warn("The --cmd option for script is deprecated as of "
+                              "0.9 and will be removed in 0.11.",
+                              DeprecationWarning)
                 operations = self._generate_operations(args.cmd, jobs, args.requires)
             else:
                 names = args.operation_name if args.operation_name else None

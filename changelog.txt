@@ -36,10 +36,6 @@ Changed
 +++++++
 - Raises ValueError when --job-name passed by the user because that interferes with status checking (#164, #241).
 
-Fixed
-+++++
-- Fix bug in FlowProject.add_operation that was calling FlowOperation instead of FlowCmdOperation (#254, #255).
-
 Version 0.9
 ===========
 

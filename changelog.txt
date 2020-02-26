@@ -36,8 +36,7 @@ Changed
 
 Fixed
 +++++
-- Fix bug in FlowProject.add_operation that was calling FlowOperation instead
-of FlowCmdOperation.
+- Fix bug in FlowProject.add_operation that was calling FlowOperation instead of FlowCmdOperation (#254, #255).
 
 Version 0.9
 ===========

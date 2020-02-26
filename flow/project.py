@@ -2982,7 +2982,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         op = self.operations[name] = FlowCmdOperation(cmd=cmd, pre=pre, post=post)
         if name in self._groups:
             raise KeyError("A group with this identifier already exists.")
-        self._groups[name] = FlowGroup(name, operations={name: op}, operation_directives=dict(name=kwargs))
+        self._groups[name] = FlowGroup(name,
+                                       operations={name: op},
+                                       operation_directives=dict(name=kwargs))
 
     @deprecated(
         deprecated_in="0.8", removed_in="0.10",

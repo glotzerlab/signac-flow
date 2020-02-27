@@ -24,7 +24,7 @@ Added
 Changed
 +++++++
 
-- Raises ValueError when operation funtion passed to FlowProject.per() and FlowProject.post() and non-operation function passed to FlowPorject.pre.after() as an argument (#248, #249).
+- Raises ``ValueError`` when an operation function is passed to ``FlowProject.pre()`` and ``FlowProject.post()``, or a non-operation function passed to ``FlowProject.pre.after()`` (#248, #249).
 
 Changed
 +++++++

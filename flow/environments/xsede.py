@@ -51,6 +51,7 @@ class Stampede2Environment(DefaultSlurmEnvironment):
     template = 'stampede2.sh'
     cores_per_node = 48
     mpi_cmd = 'ibrun'
+    offset_counter = 0
 
     @classmethod
     def add_args(cls, parser):
@@ -84,13 +85,16 @@ class Stampede2Environment(DefaultSlurmEnvironment):
         """
         if operation.directives.get('nranks'):
             if parallel:
-                return '{} -n {} -o {} task_affinity '.format(
-                       cls.mpi_cmd, operation.directives['nranks'],
-                       operation.directives['np_offset'])
+                prefix = '{} -n {} -o {} task_affinity '.format(
+                          cls.mpi_cmd, operation.directives['nranks'],
+                          cls.offset_counter)
+                cls.offset_counter += operation.directives['nranks']
             else:
-                return '{} -n {} '.format(cls.mpi_cmd, operation.directives['nranks'])
+                prefix = '{} -n {} '.format(cls.mpi_cmd,
+                                            operation.directives['nranks'])
         else:
-            return ''
+            prefix = ''
+        return prefix
 
 
 class BridgesEnvironment(DefaultSlurmEnvironment):

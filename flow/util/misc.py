@@ -30,27 +30,6 @@ def _positive_int(value):
     return ivalue
 
 
-def draw_progressbar(value, total, width=40):
-    """Visualize progess with a progress bar.
-
-    :param value:
-        The current progress as a fraction of total.
-    :type value:
-        int
-    :param total:
-        The maximum value that 'value' may obtain.
-    :type total:
-        int
-    :param width:
-        The character width of the drawn progress bar.
-    :type width:
-        int
-    """
-    assert value >= 0 and total > 0
-    n = int(value / total * width)
-    return '|' + ''.join(['#'] * n) + ''.join(['-'] * (width - n)) + '|'
-
-
 def write_human_readable_statepoint(script, job):
     """Human-readable representation of a signac state point."""
     script.write('# Statepoint:\n#\n')

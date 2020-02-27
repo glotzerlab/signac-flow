@@ -128,9 +128,9 @@ def init(project):
 # Mock the bundle storing to avoid needing to make a file
 def _store_bundled(self, operations):
     if len(operations) == 1:
-        return operations[0].get_id()
+        return operations[0].id
     else:
-        h = '.'.join(op.get_id() for op in operations)
+        h = '.'.join(op.id for op in operations)
         bid = '{}/bundle/{}'.format(self, sha1(h.encode('utf-8')).hexdigest())
         return bid
 
@@ -143,9 +143,8 @@ def get_masked_flowproject(p):
     sys.executable before the FlowProject is instantiated, and then modify the
     root_directory and project_dir elements after creation."""
     sys.executable = '/usr/local/bin/python'
-    for _, op in TestProject._OPERATION_FUNCTIONS:
-        op._flow_path = 'generate_template_reference_data.py'
     fp = TestProject.get_project(root=p.root_directory())
+    fp._entrypoint.setdefault('path', 'generate_template_reference_data.py')
     fp.root_directory = lambda: PROJECT_DIRECTORY
     fp.config.project_dir = PROJECT_DIRECTORY
     return fp

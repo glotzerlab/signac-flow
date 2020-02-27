@@ -14,10 +14,12 @@ next
 Added
 +++++
 
+- Add ``FlowGroup``s (one or more operation grouping within an execution environment)(#114)
 - Add official support for University of Michigan Great Lakes cluster (#185).
 - Add official support for Bridges AI cluster (#222).
 - Add IgnoreConditions option for submit(), run() and script() (#38).
 - Add pytest support for Testing Framework (#227, #232).
+- Add markdown and html format support for print_status() (#113, #163).
 
 Changed
 +++++++
@@ -27,10 +29,12 @@ Changed
 Changed
 +++++++
 
+- The option to provide the env argument to submit and submit_operations has been deprecated (#245).
 - The command line option ``--cmd`` for ``script`` has been deprecated and will trigger a ``DeprecationWarning`` upon use until removed (#243, #218).
 
 Removed
 +++++++
+- Removed ENVIRONMENT global variable in the flow.environment module (#245).
 - Removed vendored ``tqdm`` module and replaced it with a requirement (#247).
 
 Changed

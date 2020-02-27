@@ -86,5 +86,4 @@ def test_env(env):
 
                     with open(job.fn('script_{}.sh'.format(op))) as file:
                         reference.extend([msg] + file.read().splitlines())
-
         assert '\n'.join(reference) == '\n'.join(generated)

@@ -44,7 +44,7 @@
 {% set cmd_suffix = cmd_suffix|default('') %}
 cat << EOF > {{ launcher_file }}
 {% for operation in (operations|with_np_offset) %}
-{{ cmd_prefix }}{{ operation.cmd }}{{ cmd_suffix }}
+{{ operation.cmd }}{{ cmd_suffix }}
 {% endfor %}
 EOF
 
@@ -59,7 +59,7 @@ rm {{ launcher_file }}
 {% for operation in (operations|with_np_offset) %}
 
 # {{ "%s"|format(operation) }}
-{{ operation|get_prefix(parallel=parallel, mpi_prefix=mpi_prefix, cmd_prefix=cmd_prefix) }}{{ operation.cmd }}{{ cmd_suffix }}
+{{ operation.cmd }}{{ cmd_suffix }}
 {% endfor %}
 {% endif %}
 {% endblock %}

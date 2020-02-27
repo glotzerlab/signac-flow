@@ -22,6 +22,11 @@ Added
 Changed
 +++++++
 
+- Raises ValueError when operation funtion passed to FlowProject.per() and FlowProject.post() and non-operation function passed to FlowPorject.pre.after() as an argument (#248, #249).
+
+Changed
++++++++
+
 - The command line option ``--cmd`` for ``script`` has been deprecated and will trigger a ``DeprecationWarning`` upon use until removed (#243, #218).
 
 Removed

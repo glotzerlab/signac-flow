@@ -557,9 +557,8 @@ class _FlowProjectClass(type):
                 super(pre, self).__init__(condition, tag)
 
             def __call__(self, func):
-                operation_functions = []
-                for operation in self._parent_class._collect_operations():
-                    operation_functions.append(operation[1])
+                operation_functions = [operation[1] for operation
+                                       in self._parent_class._collect_operations()]
                 if self.condition in operation_functions:
                     raise ValueError("Operation functions cannot be used as preconditions.")
                 self._parent_class._OPERATION_PRE_CONDITIONS[func].insert(0, self.condition)
@@ -574,9 +573,8 @@ class _FlowProjectClass(type):
             @classmethod
             def after(cls, *other_funcs):
                 "True if and only if all post conditions of other operation-function(s) are met."
-                operation_functions = []
-                for operation in cls._parent_class._collect_operations():
-                    operation_functions.append(operation[1])
+                operation_functions = [operation[1] for operation
+                                       in cls._parent_class._collect_operations()]
                 if not all(condition in operation_functions for condition in other_funcs):
                     raise ValueError("The arguments to pre.after must be operation functions.")
                 return cls(_create_all_metacondition(cls._parent_class._collect_post_conditions(),
@@ -613,9 +611,8 @@ class _FlowProjectClass(type):
                 super(post, self).__init__(condition, tag)
 
             def __call__(self, func):
-                operation_functions = []
-                for operation in self._parent_class._collect_operations():
-                    operation_functions.append(operation[1])
+                operation_functions = [operation[1] for operation
+                                       in self._parent_class._collect_operations()]
                 if self.condition in operation_functions:
                     raise ValueError("Operation functions cannot be used as postconditions.")
                 self._parent_class._OPERATION_POST_CONDITIONS[func].insert(0, self.condition)

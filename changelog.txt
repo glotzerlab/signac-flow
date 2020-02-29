@@ -25,6 +25,7 @@ Changed
 +++++++
 
 - Raises ``ValueError`` when an operation function is passed to ``FlowProject.pre()`` and ``FlowProject.post()``, or a non-operation function passed to ``FlowProject.pre.after()`` (#248, #249).
+- Adding test for the same in tests/test_project.py.
 
 Changed
 +++++++

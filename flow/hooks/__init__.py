@@ -11,7 +11,7 @@ except ImportError:
 
     class Git:
         def __init__(self, *args, **kwargs):
-            raise ImportError("'TrackWorkspaceWithGit' requires GitPython.")
+            raise ImportError("'Git' requires GitPython.")
 
 
 logger = logging.getLogger(__name__)

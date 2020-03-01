@@ -1,4 +1,4 @@
-# <img src="https://raw.githubusercontent.com/glotzerlab/signac-flow/master/doc/images/logo.png" width="75" height="75"> signac-flow - manage workflows with signac
+# <img src="https://raw.githubusercontent.com/glotzerlab/signac-flow/master/doc/images/palette-header.png" width="75" height="58"> signac-flow - manage workflows with signac
 
 [![Affiliated with NumFOCUS](https://img.shields.io/badge/NumFOCUS-affiliated%20project-orange.svg?style=flat&colorA=E1523D&colorB=007D8A)](https://numfocus.org/sponsored-projects/affiliated-projects)
 [![PyPI](https://img.shields.io/pypi/v/signac-flow.svg)](https://pypi.org/project/signac-flow/)
@@ -51,7 +51,7 @@ pip install signac-flow
 
 You can test this package by executing
 
-    $ python -m unittest discover tests/
+    $ python -m pytest tests/
 
 within the repository root directory.
 

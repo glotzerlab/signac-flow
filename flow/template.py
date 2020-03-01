@@ -6,25 +6,11 @@
 These templates can be initialized via the init() function defined
 in this module and the main 'flow' command line interface.
 """
-from __future__ import print_function
 import os
 import sys
 import errno
 import logging
-
-try:
-    import jinja2
-    from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
-except ImportError:
-    # Mock exception, which will never be raised.
-    class Jinja2TemplateNotFound(Exception):
-        pass
-
-    JINJA2 = False
-else:
-    JINJA2 = True
-
-from .util.misc import _is_identifier
+import jinja2
 
 
 logger = logging.getLogger(__name__)
@@ -39,12 +25,9 @@ TEMPLATES = {
 
 def init(alias=None, template=None, root=None, out=None):
     "Initialize a templated FlowProject module."
-    if not JINJA2:
-        raise ValueError("The init() function requires the 'jinja2' package.")
-
     if alias is None:
         alias = 'project'
-    elif not _is_identifier(alias):
+    elif not alias.isidentifier():
         raise ValueError(
             "The alias '{}' is not a valid Python identifier and therefore "
             "not be used as a FlowProject alias.".format(alias))

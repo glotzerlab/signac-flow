@@ -7,10 +7,8 @@ This module provides the ComputeEnvironment class, which can be
 subclassed to automatically detect specific computational environments.
 
 This enables the user to adjust their workflow based on the present
-environment, e.g. for the adjustemt of scheduler submission scripts.
+environment, e.g. for the adjustment of scheduler submission scripts.
 """
-from __future__ import print_function
-from __future__ import division
 import os
 import re
 import socket
@@ -30,21 +28,16 @@ from .scheduling.fakescheduler import FakeScheduler
 from .util import config as flow_config
 from .errors import NoSchedulerError
 
-
 logger = logging.getLogger(__name__)
-
-
-# Global variable can be used to override detected environment
-ENVIRONMENT = None
 
 
 def setup(py_modules, **attrs):
     """Setup function for environment modules.
 
     Use this function in place of setuptools.setup to not only install
-    a environments module, but also register it with the global signac
-    configuration. Once registered, is automatically imported when the
-    get_environment() function is called.
+    an environment's module, but also register it with the global signac
+    configuration. Once registered, the environment is automatically
+    imported when the :py:meth:`~.get_environment` function is called.
     """
     import setuptools
     from setuptools.command.install import install
@@ -75,9 +68,9 @@ def setup(py_modules, **attrs):
 
 
 class ComputeEnvironmentType(type):
-    """Meta class for the definition of ComputeEnvironments.
+    """Metaclass for the definition of ComputeEnvironments.
 
-    This meta class automatically registers ComputeEnvironment definitions,
+    This metaclass automatically registers ComputeEnvironment definitions,
     which enables the automatic determination of the present environment.
     """
 
@@ -89,22 +82,29 @@ class ComputeEnvironmentType(type):
         return super(ComputeEnvironmentType, cls).__init__(name, bases, dct)
 
 
+def template_filter(func):
+    "Mark the function as a ComputeEnvironment template filter."
+    setattr(func, '_flow_template_filter', True)
+    return classmethod(func)
+
+
 class ComputeEnvironment(metaclass=ComputeEnvironmentType):
     """Define computational environments.
 
     The ComputeEnvironment class allows us to automatically determine
-    specific environments in order to programatically adjust workflows
+    specific environments in order to programmatically adjust workflows
     in different environments.
 
-    The default method for the detection of a specific environemnt is to
+    The default method for the detection of a specific environment is to
     provide a regular expression matching the environment's hostname.
-    For example, if the hostname is my_server.com, one could identify the
-    environment by setting the hostname_pattern to 'my_server'.
+    For example, if the hostname is my-server.com, one could identify the
+    environment by setting the hostname_pattern to 'my-server'.
     """
     scheduler_type = None
     hostname_pattern = None
     submit_flags = None
     template = 'base_script.sh'
+    mpi_cmd = 'mpiexec'
 
     @classmethod
     def is_present(cls):
@@ -125,7 +125,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
     @classmethod
     def get_scheduler(cls):
-        """Return a environment specific scheduler driver.
+        """Return an environment-specific scheduler driver.
 
         The returned scheduler class provides a standardized interface to
         different scheduler implementations.
@@ -148,7 +148,10 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         env_flags = getattr(cls, 'submit_flags', [])
         if env_flags:
             flags.extend(env_flags)
-
+        # parse the flag to check for --job-name
+        for flagi in flags:
+            if '--job-name' in flagi:
+                raise ValueError('Assignment of "--job-name" is not supported.')
         # Hand off the actual submission to the scheduler
         if cls.get_scheduler().submit(script, flags=flags, *args, **kwargs):
             return JobStatus.submitted
@@ -169,8 +172,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         """Request a value from the user's configuration.
 
         This method should be used whenever values need to be provided
-        that are specific to a users's environment. A good example are
-        account names.
+        that are specific to a user's environment, e.g. account names.
 
         When a key is not configured and no default value is provided,
         a :py:class:`~.errors.SubmitError` will be raised and the user will
@@ -178,18 +180,85 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
         Please note, that the key will be automatically expanded to
         be specific to this environment definition. For example, a
-        key should be 'account', not 'MyEnvironment.account`.
+        key should be ``'account'``, not ``'MyEnvironment.account'``.
 
         :param key: The environment specific configuration key.
         :type key: str
         :param default: A default value in case the key cannot be found
             within the user's configuration.
-        :type key: str
+        :type default: str
         :return: The value or default value.
         :raises SubmitError: If the key is not in the user's configuration
             and no default value is provided.
         """
         return flow_config.require_config_value(key, ns=cls.__name__, default=default)
+
+    @classmethod
+    def _get_omp_prefix(cls, operation):
+        """Get the OpenMP prefix based on the `omp_num_threads` directive.
+
+        :param operation:
+            The operation for which to add prefix.
+        :return omp_prefix:
+            The prefix should be added for the operation.
+        :type omp_prefix:
+            str
+        """
+        return 'export OMP_NUM_THREADS={}\n'.format(operation.directives['omp_num_threads'])
+
+    @classmethod
+    def _get_mpi_prefix(cls, operation, parallel):
+        """Get the mpi prefix based on proper directives.
+
+        :param operation:
+            The operation for which to add prefix.
+        :param parallel:
+            If True, operations are assumed to be executed in parallel, which means
+            that the number of total tasks is the sum of all tasks instead of the
+            maximum number of tasks. Default is set to False.
+        :return mpi_prefix:
+            The prefix should be added for the operation.
+        :type mpi_prefix:
+            str
+        """
+        if operation.directives.get('nranks'):
+            return '{} -n {} '.format(cls.mpi_cmd, operation.directives['nranks'])
+        else:
+            return ''
+
+    @template_filter
+    def get_prefix(cls, operation, parallel=False, mpi_prefix=None, cmd_prefix=None):
+        """Template filter for getting the prefix based on proper directives.
+
+        :param operation:
+            The operation for which to add prefix.
+        :param parallel:
+            If True, operations are assumed to be executed in parallel, which means
+            that the number of total tasks is the sum of all tasks instead of the
+            maximum number of tasks. Default is set to False.
+        :param mpi_prefix:
+            User defined mpi_prefix string. Default is set to None.
+            This will be deprecated and removed in the future.
+        :param cmd_prefix:
+            User defined cmd_prefix string. Default is set to None.
+            This will be deprecated and removed in the future.
+        :return prefix:
+            The prefix should be added for the operation.
+        :type prefix:
+            str
+        """
+        prefix = ''
+        if operation.directives.get('omp_num_threads'):
+            prefix += cls._get_omp_prefix(operation)
+        if mpi_prefix:
+            prefix += mpi_prefix
+        else:
+            prefix += cls._get_mpi_prefix(operation, parallel)
+        if cmd_prefix:
+            prefix += cmd_prefix
+        # if cmd_prefix and if mpi_prefix for backwards compatibility
+        # Can change to get them from directives for future
+        return prefix
 
 
 class StandardEnvironment(ComputeEnvironment):
@@ -198,19 +267,6 @@ class StandardEnvironment(ComputeEnvironment):
     @classmethod
     def is_present(cls):
         return True
-
-    @classmethod
-    def mpi_cmd(cls, cmd, np):
-        return 'mpirun -np {np} {cmd}'.format(np=np, cmd=cmd)
-
-
-class UnknownEnvironment(StandardEnvironment):
-    "Deprecated 'standard' environment, replaced by 'StandardEnvironment.'"
-
-    def __init__(self, *args, **kwargs):
-        raise RuntimeError(
-            "The 'flow.environment.UnknownEnvironment' class has been replaced by the "
-            "'flow.environment.StandardEnvironment' class.")
 
 
 class TestEnvironment(ComputeEnvironment):
@@ -365,13 +421,13 @@ def registered_environments(import_configured=True):
 def get_environment(test=False, import_configured=True):
     """Attempt to detect the present environment.
 
-    This function iterates through all defined ComputeEnvironment
-    classes in reversed order of definition and and returns the
-    first EnvironmentClass where the is_present() method returns
-    True.
+    This function iterates through all defined :py:class:`~.ComputeEnvironment`
+    classes in reversed order of definition and returns the first
+    environment where the :py:meth:`~.ComputeEnvironment.is_present` method
+    returns True.
 
     :param test:
-        Return the TestEnvironment
+        Whether to return the TestEnvironment.
     :type test:
         bool
     :returns:
@@ -380,10 +436,6 @@ def get_environment(test=False, import_configured=True):
     if test:
         return TestEnvironment
     else:
-        # Return a globally specified environment
-        if ENVIRONMENT is not None:
-            return ENVIRONMENT
-
         # Obtain a list of all registered environments
         env_types = registered_environments(import_configured=import_configured)
         logger.debug(

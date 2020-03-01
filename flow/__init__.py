@@ -6,14 +6,14 @@
 The signac-flow package provides the basic infrastructure to easily
 configure and implement a workflow to operate on a signac_ data space.
 
-.. _signac: https://glotzerlab.engin.umich.edu/signac
+.. _signac: https://signac.io/
 """
-from __future__ import absolute_import
 from . import environment
 from . import scheduling
 from . import hooks
 from . import errors
 from . import testing
+from .project import IgnoreConditions
 from .project import FlowProject
 from .project import JobOperation
 from .project import label
@@ -31,7 +31,7 @@ from .version import __version__
 # Import packaged environments unless disabled in config:
 from .util.config import get_config_value
 if get_config_value('import_packaged_environments', default=True):
-    from . import environments  # noqa:F401
+    from . import environments  # noqa: F401
 
 
 __all__ = [
@@ -39,6 +39,8 @@ __all__ = [
     'scheduling',
     'hooks',
     'errors',
+    'testing',
+    'IgnoreConditions',
     'FlowProject',
     'JobOperation',
     'label',
@@ -47,10 +49,9 @@ __all__ = [
     'cmd',
     'directives',
     'run',
+    'get_environment',
     'init',
     'redirect_log',
-    'get_environment',
     'with_job',
-    'testing',
     '__version__',
     ]

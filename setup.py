@@ -14,6 +14,8 @@ requirements = [
     'cloudpickle',
     # Deprecation management
     'deprecation>=2',
+    # Progress bars
+    'tqdm>=4.35.0',
 ]
 
 description = "Simple workflow management for signac projects."
@@ -26,24 +28,21 @@ try:
 except (IOError, OSError):
     long_description = description
 
-
-with open("README.md", "r") as fh:
-    long_description = fh.read()
-
-
 setup(
     name='signac-flow',
-    version='0.8.0',
+    version='0.9.0',
     packages=find_packages(),
     include_package_data=True,
     zip_safe=True,
-
-    author='Carl Simon Adorf',
+    maintainer='signac Developers',
+    maintainer_email='signac-support@umich.edu',
+    author='Carl Simon Adorf et al.',
     author_email='csadorf@umich.edu',
     description=description,
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://signac.io",
+    download_url="https://pypi.org/project/signac-flow/",
     keywords='workflow management signac framework database',
 
     classifiers=[
@@ -54,6 +53,7 @@ setup(
         "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
     ],
     entry_points={
         'console_scripts': [

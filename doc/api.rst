@@ -37,6 +37,7 @@ The FlowProject
     FlowProject.label
     FlowProject.labels
     FlowProject.main
+    FlowProject.make_group
     FlowProject.next_operation
     FlowProject.next_operations
     FlowProject.operation
@@ -107,6 +108,11 @@ The FlowProject
 
 .. automethod:: flow.FlowProject.pre.true
 
+.. autoclass:: flow.IgnoreConditions
+
+.. autoclass:: flow.render_status.Renderer
+    :members: generate_terminal_output, generate_html_output, render
+
 
 @flow.cmd
 ---------
@@ -137,3 +143,9 @@ flow.get_environment()
 ----------------------
 
 .. autofunction:: get_environment
+
+The FlowGroup
+-------------
+
+.. autoclass:: flow.project.FlowGroup
+   :members: add_operation, complete, eligible, isdisjoint

@@ -2,7 +2,6 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 """Environments for XSEDE supercomputers."""
-from __future__ import print_function
 import logging
 
 from ..environment import DefaultSlurmEnvironment
@@ -19,6 +18,7 @@ class CometEnvironment(DefaultSlurmEnvironment):
     hostname_pattern = 'comet'
     template = 'comet.sh'
     cores_per_node = 24
+    mpi_cmd = 'ibrun'
 
     @classmethod
     def add_args(cls, parser):
@@ -50,6 +50,8 @@ class Stampede2Environment(DefaultSlurmEnvironment):
     hostname_pattern = '.*stampede2'
     template = 'stampede2.sh'
     cores_per_node = 48
+    mpi_cmd = 'ibrun'
+    offset_counter = 0
 
     @classmethod
     def add_args(cls, parser):
@@ -66,6 +68,34 @@ class Stampede2Environment(DefaultSlurmEnvironment):
                   'If omitted, uses the system default '
                   '(slurm default is "slurm-%%j.out").'))
 
+    @classmethod
+    def _get_mpi_prefix(cls, operation, parallel):
+        """Get the mpi prefix based on proper directives.
+
+        :param operation:
+            The operation for which to add prefix.
+        :param parallel:
+            If True, operations are assumed to be executed in parallel, which means
+            that the number of total tasks is the sum of all tasks instead of the
+            maximum number of tasks. Default is set to False.
+        :return mpi_prefix:
+            The prefix should be added for the operation.
+        :type mpi_prefix:
+            str
+        """
+        if operation.directives.get('nranks'):
+            if parallel:
+                prefix = '{} -n {} -o {} task_affinity '.format(
+                          cls.mpi_cmd, operation.directives['nranks'],
+                          cls.offset_counter)
+                cls.offset_counter += operation.directives['nranks']
+            else:
+                prefix = '{} -n {} '.format(cls.mpi_cmd,
+                                            operation.directives['nranks'])
+        else:
+            prefix = ''
+        return prefix
+
 
 class BridgesEnvironment(DefaultSlurmEnvironment):
     """Environment profile for the Bridges super computer.
@@ -75,13 +105,15 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
     hostname_pattern = r'.*\.bridges\.psc\.edu$'
     template = 'bridges.sh'
     cores_per_node = 28
+    mpi_cmd = 'mpirun'
 
     @classmethod
     def add_args(cls, parser):
         super(BridgesEnvironment, cls).add_args(parser)
         parser.add_argument(
           '--partition',
-          choices=['RM', 'RM-shared', 'RM-small', 'GPU', 'GPU-shared', 'LM'],
+          choices=['RM', 'RM-shared', 'RM-small', 'LM',
+                   'GPU', 'GPU-shared', 'GPU-small', 'GPU-AI'],
           default='RM-shared',
           help="Specify the partition to submit to.")
 

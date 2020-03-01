@@ -2,8 +2,6 @@
 # Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-from __future__ import print_function
-
 import sys
 import os
 import io
@@ -63,7 +61,7 @@ def init(project):
     # bundling and parallelism must exist in the same test. The goal is to
     # construct a minimal covering set of all test cases.
     environments = {
-        'environment.UnknownEnvironment': [],
+        'environment.StandardEnvironment': [],
         'environments.xsede.CometEnvironment': [
             {
                 'partition': ['compute', 'shared', 'gpu'],
@@ -89,7 +87,7 @@ def init(project):
         ],
         'environments.xsede.BridgesEnvironment': [
             {
-                'partition': ['RM', 'RM-Shared', 'GPU'],
+                'partition': ['RM', 'RM-Shared', 'GPU', 'GPU-AI'],
                 'walltime': [None, 1],
             },
             {
@@ -98,26 +96,9 @@ def init(project):
                 'bundle': [['mpi_op', 'omp_op']],
             }
         ],
-        'environments.umich.FluxEnvironment': [
+        'environments.umich.GreatLakesEnvironment': [
             {
-                'walltime': [None, 1],
-            },
-            {
-                'parallel': [False, True],
-                'bundle': [['mpi_op', 'omp_op']],
-            }
-        ],
-        'environments.incite.TitanEnvironment': [
-            {
-                'walltime': [None, 1],
-            },
-            {
-                'parallel': [False, True],
-                'bundle': [['mpi_op', 'omp_op']],
-            }
-        ],
-        'environments.incite.EosEnvironment': [
-            {
+                'partition': ['standard', 'gpu'],
                 'walltime': [None, 1],
             },
             {
@@ -147,9 +128,9 @@ def init(project):
 # Mock the bundle storing to avoid needing to make a file
 def _store_bundled(self, operations):
     if len(operations) == 1:
-        return operations[0].get_id()
+        return operations[0].id
     else:
-        h = '.'.join(op.get_id() for op in operations)
+        h = '.'.join(op.id for op in operations)
         bid = '{}/bundle/{}'.format(self, sha1(h.encode('utf-8')).hexdigest())
         return bid
 
@@ -162,9 +143,8 @@ def get_masked_flowproject(p):
     sys.executable before the FlowProject is instantiated, and then modify the
     root_directory and project_dir elements after creation."""
     sys.executable = '/usr/local/bin/python'
-    for _, op in TestProject._OPERATION_FUNCTIONS:
-        op._flow_path = 'generate_template_reference_data.py'
     fp = TestProject.get_project(root=p.root_directory())
+    fp._entrypoint.setdefault('path', 'generate_template_reference_data.py')
     fp.root_directory = lambda: PROJECT_DIRECTORY
     fp.config.project_dir = PROJECT_DIRECTORY
     return fp

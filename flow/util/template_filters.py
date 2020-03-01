@@ -2,7 +2,6 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 """Provide jinja2 template environment filter functions."""
-from __future__ import division, print_function
 import sys
 from math import ceil
 
@@ -12,12 +11,12 @@ from ..errors import SubmitError
 
 
 def identical(iterable):
-    """Check that all elements of an iterator are identical"""
+    """Check that all elements of an iterable are identical."""
     return len(set(iterable)) <= 1
 
 
 def format_timedelta(delta, style='HH:MM:SS'):
-    "Format a time delta for interpretation by schedulers."
+    """Format a time delta for interpretation by schedulers."""
     if isinstance(delta, int) or isinstance(delta, float):
         import datetime
         delta = datetime.timedelta(hours=delta)
@@ -82,8 +81,11 @@ def calc_tasks(operations, name, parallel=False, allow_mixed=False):
             return 0    # empty set
     else:
         raise RuntimeError(
-            "The number of required processing units ({}) differs between "
-            "different operations.".format(name))
+            "Mixed processing units requested warning:\n"
+            "The number of required processing units ({}) differs between different operations.\n"
+            "Use --force to ignore the warning, but users are encouraged to use --pretend to "
+            "confirm that the submission script allocates processing units for different "
+            "operations properly before force submission".format(name))
 
 
 def check_utilization(nn, np, ppn, threshold=0.9, name=None):
@@ -96,7 +98,7 @@ def check_utilization(nn, np, ppn, threshold=0.9, name=None):
     :param nn:
         Number of requested nodes.
     :param np:
-        Number of required processing units (CPU/GPUs etc.).
+        Number of required processing units (e.g. CPUs, GPUs).
     :param ppn:
         Number of processing units available per node.
     :param threshold:
@@ -112,13 +114,14 @@ def check_utilization(nn, np, ppn, threshold=0.9, name=None):
     if not (0 <= threshold <= 1.0):
         raise ValueError("The value for 'threshold' must be between 0 and 1.")
 
-    # Zero nodes are just returned and possible utilization or validiation checks
-    # must be performed elswhere.
+    # Zero nodes are just returned and possible utilization or validation checks
+    # must be performed elsewhere.
     if nn == 0:
         return 0
 
-    # The utilization is the number of processing units (np) required divided by the
-    # number of nodes (nn) multiplied with the number of processing units per node (ppn).
+    # The utilization is the number of processing units (np) required divided
+    # by the product of the number of nodes (nn) and the number of processing
+    # units per node (ppn).
     utilization = np / (nn * ppn)
 
     # Raise RuntimeError if the utilization is below the specified threshold.
@@ -127,8 +130,10 @@ def check_utilization(nn, np, ppn, threshold=0.9, name=None):
             "Low{name} utilization warning: {util:.0%}\n"
             "Total resources requested would require {nn} node(s), "
             "but each node supports up to {ppn}{name} task(s).\n"
-            "Requesting {np} total{name} task(s) would result "
-            "in node underutilization.".format(
+            "Requesting {np} total{name} task(s) would result in node underutilization. "
+            "Use --force to ignore the warning, but users are encouraged to use --pretend to "
+            "confirm that the submission script fully utilizes the compute resources before "
+            "force submission" .format(
                 util=utilization, np=np, nn=nn, ppn=ppn,
                 name=' {}'.format(name) if name else ''))
 
@@ -140,7 +145,7 @@ def calc_num_nodes(np, ppn=1, threshold=0, name=None):
     """Calculate the number of required nodes with optional utilization check.
 
     :param np:
-        Number of required processing units (CPU/GPU etc.).
+        Number of required processing units (e.g. CPUs, GPUs).
     :param ppn:
         Number of processing units available per node.
     :param threshold:
@@ -160,14 +165,14 @@ def calc_num_nodes(np, ppn=1, threshold=0, name=None):
 
 
 def print_warning(msg):
-    """Print warning message within jinja2 template
+    """Print warning message within jinja2 template.
 
     :param:
         The warning message as a string
     """
     import logging
     logger = logging.getLogger(__name__)
-    logger.warn(msg)
+    logger.warning(msg)
     return ''
 
 
@@ -177,7 +182,7 @@ _GET_ACCOUNT_NAME_MESSAGES_SHOWN = set()
 def get_account_name(environment, required=False):
     """Get account name for environment with user-friendly messages on failure.
 
-    :param:
+    :param environment:
         The environment for which to obtain the account variable.
     :param required:
         Specify whether the account name is required instead of optional.

@@ -30,28 +30,6 @@ def _positive_int(value):
     return ivalue
 
 
-def draw_progressbar(value, total, width=40):
-    """Visualize progess with a progress bar.
-
-    :param value:
-        The current progress as a fraction of total.
-    :type value:
-        int
-    :param total:
-        The maximum value that 'value' may obtain.
-    :type total:
-        int
-    :param width:
-        The character width of the drawn progress bar.
-    :type width:
-        int
-    """
-    "Helper function for the visualization of progress."
-    assert value >= 0 and total > 0
-    n = int(value / total * width)
-    return '|' + ''.join(['#'] * n) + ''.join(['-'] * (width - n)) + '|'
-
-
 def write_human_readable_statepoint(script, job):
     """Human-readable representation of a signac state point."""
     script.write('# Statepoint:\n#\n')
@@ -141,17 +119,6 @@ def switch_to_directory(root=None):
             yield
         finally:
             os.chdir(cwd)
-
-
-def _is_identifier(name):
-    """Check if 'name' is a valid Python identifier.
-
-    Source: https://stackoverflow.com/a/2545164
-    """
-    if name:
-        return name.isidentifier()
-    else:
-        return False    # empty string or None
 
 
 class TrackGetItemDict(dict):

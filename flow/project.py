@@ -818,9 +818,13 @@ class FlowGroup(object):
         if max_len < len(job_op_id):
             raise ValueError("Value for MAX_LEN_ID is too small ({}).".format(self.MAX_LEN_ID))
 
-        readable_name = '{}/{}/{}/{:04d}/'.format(
-            str(project)[:12], str(job)[:8],
-            op_string[:12], index)[:max_len]
+        separator = getattr(project._environment, 'JOB_ID_SEPARATOR', '/')
+        readable_name = '{project}{sep}{job}{sep}{op_string}{sep}{index:04d}{sep}'.format(
+                    sep=separator,
+                    project=str(project)[:12],
+                    job=str(job)[:8],
+                    op_string=op_string[:12],
+                    index=index)[:max_len]
 
         # By appending the unique job_op_id, we ensure that each id is truly unique.
         return readable_name + job_op_id

@@ -541,6 +541,7 @@ class TestProjectClass(TestProjectBase):
             @A.pre(op1)
             def op3(job):
                 pass
+
         with pytest.raises(ValueError):
             @A.operation
             @A.post(op1)

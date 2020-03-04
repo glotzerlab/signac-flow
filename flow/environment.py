@@ -343,6 +343,10 @@ class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
     def add_args(cls, parser):
         super(DefaultSlurmEnvironment, cls).add_args(parser)
         parser.add_argument(
+            '--memory',
+            help=("Specify how much memory to reserve per node in GB. "
+                  "Only relevant for shared queue jobs."))
+        parser.add_argument(
             '-w', '--walltime',
             type=float,
             default=12,

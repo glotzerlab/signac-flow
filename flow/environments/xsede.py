@@ -31,11 +31,6 @@ class CometEnvironment(DefaultSlurmEnvironment):
           help="Specify the partition to submit to.")
 
         parser.add_argument(
-            '--memory',
-            help=("Specify how much memory to reserve per node in GB. "
-                  "Only relevant for shared queue jobs."))
-
-        parser.add_argument(
             '--job-output',
             help=('What to name the job output file. '
                   'If omitted, uses the system default '

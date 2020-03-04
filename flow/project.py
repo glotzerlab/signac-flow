@@ -3609,6 +3609,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         parser_submit = subparsers.add_parser(
             'submit',
             parents=[base_parser],
+            conflict_handler='resolve',
         )
         self._add_submit_args(parser_submit)
         env_group = parser_submit.add_argument_group(

@@ -21,21 +21,19 @@ Added
 - Add pytest support for Testing Framework (#227, #232).
 - Add markdown and html format support for print_status() (#113, #163).
 - Add memory flag option for default Slurm scheduler (#256).
+- Add optional environment variable to specify submission script separator (#262).
 
 Changed
 +++++++
 
 - The option to provide the env argument to submit and submit_operations has been deprecated (#245).
 - The command line option ``--cmd`` for ``script`` has been deprecated and will trigger a ``DeprecationWarning`` upon use until removed (#243, #218).
+- Raises ValueError when --job-name passed by the user because that interferes with status checking (#164, #241).
 
 Removed
 +++++++
 - Removed ENVIRONMENT global variable in the flow.environment module (#245).
 - Removed vendored ``tqdm`` module and replaced it with a requirement (#247).
-
-Changed
-+++++++
-- Raises ValueError when --job-name passed by the user because that interferes with status checking (#164, #241).
 
 Version 0.9
 ===========

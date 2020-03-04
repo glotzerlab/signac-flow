@@ -26,12 +26,14 @@ Added
 Changed
 +++++++
 
+- Raises ``ValueError`` when an operation function is passed to ``FlowProject.pre()`` and ``FlowProject.post()``, or a non-operation function passed to ``FlowProject.pre.after()`` (#248, #249).
 - The option to provide the env argument to submit and submit_operations has been deprecated (#245).
 - The command line option ``--cmd`` for ``script`` has been deprecated and will trigger a ``DeprecationWarning`` upon use until removed (#243, #218).
 - Raises ValueError when --job-name passed by the user because that interferes with status checking (#164, #241).
 
 Removed
 +++++++
+
 - Removed ENVIRONMENT global variable in the flow.environment module (#245).
 - Removed vendored ``tqdm`` module and replaced it with a requirement (#247).
 

@@ -818,9 +818,13 @@ class FlowGroup(object):
         if max_len < len(job_op_id):
             raise ValueError("Value for MAX_LEN_ID is too small ({}).".format(self.MAX_LEN_ID))
 
-        readable_name = '{}/{}/{}/{:04d}/'.format(
-            str(project)[:12], str(job)[:8],
-            op_string[:12], index)[:max_len]
+        separator = getattr(project._environment, 'JOB_ID_SEPARATOR', '/')
+        readable_name = '{project}{sep}{job}{sep}{op_string}{sep}{index:04d}{sep}'.format(
+                    sep=separator,
+                    project=str(project)[:12],
+                    job=str(job)[:8],
+                    op_string=op_string[:12],
+                    index=index)[:max_len]
 
         # By appending the unique job_op_id, we ensure that each id is truly unique.
         return readable_name + job_op_id
@@ -1508,15 +1512,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         for sjob in self._expand_bundled_jobs(scheduler.jobs()):
             yield sjob
-
-    @staticmethod
-    def _map_scheduler_jobs(scheduler_jobs):
-        "Map all scheduler jobs by job id and operation name."
-        for sjob in scheduler_jobs:
-            name = sjob.name()
-            if name[32] == '-':
-                expanded = JobOperation.expand_id(name)
-                yield expanded['job_id'], expanded['operation-name'], sjob
 
     def _get_operations_status(self, job, cached_status):
         "Return a dict with information about job-operations for this job."

@@ -37,7 +37,7 @@ jobs:
       - run:
           name: check-code-style
           command: |
-            python -m flake8 --show-source flow/
+            python -m flake8 --show-source .
 
   test-3.8: &test-template
     environment:

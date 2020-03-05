@@ -28,11 +28,6 @@ try:
 except (IOError, OSError):
     long_description = description
 
-
-with open("README.md", "r") as fh:
-    long_description = fh.read()
-
-
 setup(
     name='signac-flow',
     version='0.9.0',

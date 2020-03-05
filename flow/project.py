@@ -19,6 +19,7 @@ import contextlib
 import random
 import subprocess
 import traceback
+import warnings
 from deprecation import deprecated
 from collections import defaultdict
 from collections import OrderedDict
@@ -817,9 +818,13 @@ class FlowGroup(object):
         if max_len < len(job_op_id):
             raise ValueError("Value for MAX_LEN_ID is too small ({}).".format(self.MAX_LEN_ID))
 
-        readable_name = '{}/{}/{}/{:04d}/'.format(
-            str(project)[:12], str(job)[:8],
-            op_string[:12], index)[:max_len]
+        separator = getattr(project._environment, 'JOB_ID_SEPARATOR', '/')
+        readable_name = '{project}{sep}{job}{sep}{op_string}{sep}{index:04d}{sep}'.format(
+                    sep=separator,
+                    project=str(project)[:12],
+                    job=str(job)[:8],
+                    op_string=op_string[:12],
+                    index=index)[:max_len]
 
         # By appending the unique job_op_id, we ensure that each id is truly unique.
         return readable_name + job_op_id
@@ -1036,6 +1041,10 @@ class _FlowProjectClass(type):
                 super(pre, self).__init__(condition, tag)
 
             def __call__(self, func):
+                operation_functions = [operation[1] for operation
+                                       in self._parent_class._collect_operations()]
+                if self.condition in operation_functions:
+                    raise ValueError("Operation functions cannot be used as preconditions.")
                 self._parent_class._OPERATION_PRE_CONDITIONS[func].insert(0, self.condition)
                 return func
 
@@ -1048,6 +1057,10 @@ class _FlowProjectClass(type):
             @classmethod
             def after(cls, *other_funcs):
                 "True if and only if all post conditions of other operation-function(s) are met."
+                operation_functions = [operation[1] for operation
+                                       in cls._parent_class._collect_operations()]
+                if not all(condition in operation_functions for condition in other_funcs):
+                    raise ValueError("The arguments to pre.after must be operation functions.")
                 return cls(_create_all_metacondition(cls._parent_class._collect_post_conditions(),
                                                      *other_funcs))
 
@@ -1082,6 +1095,10 @@ class _FlowProjectClass(type):
                 super(post, self).__init__(condition, tag)
 
             def __call__(self, func):
+                operation_functions = [operation[1] for operation
+                                       in self._parent_class._collect_operations()]
+                if self.condition in operation_functions:
+                    raise ValueError("Operation functions cannot be used as postconditions.")
                 self._parent_class._OPERATION_POST_CONDITIONS[func].insert(0, self.condition)
                 return func
 
@@ -1495,15 +1512,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         for sjob in self._expand_bundled_jobs(scheduler.jobs()):
             yield sjob
-
-    @staticmethod
-    def _map_scheduler_jobs(scheduler_jobs):
-        "Map all scheduler jobs by job id and operation name."
-        for sjob in scheduler_jobs:
-            name = sjob.name()
-            if name[32] == '-':
-                expanded = JobOperation.expand_id(name)
-                yield expanded['job_id'], expanded['operation-name'], sjob
 
     def _get_operations_status(self, job, cached_status):
         "Return a dict with information about job-operations for this job."
@@ -2498,6 +2506,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             _id = self._store_bundled(operations)
         if env is None:
             env = self._environment
+        else:
+            warnings.warn("The env argument is deprecated as of 0.10 and will be removed in 0.12. "
+                          "Instead, set the environment when constructing a FlowProject.",
+                          DeprecationWarning)
 
         print("Submitting cluster job '{}':".format(_id), file=sys.stderr)
 
@@ -2596,6 +2608,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "provided a single string: {}.".format(names))
         if env is None:
             env = self._environment
+        else:
+            warnings.warn("The env argument is deprecated as of 0.10 and will be removed in 0.12. "
+                          "Instead, set the environment when constructing a FlowProject.",
+                          DeprecationWarning)
         if walltime is not None:
             try:
                 walltime = datetime.timedelta(hours=walltime)
@@ -2979,10 +2995,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         if name in self.operations:
             raise KeyError("An operation with this identifier is already added.")
-        op = self.operations[name] = FlowOperation(cmd=cmd, pre=pre, post=post)
+        op = self.operations[name] = FlowCmdOperation(cmd=cmd, pre=pre, post=post)
         if name in self._groups:
             raise KeyError("A group with this identifier already exists.")
-        self._groups[name] = FlowGroup(name, operations={name: op}, directives=kwargs)
+        self._groups[name] = FlowGroup(name,
+                                       operations={name: op},
+                                       operation_directives=dict(name=kwargs))
 
     @deprecated(
         deprecated_in="0.8", removed_in="0.10",
@@ -3349,8 +3367,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Gather all pending operations or generate them based on a direct command...
         with self._potentially_buffered():
             if args.cmd:
-                print("DeprecationWarning: --cmd option for script is deprecated as of 0.9 "
-                      "and will be removed in 0.11.", file=sys.stderr)
+                warnings.warn("The --cmd option for script is deprecated as of "
+                              "0.9 and will be removed in 0.11.",
+                              DeprecationWarning)
                 operations = self._generate_operations(args.cmd, jobs, args.requires)
             else:
                 names = args.operation_name if args.operation_name else None

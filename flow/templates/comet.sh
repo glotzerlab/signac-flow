@@ -32,7 +32,4 @@
 {% if account %}
 #SBATCH -A {{ account }}
 {% endif %}
-{% if memory %}
-#SBATCH --mem={{ memory }}G
-{% endif %}
 {% endblock %}

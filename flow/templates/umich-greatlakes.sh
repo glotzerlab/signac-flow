@@ -25,7 +25,4 @@
 {% if account %}
 #SBATCH --account={{ account }}
 {% endif %}
-{% if memory %}
-#SBATCH --mem={{ memory }}
-{% endif %}
 {% endblock %}

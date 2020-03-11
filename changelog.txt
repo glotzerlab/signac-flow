@@ -30,6 +30,7 @@ Changed
 - The option to provide the env argument to submit and submit_operations has been deprecated (#245).
 - The command line option ``--cmd`` for ``script`` has been deprecated and will trigger a ``DeprecationWarning`` upon use until removed (#243, #218).
 - Raises ValueError when --job-name passed by the user because that interferes with status checking (#164, #241).
+- Submitting with ``--memory`` no longer assumes a unit of gigabytes on Bridges and Comet clusters (#257).
 
 Removed
 +++++++

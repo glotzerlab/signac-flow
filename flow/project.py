@@ -1617,7 +1617,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         #                                     ignore_errors=ignore_errors,
         #                                     cached_status=cached_status)
 
-        def _get_job_status(self, *args, **kwargs): 
+        def _get_job_status(self, *args, **kwargs):
             return self.get_job_status(*args, ignore_errors=ignore_errors,
                                        cached_status=cached_status, **kwargs)
 
@@ -1630,7 +1630,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 with contextlib.closing(pool_) as pool:
                     try:
                         import pickle
-                        self._fetch_status_in_parallel(pool, pickle, jobs, no_parallelize, _get_job_status)
+                        self._fetch_status_in_parallel(
+                            pool, pickle, jobs, no_parallelize, _get_job_status, err)
                         logger.debug("Used cPickle module for serialization.")
                     except Exception as error:
                         if not isinstance(error, (pickle.PickleError, self._PickleError)) and\
@@ -1641,16 +1642,17 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                             import cloudpickle
                         except ImportError:  # The cloudpickle package is not available.
                             logger.error("Unable to parallelize execution due to a pickling error. "
-                                        "\n\n - Try to install the 'cloudpickle' package, e.g., with "
-                                        "'pip install cloudpickle'!\n")
+                                         "\n\n - Try to install the 'cloudpickle' package, "
+                                         "e.g., with 'pip install cloudpickle'!\n")
                             raise error
                         else:
                             try:
                                 self._fetch_status_in_parallel(
-                                    pool, cloudpickle, jobs, no_parallelize, _get_job_status)
+                                    pool, cloudpickle, jobs, no_parallelize, _get_job_status, err)
                             except self._PickleError as error:
-                                raise RuntimeError("Unable to parallelize execution due to a pickling "
-                                                "error: {}.".format(error))
+                                raise RuntimeError(
+                                    "Unable to parallelize execution due to a pickling "
+                                    "error: {}.".format(error))
             except RuntimeError as error:
                 if "can't start new thread" not in error.args:
                     raise   # unrelated error
@@ -1669,9 +1671,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 print('Collecting job status info: {}/{}'.format(i+1, num_jobs), file=err)
                 return statuses
 
-    def _fetch_status_in_parallel(self, pool, pickle, jobs, no_parallelize, _get_job_status):
+    def _fetch_status_in_parallel(self, pool, pickle, jobs, no_parallelize, _get_job_status, err):
         try:
-            s_project = pickle.dumps(self)
             s_get_status = pickle.dumps(_get_job_status)
             s_jobs = pickle.dumps(jobs)
         except Exception as error:  # Masking all errors since they must be pickling related.
@@ -1681,8 +1682,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # First attempt at parallelized status determination.
         # This may fail on systems that don't allow threads.
         return list(tqdm(
-            iterable=_map(pickle.loads(_get_job_status), pickle.loads(jobs)),
-            desc="Collecting job status info", total=len(jobs), file=err))      
+            iterable=_map(pickle.loads(s_get_status), pickle.loads(s_jobs)),
+            desc="Collecting job status info", total=len(jobs), file=err))
 
     PRINT_STATUS_ALL_VARYING_PARAMETERS = True
     """This constant can be used to signal that the print_status() method is supposed

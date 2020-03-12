@@ -1594,7 +1594,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         else:
             logger.info("Updated job status cache.")
 
-    def _fetch_status(self, jobs, err, ignore_errors, no_parallelize):
+    def _fetch_status(self, jobs, err, ignore_errors, no_parallelize, execute_ThreadPool=True):
         # Update the project's status cache
         self._fetch_scheduler_status(jobs, err, ignore_errors)
 
@@ -1619,7 +1619,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         with self._potentially_buffered():
             try:
-                with contextlib.closing(ThreadPool()) as pool:
+                if execute_ThreadPool:
+                    pool_ = ThreadPool()
+                else:
+                    pool_ = Pool()
+                with contextlib.closing(pool_) as pool:
                     _map = map if no_parallelize else pool.imap
                     # First attempt at parallelized status determination.
                     # This may fail on systems that don't allow threads.

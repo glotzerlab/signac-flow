@@ -1171,12 +1171,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         self._groups = dict()
         self._register_groups()
 
-        # Enable the use of buffered mode for certain functions
-        try:
-            self._use_buffered_mode = self.config['flow'].as_bool('use_buffered_mode')
-        except KeyError:
-            self._use_buffered_mode = False
-
     def _setup_template_environment(self):
         """Setup the jinja2 template environment.
 
@@ -2393,7 +2387,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @contextlib.contextmanager
     def _potentially_buffered(self):
-        if self._use_buffered_mode:
+        """Enable the use of buffered mode for certain functions."""
+        if self.config['flow'].as_bool('use_buffered_mode'):
             logger.debug("Entering buffered mode...")
             with signac.buffered():
                 yield

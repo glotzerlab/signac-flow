@@ -31,6 +31,7 @@ Changed
 - The command line option ``--cmd`` for ``script`` has been deprecated and will trigger a ``DeprecationWarning`` upon use until removed (#243, #218).
 - Raises ValueError when --job-name passed by the user because that interferes with status checking (#164, #241).
 - Submitting with ``--memory`` no longer assumes a unit of gigabytes on Bridges and Comet clusters (#257).
+- Buffering is enabled by default, improving the performance of status checks (#273).
 
 Removed
 +++++++

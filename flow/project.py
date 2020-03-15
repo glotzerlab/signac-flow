@@ -943,21 +943,19 @@ class FlowGroup(object):
             # get directives for operation
             op_dir = self._resolve_directives(name, default_directives, job)
             # Find the correct number of processors for operation
-            np = op_dir.get('np')
-
             if parallel:
                 # In general parallel means add resources
                 directives['ngpu'] += op_dir['ngpu']
                 directives['nranks'] += op_dir['nranks']
                 directives['omp_num_threads'] += op_dir['omp_num_threads']
-                directives['np'] += np
+                directives['np'] += op_dir['np']
             else:
                 # In serial we take the max
                 directives['ngpu'] = max(directives['ngpu'], op_dir['ngpu'])
                 directives['nranks'] = max(directives['nranks'], op_dir['nranks'])
                 directives['omp_num_threads'] = max(directives['omp_num_threads'],
                                                     op_dir['omp_num_threads'])
-                directives['np'] = max(directives['np'], np)
+                directives['np'] = max(directives['np'], op_dir['np'])
         return directives
 
 

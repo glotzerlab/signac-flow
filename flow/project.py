@@ -1594,7 +1594,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         else:
             logger.info("Updated job status cache.")
 
-    def _fetch_status(self, jobs, err, ignore_errors, no_parallelize, execute_ThreadPool=False):
+    def _fetch_status(self, jobs, err, ignore_errors, no_parallelize):
         # Update the project's status cache
         self._fetch_scheduler_status(jobs, err, ignore_errors)
 
@@ -1623,10 +1623,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         with self._potentially_buffered():
             try:
-                if execute_ThreadPool:
+                _parallel_nature=flow_config.get_config_value('parallel_nature')
+                if _parallel_nature=='thread':
                     pool_ = ThreadPool()
-                else:
+                elif _parallel_nature=='process':
                     pool_ = Pool()
+                else:
+                    raise RuntimeError(
+                        "Unable to parallize execution due to specified parallel_nature. "
+                        "You can configure it in your signac.rc file")
                 with contextlib.closing(pool_) as pool:
                     try:
                         import pickle

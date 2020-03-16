@@ -15,6 +15,7 @@ import_packaged_environments = boolean()
 status_performance_warn_threshold = float(default=0.2)
 show_traceback = boolean()
 eligible_jobs_max_lines = int(default=10)
+parallel_nature = str(default='thread')
 """
 
 

@@ -1613,51 +1613,59 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             cached_status = self.document['_status']._as_dict()
         except KeyError:
             cached_status = dict()
-        # _get_job_status = functools.partial(self.get_job_status,
-        #                                     ignore_errors=ignore_errors,
-        #                                     cached_status=cached_status)
 
-        def _get_job_status(self, *args, **kwargs):
-            return self.get_job_status(*args, ignore_errors=ignore_errors,
-                                       cached_status=cached_status, **kwargs)
+        _get_job_status = functools.partial(self.get_job_status,
+                                            ignore_errors=ignore_errors,
+                                            cached_status=cached_status)
 
         with self._potentially_buffered():
             try:
-                _parallel_nature=flow_config.get_config_value('parallel_nature')
-                if _parallel_nature=='thread':
-                    pool_ = ThreadPool()
+                # _parallel_nature=flow_config.get_config_value('parallel_nature')
+                _parallel_nature='process'
+                if _parallel_nature=='threads':
+                    with contextlib.closing(ThreadPool()) as pool:
+                        _map = map if no_parallelize else pool.imap
+                        # First attempt at parallelized status determination.
+                        # This may fail on systems that don't allow threads.
+                        return list(tqdm(
+                            iterable=_map(_get_job_status,jobs),
+                            desc="Collecting job status info", total=len(jobs), file=err))                    
                 elif _parallel_nature=='process':
-                    pool_ = Pool()
+                    with contextlib.closing(Pool()) as pool:
+                        try:
+                            import dill
+                            import cPickle
+                            results = self._fetch_status_in_parallel(
+                                pool, pickle, _get_job_status, jobs, no_parallelize)
+                            logger.debug("Used cPickle module for serialization.")
+                        except Exception as error:
+                            if not isinstance(error, (pickle.PickleError, self._PickleError)) and\
+                                    'pickle' not in str(error).lower():
+                                raise    # most likely not a pickle related error...
+
+                            try:
+                                import dill
+                                import cloudpickle
+                            except ImportError:  # The cloudpickle package is not available.
+                                logger.error("Unable to parallelize execution due to a pickling error. "
+                                            "\n\n - Try to install the 'cloudpickle' package, "
+                                            "e.g., with 'pip install cloudpickle'!\n")
+                                raise error
+                            else:
+                                try:
+                                    results = self._fetch_status_in_parallel(
+                                        pool, cloudpickle, _get_job_status, jobs, no_parallelize)
+                                except self._PickleError as error:
+                                    raise RuntimeError(
+                                        "Unable to parallelize execution due to a pickling "
+                                        "error: {}.".format(error))
+                        return list(tqdm(
+                            iterable=results,
+                            desc="Collecting job status info", total=len(jobs), file=err))
                 else:
                     raise RuntimeError(
                         "Unable to parallize execution due to specified parallel_nature. "
                         "You can configure it in your signac.rc file")
-                with contextlib.closing(pool_) as pool:
-                    try:
-                        import pickle
-                        self._fetch_status_in_parallel(
-                            pool, pickle, jobs, no_parallelize, _get_job_status, err)
-                        logger.debug("Used cPickle module for serialization.")
-                    except Exception as error:
-                        if not isinstance(error, (pickle.PickleError, self._PickleError)) and\
-                                'pickle' not in str(error).lower():
-                            raise    # most likely not a pickle related error...
-
-                        try:
-                            import cloudpickle
-                        except ImportError:  # The cloudpickle package is not available.
-                            logger.error("Unable to parallelize execution due to a pickling error. "
-                                         "\n\n - Try to install the 'cloudpickle' package, "
-                                         "e.g., with 'pip install cloudpickle'!\n")
-                            raise error
-                        else:
-                            try:
-                                self._fetch_status_in_parallel(
-                                    pool, cloudpickle, jobs, no_parallelize, _get_job_status, err)
-                            except self._PickleError as error:
-                                raise RuntimeError(
-                                    "Unable to parallelize execution due to a pickling "
-                                    "error: {}.".format(error))
             except RuntimeError as error:
                 if "can't start new thread" not in error.args:
                     raise   # unrelated error
@@ -1676,19 +1684,18 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 print('Collecting job status info: {}/{}'.format(i+1, num_jobs), file=err)
                 return statuses
 
-    def _fetch_status_in_parallel(self, pool, pickle, jobs, no_parallelize, _get_job_status, err):
+    def _fetch_status_in_parallel(self, pool, pickle, _get_job_status, jobs, no_parallelize):
         try:
-            s_get_status = pickle.dumps(_get_job_status)
-            s_jobs = pickle.dumps(jobs)
+            _map = map if no_parallelize else pool.imap
+            s_get_job_status = pickle._dumps(_get_job_status)
+            s_tasks = [(pickle.loads, s_get_job_status, job) for job in jobs]
         except Exception as error:  # Masking all errors since they must be pickling related.
-            raise self._PickleError(error)
+            # raise self._PickleError(error)
+            raise RuntimeError("Pickling is done with {}".format(pickle.__name__))
 
-        _map = map if no_parallelize else pool.imap
-        # First attempt at parallelized status determination.
-        # This may fail on systems that don't allow threads.
-        return list(tqdm(
-            iterable=_map(pickle.loads(s_get_status), pickle.loads(s_jobs)),
-            desc="Collecting job status info", total=len(jobs), file=err))
+        results = _map(_serialized_get_job_status, s_tasks)
+
+        return results
 
     PRINT_STATUS_ALL_VARYING_PARAMETERS = True
     """This constant can be used to signal that the print_status() method is supposed
@@ -3770,6 +3777,16 @@ def _execute_serialized_operation(loads, project, operation):
     """Invoke the _execute_operation() method on a serialized project instance."""
     project = loads(project)
     project._execute_operation(project._loads_op(operation))
+
+def _serialized_get_job_status(s_tasks):
+    """Invoke the _get_job_status() method on a serialized project instance."""
+    loads = s_tasks[0]
+    _get_job_status = loads(s_tasks[1])
+    job = s_tasks[2]
+    _get_job_status(job)
+    
+
+    
 
 
 # Status-related helper functions

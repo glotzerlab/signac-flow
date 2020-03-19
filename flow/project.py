@@ -1634,7 +1634,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     with contextlib.closing(Pool()) as pool:
                         try:
                             import dill
-                            import cPickle
+                            import pickle
                             results = self._fetch_status_in_parallel(
                                 pool, pickle, _get_job_status, jobs, no_parallelize)
                             logger.debug("Used cPickle module for serialization.")

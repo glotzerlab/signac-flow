@@ -9,6 +9,7 @@ import sys
 import inspect
 import subprocess
 import tempfile
+import collections.abc
 from contextlib import contextmanager, redirect_stdout, redirect_stderr
 from distutils.version import StrictVersion
 from io import StringIO
@@ -119,9 +120,20 @@ class TestProjectBase():
             name='FlowTestProject',
             root=self._tmp_dir.name)
 
-    def mock_project(self, project_class=None, heterogeneous=False):
+    def mock_project(self, project_class=None, heterogeneous=False, config_overrides=None):
         project_class = project_class if project_class else self.project_class
         project = project_class.get_project(root=self._tmp_dir.name)
+        if config_overrides is not None:
+            def recursive_update(d, u):
+                for k, v in u.items():
+                    if isinstance(v, collections.abc.Mapping):
+                        d[k] = recursive_update(d.get(k, {}), v)
+                    else:
+                        d[k] = v
+                return d
+            config = project.config.copy()
+            config = recursive_update(config, config_overrides)
+            project = project_class(config=config)
         for a in range(3):
             if heterogeneous:
                 # Add jobs with only the `a` key without `b`.
@@ -1061,12 +1073,12 @@ class TestExecutionProject(TestProjectBase):
                 assert evaluated == expected_evaluation
 
 
-class TestBufferedExecutionProject(TestExecutionProject):
+class TestUnbufferedExecutionProject(TestExecutionProject):
 
     def mock_project(self, project_class=None):
-        project = super(TestBufferedExecutionProject,
-                        self).mock_project(project_class=project_class)
-        project._use_buffered_mode = True
+        project = super(TestUnbufferedExecutionProject, self).mock_project(
+            project_class=project_class,
+            config_overrides={'flow': {'use_buffered_mode': 'off'}})
         return project
 
 
@@ -1075,8 +1087,8 @@ class TestExecutionDynamicProject(TestExecutionProject):
     expected_number_of_steps = 10
 
 
-class TestBufferedExecutionDynamicProject(TestBufferedExecutionProject,
-                                          TestExecutionDynamicProject):
+class TestUnbufferedExecutionDynamicProject(TestUnbufferedExecutionProject,
+                                            TestExecutionDynamicProject):
     pass
 
 
@@ -1418,12 +1430,9 @@ class TestGroupExecutionProject(TestProjectBase):
         assert i == self.expected_number_of_steps
 
 
-class TestGroupBufferedExecutionProject(TestGroupExecutionProject):
-
-    def mock_project(self):
-        project = super(TestGroupBufferedExecutionProject, self).mock_project()
-        project._use_buffered_mode = True
-        return project
+class TestGroupUnbufferedExecutionProject(TestUnbufferedExecutionProject,
+                                          TestGroupExecutionProject):
+    pass
 
 
 class TestGroupExecutionDynamicProject(TestGroupExecutionProject):
@@ -1431,8 +1440,8 @@ class TestGroupExecutionDynamicProject(TestGroupExecutionProject):
     expected_number_of_steps = 4
 
 
-class TestGroupBufferedExecutionDynamicProject(TestGroupBufferedExecutionProject,
-                                               TestGroupExecutionDynamicProject):
+class TestGroupUnbufferedExecutionDynamicProject(TestGroupUnbufferedExecutionProject,
+                                                 TestGroupExecutionDynamicProject):
     pass
 
 

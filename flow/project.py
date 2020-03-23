@@ -1620,9 +1620,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         with self._potentially_buffered():
             try:
-                _parallel_nature = flow_config.get_config_value('parallel_nature')
-                # _parallel_nature = 'process'
-                if _parallel_nature == 'threads':
+                status_parallelization = flow_config.get_config_value('status_parallelization')
+                # status_parallelization = 'process'
+                if status_parallelization == 'threads':
                     with contextlib.closing(ThreadPool()) as pool:
                         _map = map if no_parallelize else pool.imap
                         # First attempt at parallelized status determination.
@@ -1631,7 +1631,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         return list(tqdm(
                             iterable=results,
                             desc="Collecting job status info", total=len(jobs), file=err))
-                elif _parallel_nature == 'process':
+                elif status_parallelization == 'process':
                     with contextlib.closing(Pool()) as pool:
                         try:
                             import pickle
@@ -1661,7 +1661,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         return list(tqdm(
                             iterable=results,
                             desc="Collecting job status info", total=len(jobs), file=err))
-                elif _parallel_nature == None:
+                elif status_parallelization is None:
                     raise RuntimeError(
                         "Unable to parallize execution due to specified parallel_nature. "
                         "You can configure it in your signac.rc file")

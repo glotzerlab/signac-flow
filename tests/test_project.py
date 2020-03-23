@@ -576,10 +576,12 @@ class TestProject(TestProjectBase):
         project = self.mock_project()
         for job in project:
             labels = list(project.classify(job))
-            assert len(labels) == 2 - (job.sp.b % 2)
+            assert len(labels) == 3 - (job.sp.b % 2)
             assert all(isinstance(l, str) for l in labels)
             assert 'default_label' in labels
             assert 'negative_default_label' not in labels
+            assert 'named_label' in labels
+            assert 'anonymous_label' not in labels
 
     def test_next_operations(self):
         project = self.mock_project()

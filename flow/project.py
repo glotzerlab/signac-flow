@@ -2910,8 +2910,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         for label_func, label_name in self._label_functions.items():
             if label_name is None:
-                label_name = getattr(label, '_label_name',
-                                     getattr(label, '__name__', type(label).__name__))
+                label_name = getattr(label_func, '_label_name',
+                                     getattr(label_func, '__name__', type(label_func).__name__))
             try:
                 label_value = label_func(job)
             except TypeError:
@@ -2921,7 +2921,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     label_func = getattr(self, label.__func__.__name__)
                     label_value = label_func(job)
 
-            label_name = getattr(label_func, '_label_name', label_func.__name__)
             assert label_name is not None
             if isinstance(label_value, str):
                 yield label_value

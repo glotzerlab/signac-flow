@@ -32,6 +32,10 @@ Changed
 - Raises ValueError when --job-name passed by the user because that interferes with status checking (#164, #241).
 - Submitting with ``--memory`` no longer assumes a unit of gigabytes on Bridges and Comet clusters (#257).
 
+Fixed
++++++
+- Ensure that label names are used when displaying status (#263).
+
 Removed
 +++++++
 

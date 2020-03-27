@@ -19,6 +19,10 @@ cd {{ project.config.project_dir }}
 
 # {{ "%s"|format(operation) }}
 {{ operation.cmd }}{{ cmd_suffix }}
+# Expecting to run:
+{% for run_job_operation in operation.run_job_operations %}
+# {{ run_job_operation.cmd }}
+{% endfor %}
 {% endfor %}
 {% endblock %}
 {% block footer %}

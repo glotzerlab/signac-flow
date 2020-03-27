@@ -273,7 +273,7 @@ class JobOperation(object):
         :class:`dict`
     """
 
-    def __init__(self, id, name, job, cmd, directives=None):
+    def __init__(self, id, name, job, cmd, directives=None, run_job_operations=None):
         self._id = id
         self.name = name
         self.job = job
@@ -299,6 +299,11 @@ class JobOperation(object):
         self.directives = TrackGetItemDict(
             {key: value for key, value in directives.items()})
         self.directives._keys_set_by_user = keys_set_by_user
+
+        if run_job_operations is None:
+            self.run_job_operations = []
+        else:
+            self.run_job_operations = run_job_operations
 
     def __str__(self):
         return "{}({})".format(self.name, self.job)
@@ -898,11 +903,21 @@ class FlowGroup(object):
                                        ignore_conditions=ignore_conditions_on_execution,
                                        parallel=parallel)
         submission_directives = self._get_submission_directives(default_directives, job, parallel)
-        return JobOperation(self._generate_id(job, index=index),
-                            self.name,
-                            job,
-                            cmd=uneval_cmd,
-                            directives=submission_directives)
+        run_job_operations = self._create_run_job_operations(
+            entrypoint=entrypoint,
+            default_directives=default_directives,
+            job=job,
+            ignore_conditions=ignore_conditions_on_execution,
+        )
+        submission_job_operation = JobOperation(
+            self._generate_id(job, index=index),
+            self.name,
+            job,
+            cmd=uneval_cmd,
+            directives=submission_directives,
+            run_job_operations=list(run_job_operations)
+        )
+        return submission_job_operation
 
     def _create_run_job_operations(self, entrypoint, default_directives, job,
                                    ignore_conditions=IgnoreConditions.NONE, index=0):

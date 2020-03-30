@@ -320,7 +320,7 @@ class TestProjectClass(TestProjectBase):
         @A.operation
         @with_job
         def test_context(job):
-            assert os.getcwd() == job.ws
+            assert os.path.realpath(os.getcwd()) == os.path.realpath(job.ws)
 
         project = self.mock_project(A)
         with add_cwd_to_environment_pythonpath():

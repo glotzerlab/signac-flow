@@ -1171,12 +1171,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         self._groups = dict()
         self._register_groups()
 
-        # Enable the use of buffered mode for certain functions
-        try:
-            self._use_buffered_mode = self.config['flow'].as_bool('use_buffered_mode')
-        except KeyError:
-            self._use_buffered_mode = False
-
     def _setup_template_environment(self):
         """Setup the jinja2 template environment.
 
@@ -2446,7 +2440,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @contextlib.contextmanager
     def _potentially_buffered(self):
-        if self._use_buffered_mode:
+        """Enable the use of buffered mode for certain functions."""
+        if self.config['flow'].as_bool('use_buffered_mode'):
             logger.debug("Entering buffered mode...")
             with signac.buffered():
                 yield
@@ -2963,8 +2958,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         for label_func, label_name in self._label_functions.items():
             if label_name is None:
-                label_name = getattr(label, '_label_name',
-                                     getattr(label, '__name__', type(label).__name__))
+                label_name = getattr(label_func, '_label_name',
+                                     getattr(label_func, '__name__', type(label_func).__name__))
             try:
                 label_value = label_func(job)
             except TypeError:
@@ -2974,7 +2969,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     label_func = getattr(self, label.__func__.__name__)
                     label_value = label_func(job)
 
-            label_name = getattr(label_func, '_label_name', label_func.__name__)
             assert label_name is not None
             if isinstance(label_value, str):
                 yield label_value

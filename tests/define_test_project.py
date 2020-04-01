@@ -22,6 +22,11 @@ def negative_default_label(job):
     return False
 
 
+@_TestProject.label('named_label')
+def anonymous_label(job):
+    return True
+
+
 @_TestProject.label
 def b_is_even(job):
     try:

@@ -1594,10 +1594,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         else:
             logger.info("Updated job status cache.")
 
-    def _fetch_status(self, jobs, err, ignore_errors, no_parallelize):
+    def _fetch_status(self, jobs, err, ignore_errors):
         # Update the project's status cache
         self._fetch_scheduler_status(jobs, err, ignore_errors)
-
         # Get status dict for all selected jobs
         def _print_progress(x):
             print("Updating status: ", end='', file=err)
@@ -1621,6 +1620,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         with self._potentially_buffered():
             try:
                 status_parallelization = flow_config.get_config_value('status_parallelization')
+                no_parallelize = flow_config.get_config_value('no_parallelize')
                 # status_parallelization = 'process'
                 if status_parallelization == 'threads':
                     with contextlib.closing(ThreadPool()) as pool:
@@ -1663,7 +1663,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                             desc="Collecting job status info", total=len(jobs), file=err))
                 elif status_parallelization is None:
                     raise RuntimeError(
-                        "Unable to parallize execution due to specified parallel_nature. "
+                        "Unable to parallize execution due to specified status_parallelization. "
                         "You can configure it in your signac.rc file")
             except RuntimeError as error:
                 if "can't start new thread" not in error.args:
@@ -2562,7 +2562,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         else:
             warnings.warn("The env argument is deprecated as of 0.10 and will be removed in 0.12. "
                           "Instead, set the environment when constructing a FlowProject.",
-                          DeprecationWarning)
+                          UserWarning)
 
         print("Submitting cluster job '{}':".format(_id), file=sys.stderr)
 

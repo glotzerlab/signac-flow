@@ -281,38 +281,11 @@ class JobOperation(object):
         # script engine later.
         keys_set_by_user = set(directives)
 
-        nranks = directives.get('nranks', 1)
-        nthreads = directives.get('omp_num_threads', 1)
-
-        if callable(nranks) or callable(nthreads):
-            def np_callable(job):
-                nr = nranks(job) if callable(nranks) else nranks
-                nt = nthreads(job) if callable(nthreads) else nthreads
-                return nr*nt
-
-            directives.setdefault('np', np_callable)
-        else:
-            directives.setdefault('np', nranks*nthreads)
-
-        directives.setdefault('ngpu', 0)
-        directives.setdefault('nranks', 0)
-        directives.setdefault('omp_num_threads', 0)
-        directives.setdefault('processor_fraction', 1)
-
-        # Evaluate strings and callables for job:
-        def evaluate(value):
-            if value and callable(value):
-                return value(job)
-            elif isinstance(value, str):
-                return value.format(job=job)
-            else:
-                return value
-
         # We use a special dictionary that allows us to track all keys that have been
         # evaluated by the template engine and compare them to those explicitly set
         # by the user. See also comment above.
         self.directives = TrackGetItemDict(
-            {key: evaluate(value) for key, value in directives.items()})
+            {key: value for key, value in directives.items()})
         self.directives._keys_set_by_user = keys_set_by_user
 
     def __str__(self):
@@ -687,11 +660,37 @@ class FlowGroup(object):
         else:
             return "{} {}".format(entrypoint['executable'], entrypoint['path']).lstrip()
 
-    def _resolve_directives(self, name, defaults):
+    def _resolve_directives(self, name, defaults, job):
         if name in self.operation_directives:
-            return deepcopy(self.operation_directives[name])
+            directives = deepcopy(self.operation_directives[name])
         else:
-            return deepcopy(defaults.get(name, dict()))
+            directives = deepcopy(defaults.get(name, dict()))
+        nranks = directives.get('nranks', 1)
+        nthreads = directives.get('omp_num_threads', 1)
+        if callable(nranks) or callable(nthreads):
+            def np_callable(job):
+                nr = nranks(job) if callable(nranks) else nranks
+                nt = nthreads(job) if callable(nthreads) else nthreads
+                return nr*nt
+
+            directives.setdefault('np', np_callable)
+        else:
+            directives.setdefault('np', nranks*nthreads)
+
+        directives.setdefault('ngpu', 0)
+        directives.setdefault('nranks', 0)
+        directives.setdefault('omp_num_threads', 0)
+        directives.setdefault('processor_fraction', 1)
+
+        # Evaluate strings and callables for job:
+        def evaluate(value):
+            if value and callable(value):
+                return value(job)
+            elif isinstance(value, str):
+                return value.format(job=job)
+            else:
+                return value
+        return {key: evaluate(value) for key, value in directives.items()}
 
     def _submit_cmd(self, entrypoint, ignore_conditions, parallel, job=None):
         entrypoint = self._determine_entrypoint(entrypoint, dict(), job)
@@ -924,7 +923,7 @@ class FlowGroup(object):
         """
         for name, op in self.operations.items():
             if op.eligible(job, ignore_conditions):
-                directives = self._resolve_directives(name, default_directives)
+                directives = self._resolve_directives(name, default_directives, job)
                 uneval_cmd = functools.partial(self._run_cmd, entrypoint=entrypoint,
                                                operation_name=name, operation=op,
                                                directives=directives, job=job)
@@ -944,35 +943,23 @@ class FlowGroup(object):
         """
         directives = dict(ngpu=0, nranks=0, omp_num_threads=0, np=0)
 
-        def get_directive(directives, key, default, job):
-            d = directives.get(key, default)
-            return d(job) if callable(d) else d
-
         for name in self.operations:
             # get directives for operation
-            op_dir = self._resolve_directives(name, default_directives)
-            # if operations are callable handle appropriately with job
-            op_dir.update(dict(
-                ngpu=get_directive(op_dir, 'ngpu', 0, job),
-                nranks=get_directive(op_dir, 'nranks', 0, job),
-                omp_num_threads=get_directive(op_dir, 'omp_num_threads', 0, job)))
-
+            op_dir = self._resolve_directives(name, default_directives, job)
             # Find the correct number of processors for operation
-            np = op_dir.get('np', max(op_dir['nranks'], 1) * max(op_dir['omp_num_threads'], 1))
-
             if parallel:
                 # In general parallel means add resources
                 directives['ngpu'] += op_dir['ngpu']
                 directives['nranks'] += op_dir['nranks']
                 directives['omp_num_threads'] += op_dir['omp_num_threads']
-                directives['np'] += np
+                directives['np'] += op_dir['np']
             else:
                 # In serial we take the max
                 directives['ngpu'] = max(directives['ngpu'], op_dir['ngpu'])
                 directives['nranks'] = max(directives['nranks'], op_dir['nranks'])
                 directives['omp_num_threads'] = max(directives['omp_num_threads'],
                                                     op_dir['omp_num_threads'])
-                directives['np'] = max(directives['np'], np)
+                directives['np'] = max(directives['np'], op_dir['np'])
         return directives
 
 

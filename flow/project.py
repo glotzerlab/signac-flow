@@ -1667,7 +1667,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _fetch_status_in_parallel(self, pool, pickle, jobs, ignore_errors, cached_status):
         try:
             s_project = pickle.dumps(self)
-            s_tasks = [(pickle.loads, s_project, job.id, ignore_errors, cached_status)
+            s_tasks = [(pickle.loads, s_project, job.get_id(), ignore_errors, cached_status)
                        for job in jobs]
         except Exception as error:  # Masking all errors since they must be pickling related.
             raise self._PickleError(error)

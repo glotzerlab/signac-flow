@@ -281,38 +281,11 @@ class JobOperation(object):
         # script engine later.
         keys_set_by_user = set(directives)
 
-        nranks = directives.get('nranks', 1)
-        nthreads = directives.get('omp_num_threads', 1)
-
-        if callable(nranks) or callable(nthreads):
-            def np_callable(job):
-                nr = nranks(job) if callable(nranks) else nranks
-                nt = nthreads(job) if callable(nthreads) else nthreads
-                return nr*nt
-
-            directives.setdefault('np', np_callable)
-        else:
-            directives.setdefault('np', nranks*nthreads)
-
-        directives.setdefault('ngpu', 0)
-        directives.setdefault('nranks', 0)
-        directives.setdefault('omp_num_threads', 0)
-        directives.setdefault('processor_fraction', 1)
-
-        # Evaluate strings and callables for job:
-        def evaluate(value):
-            if value and callable(value):
-                return value(job)
-            elif isinstance(value, str):
-                return value.format(job=job)
-            else:
-                return value
-
         # We use a special dictionary that allows us to track all keys that have been
         # evaluated by the template engine and compare them to those explicitly set
         # by the user. See also comment above.
         self.directives = TrackGetItemDict(
-            {key: evaluate(value) for key, value in directives.items()})
+            {key: value for key, value in directives.items()})
         self.directives._keys_set_by_user = keys_set_by_user
 
     def __str__(self):
@@ -687,11 +660,37 @@ class FlowGroup(object):
         else:
             return "{} {}".format(entrypoint['executable'], entrypoint['path']).lstrip()
 
-    def _resolve_directives(self, name, defaults):
+    def _resolve_directives(self, name, defaults, job):
         if name in self.operation_directives:
-            return deepcopy(self.operation_directives[name])
+            directives = deepcopy(self.operation_directives[name])
         else:
-            return deepcopy(defaults.get(name, dict()))
+            directives = deepcopy(defaults.get(name, dict()))
+        nranks = directives.get('nranks', 1)
+        nthreads = directives.get('omp_num_threads', 1)
+        if callable(nranks) or callable(nthreads):
+            def np_callable(job):
+                nr = nranks(job) if callable(nranks) else nranks
+                nt = nthreads(job) if callable(nthreads) else nthreads
+                return nr*nt
+
+            directives.setdefault('np', np_callable)
+        else:
+            directives.setdefault('np', nranks*nthreads)
+
+        directives.setdefault('ngpu', 0)
+        directives.setdefault('nranks', 0)
+        directives.setdefault('omp_num_threads', 0)
+        directives.setdefault('processor_fraction', 1)
+
+        # Evaluate strings and callables for job:
+        def evaluate(value):
+            if value and callable(value):
+                return value(job)
+            elif isinstance(value, str):
+                return value.format(job=job)
+            else:
+                return value
+        return {key: evaluate(value) for key, value in directives.items()}
 
     def _submit_cmd(self, entrypoint, ignore_conditions, parallel, job=None):
         entrypoint = self._determine_entrypoint(entrypoint, dict(), job)
@@ -924,7 +923,7 @@ class FlowGroup(object):
         """
         for name, op in self.operations.items():
             if op.eligible(job, ignore_conditions):
-                directives = self._resolve_directives(name, default_directives)
+                directives = self._resolve_directives(name, default_directives, job)
                 uneval_cmd = functools.partial(self._run_cmd, entrypoint=entrypoint,
                                                operation_name=name, operation=op,
                                                directives=directives, job=job)
@@ -944,35 +943,23 @@ class FlowGroup(object):
         """
         directives = dict(ngpu=0, nranks=0, omp_num_threads=0, np=0)
 
-        def get_directive(directives, key, default, job):
-            d = directives.get(key, default)
-            return d(job) if callable(d) else d
-
         for name in self.operations:
             # get directives for operation
-            op_dir = self._resolve_directives(name, default_directives)
-            # if operations are callable handle appropriately with job
-            op_dir.update(dict(
-                ngpu=get_directive(op_dir, 'ngpu', 0, job),
-                nranks=get_directive(op_dir, 'nranks', 0, job),
-                omp_num_threads=get_directive(op_dir, 'omp_num_threads', 0, job)))
-
+            op_dir = self._resolve_directives(name, default_directives, job)
             # Find the correct number of processors for operation
-            np = op_dir.get('np', max(op_dir['nranks'], 1) * max(op_dir['omp_num_threads'], 1))
-
             if parallel:
                 # In general parallel means add resources
                 directives['ngpu'] += op_dir['ngpu']
                 directives['nranks'] += op_dir['nranks']
                 directives['omp_num_threads'] += op_dir['omp_num_threads']
-                directives['np'] += np
+                directives['np'] += op_dir['np']
             else:
                 # In serial we take the max
                 directives['ngpu'] = max(directives['ngpu'], op_dir['ngpu'])
                 directives['nranks'] = max(directives['nranks'], op_dir['nranks'])
                 directives['omp_num_threads'] = max(directives['omp_num_threads'],
                                                     op_dir['omp_num_threads'])
-                directives['np'] = max(directives['np'], np)
+                directives['np'] = max(directives['np'], op_dir['np'])
         return directives
 
 
@@ -1592,6 +1579,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Update the project's status cache
         self._fetch_scheduler_status(jobs, err, ignore_errors)
         # Get status dict for all selected jobs
+
         def _print_progress(x):
             print("Updating status: ", end='', file=err)
             err.flush()
@@ -1614,14 +1602,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         with self._potentially_buffered():
             try:
                 status_parallelization = flow_config.get_config_value('status_parallelization')
-                no_parallelize = flow_config.get_config_value('no_parallelize')
                 # status_parallelization = 'process'
-                if status_parallelization == 'threads':
+                if status_parallelization == 'thread':
                     with contextlib.closing(ThreadPool()) as pool:
-                        _map = map if no_parallelize else pool.imap
                         # First attempt at parallelized status determination.
                         # This may fail on systems that don't allow threads.
-                        results = _map(_get_job_status, jobs)
+                        results = pool.imap(_get_job_status, jobs)
                         return list(tqdm(
                             iterable=results,
                             desc="Collecting job status info", total=len(jobs), file=err))
@@ -1630,7 +1616,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         try:
                             import pickle
                             results = self._fetch_status_in_parallel(
-                                pool, pickle, _get_job_status, jobs, no_parallelize)
+                                pool, pickle, jobs, ignore_errors, cached_status)
                         except Exception as error:
                             if not isinstance(error, (pickle.PickleError, self._PickleError)) and\
                                     'pickle' not in str(error).lower():
@@ -1647,7 +1633,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                             else:
                                 try:
                                     results = self._fetch_status_in_parallel(
-                                        pool, cloudpickle, _get_job_status, jobs, no_parallelize)
+                                        pool, cloudpickle, jobs, ignore_errors, cached_status)
                                 except self._PickleError as error:
                                     raise RuntimeError(
                                         "Unable to parallelize execution due to a pickling "
@@ -1655,10 +1641,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         return list(tqdm(
                             iterable=results,
                             desc="Collecting job status info", total=len(jobs), file=err))
-                elif status_parallelization is None:
-                    raise RuntimeError(
-                        "Unable to parallize execution due to specified status_parallelization. "
-                        "You can configure it in your signac.rc file")
+                else:
+                    results = map(_get_job_status, jobs)
+                    return list(tqdm(
+                        iterable=results,
+                        desc="Collecting job status info", total=len(jobs), file=err))
             except RuntimeError as error:
                 if "can't start new thread" not in error.args:
                     raise   # unrelated error
@@ -1677,17 +1664,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 print('Collecting job status info: {}/{}'.format(i+1, num_jobs), file=err)
                 return statuses
 
-    def _fetch_status_in_parallel(self, pool, pickle, _get_job_status, jobs, no_parallelize):
+    def _fetch_status_in_parallel(self, pool, pickle, jobs, ignore_errors, cached_status):
         try:
-            _map = map if no_parallelize else pool.imap
-            s_get_job_status = pickle.dumps(_get_job_status)
-            s_tasks = [(pickle.loads, s_get_job_status, job)
-                       for job in tqdm(jobs, desc='Serialize tasks', file=sys.stderr)]
+            s_project = pickle.dumps(self)
+            s_tasks = [(pickle.loads, s_project, job, ignore_errors, cached_status)
+                       for job in jobs]
         except Exception as error:  # Masking all errors since they must be pickling related.
             raise self._PickleError(error)
             # raise RuntimeError("Pickling is done with {}".format(pickle.__name__))
 
-        results = _map(_serialized_get_job_status, s_tasks)
+        results = pool.imap(_serialized_get_job_status, s_tasks)
 
         return results
 
@@ -1830,7 +1816,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             ]
 
             with prof(single=False):
-                tmp = self._fetch_status(jobs, err, ignore_errors, no_parallelize)
+                tmp = self._fetch_status(jobs, err, ignore_errors)
 
             prof._mergeFileTiming()
 
@@ -1894,7 +1880,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     "results may be highly inaccurate.")
 
         else:
-            tmp = self._fetch_status(jobs, err, ignore_errors, no_parallelize)
+            tmp = self._fetch_status(jobs, err, ignore_errors)
             profiling_results = None
 
         operations_errors = {s['_operations_error'] for s in tmp}
@@ -3773,12 +3759,14 @@ def _execute_serialized_operation(loads, project, operation):
     project._execute_operation(project._loads_op(operation))
 
 
-def _serialized_get_job_status(s_tasks):
+def _serialized_get_job_status(s_task):
     """Invoke the _get_job_status() method on a serialized project instance."""
-    loads = s_tasks[0]
-    _get_job_status = loads(s_tasks[1])
-    job = s_tasks[2]
-    _get_job_status(job)
+    loads = s_task[0]
+    project = loads(s_task[1])
+    job = s_task[2]
+    ignore_errors = s_task[3]
+    cached_status = s_task[4]
+    return project.get_job_status(job, ignore_errors=ignore_errors, cached_status=cached_status)
 
 
 # Status-related helper functions

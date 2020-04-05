@@ -38,6 +38,10 @@ jobs:
           name: check-code-style
           command: |
             python -m flake8 --show-source .
+      - run:
+          name: check-doc-strings-style
+          command: |
+            pydocstyle
 
   test-3.8: &test-template
     environment:

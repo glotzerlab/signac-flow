@@ -1602,7 +1602,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         with self._potentially_buffered():
             try:
                 status_parallelization = flow_config.get_config_value('status_parallelization')
-                # status_parallelization = 'process'
+                status_parallelization = 'process'
                 if status_parallelization == 'thread':
                     with contextlib.closing(ThreadPool()) as pool:
                         # First attempt at parallelized status determination.
@@ -1667,7 +1667,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _fetch_status_in_parallel(self, pool, pickle, jobs, ignore_errors, cached_status):
         try:
             s_project = pickle.dumps(self)
-            s_tasks = [(pickle.loads, s_project, job, ignore_errors, cached_status)
+            s_tasks = [(pickle.loads, s_project, job.id, ignore_errors, cached_status)
                        for job in jobs]
         except Exception as error:  # Masking all errors since they must be pickling related.
             raise self._PickleError(error)
@@ -2023,7 +2023,17 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             context['op_counter'].append(('[{} more operations omitted]'.format(n), ''))
 
         status_renderer = StatusRenderer()
-        render_output = status_renderer.render(template, template_environment, context, detailed,
+        # We have to make a deep copy of the template environment if we're
+        # using a process Pool for parallelism. Somewhere in the process of
+        # manually pickling and dispatching tasks to individual processes
+        # Python's reference counter loses track of the environment and ends up
+        # destructing the template environment. This causes subsequent calls to
+        # print_status to fail (although _fetch_status calls will still
+        # succeed).
+        status_parallelization = flow_config.get_config_value('status_parallelization')
+        status_parallelization = "process"
+        te = deepcopy(template_environment) if status_parallelization == "process" else template_environment
+        render_output = status_renderer.render(template, te, context, detailed,
                                                expand, unroll, compact, output_format)
 
         print(render_output, file=file)
@@ -3763,7 +3773,7 @@ def _serialized_get_job_status(s_task):
     """Invoke the _get_job_status() method on a serialized project instance."""
     loads = s_task[0]
     project = loads(s_task[1])
-    job = s_task[2]
+    job = project.open_job(id=s_task[2])
     ignore_errors = s_task[3]
     cached_status = s_task[4]
     return project.get_job_status(job, ignore_errors=ignore_errors, cached_status=cached_status)

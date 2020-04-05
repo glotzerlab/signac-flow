@@ -2032,7 +2032,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # succeed).
         status_parallelization = flow_config.get_config_value('status_parallelization')
         status_parallelization = "process"
-        te = deepcopy(template_environment) if status_parallelization == "process" else template_environment
+        te = deepcopy(template_environment) if status_parallelization == "process" \
+            else template_environment
         render_output = status_renderer.render(template, te, context, detailed,
                                                expand, unroll, compact, output_format)
 

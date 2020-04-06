@@ -27,6 +27,9 @@ from .scheduling.simple_scheduler import SimpleScheduler
 from .scheduling.fakescheduler import FakeScheduler
 from .util import config as flow_config
 from .errors import NoSchedulerError
+from .directives import Directives
+from .directives import NP, NGPU, NRANKS, OMP_NUM_THREADS, WALLTIME, EXECUTABLE
+from .directives import PROCESS_FRACTION
 
 logger = logging.getLogger(__name__)
 
@@ -259,6 +262,12 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         # if cmd_prefix and if mpi_prefix for backwards compatibility
         # Can change to get them from directives for future
         return prefix
+
+    @classmethod
+    def get_default_directives(cls):
+        return Directives(
+            [NP, NGPU, NRANKS, OMP_NUM_THREADS,
+             EXECUTABLE, WALLTIME, PROCESS_FRACTION])
 
 
 class StandardEnvironment(ComputeEnvironment):

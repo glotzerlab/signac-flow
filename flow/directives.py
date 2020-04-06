@@ -145,6 +145,9 @@ class Directives(MutableMapping):
     def __str__(self):
         return str(dict(self))
 
+    def __repr__(self):
+        return "Directives({})".format(str(self))
+
     def update(self, other, aggregate=False, job=None, parallel=False):
         if aggregate:
             self._aggregate(other, job=job, parallel=parallel)
@@ -193,12 +196,12 @@ def _evaluate(value, job=None):
 
 
 def finalize_np(value, directives):
-    nranks = directives.get('nranks', 0)
-    omp_num_threads = directives.get('omp_num_threads', 0)
+    nranks = directives.get('nranks', 1)
+    omp_num_threads = directives.get('omp_num_threads', 1)
     if callable(nranks) or callable(omp_num_threads):
         return value
     else:
-        return max(value, nranks * omp_num_threads)
+        return max(value, max(1, nranks) * max(1, omp_num_threads))
 
 
 class OnlyType:

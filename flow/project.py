@@ -3183,8 +3183,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if hasattr(func, '_flow_groups'):
                 op_directives = getattr(func, '_flow_group_operation_directives', dict())
                 for group_name in func._flow_groups:
-                    directives = self._environment.get_default_directives()
-                    directives.update(op_directives.get(group_name, dict()))
+                    raw_directives = op_directives.get(group_name)
+                    if raw_directives is not None:
+                        directives = self._environment.get_default_directives()
+                        directives.update(raw_directives)
+                    else:
+                        directives = None
                     self._groups[group_name].add_operation(
                         op_name, op, directives)
 

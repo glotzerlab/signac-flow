@@ -1602,7 +1602,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         with self._potentially_buffered():
             try:
                 status_parallelization = flow_config.get_config_value('status_parallelization')
-                status_parallelization = 'process'
                 if status_parallelization == 'thread':
                     with contextlib.closing(ThreadPool()) as pool:
                         # First attempt at parallelized status determination.
@@ -2031,7 +2030,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # print_status to fail (although _fetch_status calls will still
         # succeed).
         status_parallelization = flow_config.get_config_value('status_parallelization')
-        status_parallelization = "process"
         te = deepcopy(template_environment) if status_parallelization == "process" \
             else template_environment
         render_output = status_renderer.render(template, te, context, detailed,

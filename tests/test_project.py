@@ -703,6 +703,26 @@ class TestProject(TestProjectBase):
         self.mock_project(project_class=B).detect_operation_graph()
 
 
+class TestProcessProject(TestProject):
+
+    def mock_project(self, project_class=None, heterogeneous=False):
+        project = super(TestProcessProject, self).mock_project(
+            project_class=project_class,
+            heterogeneous=heterogeneous,
+            config_overrides={'flow': {'status_parallelization': 'process'}})
+        return project
+
+
+class TestConcurrentProject(TestProject):
+
+    def mock_project(self, project_class=None, heterogeneous=False):
+        project = super(TestConcurrentProject, self).mock_project(
+            project_class=project_class,
+            heterogeneous=heterogeneous,
+            config_overrides={'flow': {'status_parallelization': 'none'}})
+        return project
+
+
 class TestExecutionProject(TestProjectBase):
     project_class = _TestProject
     expected_number_of_steps = 4

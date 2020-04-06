@@ -660,37 +660,11 @@ class FlowGroup(object):
         else:
             return "{} {}".format(entrypoint['executable'], entrypoint['path']).lstrip()
 
-    def _resolve_directives(self, name, defaults, job):
+    def _resolve_directives(self, name, defaults):
         if name in self.operation_directives:
-            directives = deepcopy(self.operation_directives[name])
+            return deepcopy(self.operation_directives[name])
         else:
-            directives = deepcopy(defaults.get(name, dict()))
-        nranks = directives.get('nranks', 1)
-        nthreads = directives.get('omp_num_threads', 1)
-        if callable(nranks) or callable(nthreads):
-            def np_callable(job):
-                nr = nranks(job) if callable(nranks) else nranks
-                nt = nthreads(job) if callable(nthreads) else nthreads
-                return nr*nt
-
-            directives.setdefault('np', np_callable)
-        else:
-            directives.setdefault('np', nranks*nthreads)
-
-        directives.setdefault('ngpu', 0)
-        directives.setdefault('nranks', 0)
-        directives.setdefault('omp_num_threads', 0)
-        directives.setdefault('processor_fraction', 1)
-
-        # Evaluate strings and callables for job:
-        def evaluate(value):
-            if value and callable(value):
-                return value(job)
-            elif isinstance(value, str):
-                return value.format(job=job)
-            else:
-                return value
-        return {key: evaluate(value) for key, value in directives.items()}
+            return deepcopy(defaults.get(name, dict()))
 
     def _submit_cmd(self, entrypoint, ignore_conditions, parallel, job=None):
         entrypoint = self._determine_entrypoint(entrypoint, dict(), job)
@@ -923,7 +897,8 @@ class FlowGroup(object):
         """
         for name, op in self.operations.items():
             if op.eligible(job, ignore_conditions):
-                directives = self._resolve_directives(name, default_directives, job)
+                directives = self._resolve_directives(name, default_directives)
+                directives.evaluate(job)
                 uneval_cmd = functools.partial(self._run_cmd, entrypoint=entrypoint,
                                                operation_name=name, operation=op,
                                                directives=directives, job=job)
@@ -941,25 +916,13 @@ class FlowGroup(object):
         No checks are done to mitigate inappropriate aggregation of operations.
         This can lead to poor utilization of computing resources.
         """
-        directives = dict(ngpu=0, nranks=0, omp_num_threads=0, np=0)
-
-        for name in self.operations:
+        op_names = list(self.operations)
+        directives = self._resolve_directives(op_names[0], default_directives)
+        for name in op_names[1:]:
             # get directives for operation
-            op_dir = self._resolve_directives(name, default_directives, job)
-            # Find the correct number of processors for operation
-            if parallel:
-                # In general parallel means add resources
-                directives['ngpu'] += op_dir['ngpu']
-                directives['nranks'] += op_dir['nranks']
-                directives['omp_num_threads'] += op_dir['omp_num_threads']
-                directives['np'] += op_dir['np']
-            else:
-                # In serial we take the max
-                directives['ngpu'] = max(directives['ngpu'], op_dir['ngpu'])
-                directives['nranks'] = max(directives['nranks'], op_dir['nranks'])
-                directives['omp_num_threads'] = max(directives['omp_num_threads'],
-                                                    op_dir['omp_num_threads'])
-                directives['np'] = max(directives['np'], op_dir['np'])
+            directives.update(self._resolve_directives(name,
+                                                       default_directives),
+                              aggregate=True, job=job, parallel=parallel)
         return directives
 
 
@@ -3218,15 +3181,17 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 func = self._operation_functions[op_name]
 
             if hasattr(func, '_flow_groups'):
-                operation_directives = getattr(func, '_flow_group_operation_directives', dict())
+                op_directives = getattr(func, '_flow_group_operation_directives', dict())
                 for group_name in func._flow_groups:
+                    directives = self._environment.get_default_directives()
+                    directives.update(op_directives.get(group_name, dict()))
                     self._groups[group_name].add_operation(
-                        op_name, op, operation_directives.get(group_name, None))
+                        op_name, op, directives)
 
             # For singleton groups add directives
-            self._groups[op_name].operation_directives[op_name] = getattr(func,
-                                                                          '_flow_directives',
-                                                                          dict())
+            directives = self._environment.get_default_directives()
+            directives.update(getattr(func, '_flow_directives', dict()))
+            self._groups[op_name].operation_directives[op_name] = directives
 
     @property
     def operations(self):

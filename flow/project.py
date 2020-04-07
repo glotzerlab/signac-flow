@@ -44,6 +44,7 @@ import signac
 from signac.contrib.hashing import calc_id
 from signac.contrib.filterparse import parse_filter_arg
 from signac.contrib.project import JobsCursor
+from signac.common.config import get_config
 
 from enum import IntEnum
 
@@ -1601,7 +1602,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         with self._potentially_buffered():
             try:
-                status_parallelization = flow_config.get_config_value('status_parallelization')
+                status_parallelization = self.config.get('flow').get('status_parallelization')
                 if status_parallelization == 'thread':
                     with contextlib.closing(ThreadPool()) as pool:
                         # First attempt at parallelized status determination.
@@ -2029,7 +2030,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # destructing the template environment. This causes subsequent calls to
         # print_status to fail (although _fetch_status calls will still
         # succeed).
-        status_parallelization = flow_config.get_config_value('status_parallelization')
+        status_parallelization = self.config.get('flow').get('status_parallelization')
         te = deepcopy(template_environment) if status_parallelization == "process" \
             else template_environment
         render_output = status_renderer.render(template, te, context, detailed,
@@ -2552,7 +2553,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         else:
             warnings.warn("The env argument is deprecated as of 0.10 and will be removed in 0.12. "
                           "Instead, set the environment when constructing a FlowProject.",
-                          UserWarning)
+                          DeprecationWarning)
 
         print("Submitting cluster job '{}':".format(_id), file=sys.stderr)
 

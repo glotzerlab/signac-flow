@@ -44,7 +44,6 @@ import signac
 from signac.contrib.hashing import calc_id
 from signac.contrib.filterparse import parse_filter_arg
 from signac.contrib.project import JobsCursor
-from signac.common.config import get_config
 
 from enum import IntEnum
 

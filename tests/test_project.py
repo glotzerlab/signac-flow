@@ -627,6 +627,22 @@ class TestProject(TestProjectBase):
                 with redirect_stderr(StringIO()):
                     project.print_status(parameters=parameters, detailed=True)
 
+    def test_concurrent_project_status_homogeneous_schema(self):
+        project = self.mock_project(config_overrides={'flow': {'status_parallelization': 'none'}})
+        for parameters in (None, True, ['a'], ['b'], ['a', 'b']):
+            with redirect_stdout(StringIO()):
+                with redirect_stderr(StringIO()):
+                    project.print_status(parameters=parameters, detailed=True)
+
+    def test_process_project_status_homogeneous_schema(self):
+        project = self.mock_project(
+                       config_overrides={'flow': {'status_parallelization': 'process'}}
+                       )
+        for parameters in (None, True, ['a'], ['b'], ['a', 'b']):
+            with redirect_stdout(StringIO()):
+                with redirect_stderr(StringIO()):
+                    project.print_status(parameters=parameters, detailed=True)
+
     def test_project_status_heterogeneous_schema(self):
         project = self.mock_project(heterogeneous=True)
         for parameters in (None, True, ['a'], ['b'], ['a', 'b']):
@@ -701,26 +717,6 @@ class TestProject(TestProjectBase):
             job.doc.a = True
 
         self.mock_project(project_class=B).detect_operation_graph()
-
-
-class TestProcessProject(TestProject):
-
-    def mock_project(self, project_class=None, heterogeneous=False):
-        project = super(TestProcessProject, self).mock_project(
-            project_class=project_class,
-            heterogeneous=heterogeneous,
-            config_overrides={'flow': {'status_parallelization': 'process'}})
-        return project
-
-
-class TestConcurrentProject(TestProject):
-
-    def mock_project(self, project_class=None, heterogeneous=False):
-        project = super(TestConcurrentProject, self).mock_project(
-            project_class=project_class,
-            heterogeneous=heterogeneous,
-            config_overrides={'flow': {'status_parallelization': 'none'}})
-        return project
 
 
 class TestExecutionProject(TestProjectBase):

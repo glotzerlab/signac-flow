@@ -62,17 +62,6 @@ class _DirectivesItem:
         else:
             return self.validation(value)
 
-    def _validate(self, value):
-        if not isinstance(value, self.type):
-            try:
-                return self.type(value)
-            except Exception:
-                raise TypeError("Expected something of type {0} or "
-                                "convertable to {0}. Received {1} of type {2}"
-                                "".format(self.type, value, type(value)))
-        else:
-            return value
-
 
 class Directives(MutableMapping):
     """Class that maps environment and user specified objects for execution.

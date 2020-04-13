@@ -12,6 +12,8 @@ from . import environment
 from . import scheduling
 from . import errors
 from . import testing
+from .directives import _DirectivesItem
+from .directives import Directives
 from .project import IgnoreConditions
 from .project import FlowProject
 from .project import JobOperation
@@ -52,4 +54,6 @@ __all__ = [
     'redirect_log',
     'with_job',
     '__version__',
+    'Directives',
+    '_DirectivesItem',
     ]

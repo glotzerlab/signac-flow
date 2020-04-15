@@ -52,8 +52,4 @@ __all__ = [
     'redirect_log',
     'with_job',
     '__version__',
-    'Directives',
-    '_DirectivesItem',
-    'OnlyType',
-    'directives_module',
     ]

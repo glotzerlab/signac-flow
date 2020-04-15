@@ -12,7 +12,6 @@ from . import environment
 from . import scheduling
 from . import errors
 from . import testing
-from .directives import Directives, _DirectivesItem, OnlyType
 from .project import IgnoreConditions
 from .project import FlowProject
 from .project import JobOperation
@@ -56,4 +55,5 @@ __all__ = [
     'Directives',
     '_DirectivesItem',
     'OnlyType',
+    'directives_module',
     ]

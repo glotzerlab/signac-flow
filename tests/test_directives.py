@@ -3,7 +3,7 @@
 # This software is licensed under the BSD 3-Clause License.
 import sys
 
-from flow import Directives, _DirectivesItem, OnlyType
+from flow import Directives, _DirectivesItem, OnlyType, directive_module
 
 
 def raise_if_too_small(value):

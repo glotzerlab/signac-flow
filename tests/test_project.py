@@ -643,6 +643,18 @@ class TestProject(TestProjectBase):
                 with redirect_stderr(StringIO()):
                     project.print_status(parameters=parameters, detailed=True)
 
+    def test_invalid_project_status_homogeneous_schema(self):
+        project = self.mock_project(
+                       config_overrides={'flow': {'status_parallelization': 'invalid'}}
+                       )
+        try:
+            for parameters in (None, True, ['a'], ['b'], ['a', 'b']):
+                with redirect_stdout(StringIO()):
+                    with redirect_stderr(StringIO()):
+                        project.print_status(parameters=parameters, detailed=True)
+        except Exception as err:
+            assert 'status_parallelization is invalid' in repr(err)
+
     def test_project_status_heterogeneous_schema(self):
         project = self.mock_project(heterogeneous=True)
         for parameters in (None, True, ['a'], ['b'], ['a', 'b']):

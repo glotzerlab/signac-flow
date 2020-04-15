@@ -1640,11 +1640,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         return list(tqdm(
                             iterable=results,
                             desc="Collecting job status info", total=len(jobs), file=err))
-                else:
+                elif status_parallelization == 'none':
                     results = map(_get_job_status, jobs)
                     return list(tqdm(
                         iterable=results,
                         desc="Collecting job status info", total=len(jobs), file=err))
+                else:
+                    raise RuntimeError("Configuration value status_parallelization is invalid. "
+                                       "You can set it to 'thread', 'parallel', 'none'"
+                                       )
             except RuntimeError as error:
                 if "can't start new thread" not in error.args:
                     raise   # unrelated error
@@ -1670,7 +1674,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                        for job in jobs]
         except Exception as error:  # Masking all errors since they must be pickling related.
             raise self._PickleError(error)
-            # raise RuntimeError("Pickling is done with {}".format(pickle.__name__))
 
         results = pool.imap(_serialized_get_job_status, s_tasks)
 

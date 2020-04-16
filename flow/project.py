@@ -1575,7 +1575,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         else:
             logger.info("Updated job status cache.")
 
-    def _fetch_status(self, jobs, err, ignore_errors):
+    def _fetch_status(self, jobs, err, ignore_errors, status_parallelization='none'):
         # Update the project's status cache
         self._fetch_scheduler_status(jobs, err, ignore_errors)
         # Get status dict for all selected jobs
@@ -1601,7 +1601,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         with self._potentially_buffered():
             try:
-                status_parallelization = self.config.get('flow').get('status_parallelization')
                 if status_parallelization == 'thread':
                     with contextlib.closing(ThreadPool()) as pool:
                         # First attempt at parallelized status determination.
@@ -1647,7 +1646,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         desc="Collecting job status info", total=len(jobs), file=err))
                 else:
                     raise RuntimeError("Configuration value status_parallelization is invalid. "
-                                       "You can set it to 'thread', 'parallel', 'none'"
+                                       "You can set it to 'thread', 'parallel', or 'none'"
                                        )
             except RuntimeError as error:
                 if "can't start new thread" not in error.args:
@@ -1758,10 +1757,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Print status even if querying the scheduler fails.
         :type ignore_errors:
             bool
-        :param no_parallelize:
-            Do not parallelize the status update.
-        :type no_parallelize:
-            bool
         :param template:
             User provided Jinja2 template file.
         :type template:
@@ -1794,6 +1789,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if eligible_jobs_max_lines is None:
             eligible_jobs_max_lines = flow_config.get_config_value('eligible_jobs_max_lines')
 
+        status_parallelization = self.config.get('flow').get('status_parallelization')
+
+        if no_parallelize:
+            warnings.warn(
+                "The no_parallelize argument is deprecated as of 0.10 "
+                "and will be removed in 0.12. "
+                "Instead, set the status_parallelization configuration value as none.",
+                DeprecationWarning)
+            status_parallelization = 'none'
+
         # initialize jinja2 template environment and necessary filters
         template_environment = self._template_environment()
 
@@ -1818,7 +1823,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             ]
 
             with prof(single=False):
-                tmp = self._fetch_status(jobs, err, ignore_errors)
+                tmp = self._fetch_status(jobs, err, ignore_errors, status_parallelization)
 
             prof._mergeFileTiming()
 
@@ -1882,7 +1887,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     "results may be highly inaccurate.")
 
         else:
-            tmp = self._fetch_status(jobs, err, ignore_errors)
+            tmp = self._fetch_status(jobs, err, ignore_errors, status_parallelization)
             profiling_results = None
 
         operations_errors = {s['_operations_error'] for s in tmp}
@@ -2032,7 +2037,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # destructing the template environment. This causes subsequent calls to
         # print_status to fail (although _fetch_status calls will still
         # succeed).
-        status_parallelization = self.config.get('flow').get('status_parallelization')
         te = deepcopy(template_environment) if status_parallelization == "process" \
             else template_environment
         render_output = status_renderer.render(template, te, context, detailed,

@@ -2608,6 +2608,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Gather all pending operations.
         default_directives = self._get_default_directives()
+        names = args.operation_name if args.operation_name else None
         with self._potentially_buffered():
             operations = self._get_submission_operations(jobs, default_directives, names, parallel,
                                                          ignore_conditions,
@@ -2622,8 +2623,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 force=force, walltime=walltime, **kwargs)
 
             if status is not None:  # operations were submitted, store status
-                for op in bundle:
-                    op.set_status(status)
+                for operations in bundle:
+                    operations.set_status(status)
 
     @classmethod
     def _add_submit_args(cls, parser):
@@ -3366,6 +3367,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             template=args.template, show_template_help=args.show_template_help))
 
     def _main_submit(self, args):
+        "Submit jobs to a scheduler"
         if args.test:
             args.pretend = True
         kwargs = vars(args)
@@ -3377,20 +3379,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if not args.test:
             self._fetch_scheduler_status(jobs)
 
-        # Gather all pending operations ...
-        with self._potentially_buffered():
-            names = args.operation_name if args.operation_name else None
-            default_directives = self._get_default_directives()
-            operations = self._get_submission_operations(jobs, default_directives, names,
-                                                         args.parallel, args.ignore_conditions,
-                                                         args.ignore_conditions_on_execution)
-        operations = list(islice(operations, args.num))
-        # Bundle operations up, generate the script, and submit to scheduler.
-        for bundle in make_bundles(operations, args.bundle_size):
-            status = self.submit_operations(operations=bundle, **kwargs)
-            if status is not None:
-                for operations in bundle:
-                    operations.set_status(status)
+        submit(jobs=jobs, **kwargs)
 
     def _main_exec(self, args):
         if len(args.jobid):

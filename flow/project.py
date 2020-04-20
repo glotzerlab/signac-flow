@@ -1408,10 +1408,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     ALIASES = dict(
         unknown='U',
         registered='R',
+        inactive='I',
+        submitted='S',
+        held='H',
         queued='Q',
         active='A',
-        inactive='I',
-        requires_attention='!'
+        error='E'
     )
     "These are default aliases used within the status output."
 

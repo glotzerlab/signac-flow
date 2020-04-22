@@ -98,6 +98,18 @@ For example: {{{{ project.get_id() | capitalize }}}}.
 The available filters are:
 {filters}"""
 
+_FMT_SCHEDULER_STATUS = {
+    JobStatus.unknown: 'U',
+    JobStatus.registered: 'R',
+    JobStatus.inactive: 'I',
+    JobStatus.submitted: 'S',
+    JobStatus.held: 'H',
+    JobStatus.queued: 'Q',
+    JobStatus.active: 'A',
+    JobStatus.error: 'E',
+    JobStatus.dummy: ' ',
+}
+
 
 class IgnoreConditions(IntEnum):
     """Flags that determine which conditions are used to determine job eligibility.
@@ -1405,16 +1417,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for cls in type(self).__mro__:
             self._label_functions.update(getattr(cls, '_LABEL_FUNCTIONS', dict()))
 
-    ALIASES = dict(
-        unknown='U',
-        registered='R',
-        inactive='I',
-        submitted='S',
-        held='H',
-        queued='Q',
-        active='A',
-        error='E'
-    )
+    ALIASES = {str(status).replace('JobStatus.', ''): symbol
+               for status, symbol in _FMT_SCHEDULER_STATUS.items() if status != JobStatus.dummy}
     "These are default aliases used within the status output."
 
     @classmethod
@@ -3710,19 +3714,6 @@ def _execute_serialized_operation(loads, project, operation):
 
 
 # Status-related helper functions
-
-
-_FMT_SCHEDULER_STATUS = {
-    JobStatus.unknown: 'U',
-    JobStatus.registered: 'R',
-    JobStatus.inactive: 'I',
-    JobStatus.submitted: 'S',
-    JobStatus.held: 'H',
-    JobStatus.queued: 'Q',
-    JobStatus.active: 'A',
-    JobStatus.error: 'E',
-    JobStatus.dummy: ' ',
-}
 
 
 def _update_status(args):

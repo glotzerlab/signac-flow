@@ -74,7 +74,7 @@ class TestDirectives:
     """
     Tests for Directives Class
     """
-    def test_init_directives(self, setUp):
+    def test_get_directives(self, setUp):
         directives = setUp(available_directives_list=available_directives_list)
         for item in available_directives_list:
             assert directives[item.name] == item.default
@@ -88,13 +88,31 @@ class TestDirectives:
         with pytest.raises(ValueError):
             directives._add_directive(NP)
 
+    def test_set_directives(self, setUp):
+        directives = setUp(available_directives_list=available_directives_list[:-1])
+        directives[OMP_NUM_THREADS.name] = OMP_NUM_THREADS.default
+        assert directives[OMP_NUM_THREADS.name] == OMP_NUM_THREADS.default
+
     def test_define_directive(self, setUp):
         directives = setUp(available_directives_list=available_directives_list[:-1])
-        valid_values = [100, 100, 100, 100]
-        invalid_values = [0, -1, -1, -1]
-        for idx, dir in enumerate(available_directives_list):
+        # The values below corresponds to NP, NRANKS, NGPU, EXECUTABLE.
+        valid_values = [100, 100, 100, 'My String']
+        invalid_values = [0, -1, -1, [0]]
+        for idx, dir in enumerate(available_directives_list[:-1]):
             directives._set_defined_directive(dir.name, valid_values[idx])
             assert directives[dir.name] == valid_values[idx]
-        for dir in enumerate(available_directives_list):
+        for idx, dir in enumerate(available_directives_list):
             with pytest.raises(ValueError):
                 directives._set_defined_directive(dir.name, invalid_values[idx])
+
+    def test_del_directive(self, setUp):
+        directives = setUp(available_directives_list=available_directives_list[:-1])
+        directives[OMP_NUM_THREADS.name] = OMP_NUM_THREADS.default
+        directives._set_defined_directive(NP.name, 100)
+        assert directives[NP.name] == 100
+        assert directives[OMP_NUM_THREADS.name] == OMP_NUM_THREADS.default
+        del directives[NP.name]
+        assert directives[NP.name] == NP.default
+        del directives[OMP_NUM_THREADS.name]
+        with pytest.raises(KeyError):
+            directives[OMP_NUM_THREADS.name]

@@ -358,9 +358,9 @@ class JobOperation(object):
 class SubmissionJobOperation(JobOperation):
     R"""This class represents the information needed to submit one group for one job.
 
-    This class extends :py:class:`JobOperation` to include data known at submission
-    time, specifically a set of operations/groups that will be executed via the "run"
-    command.
+    This class extends :py:class:`JobOperation` to include a set of groups
+    that will be executed via the "run" command. These groups are known at
+    submission time.
 
     :param \*args:
         Passed to the constructor of :py:class:`JobOperation`.

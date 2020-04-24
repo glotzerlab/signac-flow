@@ -364,22 +364,49 @@ class SubmissionJobOperation(JobOperation):
 
     :param \*args:
         Passed to the constructor of :py:class:`JobOperation`.
-    :param run_job_operations:
-        A list of :py:class:`JobOperation` that will be executed when this submitted
-        job is executed.
-    :type run_job_operations:
+    :param eligible_operations:
+        A list of :py:class:`JobOperation` that will be executed when this
+        submitted job is executed.
+    :type eligible_operations:
+        list
+    :param operations_with_unmet_preconditions:
+        A list of :py:class:`JobOperation` that will not be executed due to
+        unmet preconditions.
+    :type operations_with_unmet_preconditions:
+        list
+    :param operations_with_met_postconditions:
+        A list of :py:class:`JobOperation` that will not be executed due to
+        all postconditions being met.
+    :type operations_with_met_postconditions:
         list
     :param \*\*kwargs:
         Passed to the constructor of :py:class:`JobOperation`.
     """
 
-    def __init__(self, *args, run_job_operations=None, **kwargs):
+    def __init__(
+        self,
+        *args,
+        eligible_operations=None,
+        operations_with_unmet_preconditions=None,
+        operations_with_met_postconditions=None,
+        **kwargs
+    ):
         super(SubmissionJobOperation, self).__init__(*args, **kwargs)
 
-        if run_job_operations is None:
-            self.run_job_operations = []
+        if eligible_operations is None:
+            self.eligible_operations = []
         else:
-            self.run_job_operations = run_job_operations
+            self.eligible_operations = eligible_operations
+
+        if operations_with_unmet_preconditions is None:
+            self.operations_with_unmet_preconditions = []
+        else:
+            self.operations_with_unmet_preconditions = operations_with_unmet_preconditions
+
+        if operations_with_met_postconditions is None:
+            self.operations_with_met_postconditions = []
+        else:
+            self.operations_with_met_postconditions = operations_with_met_postconditions
 
 
 class FlowCondition(object):
@@ -930,19 +957,39 @@ class FlowGroup(object):
                                        ignore_conditions=ignore_conditions_on_execution,
                                        parallel=parallel)
         submission_directives = self._get_submission_directives(default_directives, job, parallel)
-        run_job_operations = self._create_run_job_operations(
+        eligible_operations = list(self._create_run_job_operations(
             entrypoint=entrypoint,
             default_directives=default_directives,
             job=job,
             ignore_conditions=ignore_conditions_on_execution,
+        ))
+        operations_with_unmet_preconditions = self._create_run_job_operations(
+            entrypoint=entrypoint,
+            default_directives=default_directives,
+            job=job,
+            ignore_conditions=IgnoreConditions(
+                ignore_conditions_on_execution | IgnoreConditions.PRE)
         )
+        operations_with_unmet_preconditions = \
+            set(operations_with_unmet_preconditions) - set(eligible_operations)
+        operations_with_met_postconditions = self._create_run_job_operations(
+            entrypoint=entrypoint,
+            default_directives=default_directives,
+            job=job,
+            ignore_conditions=IgnoreConditions(
+                ignore_conditions_on_execution | IgnoreConditions.POST)
+        )
+        operations_with_met_postconditions = \
+            set(operations_with_met_postconditions) - set(eligible_operations)
         submission_job_operation = SubmissionJobOperation(
             self._generate_id(job, index=index),
             self.name,
             job,
             cmd=uneval_cmd,
             directives=submission_directives,
-            run_job_operations=list(run_job_operations)
+            eligible_operations=list(eligible_operations),
+            operations_with_unmet_preconditions=list(operations_with_unmet_preconditions),
+            operations_with_met_postconditions=list(operations_with_met_postconditions),
         )
         return submission_job_operation
 

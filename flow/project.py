@@ -2623,8 +2623,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 force=force, walltime=walltime, **kwargs)
 
             if status is not None:  # operations were submitted, store status
-                for operations in bundle:
-                    operations.set_status(status)
+                for operation in bundle:
+                    operation.set_status(status)
 
     @classmethod
     def _add_submit_args(cls, parser):

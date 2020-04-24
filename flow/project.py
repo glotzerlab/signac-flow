@@ -2608,7 +2608,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Gather all pending operations.
         default_directives = self._get_default_directives()
-        names = args.operation_name if args.operation_name else None
         with self._potentially_buffered():
             operations = self._get_submission_operations(jobs, default_directives, names, parallel,
                                                          ignore_conditions,

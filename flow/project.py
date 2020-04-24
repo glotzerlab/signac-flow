@@ -355,6 +355,33 @@ class JobOperation(object):
             return JobStatus.unknown
 
 
+class SubmissionJobOperation(JobOperation):
+    R"""This class represents the information needed to submit one group for one job.
+
+    This class extends :py:class:`JobOperation` to include data known at submission
+    time, specifically a set of operations/groups that will be executed via the "run"
+    command.
+
+    :param \*args:
+        Passed to the constructor of :py:class:`JobOperation`.
+    :param run_job_operations:
+        A list of :py:class:`JobOperation` that will be executed when this submitted
+        job is executed.
+    :type run_job_operations:
+        list
+    :param \*\*kwargs:
+        Passed to the constructor of :py:class:`JobOperation`.
+    """
+
+    def __init__(self, *args, run_job_operations=None, **kwargs):
+        super(SubmissionJobOperation, self).__init__(*args, **kwargs)
+
+        if run_job_operations is None:
+            self.run_job_operations = []
+        else:
+            self.run_job_operations = run_job_operations
+
+
 class FlowCondition(object):
     """A FlowCondition represents a condition as a function of a signac job.
 
@@ -909,7 +936,7 @@ class FlowGroup(object):
             job=job,
             ignore_conditions=ignore_conditions_on_execution,
         )
-        submission_job_operation = JobOperation(
+        submission_job_operation = SubmissionJobOperation(
             self._generate_id(job, index=index),
             self.name,
             job,

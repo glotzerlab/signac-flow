@@ -38,7 +38,9 @@ def add_operation(Project, name):
               help="Specify the bundle size.")
 @click.option('-p', '--parallel', is_flag=True,
               help="Specify whether bundles are to be executed in parallel.")
-def cli(num_jobs, bundle, parallel):
+@click.option('-e', '--entrypoint', default='/path/to/project.py',
+              help="Entry point path used in output scripts.")
+def cli(num_jobs, bundle, parallel, entrypoint):
     """Generate a project with specific set of operations and pretend to submit.
 
     Usage example:
@@ -66,6 +68,7 @@ def cli(num_jobs, bundle, parallel):
         for i in range(num_jobs):
             tmp_project.open_job(dict(foo=i)).init()
         flow_project = Project.get_project(root=tmp_project.root_directory())
+        flow_project._entrypoint.setdefault('path', entrypoint)
 
         partition = ''
         force = False

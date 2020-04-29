@@ -1608,7 +1608,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         with self._potentially_buffered():
             try:
-                status_parallelization = self.config.get('flow').get('status_parallelization')
                 if status_parallelization == 'thread':
                     with contextlib.closing(ThreadPool()) as pool:
                         # First attempt at parallelized status determination.
@@ -1803,7 +1802,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "and will be removed in 0.12. "
                 "Instead, set the status_parallelization configuration value as none.",
                 DeprecationWarning)
-            self.config['flow']['status_parallelization'] = 'none'
+            status_parallelization = 'none'
+        else:
+            status_parallelization = self.config['flow']['status_parallelization']
 
         # initialize jinja2 template environment and necessary filters
         template_environment = self._template_environment()
@@ -1829,7 +1830,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             ]
 
             with prof(single=False):
-                tmp = self._fetch_status(jobs, err, ignore_errors)
+                tmp = self._fetch_status(jobs, err, ignore_errors, status_parallelization)
 
             prof._mergeFileTiming()
 
@@ -1893,7 +1894,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     "results may be highly inaccurate.")
 
         else:
-            tmp = self._fetch_status(jobs, err, ignore_errors)
+            tmp = self._fetch_status(jobs, err, ignore_errors, status_parallelization)
             profiling_results = None
 
         operations_errors = {s['_operations_error'] for s in tmp}
@@ -2043,7 +2044,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # destructing the template environment. This causes subsequent calls to
         # print_status to fail (although _fetch_status calls will still
         # succeed).
-        status_parallelization = self.config.get('flow').get('status_parallelization')
         te = deepcopy(template_environment) if status_parallelization == "process" \
             else template_environment
         render_output = status_renderer.render(template, te, context, detailed,

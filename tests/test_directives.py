@@ -158,7 +158,7 @@ class TestDirectives:
         assert directives[product_directive.name] == product_directive.default
 
     def test_del_directive(self, setUp, available_directives_list, product_directive):
-        directives = setUp(available_directives_list=available_directives_list[:-1])
+        directives = setUp(available_directives_list=available_directives_list)
         directives[product_directive.name] = 100
         directives._set_defined_directive(NP.name, 100)
         assert directives[NP.name] == 100

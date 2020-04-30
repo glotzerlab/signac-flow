@@ -3,6 +3,7 @@
 # This software is licensed under the BSD 3-Clause License.
 import pytest
 import sys
+from copy import deepcopy
 
 from flow.directives import Directives, _DirectivesItem
 from flow.directives import NP, NRANKS, NGPU, EXECUTABLE, OMP_NUM_THREADS
@@ -168,3 +169,45 @@ class TestDirectives:
         del directives[product_directive.name]
         with pytest.raises(KeyError):
             directives[product_directive.name]
+
+    def test_update_directive_without_aggregate(self, setUp, available_directives_list):
+        directives1 = setUp(available_directives_list=available_directives_list)
+        directives2 = deepcopy(directives1)
+        valid_values = {'np': 4, 'ngpu': 1, 'nranks': 0,
+                        'omp_num_threads': 10, 'executable': 'PathFinder',
+                        'walltime': 20., 'memory': 16, 'processor_fraction': 0.5}
+        for dirs in directives2:
+            directives2[dirs] = valid_values[dirs]
+        directives1.update(directives2)
+        for dirs in directives1:
+            assert directives1[dirs] == directives2[dirs]
+
+    def test_update_directive_serial(self, setUp, available_directives_list):
+        directives1 = setUp(available_directives_list=available_directives_list)
+        directives2 = deepcopy(directives1)
+        valid_values = {'np': 4, 'ngpu': 1, 'nranks': 0,
+                        'omp_num_threads': 10, 'executable': 'PathFinder',
+                        'walltime': 20., 'memory': 16, 'processor_fraction': 0.5}
+        expected_values = {'np': 10, 'ngpu': 1, 'nranks': 0,
+                           'omp_num_threads': 10, 'executable': sys.executable,
+                           'walltime': 32., 'memory': 16, 'processor_fraction': 1.}
+        for dirs in directives2:
+            directives2[dirs] = valid_values[dirs]
+        directives1.update(directives2, aggregate=True)
+        for dirs in directives1:
+            assert directives1[dirs] == expected_values[dirs]
+
+    def test_update_directive_parallel(self, setUp, available_directives_list):
+        directives1 = setUp(available_directives_list=available_directives_list)
+        directives2 = deepcopy(directives1)
+        valid_values = {'np': 4, 'ngpu': 1, 'nranks': 0,
+                        'omp_num_threads': 10, 'executable': 'PathFinder',
+                        'walltime': 20., 'memory': 16, 'processor_fraction': 0.5}
+        expected_values = {'np': 11, 'ngpu': 1, 'nranks': 0,
+                           'omp_num_threads': 10, 'executable': sys.executable,
+                           'walltime': 20., 'memory': 20, 'processor_fraction': 1.}
+        for dirs in directives2:
+            directives2[dirs] = valid_values[dirs]
+        directives1.update(directives2, aggregate=True, parallel=True)
+        for dirs in directives1:
+            assert directives1[dirs] == expected_values[dirs]

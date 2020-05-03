@@ -113,7 +113,9 @@ class TestItems:
         dict_directives['nranks'] = 2
         dict_directives['omp_num_threads'] = 4
         assert NP.finalize(2, dict_directives) == 8
-        dict_directives['nranks'] = NRANKS
+        def squared(v):
+            return v**2
+        dict_directives['nranks'] = squared
         assert NP.finalize(2, dict_directives) == 2
 
     def test_manual_item_default(self, product_directive):

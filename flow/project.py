@@ -3378,7 +3378,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if not args.test:
             self._fetch_scheduler_status(jobs)
 
-        submit(jobs=jobs, **kwargs)
+        self.submit(jobs=jobs, **kwargs)
 
     def _main_exec(self, args):
         if len(args.jobid):

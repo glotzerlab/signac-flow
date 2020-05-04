@@ -1798,7 +1798,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             warnings.warn(
                 "The no_parallelize argument is deprecated as of 0.10 "
                 "and will be removed in 0.12. "
-                "Instead, set the flow status_parallelization configuration value as none.",
+                "Instead, set the status_parallelization configuration value to 'none'.",
                 DeprecationWarning)
             status_parallelization = 'none'
         else:

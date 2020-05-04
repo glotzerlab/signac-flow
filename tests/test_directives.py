@@ -177,7 +177,7 @@ class TestDirectives:
         directives['test'] = True
         assert directives['test']
 
-    def test_del_directive(self, available_directives_list, product_directive):
+    def test_del_directive(self, available_directives_list):
         directives = Directives(available_directives_list)
         directives['test'] = True
         directives._set_defined_directive(NP.name, 100)

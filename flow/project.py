@@ -1613,9 +1613,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     with contextlib.closing(ThreadPool()) as pool:
                         # First attempt at parallelized status determination.
                         # This may fail on systems that don't allow threads.
-                        results = pool.imap(_get_job_status, jobs)
                         return list(tqdm(
-                            iterable=results,
+                            iterable=pool.imap(_get_job_status, jobs),
                             desc="Collecting job status info", total=len(jobs), file=err))
                 elif status_parallelization == 'process':
                     with contextlib.closing(Pool()) as pool:
@@ -1648,9 +1647,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                             iterable=results,
                             desc="Collecting job status info", total=len(jobs), file=err))
                 elif status_parallelization == 'none':
-                    results = map(_get_job_status, jobs)
                     return list(tqdm(
-                        iterable=results,
+                        iterable=map(_get_job_status, jobs),
                         desc="Collecting job status info", total=len(jobs), file=err))
                 else:
                     raise RuntimeError("Configuration value status_parallelization is invalid. "

@@ -627,7 +627,7 @@ class TestProject(TestProjectBase):
                 with redirect_stderr(StringIO()):
                     project.print_status(parameters=parameters, detailed=True)
 
-    def test_concurrent_project_status_homogeneous_schema(self):
+    def test_serial_project_status_homogeneous_schema(self):
         project = self.mock_project(config_overrides={'flow': {'status_parallelization': 'none'}})
         for parameters in (None, True, ['a'], ['b'], ['a', 'b']):
             with redirect_stdout(StringIO()):

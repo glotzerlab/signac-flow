@@ -3,7 +3,6 @@
 # This software is licensed under the BSD 3-Clause License.
 import pytest
 import sys
-from copy import deepcopy
 
 from flow.directives import Directives, _DirectivesItem
 from flow.directives import NP, NRANKS, NGPU, EXECUTABLE, OMP_NUM_THREADS
@@ -207,7 +206,7 @@ class TestDirectives:
 
     def test_update_directive_serial(self, available_directives_list, non_default_directive_values):
         directives1 = Directives(available_directives_list=available_directives_list)
-        directives2 = deepcopy(directives1)
+        directives2 = Directives(available_directives_list=available_directives_list)
         valid_values_0 = non_default_directive_values()
         valid_values_1 = non_default_directive_values(1)
         expected_values = {'np': 100, 'ngpu': 10, 'nranks': 5,
@@ -223,7 +222,7 @@ class TestDirectives:
         self, available_directives_list, non_default_directive_values
     ):
         directives1 = Directives(available_directives_list=available_directives_list)
-        directives2 = deepcopy(directives1)
+        directives2 = Directives(available_directives_list=available_directives_list)
         valid_values_0 = non_default_directive_values()
         valid_values_1 = non_default_directive_values(1)
         expected_values = {'np': 150, 'ngpu': 11, 'nranks': 5,

@@ -175,7 +175,7 @@ class TestProjectStatusPerformance(TestProjectBase):
 
         time = timeit.timeit(
             lambda: project._fetch_status(project, StringIO(),
-                                          ignore_errors=False, no_parallelize=False), number=10)
+                                          ignore_errors=False), number=10)
 
         assert time < 10
         MockScheduler.reset()
@@ -626,6 +626,32 @@ class TestProject(TestProjectBase):
             with redirect_stdout(StringIO()):
                 with redirect_stderr(StringIO()):
                     project.print_status(parameters=parameters, detailed=True)
+
+    def test_serial_project_status_homogeneous_schema(self):
+        project = self.mock_project(config_overrides={'flow': {'status_parallelization': 'none'}})
+        for parameters in (None, True, ['a'], ['b'], ['a', 'b']):
+            with redirect_stdout(StringIO()):
+                with redirect_stderr(StringIO()):
+                    project.print_status(parameters=parameters, detailed=True)
+
+    def test_process_parallelized_project_status_homogeneous_schema(self):
+        project = self.mock_project(
+                       config_overrides={'flow': {'status_parallelization': 'process'}}
+                       )
+        for parameters in (None, True, ['a'], ['b'], ['a', 'b']):
+            with redirect_stdout(StringIO()):
+                with redirect_stderr(StringIO()):
+                    project.print_status(parameters=parameters, detailed=True)
+
+    def test_project_status_invalid_parallelization_config(self):
+        project = self.mock_project(
+                       config_overrides={'flow': {'status_parallelization': 'invalid'}}
+                       )
+        for parameters in (None, True, ['a'], ['b'], ['a', 'b']):
+            with redirect_stdout(StringIO()):
+                with redirect_stderr(StringIO()):
+                    with pytest.raises(RuntimeError):
+                        project.print_status(parameters=parameters, detailed=True)
 
     def test_project_status_heterogeneous_schema(self):
         project = self.mock_project(heterogeneous=True)

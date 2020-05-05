@@ -2607,20 +2607,18 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "must be a member of class IgnoreConditions")
 
         # Gather all pending operations.
-        default_directives = self._get_default_directives()
         with self._potentially_buffered():
-            operations = self._get_submission_operations(jobs, default_directives, names, parallel,
-                                                         ignore_conditions,
+            default_directives = self._get_default_directives()
+            operations = self._get_submission_operations(jobs, default_directives, names,
+                                                         parallel, ignore_conditions,
                                                          ignore_conditions_on_execution)
         if num is not None:
             operations = list(islice(operations, num))
 
         # Bundle them up and submit.
         for bundle in _make_bundles(operations, bundle_size):
-            status = self.submit_operations(
-                operations=bundle, env=env, parallel=parallel,
-                force=force, walltime=walltime, **kwargs)
-
+            status = self.submit_operations(operations=bundle, env=env, parallel=parallel,
+                                            force=force, walltime=walltime, **kwargs)
             if status is not None:  # operations were submitted, store status
                 for operation in bundle:
                     operation.set_status(status)
@@ -3378,7 +3376,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if not args.test:
             self._fetch_scheduler_status(jobs)
 
-        self.submit(jobs=jobs, **kwargs)
+        names = args.operation_name if args.operation_name else None
+        self.submit(jobs=jobs, names=names, **kwargs)
 
     def _main_exec(self, args):
         if len(args.jobid):

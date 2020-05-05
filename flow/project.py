@@ -2956,11 +2956,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             '--no-parallelize',
             action='store_true',
             help="Do not parallelize the status determination. "
-                 "This feature is deprecated, you should set "
-                 "the flow.status_parallelization config value "
-                 "to 'none', 'thread', 'process'. You can do this by "
-                 "executing `signac config set flow.status_parallelization "
-                 "['none'|'thread'|'process']`."
+                 "The '--no-parallelize' argument is deprecated. "
+                 "Please use the status_parallelization configuration "
+                 "instead (see above)."
             )
         view_group.add_argument(
             '-o', '--output-format',
@@ -3574,7 +3572,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         parser_status = subparsers.add_parser(
             'status',
-            parents=[base_parser])
+            parents=[base_parser],
+            help="You can now specify the parallelization of the status command "
+                 "by seting the the flow.status_parallelization config "
+                 "value to 'none', 'thread', or 'process'. You can do this by "
+                 "executing `signac config set flow.status_parallelization "
+                 "VALUE`.")
         self._add_print_status_args(parser_status)
         parser_status.add_argument(
             '--profile',

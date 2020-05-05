@@ -3587,7 +3587,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                  "for the majority of runtime required for status determination. "
                  "Optionally provide a filename pattern to select for what files "
                  "to show result for. Defaults to the main module. "
-                 "(requires pprofile)")
+                 "(requires profile)")
         parser_status.set_defaults(func=self._main_status)
 
         parser_next = subparsers.add_parser(

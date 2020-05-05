@@ -3574,8 +3574,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             'status',
             parents=[base_parser],
             help="You can specify the parallelization of the status command "
-                 "by setting the the flow.status_parallelization config "
-                 "value to 'thread'(default), 'none', or 'process'. You can do this by "
+                 "by setting the flow.status_parallelization config "
+                 "value to 'thread' (default), 'none', or 'process'. You can do this by "
                  "executing `signac config set flow.status_parallelization "
                  "VALUE`.")
         self._add_print_status_args(parser_status)

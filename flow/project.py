@@ -1795,11 +1795,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             eligible_jobs_max_lines = flow_config.get_config_value('eligible_jobs_max_lines')
 
         if no_parallelize:
-            warnings.warn(
+            print(
+                "WARNING: "
                 "The no_parallelize argument is deprecated as of 0.10 "
                 "and will be removed in 0.12. "
-                "Instead, set the status_parallelization configuration value to 'none'.",
-                DeprecationWarning)
+                "Instead, set the status_parallelization configuration value to 'none'. "
+                "In order to do this from the CLI, you can execute "
+                "`signac config set flow.status_parallelization 'none'`\n",
+                file=sys.stderr
+            )
             status_parallelization = 'none'
         else:
             status_parallelization = self.config['flow']['status_parallelization']
@@ -2951,7 +2955,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         parser.add_argument(
             '--no-parallelize',
             action='store_true',
-            help="Do not parallelize the status determination.")
+            help="Do not parallelize the status determination. "
+                 "This feature is deprecated, you should set "
+                 "the flow.status_parallelization config value "
+                 "to 'none', 'thread', 'process'. You can do this by "
+                 "executing `signac config set flow.status_parallelization "
+                 "['none'|'thread'|'process']`."
+            )
         view_group.add_argument(
             '-o', '--output-format',
             type=str,
@@ -3375,8 +3385,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     "using `--profile` to determine bottlenecks within your project "
                     "workflow definition.\n"
                     "Execute `signac config set flow.{} VALUE` to specify the "
-                    "warning threshold in seconds. Use -1 to completely suppress this "
-                    "warning."
+                    "warning threshold in seconds.\n"
+                    "To speed up the compilation, you can try executing "
+                    "`signac config set flow.status_parallelization 'process'` to set "
+                    "the status_parallelization config value to process."
+                    "Use -1 to completely suppress this warning.\n"
                     .format(warn_threshold, config_key), file=sys.stderr)
 
     def _main_next(self, args):

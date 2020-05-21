@@ -589,7 +589,7 @@ class TestProject(TestProjectBase):
         for job in project:
             labels = list(project.classify(job))
             assert len(labels) == 3 - (job.sp.b % 2)
-            assert all(isinstance(l, str) for l in labels)
+            assert all(isinstance(label, str) for label in labels)
             assert 'default_label' in labels
             assert 'negative_default_label' not in labels
             assert 'named_label' in labels
@@ -1196,7 +1196,7 @@ class TestProjectMainInterface(TestProjectBase):
                         except StopIteration:
                             continue
                     for op in project.next_operations(job):
-                        assert any(op.name in l for l in op_lines)
+                        assert any(op.name in line for line in op_lines)
 
     def test_main_script(self):
         assert len(self.project)
@@ -1261,11 +1261,11 @@ class TestGroupProject(TestProjectBase):
         # For multiple operation groups and options
         for job in project:
             job_op1 = project.groups['group1']._create_submission_job_operation(
-                project._entrypoint, dict(), job)
+                project._entrypoint, project._get_default_directives(), job)
             script1 = project.script([job_op1])
             assert 'run -o group1 -j {}'.format(job) in script1
             job_op2 = project.groups['group2']._create_submission_job_operation(
-                project._entrypoint, dict(), job)
+                project._entrypoint, project._get_default_directives(), job)
             script2 = project.script([job_op2])
             assert '--num-passes=2'.format(job) in script2
 
@@ -1400,7 +1400,8 @@ class TestGroupExecutionProject(TestProjectBase):
         MockScheduler.reset()
         project = self.mock_project()
         operations = [project.groups['group1']._create_submission_job_operation(
-            project._entrypoint, dict(), job) for job in project]
+            project._entrypoint, project._get_default_directives(), job)
+            for job in project]
         assert len(list(MockScheduler.jobs())) == 0
         cluster_job_id = project._store_bundled(operations)
         with redirect_stderr(StringIO()):

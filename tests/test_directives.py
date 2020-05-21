@@ -67,17 +67,20 @@ class TestItems:
         assert MEMORY.default == 4
         assert PROCESS_FRACTION.default == 1.
 
-    def test_invalid_values(self, available_directives_list):
-        invalid_values = {'np': 0, 'ngpu': 'ngpu', 'nranks': -1,
-                          'omp_num_threads': -20, 'executable': 1,
-                          'walltime': None, 'memory': 0, 'processor_fraction': 2.5}
-        error_types = {'np': ValueError, 'ngpu': TypeError,
-                       'nranks': ValueError, 'omp_num_threads': ValueError,
-                       'executable': TypeError, 'walltime': TypeError,
-                       'memory': ValueError, 'processor_fraction': ValueError}
-        for dir in available_directives_list:
-            with pytest.raises(error_types[dir.name]):
-                dir.validation(invalid_values[dir.name])
+    def test_invalid_values(self):
+        invalid_values = {'np': [-1, 1., 'foo', {}, None],
+                          'ngpu': [-1, 1., 'foo', {}, None],
+                          'nranks': [-1, 1., 'foo', {}, None],
+                          'omp_num_threads': [-1, 1., 'foo', {}, None],
+                          'executable': [1, {}, None],
+                          'walltime': [-1., 'foo', {}, None],
+                          'memory': [-1, 4.5, 'foo', {}, None],
+                          'processor_fraction': [-0.5, 2.5, 'foo', {}, None]
+                          }
+        for dir_name in invalid_values:
+            for dir_value in invalid_values[dir_name]:
+                with pytest.raises(Exception):
+                    dir.validation(dir_value)
 
     def test_defaults_are_valid(self, available_directives_list):
         for directive in available_directives_list:
@@ -116,18 +119,15 @@ class TestItems:
         assert product_directive.default == 10
 
     def test_manual_item_validation(self, product_directive):
-        try:
-            val = product_directive.validation(product_directive.default)
-            assert product_directive.default == val
-        except Exception:
-            raise ValueError("Invalid default value for product_directive")
-        assert product_directive.default == product_directive.validation(product_directive.default)
+        val = product_directive.validation(product_directive.default)
+        assert product_directive.default == val
         assert product_directive.validation(20) == 20
         with pytest.raises(ValueError):
             product_directive.validation(0)
 
     def test_manual_item_serial(self, product_directive):
         product_directive.serial(10, 20) == 10
+        product_directive.serial(20, 10) == 20
 
     def test_manual_item_parallel(self, product_directive):
         product_directive.parallel(10, 20) == 10
@@ -167,10 +167,10 @@ class TestDirectives:
         with pytest.raises(ValueError):
             directives._set_defined_directive(NP.name, 0)
 
-    def test_set_undefined_directive(self, available_directives_list, product_directive):
+    def test_set_undefined_directive(self, available_directives_list):
         directives = Directives(available_directives_list)
         with pytest.raises(Exception):
-            directives._set_defined_directive(product_directive.name, 0)
+            directives._set_defined_directive('test', 0)
 
     def test_set_directives_item(self, available_directives_list):
         directives = Directives(available_directives_list)
@@ -192,17 +192,16 @@ class TestDirectives:
     def test_update_directive_without_aggregate(
         self, available_directives_list, non_default_directive_values
     ):
-        directives1 = Directives(available_directives_list)
+        directives = Directives(available_directives_list)
         valid_values_0 = non_default_directive_values()
         valid_values_1 = non_default_directive_values(1)
-        for dirs in directives1:
-            directives1[dirs] = valid_values_0[dirs]
+        directives.update(valid_values_0)
         expected_values = {'np': 10, 'ngpu': 1, 'nranks': 0,
                            'omp_num_threads': 10, 'executable': 'PathFinder',
                            'walltime': 20.0, 'memory': 16, 'processor_fraction': 0.5}
-        directives1.update(valid_values_1)
-        for dirs in directives1:
-            assert directives1[dirs] == expected_values[dirs]
+        directives.update(valid_values_1)
+        for dirs in directives:
+            assert directives[dirs] == expected_values[dirs]
 
     def test_update_directive_serial(self, available_directives_list, non_default_directive_values):
         directives1 = Directives(available_directives_list)
@@ -262,9 +261,5 @@ class TestDirectives:
             directives = Directives(available_directives_list)
             directives.update(valid_values)
             directives.evaluate(job)
-            expected_values = {'np': 100, 'ngpu': 10, 'nranks': 5,
-                               'omp_num_threads': 20, 'executable': 'Non Default Path',
-                               'walltime': 64., 'memory': 32,
-                               'processor_fraction': round(job.sp.i/10, 1)}
-            for dirs in directives:
-                assert directives[dirs] == expected_values[dirs]
+            expected_values = {'processor_fraction': round(job.sp.i/10, 1)}
+            assert directives['processor_fraction'] == expected_values['processor_fraction']

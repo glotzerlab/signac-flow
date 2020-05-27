@@ -12,6 +12,7 @@ from . import environment
 from . import scheduling
 from . import errors
 from . import testing
+from .project import aggregate
 from .project import IgnoreConditions
 from .project import FlowProject
 from .project import JobOperation

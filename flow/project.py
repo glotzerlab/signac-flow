@@ -1048,6 +1048,9 @@ class FlowGroup(object):
             for job in jobs:
                 eligible = False
                 for j in job:
+                    if not type(j) is signac.contrib.job.Job:
+                        eligible=False
+                        break
                     eligible = op.eligible(j, ignore_conditions)
                     if not eligible:
                         break
@@ -2315,14 +2318,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "Executing operation '{}' with current interpreter "
                 "process ({}).".format(operation, os.getpid()))
             try:
-                if(len(operation.jobs)>1):
-                    self._operation_functions[operation.name](operation.jobs)
-                else:
-                    self._operation_functions[operation.name](operation.jobs[0])
+                self._operation_functions[operation.name](*operation.jobs)
             except Exception as e:
                 raise UserOperationError(
                     'An exception was raised during operation {operation.name} '
-                    'for job {operation.job}.'.format(operation=operation)) from e
+                    'for jobs {operation.jobs}.'.format(operation=operation)) from e
 
     def _get_default_directives(self):
         return {name: self.groups[name].operation_directives.get(name, dict())
@@ -2495,6 +2495,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                             flow_group._create_run_job_operations(
                                 self._entrypoint, default_directives, jobs, ignore_conditions))
                     operations = list(filter(select, operations))
+                    print(len(operations))
             finally:
                 if messages:
                     for msg, level in set(messages):
@@ -3311,7 +3312,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         signature = inspect.signature(func)
         for i, (k, v) in enumerate(signature.parameters.items()):
-            if i and v.default is inspect.Parameter.empty:
+            if i and v.default is inspect.Parameter.empty and not v.kind == v.kind is inspect.Parameter.VAR_POSITIONAL:
                 raise ValueError(
                     "Only the first argument in an operation argument may not have "
                     "a default value! ({})".format(name))

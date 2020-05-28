@@ -2495,7 +2495,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                             flow_group._create_run_job_operations(
                                 self._entrypoint, default_directives, jobs, ignore_conditions))
                     operations = list(filter(select, operations))
-                    print(len(operations))
             finally:
                 if messages:
                     for msg, level in set(messages):

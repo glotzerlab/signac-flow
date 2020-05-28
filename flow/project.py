@@ -2259,11 +2259,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @staticmethod
     def _dumps_op(op):
-        return (op.id, op.name, op.job._id, op.cmd, op.directives)
+        return (op.id, op.name, op.jobs, op.cmd, op.directives)
 
     def _loads_op(self, blob):
-        id, name, job_id, cmd, directives = blob
-        return JobOperation(id, name, self.open_job(id=job_id), cmd, directives)
+        id, name, jobs, cmd, directives = blob
+        return JobOperation(id, name, self.open_job(id=job.id) for job in jobs, cmd, directives)
 
     def _run_operations_in_parallel(self, pool, pickle, operations, progress, timeout):
         """Execute operations in parallel.

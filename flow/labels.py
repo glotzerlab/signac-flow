@@ -11,16 +11,17 @@ of a FlowProject class definition.
 
 class label(object):
     """Decorate a :class:`~.FlowProject` class function as a label function.
-
+    
     For example:
-
+    
     .. code-block:: python
-
+    
         class MyProject(FlowProject):
-
+    
             @label()
             def foo(self, job):
                 return True
+
     """
 
     def __init__(self, name=None):
@@ -36,7 +37,15 @@ class label(object):
 class staticlabel(label):
     """A label decorator for staticmethods.
 
+    Parameters
+    ----------
+    label :
+
+    Notes
+    -----
+    
     This decorator implies "staticmethod"!
+
     """
 
     def __call__(self, func):
@@ -46,7 +55,15 @@ class staticlabel(label):
 class classlabel(label):
     """A label decorator for classmethods.
 
+    Parameters
+    ----------
+    label :
+
+    Notes
+    -----
+    
     This decorator implies "classmethod"!
+
     """
 
     def __call__(self, func):
@@ -54,4 +71,12 @@ class classlabel(label):
 
 
 def _is_label_func(func):
+    """Return func if func is a label
+
+    Parameters
+    ----------
+    func :
+        FlowProject class label function
+
+    """
     return getattr(getattr(func, '__func__', func), '_label', False)

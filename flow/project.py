@@ -1887,7 +1887,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         lines, start = inspect.getsourcelines(code)
                     except OSError:
                         continue
-                    hits_ = [ft.getHitStatsFor(l)[0] for l in range(start, start+len(lines))]
+                    hits_ = [ft.getHitStatsFor(line)[0] for line in range(start, start+len(lines))]
                     profiling_results.extend(
                         ["{:>5} {:>4}: {}".format(h, lineno, l.rstrip())
                          for lineno, (l, h) in enumerate(zip(lines, hits_), start)])

@@ -1043,8 +1043,7 @@ class FlowGroup(object):
 
         for name, op in self.operations.items():
             jobs = self.flow_aggregate[name](jobs)
-            if not type(jobs) is signac.contrib.job.Job:
-                jobs=deeplist(list(jobs))
+            jobs=deeplist(list(jobs))
             for job in jobs:
                 eligible = False
                 for j in job:
@@ -2263,7 +2262,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _loads_op(self, blob):
         id, name, jobs, cmd, directives = blob
-        return JobOperation(id, name, self.open_job(id=job.id) for job in jobs, cmd, directives)
+        return JobOperation(id, name, [self.open_job(id=job.id) for job in jobs], cmd, directives)
 
     def _run_operations_in_parallel(self, pool, pickle, operations, progress, timeout):
         """Execute operations in parallel.

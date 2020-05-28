@@ -38,7 +38,12 @@ from multiprocessing.pool import ThreadPool
 from multiprocessing import Event
 import jinja2
 from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
+import six
 from six.moves import zip_longest
+if six.PY2:
+    from collections import Iterable
+else:
+    from collections.abc import Iterable
 from tqdm import tqdm
 
 import signac
@@ -254,7 +259,6 @@ class aggregate(object):
         callable
     """
 
-
     def __init__(self, grouper=None):
         if grouper is None:
             def grouper(jobs):
@@ -299,7 +303,7 @@ class aggregate(object):
 
         def grouper(jobs):
             for key, group in groupby(sorted(jobs, key=keyfunction), key=keyfunction):
-                yield group
+                yield list(group)
 
         return cls(grouper)
 
@@ -372,19 +376,13 @@ class JobOperation(object):
         self.directives._keys_set_by_user = keys_set_by_user
 
     def __str__(self):
-        jobstr = ""
-        for job in self.jobs:
-            jobstr+="{} ".format(job.id)
-        return "{}({})".format(self.name, jobstr.strip())
+        return "{}({})".format(self.name, ", ".join(map(str, self.jobs)))
 
     def __repr__(self):
-        jobstr = ""
-        for job in self.jobs:
-            jobstr+="{} ".format(job.id)
         return "{type}(name='{name}', job(s)='{job}', cmd={cmd}, directives={directives})".format(
                    type=type(self).__name__,
                    name=self.name,
-                   job=jobstr.strip(),
+                   job=(", ".join(map(str, self.jobs))),
                    cmd=repr(self.cmd),
                    directives=self.directives)
 
@@ -798,10 +796,7 @@ class FlowGroup(object):
         if not isinstance(jobs, signac.contrib.job.Job):
             if not isinstance(jobs, list):
                 jobs = list(jobs)
-            jobstr = ''
-            for job in jobs:
-                jobstr+=job.id+' '
-            jobstr=jobstr.strip()
+            jobstr = ' '.join(map(str, jobs))
         if isinstance(operation, FlowCmdOperation):
             return operation(jobs).lstrip()
         else:
@@ -899,18 +894,21 @@ class FlowGroup(object):
 
     def calc_id_str(self, jobs, upto=None):
         jobstr = ''
-        length_not_defined=False
+        length_not_defined = False
         if upto is None:
-            length_not_defined=True
+            length_not_defined = True
         for job in jobs:
             if length_not_defined:
                 upto = len(str(job.id))
-            jobstr+=str(job.id)[:upto]+'-'
+            jobstr += str(job.id)[:upto]+'-'
         return jobstr.strip('-')
 
     def _generate_id(self, jobs, operation_name=None, index=0):
         "Return an id, which identifies this group with respect to this job."
         project = jobs[0]._project
+
+        for job in jobs:
+            assert project == job._project
 
         # The full name is designed to be truly unique for each job-group.
         if operation_name is None:
@@ -1043,28 +1041,25 @@ class FlowGroup(object):
 
         for name, op in self.operations.items():
             jobs = self.flow_aggregate[name](jobs)
-            jobs=deeplist(list(jobs))
+            jobs = deeplist(list(jobs))
             for job in jobs:
                 eligible = False
                 for j in job:
-                    if not type(j) is signac.contrib.job.Job:
-                        eligible=False
-                        break
                     eligible = op.eligible(j, ignore_conditions)
                     if not eligible:
                         break
                 if eligible:
                     directives = self._resolve_directives(name, default_directives, job)
                     uneval_cmd = functools.partial(self._run_cmd, entrypoint=entrypoint,
-                                                operation_name=name, operation=op,
-                                                directives=directives, jobs=job)
+                                                   operation_name=name, operation=op,
+                                                   directives=directives, jobs=job)
                     # Uses a different id than the groups direct id. Do not use this for submitting
-                    # jobs as current implementation prevents checking for resubmission in this case.
-                    # The different ids allow for checking whether JobOperations created to run directly
-                    # are different.
+                    # jobs as current implementation prevents checking for resubmission
+                    # in this case. The different ids allow for checking whether JobOperations
+                    # created to run directly are different.
 
                     job_op = JobOperation(self._generate_id(job, name, index=index), name, job,
-                                        cmd=uneval_cmd, directives=deepcopy(directives))
+                                          cmd=uneval_cmd, directives=deepcopy(directives))
                     yield job_op
 
     def _get_submission_directives(self, default_directives, job, parallel=False):
@@ -2258,11 +2253,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @staticmethod
     def _dumps_op(op):
-        return (op.id, op.name, op.jobs, op.cmd, op.directives)
+        return (op.id, op.name, [job.id for job in op.jobs], op.cmd, op.directives)
 
     def _loads_op(self, blob):
-        id, name, jobs, cmd, directives = blob
-        return JobOperation(id, name, [self.open_job(id=job.id) for job in jobs], cmd, directives)
+        id, name, job_ids, cmd, directives = blob
+        jobs = [self.open_job(id=job_id) for job_id in job_ids]
+        return JobOperation(id, name, jobs, cmd, directives)
 
     def _run_operations_in_parallel(self, pool, pickle, operations, progress, timeout):
         """Execute operations in parallel.
@@ -2440,14 +2436,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         reached_execution_limit = Event()
 
         def select(operation):
-            job_in_project = True
             for job in operation.jobs:
-                if not job in self:
-                    job_in_project = False
-                    break
-            if not job_in_project:
-                log("One or more jobs from '{}' are no longer part of the project.".format(operation.jobs))
-                return False
+                if job not in self:
+                    raise ValueError("Job {} is not present"
+                                     "in the proect").format(job)
+
             if num is not None and select.total_execution_count >= num:
                 reached_execution_limit.set()
                 raise StopIteration  # Reached total number of executions
@@ -3310,7 +3303,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         signature = inspect.signature(func)
         for i, (k, v) in enumerate(signature.parameters.items()):
-            if i and v.default is inspect.Parameter.empty and not v.kind == v.kind is inspect.Parameter.VAR_POSITIONAL:
+            if (
+                    i and v.default is inspect.Parameter.empty and
+                    not v.kind == v.kind is inspect.Parameter.VAR_POSITIONAL
+               ):
                 raise ValueError(
                     "Only the first argument in an operation argument may not have "
                     "a default value! ({})".format(name))
@@ -3945,8 +3941,10 @@ def _update_job_status(job, scheduler_jobs):
     "Update the status entry for job."
     update_status(job, scheduler_jobs)
 
+
 def deeplist(t):
     return list(map(deeplist, t)) if isinstance(t, (list, tuple)) else t
+
 
 __all__ = [
     'FlowProject',

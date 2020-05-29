@@ -303,7 +303,7 @@ class aggregate(object):
 
         def grouper(jobs):
             for key, group in groupby(sorted(jobs, key=keyfunction), key=keyfunction):
-                yield list(group)
+                yield group
 
         return cls(grouper)
 
@@ -1040,26 +1040,29 @@ class FlowGroup(object):
         """
 
         for name, op in self.operations.items():
-            jobs = self.flow_aggregate[name](jobs)
-            jobs = deeplist(list(jobs))
-            for job in jobs:
+            jobs_list = self.flow_aggregate[name]([job for job in jobs])
+            jobs_list = [[j for j in job] for job in jobs_list]
+            for job_list in jobs_list:
                 eligible = False
-                for j in job:
-                    eligible = op.eligible(j, ignore_conditions)
+                for job in job_list:
+                    if job is None:
+                        eligible = False
+                        break
+                    eligible = op.eligible(job, ignore_conditions)
                     if not eligible:
                         break
                 if eligible:
-                    directives = self._resolve_directives(name, default_directives, job)
+                    directives = self._resolve_directives(name, default_directives, job_list)
                     uneval_cmd = functools.partial(self._run_cmd, entrypoint=entrypoint,
                                                    operation_name=name, operation=op,
-                                                   directives=directives, jobs=job)
+                                                   directives=directives, jobs=job_list)
                     # Uses a different id than the groups direct id. Do not use this for submitting
                     # jobs as current implementation prevents checking for resubmission
                     # in this case. The different ids allow for checking whether JobOperations
                     # created to run directly are different.
 
-                    job_op = JobOperation(self._generate_id(job, name, index=index), name, job,
-                                          cmd=uneval_cmd, directives=deepcopy(directives))
+                    job_op = JobOperation(self._generate_id(job_list, name, index=index), name,
+                                          job_list, cmd=uneval_cmd, directives=deepcopy(directives))
                     yield job_op
 
     def _get_submission_directives(self, default_directives, job, parallel=False):
@@ -2402,8 +2405,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # If no jobs argument is provided, we run operations for all jobs.
         if jobs is None:
             jobs = self
-        if not isinstance(jobs, list):
-            jobs = [job for job in jobs]
+
         # Get all matching FlowGroups
         if isinstance(names, str):
             raise ValueError(
@@ -2564,7 +2566,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                 ignore_conditions=IgnoreConditions.NONE):
         "Get all pending operations for the given selection."
         assert not isinstance(operation_names, str)
-        for op in self.next_operations(* jobs, ignore_conditions=ignore_conditions):
+        for op in self.next_operations(jobs, ignore_conditions=ignore_conditions):
             if operation_names is None or any(re.fullmatch(n, op.name) for n in operation_names):
                 yield op
 
@@ -3231,7 +3233,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                                         ignore_conditions=ignore_conditions,
                                                         index=0)
 
-    def next_operations(self, *jobs, ignore_conditions=IgnoreConditions.NONE):
+    def next_operations(self, jobs, ignore_conditions=IgnoreConditions.NONE):
         """Determine the next eligible operations for jobs.
 
         :param jobs:
@@ -3246,7 +3248,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :yield:
             All instances of :class:`~.JobOperation` jobs are eligible for.
         """
-        jobs = [job for job in jobs]
+
         for op in self._job_operations(jobs, ignore_conditions):
             yield op
 

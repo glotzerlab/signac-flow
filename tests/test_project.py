@@ -589,7 +589,7 @@ class TestProject(TestProjectBase):
         for job in project:
             labels = list(project.classify(job))
             assert len(labels) == 3 - (job.sp.b % 2)
-            assert all(isinstance(l, str) for l in labels)
+            assert all(isinstance(label, str) for label in labels)
             assert 'default_label' in labels
             assert 'negative_default_label' not in labels
             assert 'named_label' in labels
@@ -1196,7 +1196,7 @@ class TestProjectMainInterface(TestProjectBase):
                         except StopIteration:
                             continue
                     for op in project.next_operations(job):
-                        assert any(op.name in l for l in op_lines)
+                        assert any(op.name in op_line for op_line in op_lines)
 
     def test_main_script(self):
         assert len(self.project)

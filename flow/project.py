@@ -352,7 +352,7 @@ class JobOperation(object):
     def __init__(self, id, name, jobs, cmd, directives=None):
         self._id = id
         self.name = name
-        self._jobs = jobs
+        self.jobs = jobs
         if not (callable(cmd) or isinstance(cmd, str)):
             raise ValueError("JobOperation cmd must be a callable or string.")
         self._cmd = cmd
@@ -376,13 +376,13 @@ class JobOperation(object):
         self.directives._keys_set_by_user = keys_set_by_user
 
     def __str__(self):
-        return "{}({})".format(self.name, self.jobs)
+        return "{}({})".format(self.name, " ".join(map(str, self.jobs)))
 
     def __repr__(self):
         return "{type}(name='{name}', job(s)='{job}', cmd={cmd}, directives={directives})".format(
                    type=type(self).__name__,
                    name=self.name,
-                   job=self.jobs,
+                   job=" ".join(map(str, self.jobs)),
                    cmd=repr(self.cmd),
                    directives=self.directives)
 
@@ -399,10 +399,6 @@ class JobOperation(object):
     @property
     def id(self):
         return self._id
-
-    @property
-    def jobs(self):
-        return " ".join(map(str, self._jobs))
 
     @property
     def cmd(self):
@@ -437,7 +433,7 @@ class FlowCondition(object):
     This can be used to build a graph of conditions and operations.
 
     :param callback:
-        A callable with one positional argument (the job).
+        A callable with one or multiple positional arguments (job or jobs).
     :type callback:
         callable
     """
@@ -445,15 +441,17 @@ class FlowCondition(object):
     def __init__(self, callback):
         self._callback = callback
 
-    def __call__(self, job):
+    def __call__(self, jobs):
         if self._callback is None:
             return True
         try:
-            return self._callback(job)
+            return self._callback(*jobs)
         except Exception as e:
             raise UserConditionError(
                 'An exception was raised while evaluating the condition {name} '
-                'for job {job}.'.format(name=self._callback.__name__, job=job)) from e
+                'for jobs {jobs}.'.format(name=self._callback.__name__,
+                                          jobs=" ".join(map(str, jobs)))) \
+                                              from e
 
     def __hash__(self):
         return hash(self._callback)
@@ -506,13 +504,13 @@ class BaseFlowOperation(object):
     def __str__(self):
         return "{type}(cmd='{cmd}')".format(type=type(self).__name__, cmd=self._cmd)
 
-    def eligible(self, job, ignore_conditions=IgnoreConditions.NONE):
+    def eligible(self, jobs, ignore_conditions=IgnoreConditions.NONE):
         """Eligible, when all pre-conditions are true and at least one post-condition is false,
         or corresponding conditions are ignored.
         :param job:
-            The signac job handles.
+            A list of signac job handles.
         :type job:
-            :class:`~signac.contrib.job.Job`
+            list
         :param ignore_conditions:
             Specify if pre and/or post conditions check is to be ignored for eligibility check.
             The default is :py:class:`IgnoreConditions.NONE`.
@@ -525,18 +523,18 @@ class BaseFlowOperation(object):
                 "must be a member of class IgnoreConditions")
         # len(self._prereqs) check for speed optimization
         pre = (not len(self._prereqs)) or (ignore_conditions & IgnoreConditions.PRE) \
-            or all(cond(job) for cond in self._prereqs)
+            or all(cond(jobs) for cond in self._prereqs)
         if pre and len(self._postconds):
             post = (ignore_conditions & IgnoreConditions.POST) \
-                or any(not cond(job) for cond in self._postconds)
+                or any(not cond(jobs) for cond in self._postconds)
         else:
             post = True
         return pre and post
 
-    def complete(self, job):
+    def complete(self, jobs):
         "True when all post-conditions are met."
         if len(self._postconds):
-            return all(cond(job) for cond in self._postconds)
+            return all(cond(jobs) for cond in self._postconds)
         else:
             return False
 
@@ -824,13 +822,13 @@ class FlowGroup(object):
                    directives=self.operation_directives,
                    options=self.options)
 
-    def eligible(self, job, ignore_conditions=IgnoreConditions.NONE):
+    def eligible(self, jobs, ignore_conditions=IgnoreConditions.NONE):
         """Eligible, when at least one BaseFlowOperation is eligible.
 
         :param job:
-            A :class:`signac.Job` from the signac workspace.
+            A list of :class:`signac.Job` from the signac workspace.
         :type job:
-            :class:`signac.Job`
+            list
         :param ignore_conditions:
             Specify if pre and/or post conditions check is to be ignored for eligibility check.
             The default is :py:class:`IgnoreConditions.NONE`.
@@ -841,7 +839,7 @@ class FlowGroup(object):
         :rtype:
             bool
         """
-        return any(op.eligible(job, ignore_conditions) for op in self)
+        return any(op.eligible(jobs, ignore_conditions) for op in self)
 
     def complete(self, job):
         """True when all BaseFlowOperation post-conditions are met.
@@ -1047,14 +1045,7 @@ class FlowGroup(object):
             jobs_list = self.flow_aggregate[name]([job for job in jobs])
             jobs_list = [[j for j in job] for job in jobs_list]
             for job_list in jobs_list:
-                eligible = False
-                for job in job_list:
-                    if job is None:
-                        eligible = False
-                        break
-                    eligible = op.eligible(job, ignore_conditions)
-                    if not eligible:
-                        break
+                eligible = op.eligible(job_list, ignore_conditions)
                 if eligible:
                     directives = self._resolve_directives(name, default_directives, job_list)
                     uneval_cmd = functools.partial(self._run_cmd, entrypoint=entrypoint,

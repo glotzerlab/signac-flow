@@ -352,7 +352,7 @@ class JobOperation(object):
     def __init__(self, id, name, jobs, cmd, directives=None):
         self._id = id
         self.name = name
-        self.jobs = jobs
+        self._jobs = jobs
         if not (callable(cmd) or isinstance(cmd, str)):
             raise ValueError("JobOperation cmd must be a callable or string.")
         self._cmd = cmd
@@ -376,13 +376,13 @@ class JobOperation(object):
         self.directives._keys_set_by_user = keys_set_by_user
 
     def __str__(self):
-        return "{}({})".format(self.name, ", ".join(map(str, self.jobs)))
+        return "{}({})".format(self.name, self.jobs)
 
     def __repr__(self):
         return "{type}(name='{name}', job(s)='{job}', cmd={cmd}, directives={directives})".format(
                    type=type(self).__name__,
                    name=self.name,
-                   job=(", ".join(map(str, self.jobs))),
+                   job=self.jobs,
                    cmd=repr(self.cmd),
                    directives=self.directives)
 
@@ -399,6 +399,10 @@ class JobOperation(object):
     @property
     def id(self):
         return self._id
+
+    @property
+    def jobs(self):
+        return " ".join(map(str, self._jobs))
 
     @property
     def cmd(self):
@@ -3237,9 +3241,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """Determine the next eligible operations for jobs.
 
         :param jobs:
-            The signac job handles.
+            A list of signac job handles.
         :type job:
-            :class:`~signac.contrib.job.Job`
+            Iterable
         :param ignore_conditions:
             Specify if pre and/or post conditions check is to be ignored for eligibility check.
             The default is :py:class:`IgnoreConditions.NONE`.
@@ -3256,13 +3260,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         deprecated_in="0.8", removed_in="0.10",
         current_version=__version__,
         details="Use next_operations() instead.")
-    def next_operation(self, job):
+    def next_operation(self, jobs):
         """Determine the next operation for this job.
 
         :param job:
             The signac job handle.
         :type job:
-            :class:`~signac.contrib.job.Job`
+            Iterable
         :param default_directives:
             The default directives to use for the operations. This is to allow for user specified
             groups to 'inherit' directives from ``default_directives``. If no defaults are desired,
@@ -3274,7 +3278,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :rtype:
             `:py:class:`~.JobOperation` or `NoneType`
         """
-        for op in self.next_operations(job):
+        for op in self.next_operations(jobs):
             return op
 
     @classmethod
@@ -3528,9 +3532,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _main_next(self, args):
         "Determine the jobs that are eligible for a specific operation."
-        for job in self:
-            if args.name in {op.name for op in self.next_operations(job)}:
-                print(job)
+        for op in self.next_operations(self):
+            if(args.name in op.name):
+                print(op.jobs)
 
     def _main_run(self, args):
         "Run all (or select) job operations."
@@ -3620,10 +3624,19 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             raise KeyError("Unknown operation '{}'.".format(args.operation))
 
         if getattr(operation_function, '_flow_aggregate', False):
-            operation_function(jobs)
+            if isinstance(jobs, list):
+                jobs_list = operation_function._flow_aggregate(jobs)
+            else:
+                jobs_list = operation_function._flow_aggregate(
+                                [job for job in jobs]
+                            )
+            jobs_list = [[j for j in job] for job in jobs_list]
         else:
-            for job in jobs:
-                operation_function(job)
+            raise ValueError("Grouper function of the operation {} "
+                             "not defined".format(args.operation))
+
+        for job_list in jobs_list:
+            operation_function(*job_list)
 
     def _select_jobs_from_args(self, args):
         "Select jobs with the given command line arguments ('-j/-f/--doc-filter')."

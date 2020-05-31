@@ -167,19 +167,26 @@ class _condition(object):
     @classmethod
     def isfile(cls, filename):
         "True if the specified file exists for this job."
-        return cls(lambda job: job.isfile(filename), 'isfile_' + filename)
+        def _isfile(*jobs):
+            return all(job.isfile(filename) for job in jobs)
+
+        return cls(_isfile, 'isfile_' + filename)
 
     @classmethod
     def true(cls, key):
         """True if the specified key is present in the job document and
         evaluates to True."""
-        return cls(lambda job: job.document.get(key, False), 'true_' + key)
+        def _document(*jobs):
+            return all(job.document.get(key, False) for job in jobs)
+        return cls(_document, 'true_' + key)
 
     @classmethod
     def false(cls, key):
         """True if the specified key is present in the job document and
         evaluates to False."""
-        return cls(lambda job: not job.document.get(key, False), 'false_' + key)
+        def _no_document(*jobs):
+            return all(not job.document.get(key, False) for job in jobs)
+        return cls(_no_document, 'false_' + key)
 
     @classmethod
     @deprecated(
@@ -199,7 +206,9 @@ class _condition(object):
     @classmethod
     def not_(cls, condition):
         "Returns ``not condition(job)`` for the provided condition function."
-        return cls(lambda job: not condition(job),
+        def _not(*jobs):
+            return not any(condition(job) for job in jobs)
+        return cls(_not,
                    'not_'.encode() + condition.__code__.co_code)
 
 
@@ -209,8 +218,8 @@ def _create_all_metacondition(condition_dict, *other_funcs):
     constructed with appropriate information for graph detection."""
     condition_list = [c for f in other_funcs for c in condition_dict[f]]
 
-    def _flow_metacondition(job):
-        return all(c(job) for c in condition_list)
+    def _flow_metacondition(*jobs):
+        return all(c(*jobs) for c in condition_list)
 
     _flow_metacondition._composed_of = condition_list
     return _flow_metacondition

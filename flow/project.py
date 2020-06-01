@@ -266,26 +266,43 @@ class aggregate(object):
         Information on how to aggregate jobs.
     :type groupper:
         callable
+    :param sort:
+        Sort jobs by a statepoint parameter.
+    :type sort:
+        str
+    :param reverse:
+        States whether sorting is to be done in ascending or descending order.
+    :type reverse:
+        bool
     """
 
-    def __init__(self, grouper=None):
+    def __init__(self, grouper=None, sort=None, reverse=False):
         if grouper is None:
             def grouper(jobs):
                 yield jobs
 
+        def key_sort(job):
+            try:
+                return job.sp[sort]
+            except KeyError:
+                raise KeyError("The key '{}' was not found in statepoint "
+                               "parameters of the job {}.".format(sort, job))
         self.grouper = grouper
+        self.sort = None if sort is None else functools.partial(sorted,
+                                                                key=key_sort,
+                                                                reverse=reverse)
 
     @classmethod
-    def groupsof(cls, num=1, fillvalue=None):
+    def groupsof(cls, num=1, fillvalue=None, sort=None, reverse=False):
         # copied from: https://docs.python.org/3/library/itertools.html#itertools.zip_longest
         def grouper(jobs):
             args = [iter(jobs)] * num
             return zip_longest(*args, fillvalue=fillvalue)
 
-        return cls(grouper)
+        return cls(grouper, sort, reverse)
 
     @classmethod
-    def groupby(cls, key=None, default=None):
+    def groupby(cls, key=None, default=None, sort=None, reverse=False):
         if isinstance(key, six.string_types):
             if default is None:
                 def keyfunction(job):
@@ -314,10 +331,36 @@ class aggregate(object):
             for key, group in groupby(sorted(jobs, key=keyfunction), key=keyfunction):
                 yield group
 
-        return cls(grouper)
+        return cls(grouper, sort, reverse)
 
     def __call__(self, func):
-        setattr(func, '_flow_aggregate', self.grouper)
+        setattr(func, '_flow_aggregate', (self.grouper, self.sort))
+        return func
+
+
+class select(object):
+    """Decorator for operation functions that will filter jobs
+    according to the needs of user.
+
+    .. code-block:: python
+
+        @select(filter=lambda job: job.sp.a>=5)
+        @FlowProject.operation
+        def foo(jobs):
+            return len(jobs)
+
+    :param filter:
+        Information on how to filter jobs.
+    :type filter:
+        callable
+    """
+
+    def __init__(self, filterby=None):
+        self._filter = functools.partial(filter, filterby)
+
+    def __call__(self, func):
+        setattr(func, '_flow_select', self._filter)
+
         return func
 
 
@@ -725,7 +768,7 @@ class FlowGroup(object):
     MAX_LEN_ID = 100
 
     def __init__(self, name, flow_aggregate=None, operations=None,
-                 operation_directives=None, options=""):
+                 operation_directives=None, options="", flow_select=None):
         self.name = name
         self.options = options
         self.operations = dict() if operations is None else operations
@@ -734,6 +777,7 @@ class FlowGroup(object):
         else:
             self.operation_directives = operation_directives
         self.flow_aggregate = dict() if flow_aggregate is None else flow_aggregate
+        self.flow_select = dict() if flow_select is None else flow_select
 
     def _set_entrypoint_item(self, entrypoint, directives, key, default, job):
         """Set a value (executable, path) for entrypoint in command.
@@ -887,6 +931,9 @@ class FlowGroup(object):
 
     def add_flow_aggregate(self, name, flow_aggregate):
         self.flow_aggregate[name] = flow_aggregate
+
+    def add_flow_select(self, name, flow_select):
+        self.flow_select[name] = flow_select
 
     def isdisjoint(self, group):
         """Returns whether two groups are disjoint (do not share any common operations).
@@ -1051,7 +1098,12 @@ class FlowGroup(object):
         """
 
         for name, op in self.operations.items():
-            jobs_list = self.flow_aggregate[name]([job for job in jobs])
+            filter = self.flow_select[name]
+            grouper, sort = self.flow_aggregate[name]
+            jobs_list = filter(jobs)
+            if sort is not None:
+                jobs_list = sort(jobs_list)
+            jobs_list = grouper([job for job in jobs_list])
             jobs_list = [[j for j in job] for job in jobs_list]
             for job_list in jobs_list:
                 eligible = op.eligible(job_list, ignore_conditions)
@@ -3373,7 +3425,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 def grouper(jobs):
                     args = [iter(jobs)] * 1
                     return zip_longest(*args, fillvalue=None)
-                func._flow_aggregate = grouper
+                func._flow_aggregate = (grouper, None)
+
+            if not getattr(func, '_flow_select', False):
+                func._flow_select = functools.partial(filter, None)
 
             # Construct FlowOperation:
             if getattr(func, '_flow_cmd', False):
@@ -3423,8 +3478,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for cls in type(self).__mro__:
             group_entries.extend(getattr(cls, '_GROUPS', []))
         flow_aggregate = dict()
+        flow_select = dict()
         for op_name in self._operations:
             flow_aggregate[op_name] = self._operation_functions[op_name]._flow_aggregate
+            flow_select[op_name] = self._operation_functions[op_name]._flow_select
         # Initialize all groups without operations
         for entry in group_entries:
             self._groups[entry.name] = FlowGroup(entry.name, options=entry.options)
@@ -3443,6 +3500,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         op_name, op, operation_directives.get(group_name, None))
                     self._groups[group_name].add_flow_aggregate(
                         op_name, flow_aggregate[op_name])
+                    self._groups[group_name].add_flow_select(
+                        op_name, flow_select[op_name])
 
             # For singleton groups add directives
             self._groups[op_name].operation_directives[op_name] = getattr(func,

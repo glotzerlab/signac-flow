@@ -18,6 +18,7 @@ from .project import FlowProject
 from .project import JobOperation
 from .project import label
 from .project import classlabel
+from .project import select
 from .project import staticlabel
 from .operations import cmd
 from .operations import directives
@@ -52,6 +53,7 @@ __all__ = [
     'get_environment',
     'init',
     'redirect_log',
+    'select',
     'with_job',
     '__version__',
     ]

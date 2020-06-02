@@ -293,11 +293,11 @@ class aggregate(object):
                                                                 reverse=reverse)
 
     @classmethod
-    def groupsof(cls, num=1, fillvalue=None, sort=None, reverse=False):
+    def groupsof(cls, num=1, sort=None, reverse=False):
         # copied from: https://docs.python.org/3/library/itertools.html#itertools.zip_longest
         def grouper(jobs):
             args = [iter(jobs)] * num
-            return zip_longest(*args, fillvalue=fillvalue)
+            return zip_longest(*args)
 
         return cls(grouper, sort, reverse)
 
@@ -1106,6 +1106,10 @@ class FlowGroup(object):
             jobs_list = grouper([job for job in jobs_list])
             jobs_list = [[j for j in job] for job in jobs_list]
             for job_list in jobs_list:
+                for i, job in enumerate(job_list):
+                    if not isinstance(job, signac.contrib.job.Job):
+                        del job_list[i:]
+                        break
                 eligible = op.eligible(job_list, ignore_conditions)
                 if eligible:
                     directives = self._resolve_directives(name, default_directives, job_list)
@@ -2496,8 +2500,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         def select(operation):
             for job in operation.jobs:
                 if job not in self:
-                    raise ValueError("Job {} is not present"
-                                     "in the proect").format(job)
+                    raise ValueError("Job {} is not present "
+                                     "in the project".format(job))
 
             if num is not None and select.total_execution_count >= num:
                 reached_execution_limit.set()
@@ -3360,14 +3364,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             raise ValueError("A group with name '{}' is already registered.".format(name))
 
         signature = inspect.signature(func)
+        total_params = len(signature.parameters)
         for i, (k, v) in enumerate(signature.parameters.items()):
             if (
-                    i and v.default is inspect.Parameter.empty and
-                    not v.kind == v.kind is inspect.Parameter.VAR_POSITIONAL
+                    i != total_params - 1 and
+                    v.kind == v.kind is inspect.Parameter.VAR_POSITIONAL
                ):
                 raise ValueError(
-                    "Only the first argument in an operation argument may not have "
-                    "a default value! ({})".format(name))
+                    "The variable parameter '{}' in the operation '{}' should be "
+                    "the last parameter!".format(k, name))
 
         # Append the name and function to the class registry
         cls._OPERATION_FUNCTIONS.append((name, func))
@@ -3424,7 +3429,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if not getattr(func, '_flow_aggregate', False):
                 def grouper(jobs):
                     args = [iter(jobs)] * 1
-                    return zip_longest(*args, fillvalue=None)
+                    return zip_longest(*args)
                 func._flow_aggregate = (grouper, None)
 
             if not getattr(func, '_flow_select', False):
@@ -4014,10 +4019,6 @@ def _update_status(args):
 def _update_job_status(job, scheduler_jobs):
     "Update the status entry for job."
     update_status(job, scheduler_jobs)
-
-
-def deeplist(t):
-    return list(map(deeplist, t)) if isinstance(t, (list, tuple)) else t
 
 
 __all__ = [

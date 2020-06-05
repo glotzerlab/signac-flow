@@ -950,16 +950,11 @@ class FlowGroup(object):
         """
         return set(self).isdisjoint(set(group))
 
-    def calc_id_str(self, jobs, upto=None):
-        jobstr = ''
-        length_not_defined = False
-        if upto is None:
-            length_not_defined = True
-        for job in jobs:
-            if length_not_defined:
-                upto = len(str(job.id))
-            jobstr += str(job.id)[:upto]+'-'
-        return jobstr.strip('-')
+    def get_aggregate_hash(self, jobs):
+        return calc_id('-'.join(map(str, jobs)))
+
+    def job_ids_seperated(self, jobs, upto=None):
+        return '-'.join(map(str, jobs))
 
     def _generate_id(self, jobs, operation_name=None, index=0):
         "Return an id, which identifies this group with respect to this job."
@@ -974,7 +969,7 @@ class FlowGroup(object):
         else:
             op_string = operation_name
 
-        job_id = self.calc_id_str(jobs)
+        job_id = self.job_ids_seperated(jobs)
         full_name = '{}%{}%{}%{}'.format(project.root_directory(),
                                          job_id,
                                          op_string,
@@ -991,12 +986,12 @@ class FlowGroup(object):
         if max_len < len(job_op_id):
             raise ValueError("Value for MAX_LEN_ID is too small ({}).".format(self.MAX_LEN_ID))
 
-        concat_jobs = self.calc_id_str(jobs, upto=8)
+        aggregate_hash = self.get_aggregate_hash(jobs)
         separator = getattr(project._environment, 'JOB_ID_SEPARATOR', '/')
         readable_name = '{project}{sep}{job}{sep}{op_string}{sep}{index:04d}{sep}'.format(
                     sep=separator,
                     project=str(project)[:12],
-                    job=concat_jobs,
+                    job=aggregate_hash[:8],
                     op_string=op_string[:12],
                     index=index)[:max_len]
 

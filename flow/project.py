@@ -24,10 +24,12 @@ from deprecation import deprecated
 from collections import defaultdict
 from collections import OrderedDict
 from collections import Counter
+from collections.abc import Iterable
 from copy import deepcopy
 from itertools import islice
 from itertools import count
 from itertools import groupby
+from itertools import zip_longest
 from hashlib import sha1
 import multiprocessing
 import threading
@@ -38,12 +40,6 @@ from multiprocessing.pool import ThreadPool
 from multiprocessing import Event
 import jinja2
 from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
-import six
-from six.moves import zip_longest
-if six.PY2:
-    from collections import Iterable
-else:
-    from collections.abc import Iterable
 from tqdm import tqdm
 
 import signac
@@ -287,10 +283,10 @@ class aggregate(object):
             except KeyError:
                 raise KeyError("The key '{}' was not found in statepoint "
                                "parameters of the job {}.".format(sort, job))
-        self.grouper = grouper
-        self.sort = None if sort is None else functools.partial(sorted,
-                                                                key=key_sort,
-                                                                reverse=reverse)
+        self._grouper = grouper
+        self._sort = None if sort is None else functools.partial(sorted,
+                                                                 key=key_sort,
+                                                                 reverse=reverse)
 
     @classmethod
     def groupsof(cls, num=1, sort=None, reverse=False):
@@ -303,7 +299,7 @@ class aggregate(object):
 
     @classmethod
     def groupby(cls, key=None, default=None, sort=None, reverse=False):
-        if isinstance(key, six.string_types):
+        if isinstance(key, str):
             if default is None:
                 def keyfunction(job):
                     return job.sp[key]
@@ -312,12 +308,13 @@ class aggregate(object):
                     return job.sp.get(key, default)
 
         elif isinstance(key, Iterable):
+            key = list(key)
             if default is None:
                 def keyfunction(job):
-                    return tuple(job.sp[k] for k in key)
+                    return [job.sp[k] for k in key]
             else:
                 def keyfunction(job):
-                    return tuple(job.sp.get(k, default) for k in key)
+                    return [job.sp.get(k, default) for k in key]
 
         elif key is None:
             # Must return a type that can be ordered with <, >
@@ -334,7 +331,7 @@ class aggregate(object):
         return cls(grouper, sort, reverse)
 
     def __call__(self, func):
-        setattr(func, '_flow_aggregate', (self.grouper, self.sort))
+        setattr(func, '_flow_aggregate', (self._grouper, self._sort))
         return func
 
 
@@ -493,7 +490,7 @@ class FlowCondition(object):
     def __init__(self, callback):
         self._callback = callback
 
-    def __call__(self, jobs):
+    def __call__(self, *jobs):
         if self._callback is None:
             return True
         try:
@@ -575,10 +572,10 @@ class BaseFlowOperation(object):
                 "must be a member of class IgnoreConditions")
         # len(self._prereqs) check for speed optimization
         pre = (not len(self._prereqs)) or (ignore_conditions & IgnoreConditions.PRE) \
-            or all(cond(jobs) for cond in self._prereqs)
+            or all(cond(*jobs) for cond in self._prereqs)
         if pre and len(self._postconds):
             post = (ignore_conditions & IgnoreConditions.POST) \
-                or any(not cond(jobs) for cond in self._postconds)
+                or any(not cond(*jobs) for cond in self._postconds)
         else:
             post = True
         return pre and post
@@ -586,7 +583,7 @@ class BaseFlowOperation(object):
     def complete(self, jobs):
         "True when all post-conditions are met."
         if len(self._postconds):
-            return all(cond(jobs) for cond in self._postconds)
+            return all(cond(*jobs) for cond in self._postconds)
         else:
             return False
 
@@ -767,8 +764,8 @@ class FlowGroup(object):
 
     MAX_LEN_ID = 100
 
-    def __init__(self, name, flow_aggregate=None, operations=None,
-                 operation_directives=None, options="", flow_select=None):
+    def __init__(self, name, operations=None, operation_directives=None,
+                 options="", flow_aggregate=None, flow_select=None):
         self.name = name
         self.options = options
         self.operations = dict() if operations is None else operations
@@ -779,7 +776,7 @@ class FlowGroup(object):
         self.flow_aggregate = dict() if flow_aggregate is None else flow_aggregate
         self.flow_select = dict() if flow_select is None else flow_select
 
-    def _set_entrypoint_item(self, entrypoint, directives, key, default, job):
+    def _set_entrypoint_item(self, entrypoint, directives, key, default, jobs):
         """Set a value (executable, path) for entrypoint in command.
 
         Order of priority is the operation directives specified and
@@ -787,17 +784,17 @@ class FlowGroup(object):
         """
         entrypoint[key] = directives.get(key, entrypoint.get(key, default))
         if callable(entrypoint[key]):
-            entrypoint[key] = entrypoint[key](job)
+            entrypoint[key] = entrypoint[key](*jobs)
 
-    def _determine_entrypoint(self, entrypoint, directives, job):
+    def _determine_entrypoint(self, entrypoint, directives, jobs):
         """Get the entrypoint for creating a JobOperation.
 
         If path cannot be determined, then raise a RuntimeError since we do not
         know where to point to.
         """
         entrypoint = entrypoint.copy()
-        self._set_entrypoint_item(entrypoint, directives, 'executable', sys.executable, job)
-        self._set_entrypoint_item(entrypoint, directives, 'path', None, job)
+        self._set_entrypoint_item(entrypoint, directives, 'executable', sys.executable, jobs)
+        self._set_entrypoint_item(entrypoint, directives, 'path', None, jobs)
         if entrypoint['path'] is None:
             raise RuntimeError("Entrypoint path not set.")
         else:
@@ -847,19 +844,13 @@ class FlowGroup(object):
             return cmd.strip()
 
     def _run_cmd(self, entrypoint, operation_name, operation, directives, jobs):
-        jobstr = deepcopy(jobs)
-        if not isinstance(jobs, signac.contrib.job.Job):
-            if not isinstance(jobs, list):
-                jobs = list(jobs)
-            jobstr = ' '.join(map(str, jobs))
         if isinstance(operation, FlowCmdOperation):
             return operation(jobs).lstrip()
         else:
-            if isinstance(jobs, list):
-                entrypoint = self._determine_entrypoint(entrypoint, directives, jobs)
-            else:
-                entrypoint = self._determine_entrypoint(entrypoint, directives, jobs[0])
-            return '{} exec {} {}'.format(entrypoint, operation_name, jobstr).lstrip()
+            entrypoint = self._determine_entrypoint(entrypoint, directives, jobs)
+            return '{} exec {} {}'.format(
+                    entrypoint, operation_name, ' '.join(map(str, jobs))
+                ).lstrip()
 
     def __iter__(self):
         yield from self.operations.values()
@@ -894,20 +885,20 @@ class FlowGroup(object):
         """
         return any(op.eligible(jobs, ignore_conditions) for op in self)
 
-    def complete(self, job):
+    def complete(self, jobs):
         """True when all BaseFlowOperation post-conditions are met.
 
         :param job:
-            A :class:`signac.Job` from the signac workspace.
+            A list of :class:`signac.Job` from the signac workspace.
         :type job:
-            :class:`signac.Job`
+            list
         :return:
             Whether the group is complete (all contained operations are
             complete).
         :rtype:
             bool
         """
-        return all(op.complete(job) for op in self)
+        return all(op.complete(jobs) for op in self)
 
     def add_operation(self, name, operation, directives=None):
         """Add an operation to the FlowGroup.
@@ -950,10 +941,13 @@ class FlowGroup(object):
         """
         return set(self).isdisjoint(set(group))
 
-    def get_aggregate_hash(self, jobs):
-        return calc_id('-'.join(map(str, jobs)))
+    def _get_aggregate_job_ids(self, jobs):
+        if len(jobs) > 1:
+            return str(jobs[0])[:8]+'-'+str(jobs[-1])[:8]
+        else:
+            return str(jobs[0])[:8]
 
-    def job_ids_seperated(self, jobs, upto=None):
+    def _job_ids_seperated(self, jobs, upto=None):
         return '-'.join(map(str, jobs))
 
     def _generate_id(self, jobs, operation_name=None, index=0):
@@ -969,7 +963,7 @@ class FlowGroup(object):
         else:
             op_string = operation_name
 
-        job_id = self.job_ids_seperated(jobs)
+        job_id = self._job_ids_seperated(jobs)
         full_name = '{}%{}%{}%{}'.format(project.root_directory(),
                                          job_id,
                                          op_string,
@@ -986,12 +980,13 @@ class FlowGroup(object):
         if max_len < len(job_op_id):
             raise ValueError("Value for MAX_LEN_ID is too small ({}).".format(self.MAX_LEN_ID))
 
-        aggregate_hash = self.get_aggregate_hash(jobs)
+        aggregate_id = self._get_aggregate_job_ids(jobs)
         separator = getattr(project._environment, 'JOB_ID_SEPARATOR', '/')
-        readable_name = '{project}{sep}{job}{sep}{op_string}{sep}{index:04d}{sep}'.format(
+        readable_name = '{project}{sep}{job}{sep}{len}{sep}{op_string}{sep}{index:04d}{sep}'.format(
                     sep=separator,
                     project=str(project)[:12],
-                    job=aggregate_hash[:8],
+                    job=aggregate_id,
+                    len=len(jobs),
                     op_string=op_string[:12],
                     index=index)[:max_len]
 
@@ -1093,16 +1088,21 @@ class FlowGroup(object):
         """
 
         for name, op in self.operations.items():
+            # For every operation, firstly jobs are filtered according to some valid function
+            # whose information is given in the :class:`~.select`, then grouped according to
+            # the valid grouper functions and eventually sorted according to some state-point
+            # parameter whose information is given in the :class:`~.aggregate`.
             filter = self.flow_select[name]
             grouper, sort = self.flow_aggregate[name]
             jobs_list = filter(jobs)
             if sort is not None:
                 jobs_list = sort(jobs_list)
             jobs_list = grouper([job for job in jobs_list])
-            jobs_list = [[j for j in job] for job in jobs_list]
             for job_list in jobs_list:
+                # Ensuring list
+                job_list = list(job_list)
                 for i, job in enumerate(job_list):
-                    if not isinstance(job, signac.contrib.job.Job):
+                    if job is None:
                         del job_list[i:]
                         break
                 eligible = op.eligible(job_list, ignore_conditions)

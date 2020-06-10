@@ -464,12 +464,12 @@ class JobOperation(object):
 
     def set_status(self, value):
         "Store the operation's status."
-        self.job._project.document.setdefault('_status', dict())[self.id] = int(value)
+        self.jobs[0]._project.document.setdefault('_status', dict())[self.id] = int(value)
 
     def get_status(self):
         "Retrieve the operation's last known status."
         try:
-            return JobStatus(self.jobs._project.document['_status'][self.id])
+            return JobStatus(self.jobs[0]._project.document['_status'][self.id])
         except KeyError:
             return JobStatus.unknown
 
@@ -832,10 +832,10 @@ class FlowGroup(object):
                 return value
         return {key: evaluate(value) for key, value in directives.items()}
 
-    def _submit_cmd(self, entrypoint, ignore_conditions, parallel, job=None):
-        entrypoint = self._determine_entrypoint(entrypoint, dict(), job)
+    def _submit_cmd(self, entrypoint, ignore_conditions, parallel, jobs=None):
+        entrypoint = self._determine_entrypoint(entrypoint, dict(), jobs)
         cmd = "{} run -o {}".format(entrypoint, self.name)
-        cmd = cmd if job is None else cmd + ' -j {}'.format(job)
+        cmd = cmd if jobs is None else cmd + ' -j {}'.format(' '.join(map(str, jobs)))
         cmd = cmd if not parallel else cmd + " --parallel"
         cmd = cmd if self.options is None else cmd + ' ' + self.options
         if ignore_conditions != IgnoreConditions.NONE:
@@ -982,11 +982,13 @@ class FlowGroup(object):
 
         aggregate_id = self._get_aggregate_job_ids(jobs)
         separator = getattr(project._environment, 'JOB_ID_SEPARATOR', '/')
-        readable_name = '{project}{sep}{job}{sep}{len}{sep}{op_string}{sep}{index:04d}{sep}'.format(
+        readable_name = '{project}{sep}{job}{sep}{len}{sep}{group}{sep}' \
+                    '{op_string}{sep}{index:04d}{sep}'.format(
                     sep=separator,
                     project=str(project)[:12],
                     job=aggregate_id,
                     len=len(jobs),
+                    group=self.name,
                     op_string=op_string[:12],
                     index=index)[:max_len]
 
@@ -1000,7 +1002,42 @@ class FlowGroup(object):
         except KeyError:
             return JobStatus.unknown
 
-    def _create_submission_job_operation(self, entrypoint, default_directives, job,
+    def _get_filtered_jobs(self, jobs, operation_name):
+        "Returns filtered jobs for a given operation name"
+        jobs = list(jobs)
+        filter = self.flow_select[operation_name]
+        grouper, sort = self.flow_aggregate[operation_name]
+        jobs_list = filter(deepcopy(jobs))
+        if sort is not None:
+            jobs_list = sort(jobs_list)
+        jobs_list = grouper([job for job in jobs_list])
+        return jobs_list
+
+    def _get_filtered_job_id_per_operation(self, jobs, index=0):
+        """For any group, create filtered job lists.
+
+        Jobs are filtered using the attributes flow_select and flow_aggregate.
+
+        :param jobs:
+            The list of jobs that the :class:`~.JobOperation` is based on.
+        :type jobs:
+            list
+        :param operation_names:
+            List of names of the operations present in FlowGroup instance
+        :type name:
+            list
+        """
+        for name in self.operations:
+            jobs_list = self._get_filtered_jobs(jobs, name)
+            for job_list in jobs_list:
+                job_list = list(job_list)
+                for i, job in enumerate(job_list):
+                    if job is None:
+                        del job_list[i:]
+                        break
+                yield self._generate_id(job_list, name, index=index)
+
+    def _create_submission_job_operation(self, entrypoint, default_directives, jobs,
                                          ignore_conditions_on_execution=IgnoreConditions.NONE,
                                          parallel=False, index=0):
         """Create a JobOperation object from the FlowGroup.
@@ -1017,10 +1054,10 @@ class FlowGroup(object):
             the argument can be set to an empty dictionary. This must be done explicitly, however.
         :type default_directives:
             dict
-        :param job:
-            The job that the :class:`~.JobOperation` is based on.
-        :type job:
-            :class:`signac.Job`
+        :param jobs:
+            The list of jobs that the :class:`~.JobOperation` is based on.
+        :type jobs:
+            list
         :param ignore_conditions:
             Specify if pre and/or post conditions check is to be ignored for
             checking submission eligibility. The default is `IgnoreConditions.NONE`.
@@ -1047,15 +1084,24 @@ class FlowGroup(object):
         :rtype:
             :py:class:`JobOperation`
         """
-        uneval_cmd = functools.partial(self._submit_cmd, entrypoint=entrypoint, job=job,
-                                       ignore_conditions=ignore_conditions_on_execution,
-                                       parallel=parallel)
-        submission_directives = self._get_submission_directives(default_directives, job, parallel)
-        return JobOperation(self._generate_id(job, index=index),
-                            self.name,
-                            job,
-                            cmd=uneval_cmd,
-                            directives=submission_directives)
+        for name in self.operations:
+            jobs_list = self._get_filtered_jobs(deepcopy(jobs), name)
+            for job_list in jobs_list:
+                # Ensuring list
+                job_list = list(job_list)
+                for i, job in enumerate(job_list):
+                    if job is None:
+                        del job_list[i:]
+                        break
+                uneval_cmd = functools.partial(self._submit_cmd, entrypoint=entrypoint, jobs=job_list,
+                                            ignore_conditions=ignore_conditions_on_execution,
+                                            parallel=parallel)
+                submission_directives = self._get_submission_directives(default_directives, job_list, parallel)
+                yield JobOperation(self._generate_id(job_list, name, index=index),
+                                name,
+                                job_list,
+                                cmd=uneval_cmd,
+                                directives=submission_directives)
 
     def _create_run_job_operations(self, entrypoint, default_directives, jobs,
                                    ignore_conditions=IgnoreConditions.NONE, index=0):
@@ -1092,12 +1138,7 @@ class FlowGroup(object):
             # whose information is given in the :class:`~.select`, then grouped according to
             # the valid grouper functions and eventually sorted according to some state-point
             # parameter whose information is given in the :class:`~.aggregate`.
-            filter = self.flow_select[name]
-            grouper, sort = self.flow_aggregate[name]
-            jobs_list = filter(jobs)
-            if sort is not None:
-                jobs_list = sort(jobs_list)
-            jobs_list = grouper([job for job in jobs_list])
+            jobs_list = self._get_filtered_jobs(deepcopy(jobs), name)
             for job_list in jobs_list:
                 # Ensuring list
                 job_list = list(job_list)
@@ -1738,11 +1779,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             scheduler_info = {sjob.name(): sjob.status() for sjob in self.scheduler_jobs(scheduler)}
             status = dict()
             print("Query scheduler...", file=file)
-            for job in tqdm(jobs,
-                            desc="Fetching operation status",
-                            total=len(jobs), file=file):
-                for group in self._groups.values():
-                    _id = group._generate_id(job)
+            for group in self._groups.values():
+                _ids = group._get_filtered_job_id_per_operation(jobs)
+                _ids = list(_ids)
+                for _id in tqdm(_ids, desc="Fetching job-operation status for operation '{}'".format(group.name), file=file, total=len(_ids)):
                     status[_id] = int(scheduler_info.get(_id, JobStatus.unknown))
             self.document._status.update(status)
         except NoSchedulerError:
@@ -2608,14 +2648,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                    ignore_conditions=IgnoreConditions.NONE,
                                    ignore_conditions_on_execution=IgnoreConditions.NONE):
         """Grabs JobOperations that are eligible to run from FlowGroups."""
-        for job in jobs:
-            for group in self._gather_flow_groups(names):
-                if group.eligible(job, ignore_conditions) and self._eligible_for_submission(group,
-                                                                                            job):
-                    yield group._create_submission_job_operation(
-                            entrypoint=self._entrypoint, default_directives=default_directives,
-                            job=job, parallel=parallel, index=0,
-                            ignore_conditions_on_execution=ignore_conditions_on_execution)
+        operations = []
+        for group in self._gather_flow_groups(names):
+            # if group.eligible(jobs, ignore_conditions) and self._eligible_for_submission(group,
+            #                                                                             jobs):
+            operations.extend(group._create_submission_job_operation(
+                    entrypoint=self._entrypoint, default_directives=default_directives,
+                    jobs=jobs, parallel=parallel, index=0,
+                    ignore_conditions_on_execution=ignore_conditions_on_execution))
+
+        return operations
 
     def _get_pending_operations(self, jobs, operation_names=None,
                                 ignore_conditions=IgnoreConditions.NONE):

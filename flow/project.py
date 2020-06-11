@@ -773,8 +773,8 @@ class FlowGroup(object):
             self.operation_directives = dict()
         else:
             self.operation_directives = operation_directives
-        self.flow_aggregate = dict() if flow_aggregate is None else flow_aggregate
-        self.flow_select = dict() if flow_select is None else flow_select
+        self.flow_aggregate = flow_aggregate
+        self.flow_select = flow_select
 
     def _set_entrypoint_item(self, entrypoint, directives, key, default, jobs):
         """Set a value (executable, path) for entrypoint in command.
@@ -900,7 +900,7 @@ class FlowGroup(object):
         """
         return all(op.complete(jobs) for op in self)
 
-    def add_operation(self, name, operation, directives=None):
+    def add_operation(self, name, operation, directives=None, flow_aggregate=None, flow_select=None):
         """Add an operation to the FlowGroup.
 
         :param name:
@@ -916,15 +916,102 @@ class FlowGroup(object):
         :type directives:
             dict
         """
+        if not len(self.operations):
+            self.flow_aggregate = flow_aggregate
+            self.flow_select = flow_select
+        else:
+            closure_consts = []
+            closure_self_consts = []
+            closure_freevars = []
+            closure_self_freevars = []
+            if flow_aggregate[0].__closure__ is not None:
+                for cl in flow_aggregate[0].__closure__:
+                    try:
+                        closure_consts.append(cl.cell_contents.__code__.co_consts)
+                    except Exception:
+                        closure_consts.append(cl.cell_contents)
+                    try:
+                        closure_freevars.append(cl.cell_contents.__code__.co_freevars)
+                    except Exception:
+                        closure_freevars.append(cl.cell_contents)
+            if self.flow_aggregate[0].__closure__ is not None:
+                for self_cl in self.flow_aggregate[0].__closure__:
+                    try:
+                        closure_self_consts.append(self_cl.cell_contents.__code__.co_consts)
+                    except Exception:
+                        closure_self_consts.append(self_cl.cell_contents)
+                    try:
+                        closure_self_freevars.append(self_cl.cell_contents.__code__.co_freevars)
+                    except:
+                        closure_self_freevars.append(self_cl.cell_contents)
+
+            raiseError = False
+            if self.flow_aggregate[0].__code__.co_consts != flow_aggregate[0].__code__.co_consts:
+                raiseError = True
+            elif self.flow_aggregate[0].__code__.co_freevars != flow_aggregate[0].__code__.co_freevars:
+                raiseError = True
+            elif closure_consts != closure_self_consts or \
+                 closure_freevars != closure_self_freevars:
+                raiseError = True
+
+            try:
+                if self.flow_select.args[0].__code__.co_consts != \
+                   flow_select.args[0].__code__.co_consts or \
+                   self.flow_select.args[0].__code__.co_freevars != \
+                   flow_select.args[0].__code__.co_freevars:
+                    raiseError = True
+            except Exception:
+                raiseError = not (self.flow_select.args[0] == flow_select.args[0])
+
+            try:
+                if self.flow_aggregate[1].keywords['key'].__code__.co_consts != \
+                   flow_aggregate[1].keywords['key'].__code__.co_consts or \
+                   self.flow_aggregate[1].keywords['key'].__code__.co_freevars != \
+                   flow_aggregate[1].keywords['key'].__code__.co_freevars or \
+                   self.flow_aggregate[1].keywords['reverse'] != \
+                   flow_aggregate[1].keywords['reverse']:
+                    raiseError = True
+            except Exception:
+                raiseError = not (self.flow_aggregate[1].keywords['key'] == flow_aggregate[1].keywords['key']) or \
+                             not (self.flow_aggregate[1].keywords['reverse'] == flow_aggregate[1].keywords['reverse'])
+
+            closure_consts = []
+            closure_self_consts = []
+            closure_freevars = []
+            closure_self_freevars = []
+
+            if flow_aggregate[1].keywords['key'].__closure__ is not None:
+                for cl in flow_aggregate[1].keywords['key'].__closure__:
+                    try:
+                        closure_consts.append(cl.cell_contents.__code__.co_consts)
+                    except Exception:
+                        closure_consts.append(cl.cell_contents)
+                    try:
+                        closure_freevars.append(cl.cell_contents.__code__.co_freevars)
+                    except Exception:
+                        closure_freevars.append(cl.cell_contents)
+            if self.flow_aggregate[1].keywords['key'].__closure__ is not None:
+                for self_cl in self.flow_aggregate[1].keywords['key'].__closure__:
+                    try:
+                        closure_self_consts.append(self_cl.cell_contents.__code__.co_consts)
+                    except Exception:
+                        closure_self_consts.append(self_cl.cell_contents)
+                    try:
+                        closure_self_freevars.append(self_cl.cell_contents.__code__.co_freevars)
+                    except:
+                        closure_self_freevars.append(self_cl.cell_contents)
+
+            if closure_consts != closure_self_consts or \
+                 closure_freevars != closure_self_freevars:
+                raiseError = True
+
+            if raiseError:
+                raise ValueError("Can't add the operation '{}' to the group '{}' "
+                                 "due to different aggregate parameters.".format(name, self.name))
+
         self.operations[name] = operation
         if directives is not None:
             self.operation_directives[name] = directives
-
-    def add_flow_aggregate(self, name, flow_aggregate):
-        self.flow_aggregate[name] = flow_aggregate
-
-    def add_flow_select(self, name, flow_select):
-        self.flow_select[name] = flow_select
 
     def isdisjoint(self, group):
         """Returns whether two groups are disjoint (do not share any common operations).
@@ -1092,8 +1179,8 @@ class FlowGroup(object):
             # whose information is given in the :class:`~.select`, then grouped according to
             # the valid grouper functions and eventually sorted according to some state-point
             # parameter whose information is given in the :class:`~.aggregate`.
-            filter = self.flow_select[name]
-            grouper, sort = self.flow_aggregate[name]
+            filter = self.flow_select
+            grouper, sort = self.flow_aggregate
             jobs_list = filter(jobs)
             if sort is not None:
                 jobs_list = sort(jobs_list)
@@ -3497,11 +3584,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 operation_directives = getattr(func, '_flow_group_operation_directives', dict())
                 for group_name in func._flow_groups:
                     self._groups[group_name].add_operation(
-                        op_name, op, operation_directives.get(group_name, None))
-                    self._groups[group_name].add_flow_aggregate(
-                        op_name, flow_aggregate[op_name])
-                    self._groups[group_name].add_flow_select(
-                        op_name, flow_select[op_name])
+                        op_name, op, operation_directives.get(group_name, None),
+                        flow_aggregate[op_name], flow_select[op_name])
 
             # For singleton groups add directives
             self._groups[op_name].operation_directives[op_name] = getattr(func,

@@ -283,6 +283,16 @@ class aggregate(object):
             except KeyError:
                 raise KeyError("The key '{}' was not found in statepoint "
                                "parameters of the job {}.".format(sort, job))
+
+        if not callable(grouper):
+            raise TypeError("Expected callable grouper function, got {}".format(type(grouper)))
+
+        if sort is not None and not isinstance(sort, str):
+            raise TypeError("Expected string sort parameter, got {}".format(type(sort)))
+
+        if not isinstance(reverse, bool):
+            raise TypeError("Expected bool reverse parameter got {}".format(type(reverse)))
+
         self._grouper = grouper
         self._sort = None if sort is None else functools.partial(sorted,
                                                                  key=key_sort,
@@ -353,6 +363,8 @@ class select(object):
     """
 
     def __init__(self, filterby=None):
+        if not callable(filterby):
+            raise TypeError("Expected callable filterby function, got {}".format(type(filterby)))
         self._filter = functools.partial(filter, filterby)
 
     def __call__(self, func):
@@ -760,6 +772,16 @@ class FlowGroup(object):
         This lets options like ``--num_passes`` to be given to a group.
     :type options:
         str
+    :param flow_aggregate:
+        The operation specific aggregate parameters specified
+        using the :py:class:`aggregate`
+    :type flow_aggregate:
+            tuple
+    :param flow_select:
+            The operation specific filter parameters specified
+            using the :py:class:`select`
+    :type flow_select:
+            callable
     """
 
     MAX_LEN_ID = 100
@@ -900,7 +922,8 @@ class FlowGroup(object):
         """
         return all(op.complete(jobs) for op in self)
 
-    def add_operation(self, name, operation, directives=None, flow_aggregate=None, flow_select=None):
+    def add_operation(self, name, operation, directives=None,
+                      flow_aggregate=None, flow_select=None):
         """Add an operation to the FlowGroup.
 
         :param name:
@@ -915,6 +938,16 @@ class FlowGroup(object):
             The operation specific directives.
         :type directives:
             dict
+        :param flow_aggregate:
+            The operation specific aggregate parameters specified
+            using the :py:class:`aggregate`
+        :type flow_aggregate:
+            tuple
+        :param flow_select:
+            The operation specific filter parameters specified
+            using the :py:class:`select`
+        :type flow_select:
+            callable
         """
         if not len(self.operations):
             self.flow_aggregate = flow_aggregate
@@ -924,6 +957,7 @@ class FlowGroup(object):
             closure_self_consts = []
             closure_freevars = []
             closure_self_freevars = []
+
             if flow_aggregate[0].__closure__ is not None:
                 for cl in flow_aggregate[0].__closure__:
                     try:
@@ -934,6 +968,7 @@ class FlowGroup(object):
                         closure_freevars.append(cl.cell_contents.__code__.co_freevars)
                     except Exception:
                         closure_freevars.append(cl.cell_contents)
+
             if self.flow_aggregate[0].__closure__ is not None:
                 for self_cl in self.flow_aggregate[0].__closure__:
                     try:
@@ -942,72 +977,83 @@ class FlowGroup(object):
                         closure_self_consts.append(self_cl.cell_contents)
                     try:
                         closure_self_freevars.append(self_cl.cell_contents.__code__.co_freevars)
-                    except:
+                    except Exception:
                         closure_self_freevars.append(self_cl.cell_contents)
+
+            if flow_select.args[0] is not None:
+                if flow_select.args[0].__closure__ is not None:
+                    for cl in flow_select.args[0].__closure__:
+                        try:
+                            closure_consts.append(cl.cell_contents.__code__.co_consts)
+                        except Exception:
+                            closure_consts.append(cl.cell_contents)
+                        try:
+                            closure_freevars.append(cl.cell_contents.__code__.co_freevars)
+                        except Exception:
+                            closure_freevars.append(cl.cell_contents)
+
+                if self.flow_select.args[0].__closure__ is not None:
+                    for self_cl in self.flow_select.args[0].__closure__:
+                        try:
+                            closure_self_consts.append(self_cl.cell_contents.__code__.co_consts)
+                        except Exception:
+                            closure_self_consts.append(self_cl.cell_contents)
+                        try:
+                            closure_self_freevars.append(self_cl.cell_contents.__code__.co_freevars)
+                        except Exception:
+                            closure_self_freevars.append(self_cl.cell_contents)
 
             raiseError = False
             if self.flow_aggregate[0].__code__.co_consts != flow_aggregate[0].__code__.co_consts:
                 raiseError = True
-            elif self.flow_aggregate[0].__code__.co_freevars != flow_aggregate[0].__code__.co_freevars:
+            elif (
+                self.flow_aggregate[0].__code__.co_freevars !=
+                flow_aggregate[0].__code__.co_freevars
+            ):
                 raiseError = True
-            elif closure_consts != closure_self_consts or \
-                 closure_freevars != closure_self_freevars:
-                raiseError = True
-
-            try:
-                if self.flow_select.args[0].__code__.co_consts != \
-                   flow_select.args[0].__code__.co_consts or \
-                   self.flow_select.args[0].__code__.co_freevars != \
-                   flow_select.args[0].__code__.co_freevars:
-                    raiseError = True
-            except Exception:
-                raiseError = not (self.flow_select.args[0] == flow_select.args[0])
-
-            try:
-                if self.flow_aggregate[1].keywords['key'].__code__.co_consts != \
-                   flow_aggregate[1].keywords['key'].__code__.co_consts or \
-                   self.flow_aggregate[1].keywords['key'].__code__.co_freevars != \
-                   flow_aggregate[1].keywords['key'].__code__.co_freevars or \
-                   self.flow_aggregate[1].keywords['reverse'] != \
-                   flow_aggregate[1].keywords['reverse']:
-                    raiseError = True
-            except Exception:
-                raiseError = not (self.flow_aggregate[1].keywords['key'] == flow_aggregate[1].keywords['key']) or \
-                             not (self.flow_aggregate[1].keywords['reverse'] == flow_aggregate[1].keywords['reverse'])
-
-            closure_consts = []
-            closure_self_consts = []
-            closure_freevars = []
-            closure_self_freevars = []
-
-            if flow_aggregate[1].keywords['key'].__closure__ is not None:
-                for cl in flow_aggregate[1].keywords['key'].__closure__:
-                    try:
-                        closure_consts.append(cl.cell_contents.__code__.co_consts)
-                    except Exception:
-                        closure_consts.append(cl.cell_contents)
-                    try:
-                        closure_freevars.append(cl.cell_contents.__code__.co_freevars)
-                    except Exception:
-                        closure_freevars.append(cl.cell_contents)
-            if self.flow_aggregate[1].keywords['key'].__closure__ is not None:
-                for self_cl in self.flow_aggregate[1].keywords['key'].__closure__:
-                    try:
-                        closure_self_consts.append(self_cl.cell_contents.__code__.co_consts)
-                    except Exception:
-                        closure_self_consts.append(self_cl.cell_contents)
-                    try:
-                        closure_self_freevars.append(self_cl.cell_contents.__code__.co_freevars)
-                    except:
-                        closure_self_freevars.append(self_cl.cell_contents)
-
-            if closure_consts != closure_self_consts or \
-                 closure_freevars != closure_self_freevars:
+            elif (
+                closure_consts != closure_self_consts or
+                closure_freevars != closure_self_freevars
+            ):
                 raiseError = True
 
             if raiseError:
                 raise ValueError("Can't add the operation '{}' to the group '{}' "
-                                 "due to different aggregate parameters.".format(name, self.name))
+                                 "due to different aggregate parameters.".
+                                 format(name, self.name))
+            try:
+                if (
+                    self.flow_select.args[0].__code__.co_consts !=
+                    flow_select.args[0].__code__.co_consts or
+                    self.flow_select.args[0].__code__.co_freevars !=
+                    flow_select.args[0].__code__.co_freevars
+                ):
+                    raise ValueError("Can't add the operation '{}' to the group '{}' "
+                                     "due to different aggregate parameters.".
+                                     format(name, self.name))
+            except Exception:
+                if not (self.flow_select.args[0] == flow_select.args[0]):
+                    raise ValueError("Can't add the operation '{}' to the group '{}' "
+                                     "due to different aggregate parameters.".
+                                     format(name, self.name))
+
+            try:
+                if (
+                    self.flow_aggregate[1].keywords['key'].__code__.co_consts !=
+                    flow_aggregate[1].keywords['key'].__code__.co_consts or
+                    self.flow_aggregate[1].keywords['key'].__code__.co_freevars !=
+                    flow_aggregate[1].keywords['key'].__code__.co_freevars or
+                    self.flow_aggregate[1].keywords['reverse'] !=
+                    flow_aggregate[1].keywords['reverse']
+                ):
+                    raise ValueError("Can't add the operation '{}' to the group '{}' "
+                                     "due to different aggregate parameters.".
+                                     format(name, self.name))
+            except Exception:
+                if not (self.flow_aggregate[1] == flow_aggregate[1]):
+                    raise ValueError("Can't add the operation '{}' to the group '{}' "
+                                     "due to different aggregate parameters.".
+                                     format(name, self.name))
 
         self.operations[name] = operation
         if directives is not None:

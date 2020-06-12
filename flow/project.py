@@ -3812,19 +3812,20 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         except KeyError:
             raise KeyError("Unknown operation '{}'.".format(args.operation))
 
-        if getattr(operation_function, '_flow_aggregate', False):
-            if isinstance(jobs, list):
-                jobs_list = operation_function._flow_aggregate(jobs)
-            else:
-                jobs_list = operation_function._flow_aggregate(
-                                [job for job in jobs]
-                            )
-            jobs_list = [[j for j in job] for job in jobs_list]
-        else:
-            raise ValueError("Grouper function of the operation {} "
-                             "not defined".format(args.operation))
+        jobs = list(jobs)
+        filter = operation_function._flow_select
+        grouper, sort = operation_function._flow_aggregate
+        jobs_list = filter(jobs)
+        if sort is not None:
+            jobs_list = sort(jobs_list)
+        jobs_list = grouper([job for job in jobs_list])
 
         for job_list in jobs_list:
+            job_list = list(job_list)
+            for i, job in enumerate(job_list):
+                if job is None:
+                    del job_list[i:]
+                    break
             operation_function(*job_list)
 
     def _select_jobs_from_args(self, args):

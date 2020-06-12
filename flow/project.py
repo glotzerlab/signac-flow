@@ -3723,7 +3723,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         "Determine the jobs that are eligible for a specific operation."
         for op in self.next_operations(self):
             if(args.name in op.name):
-                print(op.jobs)
+                print("Eligible aggregates: ", end=" ")
+                for job in op.jobs:
+                    print(job, end=" ")
+                print()
 
     def _main_run(self, args):
         "Run all (or select) job operations."

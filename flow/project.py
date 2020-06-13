@@ -1121,13 +1121,13 @@ class FlowGroup(object):
         aggregate_id = self._get_aggregate_job_ids(jobs)
         separator = getattr(project._environment, 'JOB_ID_SEPARATOR', '/')
         readable_name = '{project}{sep}{job}{sep}{len}{sep}{group}{sep}' \
-                    '{index:04d}{sep}'.format(
-                    sep=separator,
-                    project=str(project)[:12],
-                    job=aggregate_id,
-                    len=len(jobs),
-                    group=self.name,
-                    index=index)[:max_len]
+                        '{index:04d}{sep}'.format(
+                            sep=separator,
+                            project=str(project)[:12],
+                            job=aggregate_id,
+                            len=len(jobs),
+                            group=self.name,
+                            index=index)[:max_len]
 
         # By appending the unique job_op_id, we ensure that each id is truly unique.
         return readable_name + job_op_id
@@ -1212,8 +1212,8 @@ class FlowGroup(object):
             :py:class:`JobOperation`
         """
         uneval_cmd = functools.partial(self._submit_cmd, entrypoint=entrypoint, jobs=jobs,
-                                    ignore_conditions=ignore_conditions_on_execution,
-                                    parallel=parallel)
+                                       ignore_conditions=ignore_conditions_on_execution,
+                                       parallel=parallel)
         submission_directives = self._get_submission_directives(default_directives, jobs, parallel)
         return JobOperation(self._generate_id(jobs, index=index),
                             self.name,

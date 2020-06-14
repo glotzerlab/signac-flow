@@ -638,6 +638,10 @@ class FlowCmdOperation(BaseFlowOperation):
         else:
             return self._cmd.format(jobs=' '.join(map(str, jobs)))
 
+    @property
+    def cmd(self):
+        return self._cmd
+
 
 class FlowOperation(BaseFlowOperation):
     """FlowOperation holds a Python function that does not return a shell executable string.
@@ -3638,9 +3642,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             group_entries.extend(getattr(cls, '_GROUPS', []))
         flow_aggregate = dict()
         flow_select = dict()
-        for op_name in self._operations:
-            flow_aggregate[op_name] = self._operation_functions[op_name]._flow_aggregate
-            flow_select[op_name] = self._operation_functions[op_name]._flow_select
+        for op_name, op in self._operations.items():
+            try:
+                flow_aggregate[op_name] = self._operation_functions[op_name]._flow_aggregate
+                flow_select[op_name] = self._operation_functions[op_name]._flow_select
+            except KeyError:
+                flow_aggregate[op_name] = op.cmd._flow_aggregate
+                flow_select[op_name] = op.cmd._flow_select
         # Initialize all groups without operations
         for entry in group_entries:
             self._groups[entry.name] = FlowGroup(entry.name, options=entry.options)
@@ -3834,16 +3842,21 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             except KeyError:
                 operation = self._operations[args.operation]
 
-                def operation_function(jobs):
+                def operation_function(*jobs):
                     cmd = operation(jobs).format(jobs=jobs)
                     subprocess.run(cmd, shell=True, check=True)
 
         except KeyError:
             raise KeyError("Unknown operation '{}'.".format(args.operation))
 
+        try:
+            filter = operation_function._flow_select
+            grouper, sort = operation_function._flow_aggregate
+        except AttributeError:
+            filter = operation.cmd._flow_select
+            grouper, sort = operation.cmd._flow_aggregate
+
         jobs = list(jobs)
-        filter = operation_function._flow_select
-        grouper, sort = operation_function._flow_aggregate
         jobs_list = filter(jobs)
         if sort is not None:
             jobs_list = sort(jobs_list)

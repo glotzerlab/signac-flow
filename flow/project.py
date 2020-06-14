@@ -370,13 +370,16 @@ class SubmissionJobOperation(JobOperation):
     :type eligible_operations:
         list
     :param operations_with_unmet_preconditions:
-        A list of :py:class:`JobOperation` that will not be executed due to
-        unmet preconditions.
+        A list of :py:class:`JobOperation` that will not be executed in the
+        first pass of :meth:`FlowProject.run` due to unmet preconditions. These
+        operations may be executed in subsequent iterations of the run loop.
     :type operations_with_unmet_preconditions:
         list
     :param operations_with_met_postconditions:
-        A list of :py:class:`JobOperation` that will not be executed due to
-        all postconditions being met.
+        A list of :py:class:`JobOperation` that will not be executed in the
+        first pass of :meth:`FlowProject.run` because all postconditions are
+        met. These operations may be executed in subsequent iterations of the
+        run loop.
     :type operations_with_met_postconditions:
         list
     :param \*\*kwargs:
@@ -956,40 +959,36 @@ class FlowGroup(object):
         uneval_cmd = functools.partial(self._submit_cmd, entrypoint=entrypoint, job=job,
                                        ignore_conditions=ignore_conditions_on_execution,
                                        parallel=parallel)
+
+        def _get_run_ops(ignore_ops, additional_ignores_flag=IgnoreConditions.NONE):
+            """Get operations that match the combination of the conditions required by
+            _create_submission_job_operation and the ignored flags, and remove operations
+            in the ignore_ops list."""
+            return list(
+                set(self._create_run_job_operations(
+                    entrypoint=entrypoint,
+                    default_directives=default_directives,
+                    job=job,
+                    ignore_conditions=ignore_conditions_on_execution | additional_ignores_flag)
+                ) - set(ignore_ops)
+            )
+
         submission_directives = self._get_submission_directives(default_directives, job, parallel)
-        eligible_operations = list(self._create_run_job_operations(
-            entrypoint=entrypoint,
-            default_directives=default_directives,
-            job=job,
-            ignore_conditions=ignore_conditions_on_execution,
-        ))
-        operations_with_unmet_preconditions = self._create_run_job_operations(
-            entrypoint=entrypoint,
-            default_directives=default_directives,
-            job=job,
-            ignore_conditions=IgnoreConditions(
-                ignore_conditions_on_execution | IgnoreConditions.PRE)
-        )
-        operations_with_unmet_preconditions = \
-            set(operations_with_unmet_preconditions) - set(eligible_operations)
-        operations_with_met_postconditions = self._create_run_job_operations(
-            entrypoint=entrypoint,
-            default_directives=default_directives,
-            job=job,
-            ignore_conditions=IgnoreConditions(
-                ignore_conditions_on_execution | IgnoreConditions.POST)
-        )
-        operations_with_met_postconditions = \
-            set(operations_with_met_postconditions) - set(eligible_operations)
+        eligible_operations = _get_run_ops([])
+        operations_with_unmet_preconditions = _get_run_ops(
+            eligible_operations, IgnoreConditions.PRE)
+        operations_with_met_postconditions = _get_run_ops(
+            eligible_operations, IgnoreConditions.POST)
+
         submission_job_operation = SubmissionJobOperation(
             self._generate_id(job, index=index),
             self.name,
             job,
             cmd=uneval_cmd,
             directives=submission_directives,
-            eligible_operations=list(eligible_operations),
-            operations_with_unmet_preconditions=list(operations_with_unmet_preconditions),
-            operations_with_met_postconditions=list(operations_with_met_postconditions),
+            eligible_operations=eligible_operations,
+            operations_with_unmet_preconditions=operations_with_unmet_preconditions,
+            operations_with_met_postconditions=operations_with_met_postconditions,
         )
         return submission_job_operation
 

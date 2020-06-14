@@ -115,15 +115,15 @@ class IgnoreConditions(IntEnum):
     """Flags that determine which conditions are used to determine job eligibility.
 
     The options include:
+        * IgnoreConditions.NONE: check all conditions
         * IgnoreConditions.PRE: ignore pre conditions
         * IgnoreConditions.POST: ignore post conditions
         * IgnoreConditions.ALL: ignore all conditions
-        * IgnoreConditions.NONE: check all conditions
     """
+    NONE = 0
     PRE = 1
     POST = 2
     ALL = PRE | POST
-    NONE = 0
 
     def __str__(self):
         return {IgnoreConditions.PRE: 'pre', IgnoreConditions.POST: 'post',

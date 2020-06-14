@@ -7,14 +7,17 @@ class TestProject(flow.FlowProject):
     omp_num_threads = 4
     nranks = 5
 
+group1 = TestProject.make_group(name="group1")
 
 @TestProject.operation
+@group1
 def serial_op(job):
     pass
 
 
 @TestProject.operation
 @flow.directives(np=TestProject.np)
+@group1
 def parallel_op(job):
     pass
 

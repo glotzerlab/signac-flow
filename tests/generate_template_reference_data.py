@@ -188,7 +188,7 @@ def main(args):
                         with redirect_stdout(f):
                             print(tmp_out.read(), end='')
                 else:
-                    for op in fp.operations:
+                    for op in {**fp.operations, **fp.groups}:
                         if 'partition' in parameters:
                             # Don't try to submit GPU operations to CPU partitions
                             # and vice versa.  We should be able to relax this

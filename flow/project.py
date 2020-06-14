@@ -162,7 +162,7 @@ class _condition(object):
 
     @classmethod
     def isfile(cls, filename):
-        "True if the specified file exists for this job."
+        "True if the specified file exists for this aggregate."
         def _isfile(*jobs):
             return all(job.isfile(filename) for job in jobs)
 
@@ -170,16 +170,16 @@ class _condition(object):
 
     @classmethod
     def true(cls, key):
-        """True if the specified key is present in the job document and
-        evaluates to True."""
+        """True if the specified key is present in the job document
+        of every job in the aggregate and evaluates to True."""
         def _document(*jobs):
             return all(job.document.get(key, False) for job in jobs)
         return cls(_document, 'true_' + key)
 
     @classmethod
     def false(cls, key):
-        """True if the specified key is present in the job document and
-        evaluates to False."""
+        """True if the specified key is present in the job document
+        for every job in the aggregate and evaluates to False."""
         def _no_document(*jobs):
             return all(not job.document.get(key, False) for job in jobs)
         return cls(_no_document, 'false_' + key)
@@ -201,7 +201,8 @@ class _condition(object):
 
     @classmethod
     def not_(cls, condition):
-        "Returns ``not condition(job)`` for the provided condition function."
+        "Returns ``not condition(job)`` for the provided condition function "
+        "for every job in the aggregate"
         def _not(*jobs):
             return not any(condition(job) for job in jobs)
         return cls(_not,
@@ -248,7 +249,7 @@ def make_bundles(operations, size=None):
 
 
 class aggregate(object):
-    """Decorator for operation functions that are aggregate operations.
+    """Decorator for operation functions that needs to be aggregated.
 
     .. code-block:: python
         example_aggregate = aggregate()
@@ -258,16 +259,16 @@ class aggregate(object):
         def foo(jobs):
             return len(jobs)
 
-    :param groupper:
+    :param grouper:
         Information on how to aggregate jobs.
-    :type groupper:
+    :type grouper:
         callable
     :param sort:
         Sort jobs by a statepoint parameter.
     :type sort:
-        str
+        str or NoneType
     :param reverse:
-        States whether sorting is to be done in ascending or descending order.
+        States if the jobs are to be sorted in reverse order.
     :type reverse:
         bool
     """
@@ -347,7 +348,7 @@ class aggregate(object):
 
 class select(object):
     """Decorator for operation functions that will filter jobs
-    according to the needs of user.
+    according to the given condition.
 
     .. code-block:: python
 
@@ -356,9 +357,9 @@ class select(object):
         def foo(jobs):
             return len(jobs)
 
-    :param filter:
-        Information on how to filter jobs.
-    :type filter:
+    :param filterby:
+        Condition for filtering jobs.
+    :type filterby:
         callable
     """
 
@@ -374,7 +375,8 @@ class select(object):
 
 
 class JobOperation(object):
-    """This class represents the information needed to execute one group for one job.
+    """This class represents the information needed to execute one group for one aggregate
+    of job(s).
 
     The execution or submission of a :py:class:`FlowGroup` uses a passed in command
     which can either be a string or function with no arguments that returns a shell
@@ -397,7 +399,7 @@ class JobOperation(object):
     :param jobs:
         A list of job(s) instance associated with this operation.
     :type jobs:
-        :class:`list`.
+        list
     :param cmd:
         The command that executes this operation. Can be a function that when
         evaluated returns a string.
@@ -492,14 +494,14 @@ class JobOperation(object):
 
 
 class FlowCondition(object):
-    """A FlowCondition represents a condition as a function of a signac job.
+    """A FlowCondition represents a condition as a function of signac jobs.
 
     The __call__() function of a FlowCondition object may return either True
     or False, representing whether the condition is met or not.
     This can be used to build a graph of conditions and operations.
 
     :param callback:
-        A callable with one or multiple positional arguments (job or jobs).
+        A callable with one or multiple positional arguments.
     :type callback:
         callable
     """
@@ -515,9 +517,9 @@ class FlowCondition(object):
         except Exception as e:
             raise UserConditionError(
                 'An exception was raised while evaluating the condition {name} '
-                'for jobs {jobs}.'.format(name=self._callback.__name__,
-                                          jobs=" ".join(map(str, jobs)))) \
-                                              from e
+                'for job(s) {jobs}.'.format(name=self._callback.__name__,
+                                            jobs=" ".join(map(str, jobs)))) \
+                                                from e
 
     def __hash__(self):
         return hash(self._callback)
@@ -527,14 +529,15 @@ class FlowCondition(object):
 
 
 class BaseFlowOperation(object):
-    """A BaseFlowOperation represents a data space operation, operating on any job.
+    """A BaseFlowOperation represents a data space operation, operating on any
+    job or aggregate of jobs.
 
     Every BaseFlowOperation is associated with a specific command.
 
     Pre-requirements (pre) and post-conditions (post) can be used to
     trigger an operation only when certain conditions are met. Conditions are unary
-    callables, which expect an instance of job as their first and only positional
-    argument and return either True or False.
+    callables, which expect an instance of job or aggregate of jobs as their first
+    and only positional argument and return either True or False.
 
     An operation is considered "eligible" for execution when all pre-requirements
     are met and when at least one of the post-conditions is not met.
@@ -545,7 +548,7 @@ class BaseFlowOperation(object):
         This class should not be instantiated directly.
 
     :param cmd:
-        The command to execute operation; should be a function of job.
+        The command to execute operation; should be a function of one or multiple jobs.
     :type cmd:
         str or callable
     :param pre:
@@ -573,9 +576,9 @@ class BaseFlowOperation(object):
     def eligible(self, jobs, ignore_conditions=IgnoreConditions.NONE):
         """Eligible, when all pre-conditions are true and at least one post-condition is false,
         or corresponding conditions are ignored.
-        :param job:
+        :param jobs:
             A list of signac job handles.
-        :type job:
+        :type jobs:
             list
         :param ignore_conditions:
             Specify if pre and/or post conditions check is to be ignored for eligibility check.
@@ -609,13 +612,14 @@ class FlowCmdOperation(BaseFlowOperation):
     """A BaseFlowOperation that holds a shell executable command.
 
     When an operation has the ``@cmd`` directive specified, it is instantiated
-    as a FlowCmdOperation. The operation should be a function of
+    as a FlowCmdOperation. The operation should be a function of single or multiple
     :py:class:`~signac.contrib.job.Job`. The command (cmd) may
-    either be a unary callable that expects an instance of
-    :class:`~signac.contrib.job.Job` as its only positional argument and returns
+    either be a unary callable that expects an instance of single or multiple
+    :class:`~signac.contrib.job.Job` as its positional argument and returns
     a string containing valid shell commands, or the string of commands itself.
-    In either case, the resulting string may contain any attributes of the job placed
-    in curly braces, which will then be substituted by Python string formatting.
+    In either case, the resulting string may contain any attributes of the job or
+    aggregate of jobs place in curly braces, which will then be substituted by
+    Python string formatting.
 
     .. note::
         This class should not be instantiated directly.
@@ -628,11 +632,11 @@ class FlowCmdOperation(BaseFlowOperation):
     def __str__(self):
         return "{type}(cmd='{cmd}')".format(type=type(self).__name__, cmd=self._cmd)
 
-    def __call__(self, job=None):
+    def __call__(self, jobs=None):
         if callable(self._cmd):
-            return self._cmd(job).format(job=job)
+            return self._cmd(*jobs).format(jobs=' '.join(map(str, jobs)))
         else:
-            return self._cmd.format(job=job)
+            return self._cmd.format(jobs=' '.join(map(str, jobs)))
 
 
 class FlowOperation(BaseFlowOperation):
@@ -732,7 +736,7 @@ class FlowGroup(object):
     """A FlowGroup represents a subset of a workflow for a project.
 
     Any :py:class:`FlowGroup` is associated with one or more instances of
-    :py:class:`BaseFlowOperation`.
+    :py:class:`BaseFlowOperation` having similar aggregations.
 
     In the example below, the directives will be {'nranks': 4} for op1 and
     {'nranks': 2, 'executable': 'python3'} for op2
@@ -781,12 +785,12 @@ class FlowGroup(object):
         The operation specific aggregate parameters specified
         using the :py:class:`aggregate`
     :type flow_aggregate:
-            tuple
+        tuple
     :param flow_select:
-            The operation specific filter parameters specified
-            using the :py:class:`select`
+        The operation specific filter parameters specified
+        using the :py:class:`select`
     :type flow_select:
-            callable
+        callable
     """
 
     MAX_LEN_ID = 100
@@ -827,7 +831,7 @@ class FlowGroup(object):
         else:
             return "{} {}".format(entrypoint['executable'], entrypoint['path']).lstrip()
 
-    def _resolve_directives(self, name, defaults, job):
+    def _resolve_directives(self, name, defaults, jobs):
         if name in self.operation_directives:
             directives = deepcopy(self.operation_directives[name])
         else:
@@ -835,9 +839,9 @@ class FlowGroup(object):
         nranks = directives.get('nranks', 1)
         nthreads = directives.get('omp_num_threads', 1)
         if callable(nranks) or callable(nthreads):
-            def np_callable(job):
-                nr = nranks(job) if callable(nranks) else nranks
-                nt = nthreads(job) if callable(nthreads) else nthreads
+            def np_callable(jobs):
+                nr = nranks(*jobs) if callable(nranks) else nranks
+                nt = nthreads(*jobs) if callable(nthreads) else nthreads
                 return nr*nt
 
             directives.setdefault('np', np_callable)
@@ -852,9 +856,9 @@ class FlowGroup(object):
         # Evaluate strings and callables for job:
         def evaluate(value):
             if value and callable(value):
-                return value(job)
+                return value(*jobs)
             elif isinstance(value, str):
-                return value.format(job=job)
+                return value.format(jobs=' '.join(map(str, jobs)))
             else:
                 return value
         return {key: evaluate(value) for key, value in directives.items()}
@@ -884,21 +888,22 @@ class FlowGroup(object):
 
     def __repr__(self):
         return "{type}(name='{name}', operations='{operations}', " \
-               "flow_aggregate={flow_aggregate}, operation_directives={directives}, " \
-               "options='{options}')".format(
+               "operation_directives={directives}, options='{options}', " \
+               "flow_aggregate={flow_aggregate}, flow_select={flow_select})".format(
                    type=type(self).__name__,
                    name=self.name,
                    operations=' '.join(list(self.operations)),
-                   flow_aggregate=self.flow_aggregate,
                    directives=self.operation_directives,
-                   options=self.options)
+                   options=self.options,
+                   flow_aggregate=self.flow_aggregate,
+                   flow_select=self.flow_select)
 
     def eligible(self, jobs, ignore_conditions=IgnoreConditions.NONE):
         """Eligible, when at least one BaseFlowOperation is eligible.
 
-        :param job:
+        :param jobs:
             A list of :class:`signac.Job` from the signac workspace.
-        :type job:
+        :type jobs:
             list
         :param ignore_conditions:
             Specify if pre and/or post conditions check is to be ignored for eligibility check.
@@ -915,9 +920,9 @@ class FlowGroup(object):
     def complete(self, jobs):
         """True when all BaseFlowOperation post-conditions are met.
 
-        :param job:
+        :param jobs:
             A list of :class:`signac.Job` from the signac workspace.
-        :type job:
+        :type jobs:
             list
         :return:
             Whether the group is complete (all contained operations are
@@ -958,11 +963,16 @@ class FlowGroup(object):
             self.flow_aggregate = flow_aggregate
             self.flow_select = flow_select
         else:
+            # A FlowGroup instance can't have aggregate operations
+            # which are not aggregated in similar way. Hence we're checking
+            # whether the aggregate parameters for a specific operation are similar
+            # or not.
             closure_consts = []
             closure_self_consts = []
             closure_freevars = []
             closure_self_freevars = []
-
+            # Checking for closures. (This might fail if the user specifies partial functions)
+            # This needs to be refactored. (Not sure if this is the right way to check or not)
             if flow_aggregate[0].__closure__ is not None:
                 for cl in flow_aggregate[0].__closure__:
                     try:
@@ -1079,17 +1089,8 @@ class FlowGroup(object):
         """
         return set(self).isdisjoint(set(group))
 
-    def _get_aggregate_job_ids(self, jobs):
-        if len(jobs) > 1:
-            return str(jobs[0])[:8]+'-'+str(jobs[-1])[:8]
-        else:
-            return str(jobs[0])[:8]
-
-    def _job_ids_seperated(self, jobs, upto=None):
-        return '-'.join(map(str, jobs))
-
     def _generate_id(self, jobs, operation_name=None, index=0):
-        "Return an id, which identifies this group with respect to this job."
+        "Return an id, which identifies this group with respect to this aggregate(job(s))."
         project = jobs[0]._project
 
         for job in jobs:
@@ -1101,7 +1102,7 @@ class FlowGroup(object):
         else:
             op_string = operation_name
 
-        job_id = self._job_ids_seperated(jobs)
+        job_id = '-'.join(map(str, jobs))
         full_name = '{}%{}%{}%{}'.format(project.root_directory(),
                                          job_id,
                                          op_string,
@@ -1118,7 +1119,11 @@ class FlowGroup(object):
         if max_len < len(job_op_id):
             raise ValueError("Value for MAX_LEN_ID is too small ({}).".format(self.MAX_LEN_ID))
 
-        aggregate_id = self._get_aggregate_job_ids(jobs)
+        if len(jobs) > 1:
+            aggregate_id = str(jobs[0])[:8]+'-'+str(jobs[-1])[:8]
+        else:
+            aggregate_id = str(jobs[0])[:8]
+
         separator = getattr(project._environment, 'JOB_ID_SEPARATOR', '/')
         readable_name = '{project}{sep}{job}{sep}{len}{sep}{group}{sep}' \
                         '{index:04d}{sep}'.format(
@@ -1148,6 +1153,11 @@ class FlowGroup(object):
         if sort is not None:
             jobs_list = sort(jobs_list)
         jobs_list = grouper([job for job in jobs_list])
+        jobs_list = [[j for j in jobs] for jobs in jobs_list]
+        for i, job in enumerate(jobs_list[-1]):
+            if job is None:
+                del jobs_list[-1][i:]
+                break
         return jobs_list
 
     def _get_filtered_job_id_per_group(self, jobs, index=0):
@@ -1157,11 +1167,6 @@ class FlowGroup(object):
         """
         jobs_list = self._get_filtered_jobs(jobs)
         for job_list in jobs_list:
-            job_list = list(job_list)
-            for i, job in enumerate(job_list):
-                if job is None:
-                    del job_list[i:]
-                    break
             yield self._generate_id(job_list, index=index)
 
     def _create_submission_job_operation(self, entrypoint, default_directives, jobs,
@@ -1251,19 +1256,13 @@ class FlowGroup(object):
             Iterator[JobOperation]
         """
 
+        jobs_list = self._get_filtered_jobs(deepcopy(jobs))
         for name, op in self.operations.items():
             # For every operation, firstly jobs are filtered according to some valid function
             # whose information is given in the :class:`~.select`, then grouped according to
             # the valid grouper functions and eventually sorted according to some state-point
             # parameter whose information is given in the :class:`~.aggregate`.
-            jobs_list = self._get_filtered_jobs(deepcopy(jobs))
             for job_list in jobs_list:
-                # Ensuring list
-                job_list = list(job_list)
-                for i, job in enumerate(job_list):
-                    if job is None:
-                        del job_list[i:]
-                        break
                 eligible = op.eligible(job_list, ignore_conditions)
                 if eligible:
                     directives = self._resolve_directives(name, default_directives, job_list)
@@ -1279,7 +1278,7 @@ class FlowGroup(object):
                                           job_list, cmd=uneval_cmd, directives=deepcopy(directives))
                     yield job_op
 
-    def _get_submission_directives(self, default_directives, job, parallel=False):
+    def _get_submission_directives(self, default_directives, jobs, parallel=False):
         """Get the combined resources for submission.
 
         No checks are done to mitigate inappropriate aggregation of operations.
@@ -1289,7 +1288,7 @@ class FlowGroup(object):
 
         for name in self.operations:
             # get directives for operation
-            op_dir = self._resolve_directives(name, default_directives, job)
+            op_dir = self._resolve_directives(name, default_directives, jobs)
             # Find the correct number of processors for operation
             if parallel:
                 # In general parallel means add resources
@@ -2765,24 +2764,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                    ignore_conditions=IgnoreConditions.NONE,
                                    ignore_conditions_on_execution=IgnoreConditions.NONE):
         """Grabs JobOperations that are eligible to run from FlowGroups."""
-        operations = []
         for group in self._gather_flow_groups(names):
             for job_list in group._get_filtered_jobs(deepcopy(jobs)):
-                job_list = list(job_list)
-                for i, job in enumerate(job_list):
-                    if job is None:
-                        del job_list[i:]
-                        break
                 if (
                     group.eligible(job_list, ignore_conditions) and
                     self._eligible_for_submission(group, job_list)
                 ):
-                    operations.append(group._create_submission_job_operation(
-                            entrypoint=self._entrypoint, default_directives=default_directives,
-                            jobs=job_list, parallel=parallel, index=0,
-                            ignore_conditions_on_execution=ignore_conditions_on_execution))
-
-        return operations
+                    yield group._create_submission_job_operation(
+                        entrypoint=self._entrypoint, default_directives=default_directives,
+                        jobs=job_list, parallel=parallel, index=0,
+                        ignore_conditions_on_execution=ignore_conditions_on_execution)
 
     def _get_pending_operations(self, jobs, operation_names=None,
                                 ignore_conditions=IgnoreConditions.NONE):
@@ -3430,20 +3421,21 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for _label in self.labels(job):
             yield _label
 
-    def completed_operations(self, job):
-        """Determine which operations have been completed for job.
+    def completed_operations(self, jobs):
+        """Determine which operations have been completed for
+        specified jobs.
 
         :param job:
-            The signac job handle.
+            Sequence of signac job handles.
         :type job:
-            :class:`~signac.contrib.job.Job`
+            Iterable
         :return:
             The name of the operations that are complete.
         :rtype:
             str
         """
         for name, op in self._operations.items():
-            if op.complete(job):
+            if op.complete(jobs):
                 yield name
 
     def _job_operations(self, jobs, ignore_conditions=IgnoreConditions.NONE):
@@ -3459,7 +3451,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """Determine the next eligible operations for jobs.
 
         :param jobs:
-            A list of signac job handles.
+            Sequence of signac job handles.
         :type job:
             Iterable
         :param ignore_conditions:
@@ -3479,10 +3471,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         current_version=__version__,
         details="Use next_operations() instead.")
     def next_operation(self, jobs):
-        """Determine the next operation for this job.
+        """Determine the next operation for these jobs.
 
-        :param job:
-            The signac job handle.
+        :param jobs:
+            Sequence of signac job handles.
         :type job:
             Iterable
         :param default_directives:
@@ -3842,8 +3834,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             except KeyError:
                 operation = self._operations[args.operation]
 
-                def operation_function(job):
-                    cmd = operation(job).format(job=job)
+                def operation_function(jobs):
+                    cmd = operation(jobs).format(jobs=jobs)
                     subprocess.run(cmd, shell=True, check=True)
 
         except KeyError:

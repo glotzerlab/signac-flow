@@ -123,7 +123,7 @@ class IgnoreConditions(IntEnum):
     PRE = 1
     POST = 2
     ALL = PRE | POST
-    NONE = ~ ALL
+    NONE = 0
 
     def __str__(self):
         return {IgnoreConditions.PRE: 'pre', IgnoreConditions.POST: 'post',

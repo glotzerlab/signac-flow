@@ -39,6 +39,7 @@ Changed
 Fixed
 +++++
 - Ensure that label names are used when displaying status (#263).
+- Fix node counting for large resource sets on Summit (#294).
 
 Removed
 +++++++

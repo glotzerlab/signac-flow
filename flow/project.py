@@ -111,8 +111,8 @@ _FMT_SCHEDULER_STATUS = {
 }
 
 
-### TODO: When we drop Python 3.5 support, change this to inherit from IntFlag
-### instead of IntEnum so that we can remove the operator overloads.
+# TODO: When we drop Python 3.5 support, change this to inherit from IntFlag
+# instead of IntEnum so that we can remove the operator overloads.
 class IgnoreConditions(IntEnum):
     """Flags that determine which conditions are used to determine job eligibility.
 
@@ -122,8 +122,8 @@ class IgnoreConditions(IntEnum):
         * IgnoreConditions.POST: ignore post conditions
         * IgnoreConditions.ALL: ignore all conditions
     """
-    ### The following three functions can be removed once we drop Python 3.5
-    ### support, they are implemented by the IntFlag class in Python > 3.6.
+    # The following three functions can be removed once we drop Python 3.5
+    # support, they are implemented by the IntFlag class in Python > 3.6.
     def __or__(self, other):
         if not isinstance(other, (self.__class__, int)):
             return NotImplemented
@@ -994,7 +994,7 @@ class FlowGroup(object):
                     default_directives=default_directives,
                     job=job,
                     ignore_conditions=ignore_conditions_on_execution | additional_ignores_flag)
-                ) - set(ignore_ops)
+                    ) - set(ignore_ops)
             )
 
         submission_directives = self._get_submission_directives(default_directives, job, parallel)

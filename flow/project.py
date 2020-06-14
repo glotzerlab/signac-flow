@@ -302,7 +302,7 @@ class JobOperation(object):
         :class:`dict`
     """
 
-    def __init__(self, id, name, job, cmd, directives=None, run_job_operations=None):
+    def __init__(self, id, name, job, cmd, directives=None):
         self._id = id
         self.name = name
         self.job = job
@@ -328,11 +328,6 @@ class JobOperation(object):
         self.directives = TrackGetItemDict(
             {key: value for key, value in directives.items()})
         self.directives._keys_set_by_user = keys_set_by_user
-
-        if run_job_operations is None:
-            self.run_job_operations = []
-        else:
-            self.run_job_operations = run_job_operations
 
     def __str__(self):
         return "{}({})".format(self.name, self.job)
@@ -989,7 +984,7 @@ class FlowGroup(object):
                                        ignore_conditions=ignore_conditions_on_execution,
                                        parallel=parallel)
 
-        def _get_run_ops(ignore_ops, additional_ignores_flag=IgnoreConditions.NONE):
+        def _get_run_ops(ignore_ops, additional_ignores_flag):
             """Get operations that match the combination of the conditions required by
             _create_submission_job_operation and the ignored flags, and remove operations
             in the ignore_ops list."""
@@ -1003,7 +998,8 @@ class FlowGroup(object):
             )
 
         submission_directives = self._get_submission_directives(default_directives, job, parallel)
-        eligible_operations = _get_run_ops([])
+        eligible_operations = _get_run_ops(
+            [], IgnoreConditions.NONE)
         operations_with_unmet_preconditions = _get_run_ops(
             eligible_operations, IgnoreConditions.PRE)
         operations_with_met_postconditions = _get_run_ops(

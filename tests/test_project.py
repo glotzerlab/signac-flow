@@ -1267,7 +1267,7 @@ class TestGroupProject(TestProjectBase):
             job_op2 = project.groups['group2']._create_submission_job_operation(
                 project._entrypoint, dict(), job)
             script2 = project.script([job_op2])
-            assert '--num-passes=2'.format(job) in script2
+            assert '--num-passes=2' in script2
 
     def test_directives_hierarchy(self):
         project = self.mock_project()

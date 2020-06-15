@@ -47,7 +47,7 @@ def non_default_directive_values():
             return {'np': 4, 'ngpu': 1, 'nranks': 0,
                     'omp_num_threads': 10, 'executable': 'PathFinder',
                     'walltime': 20., 'memory': 16, 'processor_fraction': 0.5}
-        return {'np': 4, 'ngpu': 10, 'nranks': 5,
+        return {'np': 1, 'ngpu': 10, 'nranks': 5,
                 'omp_num_threads': 20, 'executable': 'Non Default Path',
                 'walltime': 64., 'memory': 32, 'processor_fraction': 0.5}
     return _values
@@ -111,7 +111,8 @@ class TestItems:
         assert NP.finalize(2, dict_directives) == 2
         dict_directives['nranks'] = 2
         dict_directives['omp_num_threads'] = 4
-        assert NP.finalize(2, dict_directives) == 8
+        assert NP.finalize(2, dict_directives) == 2
+        assert NP.finalize(1, dict_directives) == 8
         dict_directives['nranks'] = lambda x: x**2
         assert NP.finalize(2, dict_directives) == 2
 
@@ -196,7 +197,7 @@ class TestDirectives:
         valid_values_0 = non_default_directive_values()
         valid_values_1 = non_default_directive_values(1)
         directives.update(valid_values_0)
-        expected_values = {'np': 10, 'ngpu': 1, 'nranks': 0,
+        expected_values = {'np': 4, 'ngpu': 1, 'nranks': 0,
                            'omp_num_threads': 10, 'executable': 'PathFinder',
                            'walltime': 20.0, 'memory': 16, 'processor_fraction': 0.5}
         directives.update(valid_values_1)
@@ -224,7 +225,7 @@ class TestDirectives:
         directives2 = Directives(available_directives_list)
         valid_values_0 = non_default_directive_values()
         valid_values_1 = non_default_directive_values(1)
-        expected_values = {'np': 150, 'ngpu': 11, 'nranks': 5,
+        expected_values = {'np': 104, 'ngpu': 11, 'nranks': 5,
                            'omp_num_threads': 30, 'executable': 'Non Default Path',
                            'walltime': 64.0, 'memory': 48, 'processor_fraction': 0.5}
         directives1.update(valid_values_0)

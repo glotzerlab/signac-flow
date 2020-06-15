@@ -208,12 +208,23 @@ def raise_below(value):
     return is_greater
 
 
+_NP_DEFAULT = 1
+
+
 def finalize_np(value, directives):
+    """Return the 'actual number of processes/threads to use.
+
+    We check the default value because when aggregation occurs we add the number
+    of MPI ranks and OMP_NUM_THREADS. If we always took the greater of the given
+    NP and ranks * threads then after aggregating we will inflate the number of
+    processors needed as (r1 * t1) + (r2 * t2) <= (r1 * r2 * t1 * t2) for
+    numbers greater than one.
+    """
+    if callable(value) or value != _NP_DEFAULT:
+        return value
     nranks = directives.get('nranks', 1)
     omp_num_threads = directives.get('omp_num_threads', 1)
     if callable(nranks) or callable(omp_num_threads):
-        return value
-    elif callable(value):
         return value
     else:
         return max(value, max(1, nranks) * max(1, omp_num_threads))
@@ -221,7 +232,7 @@ def finalize_np(value, directives):
 
 natural_number = OnlyType(int, postprocess=raise_below(1))
 # Common directives and their instantiation as _DirectivesItem
-NP = _DirectivesItem('np', natural_number, 1, finalize=finalize_np)
+NP = _DirectivesItem('np', natural_number, _NP_DEFAULT, finalize=finalize_np)
 NP.__doc__ = """
 The number of tasks expected to run for a given operation
 

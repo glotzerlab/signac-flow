@@ -90,6 +90,15 @@ def with_job(func):
         def hello_cmd(job):
             return 'trap "cd `pwd`" EXIT && cd {} && echo "hello {job}"'.format(job.ws)
     """
+    signature = inspect.signature(func)
+    if len(signature.parameters) > 1:
+        raise ValueError("Only a single 'positional argument' is allowed "
+                         "when @with_job decorator is used")
+    for v in signature.parameters.values():
+        if v.kind is inspect.Parameter.VAR_POSITIONAL:
+            raise ValueError("Only a single 'positional argument' is allowed "
+                             "when @with_job decorator is used")
+
     @wraps(func)
     def decorated(job):
         with job:

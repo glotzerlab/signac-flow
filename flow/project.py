@@ -3525,9 +3525,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         total_params = len(signature.parameters)
         for i, (k, v) in enumerate(signature.parameters.items()):
             if (
-                    i != total_params - 1 and
-                    v.kind == v.kind is inspect.Parameter.VAR_POSITIONAL
-               ):
+                i != total_params - 1 and
+                v.kind is inspect.Parameter.VAR_POSITIONAL
+            ):
                 raise ValueError(
                     "The variable parameter '{}' in the operation '{}' should be "
                     "the last parameter!".format(k, name))

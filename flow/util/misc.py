@@ -163,11 +163,11 @@ class _hashable_dict(dict):
         return hash(tuple(sorted(self.items())))
 
 
-def to_hashable(l):
+def to_hashable(obj):
     # if isinstance(l, Sequence):
-    if type(l) == list:
-        return tuple(to_hashable(_) for _ in l)
-    elif type(l) == dict:
-        return _hashable_dict(l)
+    if type(obj) == list:
+        return tuple(to_hashable(_) for _ in obj)
+    elif type(obj) == dict:
+        return _hashable_dict(obj)
     else:
-        return l
+        return obj

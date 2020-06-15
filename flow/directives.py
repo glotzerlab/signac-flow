@@ -163,17 +163,6 @@ class Directives(MutableMapping):
                                                           other_directive)
 
 
-def raise_if_too_small(value):
-    def is_greater(v):
-        try:
-            if v < value:
-                raise ValueError
-        except (TypeError, ValueError):
-            raise ValueError("Expected a number greater than {}. Received {}"
-                             "".format(value, v))
-        return v
-
-
 def _evaluate(value, job=None):
     if callable(value):
         if job is None:
@@ -182,15 +171,6 @@ def _evaluate(value, job=None):
             return value(job)
     else:
         return value
-
-
-def finalize_np(value, directives):
-    nranks = directives.get('nranks', 1)
-    omp_num_threads = directives.get('omp_num_threads', 1)
-    if callable(nranks) or callable(omp_num_threads):
-        return value
-    else:
-        return max(value, max(1, nranks) * max(1, omp_num_threads))
 
 
 class OnlyType:
@@ -216,22 +196,30 @@ class OnlyType:
                                 "of type {}".format(self.type, v, type(v)))
 
 
-nonnegative_int = OnlyType(int, postprocess=raise_if_too_small(-1))
-natural_number = OnlyType(int, postprocess=raise_if_too_small(0))
-nonnegative_real = OnlyType(float, postprocess=raise_if_too_small(0))
+def raise_below(value):
+    def is_greater(v):
+        try:
+            if v < value:
+                raise ValueError
+        except (TypeError, ValueError):
+            raise ValueError("Expected a number greater than {}. Received {}"
+                             "".format(value, v))
+        return v
+    return is_greater
 
 
-def is_fraction(value):
-    if 0 <= value <= 1:
+def finalize_np(value, directives):
+    nranks = directives.get('nranks', 1)
+    omp_num_threads = directives.get('omp_num_threads', 1)
+    if callable(nranks) or callable(omp_num_threads):
+        return value
+    elif callable(value):
         return value
     else:
-        raise ValueError("Value must be beween 0 and 1.")
+        return max(value, max(1, nranks) * max(1, omp_num_threads))
 
 
-def no_aggregation(v, o):
-    return v
-
-
+natural_number = OnlyType(int, postprocess=raise_below(1))
 # Common directives and their instantiation as _DirectivesItem
 NP = _DirectivesItem('np', natural_number, 1, finalize=finalize_np)
 NP.__doc__ = """
@@ -243,6 +231,7 @@ product of "nranks" or "omp_num_threads" is greater than the current value. The
 maximum of these two values is used.
 """
 
+nonnegative_int = OnlyType(int, postprocess=raise_below(0))
 NGPU = _DirectivesItem('ngpu', nonnegative_int, 0)
 NGPU.__doc__ = """
 The number of GPU's to request for this operation.
@@ -263,6 +252,11 @@ The number of OpenMP threads to use for this operation.
 Expects a nonnegative integer.
 """
 
+
+def no_aggregation(v, o):
+    return v
+
+
 EXECUTABLE = _DirectivesItem('executable', OnlyType(str), sys.executable,
                              no_aggregation, no_aggregation)
 EXECUTABLE.__doc__ = """
@@ -272,10 +266,12 @@ Expects a string pointing to a valid executable file in the
 current file system.
 
 By default this should point to a Python executable (interpreter); however, if
-the :py:class:`FlowProject` path is set to be empty, the executable can be the
-file path to an executable Python script.
+the :py:class:`FlowProject` path is set to an empty string, the executable can
+be the file path to an executable Python script.
 """
 
+
+nonnegative_real = OnlyType(float, postprocess=raise_below(0))
 WALLTIME = _DirectivesItem('walltime', nonnegative_real, 12.,
                            lambda x, y: x + y, max)
 WALLTIME.__doc__ = """
@@ -291,6 +287,14 @@ The number of GB to request for an operation.
 
 Expects a natural number (i.e. an integer >= 1).
 """
+
+
+def is_fraction(value):
+    if 0 <= value <= 1:
+        return value
+    else:
+        raise ValueError("Value must be beween 0 and 1.")
+
 
 PROCESS_FRACTION = _DirectivesItem('processor_fraction',
                                    OnlyType(float, postprocess=is_fraction),

@@ -59,7 +59,8 @@ rm {{ launcher_file }}
 {% for operation in (operations|with_np_offset) %}
 
 # {{ "%s"|format(operation) }}
-{{ operation.cmd }}{{ cmd_suffix }}
+{{ operation.cmd }}
+{{ "_FLOW_STAMPEDE_OFFSET_=%d "|format(operation.directives.np_offset) }}{{ operation.cmd }}{{ cmd_suffix }}
 {% endfor %}
 {% endif %}
 {% endblock %}

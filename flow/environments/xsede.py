@@ -3,6 +3,7 @@
 # This software is licensed under the BSD 3-Clause License.
 """Environments for XSEDE supercomputers."""
 import logging
+import os
 
 from ..environment import DefaultSlurmEnvironment
 
@@ -37,6 +38,9 @@ class CometEnvironment(DefaultSlurmEnvironment):
                   '(slurm default is "slurm-%%j.out").'))
 
 
+_STAMPEDE_OFFSET = os.environ.get('_FLOW_STAMPEDE_OFFSET_`', 0)
+
+
 class Stampede2Environment(DefaultSlurmEnvironment):
     """Environment profile for the Stampede2 supercomputer.
 
@@ -47,6 +51,7 @@ class Stampede2Environment(DefaultSlurmEnvironment):
     cores_per_node = 48
     mpi_cmd = 'ibrun'
     offset_counter = 0
+    base_offset = _STAMPEDE_OFFSET
 
     @classmethod
     def add_args(cls, parser):
@@ -79,14 +84,11 @@ class Stampede2Environment(DefaultSlurmEnvironment):
             str
         """
         if operation.directives.get('nranks'):
+            prefix = '{} -n {} -o {} task_affinity '.format(
+                cls.mpi_cmd, operation.directives['nranks'],
+                cls.base_offset + cls.offset_counter)
             if parallel:
-                prefix = '{} -n {} -o {} task_affinity '.format(
-                          cls.mpi_cmd, operation.directives['nranks'],
-                          cls.offset_counter)
                 cls.offset_counter += operation.directives['nranks']
-            else:
-                prefix = '{} -n {} '.format(cls.mpi_cmd,
-                                            operation.directives['nranks'])
         else:
             prefix = ''
         return prefix

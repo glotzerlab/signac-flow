@@ -692,11 +692,10 @@ class FlowGroup(object):
                 return value
         return {key: evaluate(value) for key, value in directives.items()}
 
-    def _submit_cmd(self, entrypoint, ignore_conditions, parallel, job=None):
+    def _submit_cmd(self, entrypoint, ignore_conditions, job=None):
         entrypoint = self._determine_entrypoint(entrypoint, dict(), job)
         cmd = "{} run -o {}".format(entrypoint, self.name)
         cmd = cmd if job is None else cmd + ' -j {}'.format(job)
-        cmd = cmd if not parallel else cmd + " --parallel"
         cmd = cmd if self.options is None else cmd + ' ' + self.options
         if ignore_conditions != IgnoreConditions.NONE:
             return cmd.strip() + ' --ignore-conditions=' + str(ignore_conditions)
@@ -837,7 +836,7 @@ class FlowGroup(object):
 
     def _create_submission_job_operation(self, entrypoint, default_directives, job,
                                          ignore_conditions_on_execution=IgnoreConditions.NONE,
-                                         parallel=False, index=0):
+                                         index=0):
         """Create a JobOperation object from the FlowGroup.
 
         Creates a JobOperation for use in submitting and scripting.
@@ -866,10 +865,6 @@ class FlowGroup(object):
             submitting.  The default is `IgnoreConditions.NONE`.
         :type ignore_conditions_on_execution:
             :py:class:`~.IgnoreConditions`
-        :param parallel:
-            Whether the submission should run its operations in parallel.
-        :type parallel:
-            bool
         :param index:
             Index for the :class:`~.JobOperation`.
         :type index:
@@ -877,15 +872,13 @@ class FlowGroup(object):
         :return:
             Returns a :py:class:`~.JobOperation` for submitting the group. The
             :py:class:`~.JobOperation` will have directives that have been collected
-            appropriately from its contained operations based on parallel or serial
-            execution.
+            appropriately from its contained operations.
         :rtype:
             :py:class:`JobOperation`
         """
         uneval_cmd = functools.partial(self._submit_cmd, entrypoint=entrypoint, job=job,
-                                       ignore_conditions=ignore_conditions_on_execution,
-                                       parallel=parallel)
-        submission_directives = self._get_submission_directives(default_directives, job, parallel)
+                                       ignore_conditions=ignore_conditions_on_execution)
+        submission_directives = self._get_submission_directives(default_directives, job)
         return JobOperation(self._generate_id(job, index=index),
                             self.name,
                             job,
@@ -935,7 +928,7 @@ class FlowGroup(object):
                                       cmd=uneval_cmd, directives=deepcopy(directives))
                 yield job_op
 
-    def _get_submission_directives(self, default_directives, job, parallel=False):
+    def _get_submission_directives(self, default_directives, job):
         """Get the combined resources for submission.
 
         No checks are done to mitigate inappropriate aggregation of operations.
@@ -947,19 +940,11 @@ class FlowGroup(object):
             # get directives for operation
             op_dir = self._resolve_directives(name, default_directives, job)
             # Find the correct number of processors for operation
-            if parallel:
-                # In general parallel means add resources
-                directives['ngpu'] += op_dir['ngpu']
-                directives['nranks'] += op_dir['nranks']
-                directives['omp_num_threads'] += op_dir['omp_num_threads']
-                directives['np'] += op_dir['np']
-            else:
-                # In serial we take the max
-                directives['ngpu'] = max(directives['ngpu'], op_dir['ngpu'])
-                directives['nranks'] = max(directives['nranks'], op_dir['nranks'])
-                directives['omp_num_threads'] = max(directives['omp_num_threads'],
-                                                    op_dir['omp_num_threads'])
-                directives['np'] = max(directives['np'], op_dir['np'])
+            directives['ngpu'] = max(directives['ngpu'], op_dir['ngpu'])
+            directives['nranks'] = max(directives['nranks'], op_dir['nranks'])
+            directives['omp_num_threads'] = max(directives['omp_num_threads'],
+                                                op_dir['omp_num_threads'])
+            directives['np'] = max(directives['np'], op_dir['np'])
         return directives
 
 
@@ -2347,7 +2332,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                              " -o/--operation option.")
         return operations
 
-    def _get_submission_operations(self, jobs, default_directives, names=None, parallel=False,
+    def _get_submission_operations(self, jobs, default_directives, names=None,
                                    ignore_conditions=IgnoreConditions.NONE,
                                    ignore_conditions_on_execution=IgnoreConditions.NONE):
         """Grabs JobOperations that are eligible to run from FlowGroups."""
@@ -2356,9 +2341,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 if group.eligible(job, ignore_conditions) and self._eligible_for_submission(group,
                                                                                             job):
                     yield group._create_submission_job_operation(
-                            entrypoint=self._entrypoint, default_directives=default_directives,
-                            job=job, parallel=parallel, index=0,
-                            ignore_conditions_on_execution=ignore_conditions_on_execution)
+                        entrypoint=self._entrypoint,
+                        default_directives=default_directives,
+                        job=job, index=0,
+                        ignore_conditions_on_execution=ignore_conditions_on_execution)
 
     def _get_pending_operations(self, jobs, operation_names=None,
                                 ignore_conditions=IgnoreConditions.NONE):
@@ -2560,8 +2546,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type num:
             int
         :param parallel:
-            Execute all bundled operations in parallel. With multiple operation
-            groups, this also will run the operations in a group in parallel.
+            Execute all bundled operations in parallel.
         :type parallel:
             bool
         :param force:
@@ -2609,7 +2594,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Gather all pending operations.
         default_directives = self._get_default_directives()
         with self._potentially_buffered():
-            operations = self._get_submission_operations(jobs, default_directives, names, parallel,
+            operations = self._get_submission_operations(jobs, default_directives, names,
                                                          ignore_conditions,
                                                          ignore_conditions_on_execution)
         if num is not None:
@@ -3356,7 +3341,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 names = args.operation_name if args.operation_name else None
                 default_directives = self._get_default_directives()
                 operations = self._get_submission_operations(jobs, default_directives, names,
-                                                             args.parallel, args.ignore_conditions,
+                                                             args.ignore_conditions,
                                                              args.ignore_conditions_on_execution)
             operations = list(islice(operations, args.num))
 
@@ -3382,7 +3367,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             names = args.operation_name if args.operation_name else None
             default_directives = self._get_default_directives()
             operations = self._get_submission_operations(jobs, default_directives, names,
-                                                         args.parallel, args.ignore_conditions,
+                                                         args.ignore_conditions,
                                                          args.ignore_conditions_on_execution)
         operations = list(islice(operations, args.num))
         # Bundle operations up, generate the script, and submit to scheduler.

@@ -682,9 +682,10 @@ class FlowGroupEntry(object):
     :type options:
         str
     """
-    def __init__(self, name, options=""):
+    def __init__(self, name, options="", flow_aggregate=(None, None)):
         self.name = name
         self.options = options
+        self.flow_aggregate = flow_aggregate
 
     def __call__(self, func):
         """Decorator that adds the function into the group's operations.
@@ -810,6 +811,7 @@ class FlowGroup(object):
             self.operation_directives = operation_directives
         self.flow_aggregate = flow_aggregate
         self.flow_select = flow_select
+        self.aggregate_per_group = True
 
     def _set_entrypoint_item(self, entrypoint, directives, key, default, jobs):
         """Set a value (executable, path) for entrypoint in command.
@@ -963,10 +965,14 @@ class FlowGroup(object):
         :type flow_select:
             callable
         """
-        if not len(self.operations):
+        self.operations[name] = operation
+        if directives is not None:
+            self.operation_directives[name] = directives
+
+        if self.flow_aggregate == (None, None):
             self.flow_aggregate = flow_aggregate
-            self.flow_select = flow_select
-        else:
+            self.aggregate_per_group = False
+        elif not self.aggregate_per_group:
             # A FlowGroup instance can't have aggregate operations
             # which are not aggregated in similar way. Hence we're checking
             # whether the aggregate parameters for a specific operation are similar
@@ -999,6 +1005,51 @@ class FlowGroup(object):
                     except Exception:
                         closure_self_freevars.append(self_cl.cell_contents)
 
+            raiseError = False
+            if self.flow_aggregate[0].__code__.co_consts != flow_aggregate[0].__code__.co_consts:
+                raiseError = True
+            elif (
+                self.flow_aggregate[0].__code__.co_freevars !=
+                flow_aggregate[0].__code__.co_freevars
+            ):
+                raiseError = True
+            elif (
+                closure_consts != closure_self_consts or
+                closure_freevars != closure_self_freevars
+            ):
+                raiseError = True
+
+            if raiseError:
+                raise ValueError("Can't add the operation '{}' to the group '{}' "
+                                 "due to different aggregate parameters.".
+                                 format(name, self.name))
+
+            try:
+                if (
+                    self.flow_aggregate[1].keywords['key'].__code__.co_consts !=
+                    flow_aggregate[1].keywords['key'].__code__.co_consts or
+                    self.flow_aggregate[1].keywords['key'].__code__.co_freevars !=
+                    flow_aggregate[1].keywords['key'].__code__.co_freevars or
+                    self.flow_aggregate[1].keywords['reverse'] !=
+                    flow_aggregate[1].keywords['reverse']
+                ):
+                    raise ValueError("Can't add the operation '{}' to the group '{}' "
+                                     "due to different aggregate parameters."
+                                     "".format(name, self.name))
+            except Exception:
+                if not (self.flow_aggregate[1] == flow_aggregate[1]):
+                    raise ValueError("Can't add the operation '{}' to the group '{}' "
+                                     "due to different aggregate parameters."
+                                     "".format(name, self.name))
+
+        if len(self.operations) == 1:
+            self.flow_select = flow_select
+        else:
+            closure_consts = []
+            closure_self_consts = []
+            closure_freevars = []
+            closure_self_freevars = []
+
             if flow_select.args[0] is not None:
                 if flow_select.args[0].__closure__ is not None:
                     for cl in flow_select.args[0].__closure__:
@@ -1022,24 +1073,14 @@ class FlowGroup(object):
                         except Exception:
                             closure_self_freevars.append(self_cl.cell_contents)
 
-            raiseError = False
-            if self.flow_aggregate[0].__code__.co_consts != flow_aggregate[0].__code__.co_consts:
-                raiseError = True
-            elif (
-                self.flow_aggregate[0].__code__.co_freevars !=
-                flow_aggregate[0].__code__.co_freevars
-            ):
-                raiseError = True
-            elif (
+            if (
                 closure_consts != closure_self_consts or
                 closure_freevars != closure_self_freevars
             ):
-                raiseError = True
-
-            if raiseError:
                 raise ValueError("Can't add the operation '{}' to the group '{}' "
-                                 "due to different aggregate parameters.".
+                                 "due to different select parameters.".
                                  format(name, self.name))
+
             try:
                 if (
                     self.flow_select.args[0].__code__.co_consts !=
@@ -1048,35 +1089,13 @@ class FlowGroup(object):
                     flow_select.args[0].__code__.co_freevars
                 ):
                     raise ValueError("Can't add the operation '{}' to the group '{}' "
-                                     "due to different aggregate parameters.".
+                                     "due to different select parameters.".
                                      format(name, self.name))
             except Exception:
                 if not (self.flow_select.args[0] == flow_select.args[0]):
                     raise ValueError("Can't add the operation '{}' to the group '{}' "
-                                     "due to different aggregate parameters.".
+                                     "due to different select parameters.".
                                      format(name, self.name))
-
-            try:
-                if (
-                    self.flow_aggregate[1].keywords['key'].__code__.co_consts !=
-                    flow_aggregate[1].keywords['key'].__code__.co_consts or
-                    self.flow_aggregate[1].keywords['key'].__code__.co_freevars !=
-                    flow_aggregate[1].keywords['key'].__code__.co_freevars or
-                    self.flow_aggregate[1].keywords['reverse'] !=
-                    flow_aggregate[1].keywords['reverse']
-                ):
-                    raise ValueError("Can't add the operation '{}' to the group '{}' "
-                                     "due to different aggregate parameters.".
-                                     format(name, self.name))
-            except Exception:
-                if not (self.flow_aggregate[1] == flow_aggregate[1]):
-                    raise ValueError("Can't add the operation '{}' to the group '{}' "
-                                     "due to different aggregate parameters.".
-                                     format(name, self.name))
-
-        self.operations[name] = operation
-        if directives is not None:
-            self.operation_directives[name] = directives
 
     def isdisjoint(self, group):
         """Returns whether two groups are disjoint (do not share any common operations).
@@ -3601,7 +3620,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 self._operation_functions[name] = func
 
     @classmethod
-    def make_group(cls, name, options=""):
+    def make_group(cls, name, options="", aggregator=None, sort=None, reverse=False):
         """Make a FlowGroup named ``name`` and return a decorator to make groups.
 
         .. code-block:: python
@@ -3630,7 +3649,19 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         else:
             cls._GROUP_NAMES.add(name)
 
-        group_entry = FlowGroupEntry(name, options)
+        if sort is None:
+            selector = None
+        else:
+            def key_sort(job):
+                try:
+                    return job.sp[sort]
+                except KeyError:
+                    raise KeyError("The key '{}' was not found in statepoint "
+                                   "parameters of the job {}.".format(sort, job))
+
+            selector = functools.partial(sorted, key=key_sort, reverse=reverse)
+
+        group_entry = FlowGroupEntry(name, options, (aggregator, selector))
         cls._GROUPS.append(group_entry)
         return group_entry
 
@@ -3651,7 +3682,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 flow_select[op_name] = op.cmd._flow_select
         # Initialize all groups without operations
         for entry in group_entries:
-            self._groups[entry.name] = FlowGroup(entry.name, options=entry.options)
+            self._groups[entry.name] = FlowGroup(entry.name, options=entry.options,
+                                                 flow_aggregate=entry.flow_aggregate)
 
         # Add operations and directives to group
         for (op_name, op) in self._operations.items():

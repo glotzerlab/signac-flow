@@ -175,7 +175,7 @@ class TestProjectStatusPerformance(TestProjectBase):
 
         time = timeit.timeit(
             lambda: project._fetch_status(project, StringIO(),
-                                          ignore_errors=False, no_parallelize=False), number=10)
+                                          ignore_errors=False), number=10)
 
         assert time < 10
         MockScheduler.reset()
@@ -589,7 +589,7 @@ class TestProject(TestProjectBase):
         for job in project:
             labels = list(project.classify(job))
             assert len(labels) == 3 - (job.sp.b % 2)
-            assert all(isinstance(l, str) for l in labels)
+            assert all(isinstance(label, str) for label in labels)
             assert 'default_label' in labels
             assert 'negative_default_label' not in labels
             assert 'named_label' in labels
@@ -626,6 +626,32 @@ class TestProject(TestProjectBase):
             with redirect_stdout(StringIO()):
                 with redirect_stderr(StringIO()):
                     project.print_status(parameters=parameters, detailed=True)
+
+    def test_serial_project_status_homogeneous_schema(self):
+        project = self.mock_project(config_overrides={'flow': {'status_parallelization': 'none'}})
+        for parameters in (None, True, ['a'], ['b'], ['a', 'b']):
+            with redirect_stdout(StringIO()):
+                with redirect_stderr(StringIO()):
+                    project.print_status(parameters=parameters, detailed=True)
+
+    def test_process_parallelized_project_status_homogeneous_schema(self):
+        project = self.mock_project(
+                       config_overrides={'flow': {'status_parallelization': 'process'}}
+                       )
+        for parameters in (None, True, ['a'], ['b'], ['a', 'b']):
+            with redirect_stdout(StringIO()):
+                with redirect_stderr(StringIO()):
+                    project.print_status(parameters=parameters, detailed=True)
+
+    def test_project_status_invalid_parallelization_config(self):
+        project = self.mock_project(
+                       config_overrides={'flow': {'status_parallelization': 'invalid'}}
+                       )
+        for parameters in (None, True, ['a'], ['b'], ['a', 'b']):
+            with redirect_stdout(StringIO()):
+                with redirect_stderr(StringIO()):
+                    with pytest.raises(RuntimeError):
+                        project.print_status(parameters=parameters, detailed=True)
 
     def test_project_status_heterogeneous_schema(self):
         project = self.mock_project(heterogeneous=True)
@@ -1170,7 +1196,7 @@ class TestProjectMainInterface(TestProjectBase):
                         except StopIteration:
                             continue
                     for op in project.next_operations(job):
-                        assert any(op.name in l for l in op_lines)
+                        assert any(op.name in op_line for op_line in op_lines)
 
     def test_main_script(self):
         assert len(self.project)
@@ -1241,7 +1267,7 @@ class TestGroupProject(TestProjectBase):
             job_op2 = project.groups['group2']._create_submission_job_operation(
                 project._entrypoint, dict(), job)
             script2 = project.script([job_op2])
-            assert '--num-passes=2'.format(job) in script2
+            assert '--num-passes=2' in script2
 
     def test_directives_hierarchy(self):
         project = self.mock_project()

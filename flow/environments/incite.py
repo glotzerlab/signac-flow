@@ -40,7 +40,7 @@ class SummitEnvironment(DefaultLSFEnvironment):
             for _ in range(nsets):
                 cores_used += tasks * cpus_per_task
                 gpus_used += gpus
-                if (cores_used > cls.cores_per_node or
+                while (cores_used > cls.cores_per_node or
                         gpus_used > cls.gpus_per_node):
                     nodes_used += 1
                     cores_used = max(0, cores_used - cls.cores_per_node)

@@ -98,20 +98,61 @@ For example: {{{{ project.get_id() | capitalize }}}}.
 The available filters are:
 {filters}"""
 
+_FMT_SCHEDULER_STATUS = {
+    JobStatus.unknown: 'U',
+    JobStatus.registered: 'R',
+    JobStatus.inactive: 'I',
+    JobStatus.submitted: 'S',
+    JobStatus.held: 'H',
+    JobStatus.queued: 'Q',
+    JobStatus.active: 'A',
+    JobStatus.error: 'E',
+    JobStatus.dummy: ' ',
+}
 
+
+# TODO: When we drop Python 3.5 support, change this to inherit from IntFlag
+# instead of IntEnum so that we can remove the operator overloads.
 class IgnoreConditions(IntEnum):
     """Flags that determine which conditions are used to determine job eligibility.
 
     The options include:
+        * IgnoreConditions.NONE: check all conditions
         * IgnoreConditions.PRE: ignore pre conditions
         * IgnoreConditions.POST: ignore post conditions
         * IgnoreConditions.ALL: ignore all conditions
-        * IgnoreConditions.NONE: check all conditions
     """
+    # The following three functions can be removed once we drop Python 3.5
+    # support, they are implemented by the IntFlag class in Python > 3.6.
+    def __or__(self, other):
+        if not isinstance(other, (self.__class__, int)):
+            return NotImplemented
+        result = self.__class__(self._value_ | self.__class__(other)._value_)
+        return result
+
+    def __and__(self, other):
+        if not isinstance(other, (self.__class__, int)):
+            return NotImplemented
+        return self.__class__(self._value_ & self.__class__(other)._value_)
+
+    def __xor__(self, other):
+        if not isinstance(other, (self.__class__, int)):
+            return NotImplemented
+        return self.__class__(self._value_ ^ self.__class__(other)._value_)
+
+    # This operator must be defined since IntFlag simply performs an integer
+    # bitwise not on the underlying enum value, which is problematic in
+    # twos-complement arithmetic. What we want is to only flip valid bits.
+    def __invert__(self):
+        # Compute the largest number of bits use to represent one of the flags
+        # so that we can XOR the appropriate number.
+        max_bits = len(bin(max([elem.value for elem in type(self)]))) - 2
+        return self.__class__((2**max_bits - 1) ^ self._value_)
+
+    NONE = 0
     PRE = 1
     POST = 2
     ALL = PRE | POST
-    NONE = ~ ALL
 
     def __str__(self):
         return {IgnoreConditions.PRE: 'pre', IgnoreConditions.POST: 'post',
@@ -336,6 +377,63 @@ class JobOperation(object):
             return JobStatus(self.job._project.document['_status'][self.id])
         except KeyError:
             return JobStatus.unknown
+
+
+class SubmissionJobOperation(JobOperation):
+    R"""This class represents the information needed to submit one group for one job.
+
+    This class extends :py:class:`JobOperation` to include a set of groups
+    that will be executed via the "run" command. These groups are known at
+    submission time.
+
+    :param \*args:
+        Passed to the constructor of :py:class:`JobOperation`.
+    :param eligible_operations:
+        A list of :py:class:`JobOperation` that will be executed when this
+        submitted job is executed.
+    :type eligible_operations:
+        list
+    :param operations_with_unmet_preconditions:
+        A list of :py:class:`JobOperation` that will not be executed in the
+        first pass of :meth:`FlowProject.run` due to unmet preconditions. These
+        operations may be executed in subsequent iterations of the run loop.
+    :type operations_with_unmet_preconditions:
+        list
+    :param operations_with_met_postconditions:
+        A list of :py:class:`JobOperation` that will not be executed in the
+        first pass of :meth:`FlowProject.run` because all postconditions are
+        met. These operations may be executed in subsequent iterations of the
+        run loop.
+    :type operations_with_met_postconditions:
+        list
+    :param \*\*kwargs:
+        Passed to the constructor of :py:class:`JobOperation`.
+    """
+
+    def __init__(
+        self,
+        *args,
+        eligible_operations=None,
+        operations_with_unmet_preconditions=None,
+        operations_with_met_postconditions=None,
+        **kwargs
+    ):
+        super(SubmissionJobOperation, self).__init__(*args, **kwargs)
+
+        if eligible_operations is None:
+            self.eligible_operations = []
+        else:
+            self.eligible_operations = eligible_operations
+
+        if operations_with_unmet_preconditions is None:
+            self.operations_with_unmet_preconditions = []
+        else:
+            self.operations_with_unmet_preconditions = operations_with_unmet_preconditions
+
+        if operations_with_met_postconditions is None:
+            self.operations_with_met_postconditions = []
+        else:
+            self.operations_with_met_postconditions = operations_with_met_postconditions
 
 
 class FlowCondition(object):
@@ -870,20 +968,47 @@ class FlowGroup(object):
         :type index:
             int
         :return:
-            Returns a :py:class:`~.JobOperation` for submitting the group. The
+            Returns a :py:class:`~.SubmissionJobOperation` for submitting the group. The
             :py:class:`~.JobOperation` will have directives that have been collected
             appropriately from its contained operations.
         :rtype:
-            :py:class:`JobOperation`
+            :py:class:`SubmissionJobOperation`
         """
         uneval_cmd = functools.partial(self._submit_cmd, entrypoint=entrypoint, job=job,
                                        ignore_conditions=ignore_conditions_on_execution)
+
+        def _get_run_ops(ignore_ops, additional_ignores_flag):
+            """Get operations that match the combination of the conditions required by
+            _create_submission_job_operation and the ignored flags, and remove operations
+            in the ignore_ops list."""
+            return list(
+                set(self._create_run_job_operations(
+                    entrypoint=entrypoint,
+                    default_directives=default_directives,
+                    job=job,
+                    ignore_conditions=ignore_conditions_on_execution | additional_ignores_flag)
+                    ) - set(ignore_ops)
+            )
+
         submission_directives = self._get_submission_directives(default_directives, job)
-        return JobOperation(self._generate_id(job, index=index),
-                            self.name,
-                            job,
-                            cmd=uneval_cmd,
-                            directives=submission_directives)
+        eligible_operations = _get_run_ops(
+            [], IgnoreConditions.NONE)
+        operations_with_unmet_preconditions = _get_run_ops(
+            eligible_operations, IgnoreConditions.PRE)
+        operations_with_met_postconditions = _get_run_ops(
+            eligible_operations, IgnoreConditions.POST)
+
+        submission_job_operation = SubmissionJobOperation(
+            self._generate_id(job, index=index),
+            self.name,
+            job,
+            cmd=uneval_cmd,
+            directives=submission_directives,
+            eligible_operations=eligible_operations,
+            operations_with_unmet_preconditions=operations_with_unmet_preconditions,
+            operations_with_met_postconditions=operations_with_met_postconditions,
+        )
+        return submission_job_operation
 
     def _create_run_job_operations(self, entrypoint, default_directives, job,
                                    ignore_conditions=IgnoreConditions.NONE, index=0):
@@ -1390,14 +1515,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for cls in type(self).__mro__:
             self._label_functions.update(getattr(cls, '_LABEL_FUNCTIONS', dict()))
 
-    ALIASES = dict(
-        unknown='U',
-        registered='R',
-        queued='Q',
-        active='A',
-        inactive='I',
-        requires_attention='!'
-    )
+    ALIASES = {str(status).replace('JobStatus.', ''): symbol
+               for status, symbol in _FMT_SCHEDULER_STATUS.items() if status != JobStatus.dummy}
     "These are default aliases used within the status output."
 
     @classmethod
@@ -1560,11 +1679,18 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         else:
             logger.info("Updated job status cache.")
 
-    def _fetch_status(self, jobs, err, ignore_errors, no_parallelize):
+    def _fetch_status(self, jobs, err, ignore_errors, status_parallelization='thread'):
+        # The argument status_parallelization is used so that _fetch_status method
+        # gets to know whether the deprecated argument no_parallelization passed
+        # while calling print_status is True or False. This can also be done by
+        # setting self.config['flow']['status_parallelization']='none' if the argument
+        # is True. But the later functionality will last the rest of the session but in order
+        # to do proper deprecation, it is not required for now.
+
         # Update the project's status cache
         self._fetch_scheduler_status(jobs, err, ignore_errors)
-
         # Get status dict for all selected jobs
+
         def _print_progress(x):
             print("Updating status: ", end='', file=err)
             err.flush()
@@ -1579,19 +1705,58 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             cached_status = self.document['_status']._as_dict()
         except KeyError:
             cached_status = dict()
+
         _get_job_status = functools.partial(self.get_job_status,
                                             ignore_errors=ignore_errors,
                                             cached_status=cached_status)
 
         with self._potentially_buffered():
             try:
-                with contextlib.closing(ThreadPool()) as pool:
-                    _map = map if no_parallelize else pool.imap
-                    # First attempt at parallelized status determination.
-                    # This may fail on systems that don't allow threads.
+                if status_parallelization == 'thread':
+                    with contextlib.closing(ThreadPool()) as pool:
+                        # First attempt at parallelized status determination.
+                        # This may fail on systems that don't allow threads.
+                        return list(tqdm(
+                            iterable=pool.imap(_get_job_status, jobs),
+                            desc="Collecting job status info", total=len(jobs), file=err))
+                elif status_parallelization == 'process':
+                    with contextlib.closing(Pool()) as pool:
+                        try:
+                            import pickle
+                            results = self._fetch_status_in_parallel(
+                                pool, pickle, jobs, ignore_errors, cached_status)
+                        except Exception as error:
+                            if not isinstance(error, (pickle.PickleError, self._PickleError)) and\
+                                    'pickle' not in str(error).lower():
+                                raise    # most likely not a pickle related error...
+
+                            try:
+                                import cloudpickle
+                            except ImportError:  # The cloudpickle package is not available.
+                                logger.error("Unable to parallelize execution due to a "
+                                             "pickling error. "
+                                             "\n\n - Try to install the 'cloudpickle' package, "
+                                             "e.g., with 'pip install cloudpickle'!\n")
+                                raise error
+                            else:
+                                try:
+                                    results = self._fetch_status_in_parallel(
+                                        pool, cloudpickle, jobs, ignore_errors, cached_status)
+                                except self._PickleError as error:
+                                    raise RuntimeError(
+                                        "Unable to parallelize execution due to a pickling "
+                                        "error: {}.".format(error))
+                        return list(tqdm(
+                            iterable=results,
+                            desc="Collecting job status info", total=len(jobs), file=err))
+                elif status_parallelization == 'none':
                     return list(tqdm(
-                        iterable=_map(_get_job_status, jobs),
+                        iterable=map(_get_job_status, jobs),
                         desc="Collecting job status info", total=len(jobs), file=err))
+                else:
+                    raise RuntimeError("Configuration value status_parallelization is invalid. "
+                                       "You can set it to 'thread', 'parallel', or 'none'"
+                                       )
             except RuntimeError as error:
                 if "can't start new thread" not in error.args:
                     raise   # unrelated error
@@ -1609,6 +1774,18 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 # Always print the completed progressbar.
                 print('Collecting job status info: {}/{}'.format(i+1, num_jobs), file=err)
                 return statuses
+
+    def _fetch_status_in_parallel(self, pool, pickle, jobs, ignore_errors, cached_status):
+        try:
+            s_project = pickle.dumps(self)
+            s_tasks = [(pickle.loads, s_project, job.get_id(), ignore_errors, cached_status)
+                       for job in jobs]
+        except Exception as error:  # Masking all errors since they must be pickling related.
+            raise self._PickleError(error)
+
+        results = pool.imap(_serialized_get_job_status, s_tasks)
+
+        return results
 
     PRINT_STATUS_ALL_VARYING_PARAMETERS = True
     """This constant can be used to signal that the print_status() method is supposed
@@ -1689,10 +1866,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Print status even if querying the scheduler fails.
         :type ignore_errors:
             bool
-        :param no_parallelize:
-            Do not parallelize the status update.
-        :type no_parallelize:
-            bool
         :param template:
             User provided Jinja2 template file.
         :type template:
@@ -1725,6 +1898,20 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if eligible_jobs_max_lines is None:
             eligible_jobs_max_lines = flow_config.get_config_value('eligible_jobs_max_lines')
 
+        if no_parallelize:
+            print(
+                "WARNING: "
+                "The no_parallelize argument is deprecated as of 0.10 "
+                "and will be removed in 0.12. "
+                "Instead, set the status_parallelization configuration value to 'none'. "
+                "In order to do this from the CLI, you can execute "
+                "`signac config set flow.status_parallelization 'none'`\n",
+                file=sys.stderr
+            )
+            status_parallelization = 'none'
+        else:
+            status_parallelization = self.config['flow']['status_parallelization']
+
         # initialize jinja2 template environment and necessary filters
         template_environment = self._template_environment()
 
@@ -1749,7 +1936,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             ]
 
             with prof(single=False):
-                tmp = self._fetch_status(jobs, err, ignore_errors, no_parallelize)
+                tmp = self._fetch_status(jobs, err, ignore_errors, status_parallelization)
 
             prof._mergeFileTiming()
 
@@ -1798,7 +1985,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         lines, start = inspect.getsourcelines(code)
                     except OSError:
                         continue
-                    hits_ = [ft.getHitStatsFor(l)[0] for l in range(start, start+len(lines))]
+                    hits_ = [ft.getHitStatsFor(line)[0] for line in range(start, start+len(lines))]
                     profiling_results.extend(
                         ["{:>5} {:>4}: {}".format(h, lineno, l.rstrip())
                          for lineno, (l, h) in enumerate(zip(lines, hits_), start)])
@@ -1813,7 +2000,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     "results may be highly inaccurate.")
 
         else:
-            tmp = self._fetch_status(jobs, err, ignore_errors, no_parallelize)
+            tmp = self._fetch_status(jobs, err, ignore_errors, status_parallelization)
             profiling_results = None
 
         operations_errors = {s['_operations_error'] for s in tmp}
@@ -1956,7 +2143,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             context['op_counter'].append(('[{} more operations omitted]'.format(n), ''))
 
         status_renderer = StatusRenderer()
-        render_output = status_renderer.render(template, template_environment, context, detailed,
+        # We have to make a deep copy of the template environment if we're
+        # using a process Pool for parallelism. Somewhere in the process of
+        # manually pickling and dispatching tasks to individual processes
+        # Python's reference counter loses track of the environment and ends up
+        # destructing the template environment. This causes subsequent calls to
+        # print_status to fail (although _fetch_status calls will still
+        # succeed).
+        te = deepcopy(template_environment) if status_parallelization == "process" \
+            else template_environment
+        render_output = status_renderer.render(template, te, context, detailed,
                                                expand, unroll, compact, output_format)
 
         print(render_output, file=file)
@@ -2592,8 +2788,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "must be a member of class IgnoreConditions")
 
         # Gather all pending operations.
-        default_directives = self._get_default_directives()
         with self._potentially_buffered():
+
+            default_directives = self._get_default_directives()
             operations = self._get_submission_operations(jobs, default_directives, names,
                                                          ignore_conditions,
                                                          ignore_conditions_on_execution)
@@ -2602,13 +2799,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Bundle them up and submit.
         for bundle in _make_bundles(operations, bundle_size):
-            status = self.submit_operations(
-                operations=bundle, env=env, parallel=parallel,
-                force=force, walltime=walltime, **kwargs)
-
+            status = self.submit_operations(operations=bundle, env=env, parallel=parallel,
+                                            force=force, walltime=walltime, **kwargs)
             if status is not None:  # operations were submitted, store status
-                for op in bundle:
-                    op.set_status(status)
+                for operation in bundle:
+                    operation.set_status(status)
 
     @classmethod
     def _add_submit_args(cls, parser):
@@ -2863,7 +3058,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         parser.add_argument(
             '--no-parallelize',
             action='store_true',
-            help="Do not parallelize the status determination.")
+            help="Do not parallelize the status determination. "
+                 "The '--no-parallelize' argument is deprecated. "
+                 "Please use the status_parallelization configuration "
+                 "instead (see above)."
+            )
         view_group.add_argument(
             '-o', '--output-format',
             type=str,
@@ -3287,8 +3486,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     "using `--profile` to determine bottlenecks within your project "
                     "workflow definition.\n"
                     "Execute `signac config set flow.{} VALUE` to specify the "
-                    "warning threshold in seconds. Use -1 to completely suppress this "
-                    "warning."
+                    "warning threshold in seconds.\n"
+                    "To speed up the compilation, you can try executing "
+                    "`signac config set flow.status_parallelization 'process'` to set "
+                    "the status_parallelization config value to process."
+                    "Use -1 to completely suppress this warning.\n"
                     .format(warn_threshold, config_key), file=sys.stderr)
 
     def _main_next(self, args):
@@ -3351,6 +3553,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             template=args.template, show_template_help=args.show_template_help))
 
     def _main_submit(self, args):
+        "Submit jobs to a scheduler"
         if args.test:
             args.pretend = True
         kwargs = vars(args)
@@ -3362,20 +3565,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if not args.test:
             self._fetch_scheduler_status(jobs)
 
-        # Gather all pending operations ...
-        with self._potentially_buffered():
-            names = args.operation_name if args.operation_name else None
-            default_directives = self._get_default_directives()
-            operations = self._get_submission_operations(jobs, default_directives, names,
-                                                         args.ignore_conditions,
-                                                         args.ignore_conditions_on_execution)
-        operations = list(islice(operations, args.num))
-        # Bundle operations up, generate the script, and submit to scheduler.
-        for bundle in make_bundles(operations, args.bundle_size):
-            status = self.submit_operations(operations=bundle, **kwargs)
-            if status is not None:
-                for operations in bundle:
-                    operations.set_status(status)
+        names = args.operation_name if args.operation_name else None
+        self.submit(jobs=jobs, names=names, **kwargs)
 
     def _main_exec(self, args):
         if len(args.jobid):
@@ -3473,7 +3664,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         parser_status = subparsers.add_parser(
             'status',
-            parents=[base_parser])
+            parents=[base_parser],
+            help="You can specify the parallelization of the status command "
+                 "by setting the flow.status_parallelization config "
+                 "value to 'thread' (default), 'none', or 'process'. You can do this by "
+                 "executing `signac config set flow.status_parallelization "
+                 "VALUE`.")
         self._add_print_status_args(parser_status)
         parser_status.add_argument(
             '--profile',
@@ -3692,20 +3888,17 @@ def _execute_serialized_operation(loads, project, operation):
     project._execute_operation(project._loads_op(operation))
 
 
+def _serialized_get_job_status(s_task):
+    """Invoke the _get_job_status() method on a serialized project instance."""
+    loads = s_task[0]
+    project = loads(s_task[1])
+    job = project.open_job(id=s_task[2])
+    ignore_errors = s_task[3]
+    cached_status = s_task[4]
+    return project.get_job_status(job, ignore_errors=ignore_errors, cached_status=cached_status)
+
+
 # Status-related helper functions
-
-
-_FMT_SCHEDULER_STATUS = {
-    JobStatus.unknown: 'U',
-    JobStatus.registered: 'R',
-    JobStatus.inactive: 'I',
-    JobStatus.submitted: 'S',
-    JobStatus.held: 'H',
-    JobStatus.queued: 'Q',
-    JobStatus.active: 'A',
-    JobStatus.error: 'E',
-    JobStatus.dummy: ' ',
-}
 
 
 def _update_status(args):

@@ -22,6 +22,7 @@ Added
 - Add markdown and html format support for print_status() (#113, #163).
 - Add memory flag option for default Slurm scheduler (#256).
 - Add optional environment variable to specify submission script separator (#262).
+- Add ``status_parallelization`` configuration to specify the parallelization nature of fetching status (#264, #271).
 
 Changed
 +++++++
@@ -32,10 +33,13 @@ Changed
 - Raises ValueError when --job-name passed by the user because that interferes with status checking (#164, #241).
 - Submitting with ``--memory`` no longer assumes a unit of gigabytes on Bridges and Comet clusters (#257).
 - Buffering is enabled by default, improving the performance of status checks (#273).
+- Deprecate the use of ``no_parallelize`` argument while printing status (#264, #271).
+- Submission via the command-line interface now calls the ``FlowProject.submit`` function instead of bypassing it for ``FlowProject.submit_operations``(#238, #286).
 
 Fixed
 +++++
 - Ensure that label names are used when displaying status (#263).
+- Fix node counting for large resource sets on Summit (#294).
 
 Removed
 +++++++

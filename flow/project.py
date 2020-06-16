@@ -767,6 +767,10 @@ class FlowGroupEntry(object):
         commands to execute.
     :type options:
         str
+    :param aggregator:
+        Aggregation parameters :py:class:`FlowGroup` to be created.
+    :type aggregator:
+        tuple
     """
     def __init__(self, name, options="", flow_aggregate=(None, None)):
         self.name = name
@@ -1328,12 +1332,6 @@ class FlowGroup(object):
         uneval_cmd = functools.partial(self._submit_cmd, entrypoint=entrypoint, jobs=jobs,
                                        ignore_conditions=ignore_conditions_on_execution,
                                        parallel=parallel)
-        # submission_directives = self._get_submission_directives(default_directives, jobs, parallel)
-        # return JobOperation(self._generate_id(jobs, index=index),
-        #                     self.name,
-        #                     jobs,
-        #                     cmd=uneval_cmd,
-        #                     directives=submission_directives)
 
         def _get_run_ops(ignore_ops, additional_ignores_flag):
             """Get operations that match the combination of the conditions required by
@@ -1343,12 +1341,12 @@ class FlowGroup(object):
                 set(self._create_run_job_operations(
                     entrypoint=entrypoint,
                     default_directives=default_directives,
-                    job=job,
+                    jobs=jobs,
                     ignore_conditions=ignore_conditions_on_execution | additional_ignores_flag)
                     ) - set(ignore_ops)
             )
 
-        submission_directives = self._get_submission_directives(default_directives, job, parallel)
+        submission_directives = self._get_submission_directives(default_directives, jobs, parallel)
         eligible_operations = _get_run_ops(
             [], IgnoreConditions.NONE)
         operations_with_unmet_preconditions = _get_run_ops(
@@ -1357,9 +1355,9 @@ class FlowGroup(object):
             eligible_operations, IgnoreConditions.POST)
 
         submission_job_operation = SubmissionJobOperation(
-            self._generate_id(job, index=index),
+            self._generate_id(jobs, index=index),
             self.name,
-            job,
+            jobs,
             cmd=uneval_cmd,
             directives=submission_directives,
             eligible_operations=eligible_operations,
@@ -3762,6 +3760,18 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             A string to append to submissions can be any valid :meth:`FlowOperation.run` option.
         :type options:
             str
+        :param aggregator:
+            Aggregator function which aggregates jobs for this group.
+        :type aggregator:
+            callable
+        :param sort:
+            Sort jobs by a statepoint parameter.
+        :type sort:
+            str
+        :param reverse:
+            States if the jobs are to be sorted in reverse order.
+        :type reverse:
+            bool
         """
         if name in cls._GROUP_NAMES:
             raise ValueError("Repeat definition of group with name '{}'.".format(name))

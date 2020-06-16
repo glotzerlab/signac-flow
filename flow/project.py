@@ -111,19 +111,48 @@ _FMT_SCHEDULER_STATUS = {
 }
 
 
+# TODO: When we drop Python 3.5 support, change this to inherit from IntFlag
+# instead of IntEnum so that we can remove the operator overloads.
 class IgnoreConditions(IntEnum):
     """Flags that determine which conditions are used to determine job eligibility.
 
     The options include:
+        * IgnoreConditions.NONE: check all conditions
         * IgnoreConditions.PRE: ignore pre conditions
         * IgnoreConditions.POST: ignore post conditions
         * IgnoreConditions.ALL: ignore all conditions
-        * IgnoreConditions.NONE: check all conditions
     """
+    # The following three functions can be removed once we drop Python 3.5
+    # support, they are implemented by the IntFlag class in Python > 3.6.
+    def __or__(self, other):
+        if not isinstance(other, (self.__class__, int)):
+            return NotImplemented
+        result = self.__class__(self._value_ | self.__class__(other)._value_)
+        return result
+
+    def __and__(self, other):
+        if not isinstance(other, (self.__class__, int)):
+            return NotImplemented
+        return self.__class__(self._value_ & self.__class__(other)._value_)
+
+    def __xor__(self, other):
+        if not isinstance(other, (self.__class__, int)):
+            return NotImplemented
+        return self.__class__(self._value_ ^ self.__class__(other)._value_)
+
+    # This operator must be defined since IntFlag simply performs an integer
+    # bitwise not on the underlying enum value, which is problematic in
+    # twos-complement arithmetic. What we want is to only flip valid bits.
+    def __invert__(self):
+        # Compute the largest number of bits use to represent one of the flags
+        # so that we can XOR the appropriate number.
+        max_bits = len(bin(max([elem.value for elem in type(self)]))) - 2
+        return self.__class__((2**max_bits - 1) ^ self._value_)
+
+    NONE = 0
     PRE = 1
     POST = 2
     ALL = PRE | POST
-    NONE = ~ ALL
 
     def __str__(self):
         return {IgnoreConditions.PRE: 'pre', IgnoreConditions.POST: 'post',
@@ -348,6 +377,63 @@ class JobOperation(object):
             return JobStatus(self.job._project.document['_status'][self.id])
         except KeyError:
             return JobStatus.unknown
+
+
+class SubmissionJobOperation(JobOperation):
+    R"""This class represents the information needed to submit one group for one job.
+
+    This class extends :py:class:`JobOperation` to include a set of groups
+    that will be executed via the "run" command. These groups are known at
+    submission time.
+
+    :param \*args:
+        Passed to the constructor of :py:class:`JobOperation`.
+    :param eligible_operations:
+        A list of :py:class:`JobOperation` that will be executed when this
+        submitted job is executed.
+    :type eligible_operations:
+        list
+    :param operations_with_unmet_preconditions:
+        A list of :py:class:`JobOperation` that will not be executed in the
+        first pass of :meth:`FlowProject.run` due to unmet preconditions. These
+        operations may be executed in subsequent iterations of the run loop.
+    :type operations_with_unmet_preconditions:
+        list
+    :param operations_with_met_postconditions:
+        A list of :py:class:`JobOperation` that will not be executed in the
+        first pass of :meth:`FlowProject.run` because all postconditions are
+        met. These operations may be executed in subsequent iterations of the
+        run loop.
+    :type operations_with_met_postconditions:
+        list
+    :param \*\*kwargs:
+        Passed to the constructor of :py:class:`JobOperation`.
+    """
+
+    def __init__(
+        self,
+        *args,
+        eligible_operations=None,
+        operations_with_unmet_preconditions=None,
+        operations_with_met_postconditions=None,
+        **kwargs
+    ):
+        super(SubmissionJobOperation, self).__init__(*args, **kwargs)
+
+        if eligible_operations is None:
+            self.eligible_operations = []
+        else:
+            self.eligible_operations = eligible_operations
+
+        if operations_with_unmet_preconditions is None:
+            self.operations_with_unmet_preconditions = []
+        else:
+            self.operations_with_unmet_preconditions = operations_with_unmet_preconditions
+
+        if operations_with_met_postconditions is None:
+            self.operations_with_met_postconditions = []
+        else:
+            self.operations_with_met_postconditions = operations_with_met_postconditions
 
 
 class FlowCondition(object):
@@ -897,12 +983,39 @@ class FlowGroup(object):
         uneval_cmd = functools.partial(self._submit_cmd, entrypoint=entrypoint, job=job,
                                        ignore_conditions=ignore_conditions_on_execution,
                                        parallel=parallel)
+
+        def _get_run_ops(ignore_ops, additional_ignores_flag):
+            """Get operations that match the combination of the conditions required by
+            _create_submission_job_operation and the ignored flags, and remove operations
+            in the ignore_ops list."""
+            return list(
+                set(self._create_run_job_operations(
+                    entrypoint=entrypoint,
+                    default_directives=default_directives,
+                    job=job,
+                    ignore_conditions=ignore_conditions_on_execution | additional_ignores_flag)
+                    ) - set(ignore_ops)
+            )
+
         submission_directives = self._get_submission_directives(default_directives, job, parallel)
-        return JobOperation(self._generate_id(job, index=index),
-                            self.name,
-                            job,
-                            cmd=uneval_cmd,
-                            directives=submission_directives)
+        eligible_operations = _get_run_ops(
+            [], IgnoreConditions.NONE)
+        operations_with_unmet_preconditions = _get_run_ops(
+            eligible_operations, IgnoreConditions.PRE)
+        operations_with_met_postconditions = _get_run_ops(
+            eligible_operations, IgnoreConditions.POST)
+
+        submission_job_operation = SubmissionJobOperation(
+            self._generate_id(job, index=index),
+            self.name,
+            job,
+            cmd=uneval_cmd,
+            directives=submission_directives,
+            eligible_operations=eligible_operations,
+            operations_with_unmet_preconditions=operations_with_unmet_preconditions,
+            operations_with_met_postconditions=operations_with_met_postconditions,
+        )
+        return submission_job_operation
 
     def _create_run_job_operations(self, entrypoint, default_directives, job,
                                    ignore_conditions=IgnoreConditions.NONE, index=0):

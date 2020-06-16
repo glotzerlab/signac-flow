@@ -2852,8 +2852,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         execution_group.add_argument(
             '-p', '--parallel',
             action='store_true',
-            help="Execute all operations in parallel. This applies to "
-                 "bundled operations and operations within a multi-operation group..")
+            help="Execute all operations in parallel.")
         cls._add_direct_cmd_arg_group(parser)
         cls._add_template_arg_group(parser)
 
@@ -2945,9 +2944,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         bundling_group.add_argument(
             '-p', '--parallel',
             action='store_true',
-            help="Execute all operations or multi-operation groups within "
-                 "a single bundle in parallel. For multi-operation groups "
-                 "operations within a group run in parallel.")
+            help="Execute all operations in a single bundle in parallel.")
 
     @classmethod
     def _add_direct_cmd_arg_group(cls, parser):

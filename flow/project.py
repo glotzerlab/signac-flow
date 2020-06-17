@@ -1132,6 +1132,8 @@ class FlowGroup(object):
                                      "due to different aggregate parameters."
                                      "".format(name, self.name))
 
+        # Adding `select` parameters for a group.
+        # This parameter must be the same for every operation in a group
         if len(self.operations) == 1:
             self.flow_select = flow_select
         else:

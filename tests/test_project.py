@@ -1315,13 +1315,9 @@ class TestGroupProject(TestProjectBase):
         group = project.groups['group']
         job = [j for j in project][0]
         directives = group._get_submission_directives(project._get_default_directives(),
-                                                      job, parallel=False)
+                                                      job)
         assert all([directives['ngpu'] == 2, directives['nranks'] == 4,
                     directives['np'] == 4])
-        directives = group._get_submission_directives(project._get_default_directives(),
-                                                      job, parallel=True)
-        assert all([directives['ngpu'] == 4, directives['nranks'] == 10,
-                    directives['np'] == 10])
 
     def test_flowgroup_repr(self):
         class A(flow.FlowProject):

@@ -35,6 +35,7 @@ Changed
 - Buffering is enabled by default, improving the performance of status checks (#273).
 - Deprecate the use of ``no_parallelize`` argument while printing status (#264, #271).
 - Submission via the command-line interface now calls the ``FlowProject.submit`` function instead of bypassing it for ``FlowProject.submit_operations``(#238, #286).
+- Updated Great Lakes gpu request syntax (#299).
 
 Fixed
 +++++

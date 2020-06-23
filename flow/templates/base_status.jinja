@@ -33,6 +33,14 @@
 | {{ op }} | {{ n_jobs }} |
 {% endfor %}
 {% endblock %}
+
+{% block aggregate_summary %}
+| aggregate_operation | number of eligible aggregates |
+| ------------------- | ----------------------------- |
+{% for ops, n_aggs in ag_counter.items() %}
+| {{ ops }} | {{ n_aggs }} |
+{% endfor %}
+{% endblock %}
 {% endif %}
 {% endblock%}
 

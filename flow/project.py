@@ -962,7 +962,7 @@ class FlowGroup(object):
     def _submit_cmd(self, entrypoint, ignore_conditions, jobs=None):
         entrypoint = self._determine_entrypoint(entrypoint, dict(), jobs)
         cmd = "{} run -o {}".format(entrypoint, self.name)
-        cmd = cmd if job is None else cmd + ' -j {}'.format(' '.join(map(str, jobs)))
+        cmd = cmd if jobs is None else cmd + ' -j {}'.format(' '.join(map(str, jobs)))
         cmd = cmd if self.options is None else cmd + ' ' + self.options
         if ignore_conditions != IgnoreConditions.NONE:
             return cmd.strip() + ' --ignore-conditions=' + str(ignore_conditions)
@@ -1263,11 +1263,13 @@ class FlowGroup(object):
         jobs = list(jobs)
         filter = self.flow_select
         grouper, sort = self.flow_aggregate
-        jobs_list = filter(deepcopy(jobs))
+        jobs_list = filter(jobs)
         if sort is not None:
             jobs_list = sort(jobs_list)
         jobs_list = grouper([job for job in jobs_list])
         jobs_list = [[j for j in jobs] for jobs in jobs_list]
+        if not len(jobs_list):
+            return None
         for i, job in enumerate(jobs_list[-1]):
             if job is None:
                 del jobs_list[-1][i:]
@@ -1280,6 +1282,8 @@ class FlowGroup(object):
         Jobs are filtered using the attributes flow_select and flow_aggregate.
         """
         jobs_list = self._get_filtered_jobs(jobs)
+        if jobs_list is None:
+            return None
         for job_list in jobs_list:
             yield self._generate_id(job_list, index=index)
 
@@ -1392,7 +1396,9 @@ class FlowGroup(object):
             Iterator[JobOperation]
         """
 
-        jobs_list = self._get_filtered_jobs(deepcopy(jobs))
+        jobs_list = self._get_filtered_jobs(jobs)
+        if jobs_list is None:
+            return
         for name, op in self.operations.items():
             # For every operation, firstly jobs are filtered according to some valid function
             # whose information is given in the :class:`~.select`, then grouped according to
@@ -1414,7 +1420,7 @@ class FlowGroup(object):
                                           job_list, cmd=uneval_cmd, directives=deepcopy(directives))
                     yield job_op
 
-    def _get_submission_directives(self, default_directives, job):
+    def _get_submission_directives(self, default_directives, jobs):
         """Get the combined resources for submission.
 
         No checks are done to mitigate inappropriate aggregation of operations.
@@ -1965,6 +1971,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         status_dict = defaultdict(starting_dict)
         for group in self._groups.values():
             jobs_list = group._get_filtered_jobs(self)
+            if jobs_list is None:
+                continue
             if len(jobs_list) < len(self):
                 aggregate = True
             else:
@@ -2041,6 +2049,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             print("Query scheduler...", file=file)
             for group in self._groups.values():
                 _ids = group._get_filtered_job_id_per_group(jobs)
+                if _ids is None:
+                    continue
                 for _id in _ids:
                     status[_id] = int(scheduler_info.get(_id, JobStatus.unknown))
             self.document._status.update(status)
@@ -2509,9 +2519,24 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         op_counter = Counter()
         for job in context['jobs']:
             for k, v in job['operations'].items():
-                if k != '' and v['eligible']:
+                if k != '' and v['eligible'] and not v['aggregate']:
                     op_counter[k] += 1
         context['op_counter'] = op_counter.most_common(eligible_jobs_max_lines)
+
+        aggregate_op = dict()
+        ag_counter = Counter()
+        for job in context['jobs']:
+            for k, v in job['operations'].items():
+                if k != '' and v['eligible'] and v['aggregate']:
+                    if k not in aggregate_op:
+                        aggregate_op[k] = []
+                        aggregate_op[k].append(v['aggregate_jobs'])
+                    if not v['aggregate_jobs'] in aggregate_op[k]:
+                        aggregate_op[k].append(v['aggregate_jobs'])
+        for op, ags in aggregate_op.items():
+            ag_counter[op] = len(ags)
+        context['ag_counter'] = ag_counter
+
         n = len(op_counter) - len(context['op_counter'])
         if n > 0:
             context['op_counter'].append(('[{} more operations omitted]'.format(n), ''))
@@ -2908,7 +2933,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                    ignore_conditions_on_execution=IgnoreConditions.NONE):
         """Grabs JobOperations that are eligible to run from FlowGroups."""
         for group in self._gather_flow_groups(names):
-            for job_list in group._get_filtered_jobs(deepcopy(jobs)):
+            jobs_list = group._get_filtered_jobs(jobs)
+            if jobs_list is None:
+                continue
+            for job_list in jobs_list:
                 if (
                     group.eligible(job_list, ignore_conditions) and
                     self._eligible_for_submission(group, job_list)

@@ -1978,16 +1978,31 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         starting_dict = functools.partial(dict, scheduler_status=JobStatus.unknown)
         status_dict = defaultdict(starting_dict)
         for group in self._groups.values():
-            completed = group.complete(job)
-            eligible = False if completed else group.eligible(job)
-            scheduler_status = cached_status.get(group._generate_id(job),
+            jobs_list = group._get_filtered_jobs(self)
+            if len(jobs_list) < len(self):
+                aggregate = True
+            else:
+                aggregate = False
+            jobs = None
+            for job_list in jobs_list:
+                if job in job_list:
+                    jobs = job_list
+                    break
+            if jobs is None:
+                break
+            completed = group.complete(jobs)
+            eligible = False if completed else group.eligible(jobs)
+
+            scheduler_status = cached_status.get(group._generate_id(jobs),
                                                  JobStatus.unknown)
             for operation in group.operations:
                 if scheduler_status >= status_dict[operation]['scheduler_status']:
                     status_dict[operation] = {
                             'scheduler_status': scheduler_status,
                             'eligible': eligible,
-                            'completed': completed
+                            'completed': completed,
+                            'aggregate_jobs': [job.id for job in jobs],
+                            'aggregate': aggregate
                             }
 
         for key in sorted(status_dict):

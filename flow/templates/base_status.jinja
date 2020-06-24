@@ -26,22 +26,17 @@
 {% endfor %}
 {% endblock%}
 
-{% block operation_summary %}
-| operation | number of eligible jobs |
-| --------- | ----------------------- |
-{% for op, n_jobs in op_counter %}
-| {{ op }} | {{ n_jobs }} |
-{% endfor %}
-{% endblock %}
-
 {% block aggregate_summary %}
-| aggregate_operation | number of eligible aggregates |
-| ------------------- | ----------------------------- |
-{% for ops, n_aggs in ag_counter.items() %}
+| operation | number of eligible aggregates |
+| --------- | ----------------------------- |
+{% for ops, n_aggs in aggregate_counter.items() %}
 | {{ ops }} | {{ n_aggs }} |
 {% endfor %}
 {% endblock %}
 {% endif %}
+{{ 'All operations are now aggregate operations hence you will '
+   'now see number of eligible aggregates instead of eligible jobs.'
+}}
 {% endblock%}
 
 {% block detailed %}

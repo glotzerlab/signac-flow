@@ -1716,7 +1716,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         sys.exit(2)
 
     @classmethod
-    def label(cls, label_name_or_func=None):
+    def label(cls, label_name_or_func=None, aggregator=None):
         """Designate a function to be a label function of this class.
 
         For example, we can define a label function like this:
@@ -1751,12 +1751,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         if callable(label_name_or_func):
             cls._LABEL_FUNCTIONS[label_name_or_func] = None
+            label_name_or_func._aggregator = aggregator
             return label_name_or_func
 
         def label_func(func):
             cls._LABEL_FUNCTIONS[func] = label_name_or_func
             return func
 
+        label_func._aggregator = aggregator
         return label_func
 
     def detect_operation_graph(self):
@@ -2523,19 +2525,19 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     op_counter[k] += 1
         context['op_counter'] = op_counter.most_common(eligible_jobs_max_lines)
 
-        aggregate_op = dict()
-        ag_counter = Counter()
+        aggregate_dict = dict()
+        aggregate_counter = Counter()
         for job in context['jobs']:
             for k, v in job['operations'].items():
-                if k != '' and v['eligible'] and v['aggregate']:
-                    if k not in aggregate_op:
-                        aggregate_op[k] = []
-                        aggregate_op[k].append(v['aggregate_jobs'])
-                    if not v['aggregate_jobs'] in aggregate_op[k]:
-                        aggregate_op[k].append(v['aggregate_jobs'])
-        for op, ags in aggregate_op.items():
-            ag_counter[op] = len(ags)
-        context['ag_counter'] = ag_counter
+                if k != '' and v['eligible']:
+                    if k not in aggregate_dict:
+                        aggregate_dict[k] = []
+                        aggregate_dict[k].append(v['aggregate_jobs'])
+                    if not v['aggregate_jobs'] in aggregate_dict[k]:
+                        aggregate_dict[k].append(v['aggregate_jobs'])
+        for op, ags in aggregate_dict.items():
+            aggregate_counter[op] = len(ags)
+        context['aggregate_counter'] = aggregate_counter
 
         n = len(op_counter) - len(context['op_counter'])
         if n > 0:
@@ -3474,21 +3476,30 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         See also: :meth:`~.label`
         """
+        aggregates = []
+        for group in self._groups.values():
+            jobs_list = group._get_filtered_jobs(self)
+            if jobs_list is None:
+                continue
+            for job_list in jobs_list:
+                if job in job_list:
+                    aggregates.append(job_list)
+                    break
         for label_func, label_name in self._label_functions.items():
             if label_name is None:
                 label_name = getattr(label_func, '_label_name',
                                      getattr(label_func, '__name__', type(label_func).__name__))
-            for group in self._groups.values():
-                jobs_list = group._get_filtered_jobs(self)
+            aggregator = getattr(label_func, '_aggregator', None)
+            if aggregator is not None:
+                aggregates = []
+                jobs_list = aggregator([job for job in self])
                 if jobs_list is None:
                     continue
-                jobs = None
                 for job_list in jobs_list:
                     if job in job_list:
-                        jobs = job_list
+                        aggregates.append(job_list)
                         break
-                if jobs is None:
-                    break
+            for jobs in aggregates:
                 try:
                     label_value = label_func(*jobs)
                 except TypeError:

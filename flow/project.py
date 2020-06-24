@@ -3478,20 +3478,32 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if label_name is None:
                 label_name = getattr(label_func, '_label_name',
                                      getattr(label_func, '__name__', type(label_func).__name__))
-            try:
-                label_value = label_func(job)
-            except TypeError:
+            for group in self._groups.values():
+                jobs_list = group._get_filtered_jobs(self)
+                if jobs_list is None:
+                    continue
+                jobs = None
+                for job_list in jobs_list:
+                    if job in job_list:
+                        jobs = job_list
+                        break
+                if jobs is None:
+                    break
                 try:
-                    label_value = label_func(self, job)
-                except Exception:
-                    label_func = getattr(self, label.__func__.__name__)
-                    label_value = label_func(job)
-
-            assert label_name is not None
-            if isinstance(label_value, str):
-                yield label_value
-            elif bool(label_value) is True:
-                yield label_name
+                    label_value = label_func(*jobs)
+                except TypeError:
+                    try:
+                        label_value = label_func(self, *jobs)
+                    except TypeError:
+                        continue
+                    except Exception:
+                        label_func = getattr(self, label.__func__.__name__)
+                        label_value = label_func(*jobs)
+                assert label_name is not None
+                if isinstance(label_value, str):
+                    yield label_value
+                elif bool(label_value) is True:
+                    yield label_name
 
     def add_operation(self, name, cmd, pre=None, post=None, **kwargs):
         """

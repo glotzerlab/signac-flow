@@ -2620,7 +2620,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         logger.info("Use environment '{}'.".format(env))
         logger.info("Set 'base_script={}'.".format(env.template))
         context['base_script'] = env.template
-        context['environment'] = env.__name__
+        context['environment'] = env
         context['id'] = _id
         context['operations'] = list(operations)
         context.update(kwargs)

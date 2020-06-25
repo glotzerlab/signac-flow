@@ -1276,18 +1276,18 @@ class TestGroupProject(TestProjectBase):
             job_ops = project._get_submission_operations([job],
                                                          project._get_default_directives(),
                                                          names=['group2'])
-            assert all([job_op.directives.get('ngpu', 0) == 2 for job_op in job_ops])
+            assert all([job_op.directives.get('omp_num_threads', 0) == 4 for job_op in job_ops])
             job_ops = project._get_submission_operations([job],
                                                          project._get_default_directives(),
                                                          names=['op3'])
-            assert all([job_op.directives.get('ngpu', 0) == 1 for job_op in job_ops])
+            assert all([job_op.directives.get('omp_num_threads', 0) == 1 for job_op in job_ops])
             # Test run JobOperations
             job_ops = project.groups['group2']._create_run_job_operations(
                 project._entrypoint, project._get_default_directives(), job)
-            assert all([job_op.directives.get('ngpu', 0) == 2 for job_op in job_ops])
+            assert all([job_op.directives.get('omp_num_threads', 0) == 4 for job_op in job_ops])
             job_ops = project.groups['op3']._create_run_job_operations(
                 project._entrypoint, project._get_default_directives(), job)
-            assert all([job_op.directives.get('ngpu', 0) == 1 for job_op in job_ops])
+            assert all([job_op.directives.get('omp_num_threads', 0) == 1 for job_op in job_ops])
 
     def test_submission_aggregation(self):
         class A(flow.FlowProject):

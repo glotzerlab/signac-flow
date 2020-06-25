@@ -37,6 +37,7 @@ def process_job(document, job):
         ('script_hybrid_op.sh',  'MPI-OpenMP Hybrid operation'),
         ('script_gpu_op.sh',  'GPU operation'),
         ('script_mpi_gpu_op.sh',  'MPI-GPU operation'),
+        ('script_group1.sh',  'Operation group'),
     ])
 
     if job.sp.parameters.get('bundle', False):

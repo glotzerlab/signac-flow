@@ -59,7 +59,7 @@ rm {{ launcher_file }}
 {% for operation in operations %}
 
 # {{ "%s"|format(operation) }}
-{{ "_FLOW_STAMPEDE_OFFSET_=%d "|format(environment.base_offset) }}{{ operation.cmd }}{{ cmd_suffix }}
+{{ "_FLOW_STAMPEDE_OFFSET_=%d "|format(operation.directives['nranks']|return_and_increment) }}{{ operation.cmd }}{{ cmd_suffix }}
 {% if operation.eligible_operations|length > 0 %}
 # Eligible to run:
 {% for run_op in operation.eligible_operations %}
@@ -79,5 +79,9 @@ rm {{ launcher_file }}
 {% endfor %}
 {% endif %}
 {% endfor %}
+{# We need to reset the environment's base offset in between script generation for separate bundles. #}
+{# Since Jinja's bytecode optimizes out calls to filters with a constant argument, we are forced to #}
+{# rerun this function on the environment's base offset at the end of each run to return the offset to 0. #}
+{{ "%d"|format(environment.base_offset)|decrement_offset }}
 {% endif %}
 {% endblock %}

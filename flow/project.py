@@ -3633,9 +3633,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             $ python my_project.py --help
         """
         # Find file that main is called in. When running through the command
-        # line interface, we know exactly what the entrypoint path should be
-        # (it's the file where main is called, which we can pull off the stack)
-        # so we bypass our original best guess from Project construction.
+        # line interface, we know exactly what the entrypoint path should be:
+        # it's the file where main is called, which we can pull off the stack.
         self._entrypoint.setdefault('path', os.path.realpath(inspect.stack()[-1].filename))
 
         if parser is None:

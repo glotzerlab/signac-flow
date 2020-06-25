@@ -6,6 +6,7 @@ import logging
 import os
 
 from ..environment import DefaultSlurmEnvironment
+from ..environment import template_filter
 
 
 logger = logging.getLogger(__name__)
@@ -52,6 +53,26 @@ class Stampede2Environment(DefaultSlurmEnvironment):
     mpi_cmd = 'ibrun'
     offset_counter = 0
     base_offset = _STAMPEDE_OFFSET
+
+    @template_filter
+    def return_and_increment(cls, increment):
+        """Increment the base offset, then return the value prior to incrementing.
+
+        Note that this filter is designed for use at submission time, and the
+        environment variable will be used upon script generation. At run time, the
+        base offset will be set only once (when run initializes the environment)."""
+        cls.base_offset += increment
+        return cls.base_offset - increment
+
+    @template_filter
+    def decrement_offset(cls, value):
+        """Decrement the offset value.
+
+        This function is a hackish solution to get around the fact that Jinja has
+        very limited support for direct modification of Python objects, and we need
+        to be able to reset the offset between bundles."""
+        cls.base_offset -= int(value)
+        return ''
 
     @classmethod
     def add_args(cls, parser):

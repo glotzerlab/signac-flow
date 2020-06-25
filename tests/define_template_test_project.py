@@ -43,7 +43,7 @@ def hybrid_op(job):
 
 
 @TestProject.operation
-@flow.directives(ngpu=TestProject.ngpu)
+@flow.directives(ngpu=TestProject.ngpu, nranks=TestProject.ngpu)
 def gpu_op(job):
     pass
 

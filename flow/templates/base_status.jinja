@@ -29,7 +29,7 @@
 {% block aggregate_summary %}
 | operation | number of eligible aggregates |
 | --------- | ----------------------------- |
-{% for ops, n_aggs in aggregate_counter.items() %}
+{% for ops, n_aggs in aggregate_counter %}
 | {{ ops }} | {{ n_aggs }} |
 {% endfor %}
 {% endblock %}
@@ -53,6 +53,19 @@
 | {{job['job_id']}} | {{ field_operation | highlight(value['eligible'], pretty) | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }} | {{ para_output }}{{ job['labels'] | join(', ') }} |
 {% else %}
 |  | {{ field_operation | highlight(value['eligible'], pretty) | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }} | {{ para_output }}{{ job['labels'] | join(', ') }} |
+{% endif %}
+{% endfor %}
+{% endfor %}
+
+{{ 'Detailed Aggregate View: \n' }}
+| operation | aggregate |
+| --------- | --------- |
+{% for op, agg_stati in detailed_ags.items() %}
+{% for agg, stati in agg_stati %}
+{% if loop.first %}
+| {{op}} | {{agg }}| {{'['+scheduler_status_code[stati]+']' }} |
+{% else %}
+|  | {{ agg }} | {{ '['+scheduler_status_code[stati]+']' }}|
 {% endif %}
 {% endfor %}
 {% endfor %}

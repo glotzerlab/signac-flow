@@ -1997,7 +1997,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                             'scheduler_status': scheduler_status,
                             'eligible': eligible,
                             'completed': completed,
-                            'aggregate_jobs': [job.id for job in jobs],
+                            'aggregate_jobs': '{}...{}...{}'.format(
+                                jobs[0], len(jobs), jobs[-1]
+                            ) if len(jobs) > 1 else str(jobs[0]),
                             'aggregate': aggregate
                             }
 
@@ -2518,13 +2520,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if not has_eligible_ops and not context['all_ops']:
                 _add_dummy_operation(job)
 
-        op_counter = Counter()
-        for job in context['jobs']:
-            for k, v in job['operations'].items():
-                if k != '' and v['eligible'] and not v['aggregate']:
-                    op_counter[k] += 1
-        context['op_counter'] = op_counter.most_common(eligible_jobs_max_lines)
-
         aggregate_dict = dict()
         aggregate_counter = Counter()
         for job in context['jobs']:
@@ -2537,12 +2532,29 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         aggregate_dict[k].append(v['aggregate_jobs'])
         for op, ags in aggregate_dict.items():
             aggregate_counter[op] = len(ags)
-        context['aggregate_counter'] = aggregate_counter
+        context['aggregate_counter'] = aggregate_counter.most_common(eligible_jobs_max_lines)
 
-        n = len(op_counter) - len(context['op_counter'])
+        n = len(aggregate_counter) - len(context['aggregate_counter'])
         if n > 0:
-            context['op_counter'].append(('[{} more operations omitted]'.format(n), ''))
+            context['aggregate_counter'].append(('[{} more operations omitted]'.format(n), ''))
+        aggregates_per_op = dict()
+        for job in context['jobs']:
+            for k, v in job['operations'].items():
+                if k != '' and v['eligible'] and v['aggregate']:
+                    if k not in aggregates_per_op:
+                        aggregates_per_op[k] = []
+                        aggregates_per_op[k].append((v['aggregate_jobs'], v['scheduler_status']))
+                    else:
+                        present = False
+                        for jobs, stati in aggregates_per_op[k]:
+                            if v['aggregate_jobs'] in jobs:
+                                present = True
+                                break
+                        if not present:
+                            aggregates_per_op[k].append(
+                                (v['aggregate_jobs'], v['scheduler_status']))
 
+        context['detailed_ags'] = aggregates_per_op
         status_renderer = StatusRenderer()
         # We have to make a deep copy of the template environment if we're
         # using a process Pool for parallelism. Somewhere in the process of

@@ -205,7 +205,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         :type omp_prefix:
             str
         """
-        return 'export OMP_NUM_THREADS={} '.format(operation.directives['omp_num_threads'])
+        return 'export OMP_NUM_THREADS={}; '.format(operation.directives['omp_num_threads'])
 
     @classmethod
     def _get_mpi_prefix(cls, operation, parallel):

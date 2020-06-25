@@ -1052,11 +1052,12 @@ class FlowGroup(object):
                 job_op = JobOperation(self._generate_id(job, name, index=index), name, job,
                                       cmd=cmd, directives=deepcopy(directives))
                 # Get the prefix, and if it's not NULL, set the fork directive
-                # to True since we must launch a separate process.
+                # to True since we must launch a separate process. Override
+                # the command directly.
                 prefix = job._project._environment.get_prefix(job_op)
                 if prefix != '':
                     job_op.directives['fork'] = True
-                    job_op.cmd = '{} {}'.format(prefix, job_op.cmd)
+                    job_op._cmd = '{} {}'.format(prefix, job_op.cmd)
                 yield job_op
 
     def _get_submission_directives(self, default_directives, job):

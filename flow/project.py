@@ -752,11 +752,12 @@ class FlowGroup(object):
         """
         entrypoint = entrypoint.copy()
         self._set_entrypoint_item(entrypoint, directives, 'executable', sys.executable, job)
-        self._set_entrypoint_item(entrypoint, directives, 'path', None, job)
-        if entrypoint['path'] is None:
-            raise RuntimeError("Entrypoint path not set.")
-        else:
-            return "{} {}".format(entrypoint['executable'], entrypoint['path']).lstrip()
+
+        # If a path is not provided, default to the path to the file where the
+        # FlowProject (subclass) is defined.
+        default_path = inspect.getfile(job._project.__class__)
+        self._set_entrypoint_item(entrypoint, directives, 'path', default_path, job)
+        return "{} {}".format(entrypoint['executable'], entrypoint['path']).lstrip()
 
     def _resolve_directives(self, name, defaults, job):
         if name in self.operation_directives:
@@ -1042,15 +1043,20 @@ class FlowGroup(object):
         for name, op in self.operations.items():
             if op.eligible(job, ignore_conditions):
                 directives = self._resolve_directives(name, default_directives, job)
-                uneval_cmd = functools.partial(self._run_cmd, entrypoint=entrypoint,
-                                               operation_name=name, operation=op,
-                                               directives=directives, job=job)
+                cmd = self._run_cmd(entrypoint=entrypoint, operation_name=name,
+                                    operation=op, directives=directives, job=job)
                 # Uses a different id than the groups direct id. Do not use this for submitting
                 # jobs as current implementation prevents checking for resubmission in this case.
                 # The different ids allow for checking whether JobOperations created to run directly
                 # are different.
                 job_op = JobOperation(self._generate_id(job, name, index=index), name, job,
-                                      cmd=uneval_cmd, directives=deepcopy(directives))
+                                      cmd=cmd, directives=deepcopy(directives))
+                # Get the prefix, and if it's not NULL, set the fork directive
+                # to True since we must launch a separate process.
+                prefix = job._project._environment.get_prefix(job_op)
+                if prefix != '':
+                    job_op.directives['fork'] = True
+                    job_op.cmd = '{} {}'.format(prefix, job_op.cmd)
                 yield job_op
 
     def _get_submission_directives(self, default_directives, job):
@@ -2265,9 +2271,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             result.get(timeout=timeout)
 
     def _execute_operation(self, operation, timeout=None, pretend=False):
-        prefix = self._environment.get_prefix(operation)
         if pretend:
-            print(prefix + ' ' + operation.cmd if prefix != '' else operation.cmd)
+            print(operation.cmd)
             return None
 
         logger.info("Execute operation '{}'...".format(operation))
@@ -2281,14 +2286,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             or operation.name not in self._operation_functions
             # The specified executable is not the same as the interpreter instance:
             or operation.directives.get('executable', sys.executable) != sys.executable
-            or prefix != ''
         ):
             # ... need to fork:
             logger.debug(
                 "Forking to execute operation '{}' with "
-                "cmd '{}'.".format(operation, prefix + ' ' + operation.cmd))
-            subprocess.run(prefix + ' ' + operation.cmd,
-                           shell=True, timeout=timeout, check=True)
+                "cmd '{}'.".format(operation, operation.cmd))
+            subprocess.run(operation.cmd, shell=True, timeout=timeout,
+                           check=True)
         else:
             # ... executing operation in interpreter process as function:
             logger.debug(
@@ -3627,7 +3631,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
             $ python my_project.py --help
         """
-        # Find file that main is called in
+        # Find file that main is called in. When running through the command
+        # line interface, we know exactly what the entrypoint path should be
+        # (it's the file where main is called, which we can pull off the stack)
+        # so we bypass our original best guess from Project construction.
         self._entrypoint.setdefault('path', os.path.realpath(inspect.stack()[-1].filename))
 
         if parser is None:

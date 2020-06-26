@@ -33,6 +33,7 @@ from deprecation import fail_if_not_removed
 from define_test_project import _TestProject
 from define_test_project import _DynamicTestProject
 from define_dag_test_project import DagTestProject
+from define_aggregate_test_project import _AggregateTestProject
 
 
 @contextmanager
@@ -738,15 +739,17 @@ class TestExecutionProject(TestProjectBase):
 
     def test_pending_operations_order(self):
         # The execution order of local runs is internally assumed to be
-        # 'by-job' by default. A failure of this unit tests means that
-        # a 'by-job' order must be implemented explicitly within the
+        # 'by-ops' by default. A failure of this unit tests means that
+        # a 'by-ops' order must be implemented explicitly within the
         # FlowProject.run() function.
         project = self.mock_project()
         ops = list(project._get_pending_operations(self.project.find_jobs()))
-        # The length of the list of operations grouped by job is equal
+        # The length of the list of operations grouped by operations is equal
         # to the length of its set if and only if the operations are grouped
-        # by job already:
-        jobs_order_none = [job._id for job, _ in groupby(ops, key=lambda op: op.job)]
+        # by operations already:
+
+        # Sorting with respect to job is
+        jobs_order_none = [op for op, _ in groupby(ops, key=lambda op: op.name)]
         assert len(jobs_order_none) == len(set(jobs_order_none))
 
     def test_run(self, subtests):
@@ -758,7 +761,7 @@ class TestExecutionProject(TestProjectBase):
         def sort_key(op):
             return op.name, op.job.get_id()
 
-        for order in (None, 'none', 'cyclic', 'by-job', 'random', sort_key):
+        for order in (None, 'none', 'cyclic', 'by-ops', 'random', sort_key):
             for job in self.project.find_jobs():  # clear
                 job.remove()
             with subtests.test(order=order):
@@ -1542,3 +1545,83 @@ class TestGroupProjectMainInterface(TestProjectBase):
 
 class TestGroupDynamicProjectMainInterface(TestProjectMainInterface):
     project_class = _DynamicTestProject
+
+
+class TestGroupAggregationProjectMainInterface(TestProjectBase):
+    project_class = _AggregateTestProject
+    entrypoint = dict(
+        path=os.path.realpath(os.path.join(os.path.dirname(__file__),
+                              'define_aggregate_test_project.py'))
+    )
+
+    def mock_project(self):
+        project = self.project_class.get_project(root=self._tmp_dir.name)
+        for i in range(30):
+            project.open_job(dict(i=i)).init()
+        project._entrypoint = self.entrypoint
+        return project
+
+    def switch_to_cwd(self):
+        os.chdir(self.cwd)
+
+    @pytest.fixture(autouse=True)
+    def setup_main_interface(self, request):
+        self.project = self.mock_project()
+        self.cwd = os.getcwd()
+        os.chdir(self._tmp_dir.name)
+        request.addfinalizer(self.switch_to_cwd)
+
+    def generate_job_ids(self, jobs, compressed=False):
+        jobs = list(jobs)
+        if compressed:
+            return '{}...{}...{}'.format(
+                str(jobs[0])[:8], len(jobs), str(jobs[-1])[:8])
+        else:
+            return ' '.join(map(str, jobs))
+
+    def call_subcmd(self, subcmd):
+        # Determine path to project module and construct command.
+        fn_script = inspect.getsourcefile(type(self.project))
+        _cmd = 'python {} {}'.format(fn_script, subcmd)
+        try:
+            with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
+                with switch_to_directory(self.project.root_directory()):
+                    return subprocess.check_output(_cmd.split(), stderr=subprocess.DEVNULL)
+        except subprocess.CalledProcessError as error:
+            print(error, file=sys.stderr)
+            print(error.output, file=sys.stderr)
+            raise
+
+    def test_main_run(self):
+        project = self.mock_project()
+        assert len(project)
+        for job in project:
+            assert not job.doc.get('average', False)
+            assert not job.doc.get('test3', False)
+        self.call_subcmd('run -o agg_op1 -j {}'.format(
+            self.generate_job_ids(project)
+        ))
+        for job in project:
+            print(job.document)
+            assert job.doc.get('average', False)
+            assert job.doc.get('test3', False)
+
+    def test_main_script(self):
+        project = self.mock_project()
+        assert len(project)
+        script_output = self.call_subcmd(
+            'script -o group_agg -j {}'.format(self.generate_job_ids(project))
+        ).decode().splitlines()
+        assert self.generate_job_ids(project, compressed=True) in '\n'.join(script_output)
+        assert '-o group_agg' in '\n'.join(script_output)
+
+    def test_main_submit(self):
+        project = self.mock_project()
+        assert len(project)
+        # Assert that correct output for group submission is given
+        submit_output = self.call_subcmd(
+            'submit -j {} -o group_agg --pretend'.format(
+                self.generate_job_ids(project))
+        ).decode().splitlines()
+        output_string = '\n'.join(submit_output)
+        assert 'run -o group_agg -j {}' in output_string

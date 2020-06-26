@@ -728,7 +728,9 @@ class FlowGroup(object):
                  options=""):
         self.name = name
         self.options = options
-        self.operations = dict() if operations is None else operations
+        # An OrderedDict is not necessary here, but is used to ensure
+        # consistent ordering of pretend submission output for templates.
+        self.operations = OrderedDict() if operations is None else OrderedDict(operations)
         if operation_directives is None:
             self.operation_directives = dict()
         else:
@@ -2620,7 +2622,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         logger.info("Use environment '{}'.".format(env))
         logger.info("Set 'base_script={}'.".format(env.template))
         context['base_script'] = env.template
-        context['environment'] = env.__name__
+        context['environment'] = env
         context['id'] = _id
         context['operations'] = list(operations)
         context.update(kwargs)
@@ -3633,9 +3635,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             $ python my_project.py --help
         """
         # Find file that main is called in. When running through the command
-        # line interface, we know exactly what the entrypoint path should be
-        # (it's the file where main is called, which we can pull off the stack)
-        # so we bypass our original best guess from Project construction.
+        # line interface, we know exactly what the entrypoint path should be:
+        # it's the file where main is called, which we can pull off the stack.
         self._entrypoint.setdefault('path', os.path.realpath(inspect.stack()[-1].filename))
 
         if parser is None:

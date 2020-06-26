@@ -728,7 +728,9 @@ class FlowGroup(object):
                  options=""):
         self.name = name
         self.options = options
-        self.operations = dict() if operations is None else operations
+        # An OrderedDict is not necessary here, but is used to ensure
+        # consistent ordering of pretend submission output for templates.
+        self.operations = OrderedDict() if operations is None else OrderedDict(operations)
         if operation_directives is None:
             self.operation_directives = dict()
         else:

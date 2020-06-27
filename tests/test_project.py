@@ -1011,7 +1011,6 @@ class TestExecutionProject(TestProjectBase):
         project._fetch_scheduler_status(file=StringIO())
 
         for job in project:
-            has_op = False
             next_op = list(project.next_operations(job))[0]
             assert next_op.get_status() == JobStatus.queued
 

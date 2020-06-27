@@ -37,7 +37,6 @@ The FlowProject
     FlowProject.labels
     FlowProject.main
     FlowProject.make_group
-    FlowProject.next_operation
     FlowProject.next_operations
     FlowProject.operation
     FlowProject.operations

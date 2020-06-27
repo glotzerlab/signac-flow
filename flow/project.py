@@ -3197,31 +3197,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             for op in self._job_operations(job, ignore_conditions):
                 yield op
 
-    @deprecated(
-        deprecated_in="0.8", removed_in="0.10",
-        current_version=__version__,
-        details="Use next_operations() instead.")
-    def next_operation(self, job):
-        """Determine the next operation for this job.
-
-        :param job:
-            The signac job handle.
-        :type job:
-            :class:`~signac.contrib.job.Job`
-        :param default_directives:
-            The default directives to use for the operations. This is to allow for user specified
-            groups to 'inherit' directives from ``default_directives``. If no defaults are desired,
-            the argument can be set to an empty dictionary. This must be done explicitly, however.
-        :type default_directives:
-            :py:class:`dict`
-        :return:
-            An instance of JobOperation to execute next or `None`, if no operation is eligible.
-        :rtype:
-            `:py:class:`~.JobOperation` or `NoneType`
-        """
-        for op in self.next_operations(job):
-            return op
-
     @classmethod
     def operation(cls, func, name=None):
         """Add the function `func` as operation function to the class workflow definition.

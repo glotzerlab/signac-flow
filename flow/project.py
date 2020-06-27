@@ -346,7 +346,7 @@ class JobOperation(object):
     def __eq__(self, other):
         return self.id == other.id
 
-    @deprecated(deprecated_in="0.9", removed_in="1.0", current_version=__version__)
+    @deprecated(deprecated_in="0.9", removed_in="0.11", current_version=__version__)
     def get_id(self):
         return self._id
 
@@ -1536,14 +1536,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         except TypeError:
             return x
 
-    @classmethod
-    @deprecated(
-        deprecated_in="0.8", removed_in="0.10",
-        current_version=__version__)
-    def update_aliases(cls, aliases):
-        "Update the ALIASES table for this class."
-        cls.ALIASES.update(aliases)
-
     def _fn_bundle(self, bundle_id):
         "Return the canonical name to store bundle information."
         return os.path.join(self.root_directory(), '.bundles', bundle_id)
@@ -1831,8 +1823,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type parameters:
             list of str
         :param param_max_width:
-            Limit the number of characters of parameter columns,
-            see also: :py:meth:`~.update_aliases`.
+            Limit the number of characters of parameter columns.
         :type param_max_width:
             int
         :param expand:
@@ -2968,14 +2959,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             help="Manually specify all labels that are required for the direct command "
                  "to be considered eligible for execution.")
 
-    @deprecated(
-        deprecated_in="0.8", removed_in="0.10",
-        current_version=__version__,
-        details="Use export_job_statuses() instead.")
-    def export_job_stati(self, collection, stati):
-        "Export the job stati to a database collection."
-        self.export_job_statuses(self, collection, stati)
-
     def export_job_statuses(self, collection, statuses):
         "Export the job statuses to a database collection."
         for status in statuses:
@@ -3170,27 +3153,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                        operations={name: op},
                                        operation_directives=dict(name=kwargs))
 
-    @deprecated(
-        deprecated_in="0.8", removed_in="0.10",
-        current_version=__version__,
-        details="Use labels() instead.")
-    def classify(self, job):
-        """Generator function which yields labels for job.
-
-        By default, this method yields from the project's labels() method.
-
-        :param job:
-            The signac job handle.
-        :type job:
-            :class:`~signac.contrib.job.Job`
-        :yields:
-            The labels for the provided job.
-        :yield type:
-            str
-        """
-        for _label in self.labels(job):
-            yield _label
-
     def completed_operations(self, job):
         """Determine which operations have been completed for job.
 
@@ -3234,31 +3196,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for job in jobs:
             for op in self._job_operations(job, ignore_conditions):
                 yield op
-
-    @deprecated(
-        deprecated_in="0.8", removed_in="0.10",
-        current_version=__version__,
-        details="Use next_operations() instead.")
-    def next_operation(self, job):
-        """Determine the next operation for this job.
-
-        :param job:
-            The signac job handle.
-        :type job:
-            :class:`~signac.contrib.job.Job`
-        :param default_directives:
-            The default directives to use for the operations. This is to allow for user specified
-            groups to 'inherit' directives from ``default_directives``. If no defaults are desired,
-            the argument can be set to an empty dictionary. This must be done explicitly, however.
-        :type default_directives:
-            :py:class:`dict`
-        :return:
-            An instance of JobOperation to execute next or `None`, if no operation is eligible.
-        :rtype:
-            `:py:class:`~.JobOperation` or `NoneType`
-        """
-        for op in self.next_operations(job):
-            return op
 
     @classmethod
     def operation(cls, func, name=None):
@@ -3440,12 +3377,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 if other_group._get_status(job) >= JobStatus.submitted:
                     return False
         return True
-
-    @deprecated(
-        deprecated_in="0.8", removed_in="0.10",
-        current_version=__version__)
-    def eligible_for_submission(self, job_operation):
-        return self._eligible_for_submission(self, job_operation)
 
     def _main_status(self, args):
         "Print status overview."

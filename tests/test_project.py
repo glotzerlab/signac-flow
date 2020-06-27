@@ -414,7 +414,6 @@ class TestProjectClass(TestProjectBase):
                         project.run()
                 assert os.getcwd() == starting_dir
 
-    @pytest.mark.filterwarnings("ignore:next_operation")
     def test_function_in_directives(self):
 
         class A(FlowProject):
@@ -428,9 +427,8 @@ class TestProjectClass(TestProjectBase):
         project = self.mock_project(A)
         for job in project:
             job.doc.np = 3
-            with pytest.deprecated_call():
-                next_op = project.next_operation(job)
-            assert 'mpirun -np 3 python' in next_op.cmd
+            for next_op in project.next_operations(job):
+                assert 'mpirun -np 3 python' in next_op.cmd
             break
 
     def test_callable_directives(self):
@@ -448,34 +446,30 @@ class TestProjectClass(TestProjectBase):
 
         # test setting neither nranks nor omp_num_threads
         for job in project:
-            with pytest.deprecated_call():
-                next_op = project.next_operation(job)
-            assert next_op.directives['np'] == 1
+            for next_op in project.next_operations(job):
+                assert next_op.directives['np'] == 1
 
         # test only setting nranks
         for i, job in enumerate(project):
             job.doc.nranks = i+1
-            with pytest.deprecated_call():
-                next_op = project.next_operation(job)
-            assert next_op.directives['np'] == next_op.directives['nranks']
+            for next_op in project.next_operations(job):
+                assert next_op.directives['np'] == next_op.directives['nranks']
             del job.doc['nranks']
 
         # test only setting omp_num_threads
         for i, job in enumerate(project):
             job.doc.omp_num_threads = i+1
-            with pytest.deprecated_call():
-                next_op = project.next_operation(job)
-            assert next_op.directives['np'] == next_op.directives['omp_num_threads']
+            for next_op in project.next_operations(job):
+                assert next_op.directives['np'] == next_op.directives['omp_num_threads']
             del job.doc['omp_num_threads']
 
         # test setting both nranks and omp_num_threads
         for i, job in enumerate(project):
             job.doc.omp_num_threads = i+1
             job.doc.nranks = i % 3 + 1
-            with pytest.deprecated_call():
-                next_op = project.next_operation(job)
             expected_np = (i + 1) * (i % 3 + 1)
-            assert next_op.directives['np'] == expected_np
+            for next_op in project.next_operations(job):
+                assert next_op.directives['np'] == expected_np
 
     def test_copy_conditions(self):
 
@@ -583,11 +577,10 @@ class TestProject(TestProjectBase):
     def test_instance(self):
         assert isinstance(self.project, FlowProject)
 
-    @fail_if_not_removed
     def test_labels(self):
         project = self.mock_project()
         for job in project:
-            labels = list(project.classify(job))
+            labels = list(project.labels(job))
             assert len(labels) == 3 - (job.sp.b % 2)
             assert all(isinstance(label, str) for label in labels)
             assert 'default_label' in labels
@@ -993,7 +986,6 @@ class TestExecutionProject(TestProjectBase):
             project.submit(bundle_size=0)
             assert len(list(MockScheduler.jobs())) == 1
 
-    @fail_if_not_removed
     def test_submit_status(self):
         MockScheduler.reset()
         project = self.mock_project()
@@ -1002,18 +994,16 @@ class TestExecutionProject(TestProjectBase):
         for job in project:
             if job not in even_jobs:
                 continue
-            list(project.classify(job))
-            with pytest.deprecated_call():
-                assert project.next_operation(job).name == 'op1'
-                assert project.next_operation(job).job == job
+            list(project.labels(job))
+            next_op = list(project.next_operations(job))[0]
+            assert next_op.name == 'op1'
+            assert next_op.job == job
         with redirect_stderr(StringIO()):
             project.submit()
         assert len(list(MockScheduler.jobs())) == num_jobs_submitted
 
         for job in project:
-            with pytest.deprecated_call():
-                next_op = project.next_operation(job)
-            assert next_op is not None
+            next_op = list(project.next_operations(job))[0]
             assert next_op.get_status() == JobStatus.submitted
 
         MockScheduler.step()
@@ -1021,9 +1011,7 @@ class TestExecutionProject(TestProjectBase):
         project._fetch_scheduler_status(file=StringIO())
 
         for job in project:
-            with pytest.deprecated_call():
-                next_op = project.next_operation(job)
-            assert next_op is not None
+            next_op = list(project.next_operations(job))[0]
             assert next_op.get_status() == JobStatus.queued
 
         MockScheduler.step()

@@ -30,7 +30,6 @@ The FlowProject
     FlowProject.ALIASES
     FlowProject.add_operation
     FlowProject.completed_operations
-    FlowProject.eligible_for_submission
     FlowProject.export_job_statuses
     FlowProject.get_job_status
     FlowProject.label

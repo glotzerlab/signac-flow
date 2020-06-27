@@ -3378,12 +3378,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     return False
         return True
 
-    @deprecated(
-        deprecated_in="0.8", removed_in="0.10",
-        current_version=__version__)
-    def eligible_for_submission(self, job_operation):
-        return self._eligible_for_submission(self, job_operation)
-
     def _main_status(self, args):
         "Print status overview."
         jobs = self._select_jobs_from_args(args)

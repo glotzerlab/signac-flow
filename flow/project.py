@@ -2714,7 +2714,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             keys_unused = {
                 key for op in operations for key in
                 op.directives._keys_set_by_user.difference(op.directives.keys_used)
-                if key not in ('fork', )  # whitelist
+                if key not in ('fork', 'nranks', 'omp_num_threads')  # ignore list
             }
             if keys_unused:
                 logger.warning(

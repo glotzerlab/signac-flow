@@ -32,7 +32,7 @@ The FlowProject
     FlowProject.classify
     FlowProject.completed_operations
     FlowProject.eligible_for_submission
-    FlowProject.export_job_stati
+    FlowProject.export_job_statuses
     FlowProject.get_job_status
     FlowProject.label
     FlowProject.labels

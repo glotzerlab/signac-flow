@@ -2959,14 +2959,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             help="Manually specify all labels that are required for the direct command "
                  "to be considered eligible for execution.")
 
-    @deprecated(
-        deprecated_in="0.8", removed_in="0.10",
-        current_version=__version__,
-        details="Use export_job_statuses() instead.")
-    def export_job_stati(self, collection, stati):
-        "Export the job stati to a database collection."
-        self.export_job_statuses(self, collection, stati)
-
     def export_job_statuses(self, collection, statuses):
         "Export the job statuses to a database collection."
         for status in statuses:

@@ -995,19 +995,16 @@ class TestExecutionProject(TestProjectBase):
             if job not in even_jobs:
                 continue
             list(project.labels(job))
-            for next_op in project.next_operations(job):
-                assert next_op.name == 'op1'
-                assert next_op.job == job
+            next_op = list(project.next_operations(job))[0]
+            assert next_op.name == 'op1'
+            assert next_op.job == job
         with redirect_stderr(StringIO()):
             project.submit()
         assert len(list(MockScheduler.jobs())) == num_jobs_submitted
 
         for job in project:
-            has_op = False
-            for next_op in project.next_operations(job):
-                assert next_op.get_status() == JobStatus.submitted
-                has_op = True
-            assert has_op is True
+            next_op = list(project.next_operations(job))[0]
+            assert next_op.get_status() == JobStatus.submitted
 
         MockScheduler.step()
         MockScheduler.step()
@@ -1015,10 +1012,8 @@ class TestExecutionProject(TestProjectBase):
 
         for job in project:
             has_op = False
-            for next_op in project.next_operations(job):
-                assert next_op.get_status() == JobStatus.queued
-                has_op = True
-            assert has_op is True
+            next_op = list(project.next_operations(job))[0]
+            assert next_op.get_status() == JobStatus.queued
 
         MockScheduler.step()
         project._fetch_scheduler_status(file=StringIO())

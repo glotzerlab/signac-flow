@@ -29,7 +29,6 @@ The FlowProject
 
     FlowProject.ALIASES
     FlowProject.add_operation
-    FlowProject.classify
     FlowProject.completed_operations
     FlowProject.eligible_for_submission
     FlowProject.export_job_statuses

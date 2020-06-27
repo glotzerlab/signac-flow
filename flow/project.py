@@ -3153,27 +3153,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                        operations={name: op},
                                        operation_directives=dict(name=kwargs))
 
-    @deprecated(
-        deprecated_in="0.8", removed_in="0.10",
-        current_version=__version__,
-        details="Use labels() instead.")
-    def classify(self, job):
-        """Generator function which yields labels for job.
-
-        By default, this method yields from the project's labels() method.
-
-        :param job:
-            The signac job handle.
-        :type job:
-            :class:`~signac.contrib.job.Job`
-        :yields:
-            The labels for the provided job.
-        :yield type:
-            str
-        """
-        for _label in self.labels(job):
-            yield _label
-
     def completed_operations(self, job):
         """Determine which operations have been completed for job.
 

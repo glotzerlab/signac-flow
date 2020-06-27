@@ -583,11 +583,10 @@ class TestProject(TestProjectBase):
     def test_instance(self):
         assert isinstance(self.project, FlowProject)
 
-    @fail_if_not_removed
     def test_labels(self):
         project = self.mock_project()
         for job in project:
-            labels = list(project.classify(job))
+            labels = list(project.labels(job))
             assert len(labels) == 3 - (job.sp.b % 2)
             assert all(isinstance(label, str) for label in labels)
             assert 'default_label' in labels
@@ -993,7 +992,6 @@ class TestExecutionProject(TestProjectBase):
             project.submit(bundle_size=0)
             assert len(list(MockScheduler.jobs())) == 1
 
-    @fail_if_not_removed
     def test_submit_status(self):
         MockScheduler.reset()
         project = self.mock_project()
@@ -1002,7 +1000,7 @@ class TestExecutionProject(TestProjectBase):
         for job in project:
             if job not in even_jobs:
                 continue
-            list(project.classify(job))
+            list(project.labels(job))
             with pytest.deprecated_call():
                 assert project.next_operation(job).name == 'op1'
                 assert project.next_operation(job).job == job

@@ -1536,14 +1536,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         except TypeError:
             return x
 
-    @classmethod
-    @deprecated(
-        deprecated_in="0.8", removed_in="0.10",
-        current_version=__version__)
-    def update_aliases(cls, aliases):
-        "Update the ALIASES table for this class."
-        cls.ALIASES.update(aliases)
-
     def _fn_bundle(self, bundle_id):
         "Return the canonical name to store bundle information."
         return os.path.join(self.root_directory(), '.bundles', bundle_id)
@@ -1831,8 +1823,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type parameters:
             list of str
         :param param_max_width:
-            Limit the number of characters of parameter columns,
-            see also: :py:meth:`~.update_aliases`.
+            Limit the number of characters of parameter columns.
         :type param_max_width:
             int
         :param expand:

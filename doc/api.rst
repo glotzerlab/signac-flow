@@ -65,7 +65,6 @@ The FlowProject
     FlowProject.script
     FlowProject.submit
     FlowProject.submit_operations
-    FlowProject.update_aliases
 
 
 .. autoclass:: FlowProject

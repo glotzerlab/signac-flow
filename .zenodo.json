@@ -32,6 +32,7 @@
         {
             "affiliation": "University of Michigan",
             "name": "Yuan Zhou",
+            "orcid": "0000-0002-6727-0836",
             "type": "Other"
         },
         {
@@ -77,8 +78,34 @@
         },
         {
             "affiliation": "University of Michigan",
-            "name": "Brandon Butler",
-            "orcid": "0000-0001-7739-7796",
+            "name": "Tobias Dwyer",
+            "orcid": "0000-0001-6443-7744",
+            "type": "Other"
+        },
+        {
+            "affiliation": "National Institute of Technology, Hamirpur",
+            "name": "Vishav Sharma",
+            "type": "Other"
+        },
+        {
+            "affiliation": "Indian Institute of Technology Roorkee",
+            "name": "Hardik Ojha",
+            "type": "Other"
+        },
+        {
+            "affiliation": "Birla Institute of Technology and Science, Pilani - Goa Campus",
+            "name": "Yash Bhardwaj",
+            "type": "Other"
+        },
+        {
+            "affiliation": "",
+            "name": "Jacob Dice",
+            "orcid": "0000-0002-9479-1661",
+            "type": "Other"
+        },
+        {
+            "affiliation": "Indian Institute of Technology, Gandhinagar",
+            "name": "Abhavya Chandra",
             "type": "Other"
         }
     ],
@@ -102,6 +129,11 @@
             "affiliation": "Boise State University",
             "name": "Mike Henry",
             "orcid": "0000-0002-3870-9993"
+        },
+        {
+            "affiliation": "University of Michigan",
+            "name": "Brandon Butler",
+            "orcid": "0000-0001-7739-7796"
         },
         {
             "affiliation": "University of Michigan",

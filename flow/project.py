@@ -346,7 +346,7 @@ class JobOperation(object):
     def __eq__(self, other):
         return self.id == other.id
 
-    @deprecated(deprecated_in="0.9", removed_in="1.0", current_version=__version__)
+    @deprecated(deprecated_in="0.9", removed_in="0.11", current_version=__version__)
     def get_id(self):
         return self._id
 

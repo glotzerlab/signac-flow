@@ -45,7 +45,7 @@ from signac.contrib.hashing import calc_id
 from signac.contrib.filterparse import parse_filter_arg
 from signac.contrib.project import JobsCursor
 
-from enum import IntEnum
+from enum import IntFlag
 
 from .environment import get_environment
 from .scheduling.base import ClusterJob
@@ -111,9 +111,7 @@ _FMT_SCHEDULER_STATUS = {
 }
 
 
-# TODO: When we drop Python 3.5 support, change this to inherit from IntFlag
-# instead of IntEnum so that we can remove the operator overloads.
-class IgnoreConditions(IntEnum):
+class IgnoreConditions(IntFlag):
     """Flags that determine which conditions are used to determine job eligibility.
 
     The options include:
@@ -122,29 +120,11 @@ class IgnoreConditions(IntEnum):
         * IgnoreConditions.POST: ignore post conditions
         * IgnoreConditions.ALL: ignore all conditions
     """
-    # The following three functions can be removed once we drop Python 3.5
-    # support, they are implemented by the IntFlag class in Python > 3.6.
-    def __or__(self, other):
-        if not isinstance(other, (self.__class__, int)):
-            return NotImplemented
-        result = self.__class__(self._value_ | self.__class__(other)._value_)
-        return result
-
-    def __and__(self, other):
-        if not isinstance(other, (self.__class__, int)):
-            return NotImplemented
-        return self.__class__(self._value_ & self.__class__(other)._value_)
-
-    def __xor__(self, other):
-        if not isinstance(other, (self.__class__, int)):
-            return NotImplemented
-        return self.__class__(self._value_ ^ self.__class__(other)._value_)
-
     # This operator must be defined since IntFlag simply performs an integer
     # bitwise not on the underlying enum value, which is problematic in
     # twos-complement arithmetic. What we want is to only flip valid bits.
     def __invert__(self):
-        # Compute the largest number of bits use to represent one of the flags
+        # Compute the largest number of bits used to represent one of the flags
         # so that we can XOR the appropriate number.
         max_bits = len(bin(max([elem.value for elem in type(self)]))) - 2
         return self.__class__((2**max_bits - 1) ^ self._value_)

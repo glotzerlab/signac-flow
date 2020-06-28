@@ -37,5 +37,5 @@ def agg_op2(*jobs):
         job.document.test3 = True
 
 
-if __name__ == 'main':
+if __name__ == '__main__':
     _AggregateTestProject().main()

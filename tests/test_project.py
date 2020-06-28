@@ -1598,7 +1598,7 @@ class TestGroupAggregationProjectMainInterface(TestProjectBase):
         for job in project:
             assert not job.doc.get('average', False)
             assert not job.doc.get('test3', False)
-        self.call_subcmd('run -o agg_op1 -j {}'.format(
+        self.call_subcmd('run -o group_agg -j {}'.format(
             self.generate_job_ids(project)
         ))
         for job in project:
@@ -1619,9 +1619,9 @@ class TestGroupAggregationProjectMainInterface(TestProjectBase):
         project = self.mock_project()
         assert len(project)
         # Assert that correct output for group submission is given
+        job_ids = self.generate_job_ids(project)
         submit_output = self.call_subcmd(
-            'submit -j {} -o group_agg --pretend'.format(
-                self.generate_job_ids(project))
+            'submit -j {} -o group_agg --pretend'.format(job_ids)
         ).decode().splitlines()
         output_string = '\n'.join(submit_output)
-        assert 'run -o group_agg -j {}' in output_string
+        assert 'run -o group_agg -j {}'.format(job_ids) in output_string

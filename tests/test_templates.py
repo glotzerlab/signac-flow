@@ -46,6 +46,7 @@ def test_env(env):
         for job in jobs:
             parameters = job.sp.parameters()
             if 'bundle' in parameters:
+                continue
                 bundle = parameters.pop('bundle')
                 tmp_out = io.TextIOWrapper(
                     io.BytesIO(), sys.stdout.encoding)

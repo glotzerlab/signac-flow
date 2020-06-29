@@ -15,12 +15,20 @@ def aggregate_doc_condition(*jobs):
     except KeyError:
         return False
 
+@_AggregateTestProject.operation
+@aggregate()
+@_AggregateTestProject.post.true('average')
+def agg_op1(*jobs):
+    sum = 0
+    for job in jobs:
+        sum += job.sp.i
+    for job in jobs:
+        job.document.sum = sum
 
 @_AggregateTestProject.operation
 @group1
 @_AggregateTestProject.post.true('average')
-def agg_op1(*jobs):
-    print('asfsdg')
+def agg_op2(*jobs):
     average = 0
     for job in jobs:
         average += job.sp.i
@@ -32,7 +40,7 @@ def agg_op1(*jobs):
 @_AggregateTestProject.operation
 @group1
 @_AggregateTestProject.post.true('test3')
-def agg_op2(*jobs):
+def agg_op3(*jobs):
     for job in jobs:
         job.document.test3 = True
 

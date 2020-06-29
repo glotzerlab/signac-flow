@@ -1547,6 +1547,88 @@ class TestGroupDynamicProjectMainInterface(TestProjectMainInterface):
     project_class = _DynamicTestProject
 
 
+class TestAggregationProjectMainInterface(TestProjectBase):
+    project_class = _AggregateTestProject
+    entrypoint = dict(
+        path=os.path.realpath(os.path.join(os.path.dirname(__file__),
+                              'define_aggregate_test_project.py'))
+    )
+
+    def mock_project(self):
+        project = self.project_class.get_project(root=self._tmp_dir.name)
+        for i in range(30):
+            project.open_job(dict(i=i)).init()
+        project._entrypoint = self.entrypoint
+        return project
+
+    def switch_to_cwd(self):
+        os.chdir(self.cwd)
+
+    @pytest.fixture(autouse=True)
+    def setup_main_interface(self, request):
+        self.project = self.mock_project()
+        self.cwd = os.getcwd()
+        os.chdir(self._tmp_dir.name)
+        request.addfinalizer(self.switch_to_cwd)
+
+    def generate_job_ids(self, jobs, compressed=False):
+        jobs = list(jobs)
+        if compressed:
+            return '{}...{}...{}'.format(
+                str(jobs[0])[:8], len(jobs), str(jobs[-1])[:8])
+        else:
+            return ' '.join(map(str, jobs))
+
+    def call_subcmd(self, subcmd):
+        # Determine path to project module and construct command.
+        fn_script = inspect.getsourcefile(type(self.project))
+        _cmd = 'python {} {}'.format(fn_script, subcmd)
+        try:
+            with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
+                with switch_to_directory(self.project.root_directory()):
+                    return subprocess.check_output(_cmd.split(), stderr=subprocess.DEVNULL)
+        except subprocess.CalledProcessError as error:
+            print(error, file=sys.stderr)
+            print(error.output, file=sys.stderr)
+            raise
+
+    def test_main_run(self):
+        project = self.mock_project()
+        assert len(project)
+        for job in project:
+            assert not job.doc.get('sum', False)
+        self.call_subcmd('run -o agg_op1 -j {}'.format(
+            self.generate_job_ids(project)
+        ))
+        sum = 0
+        for job in project:
+            sum += job.sp.i
+
+        for job in project:
+            assert job.doc['sum'] == sum
+
+    def test_main_script(self):
+        project = self.mock_project()
+        assert len(project)
+        script_output = self.call_subcmd(
+            'script -o agg_op1 -j {}'.format(self.generate_job_ids(project))
+        ).decode().splitlines()
+        assert self.generate_job_ids(project, compressed=True) in '\n'.join(script_output)
+        assert '-o agg_op1' in '\n'.join(script_output)
+
+    def test_main_submit(self):
+        project = self.mock_project()
+        assert len(project)
+        # Assert that correct output for group submission is given
+        job_ids = self.generate_job_ids(project)
+        submit_output = self.call_subcmd(
+            'submit -j {} -o agg_op1 --pretend'.format(job_ids)
+        ).decode().splitlines()
+        output_string = '\n'.join(submit_output)
+        assert self.generate_job_ids(project, compressed=True) in output_string
+        assert 'run -o agg_op1 -j {}'.format(job_ids) in output_string
+
+
 class TestGroupAggregationProjectMainInterface(TestProjectBase):
     project_class = _AggregateTestProject
     entrypoint = dict(
@@ -1602,7 +1684,6 @@ class TestGroupAggregationProjectMainInterface(TestProjectBase):
             self.generate_job_ids(project)
         ))
         for job in project:
-            print(job.document)
             assert job.doc.get('average', False)
             assert job.doc.get('test3', False)
 
@@ -1624,4 +1705,5 @@ class TestGroupAggregationProjectMainInterface(TestProjectBase):
             'submit -j {} -o group_agg --pretend'.format(job_ids)
         ).decode().splitlines()
         output_string = '\n'.join(submit_output)
+        assert self.generate_job_ids(project, compressed=True) in output_string
         assert 'run -o group_agg -j {}'.format(job_ids) in output_string

@@ -82,20 +82,12 @@ class TestItems:
                           'memory': [-1, 'foo', {}, None],
                           'processor_fraction': [-0.5, 2.5, 'foo', {}, None]
                           }
-        errors = [ValueError, TypeError, TypeError, TypeError]
-        errors_generated = {'np': errors,
-                            'ngpu': errors,
-                            'nranks': errors,
-                            'omp_num_threads': errors,
-                            'walltime': errors[1:],
-                            'memory': errors,
-                            'processor_fraction': [ValueError] + errors
-                            }
+
         for directive in available_directives_list:
             if directive.name == 'executable':
                 continue
             for i, value in enumerate(invalid_values[directive.name]):
-                with pytest.raises(errors_generated[directive.name][i]):
+                with pytest.raises((ValueError, TypeError)):
                     directive.validation(value)
 
     def test_defaults_are_valid(self, available_directives_list):

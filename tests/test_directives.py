@@ -74,26 +74,26 @@ class TestItems:
         assert PROCESS_FRACTION.default == 1.
 
     def test_invalid_values(self, available_directives_list):
-        invalid_values = {'np': [-1, 1.5, 'foo', {}, None],
-                          'ngpu': [-1, 1.5, 'foo', {}, None],
-                          'nranks': [-1, 1.5, 'foo', {}, None],
-                          'omp_num_threads': [-1, 1.5, 'foo', {}, None],
-                          'executable': [1, {}, None],
-                          'walltime': [-1., 'foo', {}, None],
-                          'memory': [-1, 4.5, 'foo', {}, None],
+        invalid_values = {'np': [-1, 'foo', {}, None],
+                          'ngpu': [-1, 'foo', {}, None],
+                          'nranks': [-1, 'foo', {}, None],
+                          'omp_num_threads': [-1, 'foo', {}, None],
+                          'walltime': ['foo', {}, None],
+                          'memory': [-1, 'foo', {}, None],
                           'processor_fraction': [-0.5, 2.5, 'foo', {}, None]
                           }
-        errors = [ValueError, TypeError, TypeError, TypeError, TypeError]
+        errors = [ValueError, TypeError, TypeError, TypeError]
         errors_generated = {'np': errors,
                             'ngpu': errors,
                             'nranks': errors,
                             'omp_num_threads': errors,
-                            'executable': errors[2:],
-                            'walltime': errors[:-1],
+                            'walltime': errors[1:],
                             'memory': errors,
-                            'processor_fraction': [ValueError] + errors[:-1]
+                            'processor_fraction': [ValueError] + errors
                             }
         for directive in available_directives_list:
+            if directive.name == 'executable':
+                continue
             for i, value in enumerate(invalid_values[directive.name]):
                 with pytest.raises(errors_generated[directive.name][i]):
                     directive.validation(value)

@@ -189,8 +189,11 @@ class OnlyType:
         if isinstance(v, self.type):
             return v
         else:
-            raise TypeError("Excepted an object of type {}. Received {} "
-                            "of type {}".format(self.type, v, type(v)))
+            try:
+                return self.type(v)
+            except Exception:
+                raise TypeError("Excepted an object of type {}. Received {} "
+                                "of type {}".format(self.type, v, type(v)))
 
 
 def raise_below(value):

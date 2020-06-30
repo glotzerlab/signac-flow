@@ -2,7 +2,10 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 from collections.abc import Iterable
+from itertools import groupby
 from itertools import zip_longest
+from functools import partial
+
 
 class _aggregate:
     """Decorator for operation functions that needs to be aggregated.
@@ -39,7 +42,7 @@ class _aggregate:
     def __init__(self, aggregator=None, sort=None, reverse=False):
         if aggregator is None:
             def aggregator(jobs):
-                yield jobs
+                return jobs
 
         def key_sort(job, sort=sort):
             try:
@@ -49,7 +52,8 @@ class _aggregate:
                                "parameters of the job {}.".format(sort, job))
 
         if not callable(aggregator):
-            raise TypeError("Expected callable aggregator function, got {}".format(type(aggregator)))
+            raise TypeError("Expected callable aggregator function, got {}"
+                            "".format(type(aggregator)))
 
         if sort is not None and not isinstance(sort, str):
             raise TypeError("Expected string sort parameter, got {}".format(type(sort)))
@@ -58,13 +62,20 @@ class _aggregate:
             raise TypeError("Expected bool reverse parameter got {}".format(type(reverse)))
 
         self._aggregator = aggregator
-        self._sort = None if sort is None else functools.partial(sorted,
-                                                                 key=key_sort,
-                                                                 reverse=reverse)
+        self._sort = None if sort is None else partial(sorted,
+                                                       key=key_sort,
+                                                       reverse=reverse)
 
     @classmethod
     def groupsof(cls, num=1, sort=None, reverse=False):
         # copied from: https://docs.python.org/3/library/itertools.html#itertools.zip_longest
+        try:
+            num = int(num)
+            if num < 0:
+                raise ValueError("The num parameter should be greater than 0")
+        except Exception:
+            raise TypeError("The num parameter should be an integer")
+
         def aggregator(jobs):
             args = [iter(jobs)] * num
             return zip_longest(*args)
@@ -86,16 +97,16 @@ class _aggregate:
 
             if default is None:
                 def keyfunction(job):
-                    return [job.sp[k] for key in keys]
+                    return [job.sp[key] for key in keys]
             else:
                 def keyfunction(job):
-                    return [job.sp.get(k, default) for key in keys]
+                    return [job.sp.get(key, default) for key in keys]
 
         elif callable(key):
             keyfunction = key
 
         else:
-            raise ValueError("Invalid key argument. Expected either str, Iterable "
+            raise TypeError("Invalid key argument. Expected either str, Iterable "
                             "or a callable, got {}".format(type(key)))
 
         def aggregator(jobs):
@@ -132,7 +143,7 @@ class _select:
     def __init__(self, filterby=None):
         if filterby is not None and not callable(filterby):
             raise TypeError("Expected callable filterby function, got {}".format(type(filterby)))
-        self._filter = functools.partial(filter, filterby)
+        self._filter = partial(filter, filterby)
 
     def __call__(self, func=None):
         if func is None:

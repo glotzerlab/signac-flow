@@ -205,15 +205,6 @@ class _condition(object):
         return cls(lambda job: not job.document.get(key, False), 'false_' + key)
 
     @classmethod
-    @deprecated(
-        deprecated_in="0.9", removed_in="0.11", current_version=__version__,
-        details="This condition decorator is obsolete.")
-    def always(cls, func):
-        "Returns True."
-        cls.current_arbitrary_tag += 1
-        return cls(lambda _: True, str(cls.current_arbitrary_tag))(func)
-
-    @classmethod
     def never(cls, func):
         "Returns False."
         cls.current_arbitrary_tag += 1
@@ -253,16 +244,6 @@ def _make_bundles(operations, size=None):
             yield b
         else:
             break
-
-
-@deprecated(deprecated_in="0.9", removed_in="0.11", current_version=__version__)
-def make_bundles(operations, size=None):
-    """Utility function for the generation of bundles.
-
-    This function splits an iterable of operations into equally
-    sized bundles and a possibly smaller final bundle.
-    """
-    return _make_bundles(operations, size)
 
 
 class JobOperation(object):
@@ -345,10 +326,6 @@ class JobOperation(object):
 
     def __eq__(self, other):
         return self.id == other.id
-
-    @deprecated(deprecated_in="0.9", removed_in="0.11", current_version=__version__)
-    def get_id(self):
-        return self._id
 
     @property
     def id(self):

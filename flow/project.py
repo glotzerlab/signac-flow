@@ -449,8 +449,11 @@ class FlowCondition(object):
         callable
     """
 
+    @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
     def __init__(self, callback):
         self._callback = callback
+        warnings.warn("The FlowCondition class is deprecated as of 0.11 "
+                      "and will be removed in 0.13", DeprecationWarning)
 
     def __call__(self, job):
         if self._callback is None:
@@ -507,8 +510,23 @@ class BaseFlowOperation(object):
         if post is None:
             post = []
 
-        self._prereqs = [FlowCondition(cond) for cond in pre]
-        self._postconds = [FlowCondition(cond) for cond in post]
+        def _flow_condition(cond):
+            def _callable_condition(job):
+                if cond is None:
+                    return True
+                try:
+                    return cond(job)
+                except Exception as e:
+                    raise UserConditionError(
+                        'An exception was raised while evaluating the condition {name} '
+                        'for job {job}.'
+                        ''.format(name=cond.__name__, job=job)) from e
+
+            _callable_condition._callback = cond
+            return _callable_condition
+
+        self._prereqs = [_flow_condition(cond) for cond in pre]
+        self._postconds = [_flow_condition(cond) for cond in post]
 
     def __str__(self):
         return "{type}(cmd='{cmd}')".format(type=type(self).__name__, cmd=self._cmd)

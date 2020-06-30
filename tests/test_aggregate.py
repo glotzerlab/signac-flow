@@ -216,8 +216,7 @@ class TestSelect(AggregateProjectSetup):
     def test_default_init(self):
         select = _select()
         test_list = [1, 2, 3, 4, 5]
-        assert [item for item in select._filter(test_list)] == \
-               test_list
+        assert [item for item in select._filter(test_list)] == test_list
 
     def test_invalid_filter(self):
         filters = ['str', 1, []]
@@ -266,5 +265,4 @@ class TestSelect(AggregateProjectSetup):
         for job in project:
             if filter(job):
                 filtered_jobs.append(job)
-        assert [job for job in select()(project)] == \
-               filtered_jobs
+        assert [job for job in select()(project)] == filtered_jobs

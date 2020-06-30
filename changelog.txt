@@ -5,6 +5,14 @@ Changes
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 The numbers in brackets denote the related GitHub issue and/or pull request.
 
+next
+----
+
+Removed
++++++++
+
+- Remove the deprecated methods ``always``, ``make_bundles``, and ``JobOperation.get_id`` (#312).
+
 Version 0.10
 ============
 

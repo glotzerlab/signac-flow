@@ -96,10 +96,6 @@ jobs:
     <<: *test-template
     docker:
       - image: circleci/python:3.6
-  test-3.5:
-    <<: *test-template
-    docker:
-      - image: circleci/python:3.5
 
   test-deploy-pypi:
     docker:
@@ -133,9 +129,6 @@ workflows:
             branches:
               only: /release\/.*/
       - pre-test-checks
-      - test-3.5:
-          requires:
-            - pre-test-checks
       - test-3.6:
           requires:
             - pre-test-checks
@@ -159,7 +152,6 @@ workflows:
             branches:
               only: /release\/.*/
           requires:
-            - test-3.5
             - test-3.6
             - test-3.7
             - test-3.8

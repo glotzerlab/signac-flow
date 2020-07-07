@@ -11,7 +11,7 @@ next
 Changed
 +++++++
 
-- Deprecate the use of ``FlowCondition`` class (#307, #315).
+- Make ``FlowCondition`` class private (#307, #315).
 
 Version 0.10
 ============

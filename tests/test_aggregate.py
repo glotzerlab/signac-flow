@@ -5,7 +5,7 @@ from itertools import zip_longest
 from tempfile import TemporaryDirectory
 
 import signac
-from flow.aggregate import _aggregate, _select
+from flow.aggregate import aggregate
 
 
 class AggregateProjectSetup:
@@ -35,61 +35,68 @@ class AggregateProjectSetup:
         return self.mock_project()
 
 
-# Tests for _aggregate class
 class TestAggregate(AggregateProjectSetup):
 
     def test_default_init(self):
-        aggregate = _aggregate()
+        aggregate_instance = aggregate()
         test_list = [1, 2, 3, 4, 5]
-        assert aggregate._sort is None
-        assert aggregate._aggregator(test_list) == test_list
+        assert aggregate_instance._sort is None
+        assert aggregate_instance._aggregator(test_list) == test_list
+        assert [jobs for jobs in aggregate_instance._select(test_list)] == \
+               test_list
 
     def test_invalid_aggregator(self):
         aggregators = ['str', 1, {}]
         for aggregator in aggregators:
             with pytest.raises(TypeError):
-                _aggregate(aggregator)
+                aggregate(aggregator)
 
     def test_invalid_sort(self):
         sort_list = [1, {}, lambda x: x]
         for sort in sort_list:
             with pytest.raises(TypeError):
-                _aggregate(sort=sort)
+                aggregate(sort=sort)
 
     def test_invalid_reverse(self):
         reverse_list = ['str', 1, {}, lambda x: x]
         for reverse in reverse_list:
             with pytest.raises(TypeError):
-                _aggregate(reverse=reverse)
+                aggregate(reverse=reverse)
+
+    def test_invalid_select(self):
+        selectors = ['str', 1, []]
+        for _select in selectors:
+            with pytest.raises(TypeError):
+                aggregate(select=_select)
 
     def test_call_without_function(self):
-        aggregate = _aggregate()
-        call_result = aggregate()
-        assert len(call_result) == 2
+        aggregate_instance = aggregate()
+        call_result = aggregate_instance()
+        assert len(call_result) == 3
         assert call_result[1] is None
         assert call_result[0]([1, 2, 3, 4, 5]) == [1, 2, 3, 4, 5]
 
     def test_call_with_function(self):
-        aggregate = _aggregate()
+        aggregate_instance = aggregate()
 
         def test_function(x):
             return x
 
         assert not getattr(test_function, '_flow_aggregate', False)
-        test_function = aggregate(test_function)
+        test_function = aggregate_instance(test_function)
         assert getattr(test_function, '_flow_aggregate', False)
 
     def test_with_decorator_with_pre_initialization(self):
-        aggregate = _aggregate()
+        aggregate_instance = aggregate()
 
-        @aggregate
+        @aggregate_instance
         def test_function(x):
             return x
 
         assert getattr(test_function, '_flow_aggregate', False)
 
     def test_with_decorator_without_pre_initialization(self):
-        @_aggregate()
+        @aggregate()
         def test_function(x):
             return x
 
@@ -100,38 +107,38 @@ class TestAggregate(AggregateProjectSetup):
         def helper_aggregator(jobs):
             yield from jobs
 
-        aggregate = _aggregate(helper_aggregator)
+        aggregate_instance = aggregate(helper_aggregator)
 
         aggregate_job_manual = helper_aggregator(project)
-        aggregate_job_via_aggregator = aggregate()[0](project)
+        aggregate_job_via_aggregator = aggregate_instance()[0](project)
 
         assert [jobs for jobs in aggregate_job_manual] == \
                [jobs for jobs in aggregate_job_via_aggregator]
 
     def test_valid_aggregator_partial(self, setUp, project):
-        aggregate = _aggregate(lambda jobs: jobs)
-        aggregate_job_via_aggregator = aggregate()[0](project)
+        aggregate_instance = aggregate(lambda jobs: jobs)
+        aggregate_job_via_aggregator = aggregate_instance()[0](project)
 
         assert [jobs for jobs in project] == \
                [jobs for jobs in aggregate_job_via_aggregator]
 
     def test_valid_sort(self, setUp, project):
         helper_sort = partial(sorted, key=lambda job: job.sp.i)
-        aggregate = _aggregate(sort='i')
+        aggregate_instance = aggregate(sort='i')
 
-        assert(helper_sort(project) == aggregate()[1](project))
+        assert(helper_sort(project) == aggregate_instance()[1](project))
 
     def test_valid_reversed_sort(self, setUp, project):
         helper_sort = partial(sorted, key=lambda job: job.sp.i, reverse=True)
-        aggregate = _aggregate(sort='i', reverse=True)
+        aggregate_instance = aggregate(sort='i', reverse=True)
 
-        assert(helper_sort(project) == aggregate()[1](project))
+        assert(helper_sort(project) == aggregate_instance()[1](project))
 
     def test_groups_of_invalid_num(self):
         invalid_values = [{}, 'str', -1, -1.5]
         for invalid_value in invalid_values:
             with pytest.raises((TypeError, ValueError)):
-                _aggregate.groupsof(invalid_value)
+                aggregate.groupsof(invalid_value)
 
     def test_groups_of_valid_num(self, setUp, project):
         valid_values = [1, 2, 3, 6]
@@ -141,53 +148,53 @@ class TestAggregate(AggregateProjectSetup):
             return zip_longest(*args)
 
         for valid_value in valid_values:
-            aggregate = _aggregate.groupsof(valid_value)
+            aggregate_instance = aggregate.groupsof(valid_value)
             aggregate_job_manual = helper_aggregator(project, valid_value)
-            aggregate_job_via_aggregator = aggregate()[0](project)
+            aggregate_job_via_aggregator = aggregate_instance()[0](project)
             assert [jobs for jobs in aggregate_job_manual] == \
                    [jobs for jobs in aggregate_job_via_aggregator]
 
     def test_group_by_invalid_key(self):
         with pytest.raises(TypeError):
-            _aggregate.groupby(1)
+            aggregate.groupby(1)
 
     def test_groupby_with_valid_string_key(self, setUp, project):
-        aggregate = _aggregate.groupby('even')
+        aggregate_instance = aggregate.groupby('even')
         aggregates = 0
-        for agg in aggregate()[0](project):
+        for agg in aggregate_instance()[0](project):
             aggregates += 1
         assert aggregates == 2
 
     def test_groupby_with_invalid_string_key(self, setUp, project):
-        aggregate = _aggregate.groupby('invalid_key')
+        aggregate_instance = aggregate.groupby('invalid_key')
         with pytest.raises(KeyError):
-            for agg in aggregate()[0](project):
+            for agg in aggregate_instance()[0](project):
                 pass
 
     def test_groupby_with_default_key_for_string(self, setUp, project):
-        aggregate = _aggregate.groupby('half', default=-1)
+        aggregate_instance = aggregate.groupby('half', default=-1)
         aggregates = 0
-        for agg in aggregate()[0](project):
+        for agg in aggregate_instance()[0](project):
             aggregates += 1
         assert aggregates == 6
 
     def test_groupby_with_Iterable_key(self, setUp, project):
-        aggregate = _aggregate.groupby(['i', 'even'])
+        aggregate_instance = aggregate.groupby(['i', 'even'])
         aggregates = 0
-        for agg in aggregate()[0](project):
+        for agg in aggregate_instance()[0](project):
             aggregates += 1
         assert aggregates == 10
 
     def test_groupby_with_invalid_Iterable_key(self, setUp, project):
-        aggregate = _aggregate.groupby(['half', 'even'])
+        aggregate_instance = aggregate.groupby(['half', 'even'])
         with pytest.raises(KeyError):
-            for agg in aggregate()[0](project):
+            for agg in aggregate_instance()[0](project):
                 pass
 
     def test_groupby_with_default_key_for_Iterable(self, setUp, project):
-        aggregate = _aggregate.groupby(['half', 'even'], default=-1)
+        aggregate_instance = aggregate.groupby(['half', 'even'], default=-1)
         aggregates = 0
-        for agg in aggregate()[0](project):
+        for agg in aggregate_instance()[0](project):
             aggregates += 1
         assert aggregates == 6
 
@@ -195,74 +202,27 @@ class TestAggregate(AggregateProjectSetup):
         def keyfunction(job):
             return job.sp['even']
 
-        aggregate = _aggregate.groupby(keyfunction)
+        aggregate_instance = aggregate.groupby(keyfunction)
         aggregates = 0
-        for agg in aggregate()[0](project):
+        for agg in aggregate_instance()[0](project):
             aggregates += 1
         assert aggregates == 2
 
     def test_groupby_with_invalid_callable_key(self, setUp, project):
         def keyfunction(job):
             return job.sp['half']
-        aggregate = _aggregate.groupby(keyfunction)
+        aggregate_instance = aggregate.groupby(keyfunction)
         with pytest.raises(KeyError):
-            for agg in aggregate()[0](project):
+            for agg in aggregate_instance()[0](project):
                 pass
 
-
-# Tests for _select class
-class TestSelect(AggregateProjectSetup):
-
-    def test_default_init(self):
-        select = _select()
-        test_list = [1, 2, 3, 4, 5]
-        assert [item for item in select._filter(test_list)] == test_list
-
-    def test_invalid_filter(self):
-        filters = ['str', 1, []]
-        for filter in filters:
-            with pytest.raises(TypeError):
-                _select(filter)
-
-    def test_call_without_function(self):
-        select = _select()
-        call_result = select()
-        assert [item for item in call_result([1, 2, 3, 4, 5])] == \
-               [1, 2, 3, 4, 5]
-
-    def test_call_with_function(self):
-        select = _select()
-
-        def test_function(x):
-            return x
-
-        assert not getattr(test_function, '_flow_select', False)
-        test_function = select(test_function)
-        assert getattr(test_function, '_flow_select', False)
-
-    def test_with_decorator_with_pre_initialization(self):
-        select = _select()
-
-        @select
-        def test_function(x):
-            return x
-
-        assert getattr(test_function, '_flow_select', False)
-
-    def test_with_decorator_without_pre_initialization(self):
-        @_select()
-        def test_function(x):
-            return x
-
-        assert getattr(test_function, '_flow_select', False)
-
-    def test_valid_filter(self, setUp, project):
-        def filter(job):
+    def test_valid_select(self, setUp, project):
+        def _select(job):
             return job.sp.i > 5
 
-        select = _select(filter)
-        filtered_jobs = []
+        select = aggregate(select=_select)()[-1]
+        selected_jobs = []
         for job in project:
-            if filter(job):
-                filtered_jobs.append(job)
-        assert [job for job in select()(project)] == filtered_jobs
+            if _select(job):
+                selected_jobs.append(job)
+        assert [job for job in select(project)] == selected_jobs

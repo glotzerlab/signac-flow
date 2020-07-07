@@ -7,7 +7,7 @@ from itertools import zip_longest
 from functools import partial
 
 
-class _aggregate:
+class aggregate:
     """Decorator for operation functions that needs to be aggregated.
 
     If this class is used for aggregation then by-default, if the aggregator
@@ -25,7 +25,7 @@ class _aggregate:
         Information on how to aggregate jobs. Takes in a list of
         jobs and can return or yield lists or single jobs instead.
         The default behaviour is creating the aggregate of all jobs.
-    :type grouper:
+    :type aggregator:
         callable
     :param sort:
         Before aggregating, sort the jobs given by a statepoint parameter.
@@ -37,14 +37,19 @@ class _aggregate:
         The default value is False.
     :type reverse:
         bool
+    :param select:
+        Condition for filtering jobs. This operates on a single job.
+        The default value is None
+    :type select:
+        callable or NoneType
     """
 
-    def __init__(self, aggregator=None, sort=None, reverse=False):
+    def __init__(self, aggregator=None, sort=None, reverse=False, select=None):
         if aggregator is None:
             def aggregator(jobs):
                 return jobs
 
-        def key_sort(job, sort=sort):
+        def key_sort(job):
             try:
                 return job.sp[sort]
             except KeyError:
@@ -61,13 +66,17 @@ class _aggregate:
         if not isinstance(reverse, bool):
             raise TypeError("Expected bool reverse parameter got {}".format(type(reverse)))
 
+        if select is not None and not callable(select):
+            raise TypeError("Expected callable select parameter, got {}".format(type(select)))
+
         self._aggregator = aggregator
         self._sort = None if sort is None else partial(sorted,
                                                        key=key_sort,
                                                        reverse=reverse)
+        self._select = partial(filter, select)
 
     @classmethod
-    def groupsof(cls, num=1, sort=None, reverse=False):
+    def groupsof(cls, num=1, sort=None, reverse=False, select=None):
         # copied from: https://docs.python.org/3/library/itertools.html#itertools.zip_longest
         try:
             num = int(num)
@@ -80,10 +89,10 @@ class _aggregate:
             args = [iter(jobs)] * num
             return zip_longest(*args)
 
-        return cls(aggregator, sort, reverse)
+        return cls(aggregator, sort, reverse, select)
 
     @classmethod
-    def groupby(cls, key, default=None, sort=None, reverse=False):
+    def groupby(cls, key, default=None, sort=None, reverse=False, select=None):
         if isinstance(key, str):
             if default is None:
                 def keyfunction(job):
@@ -113,41 +122,10 @@ class _aggregate:
             for key, group in groupby(sorted(jobs, key=keyfunction), key=keyfunction):
                 yield group
 
-        return cls(aggregator, sort, reverse)
+        return cls(aggregator, sort, reverse, select)
 
     def __call__(self, func=None):
         if func is None:
-            return (self._aggregator, self._sort)
-        setattr(func, '_flow_aggregate', (self._aggregator, self._sort))
-        return func
-
-
-class _select:
-    """Decorator for operation functions that will filter jobs
-    according to the given condition.
-
-    .. code-block:: python
-
-        @select(filter=lambda job: job.sp.a>=5)
-        @FlowProject.operation
-        def foo(jobs):
-            return len(jobs)
-
-    :param filterby:
-        Condition for filtering jobs. This operates on a single job.
-        The default value is None
-    :type filterby:
-        callable or NoneType
-    """
-
-    def __init__(self, filterby=None):
-        if filterby is not None and not callable(filterby):
-            raise TypeError("Expected callable filterby function, got {}".format(type(filterby)))
-        self._filter = partial(filter, filterby)
-
-    def __call__(self, func=None):
-        if func is None:
-            return self._filter
-        setattr(func, '_flow_select', self._filter)
-
+            return (self._aggregator, self._sort, self._select)
+        setattr(func, '_flow_aggregate', (self._aggregator, self._sort, self._select))
         return func

@@ -25,7 +25,7 @@ class AggregateProjectSetup:
         for i in range(10):
             even = i % 2 == 0
             if even:
-                project.open_job(dict(i=i, half=i/2, even=even)).init()
+                project.open_job(dict(i=i, half=i / 2, even=even)).init()
             else:
                 project.open_job(dict(i=i, even=even)).init()
         return project
@@ -43,7 +43,7 @@ class TestAggregate(AggregateProjectSetup):
         assert aggregate_instance._sort is None
         assert aggregate_instance._aggregator(test_list) == test_list
         assert [jobs for jobs in aggregate_instance._select(test_list)] == \
-             test_list
+            test_list
 
     def test_invalid_aggregator(self):
         aggregators = ['str', 1, {}]

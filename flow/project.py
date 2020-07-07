@@ -168,9 +168,9 @@ class _IgnoreConditionsConversion(argparse.Action):
 
 
 class _condition(object):
-    # This counter should be incremented each time an "always" or "never"
-    # condition is created, and the value should be used as the tag for that
-    # condition to ensure that no pair of "always" and "never" conditions
+    # This counter should be incremented each time a "never" condition
+    # is created, and the value should be used as the tag for that
+    # condition to ensure that no pair of "never" conditions
     # are found to be equal by the graph detection algorithm.
     current_arbitrary_tag = 0
 

@@ -230,10 +230,10 @@ class _condition(object):
 
     @classmethod
     def not_(cls, condition):
-        "Returns ``not condition(job)`` for the provided condition function "
-        "for every job in the aggregate"
+        """Evaluates to True if the provided condition function returns
+        False for all the jobs in the aggregate passed at once."""
         def _not(*jobs):
-            return not any(condition(job) for job in jobs)
+            return not condition(*jobs)
         return cls(_not,
                    'not_'.encode() + condition.__code__.co_code)
 
@@ -295,7 +295,7 @@ class aggregate:
         Information on how to aggregate jobs. Takes in a list of
         jobs and can return or yield lists or single jobs instead.
         The default behaviour is creating the aggregate of all jobs.
-    :type grouper:
+    :type aggregator:
         callable
     :param sort:
         Before aggregating, sort the jobs given by a statepoint parameter.
@@ -307,14 +307,19 @@ class aggregate:
         The default value is False.
     :type reverse:
         bool
+    :param select:
+        Condition for filtering jobs. This operates on a single job.
+        The default value is None
+    :type select:
+        callable or NoneType
     """
 
-    def __init__(self, aggregator=None, sort=None, reverse=False):
+    def __init__(self, aggregator=None, sort=None, reverse=False, select=None):
         if aggregator is None:
             def aggregator(jobs):
                 return jobs
 
-        def key_sort(job, sort=sort):
+        def key_sort(job):
             try:
                 return job.sp[sort]
             except KeyError:
@@ -331,13 +336,17 @@ class aggregate:
         if not isinstance(reverse, bool):
             raise TypeError("Expected bool reverse parameter got {}".format(type(reverse)))
 
+        if select is not None and not callable(select):
+            raise TypeError("Expected callable select parameter, got {}".format(type(select)))
+
         self._aggregator = aggregator
         self._sort = None if sort is None else functools.partial(sorted,
                                                                  key=key_sort,
                                                                  reverse=reverse)
+        self._select = functools.partial(filter, select)
 
     @classmethod
-    def groupsof(cls, num=1, sort=None, reverse=False):
+    def groupsof(cls, num=1, sort=None, reverse=False, select=None):
         # copied from: https://docs.python.org/3/library/itertools.html#itertools.zip_longest
         try:
             num = int(num)
@@ -350,10 +359,10 @@ class aggregate:
             args = [iter(jobs)] * num
             return zip_longest(*args)
 
-        return cls(aggregator, sort, reverse)
+        return cls(aggregator, sort, reverse, select)
 
     @classmethod
-    def groupby(cls, key, default=None, sort=None, reverse=False):
+    def groupby(cls, key, default=None, sort=None, reverse=False, select=None):
         if isinstance(key, str):
             if default is None:
                 def keyfunction(job):
@@ -383,43 +392,12 @@ class aggregate:
             for key, group in groupby(sorted(jobs, key=keyfunction), key=keyfunction):
                 yield group
 
-        return cls(aggregator, sort, reverse)
+        return cls(aggregator, sort, reverse, select)
 
     def __call__(self, func=None):
         if func is None:
-            return (self._aggregator, self._sort)
-        setattr(func, '_flow_aggregate', (self._aggregator, self._sort))
-        return func
-
-
-class select:
-    """Decorator for operation functions that will filter jobs
-    according to the given condition.
-
-    .. code-block:: python
-
-        @select(filter=lambda job: job.sp.a>=5)
-        @FlowProject.operation
-        def foo(jobs):
-            return len(jobs)
-
-    :param filterby:
-        Condition for filtering jobs. This operates on a single job.
-        The default value is None
-    :type filterby:
-        callable or NoneType
-    """
-
-    def __init__(self, filterby=None):
-        if filterby is not None and not callable(filterby):
-            raise TypeError("Expected callable filterby function, got {}".format(type(filterby)))
-        self._filter = functools.partial(filter, filterby)
-
-    def __call__(self, func=None):
-        if func is None:
-            return self._filter
-        setattr(func, '_flow_select', self._filter)
-
+            return (self._aggregator, self._sort, self._select)
+        setattr(func, '_flow_aggregate', (self._aggregator, self._sort, self._select))
         return func
 
 
@@ -496,10 +474,10 @@ class JobOperation(object):
             )
 
     def __repr__(self):
-        return "{type}(name='{name}', job(s)='{job}', cmd={cmd}, directives={directives})".format(
+        return "{type}(name='{name}', jobs='{jobs}', cmd={cmd}, directives={directives})".format(
                    type=type(self).__name__,
                    name=self.name,
-                   job=" ".join(map(str, self.jobs)),
+                   jobs="[" + " ,".join(map(str, self.jobs)) + "]",
                    cmd=repr(self.cmd),
                    directives=self.directives)
 
@@ -645,9 +623,9 @@ class BaseFlowOperation(object):
     Every BaseFlowOperation is associated with a specific command.
 
     Pre-requirements (pre) and post-conditions (post) can be used to
-    trigger an operation only when certain conditions are met. Conditions are unary
-    callables, which expect an instance of job or aggregate of jobs as their first
-    and only positional argument and return either True or False.
+    trigger an operation only when certain conditions are met. Conditions are
+    callables, which expects multiple positional arguments of all the jobs in an
+    aggregate and return either True or False.
 
     An operation is considered "eligible" for execution when all pre-requirements
     are met and when at least one of the post-conditions is not met.
@@ -731,10 +709,10 @@ class FlowCmdOperation(BaseFlowOperation):
 
     When an operation has the ``@cmd`` directive specified, it is instantiated
     as a FlowCmdOperation. The operation should be a function of single or multiple
-    :py:class:`~signac.contrib.job.Job`. The command (cmd) may
-    either be a unary callable that expects an instance of single or multiple
-    :class:`~signac.contrib.job.Job` as its positional argument and returns
-    a string containing valid shell commands, or the string of commands itself.
+    :py:class:`~signac.contrib.job.Job`. The command (cmd) is a callable that
+    expects single or multiple :class:`~signac.contrib.job.Job` instances
+    as its positional argument(s) and returns a string containing valid shell commands,
+    or the string of commands itself.
     In either case, the resulting string may contain any attributes of the job or
     aggregate of jobs place in curly braces, which will then be substituted by
     Python string formatting.
@@ -814,11 +792,10 @@ class FlowGroupEntry(object):
     :type aggregator:
         tuple
     """
-    def __init__(self, name, options="", aggregate=None, select=None):
+    def __init__(self, name, options="", aggregate=None):
         self.name = name
         self.options = options
         self.aggregate = aggregate
-        self.select = select
 
     def __call__(self, func):
         """Decorator that adds the function into the group's operations.
@@ -874,7 +851,7 @@ class FlowGroup(object):
     """A FlowGroup represents a subset of a workflow for a project.
 
     Any :py:class:`FlowGroup` is associated with one or more instances of
-    :py:class:`BaseFlowOperation` having similar aggregations.
+    :py:class:`BaseFlowOperation` having identical aggregations.
 
     In the example below, the directives will be {'nranks': 4} for op1 and
     {'nranks': 2, 'executable': 'python3'} for op2
@@ -924,17 +901,12 @@ class FlowGroup(object):
         using the :py:class:`aggregate`
     :type flow_aggregate:
         tuple
-    :param flow_select:
-        The operation specific filter parameters specified
-        using the :py:class:`select`
-    :type flow_select:
-        callable
     """
 
     MAX_LEN_ID = 100
 
     def __init__(self, name, operations=None, operation_directives=None,
-                 options="", flow_aggregate=None, flow_select=None):
+                 options="", flow_aggregate=None):
         self.name = name
         self.options = options
         self.operations = dict() if operations is None else operations
@@ -943,7 +915,6 @@ class FlowGroup(object):
         else:
             self.operation_directives = operation_directives
         self.flow_aggregate = flow_aggregate
-        self.flow_select = flow_select
 
     def _set_entrypoint_item(self, entrypoint, directives, key, default, jobs):
         """Set a value (executable, path) for entrypoint in command.
@@ -996,7 +967,7 @@ class FlowGroup(object):
             if value and callable(value):
                 return value(*jobs)
             elif isinstance(value, str):
-                return value.format(jobs=' '.join(map(str, jobs)))
+                return value.format(*jobs)
             else:
                 return value
         return {key: evaluate(value) for key, value in directives.items()}
@@ -1030,14 +1001,13 @@ class FlowGroup(object):
     def __repr__(self):
         return "{type}(name='{name}', operations='{operations}', " \
                "operation_directives={directives}, options='{options}', " \
-               "flow_aggregate={flow_aggregate}, flow_select={flow_select})".format(
+               "flow_aggregate={flow_aggregate})".format(
                    type=type(self).__name__,
                    name=self.name,
                    operations=' '.join(list(self.operations)),
                    directives=self.operation_directives,
                    options=self.options,
-                   flow_aggregate=self.flow_aggregate,
-                   flow_select=self.flow_select)
+                   flow_aggregate=self.flow_aggregate)
 
     def eligible(self, jobs, ignore_conditions=IgnoreConditions.NONE):
         """Eligible, when at least one BaseFlowOperation is eligible.
@@ -1093,12 +1063,9 @@ class FlowGroup(object):
         if directives is not None:
             self.operation_directives[name] = directives
 
-    def _add_aggregator_selector(self, flow_aggregate, flow_select):
+    def _add_aggregator(self, flow_aggregate):
         if self.flow_aggregate is None:
             self.flow_aggregate = flow_aggregate
-
-        if self.flow_select is None:
-            self.flow_select = flow_select
 
     def isdisjoint(self, group):
         """Returns whether two groups are disjoint (do not share any common operations).
@@ -1173,7 +1140,7 @@ class FlowGroup(object):
     def _create_nested_jobs_list(self, jobs_list):
         # When jobs are aggregated, the user is required to either return a
         # nested list or nested iterable in which the bottom most element is an
-        # instance so `signac.contrib.job.Job`.
+        # instance of `signac.contrib.job.Job`.
         nested_jobs = []
         jobs_list = list(jobs_list)
         all_iterable = all_jobs = True
@@ -1204,22 +1171,27 @@ class FlowGroup(object):
 
     def _get_filtered_jobs(self, jobs):
         "Returns filtered jobs for this group"
+        # For every operation, first jobs are selected according to the select
+        # function, then are aggregated according to the aggregator function,
+        # then are sorted according to some state point parameter.
+        # The `select`, `aggregator` and the `sort` functions are specified
+        # using :class:`~.aggregate`.
+
         # Ensuring Lists
         if isinstance(jobs, signac.contrib.job.Job):
             jobs = [jobs]
         else:
             jobs = list(jobs)
-        filter = self.flow_select
-        grouper, sort = self.flow_aggregate
+        aggregator, sort, selector = self.flow_aggregate
         jobs_list = list(jobs)
-        if filter.args[0] is not None:
-            jobs_list = list(filter(jobs_list))
+        if selector.args[0] is not None:
+            jobs_list = list(selector(jobs_list))
         if sort is not None:
             jobs_list = list(sort(jobs_list))
-        jobs_list = list(grouper([job for job in jobs_list]))
+        jobs_list = list(aggregator([job for job in jobs_list]))
         jobs_list = self._create_nested_jobs_list(jobs_list)
         if not len(jobs_list):
-            return None
+            return []
         for i, job in enumerate(jobs_list[-1]):
             if job is None:
                 del jobs_list[-1][i:]
@@ -1229,11 +1201,9 @@ class FlowGroup(object):
     def _get_filtered_job_id_per_group(self, jobs, index=0):
         """For any group, create filtered job lists.
 
-        Jobs are filtered using the attributes flow_select and flow_aggregate.
+        Jobs are filtered using the objects in the attribute flow_aggregate.
         """
         jobs_list = self._get_filtered_jobs(jobs)
-        if jobs_list is None:
-            return None
         for job_list in jobs_list:
             yield self._generate_id(job_list, index=index)
 
@@ -1284,6 +1254,10 @@ class FlowGroup(object):
             jobs = [jobs]
         else:
             jobs = list(jobs)
+
+        project = jobs[0]._project
+        for job in jobs:
+            assert project == job._project
 
         uneval_cmd = functools.partial(self._submit_cmd, entrypoint=entrypoint, jobs=jobs,
                                        ignore_conditions=ignore_conditions_on_execution)
@@ -1354,14 +1328,14 @@ class FlowGroup(object):
             jobs = [jobs]
         else:
             jobs = list(jobs)
+
+        project = jobs[0]._project
+        for job in jobs:
+            assert project == job._project
+
         jobs_list = self._get_filtered_jobs(jobs)
-        if jobs_list is None:
-            return
+
         for name, op in self.operations.items():
-            # For every operation, firstly jobs are filtered according to some valid function
-            # whose information is given in the :class:`~.select`, then grouped according to
-            # the valid grouper functions and eventually sorted according to some state-point
-            # parameter whose information is given in the :class:`~.aggregate`.
             for job_list in jobs_list:
                 eligible = op.eligible(job_list, ignore_conditions)
                 if eligible:
@@ -1931,7 +1905,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         status_dict = defaultdict(starting_dict)
         for group in self._groups.values():
             jobs_list = group._get_filtered_jobs(self)
-            if jobs_list is None:
+            if jobs_list == []:
                 continue
             if len(jobs_list) < len(self):
                 aggregate = True
@@ -2003,8 +1977,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             result['operation_name'] = name
         status_dict = dict()
         jobs_list = group._get_filtered_jobs(jobs)
-        if jobs_list is None:
-            pass
+
         def get_concact_id(jobs):
             if len(jobs) > 1:
                 return '{}...{}...{}'.format(
@@ -3011,8 +2984,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """Grabs JobOperations that are eligible to run from FlowGroups."""
         for group in self._gather_flow_groups(names):
             jobs_list = group._get_filtered_jobs(jobs)
-            if jobs_list is None:
-                continue
             for job_list in jobs_list:
                 if (
                     group.eligible(job_list, ignore_conditions) and
@@ -3669,10 +3640,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """Determine which operations have been completed for
         specified jobs.
 
-        :param job:
+        :param jobs:
             Sequence of signac job handles.
-        :type job:
-            Iterable
+        :type jobs:
+            Iterable of instances of :class:`~signac.contrib.job.Job`
         :return:
             The name of the operations that are complete.
         :rtype:
@@ -3682,22 +3653,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if op.complete(jobs):
                 yield name
 
-    def _job_operations(self, jobs, ignore_conditions=IgnoreConditions.NONE):
-        "Yield instances of JobOperation constructed for specific jobs."
-        for name in self.operations:
-            group = self._groups[name]
-            yield from group._create_run_job_operations(entrypoint=self._entrypoint, jobs=jobs,
-                                                        default_directives=dict(),
-                                                        ignore_conditions=ignore_conditions,
-                                                        index=0)
-
     def next_operations(self, jobs, ignore_conditions=IgnoreConditions.NONE):
         """Determine the next eligible operations for jobs.
 
         :param jobs:
             Sequence of signac job handles.
-        :type job:
-            Iterable
+        :type jobs:
+            Iterable of instances of :class:`~signac.contrib.job.Job`
         :param ignore_conditions:
             Specify if pre and/or post conditions check is to be ignored for eligibility check.
             The default is :py:class:`IgnoreConditions.NONE`.
@@ -3707,8 +3669,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             All instances of :class:`~.JobOperation` jobs are eligible for.
         """
 
-        for op in self._job_operations(jobs, ignore_conditions):
-            yield op
+        for name in self.operations:
+            group = self._groups[name]
+            yield from group._create_run_job_operations(entrypoint=self._entrypoint, jobs=jobs,
+                                                        default_directives=dict(),
+                                                        ignore_conditions=ignore_conditions,
+                                                        index=0)
 
     @deprecated(
         deprecated_in="0.8", removed_in="0.10",
@@ -3720,7 +3686,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :param jobs:
             Sequence of signac job handles.
         :type job:
-            Iterable
+            Iterable of instances of :class:`~signac.contrib.job.Job`
         :param default_directives:
             The default directives to use for the operations. This is to allow for user specified
             groups to 'inherit' directives from ``default_directives``. If no defaults are desired,
@@ -3828,10 +3794,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 _aggregate = aggregate.groupsof(1)
                 func = _aggregate(func)
 
-            if not getattr(func, '_flow_select', False):
-                _select = select()
-                func = _select(func)
-
             # Construct FlowOperation:
             if getattr(func, '_flow_cmd', False):
                 self._operations[name] = FlowCmdOperation(cmd=func, **params)
@@ -3886,14 +3848,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if aggregator is None:
             aggregator = aggregate.groupsof(1)()
         else:
-            aggregator = aggregate(aggregator=aggregator, sort=sort, reverse=reverse)()
+            aggregator = aggregate(aggregator=aggregator, sort=sort,
+                                   reverse=reverse, select=selector)()
 
-        if selector is None:
-            selector = select()()
-        else:
-            selector = select(selector)
-
-        group_entry = FlowGroupEntry(name, options, aggregator, selector)
+        group_entry = FlowGroupEntry(name, options, aggregator)
         cls._GROUPS.append(group_entry)
         return group_entry
 
@@ -3903,20 +3861,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Gather all groups from class and parent classes.
         for cls in type(self).__mro__:
             group_entries.extend(getattr(cls, '_GROUPS', []))
-        flow_aggregate = dict()
-        flow_select = dict()
+        aggregates = dict()
         for op_name, op in self._operations.items():
             try:
-                flow_aggregate[op_name] = self._operation_functions[op_name]._flow_aggregate
-                flow_select[op_name] = self._operation_functions[op_name]._flow_select
+                aggregates[op_name] = self._operation_functions[op_name]._flow_aggregate
             except KeyError:
-                flow_aggregate[op_name] = op.cmd._flow_aggregate
-                flow_select[op_name] = op.cmd._flow_select
+                aggregates[op_name] = op.cmd._flow_aggregate
         # Initialize all groups without operations
         for entry in group_entries:
             self._groups[entry.name] = FlowGroup(entry.name, options=entry.options,
-                                                 flow_aggregate=entry.aggregate,
-                                                 flow_select=entry.select)
+                                                 flow_aggregate=entry.aggregate)
 
         # Add operations and directives to group
         for (op_name, op) in self._operations.items():
@@ -3930,9 +3884,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 for group_name in func._flow_groups:
                     self._groups[group_name].add_operation(
                         op_name, op, operation_directives.get(group_name, None))
-                    self._groups[group_name]._add_aggregator_selector(
-                        flow_aggregate[op_name], flow_select[op_name]
-                    )
+                    self._groups[group_name]._add_aggregator(aggregates[op_name])
 
             # For singleton groups add directives
             self._groups[op_name].operation_directives[op_name] = getattr(func,
@@ -4109,24 +4061,22 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 operation = self._operations[args.operation]
 
                 def operation_function(*jobs):
-                    cmd = operation(jobs).format(jobs=jobs)
+                    cmd = operation(*jobs)
                     subprocess.run(cmd, shell=True, check=True)
 
         except KeyError:
             raise KeyError("Unknown operation '{}'.".format(args.operation))
 
         try:
-            filter = operation_function._flow_select
-            grouper, sort = operation_function._flow_aggregate
+            aggregator, sort, selector = operation_function._flow_aggregate
         except AttributeError:
-            filter = operation.cmd._flow_select
-            grouper, sort = operation.cmd._flow_aggregate
+            aggregator, sort, selector = operation.cmd._flow_aggregate
 
         jobs = list(jobs)
-        jobs_list = filter(jobs)
+        jobs_list = selector(jobs)
         if sort is not None:
             jobs_list = sort(jobs_list)
-        jobs_list = grouper([job for job in jobs_list])
+        jobs_list = aggregator([job for job in jobs_list])
 
         for job_list in jobs_list:
             job_list = list(job_list)

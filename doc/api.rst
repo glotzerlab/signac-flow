@@ -40,7 +40,6 @@ The FlowProject
     FlowProject.operation
     FlowProject.operations
     FlowProject.post
-    FlowProject.post.always
     FlowProject.post.copy_from
     FlowProject.post.false
     FlowProject.post.isfile
@@ -49,7 +48,6 @@ The FlowProject
     FlowProject.post.true
     FlowProject.pre
     FlowProject.pre.after
-    FlowProject.pre.always
     FlowProject.pre.copy_from
     FlowProject.pre.false
     FlowProject.pre.isfile
@@ -72,8 +70,6 @@ The FlowProject
 
 .. automethod:: flow.FlowProject.post
 
-.. automethod:: flow.FlowProject.post.always
-
 .. automethod:: flow.FlowProject.post.copy_from
 
 .. automethod:: flow.FlowProject.post.false
@@ -89,8 +85,6 @@ The FlowProject
 .. automethod:: flow.FlowProject.pre
 
 .. automethod:: flow.FlowProject.pre.after
-
-.. automethod:: flow.FlowProject.pre.always
 
 .. automethod:: flow.FlowProject.pre.copy_from
 

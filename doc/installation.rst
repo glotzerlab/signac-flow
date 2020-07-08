@@ -5,7 +5,8 @@ Installation
 ============
 
 The recommended installation method for **signac-flow** is via conda_ or pip_.
-The software is tested for Python versions 3.5+ and signac_ versions 1.0+.
+The software is tested for Python versions 3.6+ and signac_ versions 1.0+.
+Supported Python and NumPy versions are determined according to the `NEP 29 deprecation policy <https://numpy.org/neps/nep-0029-deprecation_policy.html>`_.
 
 .. _conda: https://conda.io/
 .. _conda-forge: https://conda-forge.org/

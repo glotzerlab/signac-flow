@@ -191,20 +191,21 @@ def get_account_name(environment, required=False):
     :raises SubmitError:
         Raised if 'required' is True and the account name is missing.
     """
+    env_name = environment.__name__
     try:
-        return require_config_value('account', ns=environment)
+        return require_config_value('account', ns=env_name)
     except ConfigKeyError as error:
         if required:
             raise SubmitError(
                 "Environment '{env}' requires the specification of an account name.\n"
                 "Set the account name for example with:\n\n"
                 "  $ signac config --global set {key} ACCOUNT_NAME\n".format(
-                    env=environment, key=str(error)))
-        elif environment not in _GET_ACCOUNT_NAME_MESSAGES_SHOWN:
+                    env=env_name, key=str(error)))
+        elif env_name not in _GET_ACCOUNT_NAME_MESSAGES_SHOWN:
             print(
                 "Environment '{env}' allows the specification of an account name.\n"
                 "Set the account name for example with:\n\n"
                 "  $ signac config --global set {key} ACCOUNT_NAME\n".format(
-                    env=environment, key=str(error)),
+                    env=env_name, key=str(error)),
                 file=sys.stderr)
-            _GET_ACCOUNT_NAME_MESSAGES_SHOWN.add(environment)
+            _GET_ACCOUNT_NAME_MESSAGES_SHOWN.add(env_name)

@@ -29,16 +29,13 @@ The FlowProject
 
     FlowProject.ALIASES
     FlowProject.add_operation
-    FlowProject.classify
     FlowProject.completed_operations
-    FlowProject.eligible_for_submission
-    FlowProject.export_job_stati
+    FlowProject.export_job_statuses
     FlowProject.get_job_status
     FlowProject.label
     FlowProject.labels
     FlowProject.main
     FlowProject.make_group
-    FlowProject.next_operation
     FlowProject.next_operations
     FlowProject.operation
     FlowProject.operations
@@ -65,7 +62,6 @@ The FlowProject
     FlowProject.script
     FlowProject.submit
     FlowProject.submit_operations
-    FlowProject.update_aliases
 
 
 .. autoclass:: FlowProject

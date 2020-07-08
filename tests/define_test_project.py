@@ -62,9 +62,9 @@ def op2(job):
 
 
 @_TestProject.operation
-@group2.with_directives(dict(ngpu=2))
+@group2.with_directives(dict(omp_num_threads=4))
 @_TestProject.post.true('test3')
-@flow.directives(ngpu=1)
+@flow.directives(ngpu=1, omp_num_threads=1)
 def op3(job):
     job.document.test3 = True
 

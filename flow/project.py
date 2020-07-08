@@ -47,7 +47,7 @@ from signac.contrib.hashing import calc_id
 from signac.contrib.filterparse import parse_filter_arg
 from signac.contrib.project import JobsCursor
 
-from enum import IntEnum
+from enum import IntFlag
 
 from .environment import get_environment
 from .scheduling.base import ClusterJob
@@ -113,9 +113,7 @@ _FMT_SCHEDULER_STATUS = {
 }
 
 
-# TODO: When we drop Python 3.5 support, change this to inherit from IntFlag
-# instead of IntEnum so that we can remove the operator overloads.
-class IgnoreConditions(IntEnum):
+class IgnoreConditions(IntFlag):
     """Flags that determine which conditions are used to determine job eligibility.
 
     The options include:
@@ -124,29 +122,11 @@ class IgnoreConditions(IntEnum):
         * IgnoreConditions.POST: ignore post conditions
         * IgnoreConditions.ALL: ignore all conditions
     """
-    # The following three functions can be removed once we drop Python 3.5
-    # support, they are implemented by the IntFlag class in Python > 3.6.
-    def __or__(self, other):
-        if not isinstance(other, (self.__class__, int)):
-            return NotImplemented
-        result = self.__class__(self._value_ | self.__class__(other)._value_)
-        return result
-
-    def __and__(self, other):
-        if not isinstance(other, (self.__class__, int)):
-            return NotImplemented
-        return self.__class__(self._value_ & self.__class__(other)._value_)
-
-    def __xor__(self, other):
-        if not isinstance(other, (self.__class__, int)):
-            return NotImplemented
-        return self.__class__(self._value_ ^ self.__class__(other)._value_)
-
     # This operator must be defined since IntFlag simply performs an integer
     # bitwise not on the underlying enum value, which is problematic in
     # twos-complement arithmetic. What we want is to only flip valid bits.
     def __invert__(self):
-        # Compute the largest number of bits use to represent one of the flags
+        # Compute the largest number of bits used to represent one of the flags
         # so that we can XOR the appropriate number.
         max_bits = len(bin(max([elem.value for elem in type(self)]))) - 2
         return self.__class__((2**max_bits - 1) ^ self._value_)
@@ -487,7 +467,7 @@ class JobOperation(object):
     def __eq__(self, other):
         return self.id == other.id
 
-    @deprecated(deprecated_in="0.9", removed_in="1.0", current_version=__version__)
+    @deprecated(deprecated_in="0.9", removed_in="0.11", current_version=__version__)
     def get_id(self):
         return self._id
 
@@ -909,7 +889,9 @@ class FlowGroup(object):
                  options="", flow_aggregate=None):
         self.name = name
         self.options = options
-        self.operations = dict() if operations is None else operations
+        # An OrderedDict is not necessary here, but is used to ensure
+        # consistent ordering of pretend submission output for templates.
+        self.operations = OrderedDict() if operations is None else OrderedDict(operations)
         if operation_directives is None:
             self.operation_directives = dict()
         else:
@@ -927,18 +909,16 @@ class FlowGroup(object):
             entrypoint[key] = entrypoint[key](*jobs)
 
     def _determine_entrypoint(self, entrypoint, directives, jobs):
-        """Get the entrypoint for creating a JobOperation.
-
-        If path cannot be determined, then raise a RuntimeError since we do not
-        know where to point to.
-        """
+        "Get the entrypoint for creating a JobOperation."
         entrypoint = entrypoint.copy()
         self._set_entrypoint_item(entrypoint, directives, 'executable', sys.executable, jobs)
-        self._set_entrypoint_item(entrypoint, directives, 'path', None, jobs)
-        if entrypoint['path'] is None:
-            raise RuntimeError("Entrypoint path not set.")
-        else:
-            return "{} {}".format(entrypoint['executable'], entrypoint['path']).lstrip()
+
+        # If a path is not provided, default to the path to the file where the
+        # FlowProject (subclass) is defined.
+        # We are assuming that all the jobs belong from the same project
+        default_path = inspect.getfile(jobs[0]._project.__class__)
+        self._set_entrypoint_item(entrypoint, directives, 'path', default_path, jobs)
+        return "{} {}".format(entrypoint['executable'], entrypoint['path']).lstrip()
 
     def _resolve_directives(self, name, defaults, jobs):
         if name in self.operation_directives:
@@ -1350,6 +1330,15 @@ class FlowGroup(object):
 
                     job_op = JobOperation(self._generate_id(job_list, name, index=index), name,
                                           job_list, cmd=uneval_cmd, directives=deepcopy(directives))
+
+                    # Get the prefix, and if it's not NULL, set the fork directive
+                    # to True since we must launch a separate process. Override
+                    # the command directly.
+                    prefix = job._project._environment.get_prefix(job_op)
+                    if prefix != '':
+                        job_op.directives['fork'] = True
+                        job_op._cmd = '{} {}'.format(prefix, job_op.cmd)
+
                     yield job_op
 
     def _get_submission_directives(self, default_directives, jobs):
@@ -1828,14 +1817,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         except TypeError:
             return x
 
-    @classmethod
-    @deprecated(
-        deprecated_in="0.8", removed_in="0.10",
-        current_version=__version__)
-    def update_aliases(cls, aliases):
-        "Update the ALIASES table for this class."
-        cls.ALIASES.update(aliases)
-
     def _fn_bundle(self, bundle_id):
         "Return the canonical name to store bundle information."
         return os.path.join(self.root_directory(), '.bundles', bundle_id)
@@ -2105,7 +2086,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                             import pickle
                             results = self._fetch_status_in_parallel(
                                 pool, pickle, jobs, groups, ignore_errors, cached_status)
-                            labels = self._fetch_labels_in_parallel(pool, pickle, jobs, ignore_errors)
+                            labels = self._fetch_labels_in_parallel(
+                                pool, pickle, jobs, ignore_errors)
                         except Exception as error:
                             if not isinstance(error, (pickle.PickleError, self._PickleError)) and\
                                     'pickle' not in str(error).lower():
@@ -2122,8 +2104,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                             else:
                                 try:
                                     results = self._fetch_status_in_parallel(
-                                        pool, cloudpickle, jobs, groups, ignore_errors, cached_status)
-                                    labels = self._fetch_labels_in_parallel(pool, cloudpickle, jobs, ignore_errors)
+                                        pool, cloudpickle, jobs, groups,
+                                        ignore_errors, cached_status)
+                                    labels = self._fetch_labels_in_parallel(
+                                        pool, cloudpickle, jobs, ignore_errors)
                                 except self._PickleError as error:
                                     raise RuntimeError(
                                         "Unable to parallelize execution due to a pickling "
@@ -2156,12 +2140,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 for i, group in enumerate(groups):
                     op_results.append(_get_group_status(group, jobs))
                     if time.time() - t > 0.2:  # status interval
-                        print(
-                            'Collecting group status per job info: {}/{}'.format(i+1, num_groups),
-                            end='\r', file=err)
+                        print('Collecting group status per job info: {}/{}'
+                              ''.format(i+1, num_groups),
+                              end='\r', file=err)
                         t = time.time()
                 # Always print the completed progressbar.
-                print('Collecting group status per job info: {}/{}'.format(i+1, num_groups), file=err)
+                print('Collecting group status per job info: {}/{}'
+                      ''.format(i+1, num_groups), file=err)
                 for job in jobs:
                     job_labels.append(_get_job_labels(job))
 
@@ -2246,8 +2231,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type parameters:
             list of str
         :param param_max_width:
-            Limit the number of characters of parameter columns,
-            see also: :py:meth:`~.update_aliases`.
+            Limit the number of characters of parameter columns.
         :type param_max_width:
             int
         :param expand:
@@ -2579,7 +2563,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         #         if k != '' and v['eligible'] and v['length']:
         #             if k not in aggregates_per_op:
         #                 aggregates_per_op[k] = []
-        #                 aggregates_per_op[k].append((v['aggregates'].split(' '), v['scheduler_status']))
+        #                 aggregates_per_op[k].append(
+        # (v['aggregates'].split(' '), v['scheduler_status']))
         #             else:
         #                 present = False
         #                 for jobs, stati in aggregates_per_op[k]:
@@ -2715,9 +2700,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             result.get(timeout=timeout)
 
     def _execute_operation(self, operation, timeout=None, pretend=False):
-        prefix = self._environment.get_prefix(operation)
         if pretend:
-            print(prefix + ' ' + operation.cmd if prefix != '' else operation.cmd)
+            print(operation.cmd)
             return None
 
         logger.info("Execute operation '{}'...".format(operation))
@@ -2731,14 +2715,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             or operation.name not in self._operation_functions
             # The specified executable is not the same as the interpreter instance:
             or operation.directives.get('executable', sys.executable) != sys.executable
-            or prefix != ''
         ):
             # ... need to fork:
             logger.debug(
                 "Forking to execute operation '{}' with "
-                "cmd '{}'.".format(operation, prefix + ' ' + operation.cmd))
-            subprocess.run(prefix + ' ' + operation.cmd,
-                           shell=True, timeout=timeout, check=True)
+                "cmd '{}'.".format(operation, operation.cmd))
+            subprocess.run(operation.cmd, shell=True, timeout=timeout,
+                           check=True)
         else:
             # ... executing operation in interpreter process as function:
             logger.debug(
@@ -3067,7 +3050,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         logger.info("Use environment '{}'.".format(env))
         logger.info("Set 'base_script={}'.".format(env.template))
         context['base_script'] = env.template
-        context['environment'] = env.__name__
+        context['environment'] = env
         context['id'] = _id
         context['operations'] = list(operations)
         context.update(kwargs)
@@ -3159,7 +3142,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             keys_unused = {
                 key for op in operations for key in
                 op.directives._keys_set_by_user.difference(op.directives.keys_used)
-                if key not in ('fork', )  # whitelist
+                if key not in ('fork', 'nranks', 'omp_num_threads')  # ignore list
             }
             if keys_unused:
                 logger.warning(
@@ -3413,14 +3396,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             nargs='+',
             help="Manually specify all labels that are required for the direct command "
                  "to be considered eligible for execution.")
-
-    @deprecated(
-        deprecated_in="0.8", removed_in="0.10",
-        current_version=__version__,
-        details="Use export_job_statuses() instead.")
-    def export_job_stati(self, collection, stati):
-        "Export the job stati to a database collection."
-        self.export_job_statuses(self, collection, stati)
 
     def export_job_statuses(self, collection, statuses):
         "Export the job statuses to a database collection."
@@ -3676,31 +3651,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                                         ignore_conditions=ignore_conditions,
                                                         index=0)
 
-    @deprecated(
-        deprecated_in="0.8", removed_in="0.10",
-        current_version=__version__,
-        details="Use next_operations() instead.")
-    def next_operation(self, jobs):
-        """Determine the next operation for these jobs.
-
-        :param jobs:
-            Sequence of signac job handles.
-        :type job:
-            Iterable of instances of :class:`~signac.contrib.job.Job`
-        :param default_directives:
-            The default directives to use for the operations. This is to allow for user specified
-            groups to 'inherit' directives from ``default_directives``. If no defaults are desired,
-            the argument can be set to an empty dictionary. This must be done explicitly, however.
-        :type default_directives:
-            :py:class:`dict`
-        :return:
-            An instance of JobOperation to execute next or `None`, if no operation is eligible.
-        :rtype:
-            `:py:class:`~.JobOperation` or `NoneType`
-        """
-        for op in self.next_operations(jobs):
-            return op
-
     @classmethod
     def operation(cls, func, name=None):
         """Add the function `func` as operation function to the class workflow definition.
@@ -3917,12 +3867,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     return False
         return True
 
-    @deprecated(
-        deprecated_in="0.8", removed_in="0.10",
-        current_version=__version__)
-    def eligible_for_submission(self, job_operation):
-        return self._eligible_for_submission(self, job_operation)
-
     def _main_status(self, args):
         "Print status overview."
         jobs = self._select_jobs_from_args(args)
@@ -4125,7 +4069,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
             $ python my_project.py --help
         """
-        # Find file that main is called in
+        # Find file that main is called in. When running through the command
+        # line interface, we know exactly what the entrypoint path should be:
+        # it's the file where main is called, which we can pull off the stack.
         self._entrypoint.setdefault('path', os.path.realpath(inspect.stack()[-1].filename))
 
         if parser is None:
@@ -4394,7 +4340,9 @@ def _serialized_get_group_status(s_task):
             break
     ignore_errors = s_task[4]
     cached_status = s_task[5]
-    return project._get_group_status(group, jobs, ignore_errors=ignore_errors, cached_status=cached_status)
+    return project._get_group_status(
+        group, jobs, ignore_errors=ignore_errors, cached_status=cached_status)
+
 
 def _serialized_get_job_labels(s_task):
     """Invoke the _get_job_labels() method on a serialized project instance."""
@@ -4403,6 +4351,7 @@ def _serialized_get_job_labels(s_task):
     jobs = project.open_job(id=s_task[2])
     ignore_errors = s_task[3]
     return project._get_job_labels(jobs, ignore_errors=ignore_errors)
+
 
 # Status-related helper functions
 

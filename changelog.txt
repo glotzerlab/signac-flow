@@ -1,4 +1,4 @@
-=======
+======
 Changes
 =======
 
@@ -11,31 +11,43 @@ next
 next
 ----
 
+Removed
++++++++
+
+- Drop support for Python 3.5 (#305). The signac project will follow the `NEP 29 deprecation policy <https://numpy.org/neps/nep-0029-deprecation_policy.html>`_ going forward.
+
+
+Version 0.10
+============
+
+[0.10.0] -- 2020-06-27
+----------------------
+
 Added
 +++++
 
-- Add ``FlowGroup``s (one or more operation grouping within an execution environment)(#114)
+- Add ``FlowGroup`` (one or more operations can be grouped within an execution environment) (#114).
 - Add official support for University of Michigan Great Lakes cluster (#185).
 - Add official support for Bridges AI cluster (#222).
-- Add IgnoreConditions option for submit(), run() and script() (#38).
-- Add pytest support for Testing Framework (#227, #232).
-- Add markdown and html format support for print_status() (#113, #163).
+- Add ``IgnoreConditions`` option for ``submit()``, ``run()`` and ``script()`` (#38, #209).
+- Add pytest support for testing framework (#227, #232).
+- Add markdown and html format support for ``print_status()`` (#113, #163).
 - Add memory flag option for default Slurm scheduler (#256).
 - Add optional environment variable to specify submission script separator (#262).
-- Add ``status_parallelization`` configuration to specify the parallelization nature of fetching status (#264, #271).
+- Add ``status_parallelization`` configuration to specify the parallelization used for fetching status (#264, #271).
 
 Changed
 +++++++
 
 - Raises ``ValueError`` when an operation function is passed to ``FlowProject.pre()`` and ``FlowProject.post()``, or a non-operation function passed to ``FlowProject.pre.after()`` (#248, #249).
-- The option to provide the env argument to submit and submit_operations has been deprecated (#245).
+- The option to provide the ``env`` argument to ``submit`` and ``submit_operations`` has been deprecated (#245).
 - The command line option ``--cmd`` for ``script`` has been deprecated and will trigger a ``DeprecationWarning`` upon use until removed (#243, #218).
-- Raises ValueError when --job-name passed by the user because that interferes with status checking (#164, #241).
+- Raises ``ValueError`` when ``--job-name`` is passed by the user because that interferes with status checking (#164, #241).
 - Submitting with ``--memory`` no longer assumes a unit of gigabytes on Bridges and Comet clusters (#257).
 - Buffering is enabled by default, improving the performance of status checks (#273).
 - Deprecate the use of ``no_parallelize`` argument while printing status (#264, #271).
-- Submission via the command-line interface now calls the ``FlowProject.submit`` function instead of bypassing it for ``FlowProject.submit_operations``(#238, #286).
-- Updated Great Lakes gpu request syntax (#299).
+- Submission via the command-line interface now calls the ``FlowProject.submit`` function instead of bypassing it for ``FlowProject.submit_operations`` (#238, #286).
+- Updated Great Lakes GPU request syntax (#299).
 
 Fixed
 +++++
@@ -45,7 +57,7 @@ Fixed
 Removed
 +++++++
 
-- Removed ENVIRONMENT global variable in the flow.environment module (#245).
+- Removed ``ENVIRONMENT`` global variable in the ``flow.environment`` module (#245).
 - Removed vendored ``tqdm`` module and replaced it with a requirement (#247).
 
 Version 0.9

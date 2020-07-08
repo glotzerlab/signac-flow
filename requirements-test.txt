@@ -1,5 +1,5 @@
 click==7.0
-ruamel.yaml==0.15.89
+ruamel.yaml==0.16.10
 flake8==3.7.7
 pytest>=4.4
 pytest-subtests

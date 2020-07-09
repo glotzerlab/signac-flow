@@ -11,6 +11,11 @@ next
 next
 ----
 
+Changed
++++++++
+
+- Make ``FlowCondition`` class private (#307, #315).
+
 Removed
 +++++++
 

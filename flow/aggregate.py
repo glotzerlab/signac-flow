@@ -11,7 +11,7 @@ import signac
 
 
 class aggregate:
-    """Decorator for operation functions that needs to be aggregated.
+    """Decorator for operation functions that are to be aggregated.
 
     If this class is used for aggregation then by-default, if the aggregator
     parameter is not passed, an aggregate of all jobs will be created.

@@ -1176,9 +1176,9 @@ class FlowGroup(object):
 
         Jobs are filtered using the objects in the attribute flow_aggregate.
         """
-        jobs_list = self.flow_aggregate(jobs)
-        for job_list in jobs_list:
-            yield self._generate_id(job_list, index=index)
+        aggregated_jobs = self.flow_aggregate(jobs)
+        for aggregate in aggregated_jobs:
+            yield self._generate_id(aggregate, index=index)
 
     def _create_submission_job_operation(self, entrypoint, default_directives, jobs,
                                          ignore_conditions_on_execution=IgnoreConditions.NONE,
@@ -1306,23 +1306,24 @@ class FlowGroup(object):
         for job in jobs:
             assert project == job._project
 
-        jobs_list = self.flow_aggregate(jobs)
+        aggregated_jobs = self.flow_aggregate(jobs)
 
         for name, op in self.operations.items():
-            for job_list in jobs_list:
-                eligible = op.eligible(job_list, ignore_conditions)
+            for aggregate in aggregated_jobs:
+                eligible = op.eligible(aggregate, ignore_conditions)
                 if eligible:
-                    directives = self._resolve_directives(name, default_directives, job_list)
+                    directives = self._resolve_directives(name, default_directives, aggregate)
                     uneval_cmd = functools.partial(self._run_cmd, entrypoint=entrypoint,
                                                    operation_name=name, operation=op,
-                                                   directives=directives, jobs=job_list)
+                                                   directives=directives, jobs=aggregate)
                     # Uses a different id than the groups direct id. Do not use this for submitting
                     # jobs as current implementation prevents checking for resubmission
                     # in this case. The different ids allow for checking whether JobOperations
                     # created to run directly are different.
 
-                    job_op = JobOperation(self._generate_id(job_list, name, index=index), name,
-                                          job_list, cmd=uneval_cmd, directives=deepcopy(directives))
+                    job_op = JobOperation(self._generate_id(aggregate, name, index=index), name,
+                                          aggregate, cmd=uneval_cmd,
+                                          directives=deepcopy(directives))
 
                     # Get the prefix, and if it's not NULL, set the fork directive
                     # to True since we must launch a separate process. Override
@@ -1882,24 +1883,24 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         starting_dict = functools.partial(dict, scheduler_status=JobStatus.unknown)
         status_dict = defaultdict(starting_dict)
         for group in self._groups.values():
-            jobs_list = group.flow_aggregate(self)
-            if jobs_list == []:
+            aggregated_jobs = group.flow_aggregate(self)
+            if aggregated_jobs == []:
                 continue
-            if len(jobs_list) < len(self):
-                aggregate = True
+            if len(aggregated_jobs) < len(self):
+                is_aggregate = True
             else:
-                aggregate = False
-            jobs = None
-            for job_list in jobs_list:
-                if job in job_list:
-                    jobs = job_list
+                is_aggregate = False
+            aggregate = None
+            for _aggregate in aggregated_jobs:
+                if job in _aggregate:
+                    aggregate = _aggregate
                     break
-            if jobs is None:
+            if aggregate is None:
                 break
-            completed = group.complete(jobs)
-            eligible = False if completed else group.eligible(jobs)
+            completed = group.complete(aggregate)
+            eligible = False if completed else group.eligible(aggregate)
 
-            scheduler_status = cached_status.get(group._generate_id(jobs),
+            scheduler_status = cached_status.get(group._generate_id(aggregate),
                                                  JobStatus.unknown)
             for operation in group.operations:
                 if scheduler_status >= status_dict[operation]['scheduler_status']:
@@ -1908,9 +1909,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                             'eligible': eligible,
                             'completed': completed,
                             'aggregate_jobs': '{}...{}...{}'.format(
-                                jobs[0], len(jobs), jobs[-1]
-                            ) if len(jobs) > 1 else str(jobs[0]),
-                            'aggregate': aggregate
+                                aggregate[0], len(aggregate), aggregate[-1]
+                            ) if len(aggregate) > 1 else str(aggregate[0]),
+                            'aggregate': is_aggregate
                             }
 
         for key in sorted(status_dict):
@@ -1954,7 +1955,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for name in group.operations:
             result['operation_name'] = name
         status_dict = dict()
-        jobs_list = group.flow_aggregate(jobs)
+        aggregated_jobs = group.flow_aggregate(jobs)
 
         def get_concact_id(jobs):
             if len(jobs) > 1:
@@ -1964,17 +1965,17 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 )
             else:
                 return str(jobs[0])
-        for job_list in jobs_list:
-            completed = group.complete(job_list)
-            eligible = False if completed else group.eligible(job_list)
-            scheduler_status = cached_status.get(group._generate_id(job_list),
+        for aggregate in aggregated_jobs:
+            completed = group.complete(aggregate)
+            eligible = False if completed else group.eligible(aggregate)
+            scheduler_status = cached_status.get(group._generate_id(aggregate),
                                                  JobStatus.unknown)
-            status_dict[get_concact_id(job_list)] = {
+            status_dict[get_concact_id(aggregate)] = {
                     'scheduler_status': scheduler_status,
                     'eligible': eligible,
                     'completed': completed,
-                    'length': len(job_list),
-                    'aggregates': ' '.join(map(str, job_list))
+                    'length': len(aggregate),
+                    'aggregates': ' '.join(map(str, aggregate))
                     }
         result['aggregate_details'] = status_dict
         return result
@@ -2963,15 +2964,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                    ignore_conditions_on_execution=IgnoreConditions.NONE):
         """Grabs JobOperations that are eligible to run from FlowGroups."""
         for group in self._gather_flow_groups(names):
-            jobs_list = group.flow_aggregate(jobs)
-            for job_list in jobs_list:
+            aggregated_jobs = group.flow_aggregate(jobs)
+            for aggregate in aggregated_jobs:
                 if (
-                    group.eligible(job_list, ignore_conditions) and
-                    self._eligible_for_submission(group, job_list)
+                    group.eligible(aggregate, ignore_conditions) and
+                    self._eligible_for_submission(group, aggregate)
                 ):
                     yield group._create_submission_job_operation(
                         entrypoint=self._entrypoint, default_directives=default_directives,
-                        jobs=job_list, index=0,
+                        jobs=aggregate, index=0,
                         ignore_conditions_on_execution=ignore_conditions_on_execution)
 
     def _get_pending_operations(self, jobs, operation_names=None,

@@ -435,6 +435,7 @@ class aggregate:
         elif all_jobs:
             return [aggregated_jobs]
 
+
 class JobOperation(object):
     """This class represents the information needed to execute one group for one aggregate
     of job(s).
@@ -4004,7 +4005,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for aggregate in aggregated_jobs:
             for i, job in enumerate(aggregate):
                 if job is None:
-                    del job_list[i:]
+                    del aggregate[i:]
                     break
             operation_function(*aggregate)
 

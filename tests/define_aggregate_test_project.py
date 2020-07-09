@@ -15,6 +15,7 @@ def aggregate_doc_condition(*jobs):
     except KeyError:
         return False
 
+
 @_AggregateTestProject.operation
 @aggregate()
 @_AggregateTestProject.post.true('average')
@@ -24,6 +25,7 @@ def agg_op1(*jobs):
         sum += job.sp.i
     for job in jobs:
         job.document.sum = sum
+
 
 @_AggregateTestProject.operation
 @group1

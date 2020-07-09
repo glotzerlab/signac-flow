@@ -5,7 +5,7 @@ class _AggregateTestProject(FlowProject):
     pass
 
 
-group1 = _AggregateTestProject.make_group(name="group_agg", aggregator=aggregate()()[0])
+group1 = _AggregateTestProject.make_group(name="group_agg", aggregator=aggregate())
 
 
 @_AggregateTestProject.label

@@ -258,10 +258,10 @@ def make_bundles(operations, size=None):
 
 
 class aggregate:
-    """Decorator for operation functions that needs to be aggregated.
+    """Decorator for operation functions that are to be aggregated.
 
     If this class is used for aggregation then by-default, if the aggregator
-    parameter is not passed, an aggregate of all the jobs will be created.
+    parameter is not passed, an aggregate of all jobs will be created.
 
     .. code-block:: python
 
@@ -274,7 +274,7 @@ class aggregate:
     :param aggregator:
         Information on how to aggregate jobs. Takes in a list of
         jobs and can return or yield lists or single jobs instead.
-        The default behaviour is creating the aggregate of all jobs.
+        The default behavior is creating an aggregate of all jobs.
     :type aggregator:
         callable
     :param sort:
@@ -374,12 +374,66 @@ class aggregate:
 
         return cls(aggregator, sort, reverse, select)
 
-    def __call__(self, func=None):
-        if func is None:
-            return (self._aggregator, self._sort, self._select)
-        setattr(func, '_flow_aggregate', (self._aggregator, self._sort, self._select))
-        return func
+    def __call__(self, obj=None):
+        if callable(obj):
+            setattr(obj, '_flow_aggregate', self)
+            return obj
+        elif isinstance(obj, (list, signac.contrib.project.Project)):
+            aggregated_jobs = list(obj)
+            if self._select is not None:
+                aggregated_jobs = list(self._select(aggregated_jobs))
+            if self._sort is not None:
+                aggregated_jobs = list(self._sort(aggregated_jobs))
+            aggregated_jobs = self._aggregator([job for job in aggregated_jobs])
+            aggregated_jobs = self._create_nested_aggregate_list(aggregated_jobs)
+            if not len(aggregated_jobs):
+                return []
+            for i, job in enumerate(aggregated_jobs[-1]):
+                if job is None:
+                    del aggregated_jobs[-1][i:]
+                    break
+            return aggregated_jobs
+        elif isinstance(obj, signac.contrib.job.Job):
+            # For backwards compatibility
+            return [obj]
+        else:
+            raise TypeError('Invalid argument passed while calling '
+                            'the aggregate instance. Expected a callable '
+                            'or an Iterable of Jobs, got {}.'.format(type(obj)))
 
+    def _create_nested_aggregate_list(self, aggregated_jobs):
+        # When jobs are aggregated, the user is required to specify an aggregator
+        # function which either returns a nested list or nested iterable
+        # in which the base element is an instance of `signac.contrib.job.Job`.
+        # This method converts the returned object to a nested list.
+        aggregated_jobs = list(aggregated_jobs)
+        all_iterable = all_jobs = True
+        nested_aggregates = []
+        for aggregate in aggregated_jobs:
+            if isinstance(aggregate, Iterable):
+                all_jobs = False
+                if not all_iterable:
+                    # Got something like [Iterable, Iterable, Not an Iterable object]
+                    raise ValueError("Invalid aggregator function provided by "
+                                     "user.")
+                if isinstance(aggregate, (list, tuple)):
+                    nested_aggregates.append(list(aggregate))
+                else:
+                    nested_aggregates.append([job for job in aggregate])
+            elif isinstance(aggregate, signac.contrib.job.Job):
+                all_iterable = False
+                if not all_jobs:
+                    # Got something like [Job, Job, Not a Job object]
+                    raise ValueError("Invalid aggregator function provided by "
+                                     "user.")
+                continue
+            else:
+                raise ValueError("Invalid aggregator function provided by "
+                                 "user.")
+        if all_iterable:
+            return nested_aggregates
+        elif all_jobs:
+            return [aggregated_jobs]
 
 class JobOperation(object):
     """This class represents the information needed to execute one group for one aggregate
@@ -768,9 +822,9 @@ class FlowGroupEntry(object):
     :type options:
         str
     :param aggregator:
-        Aggregation parameters :py:class:`FlowGroup` to be created.
+        Object that aggregates jobs for a :py:class:`FlowGroup`.
     :type aggregator:
-        tuple
+        :py:class:`aggregate`
     """
     def __init__(self, name, options="", aggregate=None):
         self.name = name
@@ -877,10 +931,9 @@ class FlowGroup(object):
     :type options:
         str
     :param flow_aggregate:
-        The operation specific aggregate parameters specified
-        using the :py:class:`aggregate`
+        Aggregation object for this class.
     :type flow_aggregate:
-        tuple
+        :py:class:`aggregate`
     """
 
     MAX_LEN_ID = 100
@@ -1117,73 +1170,12 @@ class FlowGroup(object):
         except KeyError:
             return JobStatus.unknown
 
-    def _create_nested_jobs_list(self, jobs_list):
-        # When jobs are aggregated, the user is required to either return a
-        # nested list or nested iterable in which the bottom most element is an
-        # instance of `signac.contrib.job.Job`.
-        nested_jobs = []
-        jobs_list = list(jobs_list)
-        all_iterable = all_jobs = True
-        for job_list in jobs_list:
-            if isinstance(job_list, Iterable):
-                all_jobs = False
-                if not all_iterable:
-                    raise ValueError("Invalid aggregator function provided by "
-                                     "user.")
-                if isinstance(job_list, (list, tuple)):
-                    nested_jobs.append(list(job_list))
-                else:
-                    nested_list = [job for job in job_list]
-                    nested_jobs.append(nested_list)
-            elif isinstance(job_list, signac.contrib.job.Job):
-                all_iterable = False
-                if not all_jobs:
-                    raise ValueError("Invalid aggregator function provided by "
-                                     "user.")
-                continue
-            else:
-                raise ValueError("Invalid aggregator function provided by "
-                                 "user.")
-        if all_iterable:
-            return nested_jobs
-        elif all_jobs:
-            return [jobs_list]
-
-    def _get_filtered_jobs(self, jobs):
-        "Returns filtered jobs for this group"
-        # For every operation, first jobs are selected according to the select
-        # function, then are aggregated according to the aggregator function,
-        # then are sorted according to some state point parameter.
-        # The `select`, `aggregator` and the `sort` functions are specified
-        # using :class:`~.aggregate`.
-
-        # Ensuring Lists
-        if isinstance(jobs, signac.contrib.job.Job):
-            jobs = [jobs]
-        else:
-            jobs = list(jobs)
-        aggregator, sort, selector = self.flow_aggregate
-        jobs_list = list(jobs)
-        if selector.args[0] is not None:
-            jobs_list = list(selector(jobs_list))
-        if sort is not None:
-            jobs_list = list(sort(jobs_list))
-        jobs_list = list(aggregator([job for job in jobs_list]))
-        jobs_list = self._create_nested_jobs_list(jobs_list)
-        if not len(jobs_list):
-            return []
-        for i, job in enumerate(jobs_list[-1]):
-            if job is None:
-                del jobs_list[-1][i:]
-                break
-        return jobs_list
-
-    def _get_filtered_job_id_per_group(self, jobs, index=0):
+    def _get_filtered_job_ids_per_group(self, jobs, index=0):
         """For any group, create filtered job lists.
 
         Jobs are filtered using the objects in the attribute flow_aggregate.
         """
-        jobs_list = self._get_filtered_jobs(jobs)
+        jobs_list = self.flow_aggregate(jobs)
         for job_list in jobs_list:
             yield self._generate_id(job_list, index=index)
 
@@ -1313,7 +1305,7 @@ class FlowGroup(object):
         for job in jobs:
             assert project == job._project
 
-        jobs_list = self._get_filtered_jobs(jobs)
+        jobs_list = self.flow_aggregate(jobs)
 
         for name, op in self.operations.items():
             for job_list in jobs_list:
@@ -1637,7 +1629,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         sys.exit(2)
 
     @classmethod
-    def label(cls, label_name_or_func=None, aggregator=None):
+    def label(cls, label_name_or_func=None, aggregator=aggregate.groupsof(1)):
         """Designate a function to be a label function of this class.
 
         For example, we can define a label function like this:
@@ -1669,6 +1661,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             A label name or callable.
         :type label_name_or_func:
             str or callable
+        :param aggregator:
+            Object that aggregates jobs for this label.
+        :type aggregator:
+            :class:`~.aggregate`.
         """
         if callable(label_name_or_func):
             cls._LABEL_FUNCTIONS[label_name_or_func] = None
@@ -1885,7 +1881,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         starting_dict = functools.partial(dict, scheduler_status=JobStatus.unknown)
         status_dict = defaultdict(starting_dict)
         for group in self._groups.values():
-            jobs_list = group._get_filtered_jobs(self)
+            jobs_list = group.flow_aggregate(self)
             if jobs_list == []:
                 continue
             if len(jobs_list) < len(self):
@@ -1957,7 +1953,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for name in group.operations:
             result['operation_name'] = name
         status_dict = dict()
-        jobs_list = group._get_filtered_jobs(jobs)
+        jobs_list = group.flow_aggregate(jobs)
 
         def get_concact_id(jobs):
             if len(jobs) > 1:
@@ -2012,7 +2008,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             status = dict()
             print("Query scheduler...", file=file)
             for group in self._groups.values():
-                _ids = group._get_filtered_job_id_per_group(jobs)
+                _ids = group._get_filtered_job_ids_per_group(jobs)
                 if _ids is None:
                     continue
                 for _id in _ids:
@@ -2966,7 +2962,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                    ignore_conditions_on_execution=IgnoreConditions.NONE):
         """Grabs JobOperations that are eligible to run from FlowGroups."""
         for group in self._gather_flow_groups(names):
-            jobs_list = group._get_filtered_jobs(jobs)
+            jobs_list = group.flow_aggregate(jobs)
             for job_list in jobs_list:
                 if (
                     group.eligible(job_list, ignore_conditions) and
@@ -3752,9 +3748,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 self._operation_functions[name] = func
 
     @classmethod
-    def make_group(cls, name, options="",
-                   aggregator=None, sort=None, reverse=False,
-                   selector=None):
+    def make_group(cls, name, options="", aggregator=None):
         """Make a FlowGroup named ``name`` and return a decorator to make groups.
 
         .. code-block:: python
@@ -3778,17 +3772,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type options:
             str
         :param aggregator:
-            Aggregator function which aggregates jobs for this group.
+            Object that aggregates jobs for this label.
         :type aggregator:
-            callable
-        :param sort:
-            Sort jobs by a statepoint parameter.
-        :type sort:
-            str
-        :param reverse:
-            States if the jobs are to be sorted in reverse order.
-        :type reverse:
-            bool
+            :class:`~.aggregate`.
         """
         if name in cls._GROUP_NAMES:
             raise ValueError("Repeat definition of group with name '{}'.".format(name))
@@ -3796,10 +3782,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             cls._GROUP_NAMES.add(name)
 
         if aggregator is None:
-            aggregator = aggregate.groupsof(1)()
-        else:
-            aggregator = aggregate(aggregator=aggregator, sort=sort,
-                                   reverse=reverse, select=selector)()
+            aggregator = aggregate.groupsof(1)
 
         group_entry = FlowGroupEntry(name, options, aggregator)
         cls._GROUPS.append(group_entry)
@@ -4012,23 +3995,18 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             raise KeyError("Unknown operation '{}'.".format(args.operation))
 
         try:
-            aggregator, sort, selector = operation_function._flow_aggregate
+            aggregator = operation_function._flow_aggregate
         except AttributeError:
-            aggregator, sort, selector = operation.cmd._flow_aggregate
+            aggregator = operation.cmd._flow_aggregate
 
-        jobs = list(jobs)
-        jobs_list = selector(jobs)
-        if sort is not None:
-            jobs_list = sort(jobs_list)
-        jobs_list = aggregator([job for job in jobs_list])
+        aggregated_jobs = aggregator(jobs)
 
-        for job_list in jobs_list:
-            job_list = list(job_list)
-            for i, job in enumerate(job_list):
+        for aggregate in aggregated_jobs:
+            for i, job in enumerate(aggregate):
                 if job is None:
                     del job_list[i:]
                     break
-            operation_function(*job_list)
+            operation_function(*aggregate)
 
     def _select_jobs_from_args(self, args):
         "Select jobs with the given command line arguments ('-j/-f/--doc-filter')."

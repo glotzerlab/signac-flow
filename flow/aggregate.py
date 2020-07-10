@@ -10,6 +10,7 @@ from functools import partial
 import signac
 from signac.contrib.project import Project, JobsCursor
 
+
 class aggregate:
     """Decorator for operation functions that are to be aggregated.
 

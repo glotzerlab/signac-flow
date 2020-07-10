@@ -616,10 +616,10 @@ class SubmissionJobOperation(JobOperation):
             self.operations_with_met_postconditions = operations_with_met_postconditions
 
 
-class FlowCondition(object):
-    """A FlowCondition represents a condition as a function of signac jobs.
+class _FlowCondition(object):
+    """A _FlowCondition represents a condition as a function of a signac job.
 
-    The __call__() function of a FlowCondition object may return either True
+    The __call__() function of a _FlowCondition object may return either True
     or False, representing whether the condition is met or not.
     This can be used to build a graph of conditions and operations.
 
@@ -632,9 +632,7 @@ class FlowCondition(object):
     def __init__(self, callback):
         self._callback = callback
 
-    def __call__(self, *jobs):
-        if self._callback is None:
-            return True
+    def __call__(self, jobs):
         try:
             return self._callback(*jobs)
         except Exception as e:
@@ -690,8 +688,8 @@ class BaseFlowOperation(object):
         if post is None:
             post = []
 
-        self._prereqs = [FlowCondition(cond) for cond in pre]
-        self._postconds = [FlowCondition(cond) for cond in post]
+        self._prereqs = [_FlowCondition(cond) for cond in pre]
+        self._postconds = [_FlowCondition(cond) for cond in post]
 
     def __str__(self):
         return "{type}(cmd='{cmd}')".format(type=type(self).__name__, cmd=self._cmd)

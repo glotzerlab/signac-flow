@@ -3511,6 +3511,36 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             elif bool(label_value) is True:
                 yield label_name
 
+    def _labels(self, *jobs):
+        """ Yield all labels for the given ``job``.
+
+        The label functions now have aggregators associated with them.
+        We create aggregates first and then fetch labels for those aggregates.
+        """
+        result = defaultdict()
+        for label_func, label_name in self._label_functions.items():
+            if label_name is None:
+                label_name = getattr(label_func, '_label_name',
+                                     getattr(label_func, '__name__', type(label_func).__name__))
+            aggregated_jobs = label_func._aggregator([job for job in jobs])
+            for aggregate in aggregated_jobs:
+                try:
+                    label_value = label_func(*aggregate)
+                except TypeError:
+                    try:
+                        label_value = label_func(self, *aggregate)
+                    except Exception:
+                        label_func = getattr(self, label.__func__.__name__)
+                        label_value = label_func(*aggregate)
+                assert label_name is not None
+                if isinstance(label_value, str):
+                    for job in aggregate:
+                        result[job].append(label_value)
+                elif bool(label_value) is True:
+                    for job in aggregate:
+                        result[job].append(label_name)
+        return result
+
     def add_operation(self, name, cmd, pre=None, post=None, **kwargs):
         """
         Add an operation to the workflow.

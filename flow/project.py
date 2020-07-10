@@ -378,7 +378,7 @@ class aggregate:
         if callable(obj):
             setattr(obj, '_flow_aggregate', self)
             return obj
-        elif isinstance(obj, (list, signac.contrib.project.Project)):
+        elif isinstance(obj, (list, signac.contrib.project.Project, JobsCursor)):
             aggregated_jobs = list(obj)
             if self._select is not None:
                 aggregated_jobs = list(self._select(aggregated_jobs))
@@ -3229,7 +3229,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Bundle them up and submit.
         for bundle in _make_bundles(operations, bundle_size):
-            print("BUNDLE", bundle, bundle_size)
             status = self.submit_operations(operations=bundle, env=env, parallel=parallel,
                                             force=force, walltime=walltime, **kwargs)
             if status is not None:  # operations were submitted, store status

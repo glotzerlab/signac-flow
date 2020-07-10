@@ -3675,17 +3675,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if name in cls._GROUP_NAMES:
             raise ValueError("A group with name '{}' is already registered.".format(name))
 
-        signature = inspect.signature(func)
-        total_params = len(signature.parameters)
-        for i, (k, v) in enumerate(signature.parameters.items()):
-            if (
-                i != total_params - 1 and
-                v.kind is inspect.Parameter.VAR_POSITIONAL
-            ):
-                raise ValueError(
-                    "The variable parameter '{}' in the operation '{}' should be "
-                    "the last parameter!".format(k, name))
-
         # Append the name and function to the class registry
         cls._OPERATION_FUNCTIONS.append((name, func))
         cls._GROUPS.append(FlowGroupEntry(name=name, options=""))

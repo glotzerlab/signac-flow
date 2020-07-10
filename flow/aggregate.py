@@ -8,7 +8,7 @@ from itertools import zip_longest
 from functools import partial
 
 import signac
-
+from signac.contrib.project import Project, JobsCursor
 
 class aggregate:
     """Decorator for operation functions that are to be aggregated.
@@ -124,7 +124,7 @@ class aggregate:
         if callable(obj):
             setattr(obj, '_flow_aggregate', self)
             return obj
-        elif isinstance(obj, (list, signac.contrib.project.Project)):
+        elif isinstance(obj, (list, Project, JobsCursor)):
             aggregated_jobs = deepcopy(list(obj))
             if self._select is not None:
                 aggregated_jobs = list(self._select(aggregated_jobs))

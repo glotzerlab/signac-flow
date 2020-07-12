@@ -1676,14 +1676,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             label_name_or_func._aggregator = aggregator
             return label_name_or_func
 
-        if label_name_or_func is None:
-            return functools.partial(cls.label, aggregator=aggregator)
-
         def label_func(func):
             cls._LABEL_FUNCTIONS[func] = label_name_or_func
+            func._aggregator = aggregator
             return func
 
-        label_func._aggregator = aggregator
         return label_func
 
     def detect_operation_graph(self):
@@ -1962,7 +1959,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             result['operation_name'] = name
         status_dict = dict()
         aggregated_jobs = group.flow_aggregate(jobs)
-        errors = defaultdict(lambda: '')
+
+        errors = defaultdict(None)
 
         def get_concact_id(aggregate):
             if len(aggregate) > 1:
@@ -1999,7 +1997,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         }
                 if ignore_errors:
                     for job in aggregate:
-                        errors[job] += str(error) + '\n'
+                        if errors(job) is None:
+                            errors[job] = str(error)
+                        errors[job] += '. ' + str(error)
                 else:
                     raise
 
@@ -2199,17 +2199,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             raise self._PickleError(error)
 
         results = pool.imap(_serialized_get_group_status, s_tasks)
-
-        return results
-
-    def _fetch_labels_in_parallel(self, pool, pickle, jobs, ignore_errors):
-        try:
-            s_project = pickle.dumps(self)
-            s_tasks = [(pickle.loads, s_project, job.get_id(), ignore_errors) for job in jobs]
-        except Exception as error:  # Masking all errors since they must be pickling related.
-            raise self._PickleError(error)
-
-        results = pool.imap(_serialized_get_job_labels, s_tasks)
 
         return results
 
@@ -3533,6 +3522,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if label_name is None:
                 label_name = getattr(label_func, '_label_name',
                                      getattr(label_func, '__name__', type(label_func).__name__))
+            print(label_func)
             aggregated_jobs = label_func._aggregator([job for job in jobs])
             for aggregate in aggregated_jobs:
                 try:
@@ -3562,7 +3552,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         result[job]['labels'].append(label_name)
 
         for job in result:
-            result[job]['_labels_error'] = ', '.join(result[job]['_labels_error'])
+            result[job]['_labels_error'] = '. '.join(result[job]['_labels_error'])
         return result
 
     def add_operation(self, name, cmd, pre=None, post=None, **kwargs):
@@ -4363,18 +4353,7 @@ def _serialized_get_group_status(s_task):
     return project._get_group_status(
         group, jobs, ignore_errors=ignore_errors, cached_status=cached_status)
 
-
-def _serialized_get_job_labels(s_task):
-    """Invoke the _get_job_labels() method on a serialized project instance."""
-    loads = s_task[0]
-    project = loads(s_task[1])
-    jobs = project.open_job(id=s_task[2])
-    ignore_errors = s_task[3]
-    return project._get_job_labels(jobs, ignore_errors=ignore_errors)
-
-
 # Status-related helper functions
-
 
 def _update_status(args):
     "Wrapper-function, that is probably obsolete."

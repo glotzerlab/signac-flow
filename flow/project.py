@@ -325,6 +325,11 @@ class aggregate:
                                                                  reverse=reverse)
         self._select = functools.partial(filter, select)
 
+        if aggregator.__name__ == 'groupsof_aggregator':
+            self._is_aggregate = aggregator.__defaults__[0] != 1
+        else:
+            self._is_aggregate = False
+
     @classmethod
     def groupsof(cls, num=1, sort=None, reverse=False, select=None):
         # copied from: https://docs.python.org/3/library/itertools.html#itertools.zip_longest
@@ -335,11 +340,11 @@ class aggregate:
         except Exception:
             raise TypeError("The num parameter should be an integer")
 
-        def aggregator(jobs):
+        def groupsof_aggregator(jobs, num=num):
             args = [iter(jobs)] * num
             return zip_longest(*args)
 
-        return cls(aggregator, sort, reverse, select)
+        return cls(groupsof_aggregator, sort, reverse, select)
 
     @classmethod
     def groupby(cls, key, default=None, sort=None, reverse=False, select=None):
@@ -632,7 +637,7 @@ class _FlowCondition(object):
     def __init__(self, callback):
         self._callback = callback
 
-    def __call__(self, jobs):
+    def __call__(self, *jobs):
         try:
             return self._callback(*jobs)
         except Exception as e:
@@ -1671,6 +1676,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             label_name_or_func._aggregator = aggregator
             return label_name_or_func
 
+        if label_name_or_func is None:
+            return functools.partial(cls.label, aggregator=aggregator)
+
         def label_func(func):
             cls._LABEL_FUNCTIONS[func] = label_name_or_func
             return func
@@ -1954,28 +1962,49 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             result['operation_name'] = name
         status_dict = dict()
         aggregated_jobs = group.flow_aggregate(jobs)
+        errors = defaultdict(lambda: '')
 
-        def get_concact_id(jobs):
-            if len(jobs) > 1:
+        def get_concact_id(aggregate):
+            if len(aggregate) > 1:
                 return '{}...{}...{}'.format(
-                    str(jobs[0])[0:8], len(jobs),
-                    str(jobs[-1])[0:8]
+                    str(aggregate[0])[0:8], len(aggregate),
+                    str(aggregate[-1])[0:8]
                 )
             else:
-                return str(jobs[0])
+                return str(aggregate[0])
+
         for aggregate in aggregated_jobs:
-            completed = group.complete(aggregate)
-            eligible = False if completed else group.eligible(aggregate)
-            scheduler_status = cached_status.get(group._generate_id(aggregate),
-                                                 JobStatus.unknown)
-            status_dict[get_concact_id(aggregate)] = {
-                    'scheduler_status': scheduler_status,
-                    'eligible': eligible,
-                    'completed': completed,
-                    'length': len(aggregate),
-                    'aggregates': ' '.join(map(str, aggregate))
-                    }
+            try:
+                completed = group.complete(aggregate)
+                eligible = False if completed else group.eligible(aggregate)
+                scheduler_status = cached_status.get(group._generate_id(aggregate),
+                                                     JobStatus.unknown)
+                status_dict[get_concact_id(aggregate)] = {
+                        'scheduler_status': scheduler_status,
+                        'eligible': eligible,
+                        'completed': completed,
+                        'is_aggregate': group.flow_aggregate._is_aggregate,
+                        'aggregates': ' '.join(map(str, aggregate))
+                        }
+            except Exception as error:
+                msg = "Error while getting operations status for aggregate " \
+                      "'{}': '{}'.".format(' '.join(map(str, aggregate)), error)
+                logger.debug(msg)
+                status_dict[get_concact_id(aggregate)] = {
+                        'scheduler_status': JobStatus.unknown,
+                        'eligible': False,
+                        'completed': False,
+                        'length': len(aggregate),
+                        'aggregates': ' '.join(map(str, aggregate))
+                        }
+                if ignore_errors:
+                    for job in aggregate:
+                        errors[job] += str(error) + '\n'
+                else:
+                    raise
+
         result['aggregate_details'] = status_dict
+        result['_operation_error_per_job'] = errors
         return result
 
     def _get_job_labels(self, job, ignore_errors=False):
@@ -2061,9 +2090,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                               jobs=jobs,
                                               ignore_errors=ignore_errors,
                                               cached_status=cached_status)
-        job_labels = dict()
-        _get_job_labels = functools.partial(self._get_job_labels)
-
+        job_labels = self._labels(*jobs, ignore_errors=ignore_errors)
         with self._potentially_buffered():
             try:
                 if status_parallelization == 'thread':
@@ -2074,16 +2101,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                 iterable=pool.imap(_get_group_status, groups),
                                 desc="Collecting group status per job info",
                                 total=len(groups), file=err))
-                        for label in pool.imap(_get_job_labels, jobs):
-                            job_labels[label['job_id']] = [label['labels'], label['_labels_error']]
                 elif status_parallelization == 'process':
                     with contextlib.closing(Pool()) as pool:
                         try:
                             import pickle
                             results = self._fetch_status_in_parallel(
                                 pool, pickle, jobs, groups, ignore_errors, cached_status)
-                            labels = self._fetch_labels_in_parallel(
-                                pool, pickle, jobs, ignore_errors)
                         except Exception as error:
                             if not isinstance(error, (pickle.PickleError, self._PickleError)) and\
                                     'pickle' not in str(error).lower():
@@ -2102,8 +2125,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                     results = self._fetch_status_in_parallel(
                                         pool, cloudpickle, jobs, groups,
                                         ignore_errors, cached_status)
-                                    labels = self._fetch_labels_in_parallel(
-                                        pool, cloudpickle, jobs, ignore_errors)
                                 except self._PickleError as error:
                                     raise RuntimeError(
                                         "Unable to parallelize execution due to a pickling "
@@ -2112,15 +2133,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                 iterable=results,
                                 desc="Collecting group status per job info",
                                 total=len(groups), file=err))
-                        for label in labels:
-                            job_labels[label['job_id']] = [label['labels'], label['_labels_error']]
                 elif status_parallelization == 'none':
                     op_results = list(tqdm(
                         iterable=map(_get_group_status, groups),
                         desc="Collecting group status per job info",
                         total=len(groups), file=err))
-                    for label in map(_get_job_labels, jobs):
-                        job_labels[label['job_id']] = [label['labels'], label['_labels_error']]
                 else:
                     raise RuntimeError("Configuration value status_parallelization is invalid. "
                                        "You can set it to 'thread', 'parallel', or 'none'"
@@ -2143,15 +2160,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 # Always print the completed progressbar.
                 print('Collecting group status per job info: {}/{}'
                       ''.format(i+1, num_groups), file=err)
-                for job in jobs:
-                    job_labels.append(_get_job_labels(job))
 
             results = list()
             for job in jobs:
                 result = dict()
                 result['job_id'] = str(job)
                 result['operations'] = dict()
-                result['_operations_error'] = None
+                _operations_error = []
                 for op_result in op_results:
                     for aggregates in op_result['aggregate_details'].values():
                         if str(job) in aggregates['aggregates']:
@@ -2159,12 +2174,18 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                 'scheduler_status': aggregates['scheduler_status'],
                                 'eligible': aggregates['eligible'],
                                 'completed': aggregates['completed'],
-                                'length': aggregates['length'],
+                                'is_aggregate': aggregates['is_aggregate'],
                                 'aggregates': aggregates['aggregates']
                             }
-                # print(job_labels)
-                result['labels'] = job_labels[str(job)][0]
-                result['_labels_error'] = job_labels[str(job)][1]
+                            _operations_error.append(
+                                op_result['_operation_error_per_job'].get(job, ''))
+
+                if ''.join(_operations_error) == '':
+                    result['_operations_error'] = None
+                else:
+                    result['_operations_error'] = '\n'.join(_operations_error)
+                result['labels'] = job_labels[job]['labels']
+                result['_labels_error'] = job_labels[job]['_labels_error']
                 results.append(result)
             return results
 
@@ -2534,18 +2555,24 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if not has_eligible_ops and not context['all_ops']:
                 _add_dummy_operation(job)
 
-        aggregate_dict = dict()
+        aggregate_dict = defaultdict(lambda: [])
         aggregate_counter = Counter()
+        aggregates_per_op = defaultdict(lambda: [])
         for job in context['jobs']:
-            # print(job)
-            # breakpoint()
             for k, v in job['operations'].items():
                 if k != '' and v['eligible']:
-                    if k not in aggregate_dict:
-                        aggregate_dict[k] = []
-                        aggregate_dict[k].append(v['aggregates'].split(' '))
-                    if not v['aggregates'] in aggregate_dict[k]:
-                        aggregate_dict[k].append(v['aggregates'].split(' '))
+                    split_jobs = v['aggregates'].split(' ')
+                    if not v['aggregates'].split(' ') in aggregate_dict[k]:
+                        aggregate_dict[k].append(split_jobs)
+                        if v['is_aggregate']:
+                            _aggregate = []
+                            for _id in split_jobs:
+                                _aggregate.append(
+                                    self.open_job(id=_id)
+                                )
+                            aggregates_per_op[k].append(
+                                (_aggregate, v['scheduler_status'])
+                            )
         for op, ags in aggregate_dict.items():
             aggregate_counter[op] = len(ags)
         context['aggregate_counter'] = aggregate_counter.most_common(eligible_jobs_max_lines)
@@ -2553,24 +2580,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         n = len(aggregate_counter) - len(context['aggregate_counter'])
         if n > 0:
             context['aggregate_counter'].append(('[{} more operations omitted]'.format(n), ''))
-        aggregates_per_op = dict()
-        # for job in context['jobs']:
-        #     for k, v in job['operations'].items():
-        #         if k != '' and v['eligible'] and v['length']:
-        #             if k not in aggregates_per_op:
-        #                 aggregates_per_op[k] = []
-        #                 aggregates_per_op[k].append(
-        # (v['aggregates'].split(' '), v['scheduler_status']))
-        #             else:
-        #                 present = False
-        #                 for jobs, stati in aggregates_per_op[k]:
-        #                     if v['aggregates'].split(' ') in jobs:
-        #                         present = True
-        #                         break
-        #                 if not present:
-        #                     aggregates_per_op[k].append(
-        #                         (v['aggregates'].split(' '), v['scheduler_status']))
-
         context['detailed_ags'] = aggregates_per_op
         status_renderer = StatusRenderer()
         # We have to make a deep copy of the template environment if we're
@@ -3511,13 +3520,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             elif bool(label_value) is True:
                 yield label_name
 
-    def _labels(self, *jobs):
-        """ Yield all labels for the given ``job``.
+    def _labels(self, *jobs, ignore_errors=False):
+        """ Yield all labels for the given jobs.
 
         The label functions now have aggregators associated with them.
         We create aggregates first and then fetch labels for those aggregates.
         """
-        result = defaultdict()
+        # _label_error are now defined per aggregate for a particular label.
+        result = defaultdict(lambda: {'labels': [], '_labels_error': []})
+
         for label_func, label_name in self._label_functions.items():
             if label_name is None:
                 label_name = getattr(label_func, '_label_name',
@@ -3527,18 +3538,31 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 try:
                     label_value = label_func(*aggregate)
                 except TypeError:
-                    try:
-                        label_value = label_func(self, *aggregate)
-                    except Exception:
-                        label_func = getattr(self, label.__func__.__name__)
-                        label_value = label_func(*aggregate)
+                    label_value = label_func(self, *aggregate)
+                except Exception as error:
+                    label_value = None
+                    logger.debug("Error while determining label `{}` "
+                                 "for the aggregate '{}': '{}'."
+                                 "".format(label_name,
+                                           ', '.join(map(str, aggregate)),
+                                           error))
+                    if ignore_errors:
+                        for job in aggregate:
+                            result[job]['_labels_error'].append(str(error))
+                    else:
+                        raise
                 assert label_name is not None
-                if isinstance(label_value, str):
+                if label_value is None:
+                    continue
+                elif isinstance(label_value, str):
                     for job in aggregate:
-                        result[job].append(label_value)
+                        result[job]['labels'].append(label_value)
                 elif bool(label_value) is True:
                     for job in aggregate:
-                        result[job].append(label_name)
+                        result[job]['labels'].append(label_name)
+
+        for job in result:
+            result[job]['_labels_error'] = ', '.join(result[job]['_labels_error'])
         return result
 
     def add_operation(self, name, cmd, pre=None, post=None, **kwargs):

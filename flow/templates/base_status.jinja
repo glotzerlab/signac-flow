@@ -58,15 +58,20 @@
 {% endfor %}
 
 {{ 'Detailed Aggregate View: \n' }}
-| operation | aggregate |
-| --------- | --------- |
+| operation | jobs_in_aggregate | status |
+| --------- | ----------------- | ------ |
 {% for op, agg_stati in detailed_ags.items() %}
-{% for agg, stati in agg_stati %}
+{% for aggregate, stati in agg_stati %}
+{% for job in aggregate %}
 {% if loop.first %}
-| {{op}} | {{agg }}| {{'['+scheduler_status_code[stati]+']' }} |
+| {{op}} | {{job.id | highlight(job.id, pretty) }} | {{'['+scheduler_status_code[stati]+']'}} |
 {% else %}
-|  | {{ agg }} | {{ '['+scheduler_status_code[stati]+']' }}|
+|  | {{job.id | highlight(job.id, pretty) }} | {{ '['+scheduler_status_code[stati]+']' }} |
+{% if loop.last %}
+|  |  |  |
 {% endif %}
+{% endif %}
+{% endfor %}
 {% endfor %}
 {% endfor %}
 {{ status_legend }}

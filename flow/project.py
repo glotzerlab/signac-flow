@@ -4355,6 +4355,7 @@ def _serialized_get_group_status(s_task):
 
 # Status-related helper functions
 
+
 def _update_status(args):
     "Wrapper-function, that is probably obsolete."
     return update_status(* args)

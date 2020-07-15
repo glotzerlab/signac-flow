@@ -2803,7 +2803,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             '-p', '--parallel',
             action='store_true',
             help="Execute all operations in parallel.")
-        cls._add_direct_cmd_arg_group(parser)
         cls._add_template_arg_group(parser)
 
     @classmethod
@@ -2895,16 +2894,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             '-p', '--parallel',
             action='store_true',
             help="Execute all operations in a single bundle in parallel.")
-
-    @classmethod
-    def _add_direct_cmd_arg_group(cls, parser):
-        direct_cmd_group = parser.add_argument_group("direct cmd")
-        direct_cmd_group.add_argument(
-            '--requires',
-            type=str,
-            nargs='+',
-            help="Manually specify all labels that are required for the direct command "
-                 "to be considered eligible for execution.")
 
     def export_job_statuses(self, collection, statuses):
         "Export the job statuses to a database collection."
@@ -3404,12 +3393,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _main_script(self, args):
         "Generate a script for the execution of operations."
-        if args.requires and not args.cmd:
-            raise ValueError(
-                "The --requires option can only be used in combination with --cmd.")
-        if args.cmd and args.operation_name:
-            raise ValueError(
-                "Cannot use the -o/--operation-name and the --cmd options in combination!")
         # Select jobs:
         jobs = self._select_jobs_from_args(args)
 

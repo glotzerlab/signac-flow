@@ -2272,11 +2272,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @staticmethod
     def _dumps_op(op):
-        return (op.id, op.name, op.job._id, op.cmd, op.directives)
+        return (op.id, op.name, [job.id for job in op.jobs], op.cmd, op.directives)
 
     def _loads_op(self, blob):
-        id, name, job_id, cmd, directives = blob
-        return JobOperation(id, name, self.open_job(id=job_id), cmd, directives)
+        id, name, job_ids, cmd, directives = blob
+        jobs = [self.open_job(id=job_id) for job_id in job_ids]
+        return JobOperation(id, name, jobs, cmd, directives)
 
     def _run_operations_in_parallel(self, pool, pickle, operations, progress, timeout):
         """Execute operations in parallel.
@@ -2329,11 +2330,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "Executing operation '{}' with current interpreter "
                 "process ({}).".format(operation, os.getpid()))
             try:
-                self._operation_functions[operation.name](operation.job)
+                self._operation_functions[operation.name](*operation.jobs)
             except Exception as e:
                 raise UserOperationError(
                     'An exception was raised during operation {operation.name} '
-                    'for job {operation.job}.'.format(operation=operation)) from e
+                    'for jobs {operation.jobs}.'.format(operation=operation)) from e
 
     def _get_default_directives(self):
         return {name: self.groups[name].operation_directives.get(name, dict())
@@ -2393,13 +2394,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :param order:
             Specify the order of operations, possible values are:
                 * 'none' or None (no specific order)
-                * 'by-job' (operations are grouped by job)
+                * 'by-op' (operations are grouped by operation)
                 * 'cyclic' (order operations cyclic by job)
                 * 'random' (shuffle the execution order randomly)
                 * callable (a callable returning a comparison key for an
                             operation used to sort operations)
 
-            The default value is `none`, which is equivalent to `by-job` in the current
+            The default value is `none`, which is equivalent to `by-op` in the current
             implementation.
 
             .. note::
@@ -2451,9 +2452,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         reached_execution_limit = Event()
 
         def select(operation):
-            if operation.job not in self:
-                log("Job '{}' is no longer part of the project.".format(operation.job))
-                return False
+            for job in operation.jobs:
+                if job not in self:
+                    raise ValueError("Job {} is not present "
+                                     "in the project".format(job))
             if num is not None and select.total_execution_count >= num:
                 reached_execution_limit.set()
                 raise StopIteration  # Reached total number of executions
@@ -2496,10 +2498,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 with self._potentially_buffered():
                     operations = []
                     for flow_group in flow_groups:
-                        for job in jobs:
-                            operations.extend(
-                                flow_group._create_run_job_operations(
-                                    self._entrypoint, default_directives, job, ignore_conditions))
+                        operations.extend(
+                            flow_group._create_run_job_operations(
+                                self._entrypoint, default_directives, jobs, ignore_conditions))
 
                     operations = list(filter(select, operations))
             finally:
@@ -2515,16 +2516,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 operations = list(sorted(operations, key=order))
             elif order == 'cyclic':
                 groups = [list(group)
-                          for _, group in groupby(operations, key=lambda op: op.job)]
+                          for _, group in groupby(operations, key=lambda op: op.jobs)]
                 operations = list(roundrobin(*groups))
             elif order == 'random':
                 random.shuffle(operations)
-            elif order is None or order in ('none', 'by-job'):
-                pass  # by-job is the default order
+            elif order is None or order in ('none', 'by-op'):
+                pass  # by-op is the default order
             else:
                 raise ValueError(
                     "Invalid value for the 'order' argument, valid arguments are "
-                    "'none', 'by-job', 'cyclic', 'random', None, or a callable.")
+                    "'none', 'by-op', 'cyclic', 'random', None, or a callable.")
 
             logger.info(
                 "Executing {} operation(s) (Pass # {:02d})...".format(len(operations), i_pass))

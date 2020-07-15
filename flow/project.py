@@ -353,7 +353,6 @@ class JobOperation(object):
     def id(self):
         return self._id
 
-    @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
     @property
     def job(self):
         return self.jobs[0]
@@ -463,7 +462,7 @@ class _FlowCondition(object):
             raise UserConditionError(
                 'An exception was raised while evaluating the condition {name} '
                 'for jobs {jobs}.'.format(name=self._callback.__name__,
-                                          jobs=' '.join(map(str, jobs)))) from e
+                                          jobs=' '.join(map(str(jobs))))) from e
 
     def __hash__(self):
         return hash(self._callback)
@@ -578,9 +577,14 @@ class FlowCmdOperation(BaseFlowOperation):
 
     def __call__(self, *jobs):
         if callable(self._cmd):
-            return self._cmd(*jobs).format(*jobs)
+            return self._cmd(*jobs).format(job=jobs[0][0])
         else:
-            return self._cmd.format(*jobs)
+            try:
+                return self._cmd.format(jobs=' '.join(map(str, jobs)))
+            except KeyError:
+                if len(jobs) > 1:
+                    raise ValueError("Please use jobs instead in the command")
+                return self._cmd.format(job=jobs[0])
 
 
 class FlowOperation(BaseFlowOperation):
@@ -1073,15 +1077,15 @@ class FlowGroup(object):
         aggregated_jobs = self.aggregate(jobs)
         for name, op in self.operations.items():
             for aggregate in aggregated_jobs:
-                if op.eligible(*aggregate, ignore_conditions):
+                if op.eligible(*aggregate, ignore_conditions=ignore_conditions):
                     directives = self._resolve_directives(name, default_directives, aggregate)
                     cmd = self._run_cmd(entrypoint=entrypoint, operation_name=name,
-                                        operation=op, directives=directives, job=aggregate)
+                                        operation=op, directives=directives, jobs=aggregate)
                     # Uses a different id than the groups direct id. Do not use this for submitting
                     # jobs as current implementation prevents checking for resubmission in this
                     # case. The different ids allow for checking whether JobOperations created to
                     # run directly are different.
-                    job_op = JobOperation(self._generate_id(job, name, index=index), name,
+                    job_op = JobOperation(self._generate_id(aggregate, name, index=index), name,
                                           aggregate, cmd=cmd, directives=deepcopy(directives))
                     # Get the prefix, and if it's not NULL, set the fork directive
                     # to True since we must launch a separate process. Override
@@ -3201,15 +3205,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if op.complete(job):
                 yield name
 
-    def _job_operations(self, job, ignore_conditions=IgnoreConditions.NONE):
-        "Yield instances of JobOperation constructed for specific jobs."
-        for name in self.operations:
-            group = self._groups[name]
-            yield from group._create_run_job_operations(entrypoint=self._entrypoint, job=job,
-                                                        default_directives=dict(),
-                                                        ignore_conditions=ignore_conditions,
-                                                        index=0)
-
     def next_operations(self, *jobs, ignore_conditions=IgnoreConditions.NONE):
         """Determine the next eligible operations for jobs.
 
@@ -3225,9 +3220,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :yield:
             All instances of :class:`~.JobOperation` jobs are eligible for.
         """
-        for job in jobs:
-            for op in self._job_operations(job, ignore_conditions):
-                yield op
+        for name in self.operations:
+            group = self._groups[name]
+            yield from group._create_run_job_operations(entrypoint=self._entrypoint, jobs=jobs,
+                                                        default_directives=dict(),
+                                                        ignore_conditions=ignore_conditions,
+                                                        index=0)
 
     @classmethod
     def operation(cls, func, name=None):
@@ -3465,9 +3463,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _main_next(self, args):
         "Determine the jobs that are eligible for a specific operation."
-        for job in self:
-            if args.name in {op.name for op in self.next_operations(job)}:
-                print(job)
+        for op in self.next_operations(self):
+            if args.name in op.name:
+                for job in op.jobs:
+                    print(job, end=" ")
+                print()
 
     def _main_run(self, args):
         "Run all (or select) job operations."

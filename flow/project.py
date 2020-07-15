@@ -2448,14 +2448,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             self.run_operations(operations, pretend=pretend,
                                 np=np, timeout=timeout, progress=progress)
 
-    def _generate_operations(self, cmd, jobs, requires=None):
-        "Generate job-operations for a given 'direct' command."
-        for job in jobs:
-            if requires and set(requires).difference(self.labels(job)):
-                continue
-            cmd_ = cmd.format(job=job)
-            yield JobOperation(name=cmd_.replace(' ', '-'), cmd=cmd_, job=job)
-
     def _gather_flow_groups(self, names=None):
         """Grabs FlowGroups that match any of a set of names."""
         operations = OrderedDict()

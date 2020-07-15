@@ -3549,18 +3549,22 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             except KeyError:
                 operation = self._operations[args.operation]
 
-                def operation_function(job):
-                    cmd = operation(job).format(job=job)
+                def operation_function(*jobs):
+                    cmd = operation(*jobs).format(*jobs)
                     subprocess.run(cmd, shell=True, check=True)
 
         except KeyError:
             raise KeyError("Unknown operation '{}'.".format(args.operation))
 
-        if getattr(operation_function, '_flow_aggregate', False):
-            operation_function(jobs)
-        else:
-            for job in jobs:
-                operation_function(job)
+        try:
+            aggregator = operation_function._flow_aggregate
+        except AttributeError:
+            aggregator = operation.cmd._flow_aggregate
+
+        aggregated_jobs = aggregator(jobs)
+
+        for aggregate in aggregated_jobs:
+            operation_function(*aggregate)
 
     def _select_jobs_from_args(self, args):
         "Select jobs with the given command line arguments ('-j/-f/--doc-filter')."

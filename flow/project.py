@@ -326,7 +326,7 @@ class JobOperation(object):
 
     def __str__(self):
         if len(self.jobs) == 1:
-            return "{}-{}: {}".format(self.name, len(self.jobs), str(self.jobs[0]))
+            return "{}({})".format(self.name, str(self.jobs[0]))
         else:
             return "{}-{}: {}...{})".format(
                 self.name, len(self.jobs), str(self.jobs[0])[0:8], str(self.jobs[-1])[0:8])
@@ -462,7 +462,7 @@ class _FlowCondition(object):
             raise UserConditionError(
                 'An exception was raised while evaluating the condition {name} '
                 'for jobs {jobs}.'.format(name=self._callback.__name__,
-                                          jobs=' '.join(map(str(jobs))))) from e
+                                          jobs=' '.join(map(str, jobs)))) from e
 
     def __hash__(self):
         return hash(self._callback)
@@ -852,7 +852,7 @@ class FlowGroup(object):
         :rtype:
             bool
         """
-        return any(op.eligible(*jobs, ignore_conditions) for op in self)
+        return any(op.eligible(*jobs, ignore_conditions=ignore_conditions) for op in self)
 
     def complete(self, *jobs):
         """True when all BaseFlowOperation post-conditions are met.
@@ -2567,14 +2567,17 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                    ignore_conditions=IgnoreConditions.NONE,
                                    ignore_conditions_on_execution=IgnoreConditions.NONE):
         """Grabs JobOperations that are eligible to run from FlowGroups."""
-        for job in jobs:
-            for group in self._gather_flow_groups(names):
-                if group.eligible(job, ignore_conditions) and self._eligible_for_submission(group,
-                                                                                            job):
+        for group in self._gather_flow_groups(names):
+            aggregated_jobs = group.aggregate(jobs)
+            for aggregate in aggregated_jobs:
+                if (
+                    group.eligible(*aggregate, ignore_conditions=ignore_conditions) and
+                    self._eligible_for_submission(group, aggregate)
+                ):
                     yield group._create_submission_job_operation(
                         entrypoint=self._entrypoint,
                         default_directives=default_directives,
-                        job=job, index=0,
+                        jobs=aggregate, index=0,
                         ignore_conditions_on_execution=ignore_conditions_on_execution)
 
     def _get_pending_operations(self, jobs, operation_names=None,
@@ -3396,20 +3399,21 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def groups(self):
         return self._groups
 
-    def _eligible_for_submission(self, flow_group, job):
-        """Determine if a flow_group is eligible for submission with a given job.
+    def _eligible_for_submission(self, flow_group, jobs):
+        """Determine if a flow_group is eligible for submission with a given
+        job-aggregate.
 
         By default, an operation is eligible for submission when it
         is not considered active, that means already queued or running.
         """
-        if flow_group is None or job is None:
+        if flow_group is None or jobs is None:
             return False
-        if flow_group._get_status(job) >= JobStatus.submitted:
+        if flow_group._get_status(jobs) >= JobStatus.submitted:
             return False
         group_ops = set(flow_group)
         for other_group in self._groups.values():
             if group_ops & set(other_group):
-                if other_group._get_status(job) >= JobStatus.submitted:
+                if other_group._get_status(jobs) >= JobStatus.submitted:
                     return False
         return True
 

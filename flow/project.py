@@ -2902,12 +2902,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _add_direct_cmd_arg_group(cls, parser):
         direct_cmd_group = parser.add_argument_group("direct cmd")
         direct_cmd_group.add_argument(
-            '--cmd',
-            type=str,
-            help="Directly specify the command for an operation. "
-                 "For example: --cmd='echo {job._id}'. "
-                 "--cmd option is deprecated as of 0.9 and will be removed in 0.11.")
-        direct_cmd_group.add_argument(
             '--requires',
             type=str,
             nargs='+',
@@ -3423,17 +3417,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Gather all pending operations or generate them based on a direct command...
         with self._potentially_buffered():
-            if args.cmd:
-                warnings.warn("The --cmd option for script is deprecated as of "
-                              "0.9 and will be removed in 0.11.",
-                              DeprecationWarning)
-                operations = self._generate_operations(args.cmd, jobs, args.requires)
-            else:
-                names = args.operation_name if args.operation_name else None
-                default_directives = self._get_default_directives()
-                operations = self._get_submission_operations(jobs, default_directives, names,
-                                                             args.ignore_conditions,
-                                                             args.ignore_conditions_on_execution)
+            names = args.operation_name if args.operation_name else None
+            default_directives = self._get_default_directives()
+            operations = self._get_submission_operations(jobs, default_directives, names,
+                                                         args.ignore_conditions,
+                                                         args.ignore_conditions_on_execution)
             operations = list(islice(operations, args.num))
 
         # Generate the script and print to screen.

@@ -1912,7 +1912,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     break
             results.append(result)
 
-        print(results)
         return results
 
     def _fetch_labels_in_parallel(self, pool, pickle, jobs, ignore_errors, cached_status):

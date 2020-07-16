@@ -3,12 +3,9 @@
 # This software is licensed under the BSD 3-Clause License.
 
 from itertools import zip_longest
-from functools import partial
-
-from signac.contrib.project import Project, JobsCursor
 
 
-class _Aggregate:
+class Aggregate:
     """Decorator for operation functions that are to be aggregated.
 
     :param aggregator:
@@ -18,58 +15,67 @@ class _Aggregate:
         of all jobs.
     :type aggregator:
         callable
-    :param select:
-        Condition for filtering individual jobs. This is passed as the callable argument
-        to `filter`. The default behaviour is no filtering.
-    :type select:
-        callable
     """
 
-    def __init__(self, aggregator=None, select=None):
+    def __init__(self, aggregator=None):
         if aggregator is None:
             def aggregator(jobs):
-                return jobs
+                return [jobs]
 
         if not callable(aggregator):
             raise TypeError("Expected callable for aggregator, got {}"
                             "".format(type(aggregator)))
 
-        if select is not None and not callable(select):
-            raise TypeError("Expected callable for select, got {}".format(type(select)))
-
         self._aggregator = aggregator
-        self._select = None if select is None else partial(filter, select)
 
     @classmethod
-    def groupsof(cls, num=1, select=None):
-        # copied from: https://docs.python.org/3/library/itertools.html#itertools.zip_longest
+    def groupsof(cls, num=1):
         try:
             num = int(num)
-            if num < 0:
+            if num <= 0:
                 raise ValueError("The num parameter should be greater than 0")
-        except Exception:
+        except TypeError:
             raise TypeError("The num parameter should be an integer")
 
         def aggregator(jobs):
             args = [iter(jobs)] * num
             return zip_longest(*args)
 
-        return cls(aggregator, select)
+        return cls(aggregator)
 
     def __call__(self, obj=None):
         if callable(obj):
-            setattr(obj, '_flow_aggregate', self)
+            setattr(obj, '_flow_aggregate', _MakeAggregate(self))
             return obj
-        elif isinstance(obj, (list, Project, JobsCursor)):
-            aggregated_jobs = list(obj)
-            if self._select is not None:
-                aggregated_jobs = list(self._select(aggregated_jobs))
-            aggregated_jobs = self._aggregator([job for job in aggregated_jobs])
-            aggregated_jobs = [[job for job in aggregates] for aggregates in aggregated_jobs]
-            if not len(aggregated_jobs):
-                return []
-            return aggregated_jobs
         else:
             raise TypeError('Invalid argument passed while calling '
-                            'the aggregate instance. Expected a callable '
-                            'or an Iterable of Jobs, got {}.'.format(type(obj)))
+                            'the aggregate instance. Expected a callable, '
+                            'got {}.'.format(type(obj)))
+
+
+class _MakeAggregate:
+    """This class handles the creation of aggregates.
+
+    .. note::
+        This class should not be instantiated by users directly.
+
+    :param _aggregate:
+        Aggregate object associated with an operation function
+    :type _aggregate:
+        :py:class:`Aggregate`
+    """
+    def __init__(self, _aggregate=Aggregate()):
+        self._aggregate = _aggregate
+
+    def __call__(self, obj):
+        "Return aggregated jobs"
+        aggregated_jobs = list(obj)
+        aggregated_jobs = self._aggregate._aggregator([job for job in aggregated_jobs])
+        aggregated_jobs = [[job for job in aggregate] for aggregate in aggregated_jobs]
+        if not len(aggregated_jobs):
+            return []
+        for i, job in enumerate(aggregated_jobs[-1]):
+            if job is None:
+                del aggregated_jobs[-1][i:]
+                break
+        return aggregated_jobs

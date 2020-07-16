@@ -47,7 +47,8 @@ from signac.contrib.project import JobsCursor
 
 from enum import IntFlag
 
-from .aggregate import _Aggregate as Aggregate
+from .aggregate import Aggregate
+from .aggregate import _MakeAggregate
 from .environment import get_environment
 from .scheduling.base import ClusterJob
 from .scheduling.base import JobStatus
@@ -213,7 +214,7 @@ class _condition(object):
     @classmethod
     def not_(cls, condition):
         """Evaluates to True if the provided condition function returns
-        False for all the jobs in the aggregate passed at once."""
+        False when the jobs in the aggregate passed to the condition function."""
         def _not(*jobs):
             return not condition(*jobs)
         return cls(_not,
@@ -328,8 +329,10 @@ class JobOperation(object):
         if len(self.jobs) == 1:
             return "{}({})".format(self.name, str(self.jobs[0]))
         else:
-            return "{}-{}: {}...{})".format(
-                self.name, len(self.jobs), str(self.jobs[0])[0:8], str(self.jobs[-1])[0:8])
+            minimum = self.jobs[0]._project.min_len_unique_id()
+            return "{}-{}: {}-{})".format(
+                self.name, len(self.jobs), str(self.jobs[0])[0:minimum],
+                str(self.jobs[-1])[0:minimum])
 
     def __repr__(self):
         return "{type}(name='{name}', jobs='{jobs}', cmd={cmd}, directives={directives})".format(
@@ -517,11 +520,12 @@ class BaseFlowOperation(object):
         return "{type}(cmd='{cmd}')".format(type=type(self).__name__, cmd=self._cmd)
 
     def eligible(self, *jobs, ignore_conditions=IgnoreConditions.NONE):
-        """Eligible, when all pre-conditions are true and at least one post-condition is false,
+        r"""Eligible, when all pre-conditions are true and at least one post-condition is false,
         or corresponding conditions are ignored.
-        :param jobs:
+
+        :param \*jobs:
             A list of signac job handles.
-        :type jobs:
+        :type \*jobs:
             list of :class:`~signac.contrib.job.Job`
         :param ignore_conditions:
             Specify if pre and/or post conditions check is to be ignored for eligibility check.
@@ -579,12 +583,7 @@ class FlowCmdOperation(BaseFlowOperation):
         if callable(self._cmd):
             return self._cmd(*jobs).format(job=jobs[0])
         else:
-            try:
-                return self._cmd.format(jobs=' '.join(map(str, jobs)))
-            except KeyError:
-                if len(jobs) > 1:
-                    raise ValueError("Please use jobs instead in the command")
-                return self._cmd.format(job=jobs[0])
+            return self._cmd.format(job=jobs[0])
 
 
 class FlowOperation(BaseFlowOperation):
@@ -625,10 +624,15 @@ class FlowGroupEntry(object):
         commands to execute.
     :type options:
         str
+    :param aggregate:
+        Aggregator associated with the :py:class:`FlowGroup` to be created.
+    :type aggregate:
+        :py:class`_MakeAggregate`
     """
-    def __init__(self, name, options=""):
+    def __init__(self, name, options="", aggregate=None):
         self.name = name
         self.options = options
+        self.aggregate = aggregate
 
     def __call__(self, func):
         """Decorator that adds the function into the group's operations.
@@ -729,12 +733,16 @@ class FlowGroup(object):
         This lets options like ``--num_passes`` to be given to a group.
     :type options:
         str
+    :param aggregate:
+        Aggregate object associated with the group.
+    :type aggregate:
+        :py:class`_MakeAggregate`
     """
 
     MAX_LEN_ID = 100
 
     def __init__(self, name, operations=None, operation_directives=None,
-                 options=""):
+                 options="", aggregate=None):
         self.name = name
         self.options = options
         # An OrderedDict is not necessary here, but is used to ensure
@@ -744,7 +752,7 @@ class FlowGroup(object):
             self.operation_directives = dict()
         else:
             self.operation_directives = operation_directives
-        self.aggregate = Aggregate.groupsof(1)
+        self.aggregate = aggregate
 
     def _set_entrypoint_item(self, entrypoint, directives, key, default, jobs):
         """Set a value (executable, path) for entrypoint in command.
@@ -836,11 +844,11 @@ class FlowGroup(object):
                    options=self.options)
 
     def eligible(self, *jobs, ignore_conditions=IgnoreConditions.NONE):
-        """Eligible, when at least one BaseFlowOperation is eligible.
+        r"""Eligible, when at least one BaseFlowOperation is eligible.
 
-        :param jobs:
+        :param \*jobs:
             The list of jobs that the :class:`~.JobOperation` is based on.
-        :type jobs:
+        :type \*jobs:
             list of :class:`signac.Job`
         :param ignore_conditions:
             Specify if pre and/or post conditions check is to be ignored for eligibility check.
@@ -855,11 +863,11 @@ class FlowGroup(object):
         return any(op.eligible(*jobs, ignore_conditions=ignore_conditions) for op in self)
 
     def complete(self, *jobs):
-        """True when all BaseFlowOperation post-conditions are met.
+        r"""True when all BaseFlowOperation post-conditions are met.
 
-        :param jobs:
+        :param \*jobs:
             The list of jobs that the :class:`~.JobOperation` is based on.
-        :type jobs:
+        :type \*jobs:
             list of :class:`signac.Job`
         :return:
             Whether the group is complete (all contained operations are
@@ -888,6 +896,11 @@ class FlowGroup(object):
         self.operations[name] = operation
         if directives is not None:
             self.operation_directives[name] = directives
+
+    def _add_aggregate(self, aggregate):
+        """Add :py:class:`_MakeAggregate` object associated to the FlowGroup"""
+        if self.aggregate is None:
+            self.aggregate = aggregate
 
     def isdisjoint(self, group):
         """Returns whether two groups are disjoint (do not share any common operations).
@@ -1431,12 +1444,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         if callable(label_name_or_func):
             cls._LABEL_FUNCTIONS[label_name_or_func] = None
-            label_name_or_func._aggregate = Aggregate.groupsof(1)
             return label_name_or_func
 
         def label_func(func):
             cls._LABEL_FUNCTIONS[func] = label_name_or_func
-            func._aggregate = Aggregate.groupsof(1)
             return func
 
         return label_func
@@ -3312,11 +3323,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 yield name
 
     def next_operations(self, *jobs, ignore_conditions=IgnoreConditions.NONE):
-        """Determine the next eligible operations for jobs.
+        r"""Determine the next eligible operations for jobs.
 
-        :param jobs:
+        :param \*jobs:
             The signac job handles.
-        :type job:
+        :type \*job:
             :class:`~signac.contrib.job.Job`
         :param ignore_conditions:
             Specify if pre and/or post conditions check is to be ignored for eligibility check.
@@ -3459,7 +3470,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         else:
             cls._GROUP_NAMES.add(name)
 
-        group_entry = FlowGroupEntry(name, options)
+        aggregate = _MakeAggregate(Aggregate.groupsof(1))
+        group_entry = FlowGroupEntry(name, options, aggregate)
         cls._GROUPS.append(group_entry)
         return group_entry
 
@@ -3472,7 +3484,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Initialize all groups without operations
         for entry in group_entries:
-            self._groups[entry.name] = FlowGroup(entry.name, options=entry.options)
+            self._groups[entry.name] = FlowGroup(entry.name, options=entry.options,
+                                                 aggregate=entry.aggregate)
 
         # Add operations and directives to group
         for (op_name, op) in self._operations.items():
@@ -3481,11 +3494,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             else:
                 func = self._operation_functions[op_name]
 
+            aggregate = func._flow_aggregate
+
             if hasattr(func, '_flow_groups'):
                 operation_directives = getattr(func, '_flow_group_operation_directives', dict())
                 for group_name in func._flow_groups:
                     self._groups[group_name].add_operation(
                         op_name, op, operation_directives.get(group_name, None))
+                    self._groups[group_name]._add_aggregate(aggregate)
 
             # For singleton groups add directives
             self._groups[op_name].operation_directives[op_name] = getattr(func,
@@ -3655,7 +3671,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 operation = self._operations[args.operation]
 
                 def operation_function(*jobs):
-                    cmd = operation(*jobs).format(*jobs)
+                    cmd = operation(*jobs).format(job=jobs[0])
                     subprocess.run(cmd, shell=True, check=True)
 
         except KeyError:
@@ -3664,7 +3680,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         try:
             aggregator = operation_function._flow_aggregate
         except AttributeError:
-            aggregator = operation.cmd._flow_aggregate
+            aggregator = operation._cmd._flow_aggregate
 
         aggregated_jobs = aggregator(jobs)
 

@@ -15,7 +15,7 @@ class Aggregate:
 
     .. code-block:: python
 
-        example_aggregate = aggregate()
+        example_aggregate = Aggregate()
         @example_aggregate
         @FlowProject.operation
         def foo(*jobs):
@@ -142,13 +142,13 @@ class _MakeAggregate:
     .. note::
         This class should not be instantiated by users directly.
 
-    :param aggregate:
+    :param _aggregate:
         Aggregate object associated with an operation function
-    :type aggregate:
+    :type _aggregate:
         :py:class:`Aggregate`
     """
-    def __init__(self, aggregate=Aggregate()):
-        self._aggregate = aggregate
+    def __init__(self, _aggregate=Aggregate()):
+        self._aggregate = _aggregate
 
     def __call__(self, obj):
         "Return aggregated jobs"

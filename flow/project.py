@@ -577,7 +577,7 @@ class FlowCmdOperation(BaseFlowOperation):
 
     def __call__(self, *jobs):
         if callable(self._cmd):
-            return self._cmd(*jobs).format(job=jobs[0][0])
+            return self._cmd(*jobs).format(job=jobs[0])
         else:
             try:
                 return self._cmd.format(jobs=' '.join(map(str, jobs)))
@@ -816,7 +816,7 @@ class FlowGroup(object):
 
     def _run_cmd(self, entrypoint, operation_name, operation, directives, jobs):
         if isinstance(operation, FlowCmdOperation):
-            return operation(jobs).lstrip()
+            return operation(*jobs).lstrip()
         else:
             entrypoint = self._determine_entrypoint(entrypoint, directives, jobs)
             return '{} exec {} {}'.format(
@@ -999,6 +999,11 @@ class FlowGroup(object):
         :rtype:
             :py:class:`SubmissionJobOperation`
         """
+        if isinstance(jobs, signac.contrib.job.Job):
+            jobs = [jobs]
+        else:
+            jobs = list(jobs)
+
         uneval_cmd = functools.partial(self._submit_cmd, entrypoint=entrypoint, jobs=jobs,
                                        ignore_conditions=ignore_conditions_on_execution)
 
@@ -1856,7 +1861,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                             iterable=results,
                             desc="Collecting job status info", total=len(jobs), file=err))
                 elif status_parallelization == 'none':
-                    return list(tqdm(
+                    label_results = list(tqdm(
                         iterable=map(_get_job_labels, jobs),
                         desc="Collecting job status info", total=len(jobs), file=err))
                 else:
@@ -1907,6 +1912,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     break
             results.append(result)
 
+        print(results)
         return results
 
     def _fetch_labels_in_parallel(self, pool, pickle, jobs, ignore_errors, cached_status):

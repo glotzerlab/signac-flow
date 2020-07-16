@@ -939,13 +939,12 @@ class FlowGroup(object):
             aggregate_id = str(jobs[0])[:8]
 
         separator = getattr(project._environment, 'JOB_ID_SEPARATOR', '/')
-        readable_name = '{project}{sep}{jobs}{sep}{len}{sep}{group_name}' \
+        readable_name = '{project}{sep}{jobs}{sep}{op_string}' \
                         '{sep}{index:04d}{sep}'.format(
                             sep=separator,
                             project=str(project)[:12],
                             jobs=aggregate_id,
-                            len=len(jobs),
-                            group_name=self.name,
+                            op_string=op_string[:12],
                             index=index)[:max_len]
 
         # By appending the unique job_op_id, we ensure that each id is truly unique.
@@ -1635,6 +1634,47 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for sjob in self._expand_bundled_jobs(scheduler.jobs()):
             yield sjob
 
+    def _get_group_status(self, group, jobs, ignore_errors=False, cached_status=None):
+        "Return a dict with detailed information about the status of jobs per group."
+        result = dict()
+        for name in group.operations:
+            result['operation_name'] = name
+        status_dict = dict()
+        aggregated_jobs = group.aggregate(jobs)
+        errors = defaultdict(None)
+
+        for aggregate in aggregated_jobs:
+            try:
+                _id = group._generate_id(aggregate)
+                completed = group.complete(*aggregate)
+                eligible = False if completed else group.eligible(*aggregate)
+                scheduler_status = cached_status.get(_id, JobStatus.unknown)
+                status_dict[str(aggregate[0])] = {
+                        'scheduler_status': scheduler_status,
+                        'eligible': eligible,
+                        'completed': completed
+                        }
+            except Exception as error:
+                msg = "Error while getting operations status for aggregate " \
+                      "'{}': '{}'.".format(' '.join(map(str, aggregate)), error)
+                logger.debug(msg)
+                status_dict[str(aggregate[0])] = {
+                        'scheduler_status': JobStatus.unknown,
+                        'eligible': False,
+                        'completed': False
+                        }
+                if ignore_errors:
+                    for job in aggregate:
+                        if errors[job] is None:
+                            errors[job] = str(error)
+                        errors[job] += ' | ' + str(error)
+                else:
+                    raise
+
+        result['aggregate_details'] = status_dict
+        result['_operation_error_per_job'] = errors
+        return result
+
     def _get_operations_status(self, job, cached_status):
         "Return a dict with information about job-operations for this job."
         starting_dict = functools.partial(dict, scheduler_status=JobStatus.unknown)
@@ -1642,7 +1682,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for group in self._groups.values():
             completed = group.complete(job)
             eligible = False if completed else group.eligible(job)
-            scheduler_status = cached_status.get(group._generate_id(job),
+            scheduler_status = cached_status.get(group._generate_id([job]),
                                                  JobStatus.unknown)
             for operation in group.operations:
                 if scheduler_status >= status_dict[operation]['scheduler_status']:
@@ -1654,6 +1694,22 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         for key in sorted(status_dict):
             yield key, status_dict[key]
+
+    def _get_job_labels(self, job, ignore_errors=False, cached_status=None):
+        "Return a dict with information about the labels of a job."
+        result = dict()
+        result['job_id'] = str(job)
+        try:
+            result['labels'] = sorted(set(self.labels(job)))
+            result['_labels_error'] = None
+        except Exception as error:
+            logger.debug("Error while determining labels for job '{}': '{}'.".format(job, error))
+            if ignore_errors:
+                result['labels'] = list()
+                result['_labels_error'] = str(error)
+            else:
+                raise
+        return result
 
     def get_job_status(self, job, ignore_errors=False, cached_status=None):
         "Return a dict with detailed information about the status of a job."
@@ -1700,11 +1756,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             scheduler_info = {sjob.name(): sjob.status() for sjob in self.scheduler_jobs(scheduler)}
             status = dict()
             print("Query scheduler...", file=file)
-            for job in tqdm(jobs,
-                            desc="Fetching operation status",
-                            total=len(jobs), file=file):
-                for group in self._groups.values():
-                    _id = group._generate_id(job)
+            for group in self._groups.values():
+                aggregated_jobs = group.aggregate(jobs)
+                for aggregate in aggregated_jobs:
+                    _id = group._generate_id(aggregate)
                     status[_id] = int(scheduler_info.get(_id, JobStatus.unknown))
             self.document._status.update(status)
         except NoSchedulerError:
@@ -1743,9 +1798,23 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         except KeyError:
             cached_status = dict()
 
-        _get_job_status = functools.partial(self.get_job_status,
+        _get_job_labels = functools.partial(self._get_job_labels,
                                             ignore_errors=ignore_errors,
                                             cached_status=cached_status)
+
+        _get_group_status = functools.partial(self._get_group_status,
+                                              jobs=jobs,
+                                              ignore_errors=ignore_errors,
+                                              cached_status=cached_status)
+
+        groups = []
+        for group in self._groups.values():
+            if len(group.operations) == 1:
+                for name in group.operations:
+                    if name == group.name:
+                        groups.append(group)
+
+        op_results = list(map(_get_group_status, groups))
 
         with self._potentially_buffered():
             try:
@@ -1753,14 +1822,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     with contextlib.closing(ThreadPool()) as pool:
                         # First attempt at parallelized status determination.
                         # This may fail on systems that don't allow threads.
-                        return list(tqdm(
-                            iterable=pool.imap(_get_job_status, jobs),
+                        label_results = list(tqdm(
+                            iterable=pool.imap(_get_job_labels, jobs),
                             desc="Collecting job status info", total=len(jobs), file=err))
                 elif status_parallelization == 'process':
                     with contextlib.closing(Pool()) as pool:
                         try:
                             import pickle
-                            results = self._fetch_status_in_parallel(
+                            results = self._fetch_labels_in_parallel(
                                 pool, pickle, jobs, ignore_errors, cached_status)
                         except Exception as error:
                             if not isinstance(error, (pickle.PickleError, self._PickleError)) and\
@@ -1777,18 +1846,18 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                 raise error
                             else:
                                 try:
-                                    results = self._fetch_status_in_parallel(
+                                    results = self._fetch_labels_in_parallel(
                                         pool, cloudpickle, jobs, ignore_errors, cached_status)
                                 except self._PickleError as error:
                                     raise RuntimeError(
                                         "Unable to parallelize execution due to a pickling "
                                         "error: {}.".format(error))
-                        return list(tqdm(
+                        label_results = list(tqdm(
                             iterable=results,
                             desc="Collecting job status info", total=len(jobs), file=err))
                 elif status_parallelization == 'none':
                     return list(tqdm(
-                        iterable=map(_get_job_status, jobs),
+                        iterable=map(_get_job_labels, jobs),
                         desc="Collecting job status info", total=len(jobs), file=err))
                 else:
                     raise RuntimeError("Configuration value status_parallelization is invalid. "
@@ -1800,19 +1869,47 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
                 t = time.time()
                 num_jobs = len(jobs)
-                statuses = []
+                label_results = []
                 for i, job in enumerate(jobs):
-                    statuses.append(_get_job_status(job))
+                    label_results.append(_get_job_labels(job))
                     if time.time() - t > 0.2:  # status interval
                         print(
                             'Collecting job status info: {}/{}'.format(i+1, num_jobs),
                             end='\r', file=err)
                         t = time.time()
                 # Always print the completed progressbar.
-                print('Collecting job status info: {}/{}'.format(i+1, num_jobs), file=err)
-                return statuses
+                print('Collecting job labels info: {}/{}'.format(i+1, num_jobs), file=err)
 
-    def _fetch_status_in_parallel(self, pool, pickle, jobs, ignore_errors, cached_status):
+        results = list()
+        for job in jobs:
+            result = dict()
+            result['job_id'] = str(job)
+            result['operations'] = dict()
+            _operations_error = []
+            for op_result in op_results:
+                for id, aggregates in op_result['aggregate_details'].items():
+                    if str(job) == id:
+                        result['operations'][op_result['operation_name']] = {
+                            'scheduler_status': aggregates['scheduler_status'],
+                            'eligible': aggregates['eligible'],
+                            'completed': aggregates['completed']
+                        }
+                        _operations_error.append(
+                            op_result['_operation_error_per_job'].get(job, ''))
+            if ''.join(_operations_error) == '':
+                result['_operations_error'] = None
+            else:
+                result['_operations_error'] = '\n'.join(_operations_error)
+            for label_result in label_results:
+                if str(job) == label_result['job_id']:
+                    result['labels'] = label_result['labels']
+                    result['_labels_error'] = label_result['_labels_error']
+                    break
+            results.append(result)
+
+        return results
+
+    def _fetch_labels_in_parallel(self, pool, pickle, jobs, ignore_errors, cached_status):
         try:
             s_project = pickle.dumps(self)
             s_tasks = [(pickle.loads, s_project, job.get_id(), ignore_errors, cached_status)
@@ -1820,7 +1917,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         except Exception as error:  # Masking all errors since they must be pickling related.
             raise self._PickleError(error)
 
-        results = pool.imap(_serialized_get_job_status, s_tasks)
+        results = pool.imap(_serialized_get_job_labels, s_tasks)
 
         return results
 
@@ -3468,11 +3565,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _main_next(self, args):
         "Determine the jobs that are eligible for a specific operation."
-        for op in self.next_operations(self):
+        for op in self.next_operations(*self):
             if args.name in op.name:
-                for job in op.jobs:
-                    print(job, end=" ")
-                print()
+                print(' '.join(map(str, op.jobs)))
 
     def _main_run(self, args):
         "Run all (or select) job operations."
@@ -3869,14 +3964,14 @@ def _execute_serialized_operation(loads, project, operation):
     project._execute_operation(project._loads_op(operation))
 
 
-def _serialized_get_job_status(s_task):
+def _serialized_get_job_labels(s_task):
     """Invoke the _get_job_status() method on a serialized project instance."""
     loads = s_task[0]
     project = loads(s_task[1])
     job = project.open_job(id=s_task[2])
     ignore_errors = s_task[3]
     cached_status = s_task[4]
-    return project.get_job_status(job, ignore_errors=ignore_errors, cached_status=cached_status)
+    return project._get_job_labels(job, ignore_errors=ignore_errors, cached_status=cached_status)
 
 
 # Status-related helper functions

@@ -62,7 +62,7 @@ class _Aggregate:
             setattr(obj, '_flow_aggregate', self)
             return obj
         elif isinstance(obj, (list, Project, JobsCursor)):
-            aggregated_jobs = deepcopy(list(obj))
+            aggregated_jobs = list(obj)
             if self._select is not None:
                 aggregated_jobs = list(self._select(aggregated_jobs))
             aggregated_jobs = self._aggregator([job for job in aggregated_jobs])

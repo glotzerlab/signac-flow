@@ -43,14 +43,14 @@ class Aggregate:
 
         return cls(aggregator)
 
-    def __call__(self, obj=None):
-        if callable(obj):
-            setattr(obj, '_flow_aggregate', _MakeAggregate(self))
-            return obj
+    def __call__(self, func=None):
+        if callable(func):
+            setattr(func, '_flow_aggregate', _MakeAggregate(self))
+            return func
         else:
             raise TypeError('Invalid argument passed while calling '
                             'the aggregate instance. Expected a callable, '
-                            'got {}.'.format(type(obj)))
+                            'got {}.'.format(type(func)))
 
 
 class _MakeAggregate:
@@ -67,12 +67,13 @@ class _MakeAggregate:
     def __init__(self, _aggregate=Aggregate()):
         self._aggregate = _aggregate
 
-    def __call__(self, obj):
+    def __call__(self, list_of_jobs):
         "Return aggregated jobs"
-        aggregated_jobs = list(obj)
-        aggregated_jobs = self._aggregate._aggregator([job for job in aggregated_jobs])
+        # Ensuring list
+        list_of_jobs = list(list_of_jobs)
+        aggregated_jobs = self._aggregate._aggregator([job for job in list_of_jobs])
         aggregated_jobs = [[job for job in aggregate] for aggregate in aggregated_jobs]
-        if not len(aggregated_jobs):
+        if len(aggregated_jobs) == 0:
             return []
         for i, job in enumerate(aggregated_jobs[-1]):
             if job is None:

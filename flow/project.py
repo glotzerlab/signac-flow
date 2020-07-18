@@ -1633,7 +1633,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             result['operation_name'] = name
         status_dict = dict()
         aggregated_jobs = group._aggregate(jobs)
-        errors = defaultdict(None)
+        errors = defaultdict(lambda: None)
 
         for aggregate in aggregated_jobs:
             try:
@@ -1872,32 +1872,26 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 # Always print the completed progressbar.
                 print('Collecting job labels info: {}/{}'.format(i+1, num_jobs), file=err)
 
-        results = list()
+        results, index, i = list(), dict(), 0
+
         for job in jobs:
             result = dict()
             result['job_id'] = str(job)
             result['operations'] = dict()
-            _operations_error = []
-            for op_result in op_results:
-                for id, aggregates in op_result['aggregate_details'].items():
-                    if str(job) == id:
-                        result['operations'][op_result['operation_name']] = {
-                            'scheduler_status': aggregates['scheduler_status'],
-                            'eligible': aggregates['eligible'],
-                            'completed': aggregates['completed']
-                        }
-                        _operations_error.append(
-                            op_result['_operation_error_per_job'].get(job, ''))
-            if ''.join(_operations_error) == '':
-                result['_operations_error'] = None
-            else:
-                result['_operations_error'] = '\n'.join(_operations_error)
-            for label_result in label_results:
-                if str(job) == label_result['job_id']:
-                    result['labels'] = label_result['labels']
-                    result['_labels_error'] = label_result['_labels_error']
-                    break
+            result['labels'] = list()
+            result['_operations_error'] = list()
+            result['_labels_error'] = list()
             results.append(result)
+            index[str(job)] = i
+            i += 1
+        for op_result in op_results:
+            for id, aggregates in op_result['aggregate_details'].items():
+                results[index[id]]['operations'][op_result['operation_name']] = aggregates
+                results[index[id]]['_operations_error'] = \
+                    op_result['_operation_error_per_job'].get(id, None)
+        for label_result in label_results:
+            results[index[label_result['job_id']]]['labels'] = label_result['labels']
+            results[index[label_result['job_id']]]['_labels_error'] = label_result['_labels_error']
 
         return results
 

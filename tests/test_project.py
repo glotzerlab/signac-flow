@@ -1249,11 +1249,11 @@ class TestGroupProject(TestProjectBase):
         # For multiple operation groups and options
         for job in project:
             job_op1 = project.groups['group1']._create_submission_job_operation(
-                project._entrypoint, dict(), job)
+                project._entrypoint, dict(), [job])
             script1 = project.script([job_op1])
             assert 'run -o group1 -j {}'.format(job) in script1
             job_op2 = project.groups['group2']._create_submission_job_operation(
-                project._entrypoint, dict(), job)
+                project._entrypoint, dict(), [job])
             script2 = project.script([job_op2])
             assert '--num-passes=2' in script2
 
@@ -1271,10 +1271,10 @@ class TestGroupProject(TestProjectBase):
             assert all([job_op.directives.get('omp_num_threads', 0) == 1 for job_op in job_ops])
             # Test run JobOperations
             job_ops = project.groups['group2']._create_run_job_operations(
-                project._entrypoint, project._get_default_directives(), job)
+                project._entrypoint, project._get_default_directives(), [job])
             assert all([job_op.directives.get('omp_num_threads', 0) == 4 for job_op in job_ops])
             job_ops = project.groups['op3']._create_run_job_operations(
-                project._entrypoint, project._get_default_directives(), job)
+                project._entrypoint, project._get_default_directives(), [job])
             assert all([job_op.directives.get('omp_num_threads', 0) == 1 for job_op in job_ops])
 
     def test_submission_aggregation(self):
@@ -1384,7 +1384,7 @@ class TestGroupExecutionProject(TestProjectBase):
         MockScheduler.reset()
         project = self.mock_project()
         operations = [project.groups['group1']._create_submission_job_operation(
-            project._entrypoint, dict(), job) for job in project]
+            project._entrypoint, dict(), [job]) for job in project]
         assert len(list(MockScheduler.jobs())) == 0
         cluster_job_id = project._store_bundled(operations)
         with redirect_stderr(StringIO()):

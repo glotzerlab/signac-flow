@@ -261,11 +261,11 @@ def JobOperation(id, name, job, cmd, directive=None):
         submission process and should not be instantiated by users themselves.
 
     :param id:
-        The id of this _JobOperation instance. The id should be unique.
+        The id of this JobOperation instance. The id should be unique.
     :type id:
         str
     :param name:
-        The name of the _JobOperation.
+        The name of the JobOperation.
     :type name:
         str
     :param job:

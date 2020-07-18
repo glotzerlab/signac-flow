@@ -1259,7 +1259,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """Setup the jinja2 template environment.
 
         The templating system is used to generate templated scripts for the script()
-        and submit_operations() / submit() function and the corresponding command line
+        and _submit_operations() / submit() function and the corresponding command line
         subcommands.
         """
         if self._config.get('flow') and self._config['flow'].get('environment_modules'):
@@ -2208,6 +2208,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                             raise RuntimeError("Unable to parallelize execution due to a pickling "
                                                "error: {}.".format(error))
 
+    @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
     def run_operations(self, operations=None, pretend=False, np=None, timeout=None, progress=False):
         """Execute the next operations as specified by the project's workflow.
 
@@ -2632,9 +2633,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             self._show_template_help_and_exit(template_environment, context)
         return template.render(** context)
 
-    def submit_operations(self, operations, _id=None, env=None, parallel=False, flags=None,
-                          force=False, template='script.sh', pretend=False,
-                          show_template_help=False, **kwargs):
+    def _submit_operations(self, operations, _id=None, env=None, parallel=False, flags=None,
+                           force=False, template='script.sh', pretend=False,
+                           show_template_help=False, **kwargs):
         r"""Submit a sequence of operations to the scheduler.
 
         :param operations:
@@ -2729,6 +2730,58 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             else:
                 return env.submit(_id=_id, script=script, flags=flags, **kwargs)
 
+    @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
+    def submit_operations(self, operations, _id=None, env=None, parallel=False, flags=None,
+                          force=False, template='script.sh', pretend=False,
+                          show_template_help=False, **kwargs):
+        r"""Submit a sequence of operations to the scheduler.
+
+        :param operations:
+            The operations to submit.
+        :type operations:
+            A sequence of instances of :py:class:`.JobOperation`
+        :param _id:
+            The _id to be used for this submission.
+        :type _id:
+            str
+        :param parallel:
+            Execute all bundled operations in parallel.
+        :type parallel:
+            bool
+        :param flags:
+            Additional options to be forwarded to the scheduler.
+        :type flags:
+            list
+        :param force:
+            Ignore all warnings or checks during submission, just submit.
+        :type force:
+            bool
+        :param template:
+            The name of the template file to be used to generate the submission script.
+        :type template:
+            str
+        :param pretend:
+            Do not actually submit, but only print the submission script to screen. Useful
+            for testing the submission workflow.
+        :type pretend:
+            bool
+        :param show_template_help:
+            Show information about available template variables and filters and exit.
+        :type show_template_help:
+            bool
+        :param \*\*kwargs:
+            Additional keyword arguments to be forwarded to the scheduler.
+        :return:
+            Returns the submission status after successful submission or None.
+        """
+        warnings.warn("The submit_operations method is deprecated as of 0.11 and "
+                      "will be removed in 0.13.",
+                      DeprecationWarning)
+
+        return self._submit_operations(operations, _id, env, parallel, flags,
+                                       force, template, pretend,
+                                       show_template_help, **kwargs)
+
     def submit(self, bundle_size=1, jobs=None, names=None, num=None, parallel=False,
                force=False, walltime=None, env=None, ignore_conditions=IgnoreConditions.NONE,
                ignore_conditions_on_execution=IgnoreConditions.NONE, **kwargs):
@@ -2807,7 +2860,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Bundle them up and submit.
         for bundle in _make_bundles(operations, bundle_size):
-            status = self.submit_operations(operations=bundle, env=env, parallel=parallel,
+            status = self._submit_operations(operations=bundle, env=env, parallel=parallel,
                                             force=force, walltime=walltime, **kwargs)
             if status is not None:  # operations were submitted, store status
                 for operation in bundle:

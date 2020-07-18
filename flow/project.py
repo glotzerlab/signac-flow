@@ -2522,7 +2522,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                 ignore_conditions=IgnoreConditions.NONE):
         "Get all pending operations for the given selection."
         assert not isinstance(operation_names, str)
-        for op in self.next_operations(* jobs, ignore_conditions=ignore_conditions):
+        for op in self._next_operations(* jobs, ignore_conditions=ignore_conditions):
             if operation_names is None or any(re.fullmatch(n, op.name) for n in operation_names):
                 yield op
 
@@ -3156,7 +3156,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                                         ignore_conditions=ignore_conditions,
                                                         index=0)
 
-    def next_operations(self, *jobs, ignore_conditions=IgnoreConditions.NONE):
+    def _next_operations(self, *jobs, ignore_conditions=IgnoreConditions.NONE):
         """Determine the next eligible operations for jobs.
 
         :param jobs:
@@ -3174,6 +3174,27 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for job in jobs:
             for op in self._job_operations(job, ignore_conditions):
                 yield op
+
+    @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
+    def next_operations(self, *jobs, ignore_conditions=IgnoreConditions.NONE):
+        """Determine the next eligible operations for jobs.
+
+        :param jobs:
+            The signac job handles.
+        :type job:
+            :class:`~signac.contrib.job.Job`
+        :param ignore_conditions:
+            Specify if pre and/or post conditions check is to be ignored for eligibility check.
+            The default is :py:class:`IgnoreConditions.NONE`.
+        :type ignore_conditions:
+            :py:class:`~.IgnoreConditions`
+        :yield:
+            All instances of :class:`~.JobOperation` jobs are eligible for.
+        """
+        warnings.warn("The next_operations method is deprecated as of 0.11 and "
+                      "will be removed in 0.13.",
+                      DeprecationWarning)
+        return self._next_operations(*jobs, ignore_conditions=IgnoreConditions.NONE)
 
     @classmethod
     def operation(cls, func, name=None):
@@ -3408,7 +3429,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _main_next(self, args):
         "Determine the jobs that are eligible for a specific operation."
         for job in self:
-            if args.name in {op.name for op in self.next_operations(job)}:
+            if args.name in {op.name for op in self._next_operations(job)}:
                 print(job)
 
     def _main_run(self, args):

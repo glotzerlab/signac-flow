@@ -744,8 +744,7 @@ class TestExecutionProject(TestProjectBase):
         # a 'by-job' order must be implemented explicitly within the
         # FlowProject.run() function.
         project = self.mock_project()
-        with pytest.deprecated_call():
-            ops = list(project._get_pending_operations(self.project.find_jobs()))
+        ops = list(project._get_pending_operations(self.project.find_jobs()))
         # The length of the list of operations grouped by job is equal
         # to the length of its set if and only if the operations are grouped
         # by job already:

@@ -2141,7 +2141,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         return status_renderer
 
-    def run_operations(self, operations=None, pretend=False, np=None, timeout=None, progress=False):
+    def _run_operations(self, operations=None, pretend=False, np=None, timeout=None, progress=False):
         """Execute the next operations as specified by the project's workflow.
 
         See also: :meth:`~.run`
@@ -2207,6 +2207,39 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         except self._PickleError as error:
                             raise RuntimeError("Unable to parallelize execution due to a pickling "
                                                "error: {}.".format(error))
+
+    def run_operations(self, operations=None, pretend=False, np=None, timeout=None, progress=False):
+        """Execute the next operations as specified by the project's workflow.
+
+        See also: :meth:`~.run`
+
+        :param operations:
+            The operations to execute (optional).
+        :type operations:
+            Sequence of instances of :class:`.JobOperation`
+        :param pretend:
+            Do not actually execute the operations, but show which command would have been used.
+        :type pretend:
+            bool
+        :param np:
+            The number of processors to use for each operation.
+        :type np:
+            int
+        :param timeout:
+            An optional timeout for each operation in seconds after which execution will
+            be cancelled. Use -1 to indicate not timeout (the default).
+        :type timeout:
+            int
+        :param progress:
+            Show a progress bar during execution.
+        :type progress:
+            bool
+        """
+        warnings.warn("The run_operations method is deprecated as of 0.11 and "
+                      "will be removed in 0.13.",
+                      DeprecationWarning)
+
+        return self._run_operations(operations, pretend, np, timeout, progress)
 
     class _PickleError(Exception):
         "Indicates a pickling error while trying to parallelize the execution of operations."
@@ -2470,8 +2503,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
             logger.info(
                 "Executing {} operation(s) (Pass # {:02d})...".format(len(operations), i_pass))
-            self.run_operations(operations, pretend=pretend,
-                                np=np, timeout=timeout, progress=progress)
+            self._run_operations(operations, pretend=pretend,
+                                 np=np, timeout=timeout, progress=progress)
 
     def _generate_operations(self, cmd, jobs, requires=None):
         "Generate job-operations for a given 'direct' command."
@@ -3194,7 +3227,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         warnings.warn("The next_operations method is deprecated as of 0.11 and "
                       "will be removed in 0.13.",
                       DeprecationWarning)
-        return self._next_operations(*jobs, ignore_conditions=IgnoreConditions.NONE)
+        return self._next_operations(*jobs, ignore_conditions=ignore_conditions)
 
     @classmethod
     def operation(cls, func, name=None):

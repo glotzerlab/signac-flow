@@ -2618,7 +2618,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         else:
             yield
 
-    def script(self, operations, parallel=False, template='script.sh', show_template_help=False):
+    def _script(self, operations, parallel=False, template='script.sh', show_template_help=False):
         """Generate a run script to execute given operations.
 
         :param operations:
@@ -2649,6 +2649,33 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if show_template_help:
             self._show_template_help_and_exit(template_environment, context)
         return template.render(** context)
+
+    @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
+    def script(self, operations, parallel=False, template='script.sh', show_template_help=False):
+        """Generate a run script to execute given operations.
+
+        :param operations:
+            The operations to execute.
+        :type operations:
+            Sequence of instances of :class:`.JobOperation`
+        :param parallel:
+            Execute all operations in parallel (default is False).
+        :type parallel:
+            bool
+        :param template:
+            The name of the template to use to generate the script.
+        :type template:
+            str
+        :param show_template_help:
+            Show help related to the templating system and then exit.
+        :type show_template_help:
+            bool
+        """
+        warnings.warn("The script method is deprecated as of 0.11 and "
+                      "will be removed in 0.13.",
+                      DeprecationWarning)
+
+        return self._script(operations, parallel, template, show_template_help)
 
     def _generate_submit_script(self, _id, operations, template, show_template_help, env, **kwargs):
         """Generate submission script to submit the execution of operations to a scheduler."""
@@ -3613,7 +3640,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             operations = list(islice(operations, args.num))
 
         # Generate the script and print to screen.
-        print(self.script(
+        print(self._script(
             operations=operations, parallel=args.parallel,
             template=args.template, show_template_help=args.show_template_help))
 

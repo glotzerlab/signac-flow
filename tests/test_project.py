@@ -1254,7 +1254,8 @@ class TestGroupProject(TestProjectBase):
         # For run mode single operation groups
         for job in project:
             job_ops = project._get_submission_operations([job], dict())
-            script = project.script(job_ops)
+            with pytest.deprecated_call():
+                script = project.script(job_ops)
             if job.sp.b % 2 == 0:
                 assert str(job) in script
                 assert 'run -o op1 -j {}'.format(job) in script
@@ -1268,11 +1269,13 @@ class TestGroupProject(TestProjectBase):
         for job in project:
             job_op1 = project.groups['group1']._create_submission_job_operation(
                 project._entrypoint, dict(), job)
-            script1 = project.script([job_op1])
+            with pytest.deprecated_call():
+                script1 = project.script([job_op1])
             assert 'run -o group1 -j {}'.format(job) in script1
             job_op2 = project.groups['group2']._create_submission_job_operation(
                 project._entrypoint, dict(), job)
-            script2 = project.script([job_op2])
+            with pytest.deprecated_call():
+                script2 = project.script([job_op2])
             assert '--num-passes=2' in script2
 
     def test_directives_hierarchy(self):

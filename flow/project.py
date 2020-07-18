@@ -245,7 +245,9 @@ def make_bundles(operations, size=None):
     return _make_bundles(operations, size)
 
 
-class JobOperation(object):
+@deprecated(
+    deprecated_in="0.11", removed_in="0.13", current_version=__version__)
+def JobOperation(id, name, job, cmd, directive=None):
     """This class represents the information needed to execute one group for one job.
 
     The execution or submission of a :py:class:`FlowGroup` uses a passed in command
@@ -259,11 +261,54 @@ class JobOperation(object):
         submission process and should not be instantiated by users themselves.
 
     :param id:
-        The id of this JobOperation instance. The id should be unique.
+        The id of this _JobOperation instance. The id should be unique.
     :type id:
         str
     :param name:
-        The name of the JobOperation.
+        The name of the _JobOperation.
+    :type name:
+        str
+    :param job:
+        The job instance associated with this operation.
+    :type job:
+        :py:class:`signac.Job`.
+    :param cmd:
+        The command that executes this operation. Can be a function that when
+        evaluated returns a string.
+    :type cmd:
+        callable or str
+    :param directives:
+        A dictionary of additional parameters that provide instructions on how
+        to execute this operation, e.g., specifically required resources.
+    :type directives:
+        :class:`dict`
+    """
+    warnings.warn("The JobOperation class is deprecated as of 0.11 and "
+                  "will be removed in 0.13.",
+                  DeprecationWarning)
+
+    return _JobOperation(id, name, job, cmd, directive=None)
+
+
+class _JobOperation(object):
+    """This class represents the information needed to execute one group for one job.
+
+    The execution or submission of a :py:class:`FlowGroup` uses a passed in command
+    which can either be a string or function with no arguments that returns a shell
+    executable command.  This won't be used if it is determined that the group can be
+    executed without forking.
+
+    .. note::
+
+        This class is used by the :class:`~.FlowGroup` class for the execution and
+        submission process and should not be instantiated by users themselves.
+
+    :param id:
+        The id of this _JobOperation instance. The id should be unique.
+    :type id:
+        str
+    :param name:
+        The name of the _JobOperation.
     :type name:
         str
     :param job:
@@ -359,35 +404,35 @@ class JobOperation(object):
             return JobStatus.unknown
 
 
-class SubmissionJobOperation(JobOperation):
+class _SubmissionJobOperation(_JobOperation):
     R"""This class represents the information needed to submit one group for one job.
 
-    This class extends :py:class:`JobOperation` to include a set of groups
+    This class extends :py:class:`_JobOperation` to include a set of groups
     that will be executed via the "run" command. These groups are known at
     submission time.
 
     :param \*args:
-        Passed to the constructor of :py:class:`JobOperation`.
+        Passed to the constructor of :py:class:`_JobOperation`.
     :param eligible_operations:
-        A list of :py:class:`JobOperation` that will be executed when this
+        A list of :py:class:`_JobOperation` that will be executed when this
         submitted job is executed.
     :type eligible_operations:
         list
     :param operations_with_unmet_preconditions:
-        A list of :py:class:`JobOperation` that will not be executed in the
+        A list of :py:class:`_JobOperation` that will not be executed in the
         first pass of :meth:`FlowProject.run` due to unmet preconditions. These
         operations may be executed in subsequent iterations of the run loop.
     :type operations_with_unmet_preconditions:
         list
     :param operations_with_met_postconditions:
-        A list of :py:class:`JobOperation` that will not be executed in the
+        A list of :py:class:`_JobOperation` that will not be executed in the
         first pass of :meth:`FlowProject.run` because all postconditions are
         met. These operations may be executed in subsequent iterations of the
         run loop.
     :type operations_with_met_postconditions:
         list
     :param \*\*kwargs:
-        Passed to the constructor of :py:class:`JobOperation`.
+        Passed to the constructor of :py:class:`_JobOperation`.
     """
 
     def __init__(
@@ -398,7 +443,7 @@ class SubmissionJobOperation(JobOperation):
         operations_with_met_postconditions=None,
         **kwargs
     ):
-        super(SubmissionJobOperation, self).__init__(*args, **kwargs)
+        super(_SubmissionJobOperation, self).__init__(*args, **kwargs)
 
         if eligible_operations is None:
             self.eligible_operations = []
@@ -725,7 +770,7 @@ class FlowGroup(object):
             entrypoint[key] = entrypoint[key](job)
 
     def _determine_entrypoint(self, entrypoint, directives, job):
-        """Get the entrypoint for creating a JobOperation.
+        """Get the entrypoint for creating a _JobOperation.
 
         If path cannot be determined, then raise a RuntimeError since we do not
         know where to point to.
@@ -916,9 +961,9 @@ class FlowGroup(object):
     def _create_submission_job_operation(self, entrypoint, default_directives, job,
                                          ignore_conditions_on_execution=IgnoreConditions.NONE,
                                          index=0):
-        """Create a JobOperation object from the FlowGroup.
+        """Create a _JobOperation object from the FlowGroup.
 
-        Creates a JobOperation for use in submitting and scripting.
+        Creates a _JobOperation for use in submitting and scripting.
 
         :param entrypoint:
             The path and executable, if applicable, to point to for execution.
@@ -931,7 +976,7 @@ class FlowGroup(object):
         :type default_directives:
             dict
         :param job:
-            The job that the :class:`~.JobOperation` is based on.
+            The job that the :class:`~._JobOperation` is based on.
         :type job:
             :class:`signac.Job`
         :param ignore_conditions:
@@ -945,15 +990,15 @@ class FlowGroup(object):
         :type ignore_conditions_on_execution:
             :py:class:`~.IgnoreConditions`
         :param index:
-            Index for the :class:`~.JobOperation`.
+            Index for the :class:`~._JobOperation`.
         :type index:
             int
         :return:
-            Returns a :py:class:`~.SubmissionJobOperation` for submitting the group. The
-            :py:class:`~.JobOperation` will have directives that have been collected
+            Returns a :py:class:`~._SubmissionJobOperation` for submitting the group. The
+            :py:class:`~._JobOperation` will have directives that have been collected
             appropriately from its contained operations.
         :rtype:
-            :py:class:`SubmissionJobOperation`
+            :py:class:`_SubmissionJobOperation`
         """
         uneval_cmd = functools.partial(self._submit_cmd, entrypoint=entrypoint, job=job,
                                        ignore_conditions=ignore_conditions_on_execution)
@@ -979,7 +1024,7 @@ class FlowGroup(object):
         operations_with_met_postconditions = _get_run_ops(
             eligible_operations, IgnoreConditions.POST)
 
-        submission_job_operation = SubmissionJobOperation(
+        submission_job_operation = _SubmissionJobOperation(
             self._generate_id(job, index=index),
             self.name,
             job,
@@ -993,9 +1038,9 @@ class FlowGroup(object):
 
     def _create_run_job_operations(self, entrypoint, default_directives, job,
                                    ignore_conditions=IgnoreConditions.NONE, index=0):
-        """Create JobOperation object(s) from the FlowGroup.
+        """Create _JobOperation object(s) from the FlowGroup.
 
-        Yields a JobOperation for each contained operation given proper conditions are met.
+        Yields a _JobOperation for each contained operation given proper conditions are met.
 
         :param entrypoint:
             The path and executable, if applicable, to point to for execution.
@@ -1008,29 +1053,26 @@ class FlowGroup(object):
         :type default_directives:
             dict
         :param job:
-            The job that the :class:`~.JobOperation` is based on.
+            The job that the :class:`~._JobOperation` is based on.
         :type job:
             :class:`signac.Job`
         :param index:
-            Index for the :class:`~.JobOperation`.
+            Index for the :class:`~._JobOperation`.
         :type index:
             int
         :return:
-            Returns an iterator over eligible :py:class:`~.JobOperation`s.
+            Returns an iterator over eligible :py:class:`~._JobOperation`s.
         :rtype:
-            Iterator[JobOperation]
+            Iterator[_JobOperation]
         """
         for name, op in self.operations.items():
             if op.eligible(job, ignore_conditions):
                 directives = self._resolve_directives(name, default_directives, job)
                 cmd = self._run_cmd(entrypoint=entrypoint, operation_name=name,
                                     operation=op, directives=directives, job=job)
-                # Uses a different id than the groups direct id. Do not use this for submitting
-                # jobs as current implementation prevents checking for resubmission in this case.
-                # The different ids allow for checking whether JobOperations created to run directly
-                # are different.
-                job_op = JobOperation(self._generate_id(job, name, index=index), name, job,
-                                      cmd=cmd, directives=deepcopy(directives))
+
+                job_op = _JobOperation(self._generate_id(job, name, index=index), name, job,
+                                       cmd=cmd, directives=deepcopy(directives))
                 # Get the prefix, and if it's not NULL, set the fork directive
                 # to True since we must launch a separate process. Override
                 # the command directly.
@@ -1530,7 +1572,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :param operations:
             The operations to bundle.
         :type operations:
-            A sequence of instances of :py:class:`.JobOperation`
+            A sequence of instances of :py:class:`._JobOperation`
         :return:
             The bundle id.
         :rtype:
@@ -2141,7 +2183,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         return status_renderer
 
-    def _run_operations(self, operations=None, pretend=False, np=None, timeout=None, progress=False):
+    def _run_operations(self, operations=None, pretend=False, np=None,
+                        timeout=None, progress=False):
         """Execute the next operations as specified by the project's workflow.
 
         See also: :meth:`~.run`
@@ -2149,7 +2192,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :param operations:
             The operations to execute (optional).
         :type operations:
-            Sequence of instances of :class:`.JobOperation`
+            Sequence of instances of :class:`._JobOperation`
         :param pretend:
             Do not actually execute the operations, but show which command would have been used.
         :type pretend:
@@ -2252,7 +2295,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _loads_op(self, blob):
         id, name, job_id, cmd, directives = blob
-        return JobOperation(id, name, self.open_job(id=job_id), cmd, directives)
+        return _JobOperation(id, name, self.open_job(id=job_id), cmd, directives)
 
     def _run_operations_in_parallel(self, pool, pickle, operations, progress, timeout):
         """Execute operations in parallel.
@@ -2468,7 +2511,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                "there are still operations pending.")
                 break
             try:
-                # Change groups to available run JobOperations
+                # Change groups to available run _JobOperation(s)
                 with self._potentially_buffered():
                     operations = []
                     for flow_group in flow_groups:
@@ -2513,7 +2556,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if requires and set(requires).difference(self.labels(job)):
                 continue
             cmd_ = cmd.format(job=job)
-            yield JobOperation(name=cmd_.replace(' ', '-'), cmd=cmd_, job=job)
+            yield _JobOperation(name=cmd_.replace(' ', '-'), cmd=cmd_, job=job)
 
     def _gather_flow_groups(self, names=None):
         """Grabs FlowGroups that match any of a set of names."""
@@ -2541,7 +2584,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _get_submission_operations(self, jobs, default_directives, names=None,
                                    ignore_conditions=IgnoreConditions.NONE,
                                    ignore_conditions_on_execution=IgnoreConditions.NONE):
-        """Grabs JobOperations that are eligible to run from FlowGroups."""
+        """Grabs _JobOperations that are eligible to run from FlowGroups."""
         for job in jobs:
             for group in self._gather_flow_groups(names):
                 if group.eligible(job, ignore_conditions) and self._eligible_for_submission(group,
@@ -2641,7 +2684,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :param operations:
             The operations to submit.
         :type operations:
-            A sequence of instances of :py:class:`.JobOperation`
+            A sequence of instances of :py:class:`._JobOperation`
         :param _id:
             The _id to be used for this submission.
         :type _id:
@@ -2861,7 +2904,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Bundle them up and submit.
         for bundle in _make_bundles(operations, bundle_size):
             status = self._submit_operations(operations=bundle, env=env, parallel=parallel,
-                                            force=force, walltime=walltime, **kwargs)
+                                             force=force, walltime=walltime, **kwargs)
             if status is not None:  # operations were submitted, store status
                 for operation in bundle:
                     operation.set_status(status)
@@ -3234,7 +3277,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 yield name
 
     def _job_operations(self, job, ignore_conditions=IgnoreConditions.NONE):
-        "Yield instances of JobOperation constructed for specific jobs."
+        "Yield instances of _JobOperation constructed for specific jobs."
         for name in self.operations:
             group = self._groups[name]
             yield from group._create_run_job_operations(entrypoint=self._entrypoint, job=job,
@@ -3255,7 +3298,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type ignore_conditions:
             :py:class:`~.IgnoreConditions`
         :yield:
-            All instances of :class:`~.JobOperation` jobs are eligible for.
+            All instances of :class:`~._JobOperation` jobs are eligible for.
         """
         for job in jobs:
             for op in self._job_operations(job, ignore_conditions):
@@ -3278,6 +3321,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             All instances of :class:`~.JobOperation` jobs are eligible for.
         """
         warnings.warn("The next_operations method is deprecated as of 0.11 and "
+                      "will be removed in 0.13.",
+                      DeprecationWarning)
+        warnings.warn("The JobOperation class is deprecated as of 0.11 and "
                       "will be removed in 0.13.",
                       DeprecationWarning)
         return self._next_operations(*jobs, ignore_conditions=ignore_conditions)

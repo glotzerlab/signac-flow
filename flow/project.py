@@ -2355,7 +2355,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @staticmethod
     def _dumps_op(op):
-        return (op.id, op.name, [job.id for job in op._jobs], op.cmd, op.directives)
+        return (op.id, op.name, [job.get_id() for job in op._jobs], op.cmd, op.directives)
 
     def _loads_op(self, blob):
         id, name, job_ids, cmd, directives = blob

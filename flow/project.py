@@ -3487,14 +3487,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         else:
             jobs = self
         try:
-            try:
-                operation_function = self._operations[args.operation]
-            except KeyError:
-                operation = self._operations[args.operation]
+            operation = self._operations[args.operation]
 
+            if isinstance(operation, FlowCmdOperation):
                 def operation_function(job):
                     cmd = operation(job).format(job=job)
                     subprocess.run(cmd, shell=True, check=True)
+            else:
+                operation_function = operation
 
         except KeyError:
             raise KeyError("Unknown operation '{}'.".format(args.operation))

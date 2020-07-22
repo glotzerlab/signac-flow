@@ -2256,7 +2256,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             operation.directives.get('fork', False)
             # Separate process needed to cancel with timeout:
             or timeout is not None
-            # The operation function is of an instace of FlowCmdOperation:
+            # The operation function is of an instance of FlowCmdOperation:
             or isinstance(self._operations[operation.name], FlowCmdOperation)
             # The specified executable is not the same as the interpreter instance:
             or operation.directives.get('executable', sys.executable) != sys.executable

@@ -840,7 +840,7 @@ class FlowGroup(object):
             entrypoint[key] = entrypoint[key](job)
 
     def _determine_entrypoint(self, entrypoint, directives, job):
-        """Get the entrypoint for creating a JobOperation.
+        """Get the entrypoint for creating a _JobOperation.
 
         If path cannot be determined, then raise a RuntimeError since we do not
         know where to point to.
@@ -2330,7 +2330,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :param operations:
             The operations to execute (optional).
         :type operations:
-            Sequence of instances of :class:`.JobOperation`
+            Sequence of instances of :class:`._JobOperation`
         :param pretend:
             Do not actually execute the operations, but show which command would have been used.
         :type pretend:
@@ -2690,7 +2690,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :param operations:
             The operations to execute.
         :type operations:
-            Sequence of instances of :class:`.JobOperation`
+            Sequence of instances of :class:`._JobOperation`
         :param parallel:
             Execute all operations in parallel (default is False).
         :type parallel:
@@ -2723,7 +2723,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :param operations:
             The operations to execute.
         :type operations:
-            Sequence of instances of :class:`.JobOperation`
+            Sequence of instances of :class:`._JobOperation`
         :param parallel:
             Execute all operations in parallel (default is False).
         :type parallel:
@@ -2871,7 +2871,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :param operations:
             The operations to submit.
         :type operations:
-            A sequence of instances of :py:class:`.JobOperation`
+            A sequence of instances of :py:class:`._JobOperation`
         :param _id:
             The _id to be used for this submission.
         :type _id:
@@ -3403,7 +3403,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type ignore_conditions:
             :py:class:`~.IgnoreConditions`
         :yield:
-            All instances of :class:`~.JobOperation` jobs are eligible for.
+            All instances of :class:`~._JobOperation` jobs are eligible for.
         """
         warnings.warn("The JobOperation class is deprecated as of 0.11 and "
                       "will be removed in 0.13.",

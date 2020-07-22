@@ -1,11 +1,11 @@
-from flow import FlowProject, aggregate
+from flow import FlowProject, Aggregate
 
 
 class _AggregateTestProject(FlowProject):
     pass
 
 
-group1 = _AggregateTestProject.make_group(name="group_agg", aggregator=aggregate())
+group1 = _AggregateTestProject.make_group(name="group_agg", aggregate=Aggregate())
 
 
 @_AggregateTestProject.label
@@ -17,7 +17,7 @@ def aggregate_doc_condition(*jobs):
 
 
 @_AggregateTestProject.operation
-@aggregate()
+@Aggregate()
 @_AggregateTestProject.post.true('average')
 def agg_op1(*jobs):
     sum = 0

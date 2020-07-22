@@ -177,7 +177,7 @@ class TestProjectStatusPerformance(TestProjectBase):
         time = timeit.timeit(
             lambda: project._fetch_status(project, StringIO(),
                                           ignore_errors=False), number=10)
-
+        print(time)
         assert time < 10
         MockScheduler.reset()
 
@@ -732,8 +732,8 @@ class TestExecutionProject(TestProjectBase):
 
     def test_pending_operations_order(self):
         # The execution order of local runs is internally assumed to be
-        # 'by-ops' by default. A failure of this unit tests means that
-        # a 'by-ops' order must be implemented explicitly within the
+        # 'by-op' by default. A failure of this unit tests means that
+        # a 'by-op' order must be implemented explicitly within the
         # FlowProject.run() function.
         project = self.mock_project()
         ops = list(project._get_pending_operations(self.project.find_jobs()))
@@ -754,7 +754,7 @@ class TestExecutionProject(TestProjectBase):
         def sort_key(op):
             return op.name, op.job.get_id()
 
-        for order in (None, 'none', 'cyclic', 'by-ops', 'random', sort_key):
+        for order in (None, 'none', 'cyclic', 'by-op', 'random', sort_key):
             for job in self.project.find_jobs():  # clear
                 job.remove()
             with subtests.test(order=order):
@@ -1252,11 +1252,11 @@ class TestGroupProject(TestProjectBase):
         # For multiple operation groups and options
         for job in project:
             job_op1 = project.groups['group1']._create_submission_job_operation(
-                project._entrypoint, dict(), job)
+                project._entrypoint, dict(), [job])
             script1 = project.script([job_op1])
             assert 'run -o group1 -j {}'.format(job) in script1
             job_op2 = project.groups['group2']._create_submission_job_operation(
-                project._entrypoint, dict(), job)
+                project._entrypoint, dict(), [job])
             script2 = project.script([job_op2])
             assert '--num-passes=2' in script2
 
@@ -1274,10 +1274,10 @@ class TestGroupProject(TestProjectBase):
             assert all([job_op.directives.get('omp_num_threads', 0) == 1 for job_op in job_ops])
             # Test run JobOperations
             job_ops = project.groups['group2']._create_run_job_operations(
-                project._entrypoint, project._get_default_directives(), job)
+                project._entrypoint, project._get_default_directives(), [job])
             assert all([job_op.directives.get('omp_num_threads', 0) == 4 for job_op in job_ops])
             job_ops = project.groups['op3']._create_run_job_operations(
-                project._entrypoint, project._get_default_directives(), job)
+                project._entrypoint, project._get_default_directives(), [job])
             assert all([job_op.directives.get('omp_num_threads', 0) == 1 for job_op in job_ops])
 
     def test_submission_aggregation(self):
@@ -1387,7 +1387,7 @@ class TestGroupExecutionProject(TestProjectBase):
         MockScheduler.reset()
         project = self.mock_project()
         operations = [project.groups['group1']._create_submission_job_operation(
-            project._entrypoint, dict(), job) for job in project]
+            project._entrypoint, dict(), [job]) for job in project]
         assert len(list(MockScheduler.jobs())) == 0
         cluster_job_id = project._store_bundled(operations)
         with redirect_stderr(StringIO()):
@@ -1644,8 +1644,8 @@ class TestGroupAggregationProjectMainInterface(TestProjectBase):
     def generate_job_ids(self, jobs, compressed=False):
         jobs = list(jobs)
         if compressed:
-            return '{}...{}...{}'.format(
-                str(jobs[0])[:8], len(jobs), str(jobs[-1])[:8])
+            return '{}: ({}-{})'.format(len(jobs),
+                                        str(jobs[0])[:8], str(jobs[-1])[:8])
         else:
             return ' '.join(map(str, jobs))
 

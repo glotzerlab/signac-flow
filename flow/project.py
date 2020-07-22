@@ -840,7 +840,7 @@ class FlowGroup(object):
             entrypoint[key] = entrypoint[key](job)
 
     def _determine_entrypoint(self, entrypoint, directives, job):
-        """Get the entrypoint for creating a _JobOperation.
+        """Get the entrypoint for creating a JobOperation.
 
         If path cannot be determined, then raise a RuntimeError since we do not
         know where to point to.
@@ -1141,8 +1141,8 @@ class FlowGroup(object):
                 cmd = self._run_cmd(entrypoint=entrypoint, operation_name=name,
                                     operation=op, directives=directives, job=job)
 
-                job_op = JobOperation(self._generate_id(job, name, index=index), name, job,
-                                      cmd=cmd, directives=deepcopy(directives))
+                job_op = _JobOperation(self._generate_id(job, name, index=index), name, job,
+                                       cmd=cmd, directives=deepcopy(directives))
                 # Get the prefix, and if it's not NULL, set the fork directive
                 # to True since we must launch a separate process. Override
                 # the command directly.

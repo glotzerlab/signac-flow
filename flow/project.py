@@ -245,51 +245,6 @@ def make_bundles(operations, size=None):
     return _make_bundles(operations, size)
 
 
-@deprecated(
-    deprecated_in="0.11", removed_in="0.13", current_version=__version__)
-def JobOperation(id, name, job, cmd, directive=None):
-    """This class represents the information needed to execute one group for one job.
-
-    The execution or submission of a :py:class:`FlowGroup` uses a passed in command
-    which can either be a string or function with no arguments that returns a shell
-    executable command.  This won't be used if it is determined that the group can be
-    executed without forking.
-
-    .. note::
-
-        This class is used by the :class:`~.FlowGroup` class for the execution and
-        submission process and should not be instantiated by users themselves.
-
-    :param id:
-        The id of this JobOperation instance. The id should be unique.
-    :type id:
-        str
-    :param name:
-        The name of the JobOperation.
-    :type name:
-        str
-    :param job:
-        The job instance associated with this operation.
-    :type job:
-        :py:class:`signac.Job`.
-    :param cmd:
-        The command that executes this operation. Can be a function that when
-        evaluated returns a string.
-    :type cmd:
-        callable or str
-    :param directives:
-        A dictionary of additional parameters that provide instructions on how
-        to execute this operation, e.g., specifically required resources.
-    :type directives:
-        :class:`dict`
-    """
-    warnings.warn("The JobOperation class is deprecated as of 0.11 and "
-                  "will be removed in 0.13.",
-                  DeprecationWarning)
-
-    return _JobOperation(id, name, job, cmd, directive=None)
-
-
 class _JobOperation(object):
     """This class represents the information needed to execute one group for one job.
 
@@ -403,6 +358,119 @@ class _JobOperation(object):
         except KeyError:
             return JobStatus.unknown
 
+@deprecated(
+    deprecated_in="0.11", removed_in="0.13", current_version=__version__)
+class JobOperation(object):
+    """This class represents the information needed to execute one group for one job.
+
+    The execution or submission of a :py:class:`FlowGroup` uses a passed in command
+    which can either be a string or function with no arguments that returns a shell
+    executable command.  This won't be used if it is determined that the group can be
+    executed without forking.
+
+    .. note::
+
+        This class is used by the :class:`~.FlowGroup` class for the execution and
+        submission process and should not be instantiated by users themselves.
+
+    :param id:
+        The id of this JobOperation instance. The id should be unique.
+    :type id:
+        str
+    :param name:
+        The name of the JobOperation.
+    :type name:
+        str
+    :param job:
+        The job instance associated with this operation.
+    :type job:
+        :py:class:`signac.Job`.
+    :param cmd:
+        The command that executes this operation. Can be a function that when
+        evaluated returns a string.
+    :type cmd:
+        callable or str
+    :param directives:
+        A dictionary of additional parameters that provide instructions on how
+        to execute this operation, e.g., specifically required resources.
+    :type directives:
+        :class:`dict`
+    """
+    def __init__(self, id, name, job, cmd, directives=None):
+        self._id = id
+        self.name = name
+        self.job = job
+        if not (callable(cmd) or isinstance(cmd, str)):
+            raise ValueError("JobOperation cmd must be a callable or string.")
+        self._cmd = cmd
+
+        if directives is None:
+            directives = dict()  # default argument
+        else:
+            directives = dict(directives)  # explicit copy
+
+        # Keys which were explicitly set by the user, but are not evaluated by the
+        # template engine are cause for concern and might hint at a bug in the template
+        # script or ill-defined directives. We are therefore keeping track of all
+        # keys set by the user and check whether they have been evaluated by the template
+        # script engine later.
+        keys_set_by_user = set(directives)
+
+        # We use a special dictionary that allows us to track all keys that have been
+        # evaluated by the template engine and compare them to those explicitly set
+        # by the user. See also comment above.
+        self.directives = TrackGetItemDict(
+            {key: value for key, value in directives.items()})
+        self.directives._keys_set_by_user = keys_set_by_user
+
+    def __str__(self):
+        return "{}({})".format(self.name, self.job)
+
+    def __repr__(self):
+        return "{type}(name='{name}', job='{job}', cmd={cmd}, directives={directives})".format(
+                   type=type(self).__name__,
+                   name=self.name,
+                   job=str(self.job),
+                   cmd=repr(self.cmd),
+                   directives=self.directives)
+
+    def __hash__(self):
+        return int(sha1(self.id.encode('utf-8')).hexdigest(), 16)
+
+    def __eq__(self, other):
+        return self.id == other.id
+
+    @deprecated(deprecated_in="0.9", removed_in="0.11", current_version=__version__)
+    def get_id(self):
+        return self._id
+
+    @property
+    def id(self):
+        return self._id
+
+    @property
+    def cmd(self):
+        if callable(self._cmd):
+            # We allow cmd to be 'lazy' or an unevaluated function because
+            # in cases where a user uses the Python API without specifying
+            # a project entrypoint, running many operations is still valid.
+            # If we need to fork this will fail to generate a command and
+            # error, but not until then. If we don't fork then nothing errors,
+            # and the user gets the expected result.
+            return self._cmd()
+        else:
+            return self._cmd
+
+    def set_status(self, value):
+        "Store the operation's status."
+        self.job._project.document.setdefault('_status', dict())[self.id] = int(value)
+
+    def get_status(self):
+        "Retrieve the operation's last known status."
+        try:
+            return JobStatus(self.job._project.document['_status'][self.id])
+        except KeyError:
+            return JobStatus.unknown
 
 class _SubmissionJobOperation(_JobOperation):
     R"""This class represents the information needed to submit one group for one job.
@@ -1071,8 +1139,8 @@ class FlowGroup(object):
                 cmd = self._run_cmd(entrypoint=entrypoint, operation_name=name,
                                     operation=op, directives=directives, job=job)
 
-                job_op = _JobOperation(self._generate_id(job, name, index=index), name, job,
-                                       cmd=cmd, directives=deepcopy(directives))
+                job_op = JobOperation(self._generate_id(job, name, index=index), name, job,
+                                      cmd=cmd, directives=deepcopy(directives))
                 # Get the prefix, and if it's not NULL, set the fork directive
                 # to True since we must launch a separate process. Override
                 # the command directly.
@@ -2279,10 +2347,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type progress:
             bool
         """
-        warnings.warn("The run_operations method is deprecated as of 0.11 and "
-                      "will be removed in 0.13.",
-                      DeprecationWarning)
-
         return self._run_operations(operations, pretend, np, timeout, progress)
 
     class _PickleError(Exception):
@@ -2671,10 +2735,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type show_template_help:
             bool
         """
-        warnings.warn("The script method is deprecated as of 0.11 and "
-                      "will be removed in 0.13.",
-                      DeprecationWarning)
-
         return self._script(operations, parallel, template, show_template_help)
 
     def _generate_submit_script(self, _id, operations, template, show_template_help, env, **kwargs):
@@ -2844,10 +2904,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :return:
             Returns the submission status after successful submission or None.
         """
-        warnings.warn("The submit_operations method is deprecated as of 0.11 and "
-                      "will be removed in 0.13.",
-                      DeprecationWarning)
-
         return self._submit_operations(operations, _id, env, parallel, flags,
                                        force, template, pretend,
                                        show_template_help, **kwargs)
@@ -3331,7 +3387,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             for op in self._job_operations(job, ignore_conditions):
                 yield op
 
-    @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
+    @deprecated(deprecated_in="0.10", removed_in="0.13", current_version=__version__)
     def next_operations(self, *jobs, ignore_conditions=IgnoreConditions.NONE):
         """Determine the next eligible operations for jobs.
 
@@ -3347,9 +3403,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :yield:
             All instances of :class:`~.JobOperation` jobs are eligible for.
         """
-        warnings.warn("The next_operations method is deprecated as of 0.11 and "
-                      "will be removed in 0.13.",
-                      DeprecationWarning)
         warnings.warn("The JobOperation class is deprecated as of 0.11 and "
                       "will be removed in 0.13.",
                       DeprecationWarning)

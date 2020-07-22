@@ -11,6 +11,7 @@ import subprocess
 import tempfile
 import collections.abc
 from contextlib import contextmanager, redirect_stdout, redirect_stderr
+from deprecation import DeprecatedWarning
 from distutils.version import StrictVersion
 from io import StringIO
 from itertools import groupby
@@ -663,8 +664,7 @@ class TestProject(TestProjectBase):
     def test_script(self):
         project = self.mock_project()
         for job in project:
-            with pytest.deprecated_call():
-                script = project.script(project.next_operations(job))
+            script = project.script(project.next_operations(job))
             if job.sp.b % 2 == 0:
                 assert str(job) in script
                 assert 'echo "hello"' in script
@@ -684,8 +684,7 @@ class TestProject(TestProjectBase):
             file.write("THIS IS A CUSTOM SCRIPT!\n")
             file.write("{% endblock %}\n")
         for job in project:
-            with pytest.deprecated_call():
-                script = project.script(project.next_operations(job))
+            script = project.script(project.next_operations(job))
             assert "THIS IS A CUSTOM SCRIPT" in script
             if job.sp.b % 2 == 0:
                 assert str(job) in script
@@ -927,9 +926,7 @@ class TestExecutionProject(TestProjectBase):
                 operations.extend(project.next_operations(job))
         assert len(list(MockScheduler.jobs())) == 0
         cluster_job_id = project._store_bundled(operations)
-        with redirect_stderr(StringIO()):
-            with pytest.deprecated_call():
-                project.submit_operations(_id=cluster_job_id, operations=operations)
+        project.submit_operations(_id=cluster_job_id, operations=operations)
         assert len(list(MockScheduler.jobs())) == 1
 
     def test_submit(self):
@@ -1047,8 +1044,7 @@ class TestExecutionProject(TestProjectBase):
         cluster_job_id = project._store_bundled(operations)
         stderr = StringIO()
         with redirect_stderr(stderr):
-            with pytest.deprecated_call():
-                project.submit_operations(_id=cluster_job_id, operations=operations)
+            project.submit_operations(_id=cluster_job_id, operations=operations)
         assert len(list(MockScheduler.jobs())) == 1
         assert 'Some of the keys provided as part of the directives were not used by the template '
         'script, including: bad_directive\n' in stderr.getvalue()
@@ -1253,8 +1249,7 @@ class TestGroupProject(TestProjectBase):
         # For run mode single operation groups
         for job in project:
             job_ops = project._get_submission_operations([job], dict())
-            with pytest.deprecated_call():
-                script = project.script(job_ops)
+            script = project.script(job_ops)
             if job.sp.b % 2 == 0:
                 assert str(job) in script
                 assert 'run -o op1 -j {}'.format(job) in script
@@ -1268,13 +1263,11 @@ class TestGroupProject(TestProjectBase):
         for job in project:
             job_op1 = project.groups['group1']._create_submission_job_operation(
                 project._entrypoint, dict(), job)
-            with pytest.deprecated_call():
-                script1 = project.script([job_op1])
+            script1 = project.script([job_op1])
             assert 'run -o group1 -j {}'.format(job) in script1
             job_op2 = project.groups['group2']._create_submission_job_operation(
                 project._entrypoint, dict(), job)
-            with pytest.deprecated_call():
-                script2 = project.script([job_op2])
+            script2 = project.script([job_op2])
             assert '--num-passes=2' in script2
 
     def test_directives_hierarchy(self):
@@ -1408,8 +1401,7 @@ class TestGroupExecutionProject(TestProjectBase):
         assert len(list(MockScheduler.jobs())) == 0
         cluster_job_id = project._store_bundled(operations)
         with redirect_stderr(StringIO()):
-            with pytest.deprecated_call():
-                project.submit_operations(_id=cluster_job_id, operations=operations)
+            project.submit_operations(_id=cluster_job_id, operations=operations)
         assert len(list(MockScheduler.jobs())) == 1
 
     def test_submit(self):

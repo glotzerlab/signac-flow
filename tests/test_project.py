@@ -11,7 +11,6 @@ import subprocess
 import tempfile
 import collections.abc
 from contextlib import contextmanager, redirect_stdout, redirect_stderr
-from deprecation import DeprecatedWarning
 from distutils.version import StrictVersion
 from io import StringIO
 from itertools import groupby

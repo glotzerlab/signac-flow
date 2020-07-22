@@ -358,6 +358,7 @@ class _JobOperation(object):
         except KeyError:
             return JobStatus.unknown
 
+
 @deprecated(
     deprecated_in="0.11", removed_in="0.13", current_version=__version__)
 class JobOperation(object):
@@ -471,6 +472,7 @@ class JobOperation(object):
             return JobStatus(self.job._project.document['_status'][self.id])
         except KeyError:
             return JobStatus.unknown
+
 
 class _SubmissionJobOperation(_JobOperation):
     R"""This class represents the information needed to submit one group for one job.

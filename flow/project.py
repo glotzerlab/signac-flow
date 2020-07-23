@@ -556,14 +556,13 @@ class FlowCmdOperation(BaseFlowOperation):
     """A BaseFlowOperation that holds a shell executable command.
 
     When an operation has the ``@cmd`` directive specified, it is instantiated
-    as a FlowCmdOperation. The operation should be a function of single or multiple
-    :py:class:`~signac.contrib.job.Job` instances. The command (cmd) is a callable
-    that expects single or multiple :class:`~signac.contrib.job.Job` instances
-    as its positional argument(s) and returns a string containing valid shell commands,
-    or the string of commands itself.
-    In either case, the resulting string may contain any attributes of the job
-    or multiple jobs placed in curly braces, which will then be substituted
-    by Python string formatting.
+    as a FlowCmdOperation. The operation should be a function of
+    :py:class:`~signac.contrib.job.Job`. The command (cmd) may
+    either be a unary callable that expects an instance of
+    :class:`~signac.contrib.job.Job` as its only positional argument and returns
+    a string containing valid shell commands, or the string of commands itself.
+    In either case, the resulting string may contain any attributes of the job placed
+    in curly braces, which will then be substituted by Python string formatting.
 
     .. note::
         This class should not be instantiated directly.

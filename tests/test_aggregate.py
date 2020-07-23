@@ -4,7 +4,7 @@ from functools import partial
 from tempfile import TemporaryDirectory
 
 import signac
-from flow.aggregate import Aggregate, _MakeAggregate
+from flow.aggregate import Aggregate
 
 
 class AggregateProjectSetup:
@@ -127,7 +127,7 @@ class TestMakeAggregate(AggregateProjectSetup):
 
         aggregate_instance = Aggregate(helper_aggregator)
 
-        aggregate_instance = _MakeAggregate(aggregate_instance)
+        aggregate_instance = aggregate_instance._create_MakeAggregate()
         aggregate_job_manual = helper_aggregator(project)
         aggregate_job_via_aggregator = aggregate_instance(project)
 
@@ -136,7 +136,7 @@ class TestMakeAggregate(AggregateProjectSetup):
 
     def test_valid_aggregator_partial(self, setUp, project):
         aggregate_instance = Aggregate(lambda jobs: [jobs])
-        aggregate_instance = _MakeAggregate(aggregate_instance)
+        aggregate_instance = aggregate_instance._create_MakeAggregate()
         aggregate_job_via_aggregator = aggregate_instance(project)
 
         assert [[job for job in project]] == \
@@ -145,14 +145,14 @@ class TestMakeAggregate(AggregateProjectSetup):
     def test_valid_sort(self, setUp, project):
         helper_sort = partial(sorted, key=lambda job: job.sp.i)
         aggregate_instance = Aggregate(sort='i')
-        aggregate_instance = _MakeAggregate(aggregate_instance)
+        aggregate_instance = aggregate_instance._create_MakeAggregate()
 
         assert([helper_sort(project)] == aggregate_instance(project))
 
     def test_valid_reversed_sort(self, setUp, project):
         helper_sort = partial(sorted, key=lambda job: job.sp.i, reverse=True)
         aggregate_instance = Aggregate(sort='i', reverse=True)
-        aggregate_instance = _MakeAggregate(aggregate_instance)
+        aggregate_instance = aggregate_instance._create_MakeAggregate()
 
         assert([helper_sort(project)] == aggregate_instance(project))
 
@@ -163,7 +163,7 @@ class TestMakeAggregate(AggregateProjectSetup):
 
         for valid_value in valid_values:
             aggregate_instance = Aggregate.groupsof(valid_value)
-            aggregate_instance = _MakeAggregate(aggregate_instance)
+            aggregate_instance = aggregate_instance._create_MakeAggregate()
             aggregate_job_via_aggregator = aggregate_instance(project)
             if total_jobs % valid_value == 0:
                 length_of_aggregate = total_jobs/valid_value
@@ -173,7 +173,7 @@ class TestMakeAggregate(AggregateProjectSetup):
 
     def test_groupby_with_valid_string_key(self, setUp, project):
         aggregate_instance = Aggregate.groupby('even')
-        aggregate_instance = _MakeAggregate(aggregate_instance)
+        aggregate_instance = aggregate_instance._create_MakeAggregate()
         aggregates = 0
         for agg in aggregate_instance(project):
             aggregates += 1
@@ -181,14 +181,14 @@ class TestMakeAggregate(AggregateProjectSetup):
 
     def test_groupby_with_invalid_string_key(self, setUp, project):
         aggregate_instance = Aggregate.groupby('invalid_key')
-        aggregate_instance = _MakeAggregate(aggregate_instance)
+        aggregate_instance = aggregate_instance._create_MakeAggregate()
         with pytest.raises(KeyError):
             for agg in aggregate_instance(project):
                 pass
 
     def test_groupby_with_default_key_for_string(self, setUp, project):
         aggregate_instance = Aggregate.groupby('half', default=-1)
-        aggregate_instance = _MakeAggregate(aggregate_instance)
+        aggregate_instance = aggregate_instance._create_MakeAggregate()
         aggregates = 0
         for agg in aggregate_instance(project):
             aggregates += 1
@@ -196,7 +196,7 @@ class TestMakeAggregate(AggregateProjectSetup):
 
     def test_groupby_with_Iterable_key(self, setUp, project):
         aggregate_instance = Aggregate.groupby(['i', 'even'])
-        aggregate_instance = _MakeAggregate(aggregate_instance)
+        aggregate_instance = aggregate_instance._create_MakeAggregate()
         aggregates = 0
         for agg in aggregate_instance(project):
             aggregates += 1
@@ -204,14 +204,14 @@ class TestMakeAggregate(AggregateProjectSetup):
 
     def test_groupby_with_invalid_Iterable_key(self, setUp, project):
         aggregate_instance = Aggregate.groupby(['half', 'even'])
-        aggregate_instance = _MakeAggregate(aggregate_instance)
+        aggregate_instance = aggregate_instance._create_MakeAggregate()
         with pytest.raises(KeyError):
             for agg in aggregate_instance(project):
                 pass
 
     def test_groupby_with_valid_default_key_for_Iterable(self, setUp, project):
         aggregate_instance = Aggregate.groupby(['half', 'even'], default=[-1, -1])
-        aggregate_instance = _MakeAggregate(aggregate_instance)
+        aggregate_instance = aggregate_instance._create_MakeAggregate()
         aggregates = 0
         for agg in aggregate_instance(project):
             aggregates += 1
@@ -222,7 +222,7 @@ class TestMakeAggregate(AggregateProjectSetup):
             return job.sp['even']
 
         aggregate_instance = Aggregate.groupby(keyfunction)
-        aggregate_instance = _MakeAggregate(aggregate_instance)
+        aggregate_instance = aggregate_instance._create_MakeAggregate()
         aggregates = 0
         for agg in aggregate_instance(project):
             aggregates += 1
@@ -232,7 +232,7 @@ class TestMakeAggregate(AggregateProjectSetup):
         def keyfunction(job):
             return job.sp['half']
         aggregate_instance = Aggregate.groupby(keyfunction)
-        aggregate_instance = _MakeAggregate(aggregate_instance)
+        aggregate_instance = aggregate_instance._create_MakeAggregate()
         with pytest.raises(KeyError):
             for agg in aggregate_instance(project):
                 pass
@@ -242,7 +242,7 @@ class TestMakeAggregate(AggregateProjectSetup):
             return job.sp.i > 5
 
         aggregate_instance = Aggregate.groupsof(1, select=_select)
-        aggregate_instance = _MakeAggregate(aggregate_instance)
+        aggregate_instance = aggregate_instance._create_MakeAggregate()
         selected_jobs = []
         for job in project:
             if _select(job):

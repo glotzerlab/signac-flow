@@ -4,7 +4,6 @@
 from collections.abc import Iterable
 from itertools import groupby
 from itertools import zip_longest
-from functools import partial
 
 
 class Aggregate:
@@ -64,10 +63,9 @@ class Aggregate:
                             "".format(type(select)))
 
         self._aggregator = aggregator
-        self._sort = None if sort is None else partial(sorted,
-                                                       key=lambda job: job.sp[sort],
-                                                       reverse=bool(reverse))
-        self._select = None if select is None else partial(filter, select)
+        self._sort = sort
+        self._reverse = reverse
+        self._select = select
 
     @classmethod
     def groupsof(cls, num=1, sort=None, reverse=False, select=None):
@@ -126,9 +124,12 @@ class Aggregate:
 
         return cls(aggregator, sort, reverse, select)
 
+    def _create_MakeAggregate(self):
+        return MakeAggregate(self._aggregator, self._sort, self._reverse, self._select)
+
     def __call__(self, func=None):
         if callable(func):
-            setattr(func, '_flow_aggregate', _MakeAggregate(self))
+            setattr(func, '_flow_aggregate', self._create_MakeAggregate())
             return func
         else:
             raise TypeError('Invalid argument passed while calling '
@@ -136,28 +137,28 @@ class Aggregate:
                             'got {}.'.format(type(func)))
 
 
-class _MakeAggregate:
-    """This class handles the creation of aggregates.
+class MakeAggregate(Aggregate):
+    r"""This class handles the creation of aggregates.
 
     .. note::
         This class should not be instantiated by users directly.
-
-    :param _aggregate:
-        Aggregate object associated with an operation function
-    :type _aggregate:
-        :py:class:`Aggregate`
+    :param \*args:
+        Passed to the constructor of :py:class:`Aggregate`.
     """
-    def __init__(self, _aggregate=Aggregate()):
-        self._aggregate = _aggregate
+    def __init__(self, *args):
+        super(MakeAggregate, self).__init__(*args)
 
     def __call__(self, obj):
         "Return aggregated jobs"
         aggregated_jobs = list(obj)
-        if self._aggregate._select is not None:
-            aggregated_jobs = list(self._aggregate._select(aggregated_jobs))
-        if self._aggregate._sort is not None:
-            aggregated_jobs = list(self._aggregate._sort(aggregated_jobs))
-        aggregated_jobs = self._aggregate._aggregator([job for job in aggregated_jobs])
+        if self._select is not None:
+            aggregated_jobs = list(filter(self._select, aggregated_jobs))
+        if self._sort is not None:
+            aggregated_jobs = list(sorted(aggregated_jobs,
+                                          key=lambda job: job.sp[self._sort],
+                                          reverse=bool(self._reverse)))
+
+        aggregated_jobs = self._aggregator([job for job in aggregated_jobs])
         aggregated_jobs = self._create_nested_aggregate_list(aggregated_jobs)
         if not len(aggregated_jobs):
             return []

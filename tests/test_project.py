@@ -917,7 +917,8 @@ class TestExecutionProject(TestProjectBase):
             operations.extend(project._next_operations(job))
         assert len(list(MockScheduler.jobs())) == 0
         cluster_job_id = project._store_bundled(operations)
-        project.submit_operations(_id=cluster_job_id, operations=operations)
+        with redirect_stderr(StringIO()):
+            project.submit_operations(_id=cluster_job_id, operations=operations)
         assert len(list(MockScheduler.jobs())) == 1
 
     def test_submit(self):

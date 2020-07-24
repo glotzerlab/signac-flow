@@ -3411,6 +3411,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _main_script(self, args):
         "Generate a script for the execution of operations."
+        if args.requires and not args.cmd:
+            raise ValueError(
+                "The --requires option can only be used in combination with --cmd.")
+        if args.cmd and args.operation_name:
+            raise ValueError(
+                "Cannot use the -o/--operation-name and the --cmd options in combination!")
         # Select jobs:
         jobs = self._select_jobs_from_args(args)
 

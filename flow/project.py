@@ -361,7 +361,7 @@ class _JobOperation(object):
 
 @deprecated(
     deprecated_in="0.11", removed_in="0.13", current_version=__version__)
-class JobOperation(object):
+class JobOperation(_JobOperation):
     """This class represents the information needed to execute one group for one job.
 
     The execution or submission of a :py:class:`FlowGroup` uses a passed in command
@@ -423,55 +423,6 @@ class JobOperation(object):
         self.directives = TrackGetItemDict(
             {key: value for key, value in directives.items()})
         self.directives._keys_set_by_user = keys_set_by_user
-
-    def __str__(self):
-        return "{}({})".format(self.name, self.job)
-
-    def __repr__(self):
-        return "{type}(name='{name}', job='{job}', cmd={cmd}, directives={directives})".format(
-                   type=type(self).__name__,
-                   name=self.name,
-                   job=str(self.job),
-                   cmd=repr(self.cmd),
-                   directives=self.directives)
-
-    def __hash__(self):
-        return int(sha1(self.id.encode('utf-8')).hexdigest(), 16)
-
-    def __eq__(self, other):
-        return self.id == other.id
-
-    @deprecated(deprecated_in="0.9", removed_in="0.11", current_version=__version__)
-    def get_id(self):
-        return self._id
-
-    @property
-    def id(self):
-        return self._id
-
-    @property
-    def cmd(self):
-        if callable(self._cmd):
-            # We allow cmd to be 'lazy' or an unevaluated function because
-            # in cases where a user uses the Python API without specifying
-            # a project entrypoint, running many operations is still valid.
-            # If we need to fork this will fail to generate a command and
-            # error, but not until then. If we don't fork then nothing errors,
-            # and the user gets the expected result.
-            return self._cmd()
-        else:
-            return self._cmd
-
-    def set_status(self, value):
-        "Store the operation's status."
-        self.job._project.document.setdefault('_status', dict())[self.id] = int(value)
-
-    def get_status(self):
-        "Retrieve the operation's last known status."
-        try:
-            return JobStatus(self.job._project.document['_status'][self.id])
-        except KeyError:
-            return JobStatus.unknown
 
 
 class _SubmissionJobOperation(_JobOperation):
@@ -2330,7 +2281,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :param operations:
             The operations to execute (optional).
         :type operations:
-            Sequence of instances of :class:`._JobOperation`
+            Sequence of instances of :class:`.JobOperation`
         :param pretend:
             Do not actually execute the operations, but show which command would have been used.
         :type pretend:
@@ -2723,7 +2674,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :param operations:
             The operations to execute.
         :type operations:
-            Sequence of instances of :class:`._JobOperation`
+            Sequence of instances of :class:`.JobOperation`
         :param parallel:
             Execute all operations in parallel (default is False).
         :type parallel:
@@ -2871,7 +2822,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :param operations:
             The operations to submit.
         :type operations:
-            A sequence of instances of :py:class:`._JobOperation`
+            A sequence of instances of :py:class:`.JobOperation`
         :param _id:
             The _id to be used for this submission.
         :type _id:
@@ -3403,7 +3354,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type ignore_conditions:
             :py:class:`~.IgnoreConditions`
         :yield:
-            All instances of :class:`~._JobOperation` jobs are eligible for.
+            All instances of :class:`~.JobOperation` jobs are eligible for.
         """
         warnings.warn("The JobOperation class is deprecated as of 0.11 and "
                       "will be removed in 0.13.",

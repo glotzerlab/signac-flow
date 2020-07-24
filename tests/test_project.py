@@ -427,9 +427,8 @@ class TestProjectClass(TestProjectBase):
         project = self.mock_project(A)
         for job in project:
             job.doc.np = 3
-            with pytest.deprecated_call():
-                for next_op in project.next_operations(job):
-                    assert 'mpirun -np 3 python' in next_op.cmd
+            for next_op in project._next_operations(job):
+                assert 'mpirun -np 3 python' in next_op.cmd
             break
 
     def test_callable_directives(self):
@@ -447,24 +446,21 @@ class TestProjectClass(TestProjectBase):
 
         # test setting neither nranks nor omp_num_threads
         for job in project:
-            with pytest.deprecated_call():
-                for next_op in project.next_operations(job):
-                    assert next_op.directives['np'] == 1
+            for next_op in project._next_operations(job):
+                assert next_op.directives['np'] == 1
 
         # test only setting nranks
         for i, job in enumerate(project):
             job.doc.nranks = i+1
-            with pytest.deprecated_call():
-                for next_op in project.next_operations(job):
-                    assert next_op.directives['np'] == next_op.directives['nranks']
+            for next_op in project._next_operations(job):
+                assert next_op.directives['np'] == next_op.directives['nranks']
             del job.doc['nranks']
 
         # test only setting omp_num_threads
         for i, job in enumerate(project):
             job.doc.omp_num_threads = i+1
-            with pytest.deprecated_call():
-                for next_op in project.next_operations(job):
-                    assert next_op.directives['np'] == next_op.directives['omp_num_threads']
+            for next_op in project._next_operations(job):
+                assert next_op.directives['np'] == next_op.directives['omp_num_threads']
             del job.doc['omp_num_threads']
 
         # test setting both nranks and omp_num_threads
@@ -472,9 +468,8 @@ class TestProjectClass(TestProjectBase):
             job.doc.omp_num_threads = i+1
             job.doc.nranks = i % 3 + 1
             expected_np = (i + 1) * (i % 3 + 1)
-            with pytest.deprecated_call():
-                for next_op in project.next_operations(job):
-                    assert next_op.directives['np'] == expected_np
+            for next_op in project._next_operations(job):
+                assert next_op.directives['np'] == expected_np
 
     def test_copy_conditions(self):
 
@@ -597,13 +592,12 @@ class TestProject(TestProjectBase):
         project = self.mock_project()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
         for job in project:
-            with pytest.deprecated_call():
-                for i, op in enumerate(project.next_operations(job)):
-                    assert op.job == job
-                    if job in even_jobs:
-                        assert op.name == ['op1', 'op2', 'op3'][i]
-                    else:
-                        assert op.name == ['op2', 'op3'][i]
+            for i, op in enumerate(project._next_operations(job)):
+                assert op.job == job
+                if job in even_jobs:
+                    assert op.name == ['op1', 'op2', 'op3'][i]
+                else:
+                    assert op.name == ['op2', 'op3'][i]
             assert i == 2 if job in even_jobs else 1
 
     def test_get_job_status(self):
@@ -612,13 +606,12 @@ class TestProject(TestProjectBase):
             status = project.get_job_status(job)
             assert status['job_id'] == job.get_id()
             assert len(status['operations']) == len(project.operations)
-            with pytest.deprecated_call():
-                for op in project.next_operations(job):
-                    assert op.name in status['operations']
-                    op_status = status['operations'][op.name]
-                    assert op_status['eligible'] == project.operations[op.name].eligible(job)
-                    assert op_status['completed'] == project.operations[op.name].complete(job)
-                    assert op_status['scheduler_status'] == JobStatus.unknown
+            for op in project._next_operations(job):
+                assert op.name in status['operations']
+                op_status = status['operations'][op.name]
+                assert op_status['eligible'] == project.operations[op.name].eligible(job)
+                assert op_status['completed'] == project.operations[op.name].complete(job)
+                assert op_status['scheduler_status'] == JobStatus.unknown
 
     def test_project_status_homogeneous_schema(self):
         project = self.mock_project()
@@ -663,7 +656,7 @@ class TestProject(TestProjectBase):
     def test_script(self):
         project = self.mock_project()
         for job in project:
-            script = project.script(project.next_operations(job))
+            script = project._script(project._next_operations(job))
             if job.sp.b % 2 == 0:
                 assert str(job) in script
                 assert 'echo "hello"' in script
@@ -683,7 +676,7 @@ class TestProject(TestProjectBase):
             file.write("THIS IS A CUSTOM SCRIPT!\n")
             file.write("{% endblock %}\n")
         for job in project:
-            script = project.script(project.next_operations(job))
+            script = project._script(project._next_operations(job))
             assert "THIS IS A CUSTOM SCRIPT" in script
             if job.sp.b % 2 == 0:
                 assert str(job) in script
@@ -921,8 +914,7 @@ class TestExecutionProject(TestProjectBase):
         project = self.mock_project()
         operations = []
         for job in project:
-            with pytest.deprecated_call():
-                operations.extend(project.next_operations(job))
+            operations.extend(project._next_operations(job))
         assert len(list(MockScheduler.jobs())) == 0
         cluster_job_id = project._store_bundled(operations)
         project.submit_operations(_id=cluster_job_id, operations=operations)
@@ -1002,8 +994,7 @@ class TestExecutionProject(TestProjectBase):
             if job not in even_jobs:
                 continue
             list(project.labels(job))
-            with pytest.deprecated_call():
-                next_op = list(project.next_operations(job))[0]
+            next_op = list(project._next_operations(job))[0]
             assert next_op.name == 'op1'
             assert next_op.job == job
         with redirect_stderr(StringIO()):
@@ -1011,8 +1002,7 @@ class TestExecutionProject(TestProjectBase):
         assert len(list(MockScheduler.jobs())) == num_jobs_submitted
 
         for job in project:
-            with pytest.deprecated_call():
-                next_op = list(project.next_operations(job))[0]
+            next_op = list(project._next_operations(job))[0]
             assert next_op.get_status() == JobStatus.submitted
 
         MockScheduler.step()
@@ -1020,8 +1010,7 @@ class TestExecutionProject(TestProjectBase):
         project._fetch_scheduler_status(file=StringIO())
 
         for job in project:
-            with pytest.deprecated_call():
-                next_op = list(project.next_operations(job))[0]
+            next_op = list(project._next_operations(job))[0]
             assert next_op.get_status() == JobStatus.queued
 
         MockScheduler.step()
@@ -1037,8 +1026,7 @@ class TestExecutionProject(TestProjectBase):
         project = self.mock_project()
         operations = []
         for job in project:
-            with pytest.deprecated_call():
-                operations.extend(project.next_operations(job))
+            operations.extend(project._next_operations(job))
         assert len(list(MockScheduler.jobs())) == 0
         cluster_job_id = project._store_bundled(operations)
         stderr = StringIO()
@@ -1194,9 +1182,8 @@ class TestProjectMainInterface(TestProjectBase):
                             op_lines.append(next(lines))
                         except StopIteration:
                             continue
-                    with pytest.deprecated_call():
-                        for op in project.next_operations(job):
-                            assert any(op.name in op_line for op_line in op_lines)
+                    for op in project._next_operations(job):
+                        assert any(op.name in op_line for op_line in op_lines)
 
     def test_main_script(self):
         assert len(self.project)
@@ -1248,7 +1235,7 @@ class TestGroupProject(TestProjectBase):
         # For run mode single operation groups
         for job in project:
             job_ops = project._get_submission_operations([job], dict())
-            script = project.script(job_ops)
+            script = project._script(job_ops)
             if job.sp.b % 2 == 0:
                 assert str(job) in script
                 assert 'run -o op1 -j {}'.format(job) in script
@@ -1262,11 +1249,11 @@ class TestGroupProject(TestProjectBase):
         for job in project:
             job_op1 = project.groups['group1']._create_submission_job_operation(
                 project._entrypoint, dict(), job)
-            script1 = project.script([job_op1])
+            script1 = project._script([job_op1])
             assert 'run -o group1 -j {}'.format(job) in script1
             job_op2 = project.groups['group2']._create_submission_job_operation(
                 project._entrypoint, dict(), job)
-            script2 = project.script([job_op2])
+            script2 = project._script([job_op2])
             assert '--num-passes=2' in script2
 
     def test_directives_hierarchy(self):

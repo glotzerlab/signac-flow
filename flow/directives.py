@@ -7,13 +7,14 @@ class _DirectivesItem:
     """The representation of a single directive.
 
     Logic for validation of values when setting, defaults, and the ability for
-    directives to interspect before returning a directive are supported. This is
-    only meant to work with the Directives class itself.
+    directives to inspect other directives (such as using nranks and
+    omp_num_threads for finding np). This is only meant to work with the
+    Directives class itself.
 
     While validation is used to ensure proper setting of directives, through
-    ``finalize`` this could be abused. Also any callable can be set to any
-    directive regardless of the function taking a job as an argument and
-    returning a valid directive.
+    ``finalize`` this could be abused. Also, since directive values can be
+    dependent on jobs we allow all directives to be set to a callable.
+    Directives set to callable cannot be validated.
 
     Parameters
     ----------

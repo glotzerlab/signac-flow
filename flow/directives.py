@@ -175,7 +175,7 @@ def _evaluate(value, job=None):
         return value
 
 
-class OnlyType:
+class _OnlyType:
     def __init__(self, type_, preprocess=None, postprocess=None):
         def identity(v):
             return v
@@ -198,7 +198,7 @@ class OnlyType:
                                 "of type {}".format(self.type, v, type(v)))
 
 
-def raise_below(value):
+def _raise_below(value):
     def is_greater(v):
         try:
             if v < value:
@@ -213,7 +213,7 @@ def raise_below(value):
 _NP_DEFAULT = 1
 
 
-def finalize_np(value, directives):
+def _finalize_np(np, directives):
     """Return the actual number of processes/threads to use.
 
     We check the default value because when aggregation occurs we add the number
@@ -232,9 +232,9 @@ def finalize_np(value, directives):
         return max(value, max(1, nranks) * max(1, omp_num_threads))
 
 
-natural_number = OnlyType(int, postprocess=raise_below(1))
+_natural_number = _OnlyType(int, postprocess=_raise_below(1))
 # Common directives and their instantiation as _DirectivesItem
-NP = _DirectivesItem('np', natural_number, _NP_DEFAULT, finalize=finalize_np)
+NP = _DirectivesItem('np', _natural_number, _NP_DEFAULT, finalize=_finalize_np)
 NP.__doc__ = """
 The number of tasks expected to run for a given operation
 
@@ -244,21 +244,21 @@ product of "nranks" or "omp_num_threads" is greater than the current value. The
 maximum of these two values is used.
 """
 
-nonnegative_int = OnlyType(int, postprocess=raise_below(0))
-NGPU = _DirectivesItem('ngpu', nonnegative_int, 0)
+_nonnegative_int = _OnlyType(int, postprocess=_raise_below(0))
+NGPU = _DirectivesItem('ngpu', _nonnegative_int, 0)
 NGPU.__doc__ = """
 The number of GPUs to use for this operation.
 
 Expects a nonnegative integer.
 """
-NRANKS = _DirectivesItem('nranks', nonnegative_int, 0)
+NRANKS = _DirectivesItem('nranks', _nonnegative_int, 0)
 NRANKS.__doc__ = """
 The number of MPI ranks to use for this operation.
 
 Expects a nonnegative integer.
 """
 
-OMP_NUM_THREADS = _DirectivesItem('omp_num_threads', nonnegative_int, 0)
+OMP_NUM_THREADS = _DirectivesItem('omp_num_threads', _nonnegative_int, 0)
 OMP_NUM_THREADS.__doc__ = """
 The number of OpenMP threads to use for this operation.
 
@@ -266,12 +266,12 @@ Expects a nonnegative integer.
 """
 
 
-def no_aggregation(v, o):
+def _no_aggregation(v, o):
     return v
 
 
-EXECUTABLE = _DirectivesItem('executable', OnlyType(str), sys.executable,
-                             no_aggregation, no_aggregation)
+EXECUTABLE = _DirectivesItem('executable', _OnlyType(str), sys.executable,
+                             _no_aggregation, _no_aggregation)
 EXECUTABLE.__doc__ = """
 The path to the executable to be used for this operation.
 
@@ -284,8 +284,8 @@ path to an executable Python script.
 """
 
 
-nonnegative_real = OnlyType(float, postprocess=raise_below(0))
-WALLTIME = _DirectivesItem('walltime', nonnegative_real, 12.,
+_nonnegative_real = _OnlyType(float, postprocess=_raise_below(0))
+WALLTIME = _DirectivesItem('walltime', _nonnegative_real, 12.,
                            lambda x, y: x + y, max)
 WALLTIME.__doc__ = """
 The number of hours to request for executing this job.
@@ -295,15 +295,16 @@ values are supported. For example, a value of 0.5 will request 30 minutes of
 walltime.
 """
 
-MEMORY = _DirectivesItem('memory', natural_number, 4)
+_positive_real = _OnlyType(float, postprocess=_raise_below(1e-12))
+MEMORY = _DirectivesItem('memory', _positive_real, 4)
 MEMORY.__doc__ = """
 The number of gigabytes of memory to request for this operation.
 
-Expects a natural number (i.e. an integer >= 1).
+Expects a real number greater than zero.
 """
 
 
-def is_fraction(value):
+def _is_fraction(value):
     if 0 <= value <= 1:
         return value
     else:
@@ -311,8 +312,8 @@ def is_fraction(value):
 
 
 PROCESS_FRACTION = _DirectivesItem('processor_fraction',
-                                   OnlyType(float, postprocess=is_fraction),
-                                   1., no_aggregation, no_aggregation)
+                                   _OnlyType(float, postprocess=_is_fraction),
+                                   1., _no_aggregation, _no_aggregation)
 PROCESS_FRACTION.__doc__ = """
 Needs to be filled out.
 """

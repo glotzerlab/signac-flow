@@ -73,8 +73,8 @@ class Directives(MutableMapping):
     Parameters
     ----------
     available_directives_list : Sequence[_DirectivesItem]
-        The sequence of all environment specified directives. All other
-        directives are user specified and not validated. There is no way to
+        The sequence of all environment-specified directives. All other
+        directives are user-specified and not validated. There is no way to
         include environment directives not specified at initialization without
         using the object's private API.
     """
@@ -153,8 +153,8 @@ class Directives(MutableMapping):
         agg_func_attr = "parallel" if parallel else "serial"
         for name in self._defined_directives:
             agg_func = getattr(self._directive_definitions[name], agg_func_attr)
-            dft = self._directive_definitions[name].default
-            other_directive = other.get(name, dft)
+            default_value = self._directive_definitions[name].default
+            other_directive = other.get(name, default_value)
             directive = self[name]
             if other_directive is None:
                 continue
@@ -166,7 +166,7 @@ class Directives(MutableMapping):
 def _evaluate(value, job=None):
     if callable(value):
         if job is None:
-            raise RuntimeError("job not specified when evaluating directive.")
+            raise RuntimeError("job must be specified when evaluating a callable directive.")
         else:
             return value(job)
     else:
@@ -192,7 +192,7 @@ class OnlyType:
             try:
                 return self.type(v)
             except Exception:
-                raise TypeError("Excepted an object of type {}. Received {} "
+                raise TypeError("Expected an object of type {}. Received {} "
                                 "of type {}".format(self.type, v, type(v)))
 
 
@@ -212,7 +212,7 @@ _NP_DEFAULT = 1
 
 
 def finalize_np(value, directives):
-    """Return the 'actual number of processes/threads to use.
+    """Return the actual number of processes/threads to use.
 
     We check the default value because when aggregation occurs we add the number
     of MPI ranks and OMP_NUM_THREADS. If we always took the greater of the given
@@ -245,7 +245,7 @@ maximum of these two values is used.
 nonnegative_int = OnlyType(int, postprocess=raise_below(0))
 NGPU = _DirectivesItem('ngpu', nonnegative_int, 0)
 NGPU.__doc__ = """
-The number of GPU's to request for this operation.
+The number of GPUs to use for this operation.
 
 Expects a nonnegative integer.
 """
@@ -271,14 +271,14 @@ def no_aggregation(v, o):
 EXECUTABLE = _DirectivesItem('executable', OnlyType(str), sys.executable,
                              no_aggregation, no_aggregation)
 EXECUTABLE.__doc__ = """
-The location in the file system to the executable to be used for this operation.
+The path to the executable to be used for this operation.
 
 Expects a string pointing to a valid executable file in the
 current file system.
 
 By default this should point to a Python executable (interpreter); however, if
-the :py:class:`FlowProject` path is set to an empty string, the executable can
-be the file path to an executable Python script.
+the :py:class:`FlowProject` path is an empty string, the executable can be a
+path to an executable Python script.
 """
 
 
@@ -288,13 +288,14 @@ WALLTIME = _DirectivesItem('walltime', nonnegative_real, 12.,
 WALLTIME.__doc__ = """
 The number of hours to request for executing this job.
 
-This directive expects a float representing the number hours including
-fraction's of hours.
+This directive expects a float representing the walltime in hours. Fractional
+values are supported. For example, a value of 0.5 will request 30 minutes of
+walltime.
 """
 
 MEMORY = _DirectivesItem('memory', natural_number, 4)
 MEMORY.__doc__ = """
-The number of GB to request for an operation.
+The number of gigabytes of memory to request for this operation.
 
 Expects a natural number (i.e. an integer >= 1).
 """
@@ -304,7 +305,7 @@ def is_fraction(value):
     if 0 <= value <= 1:
         return value
     else:
-        raise ValueError("Value must be beween 0 and 1.")
+        raise ValueError("Value must be between 0 and 1.")
 
 
 PROCESS_FRACTION = _DirectivesItem('processor_fraction',

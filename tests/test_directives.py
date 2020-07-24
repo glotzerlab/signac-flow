@@ -1,12 +1,12 @@
-# Copyright (c) 2017 The Regents of the University of Michigan
+# Copyright (c) 2020 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 import pytest
 import sys
 
 from flow.directives import Directives, _DirectivesItem
-from flow.directives import NP, NRANKS, NGPU, EXECUTABLE, OMP_NUM_THREADS
-from flow.directives import WALLTIME, MEMORY, PROCESS_FRACTION
+from flow.directives import (NP, NRANKS, NGPU, EXECUTABLE, OMP_NUM_THREADS,
+                             WALLTIME, MEMORY, PROCESS_FRACTION)
 from flow.directives import no_aggregation
 from flow import FlowProject
 from tempfile import TemporaryDirectory

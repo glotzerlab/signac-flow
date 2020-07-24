@@ -2450,6 +2450,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             self.run_operations(operations, pretend=pretend,
                                 np=np, timeout=timeout, progress=progress)
 
+    def _generate_operations(self, cmd, jobs, requires=None):
+        "Generate job-operations for a given 'direct' command."
+        for job in jobs:
+            if requires and set(requires).difference(self.labels(job)):
+                continue
+            cmd_ = cmd.format(job=job)
+            yield JobOperation(name=cmd_.replace(' ', '-'), cmd=cmd_, job=job)
+
     def _gather_flow_groups(self, names=None):
         """Grabs FlowGroups that match any of a set of names."""
         operations = OrderedDict()
@@ -2797,6 +2805,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             '-p', '--parallel',
             action='store_true',
             help="Execute all operations in parallel.")
+        cls._add_direct_cmd_arg_group(parser)
         cls._add_template_arg_group(parser)
 
     @classmethod
@@ -2888,6 +2897,22 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             '-p', '--parallel',
             action='store_true',
             help="Execute all operations in a single bundle in parallel.")
+
+    @classmethod
+    def _add_direct_cmd_arg_group(cls, parser):
+        direct_cmd_group = parser.add_argument_group("direct cmd")
+        direct_cmd_group.add_argument(
+            '--cmd',
+            type=str,
+            help="Directly specify the command for an operation. "
+                 "For example: --cmd='echo {job._id}'. "
+                 "--cmd option is deprecated as of 0.9 and will be removed in 0.11.")
+        direct_cmd_group.add_argument(
+            '--requires',
+            type=str,
+            nargs='+',
+            help="Manually specify all labels that are required for the direct command "
+                 "to be considered eligible for execution.")
 
     def export_job_statuses(self, collection, statuses):
         "Export the job statuses to a database collection."
@@ -3391,11 +3416,17 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Gather all pending operations or generate them based on a direct command...
         with self._potentially_buffered():
-            names = args.operation_name if args.operation_name else None
-            default_directives = self._get_default_directives()
-            operations = self._get_submission_operations(jobs, default_directives, names,
-                                                         args.ignore_conditions,
-                                                         args.ignore_conditions_on_execution)
+            if args.cmd:
+                warnings.warn("The --cmd option for script is deprecated as of "
+                              "0.10 and will be removed in 0.12.",
+                              DeprecationWarning)
+                operations = self._generate_operations(args.cmd, jobs, args.requires)
+            else:
+                names = args.operation_name if args.operation_name else None
+                default_directives = self._get_default_directives()
+                operations = self._get_submission_operations(jobs, default_directives, names,
+                                                             args.ignore_conditions,
+                                                             args.ignore_conditions_on_execution)
             operations = list(islice(operations, args.num))
 
         # Generate the script and print to screen.

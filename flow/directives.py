@@ -1,4 +1,5 @@
 from collections.abc import MutableMapping
+import operator
 import sys
 
 
@@ -40,8 +41,8 @@ class _DirectivesItem:
         be set or are dependent in some way on other directives. The default is
         to just return the current set value.
     """
-    def __init__(self, name, validation=None, default=None,
-                 serial=max, parallel=lambda x, y: x + y, finalize=None):
+    def __init__(self, name, *, validation=None, default=None,
+                 serial=max, parallel=operator.add, finalize=None):
         self.name = name
         self.default = default
         self.serial = serial

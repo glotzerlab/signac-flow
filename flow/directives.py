@@ -234,7 +234,8 @@ def _finalize_np(np, directives):
 
 _natural_number = _OnlyType(int, postprocess=_raise_below(1))
 # Common directives and their instantiation as _DirectivesItem
-NP = _DirectivesItem('np', _natural_number, _NP_DEFAULT, finalize=_finalize_np)
+NP = _DirectivesItem('np', validation=_natural_number,
+                     default=_NP_DEFAULT, finalize=_finalize_np)
 NP.__doc__ = """
 The number of tasks expected to run for a given operation
 
@@ -245,20 +246,21 @@ maximum of these two values is used.
 """
 
 _nonnegative_int = _OnlyType(int, postprocess=_raise_below(0))
-NGPU = _DirectivesItem('ngpu', _nonnegative_int, 0)
+NGPU = _DirectivesItem('ngpu', validation=_nonnegative_int, default=0)
 NGPU.__doc__ = """
 The number of GPUs to use for this operation.
 
 Expects a nonnegative integer.
 """
-NRANKS = _DirectivesItem('nranks', _nonnegative_int, 0)
+NRANKS = _DirectivesItem('nranks', validation=_nonnegative_int, default=0)
 NRANKS.__doc__ = """
 The number of MPI ranks to use for this operation.
 
 Expects a nonnegative integer.
 """
 
-OMP_NUM_THREADS = _DirectivesItem('omp_num_threads', _nonnegative_int, 0)
+OMP_NUM_THREADS = _DirectivesItem(
+    'omp_num_threads', validation=_nonnegative_int, default=0)
 OMP_NUM_THREADS.__doc__ = """
 The number of OpenMP threads to use for this operation.
 
@@ -270,8 +272,8 @@ def _no_aggregation(v, o):
     return v
 
 
-EXECUTABLE = _DirectivesItem('executable', _OnlyType(str), sys.executable,
-                             _no_aggregation, _no_aggregation)
+EXECUTABLE = _DirectivesItem('executable', validation=_OnlyType(str), default=sys.executable,
+                             serial=_no_aggregation, parallel=_no_aggregation)
 EXECUTABLE.__doc__ = """
 The path to the executable to be used for this operation.
 
@@ -285,8 +287,8 @@ path to an executable Python script.
 
 
 _nonnegative_real = _OnlyType(float, postprocess=_raise_below(0))
-WALLTIME = _DirectivesItem('walltime', _nonnegative_real, 12.,
-                           lambda x, y: x + y, max)
+WALLTIME = _DirectivesItem('walltime', validation=_nonnegative_real, default=12.,
+                           serial=operator.add, parallel=max)
 WALLTIME.__doc__ = """
 The number of hours to request for executing this job.
 
@@ -296,7 +298,7 @@ walltime.
 """
 
 _positive_real = _OnlyType(float, postprocess=_raise_below(1e-12))
-MEMORY = _DirectivesItem('memory', _positive_real, 4)
+MEMORY = _DirectivesItem('memory', validation=_positive_real, default=4)
 MEMORY.__doc__ = """
 The number of gigabytes of memory to request for this operation.
 
@@ -312,8 +314,8 @@ def _is_fraction(value):
 
 
 PROCESS_FRACTION = _DirectivesItem('processor_fraction',
-                                   _OnlyType(float, postprocess=_is_fraction),
-                                   1., _no_aggregation, _no_aggregation)
+                                   validation=_OnlyType(float, postprocess=_is_fraction),
+                                   default=1., serial=_no_aggregation, parallel=_no_aggregation)
 PROCESS_FRACTION.__doc__ = """
 Needs to be filled out.
 """

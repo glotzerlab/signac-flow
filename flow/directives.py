@@ -18,22 +18,22 @@ class _DirectivesItem:
     ----------
     name: str
         The name of the directive
-    validation : (Callable[[T], S], optional)
+    validation : callable, optional
         A callable that accepts inputs and attempts to convert the input to a
         valid value for the directive. If it fails, it should raise an
         appropriate error. When not provided, the validation function just
         returns the passed value.
-    default
-        Sets the default for the directive.
-    serial : (Callable[[S, S], S], optional)
+    default : any, optional
+        Sets the default for the directive, defaults to `None`.
+    serial : callable, optional
         A function that takes two inputs for the directive and returns the
         appropriate value for these operations running in serial. Defaults to
         the maximum of the two.
-    parallel : (Callable[[S, S], S], optional)
+    parallel : callable, optional
         A function that takes two inputs for the directive and returns the
         appropriate value for these operations running in parallel. Defaults to
         the sum of the two.
-    finalize : (Callable[[S, Directives], S], optional):
+    finalize : callable, optional:
         A function that takes the current value of the directive and the
         directives object it is a child of and outputs the finalized value for
         that directive. This is useful if some directives have multiple ways to

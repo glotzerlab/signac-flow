@@ -534,20 +534,23 @@ class FlowCmdOperation(BaseFlowOperation):
 class FlowOperation(BaseFlowOperation):
     """FlowOperation holds a Python function that does not return a shell executable string.
 
-    All operations without the ``@cmd`` directive use this class. No command can be specified, and
-    the function is not stored internally (but in an external list) stored by the
-    :class:`FlowProject`.
+    All operations without the ``@cmd`` directive use this class. Those operations should
+    be a function of :py:class:`~signac.contrib.job.Job`.
 
     .. note::
         This class should not be instantiated directly.
     """
 
-    def __init__(self, name, pre=None, post=None):
+    def __init__(self, op_func, pre=None, post=None):
         super(FlowOperation, self).__init__(pre=pre, post=post)
-        self.name = name
+        self._op_func = op_func
 
     def __str__(self):
-        return "{type}(name='{name}')".format(type=type(self).__name__, name=self.name)
+        return "{type}(op_func='{op_func}')" \
+               "".format(type=type(self).__name__, op_func=self._op_func)
+
+    def __call__(self, job):
+        return self._op_func(job)
 
 
 class FlowGroupEntry(object):
@@ -1222,7 +1225,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         self._register_labels()
 
         # Register all operation functions with this project instance.
-        self._operation_functions = dict()
         self._operations = OrderedDict()
         self._register_operations()
 
@@ -2229,8 +2231,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             operation.directives.get('fork', False)
             # Separate process needed to cancel with timeout:
             or timeout is not None
-            # The operation function is not registered with the class:
-            or operation.name not in self._operation_functions
+            # The operation function is of an instance of FlowCmdOperation:
+            or isinstance(self._operations[operation.name], FlowCmdOperation)
             # The specified executable is not the same as the interpreter instance:
             or operation.directives.get('executable', sys.executable) != sys.executable
         ):
@@ -2246,7 +2248,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "Executing operation '{}' with current interpreter "
                 "process ({}).".format(operation, os.getpid()))
             try:
-                self._operation_functions[operation.name](operation.job)
+                self._operations[operation.name](operation.job)
             except Exception as e:
                 raise UserOperationError(
                     'An exception was raised during operation {operation.name} '
@@ -3214,8 +3216,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if getattr(func, '_flow_cmd', False):
                 self._operations[name] = FlowCmdOperation(cmd=func, **params)
             else:
-                self._operations[name] = FlowOperation(name=name, **params)
-                self._operation_functions[name] = func
+                self._operations[name] = FlowOperation(op_func=func, **params)
 
     @classmethod
     def make_group(cls, name, options=""):
@@ -3267,7 +3268,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if isinstance(op, FlowCmdOperation):
                 func = op._cmd
             else:
-                func = self._operation_functions[op_name]
+                func = op._op_func
 
             if hasattr(func, '_flow_groups'):
                 operation_directives = getattr(func, '_flow_group_operation_directives', dict())
@@ -3424,14 +3425,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         else:
             jobs = self
         try:
-            try:
-                operation_function = self._operation_functions[args.operation]
-            except KeyError:
-                operation = self._operations[args.operation]
+            operation = self._operations[args.operation]
 
+            if isinstance(operation, FlowCmdOperation):
                 def operation_function(job):
                     cmd = operation(job).format(job=job)
                     subprocess.run(cmd, shell=True, check=True)
+            else:
+                operation_function = operation
 
         except KeyError:
             raise KeyError("Unknown operation '{}'.".format(args.operation))

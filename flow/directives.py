@@ -51,11 +51,11 @@ class _DirectivesItem:
         def identity(v):
             return v
 
-        def dft_finalize(v, directives):
+        def default_finalize(v, directives):
             return v
 
         self.validation = identity if validation is None else validation
-        self.finalize = dft_finalize if finalize is None else finalize
+        self.finalize = default_finalize if finalize is None else finalize
 
     def __call__(self, value):
         if callable(value):

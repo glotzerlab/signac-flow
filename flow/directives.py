@@ -216,20 +216,20 @@ _NP_DEFAULT = 1
 def _finalize_np(np, directives):
     """Return the actual number of processes/threads to use.
 
-    We check the default value because when aggregation occurs we add the number
-    of MPI ranks and OMP_NUM_THREADS. If we always took the greater of the given
-    NP and ranks * threads then after aggregating we will inflate the number of
-    processors needed as (r1 * t1) + (r2 * t2) <= (r1 * r2 * t1 * t2) for
-    numbers greater than one.
+    We check the default np because when aggregation occurs we multiple the
+    number of MPI ranks and OMP_NUM_THREADS. If we always took the greater of
+    the given NP and ranks * threads then after aggregating we will inflate the
+    number of processors needed as (r1 * t1) + (r2 * t2) <= (r1 * r2 * t1 * t2)
+    for numbers greater than one.
     """
-    if callable(value) or value != _NP_DEFAULT:
-        return value
+    if callable(np) or np != _NP_DEFAULT:
+        return np
     nranks = directives.get('nranks', 1)
     omp_num_threads = directives.get('omp_num_threads', 1)
     if callable(nranks) or callable(omp_num_threads):
-        return value
+        return np
     else:
-        return max(value, max(1, nranks) * max(1, omp_num_threads))
+        return max(np, max(1, nranks) * max(1, omp_num_threads))
 
 
 _natural_number = _OnlyType(int, postprocess=_raise_below(1))

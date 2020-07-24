@@ -4,10 +4,9 @@
 import pytest
 import sys
 
-from flow.directives import Directives, _DirectivesItem
+from flow.directives import Directives, _DirectivesItem, _no_aggregation
 from flow.directives import (NP, NRANKS, NGPU, EXECUTABLE, OMP_NUM_THREADS,
                              WALLTIME, MEMORY, PROCESS_FRACTION)
-from flow.directives import no_aggregation
 from flow import FlowProject
 from tempfile import TemporaryDirectory
 
@@ -40,8 +39,8 @@ def product_directive():
         return value
 
     product = _DirectivesItem(name='product', validation=val,
-                              default=10, serial=no_aggregation,
-                              parallel=no_aggregation, finalize=finalize)
+                              default=10, serial=_no_aggregation,
+                              parallel=_no_aggregation, finalize=finalize)
     return product
 
 

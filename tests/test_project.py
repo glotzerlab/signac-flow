@@ -737,7 +737,7 @@ class TestExecutionProject(TestProjectBase):
         project = self.mock_project()
         ops = list(project._get_pending_operations(self.project.find_jobs()))
         # The length of the list of operations grouped by job is equal
-        # the length of its set if and only if the operations are grouped
+        # to the length of its set if and only if the operations are grouped
         # by job already:
         jobs_order_none = [job._id for job, _ in groupby(ops, key=lambda op: op.job)]
         assert len(jobs_order_none) == len(set(jobs_order_none))

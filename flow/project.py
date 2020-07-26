@@ -479,7 +479,7 @@ class BaseFlowOperation(object):
 
     Pre-requirements (pre) and post-conditions (post) can be used to
     trigger an operation only when certain conditions are met. Conditions are unary
-    callables, which expects an instance of job as their first and only positional
+    callables, which expect an instance of job as their first and only positional
     argument and return either True or False.
 
     An operation is considered "eligible" for execution when all pre-requirements
@@ -1059,28 +1059,25 @@ class FlowGroup(object):
         :rtype:
             Iterator[JobOperation]
         """
-        aggregated_jobs = [[job] for job in jobs]
-
-        for aggregate in aggregated_jobs:
-            for name, op in self.operations.items():
-                if op.eligible(*aggregate, ignore_conditions=ignore_conditions):
-                    directives = self._resolve_directives(name, default_directives, aggregate)
-                    cmd = self._run_cmd(entrypoint=entrypoint, operation_name=name,
-                                        operation=op, directives=directives, jobs=aggregate)
-                    # Uses a different id than the groups direct id. Do not use this for submitting
-                    # jobs as current implementation prevents checking for resubmission in this
-                    # case. The different ids allow for checking whether JobOperations created to
-                    # run directly are different.
-                    job_op = JobOperation(self._generate_id(aggregate, name, index=index), name,
-                                          aggregate, cmd=cmd, directives=deepcopy(directives))
-                    # Get the prefix, and if it's not NULL, set the fork directive
-                    # to True since we must launch a separate process. Override
-                    # the command directly.
-                    prefix = aggregate[0]._project._environment.get_prefix(job_op)
-                    if prefix != '':
-                        job_op.directives['fork'] = True
-                        job_op._cmd = '{} {}'.format(prefix, job_op.cmd)
-                    yield job_op
+        for name, op in self.operations.items():
+            if op.eligible(*jobs, ignore_conditions=ignore_conditions):
+                directives = self._resolve_directives(name, default_directives, jobs)
+                cmd = self._run_cmd(entrypoint=entrypoint, operation_name=name,
+                                    operation=op, directives=directives, jobs=jobs)
+                # Uses a different id than the groups direct id. Do not use this for submitting
+                # jobs as current implementation prevents checking for resubmission in this
+                # case. The different ids allow for checking whether JobOperations created to
+                # run directly are different.
+                job_op = JobOperation(self._generate_id(jobs, name, index=index), name,
+                                      jobs, cmd=cmd, directives=deepcopy(directives))
+                # Get the prefix, and if it's not NULL, set the fork directive
+                # to True since we must launch a separate process. Override
+                # the command directly.
+                prefix = jobs[0]._project._environment.get_prefix(job_op)
+                if prefix != '':
+                    job_op.directives['fork'] = True
+                    job_op._cmd = '{} {}'.format(prefix, job_op.cmd)
+                yield job_op
 
     def _get_submission_directives(self, default_directives, jobs):
         """Get the combined resources for submission.
@@ -2479,9 +2476,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 with self._potentially_buffered():
                     operations = []
                     for flow_group in flow_groups:
-                        operations.extend(
-                            flow_group._create_run_job_operations(
-                                self._entrypoint, default_directives, jobs, ignore_conditions))
+                        for job in jobs:
+                            operations.extend(
+                                flow_group._create_run_job_operations(
+                                    self._entrypoint, default_directives, [job], ignore_conditions))
 
                     operations = list(filter(select, operations))
             finally:
@@ -3206,11 +3204,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                                         index=0)
 
     def next_operations(self, *jobs, ignore_conditions=IgnoreConditions.NONE):
-        r"""Determine the next eligible operations for jobs.
+        """Determine the next eligible operations for jobs.
 
-        :param \*jobs:
+        :param jobs:
             The signac job handles.
-        :type \*jobs:
+        :type job:
             :class:`~signac.contrib.job.Job`
         :param ignore_conditions:
             Specify if pre and/or post conditions check is to be ignored for eligibility check.

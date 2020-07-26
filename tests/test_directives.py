@@ -80,6 +80,9 @@ class TestItems:
 
         for directive in available_directives_list:
             if directive.name == 'executable':
+                # Executable expect a string, if not found, then it tries to convert
+                # it into a string and becomes successful almost every time.
+                # Hence skipping Executable.
                 continue
             for i, value in enumerate(invalid_values[directive.name]):
                 with pytest.raises((ValueError, TypeError)):

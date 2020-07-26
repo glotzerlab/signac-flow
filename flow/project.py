@@ -1064,10 +1064,6 @@ class FlowGroup(object):
                 directives = self._resolve_directives(name, default_directives, jobs)
                 cmd = self._run_cmd(entrypoint=entrypoint, operation_name=name,
                                     operation=op, directives=directives, jobs=jobs)
-                # Uses a different id than the groups direct id. Do not use this for submitting
-                # jobs as current implementation prevents checking for resubmission in this
-                # case. The different ids allow for checking whether JobOperations created to
-                # run directly are different.
                 job_op = JobOperation(self._generate_id(jobs, name, index=index), name,
                                       jobs, cmd=cmd, directives=deepcopy(directives))
                 # Get the prefix, and if it's not NULL, set the fork directive

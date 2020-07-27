@@ -3315,7 +3315,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             for op in self._job_operations(job, ignore_conditions):
                 yield op
 
-    @deprecated(deprecated_in="0.10", removed_in="0.13", current_version=__version__)
+    @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
     def next_operations(self, *jobs, ignore_conditions=IgnoreConditions.NONE):
         """Determine the next eligible operations for jobs.
 

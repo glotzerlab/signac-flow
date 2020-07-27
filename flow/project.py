@@ -3331,10 +3331,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :yield:
             All instances of :class:`~.JobOperation` jobs are eligible for.
         """
-        warnings.warn("The JobOperation class is deprecated as of 0.11 and "
-                      "will be removed in 0.13.",
-                      DeprecationWarning)
-        return self._next_operations(*jobs, ignore_conditions=ignore_conditions)
+        for job in jobs:
+            for op in self._job_operations(job, ignore_conditions):
+                yield JobOperation(op.id, op.name, op.job, op._cmd, op.directives)
 
     @classmethod
     def operation(cls, func, name=None):

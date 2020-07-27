@@ -362,41 +362,6 @@ class _JobOperation(object):
 @deprecated(
     deprecated_in="0.11", removed_in="0.13", current_version=__version__)
 class JobOperation(_JobOperation):
-    """This class represents the information needed to execute one group for one job.
-
-    The execution or submission of a :py:class:`FlowGroup` uses a passed in command
-    which can either be a string or function with no arguments that returns a shell
-    executable command.  This won't be used if it is determined that the group can be
-    executed without forking.
-
-    .. note::
-
-        This class is used by the :class:`~.FlowGroup` class for the execution and
-        submission process and should not be instantiated by users themselves.
-
-    :param id:
-        The id of this JobOperation instance. The id should be unique.
-    :type id:
-        str
-    :param name:
-        The name of the JobOperation.
-    :type name:
-        str
-    :param job:
-        The job instance associated with this operation.
-    :type job:
-        :py:class:`signac.Job`.
-    :param cmd:
-        The command that executes this operation. Can be a function that when
-        evaluated returns a string.
-    :type cmd:
-        callable or str
-    :param directives:
-        A dictionary of additional parameters that provide instructions on how
-        to execute this operation, e.g., specifically required resources.
-    :type directives:
-        :class:`dict`
-    """
     pass
 
 

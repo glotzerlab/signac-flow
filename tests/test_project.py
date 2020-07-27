@@ -167,8 +167,9 @@ class TestProjectStatusPerformance(TestProjectBase):
 
     @pytest.mark.skipif(signac.__version__ < '1.3.0',
                         reason='Project.__contains__ was refactored to run in constant time '
-                               'in signac version 1.3.0. This test takes up a lot of time, hence '
-                               'skipped, for signac versions below 1.3.0.')
+                               'in signac version 1.3.0. Generating status output relies on '
+                               'this check and is therefore very slow for signac versions '
+                               'below 1.3.0.')
     def test_status_performance(self):
         """Ensure that status updates take less than 1 second for a data space of 1000 jobs."""
         import timeit

@@ -165,6 +165,8 @@ class TestProjectStatusPerformance(TestProjectBase):
             project.open_job(dict(i=i)).init()
         return project
 
+    @pytest.mark.skipif(signac.__version__ < '1.3.0',
+                        reason='__contains__ was refactored to run in constant time in 1.3.0 ')
     def test_status_performance(self):
         """Ensure that status updates take less than 1 second for a data space of 1000 jobs."""
         import timeit

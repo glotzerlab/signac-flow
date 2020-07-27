@@ -502,8 +502,8 @@ class TestProjectClass(TestProjectBase):
         op3_ = project.operations['op3']
         op4_ = project.operations['op4']
         for job in project:
-            assert not op3_.eligible(job)
-            assert not op4_.eligible(job)
+            assert not op3_._eligible([job])
+            assert not op4_._eligible([job])
 
         project.run(names=['op1'])
         for job in project:
@@ -511,13 +511,13 @@ class TestProjectClass(TestProjectBase):
             assert 'b' not in job.doc
             assert 'c' not in job.doc
             assert 'd' not in job.doc
-            assert not op3_.eligible(job)
-            assert not op4_.eligible(job)
+            assert not op3_._eligible([job])
+            assert not op4_._eligible([job])
 
         project.run(names=['op2'])
         for job in project:
-            assert op3_.eligible(job)
-            assert op4_.eligible(job)
+            assert op3_._eligible([job])
+            assert op4_._eligible([job])
 
         project.run()
         for job in project:
@@ -609,8 +609,8 @@ class TestProject(TestProjectBase):
             for op in project.next_operations(job):
                 assert op.name in status['operations']
                 op_status = status['operations'][op.name]
-                assert op_status['eligible'] == project.operations[op.name].eligible(job)
-                assert op_status['completed'] == project.operations[op.name].complete(job)
+                assert op_status['eligible'] == project.operations[op.name]._eligible([job])
+                assert op_status['completed'] == project.operations[op.name]._complete([job])
                 assert op_status['scheduler_status'] == JobStatus.unknown
 
     def test_project_status_homogeneous_schema(self):

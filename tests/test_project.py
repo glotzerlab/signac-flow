@@ -598,7 +598,7 @@ class TestProject(TestProjectBase):
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
         for job in project:
             for i, op in enumerate(project._next_operations(job)):
-                assert op.job == job
+                assert op._jobs == [job]
                 if job in even_jobs:
                     assert op.name == ['op1', 'op2', 'op3'][i]
                 else:
@@ -744,7 +744,7 @@ class TestExecutionProject(TestProjectBase):
         # The length of the list of operations grouped by job is equal
         # to the length of its set if and only if the operations are grouped
         # by job already:
-        jobs_order_none = [job._id for job, _ in groupby(ops, key=lambda op: op.job)]
+        jobs_order_none = [job._id for job, _ in groupby(ops, key=lambda op: op._jobs[0])]
         assert len(jobs_order_none) == len(set(jobs_order_none))
 
     def test_run(self, subtests):
@@ -754,7 +754,7 @@ class TestExecutionProject(TestProjectBase):
                 project.run(order='invalid-order')
 
         def sort_key(op):
-            return op.name, op.job.get_id()
+            return op.name, op._jobs[0].get_id()
 
         for order in (None, 'none', 'cyclic', 'by-job', 'random', sort_key):
             for job in self.project.find_jobs():  # clear
@@ -1002,7 +1002,7 @@ class TestExecutionProject(TestProjectBase):
             list(project.labels(job))
             next_op = list(project._next_operations(job))[0]
             assert next_op.name == 'op1'
-            assert next_op.job == job
+            assert next_op._jobs == [job]
         with redirect_stderr(StringIO()):
             project.submit()
         assert len(list(MockScheduler.jobs())) == num_jobs_submitted

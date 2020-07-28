@@ -188,7 +188,6 @@ class _condition(object):
     def false(cls, key):
         """True if the specified key is present in the job document and
         evaluates to False."""
-
         def _no_document(*jobs):
             return all(not job.document.get(key, False) for job in jobs)
         return cls(_no_document, 'false_' + key)
@@ -280,7 +279,7 @@ class _JobOperation(object):
     :param jobs:
         The jobs associated with this operation.
     :type jobs:
-        list of :class:`signac.Job`
+        list of :class:`signac.contrib.job.Job`
     :param cmd:
         The command that executes this operation. Can be a function that when
         evaluated returns a string.
@@ -355,12 +354,6 @@ class _JobOperation(object):
         return self._id
 
     @property
-    def job(self):
-        if(len(self._jobs) > 1):
-            raise NotImplementedError
-        return self._jobs[0]
-
-    @property
     def cmd(self):
         if callable(self._cmd):
             # We allow cmd to be 'lazy' or an unevaluated function because
@@ -388,7 +381,41 @@ class _JobOperation(object):
 @deprecated(
     deprecated_in="0.11", removed_in="0.13", current_version=__version__)
 class JobOperation(_JobOperation):
+    """This class represents the information needed to execute one group for one job.
 
+    The execution or submission of a :py:class:`FlowGroup` uses a passed in command
+    which can either be a string or function with no arguments that returns a shell
+    executable command.  This won't be used if it is determined that the group can be
+    executed without forking.
+
+    .. note::
+
+        This class is used by the :class:`~.FlowGroup` class for the execution and
+        submission process and should not be instantiated by users themselves.
+
+    :param id:
+        The id of this _JobOperation instance. The id should be unique.
+    :type id:
+        str
+    :param name:
+        The name of the _JobOperation.
+    :type name:
+        str
+    :param job:
+        The job associated with this operation.
+    :type job:
+        :class:`signac.contrib.job.Job`
+    :param cmd:
+        The command that executes this operation. Can be a function that when
+        evaluated returns a string.
+    :type cmd:
+        callable or str
+    :param directives:
+        A dictionary of additional parameters that provide instructions on how
+        to execute this operation, e.g., specifically required resources.
+    :type directives:
+        :class:`dict`
+    """
     def __init__(self, id, name, job, cmd, directives=None):
         self._id = id
         self.name = name
@@ -418,6 +445,13 @@ class JobOperation(_JobOperation):
         self.directives = TrackGetItemDict(
             {key: value for key, value in directives.items()})
         self.directives._keys_set_by_user = keys_set_by_user
+
+    @property
+    def job(self):
+        # The length of `_jobs` will never be more than one due to the
+        # instance check we're doing while initializing an instance of
+        # JobOperation. Hence return only the first element of `self._jobs`
+        return self._jobs[0]
 
     def __repr__(self):
         return "{type}(name='{name}', job='{job}', cmd={cmd}, directives={directives})".format(
@@ -2440,11 +2474,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "Executing operation '{}' with current interpreter "
                 "process ({}).".format(operation, os.getpid()))
             try:
-                self._operations[operation.name](operation.job)
+                self._operations[operation.name](*operation._jobs)
             except Exception as e:
                 raise UserOperationError(
                     'An exception was raised during operation {operation.name} '
-                    'for job {operation.job}.'.format(operation=operation)) from e
+                    'for job {operation._jobs[0]}.'.format(operation=operation)) from e
 
     def _get_default_directives(self):
         return {name: self.groups[name].operation_directives.get(name, dict())
@@ -3441,7 +3475,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         for job in jobs:
             for op in self._job_operations(job, ignore_conditions):
-                yield JobOperation(op.id, op.name, op.job, op._cmd, op.directives)
+                yield JobOperation(op.id, op.name, op._jobs[0], op._cmd, op.directives)
 
     @classmethod
     def operation(cls, func, name=None):

@@ -150,9 +150,9 @@ class _IgnoreConditionsConversion(argparse.Action):
 
 
 class _condition(object):
-    # This counter should be incremented each time an "always" or "never"
-    # condition is created, and the value should be used as the tag for that
-    # condition to ensure that no pair of "always" and "never" conditions
+    # This counter should be incremented each time a "never" condition
+    # is created, and the value should be used as the tag for that
+    # condition to ensure that no pair of "never" conditions
     # are found to be equal by the graph detection algorithm.
     current_arbitrary_tag = 0
 
@@ -183,15 +183,6 @@ class _condition(object):
         """True if the specified key is present in the job document and
         evaluates to False."""
         return cls(lambda job: not job.document.get(key, False), 'false_' + key)
-
-    @classmethod
-    @deprecated(
-        deprecated_in="0.9", removed_in="0.11", current_version=__version__,
-        details="This condition decorator is obsolete.")
-    def always(cls, func):
-        "Returns True."
-        cls.current_arbitrary_tag += 1
-        return cls(lambda _: True, str(cls.current_arbitrary_tag))(func)
 
     @classmethod
     def never(cls, func):
@@ -233,16 +224,6 @@ def _make_bundles(operations, size=None):
             yield b
         else:
             break
-
-
-@deprecated(deprecated_in="0.9", removed_in="0.11", current_version=__version__)
-def make_bundles(operations, size=None):
-    """Utility function for the generation of bundles.
-
-    This function splits an iterable of operations into equally
-    sized bundles and a possibly smaller final bundle.
-    """
-    return _make_bundles(operations, size)
 
 
 class _JobOperation(object):
@@ -325,10 +306,6 @@ class _JobOperation(object):
 
     def __eq__(self, other):
         return self.id == other.id
-
-    @deprecated(deprecated_in="0.9", removed_in="0.11", current_version=__version__)
-    def get_id(self):
-        return self._id
 
     @property
     def id(self):
@@ -3573,7 +3550,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         with self._potentially_buffered():
             if args.cmd:
                 warnings.warn("The --cmd option for script is deprecated as of "
-                              "0.9 and will be removed in 0.11.",
+                              "0.10 and will be removed in 0.12.",
                               DeprecationWarning)
                 operations = self._generate_operations(args.cmd, jobs, args.requires)
             else:

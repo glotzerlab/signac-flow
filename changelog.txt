@@ -8,6 +8,14 @@ The numbers in brackets denote the related GitHub issue and/or pull request.
 Version 0.10
 ============
 
+[0.10.1] -- [DATE_GOES_HERE]
+---------------------
+
+Fixes
++++++
+
+- Fix the deprecation warning for the deprecated command line option ``--cmd`` for ``script`` (#329, #243).
+
 [0.10.0] -- 2020-06-27
 ----------------------
 

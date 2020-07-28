@@ -3470,7 +3470,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         with self._potentially_buffered():
             if args.cmd:
                 warnings.warn("The --cmd option for script is deprecated as of "
-                              "0.9 and will be removed in 0.11.",
+                              "0.10 and will be removed in 0.13.",
                               DeprecationWarning)
                 operations = self._generate_operations(args.cmd, jobs, args.requires)
             else:

@@ -20,11 +20,11 @@ import random
 import subprocess
 import traceback
 import warnings
+from deprecation import deprecated
 from collections import defaultdict
 from collections import OrderedDict
 from collections import Counter
 from copy import deepcopy
-from deprecation import deprecated
 from itertools import islice
 from itertools import count
 from itertools import groupby
@@ -72,6 +72,7 @@ from .labels import classlabel
 from .labels import _is_label_func
 from .util import config as flow_config
 from .render_status import Renderer as StatusRenderer
+from .version import __version__
 
 
 logger = logging.getLogger(__name__)

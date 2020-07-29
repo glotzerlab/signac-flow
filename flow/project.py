@@ -1072,10 +1072,13 @@ class FlowGroup(object):
             aggregate_id = str(jobs[0])[:8]
 
         separator = getattr(project._environment, 'JOB_ID_SEPARATOR', '/')
-        readable_name = '{project}{sep}{jobs}{sep}{op_string}{sep}{index:04d}{sep}'.format(
+        readable_name = '{project}{sep}{jobs}{sep}{aggregate_size}{sep}{group}' \
+                        '{sep}{index:04d}{sep}'.format(
                     sep=separator,
                     project=str(project)[:12],
                     jobs=aggregate_id,
+                    aggregate_size=len(jobs),
+                    group=self.name,
                     op_string=op_string[:12],
                     index=index)[:max_len]
 

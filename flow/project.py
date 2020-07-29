@@ -1074,13 +1074,12 @@ class FlowGroup(object):
         separator = getattr(project._environment, 'JOB_ID_SEPARATOR', '/')
         readable_name = '{project}{sep}{jobs}{sep}{aggregate_size}{sep}{group}' \
                         '{sep}{index:04d}{sep}'.format(
-                    sep=separator,
-                    project=str(project)[:12],
-                    jobs=aggregate_id,
-                    aggregate_size=len(jobs),
-                    group=self.name,
-                    op_string=op_string[:12],
-                    index=index)[:max_len]
+                            sep=separator,
+                            project=str(project)[:12],
+                            jobs=aggregate_id,
+                            aggregate_size=len(jobs),
+                            group=self.name,
+                            index=index)[:max_len]
 
         # By appending the unique job_op_id, we ensure that each id is truly unique.
         return readable_name + job_op_id

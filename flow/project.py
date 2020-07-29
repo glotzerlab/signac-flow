@@ -1672,15 +1672,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         except TypeError:
             return x
 
-    def _fn_bundle(self, bundle_id):
-        "Return the canonical name to store bundle information."
-        return os.path.join(self.root_directory(), '.bundles', bundle_id)
+    def _fn_stored(self, dirname, id):
+        "Return the canonical name to store bundle or job information."
+        return os.path.join(self.root_directory(), dirname, id)
 
     def _store_bundled(self, operations):
         """Store operation-ids as part of a bundle and return bundle id.
 
         The operation identifiers are stored in a text file whose name is
-        determined by the _fn_bundle() method. This may be used to identify
+        determined by the _fn_stored() method. This may be used to identify
         the status of individual operations from the bundle id. A single
         operation will not be stored, but instead the operation's id is
         directly returned.
@@ -1699,18 +1699,42 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         else:
             h = '.'.join(op.id for op in operations)
             bid = '{}/bundle/{}'.format(self, sha1(h.encode('utf-8')).hexdigest())
-            fn_bundle = self._fn_bundle(bid)
+            fn_bundle = self._fn_stored('.bundles', bid)
             os.makedirs(os.path.dirname(fn_bundle), exist_ok=True)
             with open(fn_bundle, 'w') as file:
                 for operation in operations:
                     file.write(operation.id + '\n')
             return bid
 
+    def _store_aggregates(self, operations):
+        """Store aggregate-ids per operation information.
+
+        This enables status check of aggregates which were
+        formed previously by not present currently for any
+        operation.
+
+        :param operations:
+            The operations to be submitted.
+        :type operations:
+            A sequence of instances of :py:class:`.JobOperation`
+        """
+        for operation in operations:
+            aid = '{}.txt'.format(operation.name)
+            aggregate_wid = '{} {} \n'.format(operation.id, ' '.join(map(str, operation._jobs)))
+            fn_aggregate = self._fn_stored('.aggregates', aid)
+            os.makedirs(os.path.dirname(fn_aggregate), exist_ok=True)
+            if os.path.exists(fn_aggregate):
+                with open(fn_aggregate, 'r') as file:
+                    if aggregate_wid in file:
+                        continue
+            with open(fn_aggregate, 'a') as file:
+                file.write(aggregate_wid)
+
     def _expand_bundled_jobs(self, scheduler_jobs):
         "Expand jobs which were submitted as part of a bundle."
         for job in scheduler_jobs:
             if job.name().startswith('{}/bundle/'.format(self)):
-                with open(self._fn_bundle(job.name())) as file:
+                with open(self._fn_stored('.bundles', job.name())) as file:
                     for line in file:
                         yield ClusterJob(line.strip(), job.status())
             else:
@@ -1755,6 +1779,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for key in sorted(status_dict):
             yield key, status_dict[key]
 
+    @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
     def get_job_status(self, job, ignore_errors=False, cached_status=None):
         "Return a dict with detailed information about the status of a job."
         result = dict()
@@ -1816,6 +1841,89 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         else:
             logger.info("Updated job status cache.")
 
+    def _get_group_status(self, group, jobs, ignore_errors=False, cached_status=None):
+        "Return a dict with detailed information about the status of jobs per group."
+        result = dict()
+        for name in group.operations:
+            result['operation_name'] = name
+        status_dict = dict()
+        errors = dict()
+        jobs = [[job] for job in jobs]
+
+        dir = '.aggregates/{}.txt'.format(group.name)
+
+        if os.path.exists(dir):
+            with open(dir, 'r') as file:
+                for obj in file:
+                    fetched_aggregate = []
+                    _ids = obj.split(' ')
+                    group_id = _ids[0]
+                    job_ids = _ids[1:-1]
+                    try:
+                        for job_id in job_ids:
+                            fetched_aggregate.append(self.open_job(id=job_id))
+
+                        if fetched_aggregate not in jobs:
+                            # Checking whether the aggregate and the submission id match.
+                            # If not, then a user must have changed the submission id.
+                            # Hence skip this aggregate.
+                            assert group._generate_id(fetched_aggregate) == group_id
+                            jobs.append(fetched_aggregate)
+                    except KeyError: # Not able to open the job bia job id.
+                        pass
+                    except AssertionError:
+                        pass
+
+        for job in tqdm(jobs, desc="Collecting job status info for operation {}"
+                        "".format(group.name), leave=False):
+            if errors.get(job[0], None) is None:
+                errors[job[0]] = None
+            try:
+                _id = group._generate_id(job)
+                completed = group._complete(job)
+                eligible = False if completed else group._eligible(job)
+                scheduler_status = cached_status.get(_id, JobStatus.unknown)
+                status_dict[str(job[0])] = {
+                        'scheduler_status': scheduler_status,
+                        'eligible': eligible,
+                        'completed': completed
+                        }
+            except Exception as error:
+                msg = "Error while getting operations status for job " \
+                      "'{}': '{}'.".format(' '.join(map(str, job)), error)
+                logger.debug(msg)
+                status_dict[str(job[0])] = {
+                        'scheduler_status': JobStatus.unknown,
+                        'eligible': False,
+                        'completed': False
+                        }
+                if ignore_errors:
+                    if errors[job[0]] is None:
+                        errors[job[0]] = str(error)
+                    errors[job[0]] += '\n' + str(error)
+                else:
+                    raise
+
+        result['aggregate_details'] = status_dict
+        result['_operation_error_per_job'] = errors
+        return result
+
+    def _get_job_labels(self, job, ignore_errors=False):
+        "Return a dict with information about the labels of a job."
+        result = dict()
+        result['job_id'] = str(job)
+        try:
+            result['labels'] = sorted(set(self.labels(job)))
+            result['_labels_error'] = None
+        except Exception as error:
+            logger.debug("Error while determining labels for job '{}': '{}'.".format(job, error))
+            if ignore_errors:
+                result['labels'] = list()
+                result['_labels_error'] = str(error)
+            else:
+                raise
+        return result
+
     def _fetch_status(self, jobs, err, ignore_errors, status_parallelization='thread'):
         # The argument status_parallelization is used so that _fetch_status method
         # gets to know whether the deprecated argument no_parallelization passed
@@ -1843,9 +1951,25 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         except KeyError:
             cached_status = dict()
 
-        _get_job_status = functools.partial(self.get_job_status,
-                                            ignore_errors=ignore_errors,
-                                            cached_status=cached_status)
+        _get_job_labels = functools.partial(self._get_job_labels,
+                                            ignore_errors=ignore_errors)
+
+        _get_group_status = functools.partial(self._get_group_status,
+                                              jobs=jobs,
+                                              ignore_errors=ignore_errors,
+                                              cached_status=cached_status)
+
+        groups = []
+        for group in self._groups.values():
+            if len(group.operations) == 1:
+                for name in group.operations:
+                    if name == group.name:
+                        groups.append(group)
+
+        op_results = list(tqdm(
+            iterable=map(_get_group_status, groups),
+            desc="Collecting job status per operation.",
+            total=len(groups)))
 
         with self._potentially_buffered():
             try:
@@ -1853,14 +1977,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     with contextlib.closing(ThreadPool()) as pool:
                         # First attempt at parallelized status determination.
                         # This may fail on systems that don't allow threads.
-                        return list(tqdm(
-                            iterable=pool.imap(_get_job_status, jobs),
-                            desc="Collecting job status info", total=len(jobs), file=err))
+                        label_results = list(tqdm(
+                            iterable=pool.imap(_get_job_labels, jobs),
+                            desc="Collecting job label info", total=len(jobs), file=err))
                 elif status_parallelization == 'process':
                     with contextlib.closing(Pool()) as pool:
                         try:
                             import pickle
-                            results = self._fetch_status_in_parallel(
+                            results = self._fetch_labels_in_parallel(
                                 pool, pickle, jobs, ignore_errors, cached_status)
                         except Exception as error:
                             if not isinstance(error, (pickle.PickleError, self._PickleError)) and\
@@ -1877,19 +2001,19 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                 raise error
                             else:
                                 try:
-                                    results = self._fetch_status_in_parallel(
+                                    results = self._fetch_labels_in_parallel(
                                         pool, cloudpickle, jobs, ignore_errors, cached_status)
                                 except self._PickleError as error:
                                     raise RuntimeError(
                                         "Unable to parallelize execution due to a pickling "
                                         "error: {}.".format(error))
-                        return list(tqdm(
+                        label_results = list(tqdm(
                             iterable=results,
-                            desc="Collecting job status info", total=len(jobs), file=err))
+                            desc="Collecting job label info", total=len(jobs), file=err))
                 elif status_parallelization == 'none':
-                    return list(tqdm(
-                        iterable=map(_get_job_status, jobs),
-                        desc="Collecting job status info", total=len(jobs), file=err))
+                    label_results = list(tqdm(
+                        iterable=map(_get_job_labels, jobs),
+                        desc="Collecting job label info", total=len(jobs), file=err))
                 else:
                     raise RuntimeError("Configuration value status_parallelization is invalid. "
                                        "You can set it to 'thread', 'parallel', or 'none'"
@@ -1900,19 +2024,41 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
                 t = time.time()
                 num_jobs = len(jobs)
-                statuses = []
+                label_results = []
                 for i, job in enumerate(jobs):
-                    statuses.append(_get_job_status(job))
+                    label_results.append(_get_job_labels(job))
                     if time.time() - t > 0.2:  # status interval
                         print(
-                            'Collecting job status info: {}/{}'.format(i+1, num_jobs),
+                            'Collecting job label info: {}/{}'.format(i+1, num_jobs),
                             end='\r', file=err)
                         t = time.time()
                 # Always print the completed progressbar.
-                print('Collecting job status info: {}/{}'.format(i+1, num_jobs), file=err)
-                return statuses
+                print('Collecting job label info: {}/{}'.format(i+1, num_jobs), file=err)
 
-    def _fetch_status_in_parallel(self, pool, pickle, jobs, ignore_errors, cached_status):
+        results, index, i = list(), dict(), 0
+
+        for job in jobs:
+            result = dict()
+            result['job_id'] = str(job)
+            result['operations'] = dict()
+            result['labels'] = list()
+            result['_operations_error'] = list()
+            result['_labels_error'] = list()
+            results.append(result)
+            index[str(job)] = i
+            i += 1
+        for op_result in op_results:
+            for id, aggregates in op_result['aggregate_details'].items():
+                results[index[id]]['operations'][op_result['operation_name']] = aggregates
+                results[index[id]]['_operations_error'] = \
+                    op_result['_operation_error_per_job'].get(id, None)
+        for label_result in label_results:
+            results[index[label_result['job_id']]]['labels'] = label_result['labels']
+            results[index[label_result['job_id']]]['_labels_error'] = label_result['_labels_error']
+
+        return results
+
+    def _fetch_labels_in_parallel(self, pool, pickle, jobs, ignore_errors, cached_status):
         try:
             s_project = pickle.dumps(self)
             s_tasks = [(pickle.loads, s_project, job.get_id(), ignore_errors, cached_status)
@@ -1920,7 +2066,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         except Exception as error:  # Masking all errors since they must be pickling related.
             raise self._PickleError(error)
 
-        results = pool.imap(_serialized_get_job_status, s_tasks)
+        results = pool.imap(_serialized_get_job_labels, s_tasks)
 
         return results
 
@@ -3040,6 +3186,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                                          ignore_conditions_on_execution)
         if num is not None:
             operations = list(islice(operations, num))
+        else:
+            operations = list(operations)
+
+        self._store_aggregates(operations)
 
         # Bundle them up and submit.
         for bundle in _make_bundles(operations, bundle_size):
@@ -4088,14 +4238,13 @@ def _execute_serialized_operation(loads, project, operation):
     project._execute_operation(project._loads_op(operation))
 
 
-def _serialized_get_job_status(s_task):
-    """Invoke the _get_job_status() method on a serialized project instance."""
+def _serialized_get_job_labels(s_task):
+    """Invoke the _get_job_labels() method on a serialized project instance."""
     loads = s_task[0]
     project = loads(s_task[1])
     job = project.open_job(id=s_task[2])
     ignore_errors = s_task[3]
-    cached_status = s_task[4]
-    return project.get_job_status(job, ignore_errors=ignore_errors, cached_status=cached_status)
+    return project._get_job_labels(job, ignore_errors=ignore_errors)
 
 
 # Status-related helper functions

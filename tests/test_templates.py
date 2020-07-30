@@ -62,7 +62,7 @@ def test_env(env):
                 with open(job.fn('script_{}.sh'.format('_'.join(bundle)))) as file:
                     reference.extend([msg] + file.read().splitlines())
             else:
-                for op in fp.operations:
+                for op in {**fp.operations, **fp.groups}:
                     if 'partition' in parameters:
                         # Don't try to submit GPU operations to CPU partitions
                         # and vice versa.  We should be able to relax this

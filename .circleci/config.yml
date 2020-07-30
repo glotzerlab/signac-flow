@@ -80,14 +80,14 @@ jobs:
     <<: *test-template
     environment:
       SIGNAC_VERSION: "v1.0.0"
-  test-3.8-signac-1.2.0:
-    <<: *test-template
-    environment:
-      SIGNAC_VERSION: "v1.2.0"
   test-3.8-signac-1.3.0:
     <<: *test-template
     environment:
       SIGNAC_VERSION: "v1.3.0"
+  test-3.8-signac-1.4.0:
+    <<: *test-template
+    environment:
+      SIGNAC_VERSION: "v1.4.0"
   test-3.7:
     <<: *test-template
     docker:
@@ -96,10 +96,6 @@ jobs:
     <<: *test-template
     docker:
       - image: circleci/python:3.6
-  test-3.5:
-    <<: *test-template
-    docker:
-      - image: circleci/python:3.5
 
   test-deploy-pypi:
     docker:
@@ -133,9 +129,6 @@ workflows:
             branches:
               only: /release\/.*/
       - pre-test-checks
-      - test-3.5:
-          requires:
-            - pre-test-checks
       - test-3.6:
           requires:
             - pre-test-checks
@@ -148,10 +141,10 @@ workflows:
       - test-3.8-signac-1.0.0:
           requires:
             - test-3.8
-      - test-3.8-signac-1.2.0:
+      - test-3.8-signac-1.3.0:
           requires:
             - test-3.8
-      - test-3.8-signac-1.3.0:
+      - test-3.8-signac-1.4.0:
           requires:
             - test-3.8
       - test-deploy-pypi:
@@ -159,13 +152,12 @@ workflows:
             branches:
               only: /release\/.*/
           requires:
-            - test-3.5
             - test-3.6
             - test-3.7
             - test-3.8
             - test-3.8-signac-1.0.0
-            - test-3.8-signac-1.2.0
             - test-3.8-signac-1.3.0
+            - test-3.8-signac-1.4.0
   deploy:
     jobs:
       - deploy-pypi:

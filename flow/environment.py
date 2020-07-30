@@ -16,6 +16,7 @@ import logging
 import importlib
 from collections import OrderedDict
 import importlib.machinery
+import warnings
 
 from signac.common import config
 
@@ -28,8 +29,8 @@ from .scheduling.fakescheduler import FakeScheduler
 from .util import config as flow_config
 from .errors import NoSchedulerError
 from .directives import Directives
-from .directives import NP, NGPU, NRANKS, OMP_NUM_THREADS, WALLTIME, EXECUTABLE
-from .directives import PROCESS_FRACTION
+from .directives import (NP, NGPU, NRANKS, OMP_NUM_THREADS, WALLTIME,
+                         EXECUTABLE, PROCESS_FRACTION)
 
 logger = logging.getLogger(__name__)
 
@@ -207,7 +208,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         :type omp_prefix:
             str
         """
-        return 'export OMP_NUM_THREADS={}\n'.format(operation.directives['omp_num_threads'])
+        return 'export OMP_NUM_THREADS={}; '.format(operation.directives['omp_num_threads'])
 
     @classmethod
     def _get_mpi_prefix(cls, operation, parallel):
@@ -226,6 +227,10 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         """
         if operation.directives.get('nranks'):
             return '{} -n {} '.format(cls.mpi_cmd, operation.directives['nranks'])
+        elif operation.directives.get('ngpu', 0) > 1:
+            warnings.warn("Setting ngpu directive without nranks will no longer use MPI "
+                          "in version 0.11.", DeprecationWarning)
+            return '{} -n {}'.format(cls.mpi_cmd, operation.directives['ngpu'])
         else:
             return ''
 

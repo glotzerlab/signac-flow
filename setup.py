@@ -30,7 +30,7 @@ except (IOError, OSError):
 
 setup(
     name='signac-flow',
-    version='0.9.0',
+    version='0.10.0',
     packages=find_packages(),
     include_package_data=True,
     zip_safe=True,
@@ -50,7 +50,6 @@ setup(
         "Intended Audience :: Developers",
         "License :: OSI Approved :: BSD License",
         "Topic :: Scientific/Engineering :: Physics",
-        "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
@@ -67,5 +66,7 @@ setup(
 
     install_requires=requirements,
 
-    python_requires='>=3.5, <4',
+    # Supported versions are determined according to NEP 29.
+    # https://numpy.org/neps/nep-0029-deprecation_policy.html
+    python_requires='>=3.6, <4',
 )

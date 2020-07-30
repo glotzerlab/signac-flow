@@ -29,21 +29,17 @@ The FlowProject
 
     FlowProject.ALIASES
     FlowProject.add_operation
-    FlowProject.classify
     FlowProject.completed_operations
-    FlowProject.eligible_for_submission
-    FlowProject.export_job_stati
+    FlowProject.export_job_statuses
     FlowProject.get_job_status
     FlowProject.label
     FlowProject.labels
     FlowProject.main
     FlowProject.make_group
-    FlowProject.next_operation
     FlowProject.next_operations
     FlowProject.operation
     FlowProject.operations
     FlowProject.post
-    FlowProject.post.always
     FlowProject.post.copy_from
     FlowProject.post.false
     FlowProject.post.isfile
@@ -52,7 +48,6 @@ The FlowProject
     FlowProject.post.true
     FlowProject.pre
     FlowProject.pre.after
-    FlowProject.pre.always
     FlowProject.pre.copy_from
     FlowProject.pre.false
     FlowProject.pre.isfile
@@ -65,7 +60,6 @@ The FlowProject
     FlowProject.script
     FlowProject.submit
     FlowProject.submit_operations
-    FlowProject.update_aliases
 
 
 .. autoclass:: FlowProject
@@ -75,8 +69,6 @@ The FlowProject
 
 
 .. automethod:: flow.FlowProject.post
-
-.. automethod:: flow.FlowProject.post.always
 
 .. automethod:: flow.FlowProject.post.copy_from
 
@@ -93,8 +85,6 @@ The FlowProject
 .. automethod:: flow.FlowProject.pre
 
 .. automethod:: flow.FlowProject.pre.after
-
-.. automethod:: flow.FlowProject.pre.always
 
 .. automethod:: flow.FlowProject.pre.copy_from
 

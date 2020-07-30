@@ -299,31 +299,29 @@ class TestProjectClass(TestProjectBase):
         class C(A):
             pass
 
-        with pytest.deprecated_call():
-            @A.pre.always
-            @C.pre.always
-            @C.pre.always
-            @B.pre.always
-            @B.pre.always
-            @A.operation
-            @B.operation
-            def op1(job):
-                pass
+        @A.pre.true('test_A')
+        @C.pre.true('test_C')
+        @C.pre.true('test_C')
+        @B.pre.true('test_B')
+        @B.pre.true('test_B')
+        @A.operation
+        @B.operation
+        def op1(job):
+            pass
 
         assert len(A._collect_pre_conditions()[op1]) == 1
         assert len(B._collect_pre_conditions()[op1]) == 2
         assert len(C._collect_pre_conditions()[op1]) == 3
 
-        with pytest.deprecated_call():
-            @A.post.always
-            @C.post.always
-            @C.post.always
-            @B.post.always
-            @B.post.always
-            @A.operation
-            @B.operation
-            def op2(job):
-                pass
+        @A.post.true('test_A')
+        @C.post.true('test_C')
+        @C.post.true('test_C')
+        @B.post.true('test_B')
+        @B.post.true('test_B')
+        @A.operation
+        @B.operation
+        def op2(job):
+            pass
 
         assert len(A._collect_post_conditions()[op2]) == 1
         assert len(B._collect_post_conditions()[op2]) == 2
@@ -844,38 +842,30 @@ class TestExecutionProject(TestProjectBase):
         class C(A):
             pass
 
-        # Never post conditions are to prevent warnings on operations without
-        # post conditions
-        with pytest.deprecated_call():
-            @A.pre.never
-            @B.pre.always
-            @A.post.never
-            @B.post.never
-            @A.operation
-            @B.operation
-            def op1(job):
-                job.doc.op1 = True
+        @A.pre.never
+        @A.post.never
+        @B.post.never
+        @A.operation
+        @B.operation
+        def op1(job):
+            job.doc.op1 = True
 
-        with pytest.deprecated_call():
-            @A.pre.always
-            @B.pre.never
-            @A.post.never
-            @B.post.never
-            @A.operation
-            @B.operation
-            def op2(job):
-                job.doc.op2 = True
+        @B.pre.never
+        @A.post.never
+        @B.post.never
+        @A.operation
+        @B.operation
+        def op2(job):
+            job.doc.op2 = True
 
-        with pytest.deprecated_call():
-            @A.pre.always
-            @C.pre.never
-            @B.pre.never
-            @A.post.never
-            @B.post.never
-            @A.operation
-            @B.operation
-            def op3(job):
-                job.doc.op3 = True
+        @C.pre.never
+        @B.pre.never
+        @A.post.never
+        @B.post.never
+        @A.operation
+        @B.operation
+        def op3(job):
+            job.doc.op3 = True
 
         all_ops = set(['op1', 'op2', 'op3'])
         for project_class, bad_ops in zip(

@@ -31,7 +31,7 @@ from .util import config as flow_config
 from .errors import NoSchedulerError
 from .directives import Directives
 from .directives import (NP, NGPU, NRANKS, OMP_NUM_THREADS, WALLTIME,
-                         EXECUTABLE, PROCESS_FRACTION)
+                         EXECUTABLE, PROCESSOR_FRACTION)
 
 logger = logging.getLogger(__name__)
 
@@ -274,7 +274,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         EXECUTABLE.default = sys.executable
         return Directives(
             [NP, NGPU, NRANKS, OMP_NUM_THREADS,
-             EXECUTABLE, WALLTIME, PROCESS_FRACTION])
+             EXECUTABLE, WALLTIME, PROCESSOR_FRACTION])
 
 
 class StandardEnvironment(ComputeEnvironment):

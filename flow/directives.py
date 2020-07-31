@@ -281,8 +281,8 @@ The path to the executable to be used for this operation.
 Expects a string pointing to a valid executable file in the
 current file system.
 
-The default value is None which internally points to a Python executable (interpreter);
-however, if the :py:class:`FlowProject` path is an empty string, the executable can be a
+By default this should point to a Python executable (interpreter); however, if
+the :py:class:`FlowProject` path is an empty string, the executable can be a
 path to an executable Python script.
 """
 

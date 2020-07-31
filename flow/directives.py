@@ -1,6 +1,5 @@
 from collections.abc import MutableMapping
 import operator
-import sys
 
 
 class _DirectivesItem:
@@ -272,7 +271,7 @@ def _no_aggregation(v, o):
     return v
 
 
-EXECUTABLE = _DirectivesItem('executable', validation=_OnlyType(str), default=sys.executable,
+EXECUTABLE = _DirectivesItem('executable', validation=_OnlyType(str), default=None,
                              serial=_no_aggregation, parallel=_no_aggregation)
 EXECUTABLE.__doc__ = """
 The path to the executable to be used for this operation.
@@ -280,8 +279,8 @@ The path to the executable to be used for this operation.
 Expects a string pointing to a valid executable file in the
 current file system.
 
-By default this should point to a Python executable (interpreter); however, if
-the :py:class:`FlowProject` path is an empty string, the executable can be a
+The default value is None which internally points to a Python executable (interpreter);
+however, if the :py:class:`FlowProject` path is an empty string, the executable can be a
 path to an executable Python script.
 """
 

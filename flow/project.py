@@ -706,7 +706,11 @@ class FlowGroup(object):
         Order of priority is the operation directives specified and
         then the project specified value.
         """
-        entrypoint[key] = directives.get(key, entrypoint.get(key, default))
+        value = directives.get(key, str(None))
+        if value == str(None):
+            entrypoint[key] = entrypoint.get(key, default)
+        else:
+            entrypoint[key] = value
         if callable(entrypoint[key]):
             entrypoint[key] = entrypoint[key](job)
 

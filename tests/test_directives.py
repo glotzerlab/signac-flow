@@ -2,7 +2,6 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 import pytest
-import sys
 
 from flow.directives import Directives, _DirectivesItem, _no_aggregation
 from flow.directives import (NP, NRANKS, NGPU, EXECUTABLE, OMP_NUM_THREADS,
@@ -63,7 +62,7 @@ class TestItems:
         assert NGPU.default == 0
         assert NRANKS.default == 0
         assert OMP_NUM_THREADS.default == 0
-        assert EXECUTABLE.default == sys.executable
+        assert EXECUTABLE.default is None
         assert WALLTIME.default == 12.0
         assert MEMORY.default == 4
         assert PROCESS_FRACTION.default == 1.

@@ -312,9 +312,15 @@ def _is_fraction(value):
         raise ValueError("Value must be between 0 and 1.")
 
 
-PROCESS_FRACTION = _DirectivesItem('processor_fraction',
-                                   validation=_OnlyType(float, postprocess=_is_fraction),
-                                   default=1., serial=_no_aggregation, parallel=_no_aggregation)
-PROCESS_FRACTION.__doc__ = """
-Needs to be filled out.
+PROCESSOR_FRACTION = _DirectivesItem('processor_fraction',
+                                     validation=_OnlyType(float, postprocess=_is_fraction),
+                                     default=1., serial=_no_aggregation, parallel=_no_aggregation)
+PROCESSOR_FRACTION.__doc__ = """
+Fraction of a resource to use on a single operation.
+
+If set to 0.5 for a bundled job with 20 operations (all with 'np' set to 1), 10
+CPUs will be used. The default value is 1.
+
+Note:
+    This can be particularly useful on Stampede2's launcher.
 """

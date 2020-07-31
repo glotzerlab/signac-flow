@@ -5,7 +5,7 @@ import pytest
 
 from flow.directives import Directives, _DirectivesItem, _no_aggregation
 from flow.directives import (NP, NRANKS, NGPU, EXECUTABLE, OMP_NUM_THREADS,
-                             WALLTIME, MEMORY, PROCESS_FRACTION)
+                             WALLTIME, MEMORY, PROCESSOR_FRACTION)
 from flow import FlowProject
 from tempfile import TemporaryDirectory
 
@@ -14,7 +14,7 @@ from tempfile import TemporaryDirectory
 def available_directives_list():
     return [NP, NRANKS, NGPU, OMP_NUM_THREADS,
             EXECUTABLE, WALLTIME, MEMORY,
-            PROCESS_FRACTION]
+            PROCESSOR_FRACTION]
 
 
 @pytest.fixture()
@@ -65,7 +65,7 @@ class TestItems:
         assert EXECUTABLE.default is None
         assert WALLTIME.default == 12.0
         assert MEMORY.default == 4
-        assert PROCESS_FRACTION.default == 1.
+        assert PROCESSOR_FRACTION.default == 1.
 
     def test_invalid_values(self, available_directives_list):
         invalid_values = {'np': [-1, 'foo', {}, None],
@@ -99,7 +99,7 @@ class TestItems:
         assert EXECUTABLE.serial('Path1', 'Path2') == 'Path1'
         assert WALLTIME.serial(4, 2) == 6
         assert MEMORY.serial(4, 2) == 4
-        assert PROCESS_FRACTION.serial(0.4, 0.2) == 0.4
+        assert PROCESSOR_FRACTION.serial(0.4, 0.2) == 0.4
 
     def test_parallel(self):
         assert NP.parallel(4, 2) == 6
@@ -109,7 +109,7 @@ class TestItems:
         assert EXECUTABLE.parallel('Path1', 'Path2') == 'Path1'
         assert WALLTIME.parallel(4, 2) == 4
         assert MEMORY.parallel(4, 2) == 6
-        assert PROCESS_FRACTION.parallel(0.4, 0.2) == 0.4
+        assert PROCESSOR_FRACTION.parallel(0.4, 0.2) == 0.4
 
     def test_finalize(self):
         dict_directives = {'nranks': NRANKS.default, 'omp_num_threads': OMP_NUM_THREADS.default}
@@ -155,12 +155,12 @@ class TestDirectives:
 
     def test_add_directive(self, available_directives_list):
         directives = Directives(available_directives_list[:-1])
-        directives._add_directive(PROCESS_FRACTION)
-        assert directives[PROCESS_FRACTION.name] == PROCESS_FRACTION.default
+        directives._add_directive(PROCESSOR_FRACTION)
+        assert directives[PROCESSOR_FRACTION.name] == PROCESSOR_FRACTION.default
         with pytest.raises(TypeError):
             directives._add_directive('Test')
         with pytest.raises(ValueError):
-            directives._add_directive(PROCESS_FRACTION)
+            directives._add_directive(PROCESSOR_FRACTION)
 
     def test_set_defined_directive(self, directives):
         directives._set_defined_directive(NP.name, 10)

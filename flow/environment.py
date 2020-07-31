@@ -12,7 +12,6 @@ environment, e.g. for the adjustment of scheduler submission scripts.
 import os
 import re
 import socket
-import sys
 import logging
 import importlib
 from collections import OrderedDict

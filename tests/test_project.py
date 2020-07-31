@@ -430,7 +430,7 @@ class TestProjectClass(TestProjectBase):
         project = self.mock_project(A)
         for job in project:
             job.doc.np = 3
-            for next_op in project._next_operations(job):
+            for next_op in project._next_operations([job]):
                 assert 'mpirun -np 3 python' in next_op.cmd
             break
 
@@ -449,20 +449,20 @@ class TestProjectClass(TestProjectBase):
 
         # test setting neither nranks nor omp_num_threads
         for job in project:
-            for next_op in project._next_operations(job):
+            for next_op in project._next_operations([job]):
                 assert next_op.directives['np'] == 1
 
         # test only setting nranks
         for i, job in enumerate(project):
             job.doc.nranks = i+1
-            for next_op in project._next_operations(job):
+            for next_op in project._next_operations([job]):
                 assert next_op.directives['np'] == next_op.directives['nranks']
             del job.doc['nranks']
 
         # test only setting omp_num_threads
         for i, job in enumerate(project):
             job.doc.omp_num_threads = i+1
-            for next_op in project._next_operations(job):
+            for next_op in project._next_operations([job]):
                 assert next_op.directives['np'] == next_op.directives['omp_num_threads']
             del job.doc['omp_num_threads']
 
@@ -471,7 +471,7 @@ class TestProjectClass(TestProjectBase):
             job.doc.omp_num_threads = i+1
             job.doc.nranks = i % 3 + 1
             expected_np = (i + 1) * (i % 3 + 1)
-            for next_op in project._next_operations(job):
+            for next_op in project._next_operations([job]):
                 assert next_op.directives['np'] == expected_np
 
     def test_copy_conditions(self):
@@ -595,7 +595,7 @@ class TestProject(TestProjectBase):
         project = self.mock_project()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
         for job in project:
-            for i, op in enumerate(project._next_operations(job)):
+            for i, op in enumerate(project._next_operations([job])):
                 assert op._jobs == [job]
                 if job in even_jobs:
                     assert op.name == ['op1', 'op2', 'op3'][i]
@@ -609,7 +609,7 @@ class TestProject(TestProjectBase):
             status = project.get_job_status(job)
             assert status['job_id'] == job.get_id()
             assert len(status['operations']) == len(project.operations)
-            for op in project._next_operations(job):
+            for op in project._next_operations([job]):
                 assert op.name in status['operations']
                 op_status = status['operations'][op.name]
                 assert op_status['eligible'] == project.operations[op.name]._eligible([job])
@@ -659,7 +659,7 @@ class TestProject(TestProjectBase):
     def test_script(self):
         project = self.mock_project()
         for job in project:
-            script = project._script(project._next_operations(job))
+            script = project._script(project._next_operations([job]))
             if job.sp.b % 2 == 0:
                 assert str(job) in script
                 assert 'echo "hello"' in script
@@ -679,7 +679,7 @@ class TestProject(TestProjectBase):
             file.write("THIS IS A CUSTOM SCRIPT!\n")
             file.write("{% endblock %}\n")
         for job in project:
-            script = project._script(project._next_operations(job))
+            script = project._script(project._next_operations([job]))
             assert "THIS IS A CUSTOM SCRIPT" in script
             if job.sp.b % 2 == 0:
                 assert str(job) in script
@@ -909,7 +909,7 @@ class TestExecutionProject(TestProjectBase):
         project = self.mock_project()
         operations = []
         for job in project:
-            operations.extend(project._next_operations(job))
+            operations.extend(project._next_operations([job]))
         assert len(list(MockScheduler.jobs())) == 0
         cluster_job_id = project._store_bundled(operations)
         with redirect_stderr(StringIO()):
@@ -990,7 +990,7 @@ class TestExecutionProject(TestProjectBase):
             if job not in even_jobs:
                 continue
             list(project.labels(job))
-            next_op = list(project._next_operations(job))[0]
+            next_op = list(project._next_operations([job]))[0]
             assert next_op.name == 'op1'
             assert next_op._jobs == [job]
         with redirect_stderr(StringIO()):
@@ -998,7 +998,7 @@ class TestExecutionProject(TestProjectBase):
         assert len(list(MockScheduler.jobs())) == num_jobs_submitted
 
         for job in project:
-            next_op = list(project._next_operations(job))[0]
+            next_op = list(project._next_operations([job]))[0]
             assert next_op.get_status() == JobStatus.submitted
 
         MockScheduler.step()
@@ -1006,7 +1006,7 @@ class TestExecutionProject(TestProjectBase):
         project._fetch_scheduler_status(file=StringIO())
 
         for job in project:
-            next_op = list(project._next_operations(job))[0]
+            next_op = list(project._next_operations([job]))[0]
             assert next_op.get_status() == JobStatus.queued
 
         MockScheduler.step()
@@ -1022,7 +1022,7 @@ class TestExecutionProject(TestProjectBase):
         project = self.mock_project()
         operations = []
         for job in project:
-            operations.extend(project._next_operations(job))
+            operations.extend(project._next_operations([job]))
         assert len(list(MockScheduler.jobs())) == 0
         cluster_job_id = project._store_bundled(operations)
         stderr = StringIO()
@@ -1178,7 +1178,7 @@ class TestProjectMainInterface(TestProjectBase):
                             op_lines.append(next(lines))
                         except StopIteration:
                             continue
-                    for op in project._next_operations(job):
+                    for op in project._next_operations([job]):
                         assert any(op.name in op_line for op_line in op_lines)
 
     def test_main_script(self):

@@ -12,6 +12,7 @@ environment, e.g. for the adjustment of scheduler submission scripts.
 import os
 import re
 import socket
+import sys
 import logging
 import importlib
 from collections import OrderedDict
@@ -270,6 +271,8 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
     @classmethod
     def get_default_directives(cls):
+        if EXECUTABLE.default is None:
+            EXECUTABLE.default = sys.executable
         return Directives(
             [NP, NGPU, NRANKS, OMP_NUM_THREADS,
              EXECUTABLE, WALLTIME, PROCESS_FRACTION])

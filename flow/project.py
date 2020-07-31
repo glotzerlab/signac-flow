@@ -512,7 +512,7 @@ class _FlowCondition(object):
     def __init__(self, callback):
         self._callback = callback
 
-    def __call__(self, *jobs):
+    def __call__(self, jobs):
         try:
             return self._callback(*jobs)
         except Exception as e:
@@ -592,10 +592,10 @@ class BaseFlowOperation(object):
                 "must be a member of class IgnoreConditions")
         # len(self._prereqs) check for speed optimization
         pre = (not len(self._prereqs)) or (ignore_conditions & IgnoreConditions.PRE) \
-            or all(cond(*jobs) for cond in self._prereqs)
+            or all(cond(jobs) for cond in self._prereqs)
         if pre and len(self._postconds):
             post = (ignore_conditions & IgnoreConditions.POST) \
-                or any(not cond(*jobs) for cond in self._postconds)
+                or any(not cond(jobs) for cond in self._postconds)
         else:
             post = True
         return pre and post
@@ -603,7 +603,7 @@ class BaseFlowOperation(object):
     def _complete(self, jobs):
         "True when all post-conditions are met."
         if len(self._postconds):
-            return all(cond(*jobs) for cond in self._postconds)
+            return all(cond(jobs) for cond in self._postconds)
         else:
             return False
 
@@ -653,11 +653,19 @@ class FlowCmdOperation(BaseFlowOperation):
     def __str__(self):
         return "{type}(cmd='{cmd}')".format(type=type(self).__name__, cmd=self._cmd)
 
-    def __call__(self, job):
+    def __call__(self, *jobs):
+        if len(jobs) == 0:
+            warnings.warn("The job argument is deprecated as of 0.11 and will be removed "
+                          "in 0.13", DeprecationWarning)
+            if callable(self._cmd):
+                return self._cmd(None)
+            else:
+                return self._cmd
+
         if callable(self._cmd):
-            return self._cmd(job).format(job=job)
+            return self._cmd(*jobs).format(job=jobs[0])
         else:
-            return self._cmd.format(job=job)
+            return self._cmd.format(job=jobs[0])
 
 
 class FlowOperation(BaseFlowOperation):
@@ -2705,7 +2713,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                 ignore_conditions=IgnoreConditions.NONE):
         "Get all pending operations for the given selection."
         assert not isinstance(operation_names, str)
-        for op in self._next_operations(* jobs, ignore_conditions=ignore_conditions):
+        for op in self._next_operations(jobs, ignore_conditions):
             if operation_names is None or any(re.fullmatch(n, op.name) for n in operation_names):
                 yield op
 
@@ -3417,13 +3425,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                                         ignore_conditions=ignore_conditions,
                                                         index=0)
 
-    def _next_operations(self, *jobs, ignore_conditions=IgnoreConditions.NONE):
+    def _next_operations(self, jobs, ignore_conditions=IgnoreConditions.NONE):
         """Determine the next eligible operations for jobs.
 
         :param jobs:
             The signac job handles.
-        :type job:
-            :class:`~signac.contrib.job.Job`
+        :type jobs:
+            list of :class:`~signac.contrib.job.Job`
         :param ignore_conditions:
             Specify if pre and/or post conditions check is to be ignored for eligibility check.
             The default is :py:class:`IgnoreConditions.NONE`.
@@ -3688,7 +3696,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _main_next(self, args):
         "Determine the jobs that are eligible for a specific operation."
-        for op in self._next_operations(*self):
+        for op in self._next_operations(self):
             if args.name in op.name:
                 print(' '.join(map(str, op._jobs)))
 

@@ -1,5 +1,6 @@
 from collections.abc import MutableMapping
 import operator
+import sys
 
 
 class _DirectivesItem:
@@ -271,8 +272,9 @@ def _no_aggregation(v, o):
     return v
 
 
-EXECUTABLE = _DirectivesItem('executable', validation=_OnlyType(str), default=None,
-                             serial=_no_aggregation, parallel=_no_aggregation)
+EXECUTABLE = _DirectivesItem('executable', validation=_OnlyType(str),
+                             default=sys.executable, serial=_no_aggregation,
+                             parallel=_no_aggregation)
 EXECUTABLE.__doc__ = """
 The path to the executable to be used for this operation.
 

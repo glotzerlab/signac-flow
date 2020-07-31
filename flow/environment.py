@@ -271,12 +271,6 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
     @classmethod
     def get_default_directives(cls):
-        # While testing, we mock sys.executable to '/usr/local/bin/python'.
-        # Initially EXECUTABLE's default value was sys.executable but as
-        # we will never be able to change the default value of a _DirectivesItem
-        # instance dynamically. Hence, now the default value is set to None
-        # and we set the default value here manually as sys.executable.
-        EXECUTABLE.default = sys.executable
         return Directives(
             [NP, NGPU, NRANKS, OMP_NUM_THREADS,
              EXECUTABLE, WALLTIME, PROCESSOR_FRACTION])

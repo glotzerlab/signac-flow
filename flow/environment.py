@@ -271,8 +271,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
     @classmethod
     def get_default_directives(cls):
-        if EXECUTABLE.default is None:
-            EXECUTABLE.default = sys.executable
+        EXECUTABLE.default = sys.executable
         return Directives(
             [NP, NGPU, NRANKS, OMP_NUM_THREADS,
              EXECUTABLE, WALLTIME, PROCESS_FRACTION])

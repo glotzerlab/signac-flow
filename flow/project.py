@@ -241,8 +241,8 @@ class _JobOperation(object):
 
     The execution or submission of a :py:class:`FlowGroup` uses a passed in command
     which can either be a string or function with no arguments that returns a shell
-    executable command.  This won't be used if it is determined that the group can be
-    executed without forking.
+    executable command.  The shell executable command won't be used if it is
+    determined that the group can be executed without forking.
 
     .. note::
 
@@ -262,7 +262,7 @@ class _JobOperation(object):
     :type jobs:
         list of :class:`signac.contrib.job.Job`
     :param cmd:
-        The command that executes this operation. Can be a function that when
+        The command that executes this operation. Can be a callable that when
         evaluated returns a string.
     :type cmd:
         callable or str
@@ -309,8 +309,8 @@ class _JobOperation(object):
         else:
             minimum = self._jobs[0]._project.min_len_unique_id()
             return "{}-{}: ({}-{})".format(
-                self.name, len(self._jobs), str(self._jobs[0])[0:minimum],
-                str(self._jobs[-1])[0:minimum])
+                self.name, len(self._jobs), str(self._jobs[0])[:minimum],
+                str(self._jobs[-1])[:minimum])
 
     def __repr__(self):
         return "{type}(name='{name}', jobs='{jobs}', cmd={cmd}, directives={directives})".format(
@@ -362,8 +362,8 @@ class JobOperation(_JobOperation):
 
     The execution or submission of a :py:class:`FlowGroup` uses a passed in command
     which can either be a string or function with no arguments that returns a shell
-    executable command.  This won't be used if it is determined that the group can be
-    executed without forking.
+    executable command.  The shell executable command won't be used if it is
+    determined that the group can be executed without forking.
 
     .. note::
 
@@ -371,11 +371,11 @@ class JobOperation(_JobOperation):
         submission process and should not be instantiated by users themselves.
 
     :param id:
-        The id of this _JobOperation instance. The id should be unique.
+        The id of this JobOperation instance. The id should be unique.
     :type id:
         str
     :param name:
-        The name of the _JobOperation.
+        The name of the JobOperation.
     :type name:
         str
     :param job:
@@ -383,7 +383,7 @@ class JobOperation(_JobOperation):
     :type job:
         :class:`signac.contrib.job.Job`
     :param cmd:
-        The command that executes this operation. Can be a function that when
+        The command that executes this operation. Can be a callable that when
         evaluated returns a string.
     :type cmd:
         callable or str
@@ -519,7 +519,7 @@ class _FlowCondition(object):
             raise UserConditionError(
                 'An exception was raised while evaluating the condition {name} '
                 'for job {jobs}.'.format(name=self._callback.__name__,
-                                         jobs=' '.join(map(str, jobs)))) from e
+                                         jobs=', '.join(map(str, jobs)))) from e
 
     def __hash__(self):
         return hash(self._callback)
@@ -573,7 +573,7 @@ class BaseFlowOperation(object):
         return "{type}(cmd='{cmd}')".format(type=type(self).__name__, cmd=self._cmd)
 
     def _eligible(self, jobs, ignore_conditions=IgnoreConditions.NONE):
-        r"""Eligible, when all pre-conditions are true and at least one post-condition is false,
+        """Eligible, when all pre-conditions are true and at least one post-condition is false,
         or corresponding conditions are ignored.
 
         :param jobs:
@@ -922,11 +922,11 @@ class FlowGroup(object):
         """Eligible, when at least one BaseFlowOperation is eligible.
 
         :param jobs:
-            A list of signac job handles.
+            The signac job handles.
         :type jobs:
             list
         :param ignore_conditions:
-            Specify if pre and/or post conditions check is to be ignored for eligibility check.
+            Specify if pre and/or post conditions are to be ignored while checking eligibility.
             The default is :py:class:`IgnoreConditions.NONE`.
         :type ignore_conditions:
             :py:class:`~.IgnoreConditions`
@@ -938,12 +938,12 @@ class FlowGroup(object):
         return any(op._eligible(jobs, ignore_conditions) for op in self)
 
     def _complete(self, jobs):
-        r"""True when all BaseFlowOperation post-conditions are met.
+        """True when all BaseFlowOperation post-conditions are met.
 
-        :param \*jobs:
+        :param jobs:
             The signac job handles.
-        :type \*jobs:
-            :class:`signac.Job`
+        :type jobs:
+            list
         :return:
             Whether the group is complete (all contained operations are
             complete).
@@ -957,11 +957,11 @@ class FlowGroup(object):
         """Eligible, when at least one BaseFlowOperation is eligible.
 
         :param job:
-            A :class:`signac.Job` from the signac workspace.
+            A :class:`signac.contrib.job.Job` from the signac workspace.
         :type job:
-            :class:`signac.Job`
+            :class:`signac.contrib.job.Job`
         :param ignore_conditions:
-            Specify if pre and/or post conditions check is to be ignored for eligibility check.
+            Specify if pre and/or post conditions are to be ignored while checking eligibility.
             The default is :py:class:`IgnoreConditions.NONE`.
         :type ignore_conditions:
             :py:class:`~.IgnoreConditions`
@@ -977,9 +977,9 @@ class FlowGroup(object):
         """True when all BaseFlowOperation post-conditions are met.
 
         :param job:
-            A :class:`signac.Job` from the signac workspace.
+            A :class:`signac.contrib.job.Job` from the signac workspace.
         :type job:
-            :class:`signac.Job`
+            :class:`signac.contrib.job.Job`
         :return:
             Whether the group is complete (all contained operations are
             complete).
@@ -1096,7 +1096,7 @@ class FlowGroup(object):
         :param jobs:
             The list of jobs that the :class:`~._JobOperation` is based on.
         :type jobs:
-            list of :class:`signac.Job`
+            list of :class:`signac.contrib.job.Job`
         :param ignore_conditions:
             Specify if pre and/or post conditions check is to be ignored for
             checking submission eligibility. The default is `IgnoreConditions.NONE`.
@@ -1173,7 +1173,7 @@ class FlowGroup(object):
         :param jobs:
             The list of jobs that the :class:`~._JobOperation` is based on.
         :type jobs:
-            list of :class:`signac.Job`
+            list of :class:`signac.contrib.job.Job`
         :param index:
             Index for the :class:`~._JobOperation`.
         :type index:

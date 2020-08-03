@@ -1572,6 +1572,54 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             with open(fn_aggregate, 'a') as file:
                 file.write(aggregate_wid)
 
+    def _fetch_aggregates(self, operation, aggregated_jobs=[]):
+        """Store aggregate-ids per operation information.
+
+        This enables status check of aggregates which were
+        formed previously by not present currently for any
+        operation.
+
+        :param operation:
+            Name of the operation for fetching aggregates.
+        :type operation:
+            str
+        :param aggregated_jobs:
+            Already formed aggregates for this operation.
+            The fetched aggregates will be appended to aggregated_jobs if the
+            fetched aggregate is not present in aggregated_jobs.
+            The default behaviour is to fetch all the aggregates.
+        :type aggregated_jobs:
+            list
+        :return:
+            Fetched signac job handles that were previously submitted.
+        :rtype:
+            list
+        """
+
+        dir = '.aggregates/{}.txt'.format(operation)
+        if os.path.exists(dir):
+            with open(dir, 'r') as file:
+                for obj in file:
+                    fetched_aggregate = []
+                    _ids = obj.split(' ')
+                    submission_id = _ids[0]
+                    job_ids = _ids[1:-1]
+                    try:
+                        for job_id in job_ids:
+                            fetched_aggregate.append(self.open_job(id=job_id))
+                        if fetched_aggregate not in aggregated_jobs:
+                            # Checking whether the aggregate and the submission id match.
+                            # If not, then a user must have changed the submission id.
+                            # Hence skip this aggregate.
+                            assert group._generate_id(fetched_aggregate) == submission_id
+                            aggregated_jobs.append(fetched_aggregate)
+                    except KeyError: # Not able to open the job via job id.
+                        pass
+                    except AssertionError:
+                        pass
+
+        return aggregated_jobs
+
     def _expand_bundled_jobs(self, scheduler_jobs):
         "Expand jobs which were submitted as part of a bundle."
         for job in scheduler_jobs:
@@ -1692,29 +1740,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         errors = dict()
         jobs = [[job] for job in jobs]
 
-        dir = '.aggregates/{}.txt'.format(group.name)
-
-        if os.path.exists(dir):
-            with open(dir, 'r') as file:
-                for obj in file:
-                    fetched_aggregate = []
-                    _ids = obj.split(' ')
-                    group_id = _ids[0]
-                    job_ids = _ids[1:-1]
-                    try:
-                        for job_id in job_ids:
-                            fetched_aggregate.append(self.open_job(id=job_id))
-
-                        if fetched_aggregate not in jobs:
-                            # Checking whether the aggregate and the submission id match.
-                            # If not, then a user must have changed the submission id.
-                            # Hence skip this aggregate.
-                            assert group._generate_id(fetched_aggregate) == group_id
-                            jobs.append(fetched_aggregate)
-                    except KeyError: # Not able to open the job bia job id.
-                        pass
-                    except AssertionError:
-                        pass
+        jobs = self._fetch_aggregates(group.name, jobs)
 
         for job in tqdm(jobs, desc="Collecting job status info for operation {}"
                         "".format(group.name), leave=False):

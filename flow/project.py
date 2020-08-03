@@ -47,6 +47,7 @@ from signac.contrib.project import JobsCursor
 
 from enum import IntFlag
 
+from .aggregate import Aggregate
 from .environment import get_environment
 from .scheduling.base import ClusterJob
 from .scheduling.base import JobStatus
@@ -169,7 +170,7 @@ class _condition(object):
 
     @classmethod
     def isfile(cls, filename):
-        "True if the specified file exists for this job."
+        "True if the specified file exists for this job-aggregate."
         def _isfile(*jobs):
             return all(job.isfile(filename) for job in jobs)
 
@@ -177,8 +178,8 @@ class _condition(object):
 
     @classmethod
     def true(cls, key):
-        """True if the specified key is present in the job document and
-        evaluates to True."""
+        """True if the specified key is present in the job document
+        of every job in the job-aggregate and evaluates to True."""
         def _document(*jobs):
             return all(job.document.get(key, False) for job in jobs)
 
@@ -186,8 +187,8 @@ class _condition(object):
 
     @classmethod
     def false(cls, key):
-        """True if the specified key is present in the job document and
-        evaluates to False."""
+        """True if the specified key is present in the job document
+        of every job in the job-aggregate and evaluates to True."""
         def _no_document(*jobs):
             return all(not job.document.get(key, False) for job in jobs)
         return cls(_no_document, 'false_' + key)
@@ -200,7 +201,8 @@ class _condition(object):
 
     @classmethod
     def not_(cls, condition):
-        """Returns ``not condition(job)`` for the provided condition function."""
+        """Evaluates to True if the provided condition function returns
+        False for all the jobs in the job-aggregate passed at once."""
         def _not(*jobs):
             return not condition(*jobs)
         return cls(_not,
@@ -237,7 +239,7 @@ def _make_bundles(operations, size=None):
 
 
 class _JobOperation(object):
-    """This class represents the information needed to execute one group for one job.
+    """This class represents the information needed to execute one group for a job-aggregate.
 
     The execution or submission of a :py:class:`FlowGroup` uses a passed in command
     which can either be a string or function with no arguments that returns a shell
@@ -440,7 +442,7 @@ class JobOperation(_JobOperation):
 
 
 class _SubmissionJobOperation(_JobOperation):
-    R"""This class represents the information needed to submit one group for one job.
+    R"""This class represents the information needed to submit one group for a job-aggregate.
 
     This class extends :py:class:`_JobOperation` to include a set of groups
     that will be executed via the "run" command. These groups are known at
@@ -450,7 +452,7 @@ class _SubmissionJobOperation(_JobOperation):
         Passed to the constructor of :py:class:`_JobOperation`.
     :param eligible_operations:
         A list of :py:class:`_JobOperation` that will be executed when this
-        submitted job is executed.
+        submitted job-aggregate is executed.
     :type eligible_operations:
         list
     :param operations_with_unmet_preconditions:
@@ -497,14 +499,14 @@ class _SubmissionJobOperation(_JobOperation):
 
 
 class _FlowCondition(object):
-    """A _FlowCondition represents a condition as a function of a signac job.
+    """A _FlowCondition represents a condition as a function of a job-aggregate.
 
     The __call__() function of a _FlowCondition object may return either True
     or False, representing whether the condition is met or not.
     This can be used to build a graph of conditions and operations.
 
     :param callback:
-        A callable with one positional argument (the job).
+        A callable with one or multiple positional arguments or a variable argument.
     :type callback:
         callable
     """
@@ -518,8 +520,8 @@ class _FlowCondition(object):
         except Exception as e:
             raise UserConditionError(
                 'An exception was raised while evaluating the condition {name} '
-                'for job {jobs}.'.format(name=self._callback.__name__,
-                                         jobs=', '.join(map(str, jobs)))) from e
+                'for job(s) {jobs}.'.format(name=self._callback.__name__,
+                                            jobs=', '.join(map(str, jobs)))) from e
 
     def __hash__(self):
         return hash(self._callback)
@@ -529,14 +531,15 @@ class _FlowCondition(object):
 
 
 class BaseFlowOperation(object):
-    """A BaseFlowOperation represents a data space operation, operating on any job.
+    """A BaseFlowOperation represents a data space operation, operating on any job-aggregate.
 
     Every BaseFlowOperation is associated with a specific command.
 
     Pre-requirements (pre) and post-conditions (post) can be used to
     trigger an operation only when certain conditions are met. Conditions are unary
-    callables, which expect an instance of job as their first and only positional
-    argument and return either True or False.
+    callables, which expects multiple positional arguments or a variable arguement
+    which expects instance(s) of :class:`~signac.contrib.job.Job`and return either
+    True or False.
 
     An operation is considered "eligible" for execution when all pre-requirements
     are met and when at least one of the post-conditions is not met.
@@ -547,7 +550,7 @@ class BaseFlowOperation(object):
         This class should not be instantiated directly.
 
     :param cmd:
-        The command to execute operation; should be a function of job.
+        The command to execute operation; should be a function of one or multiple jobs.
     :type cmd:
         str or callable
     :param pre:
@@ -634,13 +637,14 @@ class FlowCmdOperation(BaseFlowOperation):
     """A BaseFlowOperation that holds a shell executable command.
 
     When an operation has the ``@cmd`` directive specified, it is instantiated
-    as a FlowCmdOperation. The operation should be a function of
-    :py:class:`~signac.contrib.job.Job`. The command (cmd) may
-    either be a unary callable that expects an instance of
-    :class:`~signac.contrib.job.Job` as its only positional argument and returns
-    a string containing valid shell commands, or the string of commands itself.
-    In either case, the resulting string may contain any attributes of the job placed
-    in curly braces, which will then be substituted by Python string formatting.
+    as a FlowCmdOperation. The operation may be a function of multiple
+    :py:class:`~signac.contrib.job.Job` depending on the type of aggregator user uses.
+    The command (cmd) is a callable which expects multiple positional arguments
+    or a variable arguement which expects instance(s) of :class:`~signac.contrib.job.Job`
+    and returns a string containing valid shell commands, or the string of commands itself.
+    In either case, the resulting string may contain any attributes of the job or
+    aggregate of jobs place in curly braces, which will then be substituted by
+    Python string formatting.
 
     .. note::
         This class should not be instantiated directly.
@@ -661,11 +665,16 @@ class FlowCmdOperation(BaseFlowOperation):
                 return self._cmd(None)
             else:
                 return self._cmd
-
-        if callable(self._cmd):
-            return self._cmd(*jobs).format(job=jobs[0])
+        elif len(jobs) == 1:
+            if callable(self._cmd):
+                return self._cmd(*jobs).format(job=jobs[0])
+            else:
+                return self._cmd.format(job=jobs[0])
         else:
-            return self._cmd.format(job=jobs[0])
+            if callable(self._cmd):
+                return self._cmd(*jobs).format(*jobs)
+            else:
+                return self._cmd.format(*jobs)
 
 
 class FlowOperation(BaseFlowOperation):
@@ -686,8 +695,8 @@ class FlowOperation(BaseFlowOperation):
         return "{type}(op_func='{op_func}')" \
                "".format(type=type(self).__name__, op_func=self._op_func)
 
-    def __call__(self, job):
-        return self._op_func(job)
+    def __call__(self, jobs):
+        return self._op_func(*jobs)
 
 
 class FlowGroupEntry(object):
@@ -709,10 +718,15 @@ class FlowGroupEntry(object):
         commands to execute.
     :type options:
         str
+    :param aggregate:
+        Object that aggregates jobs for a :py:class:`FlowGroup`.
+    :type aggregate:
+        :py:class:`MakeAggregate`
     """
-    def __init__(self, name, options=""):
+    def __init__(self, name, options="", aggregate=None):
         self.name = name
         self.options = options
+        self.aggregate = aggregate
 
     def __call__(self, func):
         """Decorator that adds the function into the group's operations.
@@ -768,7 +782,7 @@ class FlowGroup(object):
     """A FlowGroup represents a subset of a workflow for a project.
 
     Any :py:class:`FlowGroup` is associated with one or more instances of
-    :py:class:`BaseFlowOperation`.
+    :py:class:`BaseFlowOperation` having same aggregations.
 
     In the example below, the directives will be {'nranks': 4} for op1 and
     {'nranks': 2, 'executable': 'python3'} for op2
@@ -813,12 +827,16 @@ class FlowGroup(object):
         This lets options like ``--num_passes`` to be given to a group.
     :type options:
         str
+    :param aggregate:
+        Object that aggregates jobs for this group.
+    :type aggregate:
+        :py:class:`MakeAggregate`
     """
 
     MAX_LEN_ID = 100
 
     def __init__(self, name, operations=None, operation_directives=None,
-                 options=""):
+                 options="", aggregate=None):
         self.name = name
         self.options = options
         # An OrderedDict is not necessary here, but is used to ensure
@@ -828,6 +846,7 @@ class FlowGroup(object):
             self.operation_directives = dict()
         else:
             self.operation_directives = operation_directives
+        self.aggregate = aggregate
 
     def _set_entrypoint_item(self, entrypoint, directives, key, default, jobs):
         """Set a value (executable, path) for entrypoint in command.
@@ -988,7 +1007,7 @@ class FlowGroup(object):
         """
         return self._complete([job])
 
-    def add_operation(self, name, operation, directives=None):
+    def add_operation(self, name, operation, aggregate, directives=None):
         """Add an operation to the FlowGroup.
 
         :param name:
@@ -999,12 +1018,18 @@ class FlowGroup(object):
             The workflow operation to add to the FlowGroup.
         :type operation:
             :py:class:`BaseFlowOperation`
+        :param aggregate:
+            Object that aggregates jobs for this group.
+        :type aggregate:
+            :py:class:`MakeAggregate`
         :param directives:
             The operation specific directives.
         :type directives:
             dict
         """
         self.operations[name] = operation
+        if self.aggregate is None:
+            self.aggregate = aggregate
         if directives is not None:
             self.operation_directives[name] = directives
 
@@ -1730,7 +1755,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             with open(fn_aggregate, 'a') as file:
                 file.write(aggregate_wid)
 
-    def _fetch_aggregates(self, operation, aggregated_jobs=[]):
+    def _fetch_aggregates(self, operation, group=None, aggregated_jobs=[]):
         """Store aggregate-ids per operation information.
 
         This enables status check of aggregates which were
@@ -1741,6 +1766,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Name of the operation for fetching aggregates.
         :type operation:
             str
+        :param group:
+            FlowGroup associated with this operation.
+        :type group:
+            :py:class:`flow.FlowGroup`
         :param aggregated_jobs:
             Already formed aggregates for this operation.
             The fetched aggregates will be appended to aggregated_jobs if the
@@ -1769,9 +1798,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                             # Checking whether the aggregate and the submission id match.
                             # If not, then a user must have changed the submission id.
                             # Hence skip this aggregate.
-                            assert group._generate_id(fetched_aggregate) == submission_id
+                            if group is not None:
+                                assert group._generate_id(fetched_aggregate) == submission_id
                             aggregated_jobs.append(fetched_aggregate)
-                    except KeyError: # Not able to open the job via job id.
+                    except KeyError:  # Not able to open the job via job id.
                         pass
                     except AssertionError:
                         pass
@@ -1811,7 +1841,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         "Return a dict with information about job-operations for this job."
         starting_dict = functools.partial(dict, scheduler_status=JobStatus.unknown)
         status_dict = defaultdict(starting_dict)
+        print_warning = False
         for group in self._groups.values():
+            if group.aggregate._is_aggregate:
+                print_warning = True
+                continue
             completed = group._complete([job])
             eligible = False if completed else group._eligible([job])
             scheduler_status = cached_status.get(group._generate_id([job]),
@@ -1823,7 +1857,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                             'eligible': eligible,
                             'completed': completed
                             }
-
+        if print_warning:
+            print("The method ``get_job_status`` will not be implemented for fetching status "
+                  "with aggregate operations. Please use signac-flow's command-line interface "
+                  "instead.")
         for key in sorted(status_dict):
             yield key, status_dict[key]
 
@@ -1873,11 +1910,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             scheduler_info = {sjob.name(): sjob.status() for sjob in self.scheduler_jobs(scheduler)}
             status = dict()
             print("Query scheduler...", file=file)
-            for job in tqdm(jobs,
-                            desc="Fetching operation status",
-                            total=len(jobs), file=file):
-                for group in self._groups.values():
-                    _id = group._generate_id([job])
+            for group in tqdm(self._groups.values(),
+                              desc="Fetching operation status",
+                              total=len(self._groups), file=file):
+                aggregated_jobs = group.aggregate(jobs)
+                for aggregate in tqdm(aggregated_jobs, total=len(aggregated_jobs),
+                                      desc="Fetching operation info for job {}".format(group.name), leave=False,
+                                      file=file):
+                    _id = group._generate_id(aggregate)
                     status[_id] = int(scheduler_info.get(_id, JobStatus.unknown))
             self.document._status.update(status)
         except NoSchedulerError:
@@ -1896,37 +1936,45 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             result['operation_name'] = name
         status_dict = dict()
         errors = dict()
-        jobs = [[job] for job in jobs]
 
-        jobs = self._fetch_aggregates(group.name, jobs)
+        aggregated_jobs = group.aggregate(jobs)
 
-        for job in tqdm(jobs, desc="Collecting job status info for operation {}"
-                        "".format(group.name), leave=False):
-            if errors.get(job[0], None) is None:
-                errors[job[0]] = None
+        aggregated_jobs = self._fetch_aggregates(group.name, group, aggregated_jobs)
+
+        for aggregate in tqdm(aggregated_jobs,
+                              desc="Collecting job status info for operation {}".format(group.name),
+                              leave=False, total=len(aggregated_jobs)):
             try:
-                _id = group._generate_id(job)
-                completed = group._complete(job)
-                eligible = False if completed else group._eligible(job)
-                scheduler_status = cached_status.get(_id, JobStatus.unknown)
-                status_dict[str(job[0])] = {
-                        'scheduler_status': scheduler_status,
-                        'eligible': eligible,
-                        'completed': completed
-                        }
+                completed = group._complete(aggregate)
+                eligible = False if completed else group._eligible(aggregate)
+                scheduler_status = cached_status.get(group._generate_id(aggregate),
+                                                     JobStatus.unknown)
+                for job in aggregate:
+                    status_dict[str(job)] = {
+                            'scheduler_status': scheduler_status,
+                            'eligible': eligible,
+                            'completed': completed,
+                            'is_aggregate': group.aggregate._is_aggregate,
+                            'aggregates': ' '.join(map(str, aggregate))
+                            }
             except Exception as error:
-                msg = "Error while getting operations status for job " \
-                      "'{}': '{}'.".format(' '.join(map(str, job)), error)
+                msg = "Error while getting operations status for aggregate " \
+                      "'{}': '{}'.".format(' '.join(map(str, aggregate)), error)
                 logger.debug(msg)
-                status_dict[str(job[0])] = {
-                        'scheduler_status': JobStatus.unknown,
-                        'eligible': False,
-                        'completed': False
-                        }
+                for job in aggregate:
+                    status_dict[str(job)] = {
+                            'scheduler_status': JobStatus.unknown,
+                            'eligible': False,
+                            'completed': False,
+                            'is_aggregate': group.aggregate._is_aggregate,
+                            'aggregates': ' '.join(map(str, aggregate))
+                            }
                 if ignore_errors:
-                    if errors[job[0]] is None:
-                        errors[job[0]] = str(error)
-                    errors[job[0]] += '\n' + str(error)
+                    for job in aggregate:
+                        if errors[str(job)] is None:
+                            errors[str(job)] = str(error)
+                        else:
+                            errors[str(job)] += '\n' + str(error)
                 else:
                     raise
 
@@ -2068,11 +2116,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             result['job_id'] = str(job)
             result['operations'] = dict()
             result['labels'] = list()
-            result['_operations_error'] = list()
-            result['_labels_error'] = list()
-            results.append(result)
-            index[str(job)] = i
-            i += 1
+            result['_operations_error'] = None
+            result['_labels_error'] = None
+            if(result not in results):
+                results.append(result)
+                index[str(job)] = i
+                i += 1
         for op_result in op_results:
             for id, aggregates in op_result['aggregate_details'].items():
                 results[index[id]]['operations'][op_result['operation_name']] = aggregates
@@ -2440,15 +2489,33 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if not has_eligible_ops and not context['all_ops']:
                 _add_dummy_operation(job)
 
-        op_counter = Counter()
+        aggregate_dict = defaultdict(lambda: [])
+        aggregate_counter = Counter()
+        aggregates_per_op = defaultdict(lambda: [])
+
         for job in context['jobs']:
             for k, v in job['operations'].items():
                 if k != '' and v['eligible']:
-                    op_counter[k] += 1
-        context['op_counter'] = op_counter.most_common(eligible_jobs_max_lines)
-        n = len(op_counter) - len(context['op_counter'])
+                    split_jobs = v['aggregates'].split(' ')
+                    if not v['aggregates'].split(' ') in aggregate_dict[k]:
+                        aggregate_dict[k].append(split_jobs)
+                        if v['is_aggregate']:
+                            _aggregate = []
+                            for _id in split_jobs:
+                                _aggregate.append(
+                                    self.open_job(id=_id)
+                                )
+                            aggregates_per_op[k].append(
+                                (_aggregate, v['scheduler_status'])
+                            )
+        for op, ags in aggregate_dict.items():
+            aggregate_counter[op] = len(ags)
+
+        context['aggregate_counter'] = aggregate_counter.most_common(eligible_jobs_max_lines)
+        n = len(aggregate_counter) - len(context['aggregate_counter'])
         if n > 0:
-            context['op_counter'].append(('[{} more operations omitted]'.format(n), ''))
+            context['aggregate_counter'].append(('[{} more operations omitted]'.format(n), ''))
+        context['detailed_ags'] = aggregates_per_op
 
         status_renderer = StatusRenderer()
         # We have to make a deep copy of the template environment if we're
@@ -2633,11 +2700,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "Executing operation '{}' with current interpreter "
                 "process ({}).".format(operation, os.getpid()))
             try:
-                self._operations[operation.name](*operation._jobs)
+                self._operations[operation.name](operation._jobs)
             except Exception as e:
                 raise UserOperationError(
                     'An exception was raised during operation {operation.name} '
-                    'for job {operation._jobs[0]}.'.format(operation=operation)) from e
+                    'for aggregate {aggregate}.'
+                    ''.format(operation=operation,
+                              aggregate=', '.join(map(str, operation._jobs)))) \
+                                from e
 
     def _get_default_directives(self):
         return {name: self.groups[name].operation_directives.get(name, dict())
@@ -2697,13 +2767,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :param order:
             Specify the order of operations, possible values are:
                 * 'none' or None (no specific order)
-                * 'by-job' (operations are grouped by job)
+                * 'by-aggregate' (operations are grouped by job)
                 * 'cyclic' (order operations cyclic by job)
                 * 'random' (shuffle the execution order randomly)
                 * callable (a callable returning a comparison key for an
                             operation used to sort operations)
 
-            The default value is `none`, which is equivalent to `by-job` in the current
+            The default value is `none`, which is equivalent to `by-aggregate` in the current
             implementation.
 
             .. note::
@@ -2799,10 +2869,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 with self._potentially_buffered():
                     operations = []
                     for flow_group in flow_groups:
-                        for job in jobs:
+                        for aggregate in flow_group.aggregate(jobs):
                             operations.extend(
                                 flow_group._create_run_job_operations(
-                                    self._entrypoint, default_directives, [job], ignore_conditions))
+                                    self._entrypoint, default_directives,
+                                    aggregate, ignore_conditions))
 
                     operations = list(filter(select, operations))
             finally:
@@ -2822,13 +2893,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 operations = list(roundrobin(*groups))
             elif order == 'random':
                 random.shuffle(operations)
-            elif order is None or order in ('none', 'by-job'):
-                pass  # by-job is the default order
+            elif order is None or order in ('none', 'by-aggregate'):
+                pass  # by-aggregate is the default order
             else:
                 raise ValueError(
                     "Invalid value for the 'order' argument, valid arguments are "
-                    "'none', 'by-job', 'cyclic', 'random', None, or a callable.")
-
+                    "'none', 'by-aggregate', 'cyclic', 'random', None, or a callable.")
             logger.info(
                 "Executing {} operation(s) (Pass # {:02d})...".format(len(operations), i_pass))
             self._run_operations(operations, pretend=pretend,
@@ -2870,15 +2940,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                    ignore_conditions_on_execution=IgnoreConditions.NONE):
         """Grabs _JobOperations that are eligible to run from FlowGroups."""
         for group in self._gather_flow_groups(names):
-            for job in jobs:
+            for aggregate in group.aggregate(jobs):
                 if (
-                    group._eligible([job], ignore_conditions) and
-                    self._eligible_for_submission(group, [job])
+                    group._eligible(aggregate, ignore_conditions) and
+                    self._eligible_for_submission(group, aggregate)
                 ):
                     yield group._create_submission_job_operation(
                         entrypoint=self._entrypoint,
                         default_directives=default_directives,
-                        jobs=[job], index=0,
+                        jobs=aggregate, index=0,
                         ignore_conditions_on_execution=ignore_conditions_on_execution)
 
     def _get_pending_operations(self, jobs, operation_names=None,
@@ -3592,14 +3662,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if op._complete([job]):
                 yield name
 
-    def _job_operations(self, job, ignore_conditions=IgnoreConditions.NONE):
+    def _job_operations(self, jobs, ignore_conditions=IgnoreConditions.NONE):
         "Yield instances of _JobOperation constructed for specific jobs."
         for name in self.operations:
             group = self._groups[name]
-            yield from group._create_run_job_operations(entrypoint=self._entrypoint, jobs=[job],
-                                                        default_directives=dict(),
-                                                        ignore_conditions=ignore_conditions,
-                                                        index=0)
+            for aggregate in group.aggregate(jobs):
+                yield from group._create_run_job_operations(entrypoint=self._entrypoint,
+                                                            jobs=aggregate,
+                                                            default_directives=dict(),
+                                                            ignore_conditions=ignore_conditions,
+                                                            index=0)
 
     def _next_operations(self, jobs, ignore_conditions=IgnoreConditions.NONE):
         """Determine the next eligible operations for jobs.
@@ -3616,9 +3688,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :yield:
             All instances of :class:`~._JobOperation` jobs are eligible for.
         """
-        for job in jobs:
-            for op in self._job_operations(job, ignore_conditions):
-                yield op
+        for op in self._job_operations(jobs, ignore_conditions):
+            yield op
 
     @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
     def next_operations(self, *jobs, ignore_conditions=IgnoreConditions.NONE):
@@ -3637,7 +3708,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             All instances of :class:`~.JobOperation` jobs are eligible for.
         """
         for job in jobs:
-            for op in self._job_operations(job, ignore_conditions):
+            for op in self._job_operations(jobs, ignore_conditions):
                 yield JobOperation(op.id, op.name, op._jobs[0], op._cmd, op.directives)
 
     @classmethod
@@ -3665,13 +3736,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "An operation with name '{}' is already registered.".format(name))
         if name in cls._GROUP_NAMES:
             raise ValueError("A group with name '{}' is already registered.".format(name))
-
-        signature = inspect.signature(func)
-        for i, (k, v) in enumerate(signature.parameters.items()):
-            if i and v.default is inspect.Parameter.empty:
-                raise ValueError(
-                    "Only the first argument in an operation argument may not have "
-                    "a default value! ({})".format(name))
 
         # Append the name and function to the class registry
         cls._OPERATION_FUNCTIONS.append((name, func))
@@ -3725,6 +3789,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 'pre': pre_conditions.get(func, None),
                 'post': post_conditions.get(func, None)}
 
+            if not getattr(func, '_flow_aggregate', False):
+                aggregate = Aggregate.groupsof(1)
+                func._flow_aggregate = aggregate._create_MakeAggregate()
+
             # Construct FlowOperation:
             if getattr(func, '_flow_cmd', False):
                 self._operations[name] = FlowCmdOperation(cmd=func, **params)
@@ -3732,7 +3800,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 self._operations[name] = FlowOperation(op_func=func, **params)
 
     @classmethod
-    def make_group(cls, name, options=""):
+    def make_group(cls, name, options="", aggregate=None):
         """Make a FlowGroup named ``name`` and return a decorator to make groups.
 
         .. code-block:: python
@@ -3755,13 +3823,21 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             A string to append to submissions can be any valid :meth:`FlowOperation.run` option.
         :type options:
             str
+        :param aggregator:
+            Object that aggregates jobs for this group.
+            By default the value is None which results in forming the aggregates of 1.
+        :type aggregator:
+            :class:`~.Aggregate`.
         """
         if name in cls._GROUP_NAMES:
             raise ValueError("Repeat definition of group with name '{}'.".format(name))
         else:
             cls._GROUP_NAMES.add(name)
 
-        group_entry = FlowGroupEntry(name, options)
+        if aggregate is None:
+            aggregate = Aggregate.groupsof(1)
+
+        group_entry = FlowGroupEntry(name, options, aggregate._create_MakeAggregate())
         cls._GROUPS.append(group_entry)
         return group_entry
 
@@ -3774,7 +3850,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Initialize all groups without operations
         for entry in group_entries:
-            self._groups[entry.name] = FlowGroup(entry.name, options=entry.options)
+            self._groups[entry.name] = FlowGroup(entry.name, options=entry.options,
+                                                 aggregate=entry.aggregate)
 
         # Add operations and directives to group
         for (op_name, op) in self._operations.items():
@@ -3782,12 +3859,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 func = op._cmd
             else:
                 func = op._op_func
-
+            aggregate = func._flow_aggregate
             if hasattr(func, '_flow_groups'):
                 operation_directives = getattr(func, '_flow_group_operation_directives', dict())
                 for group_name in func._flow_groups:
                     self._groups[group_name].add_operation(
-                        op_name, op, operation_directives.get(group_name, None))
+                        op_name, op, aggregate, operation_directives.get(group_name, None))
 
             # For singleton groups add directives
             self._groups[op_name].operation_directives[op_name] = getattr(func,
@@ -3954,17 +4031,20 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             operation = self._operations[args.operation]
 
             if isinstance(operation, FlowCmdOperation):
-                def operation_function(job):
-                    cmd = operation(job).format(job=job)
+                def operation_function(jobs):
+                    cmd = operation(*jobs)
                     subprocess.run(cmd, shell=True, check=True)
+
+                aggregator = operation._cmd._flow_aggregate
             else:
                 operation_function = operation
+                aggregator = operation_function._op_func._flow_aggregate
 
         except KeyError:
             raise KeyError("Unknown operation '{}'.".format(args.operation))
 
-        for job in jobs:
-            operation_function(job)
+        for aggregate in aggregator(jobs):
+            operation_function(aggregate)
 
     def _select_jobs_from_args(self, args):
         "Select jobs with the given command line arguments ('-j/-f/--doc-filter')."
@@ -4110,7 +4190,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         execution_group.add_argument(
             '--order',
             type=str,
-            choices=['none', 'by-job', 'cyclic', 'random'],
+            choices=['none', 'by-aggregate', 'cyclic', 'random'],
             default=None,
             help="Specify the execution order of operations for each execution pass.")
         execution_group.add_argument(

@@ -62,6 +62,11 @@ class Aggregate:
             raise TypeError("Expected callable for select, got {}"
                             "".format(type(select)))
 
+        if getattr(aggregator, '_num', False):
+            self._is_aggregate = False if aggregator._num == 1 else True
+        else:
+            self._is_aggregate = True
+
         self._aggregator = aggregator
         self._sort = sort
         self._reverse = reverse
@@ -72,15 +77,13 @@ class Aggregate:
         # copied from: https://docs.python.org/3/library/itertools.html#itertools.zip_longest
         try:
             num = int(num)
-            if num < 0:
-                raise ValueError("The num parameter should be greater than 0")
         except Exception:
             raise TypeError("The num parameter should be an integer")
 
         def aggregator(jobs):
             args = [iter(jobs)] * num
             return zip_longest(*args)
-
+        setattr(aggregator, '_num', num)
         return cls(aggregator, sort, reverse, select)
 
     @classmethod

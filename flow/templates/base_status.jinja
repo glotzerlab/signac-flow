@@ -27,10 +27,10 @@
 {% endblock%}
 
 {% block operation_summary %}
-| operation | number of eligible jobs |
-| --------- | ----------------------- |
-{% for op, n_jobs in op_counter %}
-| {{ op }} | {{ n_jobs }} |
+| operation | number of eligible aggregates |
+| --------- | ----------------------------- |
+{% for ops, n_aggs in aggregate_counter %}
+| {{ ops }} | {{ n_aggs }} |
 {% endfor %}
 {% endblock %}
 {% endif %}
@@ -53,6 +53,25 @@
 {% endif %}
 {% endfor %}
 {% endfor %}
+
+{{ 'Detailed Aggregate View: \n' }}
+| operation | jobs_in_aggregate | status |
+| --------- | ----------------- | ------ |
+{% for op, agg_stati in detailed_ags.items() %}
+{% for aggregate, stati in agg_stati %}
+{% for job in aggregate %}
+{% if loop.first %}
+| {{op}} | {{job.id | highlight(job.id, pretty) }} | {{'['+scheduler_status_code[stati]+']'}} |
+{% else %}
+|  | {{job.id | highlight(job.id, pretty) }} | {{ '['+scheduler_status_code[stati]+']' }} |
+{% if loop.last %}
+|  |  |  |
+{% endif %}
+{% endif %}
+{% endfor %}
+{% endfor %}
+{% endfor %}
+
 {{ status_legend }}
 {% endif %}
 {% endblock %}

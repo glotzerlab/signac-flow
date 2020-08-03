@@ -12,3 +12,8 @@ repos:
         entry: flake8
         language: python
         types: [python]
+    -   id: pydocstyle
+        name: pydocstyle
+        entry: pydocstyle
+        language: python
+        types: [python]

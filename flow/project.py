@@ -1788,8 +1788,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         # If not, then a user must have changed the submission id.
                         # Hence skip this aggregate.
                         assert group._generate_id(fetched_aggregate) == submission_id
-                        aggregated_jobs.append(fetched_aggregate)
-                    except KeyError: # Not able to open the job via job id.
+                        fetched_aggregates.append(fetched_aggregate)
+                    except KeyError:  # Not able to open the job via job id.
                         pass
                     except AssertionError:
                         pass
@@ -1899,12 +1899,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             status = dict()
             print("Query scheduler...", file=file)
             for group in tqdm(self._groups.values(),
-                              desc="Fetching operation status",
+                              desc="Fetching group's status",
                               total=len(self._groups), file=file):
                 aggregated_jobs = group.aggregate(jobs)
                 for aggregate in tqdm(aggregated_jobs, total=len(aggregated_jobs),
-                                      desc="Fetching operation info for job {}".format(group.name), leave=False,
-                                      file=file):
+                                      desc="Fetching operation info for job {}".format(group.name),
+                                      leave=False, file=file):
                     _id = group._generate_id(aggregate)
                     status[_id] = int(scheduler_info.get(_id, JobStatus.unknown))
             self.document._status.update(status)

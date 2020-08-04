@@ -1605,8 +1605,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         # If not, then a user must have changed the submission id.
                         # Hence skip this aggregate.
                         assert group._generate_id(fetched_aggregate) == submission_id
-                        aggregated_jobs.append(fetched_aggregate)
-                    except KeyError: # Not able to open the job via job id.
+                        fetched_aggregates.append(fetched_aggregate)
+                    except KeyError:  # Not able to open the job via job id.
                         pass
                     except AssertionError:
                         pass

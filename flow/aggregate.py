@@ -4,7 +4,7 @@
 from collections.abc import Iterable
 from itertools import groupby
 from itertools import zip_longest
-
+from tqdm import tqdm
 
 class Aggregate:
     """Decorator for operation functions that are to be aggregated.
@@ -151,7 +151,7 @@ class MakeAggregate(Aggregate):
     def __init__(self, *args):
         super(MakeAggregate, self).__init__(*args)
 
-    def __call__(self, obj):
+    def __call__(self, obj, group_name='unknown-operation'):
         "Return aggregated jobs"
         aggregated_jobs = list(obj)
         if self._select is not None:
@@ -162,7 +162,7 @@ class MakeAggregate(Aggregate):
                                           reverse=bool(self._reverse)))
 
         aggregated_jobs = self._aggregator([job for job in aggregated_jobs])
-        aggregated_jobs = self._create_nested_aggregate_list(aggregated_jobs)
+        aggregated_jobs = self._create_nested_aggregate_list(aggregated_jobs, group_name)
         if not len(aggregated_jobs):
             return []
         for i, job in enumerate(aggregated_jobs[-1]):
@@ -171,12 +171,15 @@ class MakeAggregate(Aggregate):
                 break
         return aggregated_jobs
 
-    def _create_nested_aggregate_list(self, aggregated_jobs):
+    def _create_nested_aggregate_list(self, aggregated_jobs, group_name):
         # This method converts the returned subset of jobs as an Iterable
         # from an aggregator function to a subset of jobs as list.
         aggregated_jobs = list(aggregated_jobs)
         nested_aggregates = []
-        for aggregate in aggregated_jobs:
+
+        desc = "Collecting aggregates for {}.".format(group_name)
+        for aggregate in tqdm(aggregated_jobs, total=len(aggregated_jobs),
+                              desc=desc, leave=False):
             try:
                 nested_aggregates.append([job for job in aggregate])
             except Exception:

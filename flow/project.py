@@ -1552,7 +1552,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """Store aggregate-ids per operation information.
 
         This enables status check of aggregates which were
-        formed previously by not present currently for any
+        formed previously but are not present currently for any
         operation.
 
         :param operations:
@@ -1576,7 +1576,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """Store aggregate-ids per operation information.
 
         This enables status check of aggregates which were
-        formed previously by not present currently for any
+        formed previously but are not present currently for any
         operation.
 
         :param group:
@@ -1737,7 +1737,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         for job in fetched_jobs:
             if [job] not in jobs:
-                jobs.append(job)
+                jobs.append([job])
 
         for job in tqdm(jobs, desc="Collecting job status info for operation {}"
                         "".format(group.name), leave=False):

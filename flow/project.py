@@ -1930,7 +1930,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                               total=len(self._groups), file=file):
                 aggregated_jobs = group.aggregate(jobs, group.name)
                 for aggregate in tqdm(aggregated_jobs, total=len(aggregated_jobs),
-                                      desc="Fetching operation info for job {}".format(group.name),
+                                      desc="Fetching aggregate info for aggregate".format(group.name),
                                       leave=False, file=file):
                     _id = group._generate_id(aggregate)
                     status[_id] = int(scheduler_info.get(_id, JobStatus.unknown))

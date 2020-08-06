@@ -237,6 +237,33 @@ def _make_bundles(operations, size=None):
         else:
             break
 
+def make_aggregates(jobs, operation):
+    """Utility function for the generation of aggregates.
+
+    This function returns the generated aggregates using the
+    aggregator function associated with the operation.
+
+    If no aggregator function is associated with the operation
+    then aggregates of single jobs are returned
+
+    :param jobs:
+        The signac job handles.
+    :type jobs:
+        Iterable of type :class:`signac.contrib.job.Job`
+    :param operation:
+        The operation function of associated with the :class:`FlowProject`.
+    :type operation:
+        callable
+    :return:
+        Aggregated jobs.
+    :rtype:
+        list
+    """
+    try:
+        return operation._flow_aggregate(jobs)
+    except Exception:
+        raise ValueError("Please provide an operation function associated with "
+                         ":class:`FlowProject`")
 
 class _JobOperation(object):
     """This class represents the information needed to execute one group for a job-aggregate.

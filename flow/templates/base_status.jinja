@@ -61,9 +61,9 @@
 {% for aggregate, stati in agg_stati %}
 {% for job in aggregate %}
 {% if loop.first %}
-| {{op}} | {{job.id | highlight(job.id, pretty) }} | {{'['+scheduler_status_code[stati]+']'}} |
+| {{op}} | {{job | highlight(job, pretty) }} | {{'['+scheduler_status_code[stati]+']'}} |
 {% else %}
-| {{op}} | {{job.id | highlight(job.id, pretty) }} | {{ '['+scheduler_status_code[stati]+']' }} |
+| {{op}} | {{job | highlight(job, pretty) }} | {{ '['+scheduler_status_code[stati]+']' }} |
 {% if loop.last %}
 |  |  |  |
 {% endif %}

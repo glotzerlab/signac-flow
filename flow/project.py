@@ -1944,7 +1944,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         else:
             logger.info("Updated job status cache.")
 
-    def _get_group_status(self, group, jobs, ignore_errors=False, cached_status=None):
+    def _get_group_status(self, group, jobs, ignore_errors=False, cached_status=None, aggregates=False):
         "Return a dict with detailed information about the status of jobs per group."
         result = dict()
         for name in group.operations:
@@ -1954,11 +1954,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         aggregated_jobs = group.aggregate(jobs, group.name)
 
-        fetched_aggregates = self._fetch_aggregates(group)
+        if aggregates:
+            fetched_aggregates = self._fetch_aggregates(group)
 
-        for fetched_aggregate in fetched_aggregates:
-            if fetched_aggregate not in aggregated_jobs:
-                aggregated_jobs.append(fetched_aggregate)
+            for fetched_aggregate in fetched_aggregates:
+                if fetched_aggregate not in aggregated_jobs:
+                    aggregated_jobs.append(fetched_aggregate)
 
         def _get_aggregated_ids(aggregate):
             return ' '.join(map(str, aggregate))
@@ -1970,25 +1971,27 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 if errors.get(str(job), None) is None:
                     errors[str(job)] = None
             try:
+                _id = group._generate_id(aggregate)
                 completed = group._complete(aggregate)
                 eligible = False if completed else group._eligible(aggregate)
-                scheduler_status = cached_status.get(group._generate_id(aggregate),
-                                                     JobStatus.unknown)
+                scheduler_status = cached_status.get(_id, JobStatus.unknown)
                 status_dict[_get_aggregated_ids(aggregate)] = {
                             'scheduler_status': scheduler_status,
                             'eligible': eligible,
                             'completed': completed,
                             'is_aggregate': group.aggregate._is_aggregate,
+                            'aggregate': _get_aggregated_ids(aggregate)
                             }
             except Exception as error:
                 msg = "Error while getting operations status for aggregate " \
                       "'{}': '{}'.".format(_get_aggregated_ids(), error)
                 logger.debug(msg)
-                status_dict[_get_aggregated_ids()] = {
+                status_dict[_get_aggregated_ids(aggregate)] = {
                             'scheduler_status': JobStatus.unknown,
                             'eligible': False,
                             'completed': False,
                             'is_aggregate': group.aggregate._is_aggregate,
+                            'aggregate': _get_aggregated_ids(aggregate)
                             }
                 if ignore_errors:
                     for job in aggregate:
@@ -2019,7 +2022,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 raise
         return result
 
-    def _fetch_status(self, jobs, err, ignore_errors, status_parallelization='thread'):
+    def _fetch_status(self, jobs, err, ignore_errors, status_parallelization='thread', aggregates=False):
         # The argument status_parallelization is used so that _fetch_status method
         # gets to know whether the deprecated argument no_parallelization passed
         # while calling print_status is True or False. This can also be done by
@@ -2052,7 +2055,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         _get_group_status = functools.partial(self._get_group_status,
                                               jobs=jobs,
                                               ignore_errors=ignore_errors,
-                                              cached_status=cached_status)
+                                              cached_status=cached_status,
+                                              aggregates=aggregates)
 
         groups = []
         for group in self._groups.values():
@@ -2136,25 +2140,25 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             result = dict()
             result['job_id'] = str(job)
             result['operations'] = dict()
-            result['operation_aggregates'] = dict()
-            result['_operations_error'] = list()
-            for op_result in op_results:
-                # For every op_result we check whether a job is present in an aggregate
-                # by iterating over ``aggregate_details``.
-                result['operations'][op_result['operation_name']] = []
-                result['operation_aggregates'][op_result['operation_name']] = []
-                for id, aggregate in op_result['aggregate_details'].items():
-                    if str(job) in id.split(' '):
-                        result['operations'][op_result['operation_name']].append(aggregate)
-                        result['operation_aggregates'][op_result['operation_name']].append(id)
-                        result['_operations_error'] = op_result['_operation_error_per_job'][str(job)]
-
             result['labels'] = list()
+            result['_operations_error'] = list()
+            # result['operation_aggregates'] = dict()
+            for op_result in op_results:
+                # result['operation_aggregates'][op_result['operation_name']] = []
+                result['operations'][op_result['operation_name']] = []
             result['_labels_error'] = list()
-            if result not in results:
-                results.append(result)
-                index[str(job)] = i
-                i += 1
+            results.append(result)
+            index[str(job)] = i
+            i += 1
+
+        for op_result in op_results:
+            # For every op_result we check whether a job is present in an aggregate
+            # by iterating over ``aggregate_details``.
+            for id, aggregate in op_result['aggregate_details'].items():
+                for job in id.split(' '):
+                    results[index[job]]['operations'][op_result['operation_name']].append(aggregate)
+                    # results[index[job]]['operation_aggregates'][op_result['operation_name']].append(id)
+                    results[index[job]]['_operations_error'] = op_result['_operation_error_per_job'][str(job)]
 
         for label_result in label_results:
             results[index[label_result['job_id']]]['labels'] = label_result['labels']
@@ -2185,7 +2189,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                      unroll=True, compact=False, pretty=False,
                      file=None, err=None, ignore_errors=False,
                      no_parallelize=False, template=None, profile=False,
-                     eligible_jobs_max_lines=None, output_format='terminal'):
+                     eligible_jobs_max_lines=None, output_format='terminal',
+                     aggregates=False):
         """Print the status of the project.
 
         :param jobs:
@@ -2322,7 +2327,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             ]
 
             with prof(single=False):
-                tmp = self._fetch_status(jobs, err, ignore_errors, status_parallelization)
+                tmp = self._fetch_status(jobs, err, ignore_errors, status_parallelization, aggregates)
 
             prof._mergeFileTiming()
 
@@ -2386,7 +2391,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     "results may be highly inaccurate.")
 
         else:
-            tmp = self._fetch_status(jobs, err, ignore_errors, status_parallelization)
+            tmp = self._fetch_status(jobs, err, ignore_errors, status_parallelization, aggregates)
             profiling_results = None
 
         operations_errors = {s['_operations_error'] for s in tmp}
@@ -2405,7 +2410,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             # eligible operation.
 
             def _incomplete(s):
-                return any(op['eligible'] for op in s['operations'].values())
+                return any([op['eligible'] for op in ops] for ops in s['operations'].values())
 
             tmp = list(filter(_incomplete, tmp))
 
@@ -2525,20 +2530,17 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         aggregates_per_op = defaultdict(lambda: [])
 
         for job in context['jobs']:
-            for k, v in job['operations'].items():
-                if k != '' and v['eligible']:
-                    split_jobs = v['aggregates'].split(' ')
-                    if not v['aggregates'].split(' ') in aggregate_dict[k]:
-                        aggregate_dict[k].append(split_jobs)
-                        if v['is_aggregate']:
-                            _aggregate = []
-                            for _id in split_jobs:
-                                _aggregate.append(
-                                    self.open_job(id=_id)
+            for op_name, ops in job['operations'].items():
+                if op_name != '':
+                    for op in ops:
+                        agg_id = op['aggregate'].split(' ')
+                        if agg_id not in aggregate_dict[op_name]:
+                            aggregate_dict[op_name].append(agg_id)
+                            if op['is_aggregate']:
+                                aggregates_per_op[op_name].append(
+                                    (agg_id, op['scheduler_status'])
                                 )
-                            aggregates_per_op[k].append(
-                                (_aggregate, v['scheduler_status'])
-                            )
+
         for op, ags in aggregate_dict.items():
             aggregate_counter[op] = len(ags)
 
@@ -2546,6 +2548,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         n = len(aggregate_counter) - len(context['aggregate_counter'])
         if n > 0:
             context['aggregate_counter'].append(('[{} more operations omitted]'.format(n), ''))
+
         context['detailed_ags'] = aggregates_per_op
 
         status_renderer = StatusRenderer()
@@ -3578,6 +3581,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             type=str,
             default='terminal',
             help="Set status output format: terminal, markdown, or html.")
+        parser.add_argument(
+            '--aggregates',
+            action='store_true',
+            help="Fetch aggregates which are not created now.")
 
     def labels(self, job):
         """Yields all labels for the given ``job``.

@@ -6,6 +6,7 @@ from itertools import groupby
 from itertools import zip_longest
 from tqdm import tqdm
 
+
 class Aggregate:
     """Decorator for operation functions that are to be aggregated.
 

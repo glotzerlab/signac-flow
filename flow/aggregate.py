@@ -78,8 +78,10 @@ class Aggregate:
         # copied from: https://docs.python.org/3/library/itertools.html#itertools.zip_longest
         try:
             num = int(num)
-        except Exception:
-            raise TypeError("The num parameter should be an integer")
+            if num <= 0:
+                raise ValueError('The num parameter should have a value greater than 0')
+        except TypeError:
+            raise TypeError('The num parameter should be an integer')
 
         def aggregator(jobs):
             args = [iter(jobs)] * num

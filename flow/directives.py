@@ -269,10 +269,9 @@ NP = DirectivesItem('np', validation=_natural_number,
 NP.__doc__ = """
 The number of tasks expected to run for a given operation
 
-Expects a natural number (i.e. an integer >= 1). When querying
-this directive, introspection into the Directives is used to determine if the
-product of "nranks" or "omp_num_threads" is greater than the current value. The
-maximum of these two values is used.
+Expects a natural number (i.e. an integer >= 1). This directive introspects into
+the "nranks" or "omp_num_threads" directives and uses their product if it is
+greater than the current set value. Defaults to 1.
 """
 
 _nonnegative_int = _OnlyType(int, postprocess=_raise_below(0))
@@ -280,12 +279,12 @@ NGPU = DirectivesItem('ngpu', validation=_nonnegative_int, default=0)
 NGPU.__doc__ = """
 The number of GPUs to use for this operation.
 
-Expects a nonnegative integer.
+Expects a nonnegative integer. Defaults to 0.
 """
 
 NRANKS = DirectivesItem('nranks', validation=_nonnegative_int, default=0)
 NRANKS.__doc__ = """
-The number of MPI ranks to use for this operation.
+The number of MPI ranks to use for this operation. Defaults to 0.
 
 Expects a nonnegative integer.
 """
@@ -293,7 +292,7 @@ Expects a nonnegative integer.
 OMP_NUM_THREADS = DirectivesItem(
     'omp_num_threads', validation=_nonnegative_int, default=0)
 OMP_NUM_THREADS.__doc__ = """
-The number of OpenMP threads to use for this operation.
+The number of OpenMP threads to use for this operation. Defaults to 0.
 
 Expects a nonnegative integer.
 """
@@ -314,7 +313,7 @@ current file system.
 
 By default this should point to a Python executable (interpreter); however, if
 the :py:class:`FlowProject` path is an empty string, the executable can be a
-path to an executable Python script.
+path to an executable Python script. Defaults to ``sys.executable``.
 """
 
 
@@ -326,7 +325,7 @@ The number of hours to request for executing this job.
 
 This directive expects a float representing the walltime in hours. Fractional
 values are supported. For example, a value of 0.5 will request 30 minutes of
-walltime.
+walltime. Defaults to 4 hours.
 """
 
 _positive_real = _OnlyType(float, postprocess=_raise_below(1e-12))
@@ -352,7 +351,7 @@ PROCESSOR_FRACTION.__doc__ = """
 Fraction of a resource to use on a single operation.
 
 If set to 0.5 for a bundled job with 20 operations (all with 'np' set to 1), 10
-CPUs will be used. The default value is 1.
+CPUs will be used. Defaults to 1.
 
 Note:
     This can be particularly useful on Stampede2's launcher.

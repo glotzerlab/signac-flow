@@ -2,6 +2,7 @@ from collections.abc import MutableMapping
 import functools
 import operator
 import sys
+from flow.errors import DirectivesError
 
 
 class DirectivesItem:
@@ -127,7 +128,7 @@ class Directives(MutableMapping):
         try:
             self._defined_directives[key] = self._directive_definitions[key](value)
         except Exception as err:
-            raise err.__class__('Error setting directive "{}": {}'.format(key, str(err)))
+            raise DirectivesError(f'Error setting directive "{key}"') from err
 
     def __getitem__(self, key):
         try:

@@ -4,9 +4,11 @@
 import pytest
 import sys
 
-from flow.directives import Directives, DirectivesItem, _no_aggregation
-from flow.directives import (NP, NRANKS, NGPU, EXECUTABLE, OMP_NUM_THREADS,
-                             WALLTIME, MEMORY, PROCESSOR_FRACTION)
+from flow.directives import (
+    Directives, DirectivesItem, NP, NRANKS, NGPU, EXECUTABLE,
+    OMP_NUM_THREADS, WALLTIME, MEMORY, PROCESSOR_FRACTION, _no_aggregation
+)
+from flow.errors import DirectivesError
 from flow import FlowProject
 from tempfile import TemporaryDirectory
 
@@ -172,7 +174,7 @@ class TestDirectives:
             directives._set_defined_directive(NP._name, 0)
 
     def test_set_undefined_directive(self, directives):
-        with pytest.raises(KeyError):
+        with pytest.raises(DirectivesError):
             directives._set_defined_directive('test', 0)
 
     def test_set_directives_item(self, directives):

@@ -225,7 +225,7 @@ class _OnlyType:
 
 
 def _raise_below(value):
-    def is_greater(v):
+    def is_greater_or_equal(v):
         try:
             if v < value:
                 raise ValueError
@@ -233,7 +233,8 @@ def _raise_below(value):
             raise ValueError(f"Expected a number greater than or equal to {value}. "
                              f"Received {v}")
         return v
-    return is_greater
+
+    return is_greater_or_equal
 
 
 _NP_DEFAULT = 1

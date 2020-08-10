@@ -6,17 +6,18 @@ from flow.errors import DirectivesError
 
 
 class DirectivesItem:
-    """The representation of a single directive.
+    """The definition of a single directive.
 
     Logic for validation of values when setting, defaults, and the ability for
     directives to inspect other directives (such as using nranks and
     omp_num_threads for finding np). This is only meant to work with the
     Directives class itself.
 
-    While validation is used to ensure proper setting of directives, through
-    ``finalize`` this could be abused. Also, since directive values can be
-    dependent on jobs we allow all directives to be set to a callable.
-    Directives set to callable cannot be validated.
+    The validation of a directive occurs before the call to ``finalize``. It is
+    the caller's responsibility to ensure that finalized values are still valid.
+
+    Since directive values can be dependent on jobs we allow all directives to
+    be set to a callable which is lazily validated.
 
     Parameters
     ----------
@@ -26,23 +27,25 @@ class DirectivesItem:
         A callable that accepts inputs and attempts to convert the input to a
         valid value for the directive. If it fails, it should raise an
         appropriate error. If not provided or ``None``, the validation
-        function directly returns the passed value. Defaults to ``None``.
+        callable directly returns the passed value. Defaults to ``None``.
     default : any, optional
         Sets the default for the directive, defaults to ``None``.
     serial : callable, optional
-        A function that takes two inputs for the directive and returns the
-        appropriate value for these operations running in serial. Defaults to
-        the maximum of the two.
+        A callable that takes two inputs for the directive and returns the
+        appropriate value for these operations running in serial. If ``None`` or
+        not provided, the ``max`` function is used. Defaults to ``None``.
     parallel : callable, optional
-        A function that takes two inputs for the directive and returns the
-        appropriate value for these operations running in parallel. Defaults to
-        the sum of the two.
+        A callable that takes two inputs for the directive and returns the
+        appropriate value for these operations running in parallel. If ``None``
+        or not provided, the ``operator.add`` function is used. Defaults to
+        ``None``.  Defaults to ``None``.
     finalize : callable, optional:
-        A function that takes the current value of the directive and the
-        :class:`~.Directives` object it is a child of and outputs the finalized value for
-        that directive. This is useful if some directives have multiple ways to
-        be set or are dependent in some way on other directives. The default is
-        to just return the current set value.
+        A callable that takes the set value of the directive and the
+        :class:`~.Directives` object it is a child of and outputs the finalized
+        value for that directive. This is useful if some directives have
+        multiple ways to be set or are dependent in some way on other
+        directives. If ``None`` or not provided, the set value is returned.
+        Defaults to ``None``.
     """
 
     def __init__(self, name, *, validation=None, default=None,

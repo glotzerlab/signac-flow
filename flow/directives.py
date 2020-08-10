@@ -264,48 +264,45 @@ def _finalize_np(np, directives):
 
 _natural_number = _OnlyType(int, postprocess=_raise_below(1))
 # Common directives and their instantiation as _DirectivesItem
-NP = _DirectivesItem('np', validation=_natural_number,
-                     default=_NP_DEFAULT, finalize=_finalize_np)
-NP.__doc__ = """
+"""
 The number of tasks expected to run for a given operation
 
 Expects a natural number (i.e. an integer >= 1). This directive introspects into
 the "nranks" or "omp_num_threads" directives and uses their product if it is
 greater than the current set value. Defaults to 1.
 """
+_NP = _DirectivesItem('np', validation=_natural_number,
+                      default=_NP_DEFAULT, finalize=_finalize_np)
 
 _nonnegative_int = _OnlyType(int, postprocess=_raise_below(0))
-NGPU = _DirectivesItem('ngpu', validation=_nonnegative_int, default=0)
-NGPU.__doc__ = """
+"""
 The number of GPUs to use for this operation.
 
 Expects a nonnegative integer. Defaults to 0.
 """
+_NGPU = _DirectivesItem('ngpu', validation=_nonnegative_int, default=0)
 
-NRANKS = _DirectivesItem('nranks', validation=_nonnegative_int, default=0)
-NRANKS.__doc__ = """
+"""
 The number of MPI ranks to use for this operation. Defaults to 0.
 
 Expects a nonnegative integer.
 """
+_NRANKS = _DirectivesItem('nranks', validation=_nonnegative_int, default=0)
 
-OMP_NUM_THREADS = _DirectivesItem(
-    'omp_num_threads', validation=_nonnegative_int, default=0)
-OMP_NUM_THREADS.__doc__ = """
+"""
 The number of OpenMP threads to use for this operation. Defaults to 0.
 
 Expects a nonnegative integer.
 """
+_OMP_NUM_THREADS = _DirectivesItem(
+    'omp_num_threads', validation=_nonnegative_int, default=0)
 
 
 def _no_aggregation(v, o):
     return v
 
 
-EXECUTABLE = _DirectivesItem('executable', validation=_OnlyType(str),
-                             default=sys.executable, serial=_no_aggregation,
-                             parallel=_no_aggregation)
-EXECUTABLE.__doc__ = """
+"""
 The path to the executable to be used for this operation.
 
 Expects a string pointing to a valid executable file in the
@@ -315,26 +312,28 @@ By default this should point to a Python executable (interpreter); however, if
 the :py:class:`FlowProject` path is an empty string, the executable can be a
 path to an executable Python script. Defaults to ``sys.executable``.
 """
-
+_EXECUTABLE = _DirectivesItem('executable', validation=_OnlyType(str),
+                              default=sys.executable, serial=_no_aggregation,
+                              parallel=_no_aggregation)
 
 _nonnegative_real = _OnlyType(float, postprocess=_raise_below(0))
-WALLTIME = _DirectivesItem('walltime', validation=_nonnegative_real, default=12.,
-                           serial=operator.add, parallel=max)
-WALLTIME.__doc__ = """
+"""
 The number of hours to request for executing this job.
 
 This directive expects a float representing the walltime in hours. Fractional
 values are supported. For example, a value of 0.5 will request 30 minutes of
 walltime. Defaults to 4 hours.
 """
+_WALLTIME = _DirectivesItem('walltime', validation=_nonnegative_real, default=12.,
+                            serial=operator.add, parallel=max)
 
 _positive_real = _OnlyType(float, postprocess=_raise_below(1e-12))
-MEMORY = _DirectivesItem('memory', validation=_positive_real, default=4)
-MEMORY.__doc__ = """
+"""
 The number of gigabytes of memory to request for this operation.
 
 Expects a real number greater than zero.
 """
+_MEMORY = _DirectivesItem('memory', validation=_positive_real, default=4)
 
 
 def _is_fraction(value):
@@ -344,10 +343,7 @@ def _is_fraction(value):
         raise ValueError("Value must be between 0 and 1.")
 
 
-PROCESSOR_FRACTION = _DirectivesItem('processor_fraction',
-                                     validation=_OnlyType(float, postprocess=_is_fraction),
-                                     default=1., serial=_no_aggregation, parallel=_no_aggregation)
-PROCESSOR_FRACTION.__doc__ = """
+"""
 Fraction of a resource to use on a single operation.
 
 If set to 0.5 for a bundled job with 20 operations (all with 'np' set to 1), 10
@@ -356,3 +352,6 @@ CPUs will be used. Defaults to 1.
 Note:
     This can be particularly useful on Stampede2's launcher.
 """
+_PROCESSOR_FRACTION = _DirectivesItem('processor_fraction',
+                                      validation=_OnlyType(float, postprocess=_is_fraction),
+                                      default=1., serial=_no_aggregation, parallel=_no_aggregation)

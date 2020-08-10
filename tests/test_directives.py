@@ -5,8 +5,8 @@ import pytest
 import sys
 
 from flow.directives import (
-    _Directives, _DirectivesItem, NP, NRANKS, NGPU, EXECUTABLE,
-    OMP_NUM_THREADS, WALLTIME, MEMORY, PROCESSOR_FRACTION, _no_aggregation
+    _Directives, _DirectivesItem, _NP, _NRANKS, _NGPU, _EXECUTABLE,
+    _OMP_NUM_THREADS, _WALLTIME, _MEMORY, _PROCESSOR_FRACTION, _no_aggregation
 )
 from flow.errors import DirectivesError
 from flow import FlowProject
@@ -15,9 +15,9 @@ from tempfile import TemporaryDirectory
 
 @pytest.fixture()
 def available_directives_list():
-    return [NP, NRANKS, NGPU, OMP_NUM_THREADS,
-            EXECUTABLE, WALLTIME, MEMORY,
-            PROCESSOR_FRACTION]
+    return [_NP, _NRANKS, _NGPU, _OMP_NUM_THREADS,
+            _EXECUTABLE, _WALLTIME, _MEMORY,
+            _PROCESSOR_FRACTION]
 
 
 @pytest.fixture()
@@ -61,14 +61,14 @@ class TestItems:
     Tests for _DirectivesItem class
     """
     def test_default(self):
-        assert NP._default == 1
-        assert NGPU._default == 0
-        assert NRANKS._default == 0
-        assert OMP_NUM_THREADS._default == 0
-        assert EXECUTABLE._default == sys.executable
-        assert WALLTIME._default == 12.0
-        assert MEMORY._default == 4
-        assert PROCESSOR_FRACTION._default == 1.
+        assert _NP._default == 1
+        assert _NGPU._default == 0
+        assert _NRANKS._default == 0
+        assert _OMP_NUM_THREADS._default == 0
+        assert _EXECUTABLE._default == sys.executable
+        assert _WALLTIME._default == 12.0
+        assert _MEMORY._default == 4
+        assert _PROCESSOR_FRACTION._default == 1.
 
     def test_invalid_values(self, available_directives_list):
         invalid_values = {'np': [-1, 'foo', {}, None],
@@ -95,34 +95,34 @@ class TestItems:
             directive._validation(directive._default)
 
     def test_serial(self):
-        assert NP._serial(4, 2) == 4
-        assert NRANKS._serial(4, 2) == 4
-        assert NGPU._serial(4, 2) == 4
-        assert OMP_NUM_THREADS._serial(4, 2) == 4
-        assert EXECUTABLE._serial('Path1', 'Path2') == 'Path1'
-        assert WALLTIME._serial(4, 2) == 6
-        assert MEMORY._serial(4, 2) == 4
-        assert PROCESSOR_FRACTION._serial(0.4, 0.2) == 0.4
+        assert _NP._serial(4, 2) == 4
+        assert _NRANKS._serial(4, 2) == 4
+        assert _NGPU._serial(4, 2) == 4
+        assert _OMP_NUM_THREADS._serial(4, 2) == 4
+        assert _EXECUTABLE._serial('Path1', 'Path2') == 'Path1'
+        assert _WALLTIME._serial(4, 2) == 6
+        assert _MEMORY._serial(4, 2) == 4
+        assert _PROCESSOR_FRACTION._serial(0.4, 0.2) == 0.4
 
     def test_parallel(self):
-        assert NP._parallel(4, 2) == 6
-        assert NRANKS._parallel(4, 2) == 6
-        assert NGPU._parallel(4, 2) == 6
-        assert OMP_NUM_THREADS._parallel(4, 2) == 6
-        assert EXECUTABLE._parallel('Path1', 'Path2') == 'Path1'
-        assert WALLTIME._parallel(4, 2) == 4
-        assert MEMORY._parallel(4, 2) == 6
-        assert PROCESSOR_FRACTION._parallel(0.4, 0.2) == 0.4
+        assert _NP._parallel(4, 2) == 6
+        assert _NRANKS._parallel(4, 2) == 6
+        assert _NGPU._parallel(4, 2) == 6
+        assert _OMP_NUM_THREADS._parallel(4, 2) == 6
+        assert _EXECUTABLE._parallel('Path1', 'Path2') == 'Path1'
+        assert _WALLTIME._parallel(4, 2) == 4
+        assert _MEMORY._parallel(4, 2) == 6
+        assert _PROCESSOR_FRACTION._parallel(0.4, 0.2) == 0.4
 
     def test_finalize(self):
-        dict_directives = {'nranks': NRANKS._default, 'omp_num_threads': OMP_NUM_THREADS._default}
-        assert NP._finalize(2, dict_directives) == 2
+        dict_directives = {'nranks': _NRANKS._default, 'omp_num_threads': _OMP_NUM_THREADS._default}
+        assert _NP._finalize(2, dict_directives) == 2
         dict_directives['nranks'] = 2
         dict_directives['omp_num_threads'] = 4
-        assert NP._finalize(2, dict_directives) == 2
-        assert NP._finalize(1, dict_directives) == 8
+        assert _NP._finalize(2, dict_directives) == 2
+        assert _NP._finalize(1, dict_directives) == 8
         dict_directives['nranks'] = lambda x: x**2
-        assert NP._finalize(2, dict_directives) == 2
+        assert _NP._finalize(2, dict_directives) == 2
 
     def test_manual_item_default(self, product_directive):
         assert product_directive._default == 10
@@ -158,20 +158,20 @@ class TestDirectives:
 
     def test_add_directive(self, available_directives_list):
         directives = _Directives(available_directives_list[:-1])
-        directives._add_directive(PROCESSOR_FRACTION)
-        assert directives[PROCESSOR_FRACTION._name] == PROCESSOR_FRACTION._default
+        directives._add_directive(_PROCESSOR_FRACTION)
+        assert directives[_PROCESSOR_FRACTION._name] == _PROCESSOR_FRACTION._default
         with pytest.raises(TypeError):
             directives._add_directive('Test')
         with pytest.raises(ValueError):
-            directives._add_directive(PROCESSOR_FRACTION)
+            directives._add_directive(_PROCESSOR_FRACTION)
 
     def test_set_defined_directive(self, directives):
-        directives._set_defined_directive(NP._name, 10)
-        assert directives[NP._name] == 10
+        directives._set_defined_directive(_NP._name, 10)
+        assert directives[_NP._name] == 10
 
     def test_set_defined_directive_invalid(self, directives):
         with pytest.raises(ValueError):
-            directives._set_defined_directive(NP._name, 0)
+            directives._set_defined_directive(_NP._name, 0)
 
     def test_set_undefined_directive(self, directives):
         with pytest.raises(DirectivesError):
@@ -183,11 +183,11 @@ class TestDirectives:
 
     def test_del_directive(self, directives):
         directives['test'] = True
-        directives._set_defined_directive(NP._name, 100)
-        assert directives[NP._name] == 100
+        directives._set_defined_directive(_NP._name, 100)
+        assert directives[_NP._name] == 100
         assert directives['test']
-        del directives[NP._name]
-        assert directives[NP._name] == NP._default
+        del directives[_NP._name]
+        assert directives[_NP._name] == _NP._default
         del directives['test']
         with pytest.raises(KeyError):
             directives['test']

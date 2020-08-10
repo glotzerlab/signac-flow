@@ -655,7 +655,7 @@ class FlowCmdOperation(BaseFlowOperation):
             raise ValueError(f"Invalid key-word arguments: {', '.join(kwargs)}")
 
         if job is not None:
-            warnings.warn("The job argument is deprecated as of 0.11 and will be removed "
+            warnings.warn("The job keyword argument is deprecated as of 0.11 and will be removed "
                           "in 0.13", DeprecationWarning)
         else:
             job = jobs[0] if len(jobs) == 1 else None

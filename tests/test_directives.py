@@ -5,7 +5,7 @@ import pytest
 import sys
 
 from flow.directives import (
-    Directives, DirectivesItem, NP, NRANKS, NGPU, EXECUTABLE,
+    _Directives, _DirectivesItem, NP, NRANKS, NGPU, EXECUTABLE,
     OMP_NUM_THREADS, WALLTIME, MEMORY, PROCESSOR_FRACTION, _no_aggregation
 )
 from flow.errors import DirectivesError
@@ -22,7 +22,7 @@ def available_directives_list():
 
 @pytest.fixture()
 def directives(available_directives_list):
-    return Directives(available_directives_list)
+    return _Directives(available_directives_list)
 
 
 @pytest.fixture()
@@ -40,7 +40,7 @@ def product_directive():
             return 0
         return value
 
-    product = DirectivesItem(name='product', validation=val,
+    product = _DirectivesItem(name='product', validation=val,
                               default=10, serial=_no_aggregation,
                               parallel=_no_aggregation, finalize=finalize)
     return product
@@ -58,7 +58,7 @@ def non_default_directive_values():
 
 class TestItems:
     """
-    Tests for DirectivesItem class
+    Tests for _DirectivesItem class
     """
     def test_default(self):
         assert NP._default == 1
@@ -150,14 +150,14 @@ class TestItems:
 
 class TestDirectives:
     """
-    Tests for Directives Class
+    Tests for _Directives Class
     """
     def test_get_directive(self, directives, available_directives_list):
         for item in available_directives_list:
             assert directives[item._name] == item._default
 
     def test_add_directive(self, available_directives_list):
-        directives = Directives(available_directives_list[:-1])
+        directives = _Directives(available_directives_list[:-1])
         directives._add_directive(PROCESSOR_FRACTION)
         assert directives[PROCESSOR_FRACTION._name] == PROCESSOR_FRACTION._default
         with pytest.raises(TypeError):
@@ -206,8 +206,8 @@ class TestDirectives:
     def test_update_directive_serial(
         self, available_directives_list, non_default_directive_values
     ):
-        directives1 = Directives(available_directives_list)
-        directives2 = Directives(available_directives_list)
+        directives1 = _Directives(available_directives_list)
+        directives2 = _Directives(available_directives_list)
         valid_values_0 = non_default_directive_values[0]
         valid_values_1 = non_default_directive_values[1]
         expected_values = {'np': 100, 'ngpu': 10, 'nranks': 5,
@@ -222,8 +222,8 @@ class TestDirectives:
     def test_update_directive_parallel(
         self, available_directives_list, non_default_directive_values
     ):
-        directives1 = Directives(available_directives_list)
-        directives2 = Directives(available_directives_list)
+        directives1 = _Directives(available_directives_list)
+        directives2 = _Directives(available_directives_list)
         valid_values_0 = non_default_directive_values[0]
         valid_values_1 = non_default_directive_values[1]
         expected_values = {'np': 104, 'ngpu': 11, 'nranks': 5,
@@ -259,7 +259,7 @@ class TestDirectives:
         valid_values['processor_fraction'] = lambda job: round(job.sp.i/10, 1)
 
         for job in project:
-            directives = Directives(available_directives_list)
+            directives = _Directives(available_directives_list)
             directives.update({'processor_fraction': lambda job: round(job.sp.i/10, 1)})
             directives.evaluate(job)
             assert directives['processor_fraction'] == round(job.sp.i/10, 1)

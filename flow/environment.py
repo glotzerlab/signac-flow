@@ -28,7 +28,7 @@ from .scheduling.simple_scheduler import SimpleScheduler
 from .scheduling.fakescheduler import FakeScheduler
 from .util import config as flow_config
 from .errors import NoSchedulerError
-from .directives import Directives
+from .directives import _Directives
 from .directives import (NP, NGPU, NRANKS, OMP_NUM_THREADS, WALLTIME,
                          EXECUTABLE, PROCESSOR_FRACTION)
 
@@ -269,8 +269,8 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         return prefix
 
     @classmethod
-    def get_default_directives(cls):
-        return Directives(
+    def _get_default_directives(cls):
+        return _Directives(
             [NP, NGPU, NRANKS, OMP_NUM_THREADS,
              EXECUTABLE, WALLTIME, PROCESSOR_FRACTION])
 

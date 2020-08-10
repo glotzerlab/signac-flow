@@ -18,15 +18,15 @@ class _DirectivesItem:
 
     Parameters
     ----------
-    name: str
-        The name of the directive
+    name : str
+        The name of the directive.
     validation : callable, optional
         A callable that accepts inputs and attempts to convert the input to a
         valid value for the directive. If it fails, it should raise an
-        appropriate error. When not provided, the validation function just
-        returns the passed value.
+        appropriate error. If not provided or ``None``, the validation
+        function directly returns the passed value. Defaults to ``None``.
     default : any, optional
-        Sets the default for the directive, defaults to `None`.
+        Sets the default for the directive, defaults to ``None``.
     serial : callable, optional
         A function that takes two inputs for the directive and returns the
         appropriate value for these operations running in serial. Defaults to
@@ -37,7 +37,7 @@ class _DirectivesItem:
         the sum of the two.
     finalize : callable, optional:
         A function that takes the current value of the directive and the
-        directives object it is a child of and outputs the finalized value for
+        :class:`~.Directives` object it is a child of and outputs the finalized value for
         that directive. This is useful if some directives have multiple ways to
         be set or are dependent in some way on other directives. The default is
         to just return the current set value.
@@ -216,10 +216,10 @@ _NP_DEFAULT = 1
 def _finalize_np(np, directives):
     """Return the actual number of processes/threads to use.
 
-    We check the default np because when aggregation occurs we multiple the
+    We check the default np because when aggregation occurs we multiply the
     number of MPI ranks and OMP_NUM_THREADS. If we always took the greater of
     the given NP and ranks * threads then after aggregating we will inflate the
-    number of processors needed as (r1 * t1) + (r2 * t2) <= (r1 * r2 * t1 * t2)
+    number of processors needed as (r1 * t1) + (r2 * t2) <= (r1 + r2) * (t1 + t2)
     for numbers greater than one.
     """
     if callable(np) or np != _NP_DEFAULT:
@@ -252,6 +252,7 @@ The number of GPUs to use for this operation.
 
 Expects a nonnegative integer.
 """
+
 NRANKS = _DirectivesItem('nranks', validation=_nonnegative_int, default=0)
 NRANKS.__doc__ = """
 The number of MPI ranks to use for this operation.

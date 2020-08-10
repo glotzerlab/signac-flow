@@ -116,10 +116,10 @@ class Directives(MutableMapping):
 
     def _add_directive(self, directive):
         if not isinstance(directive, DirectivesItem):
-            raise TypeError("Expected a DirectivesItem object. Received {}".format(
-                type(directive)))
+            raise TypeError(
+                f"Expected a DirectivesItem object. Received {type(directive)}.")
         elif directive._name in self._directive_definitions:
-            raise ValueError("Cannot define {} twice.".format(directive._name))
+            raise ValueError(f"Cannot define {directive._name} twice.")
         else:
             self._directive_definitions[directive._name] = directive
             self._defined_directives[directive._name] = directive._default
@@ -138,7 +138,7 @@ class Directives(MutableMapping):
             try:
                 return self._user_directives[key]
             except KeyError:
-                raise KeyError("{} not in directives.".format(key))
+                raise KeyError(f"{key} not in directives.")
 
     def __setitem__(self, key, value):
         if key in self._directive_definitions:
@@ -163,7 +163,7 @@ class Directives(MutableMapping):
         return str(dict(self))
 
     def __repr__(self):
-        return "Directives({})".format(str(self))
+        return f"Directives({str(self)})"
 
     def update(self, other, aggregate=False, job=None, parallel=False):
         if aggregate:
@@ -220,8 +220,8 @@ class _OnlyType:
             try:
                 return self.type(v)
             except Exception:
-                raise TypeError("Expected an object of type {}. Received {} "
-                                "of type {}".format(self.type, v, type(v)))
+                raise TypeError(f"Expected an object of type {self.type}. "
+                                f"Received {v} of type {type(v)}")
 
 
 def _raise_below(value):
@@ -230,8 +230,8 @@ def _raise_below(value):
             if v < value:
                 raise ValueError
         except (TypeError, ValueError):
-            raise ValueError("Expected a number greater than {}. Received {}"
-                             "".format(value, v))
+            raise ValueError(f"Expected a number greater than or equal to {value}. "
+                             f"Received {v}")
         return v
     return is_greater
 

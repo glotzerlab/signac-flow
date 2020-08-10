@@ -725,11 +725,13 @@ class FlowGroup(object):
         self._set_entrypoint_item(entrypoint, directives, 'path', default_path, job)
         return "{} {}".format(entrypoint['executable'], entrypoint['path']).lstrip()
 
-    def _resolve_directives(self, name, defaults):
+    def _resolve_directives(self, name, defaults, env):
+        base_directives = env._get_default_directives()
         if name in self.operation_directives:
-            return deepcopy(self.operation_directives[name])
+            base_directives.update(self.operation_directives[name])
         else:
-            return deepcopy(defaults.get(name, dict()))
+            base_directives.update(defaults.get(name, dict()))
+        return base_directives
 
     def _submit_cmd(self, entrypoint, ignore_conditions, job=None):
         entrypoint = self._determine_entrypoint(entrypoint, dict(), job)
@@ -980,9 +982,11 @@ class FlowGroup(object):
         :rtype:
             Iterator[_JobOperation]
         """
+        env = job._project._environment
         for name, op in self.operations.items():
             if op.eligible(job, ignore_conditions):
-                directives = self._resolve_directives(name, default_directives)
+                directives = self._resolve_directives(
+                    name, default_directives, env)
                 directives.evaluate(job)
                 cmd = self._run_cmd(entrypoint=entrypoint, operation_name=name,
                                     operation=op, directives=directives, job=job)
@@ -1003,12 +1007,15 @@ class FlowGroup(object):
         No checks are done to mitigate inappropriate aggregation of operations.
         This can lead to poor utilization of computing resources.
         """
+        env = job._project._environment
         op_names = list(self.operations)
-        directives = self._resolve_directives(op_names[0], default_directives)
+        directives = self._resolve_directives(
+            op_names[0], default_directives, env)
         for name in op_names[1:]:
             # get directives for operation
             directives.update(self._resolve_directives(name,
-                                                       default_directives),
+                                                       default_directives,
+                                                       env),
                               aggregate=True, job=job)
         return directives
 
@@ -3395,18 +3402,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if hasattr(func, '_flow_groups'):
                 op_directives = getattr(func, '_flow_group_operation_directives', dict())
                 for group_name in func._flow_groups:
-                    raw_directives = op_directives.get(group_name)
-                    if raw_directives is not None:
-                        directives = self._environment.get_default_directives()
-                        directives.update(raw_directives)
-                    else:
-                        directives = None
+                    directives = op_directives.get(group_name)
                     self._groups[group_name].add_operation(
                         op_name, op, directives)
 
             # For singleton groups add directives
-            directives = self._environment.get_default_directives()
-            directives.update(getattr(func, '_flow_directives', dict()))
+            directives = getattr(func, '_flow_directives', dict())
             self._groups[op_name].operation_directives[op_name] = directives
 
     @property

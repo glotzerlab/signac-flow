@@ -1,4 +1,5 @@
 from collections.abc import MutableMapping
+import functools
 import operator
 import sys
 
@@ -60,7 +61,11 @@ class _DirectivesItem:
 
     def __call__(self, value):
         if callable(value):
-            return value
+            @functools.wrap
+            def validate_callable(job):
+                return self.validation(value(job))
+
+            return validate_callable
         else:
             return self.validation(value)
 

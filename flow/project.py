@@ -1051,15 +1051,15 @@ class FlowGroup(object):
             raise ValueError("Value for MAX_LEN_ID is too small ({}).".format(self.MAX_LEN_ID))
 
         if len(jobs) > 1:
-            concat_job_ids = str(jobs[0])+'-'+str(jobs[-1])
+            concat_jobs_str = str(jobs[0])+'-'+str(jobs[-1])
         else:
-            concat_job_ids = str(jobs[0])
+            concat_jobs_str = str(jobs[0])
 
         separator = getattr(project._environment, 'JOB_ID_SEPARATOR', '/')
         readable_name = '{project}{sep}{jobs}{sep}{op_string}{sep}{index:04d}{sep}'.format(
                     sep=separator,
                     project=str(project)[:12],
-                    jobs=concat_job_ids,
+                    jobs=concat_jobs_str,
                     op_string=op_string[:12],
                     index=index)[:max_len]
 

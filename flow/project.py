@@ -474,7 +474,7 @@ class BaseFlowOperation(object):
     def __str__(self):
         return "{type}(cmd='{cmd}')".format(type=type(self).__name__, cmd=self._cmd)
 
-    def eligible(self, job, ignore_conditions=IgnoreConditions.NONE):
+    def _eligible(self, job, ignore_conditions=IgnoreConditions.NONE):
         """Eligible, when all pre-conditions are true and at least one post-condition is false,
         or corresponding conditions are ignored.
         :param job:
@@ -501,12 +501,33 @@ class BaseFlowOperation(object):
             post = True
         return pre and post
 
-    def complete(self, job):
+    @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
+    def eligible(self, job, ignore_conditions=IgnoreConditions.NONE):
+        """Eligible, when all pre-conditions are true and at least one post-condition is false,
+        or corresponding conditions are ignored.
+        :param job:
+            The signac job handles.
+        :type job:
+            :class:`~signac.contrib.job.Job`
+        :param ignore_conditions:
+            Specify if pre and/or post conditions check is to be ignored for eligibility check.
+            The default is :py:class:`IgnoreConditions.NONE`.
+        :type ignore_conditions:
+            :py:class:`~.IgnoreConditions`
+        """
+        return self._eligible(job, ignore_conditions)
+
+    def _complete(self, job):
         "True when all post-conditions are met."
         if len(self._postconds):
             return all(cond(job) for cond in self._postconds)
         else:
             return False
+
+    @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
+    def complete(self, job):
+        "True when all post-conditions are met."
+        return self._complete(job)
 
 
 class FlowCmdOperation(BaseFlowOperation):
@@ -786,6 +807,26 @@ class FlowGroup(object):
                    directives=self.operation_directives,
                    options=self.options)
 
+    def _eligible(self, job, ignore_conditions=IgnoreConditions.NONE):
+        """Eligible, when at least one BaseFlowOperation is eligible.
+
+        :param job:
+            A :class:`signac.Job` from the signac workspace.
+        :type job:
+            :class:`signac.Job`
+        :param ignore_conditions:
+            Specify if pre and/or post conditions check is to be ignored for eligibility check.
+            The default is :py:class:`IgnoreConditions.NONE`.
+        :type ignore_conditions:
+            :py:class:`~.IgnoreConditions`
+        :return:
+            Whether the group is eligible.
+        :rtype:
+            bool
+        """
+        return any(op._eligible(job, ignore_conditions) for op in self)
+
+    @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
     def eligible(self, job, ignore_conditions=IgnoreConditions.NONE):
         """Eligible, when at least one BaseFlowOperation is eligible.
 
@@ -803,8 +844,24 @@ class FlowGroup(object):
         :rtype:
             bool
         """
-        return any(op.eligible(job, ignore_conditions) for op in self)
+        return self._eligible(job, ignore_conditions)
 
+    def _complete(self, job):
+        """True when all BaseFlowOperation post-conditions are met.
+
+        :param job:
+            A :class:`signac.Job` from the signac workspace.
+        :type job:
+            :class:`signac.Job`
+        :return:
+            Whether the group is complete (all contained operations are
+            complete).
+        :rtype:
+            bool
+        """
+        return all(op._complete(job) for op in self)
+
+    @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
     def complete(self, job):
         """True when all BaseFlowOperation post-conditions are met.
 
@@ -818,7 +875,7 @@ class FlowGroup(object):
         :rtype:
             bool
         """
-        return all(op.complete(job) for op in self)
+        return self._complete(job)
 
     def add_operation(self, name, operation, directives=None):
         """Add an operation to the FlowGroup.
@@ -1007,7 +1064,7 @@ class FlowGroup(object):
             Iterator[_JobOperation]
         """
         for name, op in self.operations.items():
-            if op.eligible(job, ignore_conditions):
+            if op._eligible(job, ignore_conditions):
                 directives = self._resolve_directives(name, default_directives, job)
                 cmd = self._run_cmd(entrypoint=entrypoint, operation_name=name,
                                     operation=op, directives=directives, job=job)
@@ -1563,8 +1620,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         starting_dict = functools.partial(dict, scheduler_status=JobStatus.unknown)
         status_dict = defaultdict(starting_dict)
         for group in self._groups.values():
-            completed = group.complete(job)
-            eligible = False if completed else group.eligible(job)
+            completed = group._complete(job)
+            eligible = False if completed else group._eligible(job)
             scheduler_status = cached_status.get(group._generate_id(job),
                                                  JobStatus.unknown)
             for operation in group.operations:
@@ -2522,8 +2579,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """Grabs _JobOperations that are eligible to run from FlowGroups."""
         for job in jobs:
             for group in self._gather_flow_groups(names):
-                if group.eligible(job, ignore_conditions) and self._eligible_for_submission(group,
-                                                                                            job):
+                if group._eligible(job, ignore_conditions) and self._eligible_for_submission(group,
+                                                                                             job):
                     yield group._create_submission_job_operation(
                         entrypoint=self._entrypoint,
                         default_directives=default_directives,
@@ -3227,7 +3284,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             str
         """
         for name, op in self._operations.items():
-            if op.complete(job):
+            if op._complete(job):
                 yield name
 
     def _job_operations(self, job, ignore_conditions=IgnoreConditions.NONE):

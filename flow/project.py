@@ -2672,7 +2672,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if requires and set(requires).difference(self.labels(job)):
                 continue
             cmd_ = cmd.format(job=job)
-            yield JobOperation(name=cmd_.replace(' ', '-'), cmd=cmd_, job=job)
+            yield _JobOperation(name=cmd_.replace(' ', '-'), cmd=cmd_, jobs=(job,))
 
     def _gather_flow_groups(self, names=None):
         """Grabs FlowGroups that match any of a set of names."""

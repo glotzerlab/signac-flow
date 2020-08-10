@@ -341,8 +341,11 @@ class _JobOperation(object):
     def set_status(self, value):
         "Store the operation's status."
         # Since #324 doesn't include actual aggregation, it is guaranteed that the length
-        # of self._jobs is equal to 1. #335 introduces the concept of storing aggregates
-        # which will help retrieve the information of lost aggregates.
+        # of self._jobs is equal to 1, hence we won't be facing the problem for lost
+        # aggregates. #335 introduces the concept of storing aggregates which will
+        # help retrieve the information of lost aggregates. The storage of aggregates
+        # will be similar to bundles hence no change will be made to this method.
+        # This comment should be removed after #335 gets merged.
         self._jobs[0]._project.document.setdefault('_status', dict())[self.id] = int(value)
 
     def get_status(self):
@@ -420,9 +423,7 @@ class JobOperation(_JobOperation):
 
     @property
     def job(self):
-        # The length of `_jobs` will never be more than one due to the
-        # instance check we're doing while initializing an instance of
-        # JobOperation. Hence return only the first element of `self._jobs`
+        assert len(self._jobs) == 1
         return self._jobs[0]
 
     def __repr__(self):
@@ -511,6 +512,7 @@ class _FlowCondition(object):
         try:
             return self._callback(*jobs)
         except Exception as e:
+            assert len(jobs) == 1
             raise UserConditionError(
                 'An exception was raised while evaluating the condition {name} '
                 'for job {jobs}.'.format(name=self._callback.__name__,
@@ -1051,9 +1053,9 @@ class FlowGroup(object):
             raise ValueError("Value for MAX_LEN_ID is too small ({}).".format(self.MAX_LEN_ID))
 
         if len(jobs) > 1:
-            concat_jobs_str = str(jobs[0])+'-'+str(jobs[-1])
+            concat_jobs_str = str(jobs[0])[0:8]+'-'+str(jobs[-1])[0:8]
         else:
-            concat_jobs_str = str(jobs[0])
+            concat_jobs_str = str(jobs[0])[0:8]
 
         separator = getattr(project._environment, 'JOB_ID_SEPARATOR', '/')
         readable_name = '{project}{sep}{jobs}{sep}{op_string}{sep}{index:04d}{sep}'.format(
@@ -2460,6 +2462,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             try:
                 self._operations[operation.name](*operation._jobs)
             except Exception as e:
+                assert len(self._jobs) == 1
                 raise UserOperationError(
                     'An exception was raised during operation {operation.name} '
                     'for job {operation._jobs[0]}.'.format(operation=operation)) from e
@@ -3459,6 +3462,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         for job in jobs:
             for op in self._job_operations(job, ignore_conditions):
+                # JobOperation is just meand to deal with a single job and not a list of jobs.
+                # Hence we have to make sure that a JobOperation instance hold a single job.
+                assert len(op._jobs) == 1
                 yield JobOperation(op.id, op.name, op._jobs[0], op._cmd, op.directives)
 
     @classmethod

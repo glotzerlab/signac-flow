@@ -304,13 +304,8 @@ class _JobOperation(object):
         self.directives._keys_set_by_user = keys_set_by_user
 
     def __str__(self):
-        if len(self._jobs) == 1:
-            return "{}({})".format(self.name, str(self._jobs[0]))
-        else:
-            minimum = self._jobs[0]._project.min_len_unique_id()
-            return "{}-{}: ({}-{})".format(
-                self.name, len(self._jobs), str(self._jobs[0])[:minimum],
-                str(self._jobs[-1])[:minimum])
+        assert len(self._jobs) == 1
+        return f"{self.name}({str(self._jobs[0])})"
 
     def __repr__(self):
         return "{type}(name='{name}', jobs='{jobs}', cmd={cmd}, directives={directives})".format(
@@ -345,6 +340,9 @@ class _JobOperation(object):
 
     def set_status(self, value):
         "Store the operation's status."
+        # Since #324 doesn't include actual aggregation, it is guaranteed that the length
+        # of self._jobs is equal to 1. #335 introduces the concept of storing aggregates
+        # which will help retrieve the information of lost aggregates.
         self._jobs[0]._project.document.setdefault('_status', dict())[self.id] = int(value)
 
     def get_status(self):
@@ -360,7 +358,7 @@ class _JobOperation(object):
 class JobOperation(_JobOperation):
     """This class represents the information needed to execute one group for one job.
 
-    The execution or submission of a :py:class:`FlowGroup` uses a passed in command
+    The execution or submission of a :py:class:`FlowGroup` uses a passed-in command
     which can either be a string or function with no arguments that returns a shell
     executable command.  The shell executable command won't be used if it is
     determined that the group can be executed without forking.
@@ -396,9 +394,6 @@ class JobOperation(_JobOperation):
     def __init__(self, id, name, job, cmd, directives=None):
         self._id = id
         self.name = name
-
-        assert isinstance(job, signac.contrib.job.Job)
-
         self._jobs = [job]
         if not (callable(cmd) or isinstance(cmd, str)):
             raise ValueError("JobOperation cmd must be a callable or string.")
@@ -653,19 +648,21 @@ class FlowCmdOperation(BaseFlowOperation):
     def __str__(self):
         return "{type}(cmd='{cmd}')".format(type=type(self).__name__, cmd=self._cmd)
 
-    def __call__(self, *jobs):
-        if len(jobs) == 0:
+    def __call__(self, *jobs, **kwargs):
+        job = kwargs.pop('job', None)
+        if kwargs:
+            raise ValueError(f"Invalid key-word arguments: {', '.join(kwargs)}")
+
+        if job is not None:
             warnings.warn("The job argument is deprecated as of 0.11 and will be removed "
                           "in 0.13", DeprecationWarning)
-            if callable(self._cmd):
-                return self._cmd(None)
-            else:
-                return self._cmd
+        else:
+            job = jobs[0] if len(jobs) == 1 else None
 
         if callable(self._cmd):
-            return self._cmd(*jobs).format(job=jobs[0])
+            return self._cmd(job).format(job=job)
         else:
-            return self._cmd.format(job=jobs[0])
+            return self._cmd.format(job=job)
 
 
 class FlowOperation(BaseFlowOperation):
@@ -850,7 +847,7 @@ class FlowGroup(object):
 
         # If a path is not provided, default to the path to the file where the
         # FlowProject (subclass) is defined.
-        # We are assuming that all the jobs belong from the same project
+        # We are assuming that all the jobs belong to the same project
         default_path = inspect.getfile(jobs[0]._project.__class__)
         self._set_entrypoint_item(entrypoint, directives, 'path', default_path, jobs)
         return "{} {}".format(entrypoint['executable'], entrypoint['path']).lstrip()
@@ -902,8 +899,10 @@ class FlowGroup(object):
             return operation(*jobs).lstrip()
         else:
             entrypoint = self._determine_entrypoint(entrypoint, directives, jobs)
-            return '{} exec {} {}'.format(
-                        entrypoint, operation_name, ' '.join(map(str, jobs))
+            return '{entrypoint} exec {op_name} {jobs}'.format(
+                        entrypoint=entrypoint,
+                        op_name=operation_name,
+                        jobs=' '.join(map(str, jobs))
                     ).lstrip()
 
     def __iter__(self):
@@ -1052,15 +1051,15 @@ class FlowGroup(object):
             raise ValueError("Value for MAX_LEN_ID is too small ({}).".format(self.MAX_LEN_ID))
 
         if len(jobs) > 1:
-            aggregate_id = str(jobs[0])[:8]+'-'+str(jobs[-1])[:8]
+            concat_job_ids = str(jobs[0])+'-'+str(jobs[-1])
         else:
-            aggregate_id = str(jobs[0])[:8]
+            concat_job_ids = str(jobs[0])
 
         separator = getattr(project._environment, 'JOB_ID_SEPARATOR', '/')
         readable_name = '{project}{sep}{jobs}{sep}{op_string}{sep}{index:04d}{sep}'.format(
                     sep=separator,
                     project=str(project)[:12],
-                    jobs=aggregate_id,
+                    jobs=concat_job_ids,
                     op_string=op_string[:12],
                     index=index)[:max_len]
 

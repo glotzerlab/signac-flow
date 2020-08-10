@@ -597,18 +597,10 @@ class BaseFlowOperation(object):
             post = True
         return pre and post
 
-    def _complete(self, jobs):
-        "True when all post-conditions are met."
-        if len(self._postconds):
-            return all(cond(jobs) for cond in self._postconds)
-        else:
-            return False
-
     @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
     def eligible(self, job, ignore_conditions=IgnoreConditions.NONE):
         """Eligible, when all pre-conditions are true and at least one post-condition is false,
         or corresponding conditions are ignored.
-
         :param job:
             The signac job handles.
         :type job:
@@ -620,6 +612,13 @@ class BaseFlowOperation(object):
             :py:class:`~.IgnoreConditions`
         """
         return self._eligible([job], ignore_conditions)
+
+    def _complete(self, jobs):
+        "True when all post-conditions are met."
+        if len(self._postconds):
+            return all(cond(jobs) for cond in self._postconds)
+        else:
+            return False
 
     @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
     def complete(self, job):

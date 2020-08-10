@@ -4,7 +4,7 @@
 import pytest
 import sys
 
-from flow.directives import Directives, _DirectivesItem, _no_aggregation
+from flow.directives import Directives, DirectivesItem, _no_aggregation
 from flow.directives import (NP, NRANKS, NGPU, EXECUTABLE, OMP_NUM_THREADS,
                              WALLTIME, MEMORY, PROCESSOR_FRACTION)
 from flow import FlowProject
@@ -38,7 +38,7 @@ def product_directive():
             return 0
         return value
 
-    product = _DirectivesItem(name='product', validation=val,
+    product = DirectivesItem(name='product', validation=val,
                               default=10, serial=_no_aggregation,
                               parallel=_no_aggregation, finalize=finalize)
     return product
@@ -56,17 +56,17 @@ def non_default_directive_values():
 
 class TestItems:
     """
-    Tests for _DirectivesItem class
+    Tests for DirectivesItem class
     """
     def test_default(self):
-        assert NP.default == 1
-        assert NGPU.default == 0
-        assert NRANKS.default == 0
-        assert OMP_NUM_THREADS.default == 0
-        assert EXECUTABLE.default == sys.executable
-        assert WALLTIME.default == 12.0
-        assert MEMORY.default == 4
-        assert PROCESSOR_FRACTION.default == 1.
+        assert NP._default == 1
+        assert NGPU._default == 0
+        assert NRANKS._default == 0
+        assert OMP_NUM_THREADS._default == 0
+        assert EXECUTABLE._default == sys.executable
+        assert WALLTIME._default == 12.0
+        assert MEMORY._default == 4
+        assert PROCESSOR_FRACTION._default == 1.
 
     def test_invalid_values(self, available_directives_list):
         invalid_values = {'np': [-1, 'foo', {}, None],
@@ -79,71 +79,71 @@ class TestItems:
                           }
 
         for directive in available_directives_list:
-            if directive.name == 'executable':
+            if directive._name == 'executable':
                 # Executable expect a string, if not found, then it tries to convert
                 # it into a string and becomes successful almost every time.
                 # Hence skipping Executable.
                 continue
-            for i, value in enumerate(invalid_values[directive.name]):
+            for i, value in enumerate(invalid_values[directive._name]):
                 with pytest.raises((ValueError, TypeError)):
-                    directive.validation(value)
+                    directive._validation(value)
 
     def test_defaults_are_valid(self, available_directives_list):
         for directive in available_directives_list:
-            directive.validation(directive.default)
+            directive._validation(directive._default)
 
     def test_serial(self):
-        assert NP.serial(4, 2) == 4
-        assert NRANKS.serial(4, 2) == 4
-        assert NGPU.serial(4, 2) == 4
-        assert OMP_NUM_THREADS.serial(4, 2) == 4
-        assert EXECUTABLE.serial('Path1', 'Path2') == 'Path1'
-        assert WALLTIME.serial(4, 2) == 6
-        assert MEMORY.serial(4, 2) == 4
-        assert PROCESSOR_FRACTION.serial(0.4, 0.2) == 0.4
+        assert NP._serial(4, 2) == 4
+        assert NRANKS._serial(4, 2) == 4
+        assert NGPU._serial(4, 2) == 4
+        assert OMP_NUM_THREADS._serial(4, 2) == 4
+        assert EXECUTABLE._serial('Path1', 'Path2') == 'Path1'
+        assert WALLTIME._serial(4, 2) == 6
+        assert MEMORY._serial(4, 2) == 4
+        assert PROCESSOR_FRACTION._serial(0.4, 0.2) == 0.4
 
     def test_parallel(self):
-        assert NP.parallel(4, 2) == 6
-        assert NRANKS.parallel(4, 2) == 6
-        assert NGPU.parallel(4, 2) == 6
-        assert OMP_NUM_THREADS.parallel(4, 2) == 6
-        assert EXECUTABLE.parallel('Path1', 'Path2') == 'Path1'
-        assert WALLTIME.parallel(4, 2) == 4
-        assert MEMORY.parallel(4, 2) == 6
-        assert PROCESSOR_FRACTION.parallel(0.4, 0.2) == 0.4
+        assert NP._parallel(4, 2) == 6
+        assert NRANKS._parallel(4, 2) == 6
+        assert NGPU._parallel(4, 2) == 6
+        assert OMP_NUM_THREADS._parallel(4, 2) == 6
+        assert EXECUTABLE._parallel('Path1', 'Path2') == 'Path1'
+        assert WALLTIME._parallel(4, 2) == 4
+        assert MEMORY._parallel(4, 2) == 6
+        assert PROCESSOR_FRACTION._parallel(0.4, 0.2) == 0.4
 
     def test_finalize(self):
-        dict_directives = {'nranks': NRANKS.default, 'omp_num_threads': OMP_NUM_THREADS.default}
-        assert NP.finalize(2, dict_directives) == 2
+        dict_directives = {'nranks': NRANKS._default, 'omp_num_threads': OMP_NUM_THREADS._default}
+        assert NP._finalize(2, dict_directives) == 2
         dict_directives['nranks'] = 2
         dict_directives['omp_num_threads'] = 4
-        assert NP.finalize(2, dict_directives) == 2
-        assert NP.finalize(1, dict_directives) == 8
+        assert NP._finalize(2, dict_directives) == 2
+        assert NP._finalize(1, dict_directives) == 8
         dict_directives['nranks'] = lambda x: x**2
-        assert NP.finalize(2, dict_directives) == 2
+        assert NP._finalize(2, dict_directives) == 2
 
     def test_manual_item_default(self, product_directive):
-        assert product_directive.default == 10
+        assert product_directive._default == 10
 
     def test_manual_item_validation(self, product_directive):
-        val = product_directive.validation(product_directive.default)
-        assert product_directive.default == val
-        assert product_directive.validation(20) == 20
+        val = product_directive._validation(product_directive._default)
+        assert product_directive._default == val
+        assert product_directive._validation(20) == 20
         with pytest.raises(ValueError):
-            product_directive.validation(0)
+            product_directive._validation(0)
 
     def test_manual_item_serial(self, product_directive):
-        product_directive.serial(10, 20) == 10
-        product_directive.serial(20, 10) == 20
+        product_directive._serial(10, 20) == 10
+        product_directive._serial(20, 10) == 20
 
     def test_manual_item_parallel(self, product_directive):
-        product_directive.parallel(10, 20) == 10
+        product_directive._parallel(10, 20) == 10
 
     def test_manual_item_finalize(self, product_directive):
         asset_dict = {'free': False, 'discount': 5}
-        assert product_directive.finalize(50, asset_dict) == 45
+        assert product_directive._finalize(50, asset_dict) == 45
         asset_dict['free'] = True
-        assert product_directive.finalize(50, asset_dict) == 0
+        assert product_directive._finalize(50, asset_dict) == 0
 
 
 class TestDirectives:
@@ -152,24 +152,24 @@ class TestDirectives:
     """
     def test_get_directive(self, directives, available_directives_list):
         for item in available_directives_list:
-            assert directives[item.name] == item.default
+            assert directives[item._name] == item._default
 
     def test_add_directive(self, available_directives_list):
         directives = Directives(available_directives_list[:-1])
         directives._add_directive(PROCESSOR_FRACTION)
-        assert directives[PROCESSOR_FRACTION.name] == PROCESSOR_FRACTION.default
+        assert directives[PROCESSOR_FRACTION._name] == PROCESSOR_FRACTION._default
         with pytest.raises(TypeError):
             directives._add_directive('Test')
         with pytest.raises(ValueError):
             directives._add_directive(PROCESSOR_FRACTION)
 
     def test_set_defined_directive(self, directives):
-        directives._set_defined_directive(NP.name, 10)
-        assert directives[NP.name] == 10
+        directives._set_defined_directive(NP._name, 10)
+        assert directives[NP._name] == 10
 
     def test_set_defined_directive_invalid(self, directives):
         with pytest.raises(ValueError):
-            directives._set_defined_directive(NP.name, 0)
+            directives._set_defined_directive(NP._name, 0)
 
     def test_set_undefined_directive(self, directives):
         with pytest.raises(KeyError):
@@ -181,11 +181,11 @@ class TestDirectives:
 
     def test_del_directive(self, directives):
         directives['test'] = True
-        directives._set_defined_directive(NP.name, 100)
-        assert directives[NP.name] == 100
+        directives._set_defined_directive(NP._name, 100)
+        assert directives[NP._name] == 100
         assert directives['test']
-        del directives[NP.name]
-        assert directives[NP.name] == NP.default
+        del directives[NP._name]
+        assert directives[NP._name] == NP._default
         del directives['test']
         with pytest.raises(KeyError):
             directives['test']

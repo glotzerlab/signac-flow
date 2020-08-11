@@ -1020,8 +1020,6 @@ class FlowGroup(object):
         "Return an id, which identifies this group with respect to this job."
         project = jobs[0]._project
 
-        project._verify_aggregate_project(jobs)
-
         # The full name is designed to be truly unique for each job-group.
         if operation_name is None:
             op_string = ''.join(sorted(list(self.operations)))
@@ -2022,8 +2020,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if jobs is None:
             jobs = self     # all jobs
 
-        self._verify_aggregate_project(jobs)
-
         if eligible_jobs_max_lines is None:
             eligible_jobs_max_lines = flow_config.get_config_value('eligible_jobs_max_lines')
 
@@ -2545,8 +2541,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if jobs is None:
             jobs = self
 
-        self._verify_aggregate_project(jobs)
-
         # Get all matching FlowGroups
         if isinstance(names, str):
             raise ValueError(
@@ -3007,8 +3001,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Regular argument checks and expansion
         if jobs is None:
             jobs = self  # select all jobs
-
-        self._verify_aggregate_project(jobs)
 
         if isinstance(names, str):
             raise ValueError(

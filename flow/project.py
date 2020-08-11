@@ -3738,11 +3738,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         parser_status = subparsers.add_parser(
             'status',
             parents=[base_parser],
-            help="You can specify the parallelization of the status command "
-                 "by setting the flow.status_parallelization config "
-                 "value to 'thread' (default), 'none', or 'process'. You can do this by "
-                 "executing `signac config set flow.status_parallelization "
-                 "VALUE`.")
+            description="You can specify the parallelization of the status "
+                        "command by setting the flow.status_parallelization "
+                        "config value to 'thread' (default), 'none', or "
+                        "'process'. You can do this by executing `signac "
+                        "config set flow.status_parallelization VALUE`.")
         self._add_print_status_args(parser_status)
         parser_status.add_argument(
             '--profile',

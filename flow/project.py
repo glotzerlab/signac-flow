@@ -276,9 +276,6 @@ class _JobOperation(object):
     def __init__(self, id, name, jobs, cmd, directives=None):
         self._id = id
         self.name = name
-
-        assert isinstance(jobs, tuple)
-
         self._jobs = jobs
         if not (callable(cmd) or isinstance(cmd, str)):
             raise ValueError("JobOperation cmd must be a callable or string.")
@@ -311,7 +308,7 @@ class _JobOperation(object):
         return "{type}(name='{name}', jobs='{jobs}', cmd={cmd}, directives={directives})".format(
                    type=type(self).__name__,
                    name=self.name,
-                   jobs="[" + " ,".join(map(str, self._jobs)) + "]",
+                   jobs="[" + " ,".join(map(repr, self._jobs)) + "]",
                    cmd=repr(self.cmd),
                    directives=self.directives)
 
@@ -430,7 +427,7 @@ class JobOperation(_JobOperation):
         return "{type}(name='{name}', job='{job}', cmd={cmd}, directives={directives})".format(
                    type=type(self).__name__,
                    name=self.name,
-                   job=str(self._jobs[0]),
+                   job=repr(self._jobs[0]),
                    cmd=repr(self.cmd),
                    directives=self.directives)
 

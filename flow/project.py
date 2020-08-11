@@ -257,10 +257,11 @@ class _JobOperation(object):
     :type cmd:
         callable or str
     :param directives:
-        A dictionary of additional parameters that provide instructions on how
-        to execute this operation, e.g., specifically required resources.
+        A :class:`flow.directives._Directives` object of additional parameters
+        that provide instructions on how to execute this operation, e.g.,
+        specifically required resources.
     :type directives:
-        :class:`dict`
+        :class:`flow.directives._Directives`
     """
 
     def __init__(self, id, name, job, cmd, directives=None):
@@ -271,17 +272,12 @@ class _JobOperation(object):
             raise ValueError("JobOperation cmd must be a callable or string.")
         self._cmd = cmd
 
-        if directives is None:
-            directives = dict()  # default argument
-        else:
-            directives = dict(directives)  # explicit copy
-
         # Keys which were explicitly set by the user, but are not evaluated by the
         # template engine are cause for concern and might hint at a bug in the template
         # script or ill-defined directives. We are therefore keeping track of all
         # keys set by the user and check whether they have been evaluated by the template
         # script engine later.
-        keys_set_by_user = set(directives)
+        keys_set_by_user = set(directives._user_directives)
 
         # We use a special dictionary that allows us to track all keys that have been
         # evaluated by the template engine and compare them to those explicitly set
@@ -339,7 +335,12 @@ class _JobOperation(object):
 @deprecated(
     deprecated_in="0.11", removed_in="0.13", current_version=__version__)
 class JobOperation(_JobOperation):
-    pass
+    def __init__(self, id, name, job, cmd, directives=None):
+        if directives is not None:
+            base_directives = job._project._environment._get_default_directives()
+            base_directives.update(directives)
+            directives = base_directives
+        super().__init__(id, name, job, cmd, directives)
 
 
 class _SubmissionJobOperation(_JobOperation):
@@ -2208,7 +2209,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _loads_op(self, blob):
         id, name, job_id, cmd, directives = blob
-        return _JobOperation(id, name, self.open_job(id=job_id), cmd, directives)
+        job = self.open_job(id=job_id)
+        base_directives = job._project._environment._get_default_directives()
+        base_directives.update(directives)
+        return _JobOperation(id, name, job, cmd, base_directives)
 
     def _run_operations_in_parallel(self, pool, pickle, operations, progress, timeout):
         """Execute operations in parallel.

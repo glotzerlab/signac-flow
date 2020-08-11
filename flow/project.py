@@ -897,11 +897,7 @@ class FlowGroup(object):
             return operation(*jobs).lstrip()
         else:
             entrypoint = self._determine_entrypoint(entrypoint, directives, jobs)
-            return '{entrypoint} exec {op_name} {jobs}'.format(
-                        entrypoint=entrypoint,
-                        op_name=operation_name,
-                        jobs=' '.join(map(str, jobs))
-                    ).lstrip()
+            return f"{entrypoint} exec {operation_name} {' '.join(map(str, jobs))}".lstrip()
 
     def __iter__(self):
         yield from self.operations.values()

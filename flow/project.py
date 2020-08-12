@@ -310,7 +310,9 @@ class JobOperation(object):
         self.directives._keys_set_by_user = keys_set_by_user
 
     def __str__(self):
-        return "{}({})".format(self.name, self.job)
+        concat_jobs_str = str(self._jobs[0]) if len(self._jobs) == 1 else \
+            f'({str(self._jobs[0])}-{str(self._jobs[-1])})'
+        return f"{self.name}-{len(self._jobs)}: ({concat_jobs_str})"
 
     def __repr__(self):
         return "{type}(name='{name}', job='{job}', cmd={cmd}, directives={directives})".format(
@@ -896,12 +898,8 @@ class FlowGroup(object):
             raise ValueError("Value for MAX_LEN_ID is too small ({}).".format(self.MAX_LEN_ID))
 
         separator = getattr(project._environment, 'JOB_ID_SEPARATOR', '/')
-        readable_name = '{project}{sep}{job}{sep}{op_string}{sep}{index:04d}{sep}'.format(
-                    sep=separator,
-                    project=str(project)[:12],
-                    job=str(job)[:8],
-                    op_string=op_string[:12],
-                    index=index)[:max_len]
+        readable_name = f'{str(project)[:12]}{separator}{concat_jobs_str}{separator}' \
+                        f'{len(jobs)}{separator}{self.name}{separator}{index:04d}{separator}'
 
         # By appending the unique job_op_id, we ensure that each id is truly unique.
         return readable_name + job_op_id

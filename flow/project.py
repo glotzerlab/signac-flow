@@ -1708,7 +1708,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             aid = '{}.txt'.format(operation.name)
             aggregate_wid = '{} {} \n'.format(operation.id, ' '.join(map(str, operation._jobs)))
             fn_aggregate = self._fn_stored('.aggregates', aid)
-            os.makedirs(os.path.dirname(fn_aggregate), exist_ok=True)
+            try:
+                os.makedirs(os.path.dirname(fn_aggregate), exist_ok=True)
+            except PermissionError:
+                continue
             if os.path.exists(fn_aggregate):
                 with open(fn_aggregate, 'r') as file:
                     if aggregate_wid in file:

@@ -11,16 +11,23 @@ next
 next
 ----
 
+Added
++++++
+
+- Added support for `pre-commit hooks <https://pre-commit.com/>`__ (#333).
+
 Changed
 +++++++
 
 - Make ``FlowCondition`` class private (#307, #315).
+- Deprecate ``JobOperation`` class, make ``SubmissionJobOperation`` a private class and deprecate the following methods of ``FlowProject``: ``script``, ``run_operations``, ``submit_operations``, ``next_operations``. (#313)
+- Deprecate the following methods: ``FlowGroup.eligible``, ``FlowGroup.complete``, ``BaseFlowOperation.eligible``, ``BaseFlowOperation.complete`` (#337).
 
 Removed
 +++++++
 
 - Drop support for Python 3.5 (#305). The signac project will follow the `NEP 29 deprecation policy <https://numpy.org/neps/nep-0029-deprecation_policy.html>`_ going forward.
-
+- Remove the deprecated methods ``always``, ``make_bundles``, and ``JobOperation.get_id`` (#312).
 
 Version 0.10
 ============

@@ -33,15 +33,11 @@ jobs:
       - run:
           name: install-dev-requirements
           command: |
-            pip install --user -U -r requirements-test.txt
+            pip install --user -U -r requirements-precommit.txt
       - run:
-          name: check-code-style
+          name: Run pre-checks
           command: |
-            python -m flake8 --show-source .
-      - run:
-          name: check-doc-strings-style
-          command: |
-            pydocstyle
+            pre-commit run --all-files
 
   test-3.8: &test-template
     environment:

@@ -1049,8 +1049,9 @@ class FlowGroup(object):
             concat_jobs_str = str(jobs[0])[0:8]
 
         separator = getattr(project._environment, 'JOB_ID_SEPARATOR', '/')
-        readable_name = f'{str(project)[:12]}{separator}{concat_jobs_str}{separator}' \
-                        f'{len(jobs)}{separator}{self.name}{separator}{index:04d}{separator}'
+        readable_name = f'{str(project)[:12]}{separator}{self.name}{separator}' \
+                        f'{len(jobs)}{separator}{concat_jobs_str}{separator}{index:04d}' \
+                        f'{separator}'[:max_len]
 
         # By appending the unique job_op_id, we ensure that each id is truly unique.
         return readable_name + job_op_id

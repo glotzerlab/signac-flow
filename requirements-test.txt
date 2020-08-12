@@ -1,4 +1,4 @@
 click==7.1.2
 ruamel.yaml==0.16.10
-pytest>=4.4, <6.0
+pytest>=4.4, <7.0
 pytest-subtests

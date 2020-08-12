@@ -11,6 +11,11 @@ next
 next
 ----
 
+Added
++++++
+
+- Added support for `pre-commit hooks <https://pre-commit.com/>`__ (#333).
+
 Changed
 +++++++
 

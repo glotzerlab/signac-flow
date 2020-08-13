@@ -1512,10 +1512,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         except TypeError:
             return x
 
-    def _fn_stored(self, dirname, id=None):
+    def _fn_stored(self, dirname, id):
         "Return the canonical name to store bundle or job information."
-        if id is None:
-            return os.path.join(self.root_directory(), dirname)
         return os.path.join(self.root_directory(), dirname, id)
 
     def _store_bundled(self, operations):

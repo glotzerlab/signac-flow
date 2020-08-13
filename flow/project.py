@@ -301,8 +301,15 @@ class _JobOperation(object):
         self.directives._keys_set_by_user = keys_set_by_user
 
     def __str__(self):
-        assert len(self._jobs) == 1
-        return f"{self.name}({str(self._jobs[0])})"
+        assert len(self._jobs) > 0
+        max_len = 3
+        min_len_unique_id = self._jobs[0]._project.min_len_unique_id()
+        if len(self._jobs) > max_len:
+            shown = self._jobs[:max_len-2] + ['...'] + self._jobs[-1:]
+        else:
+            shown = self._jobs
+        return f"{self.name}[#{len(self._jobs)}]" \
+               f"({', '.join([str(element)[:min_len_unique_id] for element in shown])})"
 
     def __repr__(self):
         return "{type}(name='{name}', jobs='{jobs}', cmd={cmd}, directives={directives})".format(
@@ -1048,12 +1055,9 @@ class FlowGroup(object):
             concat_jobs_str = str(jobs[0])[0:8]
 
         separator = getattr(project._environment, 'JOB_ID_SEPARATOR', '/')
-        readable_name = '{project}{sep}{jobs}{sep}{op_string}{sep}{index:04d}{sep}'.format(
-                    sep=separator,
-                    project=str(project)[:12],
-                    jobs=concat_jobs_str,
-                    op_string=op_string[:12],
-                    index=index)[:max_len]
+        readable_name = f'{str(project)[:12]}{separator}{self.name}{separator}' \
+                        f'{len(jobs)}{separator}{concat_jobs_str}{separator}{index:04d}' \
+                        f'{separator}'[:max_len]
 
         # By appending the unique job_op_id, we ensure that each id is truly unique.
         return readable_name + job_op_id

@@ -1959,15 +1959,18 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         self._fetch_scheduler_status(jobs, err, ignore_errors)
         # Get status dict for all selected jobs
 
-        def _print_progress(x):
-            print("Updating status: ", end='', file=err)
-            err.flush()
-            n = max(1, int(len(jobs) / 10))
-            for i, _ in enumerate(x):
-                if (i % n) == 0:
-                    print('.', end='', file=err)
-                    err.flush()
-                yield _
+        def _print_status(iterable, fetch_status, description):
+            t = time.time()
+            num_itr = len(iterable)
+            results = []
+            for i, itr in enumerate(iterable):
+                results.append(fetch_status(itr))
+                if time.time() - t > 0.2:  # status interval
+                    print(f'{description}: {i+1}/{num_itr}', end='\r', file=err)
+                    t = time.time()
+            # Always print the completed progressbar.
+            print(f'{description}: {i+1}/{num_itr}', file=err)
+            return results
 
         try:
             cached_status = self.document['_status']._as_dict()
@@ -1989,8 +1992,19 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     if name == group.name:
                         singleton_groups.append(group)
 
-        def _generate_results_with_tqdm(iterable, desc, len, file):
-            return list(tqdm(iterable=iterable, desc=desc, total=len, file=file))
+        def _generate_results_with_tqdm(iterable, map=None, desc=None, len_itr=None):
+            if iterable == 'groups':
+                return list(tqdm(
+                    iterable=map(_get_group_status, singleton_groups),
+                    desc="Collecting job status per operation",
+                    total=len(singleton_groups), file=err))
+            elif iterable == 'job-labels':
+                return list(tqdm(
+                    iterable=map(_get_job_labels, jobs),
+                    desc="Collecting job label info", total=len(jobs), file=err))
+            else:
+                return list(tqdm(
+                    iterable=iterable, desc=desc, total=len_itr, file=err))
 
         with self._potentially_buffered():
             try:
@@ -1998,12 +2012,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     with contextlib.closing(ThreadPool()) as pool:
                         # First attempt at parallelized status determination.
                         # This may fail on systems that don't allow threads.
-                        label_results = _generate_results_with_tqdm(
-                            pool.imap(_get_job_labels, jobs),
-                            "Collecting job label info", len(jobs), err)
-                        op_results = _generate_results_with_tqdm(
-                            pool.imap(_get_group_status, singleton_groups),
-                            "Collecting job status per operation", len(singleton_groups), err)
+                        label_results = _generate_results_with_tqdm('job-labels', pool.imap)
+                        op_results = _generate_results_with_tqdm('groups', pool.imap)
                 elif status_parallelization == 'process':
                     with contextlib.closing(Pool()) as pool:
                         try:
@@ -2032,50 +2042,20 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                         "Unable to parallelize execution due to a pickling "
                                         "error: {}.".format(error))
                         label_results = _generate_results_with_tqdm(
-                            results, "Collecting job label info", len(jobs), err)
-                        op_results = _generate_results_with_tqdm(
-                            map(_get_group_status, singleton_groups),
-                            "Collecting job status per operation", len(singleton_groups), err)
+                                results, "Collecting job label info", len_itr=len(jobs))
+                        op_results = _generate_results_with_tqdm('groups', map)
                 elif status_parallelization == 'none':
-                    label_results = _generate_results_with_tqdm(
-                        map(_get_job_labels, jobs), "Collecting job label info", len(jobs), err)
-                    op_results = _generate_results_with_tqdm(
-                        map(_get_group_status, singleton_groups),
-                        "Collecting job status per operation", len(singleton_groups), err)
+                    label_results = _generate_results_with_tqdm('job-labels', map)
+                    op_results = _generate_results_with_tqdm('groups', map)
                 else:
                     raise RuntimeError("Configuration value status_parallelization is invalid. "
-                                       "You can set it to 'thread', 'parallel', or 'none'"
-                                       )
+                                       "You can set it to 'thread', 'parallel', or 'none'")
             except RuntimeError as error:
                 if "can't start new thread" not in error.args:
                     raise   # unrelated error
-
-                t = time.time()
-                num_jobs = len(jobs)
-                label_results = []
-                for i, job in enumerate(jobs):
-                    label_results.append(_get_job_labels(job))
-                    if time.time() - t > 0.2:  # status interval
-                        print(
-                            'Collecting job label info: {}/{}'.format(i+1, num_jobs),
-                            end='\r', file=err)
-                        t = time.time()
-                # Always print the completed progressbar.
-                print('Collecting job label info: {}/{}'.format(i+1, num_jobs), file=err)
-
-                t = time.time()
-                num_groups = len(singleton_groups)
-                op_results = []
-                for i, group in enumerate(singleton_groups):
-                    op_results.append(_get_group_status(group))
-                    if time.time() - t > 0.2:  # status interval
-                        print(
-                            'Collecting job status per operation: {}/{}'.format(i+1, num_groups),
-                            end='\r', file=err)
-                        t = time.time()
-                # Always print the completed progressbar.
-                print('Collecting job status per operation: {}/{}'
-                      ''.format(i+1, num_groups), file=err)
+                label_results = _print_status(jobs, _get_job_labels, "Collecting job label info")
+                op_results = _print_status(singleton_groups, _get_group_status,
+                                           "Collecting job status per operation")
 
         results, index, i = list(), dict(), 0
 

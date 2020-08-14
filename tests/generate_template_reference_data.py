@@ -202,7 +202,7 @@ def main(args):
                                 continue
                         fn = 'script_{}.sh'.format(op)
                         if op in agg_ops:
-                            tmp_out = mock_submit(fp, env, None, [op], 1, **parameters)
+                            tmp_out = mock_submit(fp, env, fp, [op], 1, **parameters)
                         else:
                             tmp_out = mock_submit(fp, env, [job], [op], 1, **parameters)
 

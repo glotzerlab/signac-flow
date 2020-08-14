@@ -154,7 +154,7 @@ class MakeAggregate(Aggregate):
     def __init__(self, *args):
         super(MakeAggregate, self).__init__(*args)
 
-    def __call__(self, obj, group_name='unknown-operation'):
+    def __call__(self, obj, group_name='unknown-operation', project=None):
         "Return aggregated jobs"
         aggregated_jobs = list(obj)
         if self._select is not None:
@@ -165,26 +165,30 @@ class MakeAggregate(Aggregate):
                                           reverse=bool(self._reverse)))
 
         aggregated_jobs = self._aggregator([job for job in aggregated_jobs])
-        aggregated_jobs = self._create_nested_aggregate_list(aggregated_jobs, group_name)
+        aggregated_jobs = self._create_nested_aggregate_list(aggregated_jobs, group_name, project)
         if not len(aggregated_jobs):
             return []
-        for i, job in enumerate(aggregated_jobs[-1]):
-            if job is None:
-                del aggregated_jobs[-1][i:]
-                break
         return aggregated_jobs
 
-    def _create_nested_aggregate_list(self, aggregated_jobs, group_name):
+    def _create_nested_aggregate_list(self, aggregated_jobs, group_name, project):
         # This method converts the returned subset of jobs as an Iterable
         # from an aggregator function to a subset of jobs as list.
         aggregated_jobs = list(aggregated_jobs)
         nested_aggregates = []
 
-        desc = "Collecting aggregates for {}.".format(group_name)
+        desc = f"Collecting aggregates for {group_name}"
         for aggregate in tqdm(aggregated_jobs, total=len(aggregated_jobs),
                               desc=desc, leave=False):
             try:
-                nested_aggregates.append([job for job in aggregate])
+                filter_aggregate = []
+                for job in aggregate:
+                    if job is None:
+                        continue
+                    if project is not None:
+                        if job not in project:
+                            raise ValueError(f'The signac job {str(job)} not found in {project}')
+                    filter_aggregate.append(job)
+                nested_aggregates.append(tuple(filter_aggregate))
             except Exception:
                 raise ValueError("Invalid aggregator function provided by "
                                  "the user.")

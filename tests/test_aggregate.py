@@ -38,7 +38,7 @@ class TestAggregate(AggregateProjectSetup):
 
     def test_default_init(self):
         aggregate_instance = Aggregate()
-        test_list = [1, 2, 3, 4, 5]
+        test_list = (1, 2, 3, 4, 5)
         assert aggregate_instance._sort is None
         assert aggregate_instance._aggregator(test_list) == [test_list]
         assert aggregate_instance._select is None
@@ -108,6 +108,9 @@ class TestAggregate(AggregateProjectSetup):
         with pytest.raises(TypeError):
             Aggregate.groupby(1)
 
+    def test_groupby_with_valid_type_default_for_Iterable(self, setUp, project):
+        Aggregate.groupby(['half', 'even'], default=[-1, -1])
+
     def test_groupby_with_invalid_type_default_key_for_Iterable(self, setUp, project):
         with pytest.raises(TypeError):
             Aggregate.groupby(['half', 'even'], default=-1)
@@ -123,7 +126,7 @@ class TestMakeAggregate(AggregateProjectSetup):
         # Return groups of 1
         def helper_aggregator(jobs):
             for job in jobs:
-                yield [job]
+                yield (job, )
 
         aggregate_instance = Aggregate(helper_aggregator)
 
@@ -139,7 +142,7 @@ class TestMakeAggregate(AggregateProjectSetup):
         aggregate_instance = aggregate_instance._create_MakeAggregate()
         aggregate_job_via_aggregator = aggregate_instance(project)
 
-        assert [[job for job in project]] == \
+        assert [tuple([job for job in project])] == \
                aggregate_job_via_aggregator
 
     def test_valid_sort(self, setUp, project):
@@ -147,14 +150,14 @@ class TestMakeAggregate(AggregateProjectSetup):
         aggregate_instance = Aggregate(sort='i')
         aggregate_instance = aggregate_instance._create_MakeAggregate()
 
-        assert([helper_sort(project)] == aggregate_instance(project))
+        assert([tuple(helper_sort(project))] == aggregate_instance(project))
 
     def test_valid_reversed_sort(self, setUp, project):
         helper_sort = partial(sorted, key=lambda job: job.sp.i, reverse=True)
         aggregate_instance = Aggregate(sort='i', reverse=True)
         aggregate_instance = aggregate_instance._create_MakeAggregate()
 
-        assert([helper_sort(project)] == aggregate_instance(project))
+        assert([tuple(helper_sort(project))] == aggregate_instance(project))
 
     def test_groups_of_valid_num(self, setUp, project):
         valid_values = [1, 2, 3, 6]
@@ -246,5 +249,5 @@ class TestMakeAggregate(AggregateProjectSetup):
         selected_jobs = []
         for job in project:
             if _select(job):
-                selected_jobs.append([job])
+                selected_jobs.append((job,))
         assert aggregate_instance(project) == selected_jobs

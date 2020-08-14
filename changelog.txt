@@ -11,11 +11,17 @@ next
 next
 ----
 
+Added
++++++
+
+- Added support for `pre-commit hooks <https://pre-commit.com/>`__ (#333).
+
 Changed
 +++++++
 
 - Make ``FlowCondition`` class private (#307, #315).
 - Deprecate ``JobOperation`` class, make ``SubmissionJobOperation`` a private class and deprecate the following methods of ``FlowProject``: ``script``, ``run_operations``, ``submit_operations``, ``next_operations``. (#313)
+- Deprecate the following methods: ``FlowGroup.eligible``, ``FlowGroup.complete``, ``BaseFlowOperation.eligible``, ``BaseFlowOperation.complete`` (#337).
 
 Removed
 +++++++

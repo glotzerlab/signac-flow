@@ -9,6 +9,7 @@ class TestProject(flow.FlowProject):
 
 
 group1 = TestProject.make_group(name="group1")
+group2 = TestProject.make_group(name="group2", aggregate=flow.Aggregate())
 
 
 @TestProject.operation
@@ -51,4 +52,19 @@ def gpu_op(job):
 @TestProject.operation
 @flow.directives(ngpu=TestProject.ngpu, nranks=TestProject.nranks)
 def mpi_gpu_op(job):
+    pass
+
+
+@TestProject.operation
+@flow.Aggregate.groupsof(4)
+@group2
+def serial_agg_op(*jobs):
+    pass
+
+
+@TestProject.operation
+@flow.directives(np=TestProject.np)
+@flow.Aggregate.groupsof(2)
+@group2
+def parallel_agg_op(*jobs):
     pass

@@ -27,6 +27,19 @@ def find_envs():
             yield env
 
 
+def mock_submit(fp, env, jobs, names, bundle_size, **kwargs):
+    tmp_out = io.TextIOWrapper(
+        io.BytesIO(), sys.stdout.encoding)
+    with open(os.devnull, 'w') as devnull:
+        with redirect_stderr(devnull):
+            with redirect_stdout(tmp_out):
+                fp.submit(
+                    env=env, bundle_size=bundle_size, jobs=jobs, names=names,
+                    force=True, pretend=True, **kwargs)
+    tmp_out.seek(0)
+    return tmp_out
+
+
 @pytest.mark.parametrize('env', find_envs())
 def test_env(env):
     # Force asserts to show the full file when failures occur.
@@ -43,20 +56,13 @@ def test_env(env):
                 )
         reference = []
         generated = []
+        agg_ops = ['serial_agg_op', 'parallel_agg_op', 'group2']
         for job in jobs:
             parameters = job.sp.parameters()
             if 'bundle' in parameters:
                 bundle = parameters.pop('bundle')
-                tmp_out = io.TextIOWrapper(
-                    io.BytesIO(), sys.stdout.encoding)
-                with open(os.devnull, 'w') as devnull:
-                    with redirect_stderr(devnull):
-                        with redirect_stdout(tmp_out):
-                            fp.submit(
-                                env=env, jobs=[job], names=bundle, pretend=True,
-                                force=True, bundle_size=len(bundle), **parameters)
-                tmp_out.seek(0)
-                msg = "---------- Bundled submission of job {}".format(job)
+                tmp_out = mock_submit(fp, env, [job], bundle, len(bundle), **parameters)
+                msg = f"---------- Bundled submission of job {job}"
                 generated.extend([msg] + tmp_out.read().splitlines())
 
                 with open(job.fn('script_{}.sh'.format('_'.join(bundle)))) as file:
@@ -72,16 +78,13 @@ def test_env(env):
                             'gpu' in parameters['partition'].lower(),
                                 'gpu' in op.lower()):
                             continue
-                    tmp_out = io.TextIOWrapper(
-                        io.BytesIO(), sys.stdout.encoding)
-                    with open(os.devnull, 'w') as devnull:
-                        with redirect_stderr(devnull):
-                            with redirect_stdout(tmp_out):
-                                fp.submit(
-                                    env=env, jobs=[job],
-                                    names=[op], pretend=True, force=True, **parameters)
-                    tmp_out.seek(0)
-                    msg = "---------- Submission of operation {} for job {}.".format(op, job)
+                    if op in agg_ops:
+                        tmp_out = mock_submit(fp, env, None, [op], 1, **parameters)
+                        msg = f"---------- Submission of operation {op} for jobs " \
+                              f"{' '.join(map(str, jobs))}."
+                    else:
+                        tmp_out = mock_submit(fp, env, [job], [op], 1, **parameters)
+                        msg = f"---------- Submission of operation {op} for job {job}."
                     generated.extend([msg] + tmp_out.read().splitlines())
 
                     with open(job.fn('script_{}.sh'.format(op))) as file:

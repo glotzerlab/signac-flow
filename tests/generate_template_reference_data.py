@@ -161,9 +161,22 @@ def main(args):
                   "Use `-f/--force` to overwrite.".format(ARCHIVE_DIR))
             return
 
+    def mock_submit(fp, env, jobs, names, bundle_size, **kwargs):
+        tmp_out = io.TextIOWrapper(io.BytesIO(), sys.stdout.encoding)
+        with redirect_stdout(tmp_out):
+            try:
+                fp.submit(
+                    env=env, bundle_size=bundle_size, jobs=jobs, names=names,
+                    force=True, pretend=True, **kwargs)
+            except jinja2.TemplateError as e:
+                print('ERROR:', e)  # Shows template error in output script
+        tmp_out.seek(0)
+        return tmp_out
+
     with signac.TemporaryProject(name=PROJECT_NAME) as p:
         init(p)
         fp = get_masked_flowproject(p)
+        agg_ops = ['serial_agg_op', 'parallel_agg_op', 'group2']
 
         for job in fp:
             with job:
@@ -173,17 +186,7 @@ def main(args):
                 if 'bundle' in parameters:
                     bundle = parameters.pop('bundle')
                     fn = 'script_{}.sh'.format('_'.join(bundle))
-                    tmp_out = io.TextIOWrapper(io.BytesIO(), sys.stdout.encoding)
-                    with redirect_stdout(tmp_out):
-                        try:
-                            fp.submit(
-                                env=env, jobs=[job], names=bundle, pretend=True,
-                                force=True, bundle_size=len(bundle), **parameters)
-                        except jinja2.TemplateError as e:
-                            print('ERROR:', e)  # Shows template error in output script
-
-                    # Filter out non-header lines
-                    tmp_out.seek(0)
+                    tmp_out = mock_submit(fp, env, [job], bundle, len(bundle), **parameters)
                     with open(fn, 'w') as f:
                         with redirect_stdout(f):
                             print(tmp_out.read(), end='')
@@ -198,17 +201,11 @@ def main(args):
                                             'gpu' in op.lower()):
                                 continue
                         fn = 'script_{}.sh'.format(op)
-                        tmp_out = io.TextIOWrapper(io.BytesIO(), sys.stdout.encoding)
-                        with redirect_stdout(tmp_out):
-                            try:
-                                fp.submit(
-                                    env=env, jobs=[job], names=[op],
-                                    pretend=True, force=True, **parameters)
-                            except jinja2.TemplateError as e:
-                                print('ERROR:', e)  # Shows template error in output script
+                        if op in agg_ops:
+                            tmp_out = mock_submit(fp, env, None, [op], 1, **parameters)
+                        else:
+                            tmp_out = mock_submit(fp, env, [job], [op], 1, **parameters)
 
-                        # Filter out non-header lines and the job-name line
-                        tmp_out.seek(0)
                         with open(fn, 'w') as f:
                             with redirect_stdout(f):
                                 print(tmp_out.read(), end='')

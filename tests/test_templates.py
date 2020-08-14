@@ -79,9 +79,10 @@ def test_env(env):
                                 'gpu' in op.lower()):
                             continue
                     if op in agg_ops:
-                        tmp_out = mock_submit(fp, env, None, [op], 1, **parameters)
-                        msg = f"---------- Submission of operation {op} for jobs " \
-                              f"{' '.join(map(str, jobs))}."
+                        continue
+                        # tmp_out = mock_submit(fp, env, None, [op], 1, **parameters)
+                        # msg = f"---------- Submission of operation {op} for jobs " \
+                        #       f"{' '.join(map(str, jobs))}."
                     else:
                         tmp_out = mock_submit(fp, env, [job], [op], 1, **parameters)
                         msg = f"---------- Submission of operation {op} for job {job}."

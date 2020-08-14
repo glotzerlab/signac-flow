@@ -1562,13 +1562,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             op_fn = '{}.txt'.format(operation.name)
             aggregate_wid = '{} {} \n'.format(operation.id, ' '.join(map(str, operation._jobs)))
             fn_aggregate = self._fn_stored('.aggregates', op_fn)
-            try:
-                os.makedirs(os.path.dirname(fn_aggregate), exist_ok=True)
-            except PermissionError:
-                continue
+            os.makedirs(os.path.dirname(fn_aggregate), exist_ok=True)
             if os.path.exists(fn_aggregate):
                 with open(fn_aggregate, 'r+') as file:
-                    if aggregate_wid in file:
+                    agg_file_contents = file.read()
+                    if aggregate_wid in agg_file_contents:
                         continue
                     else:
                         file.write(aggregate_wid)
@@ -1614,7 +1612,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     except KeyError:  # Not able to open the job via job id.
                         pass
 
-        return tuple(fetched_aggregates)
+        return fetched_aggregates
 
     def _expand_bundled_jobs(self, scheduler_jobs):
         "Expand jobs which were submitted as part of a bundle."
@@ -1735,7 +1733,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         result['operation_name'] = group.name
         status_dict = dict()
         errors = dict()
-        jobs = [(job,) for job in jobs]  # TODO
+        # TODO: The logic needs to get changed in #336 from the below logic to
+        # jobs = group.aggregate(jobs).
+        jobs = [(job,) for job in jobs]
 
         fetched_jobs = self._fetch_aggregates(group)
 
@@ -1839,7 +1839,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     if name == group.name:
                         singleton_groups.append(group)
 
-        def _generate_results_with_tqdm(iterable, map=None, desc=None, len_itr=None):
+        def _generate_results_with_tqdm(iterable, map=map, desc=None, len_itr=None):
             if iterable == 'groups':
                 return list(tqdm(
                     iterable=map(_get_group_status, singleton_groups),
@@ -1889,11 +1889,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                         "Unable to parallelize execution due to a pickling "
                                         "error: {}.".format(error))
                         label_results = _generate_results_with_tqdm(
-                                results, "Collecting job label info", len_itr=len(jobs))
-                        op_results = _generate_results_with_tqdm('groups', map)
+                                results, desc="Collecting job label info", len_itr=len(jobs))
+                        # TODO: We need to check in #366 whether ``group.aggregate``` method
+                        # can be pickled or not. It currently fails if we try to pickle.
+                        # The process is under development.
+                        op_results = _generate_results_with_tqdm('groups')
                 elif status_parallelization == 'none':
-                    label_results = _generate_results_with_tqdm('job-labels', map)
-                    op_results = _generate_results_with_tqdm('groups', map)
+                    label_results = _generate_results_with_tqdm('job-labels')
+                    op_results = _generate_results_with_tqdm('groups')
                 else:
                     raise RuntimeError("Configuration value status_parallelization is invalid. "
                                        "You can set it to 'thread', 'parallel', or 'none'")

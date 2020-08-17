@@ -2,7 +2,7 @@
 {% extends "lsf.sh" %}
 {% block tasks %}
 {% set threshold = 0 if force else 0.9 %}
-{% set nn = operations|map('guess_resource_sets')|calc_num_nodes %}
+{% set nn = operations|map('guess_resource_sets')|calc_num_nodes(parallel) %}
 #BSUB -nnodes {{ nn }}
 {% endblock %}
 {% block header %}

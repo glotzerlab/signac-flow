@@ -37,6 +37,7 @@ def test_env(env):
         fp = gen.get_masked_flowproject(p)
         fp.import_from(origin=gen.ARCHIVE_DIR)
         jobs = fp.find_jobs(dict(environment=_env_name(env)))
+        fp.generate_aggregates()
         if not len(jobs):
             raise RuntimeError(
                 "No reference data for environment {}!".format(_env_name(env))

@@ -143,6 +143,8 @@ class TestProjectBase():
                 project.open_job(dict(a=a, b=b)).init()
                 project.open_job(dict(a=dict(a=a), b=b)).init()
         project._entrypoint = self.entrypoint
+        project.generate_aggregates()
+        print(project)
         return project
 
 
@@ -163,6 +165,7 @@ class TestProjectStatusPerformance(TestProjectBase):
         project = self.project_class.get_project(root=self._tmp_dir.name)
         for i in range(1000):
             project.open_job(dict(i=i)).init()
+        project.generate_aggregates()
         return project
 
     def test_status_performance(self):
@@ -174,7 +177,7 @@ class TestProjectStatusPerformance(TestProjectBase):
         MockScheduler.reset()
 
         time = timeit.timeit(
-            lambda: project._fetch_status(project, StringIO(),
+            lambda: project._fetch_status(list(map(str, project)), project, StringIO(),
                                           ignore_errors=False), number=10)
 
         assert time < 10
@@ -427,7 +430,7 @@ class TestProjectClass(TestProjectBase):
         project = self.mock_project(A)
         for job in project:
             job.doc.np = 3
-            for next_op in project.next_operations(job):
+            for next_op in project._next_operations([str(job)]):
                 assert 'mpirun -np 3 python' in next_op.cmd
             break
 
@@ -446,20 +449,20 @@ class TestProjectClass(TestProjectBase):
 
         # test setting neither nranks nor omp_num_threads
         for job in project:
-            for next_op in project.next_operations(job):
+            for next_op in project._next_operations([str(job)]):
                 assert next_op.directives['np'] == 1
 
         # test only setting nranks
         for i, job in enumerate(project):
             job.doc.nranks = i+1
-            for next_op in project.next_operations(job):
+            for next_op in project._next_operations([str(job)]):
                 assert next_op.directives['np'] == next_op.directives['nranks']
             del job.doc['nranks']
 
         # test only setting omp_num_threads
         for i, job in enumerate(project):
             job.doc.omp_num_threads = i+1
-            for next_op in project.next_operations(job):
+            for next_op in project._next_operations([str(job)]):
                 assert next_op.directives['np'] == next_op.directives['omp_num_threads']
             del job.doc['omp_num_threads']
 
@@ -468,7 +471,7 @@ class TestProjectClass(TestProjectBase):
             job.doc.omp_num_threads = i+1
             job.doc.nranks = i % 3 + 1
             expected_np = (i + 1) * (i % 3 + 1)
-            for next_op in project.next_operations(job):
+            for next_op in project._next_operations([str(job)]):
                 assert next_op.directives['np'] == expected_np
 
     def test_copy_conditions(self):
@@ -592,8 +595,8 @@ class TestProject(TestProjectBase):
         project = self.mock_project()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
         for job in project:
-            for i, op in enumerate(project.next_operations(job)):
-                assert op.job == job
+            for i, op in enumerate(project._next_operations([str(job)])):
+                assert op._jobs == (job,)
                 if job in even_jobs:
                     assert op.name == ['op1', 'op2', 'op3'][i]
                 else:
@@ -606,7 +609,7 @@ class TestProject(TestProjectBase):
             status = project.get_job_status(job)
             assert status['job_id'] == job.get_id()
             assert len(status['operations']) == len(project.operations)
-            for op in project.next_operations(job):
+            for op in project._next_operations([str(job)]):
                 assert op.name in status['operations']
                 op_status = status['operations'][op.name]
                 assert op_status['eligible'] == project.operations[op.name].eligible(job)
@@ -656,7 +659,7 @@ class TestProject(TestProjectBase):
     def test_script(self):
         project = self.mock_project()
         for job in project:
-            script = project.script(project.next_operations(job))
+            script = project._script(project._next_operations([str(job)]))
             if job.sp.b % 2 == 0:
                 assert str(job) in script
                 assert 'echo "hello"' in script
@@ -676,7 +679,7 @@ class TestProject(TestProjectBase):
             file.write("THIS IS A CUSTOM SCRIPT!\n")
             file.write("{% endblock %}\n")
         for job in project:
-            script = project.script(project.next_operations(job))
+            script = project._script(project._next_operations([str(job)]))
             assert "THIS IS A CUSTOM SCRIPT" in script
             if job.sp.b % 2 == 0:
                 assert str(job) in script
@@ -731,15 +734,15 @@ class TestExecutionProject(TestProjectBase):
 
     def test_pending_operations_order(self):
         # The execution order of local runs is internally assumed to be
-        # 'by-job' by default. A failure of this unit tests means that
-        # a 'by-job' order must be implemented explicitly within the
+        # 'by-op' by default. A failure of this unit tests means that
+        # a 'by-op' order must be implemented explicitly within the
         # FlowProject.run() function.
         project = self.mock_project()
-        ops = list(project._get_pending_operations(self.project.find_jobs()))
+        ops = list(project._get_pending_operations())
         # The length of the list of operations grouped by job is equal
         # to the length of its set if and only if the operations are grouped
         # by job already:
-        jobs_order_none = [job._id for job, _ in groupby(ops, key=lambda op: op.job)]
+        jobs_order_none = [name for name, _ in groupby(ops, key=lambda op: op.name)]
         assert len(jobs_order_none) == len(set(jobs_order_none))
 
     def test_run(self, subtests):
@@ -751,7 +754,7 @@ class TestExecutionProject(TestProjectBase):
         def sort_key(op):
             return op.name, op.job.get_id()
 
-        for order in (None, 'none', 'cyclic', 'by-job', 'random', sort_key):
+        for order in (None, 'none', 'cyclic', 'by-op', 'random', sort_key):
             for job in self.project.find_jobs():  # clear
                 job.remove()
             with subtests.test(order=order):
@@ -772,6 +775,7 @@ class TestExecutionProject(TestProjectBase):
 
     def test_run_with_selection(self):
         project = self.mock_project()
+        print(project)
         output = StringIO()
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
@@ -914,7 +918,7 @@ class TestExecutionProject(TestProjectBase):
         project = self.mock_project()
         operations = []
         for job in project:
-            operations.extend(project.next_operations(job))
+            operations.extend(project._next_operations([str(job)]))
         assert len(list(MockScheduler.jobs())) == 0
         cluster_job_id = project._store_bundled(operations)
         with redirect_stderr(StringIO()):
@@ -995,7 +999,7 @@ class TestExecutionProject(TestProjectBase):
             if job not in even_jobs:
                 continue
             list(project.labels(job))
-            next_op = list(project.next_operations(job))[0]
+            next_op = list(project._next_operations([str(job)]))[0]
             assert next_op.name == 'op1'
             assert next_op.job == job
         with redirect_stderr(StringIO()):
@@ -1003,7 +1007,7 @@ class TestExecutionProject(TestProjectBase):
         assert len(list(MockScheduler.jobs())) == num_jobs_submitted
 
         for job in project:
-            next_op = list(project.next_operations(job))[0]
+            next_op = list(project._next_operations([str(job)]))[0]
             assert next_op.get_status() == JobStatus.submitted
 
         MockScheduler.step()
@@ -1011,7 +1015,7 @@ class TestExecutionProject(TestProjectBase):
         project._fetch_scheduler_status(file=StringIO())
 
         for job in project:
-            next_op = list(project.next_operations(job))[0]
+            next_op = list(project._next_operations([str(job)]))[0]
             assert next_op.get_status() == JobStatus.queued
 
         MockScheduler.step()
@@ -1027,7 +1031,7 @@ class TestExecutionProject(TestProjectBase):
         project = self.mock_project()
         operations = []
         for job in project:
-            operations.extend(project.next_operations(job))
+            operations.extend(project._next_operations([str(job)]))
         assert len(list(MockScheduler.jobs())) == 0
         cluster_job_id = project._store_bundled(operations)
         stderr = StringIO()
@@ -1183,7 +1187,7 @@ class TestProjectMainInterface(TestProjectBase):
                             op_lines.append(next(lines))
                         except StopIteration:
                             continue
-                    for op in project.next_operations(job):
+                    for op in project._next_operations([str(job)]):
                         assert any(op.name in op_line for op_line in op_lines)
 
     def test_main_script(self):
@@ -1235,8 +1239,8 @@ class TestGroupProject(TestProjectBase):
         project = self.mock_project()
         # For run mode single operation groups
         for job in project:
-            job_ops = project._get_submission_operations([job], dict())
-            script = project.script(job_ops)
+            job_ops = project._get_submission_operations([str(job)], dict())
+            script = project._script(job_ops)
             if job.sp.b % 2 == 0:
                 assert str(job) in script
                 assert 'run -o op1 -j {}'.format(job) in script

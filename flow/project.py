@@ -1253,6 +1253,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         self._groups = dict()
         self._register_groups()
 
+        # Register all aggregates for all the groups with this project instance.
+        self._aggregates = dict()
+        self.generate_aggregates()
+
     def _setup_template_environment(self):
         """Setup the jinja2 template environment.
 
@@ -1700,8 +1704,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         "Update the status docs."
         if file is None:
             file = sys.stderr
-        if jobs is None:
-            jobs = list(self)
         try:
             scheduler = self._environment.get_scheduler()
 
@@ -1709,12 +1711,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             scheduler_info = {sjob.name(): sjob.status() for sjob in self.scheduler_jobs(scheduler)}
             status = dict()
             print("Query scheduler...", file=file)
-            for job in tqdm(jobs,
-                            desc="Fetching operation status",
-                            total=len(jobs), file=file):
-                for group in self._groups.values():
-                    _id = group._generate_id(job)
-                    status[_id] = int(scheduler_info.get(_id, JobStatus.unknown))
+            for group in tqdm(self._groups.values(),
+                              desc="Fetching operation status",
+                              total=len(self._groups), file=file):
+                aggregated_jobs = self._aggregates[group.name]
+                for aggregate in tqdm(aggregated_jobs, total=len(aggregated_jobs),
+                                      desc="Fetching aggregate info for aggregate",
+                                      leave=False, file=file):
+                    if self._verify_job_aggregate_via_CLI(aggregate, jobs):
+                        _id = group._generate_id(aggregate)
+                        status[_id] = int(scheduler_info.get(_id, JobStatus.unknown))
             self.document._status.update(status)
         except NoSchedulerError:
             logger.debug("No scheduler available.")
@@ -1725,7 +1731,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         else:
             logger.info("Updated job status cache.")
 
-    def _get_group_status(self, group, jobs, ignore_errors=False, cached_status=None):
+    def _get_group_status(self, group, ignore_errors=False, cached_status=None):
         "Return a dict with detailed information about the status of jobs per group."
         result = dict()
         # Only sent singleton groups with the same name as the operation.
@@ -1733,9 +1739,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         result['operation_name'] = group.name
         status_dict = dict()
         errors = dict()
-        # TODO: The logic needs to get changed in #336 from the below logic to
-        # jobs = group.aggregate(jobs).
-        jobs = [(job,) for job in jobs]
+        jobs = self._aggregates[group.name]
 
         fetched_jobs = self._fetch_aggregates(group)
 
@@ -1752,7 +1756,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 completed = group._complete(job)
                 eligible = False if completed else group._eligible(job)
                 scheduler_status = cached_status.get(_id, JobStatus.unknown)
-                status_dict[str(job[0])] = {
+                status_dict[' '.join(map(str, job))] = {
                         'scheduler_status': scheduler_status,
                         'eligible': eligible,
                         'completed': completed
@@ -1761,7 +1765,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 msg = "Error while getting operations status for job " \
                       "'{}': '{}'.".format(' '.join(map(str, job)), error)
                 logger.debug(msg)
-                status_dict[str(job[0])] = {
+                status_dict[' '.join(map(str, job))] = {
                         'scheduler_status': JobStatus.unknown,
                         'eligible': False,
                         'completed': False
@@ -1794,7 +1798,29 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 raise
         return result
 
-    def _fetch_status(self, jobs, err, ignore_errors, status_parallelization='thread'):
+    def _fetch_status(self, jobs, fetched_jobs, err, ignore_errors,
+                      status_parallelization='thread'):
+        """Fetch status associated for either all the jobs associated in a project
+        or jobs specified by a user
+
+        :param jobs:
+            IDs associated with either the jobs or an job-aggregate
+        :type jobs:
+            list of ids
+        :type fetched_jobs:
+            Distinct jobs fetched from the ids provided in the ``jobs`` argument.
+            This is used for fetching labels for a job because a label is not associated
+            with an aggregate.
+        :param ignore_errors:
+            Fetch status even if querying the scheduler fails.
+        :type ignore_errors:
+            bool
+        :param status_parallelization:
+            Nature of parallelization for fetching the status.
+            Default value parallelizes using ``multiprocessing.ThreadPool()``
+        :type status_parallelization:
+            str
+        """
         # The argument status_parallelization is used so that _fetch_status method
         # gets to know whether the deprecated argument no_parallelization passed
         # while calling print_status is True or False. This can also be done by
@@ -1812,7 +1838,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             results = []
             for i, itr in enumerate(iterable):
                 results.append(fetch_status(itr))
-                if time.time() - t > 0.2:  # status interval
+                # The status interval 0.2 seconds is used since we expect the
+                # status for an aggregate to be fetched within that interval
+                if time.time() - t > 0.2:
                     print(f'{description}: {i+1}/{num_itr}', end='\r', file=err)
                     t = time.time()
             # Always print the completed progressbar.
@@ -1828,27 +1856,21 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                             ignore_errors=ignore_errors)
 
         _get_group_status = functools.partial(self._get_group_status,
-                                              jobs=jobs,
                                               ignore_errors=ignore_errors,
                                               cached_status=cached_status)
 
-        singleton_groups = []
-        for group in self._groups.values():
-            if len(group.operations) == 1:
-                for name in group.operations:
-                    if name == group.name:
-                        singleton_groups.append(group)
+        singleton_groups = self._gather_flow_groups(self.operations)
 
         def _generate_results_with_tqdm(iterable, map=map, desc=None, len_itr=None):
             if iterable == 'groups':
                 return list(tqdm(
                     iterable=map(_get_group_status, singleton_groups),
-                    desc="Collecting job status per operation",
+                    desc="Collecting operation status",
                     total=len(singleton_groups), file=err))
             elif iterable == 'job-labels':
                 return list(tqdm(
-                    iterable=map(_get_job_labels, jobs),
-                    desc="Collecting job label info", total=len(jobs), file=err))
+                    iterable=map(_get_job_labels, fetched_jobs),
+                    desc="Collecting job label info", total=len(fetched_jobs), file=err))
             else:
                 return list(tqdm(
                     iterable=iterable, desc=desc, total=len_itr, file=err))
@@ -1866,7 +1888,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         try:
                             import pickle
                             results = self._fetch_labels_in_parallel(
-                                pool, pickle, jobs, ignore_errors, cached_status)
+                                pool, pickle, fetched_jobs, ignore_errors, cached_status)
                         except Exception as error:
                             if not isinstance(error, (pickle.PickleError, self._PickleError)) and\
                                     'pickle' not in str(error).lower():
@@ -1883,13 +1905,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                             else:
                                 try:
                                     results = self._fetch_labels_in_parallel(
-                                        pool, cloudpickle, jobs, ignore_errors, cached_status)
+                                        pool, cloudpickle, fetched_jobs, ignore_errors,
+                                        cached_status)
                                 except self._PickleError as error:
                                     raise RuntimeError(
                                         "Unable to parallelize execution due to a pickling "
                                         "error: {}.".format(error))
                         label_results = _generate_results_with_tqdm(
-                                results, desc="Collecting job label info", len_itr=len(jobs))
+                            results, desc="Collecting job label info", len_itr=len(fetched_jobs))
                         # TODO: We need to check in #366 whether ``group.aggregate``` method
                         # can be pickled or not. It currently fails if we try to pickle.
                         # The process is under development.
@@ -1903,13 +1926,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             except RuntimeError as error:
                 if "can't start new thread" not in error.args:
                     raise   # unrelated error
-                label_results = _print_status(jobs, _get_job_labels, "Collecting job label info")
+                label_results = _print_status(fetched_jobs, _get_job_labels,
+                                              "Collecting job label info")
                 op_results = _print_status(singleton_groups, _get_group_status,
-                                           "Collecting job status per operation")
+                                           "Collecting operation status")
 
         results, index, i = list(), dict(), 0
 
-        for job in jobs:
+        for job in fetched_jobs:
             results_entry = dict()
             results_entry['job_id'] = str(job)
             results_entry['operations'] = dict()
@@ -1921,6 +1945,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             i += 1
         for op_result in op_results:
             for id, aggregates in op_result['aggregate_details'].items():
+                if not self._verify_job_aggregate_via_CLI(id.split(' '), jobs):
+                    continue
                 results[index[id]]['operations'][op_result['operation_name']] = aggregates
                 results[index[id]]['_operations_error'] = \
                     op_result['_operation_error_per_job'].get(id, None)
@@ -2046,8 +2072,34 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             file = sys.stdout
         if err is None:
             err = sys.stderr
-        if jobs is None:
-            jobs = self     # all jobs
+        if jobs is not None:
+            jobs = list(map(self._hash_job_aggregates, jobs))
+
+        self._verify_aggregate_project(deepcopy(jobs))
+
+        def _get_jobs_from_aggregate_id(id):
+            # From a particular id - get distinct jobs/aggregares
+            if id[0: 4] != 'agg':
+                return self.open_job(id=id)
+
+            for aggregates in self._aggregates.values():
+                for jobs in aggregates:
+                    if self._hash_job_aggregates(jobs) == id:
+                        return jobs
+
+        if jobs is not None:
+            v_jobs = list(map(_get_jobs_from_aggregate_id, jobs))
+            valid_jobs = []
+
+            for aggregate in v_jobs:
+                if isinstance(aggregate, signac.contrib.job.Job):
+                    valid_jobs.append(aggregate)
+                else:
+                    assert isinstance(aggregate, tuple)
+                    for job in aggregate:
+                        valid_jobs.append(job)
+        else:
+            valid_jobs = self
 
         if eligible_jobs_max_lines is None:
             eligible_jobs_max_lines = flow_config.get_config_value('eligible_jobs_max_lines')
@@ -2090,7 +2142,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             ]
 
             with prof(single=False):
-                tmp = self._fetch_status(jobs, err, ignore_errors, status_parallelization)
+                tmp = self._fetch_status(jobs, valid_jobs, err, ignore_errors,
+                                         status_parallelization)
 
             prof._mergeFileTiming()
 
@@ -2154,7 +2207,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     "results may be highly inaccurate.")
 
         else:
-            tmp = self._fetch_status(jobs, err, ignore_errors, status_parallelization)
+            tmp = self._fetch_status(jobs, valid_jobs, err, ignore_errors, status_parallelization)
             profiling_results = None
 
         operations_errors = {s['_operations_error'] for s in tmp}
@@ -2198,8 +2251,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Optionally expand parameters argument to all varying parameters.
         if parameters is self.PRINT_STATUS_ALL_VARYING_PARAMETERS:
             parameters = list(
-                sorted({key for job in jobs for key in job.sp.keys() if
-                        len(set([to_hashable(job.sp().get(key)) for job in jobs])) > 1}))
+                sorted({key for job in valid_jobs for key in job.sp.keys() if
+                        len(set([to_hashable(job.sp().get(key)) for job in valid_jobs])) > 1}))
 
         if parameters:
             # get parameters info
@@ -2347,7 +2400,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if timeout is not None and timeout < 0:
             timeout = None
         if operations is None:
-            operations = list(self._get_pending_operations(self))
+            operations = list(self._get_pending_operations())
         else:
             operations = list(operations)   # ensure list
 
@@ -2511,13 +2564,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :param order:
             Specify the order of operations, possible values are:
                 * 'none' or None (no specific order)
-                * 'by-job' (operations are grouped by job)
+                * 'by-op' (operations are grouped by operation)
                 * 'cyclic' (order operations cyclic by job)
                 * 'random' (shuffle the execution order randomly)
                 * callable (a callable returning a comparison key for an
                             operation used to sort operations)
 
-            The default value is `none`, which is equivalent to `by-job` in the current
+            The default value is `none`, which is equivalent to `by-op` in the current
             implementation.
 
             .. note::
@@ -2533,9 +2586,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type ignore_conditions:
             :py:class:`~.IgnoreConditions`
         """
-        # If no jobs argument is provided, we run operations for all jobs.
-        if jobs is None:
-            jobs = self
+        if jobs is not None:
+            jobs = list(map(self._hash_job_aggregates, jobs))
+
+        self._verify_aggregate_project(deepcopy(jobs))
 
         # Get all matching FlowGroups
         if isinstance(names, str):
@@ -2569,9 +2623,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         reached_execution_limit = Event()
 
         def select(operation):
-            if operation.job not in self:
-                log("Job '{}' is no longer part of the project.".format(operation.job))
+            if not self._verify_job_aggregate_via_CLI(operation._jobs, jobs):
                 return False
+
             if num is not None and select.total_execution_count >= num:
                 reached_execution_limit.set()
                 raise StopIteration  # Reached total number of executions
@@ -2614,11 +2668,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 with self._potentially_buffered():
                     operations = []
                     for flow_group in flow_groups:
-                        for job in jobs:
+                        for aggregate in self._aggregates[flow_group.name]:
                             operations.extend(
                                 flow_group._create_run_job_operations(
-                                    self._entrypoint, default_directives, job, ignore_conditions))
-
+                                    self._entrypoint, default_directives,
+                                    aggregate, ignore_conditions))
                     operations = list(filter(select, operations))
             finally:
                 if messages:
@@ -2637,12 +2691,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 operations = list(roundrobin(*groups))
             elif order == 'random':
                 random.shuffle(operations)
-            elif order is None or order in ('none', 'by-job'):
-                pass  # by-job is the default order
+            elif order is None or order in ('none', 'by-op'):
+                pass  # by-op is the default order
             else:
                 raise ValueError(
                     "Invalid value for the 'order' argument, valid arguments are "
-                    "'none', 'by-job', 'cyclic', 'random', None, or a callable.")
+                    "'none', 'by-op', 'cyclic', 'random', None, or a callable.")
 
             logger.info(
                 "Executing {} operation(s) (Pass # {:02d})...".format(len(operations), i_pass))
@@ -2683,18 +2737,21 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _get_submission_operations(self, jobs, default_directives, names=None,
                                    ignore_conditions=IgnoreConditions.NONE,
                                    ignore_conditions_on_execution=IgnoreConditions.NONE):
-        """Grabs JobOperations that are eligible to run from FlowGroups."""
-        for job in jobs:
-            for group in self._gather_flow_groups(names):
-                if group.eligible(job, ignore_conditions) and self._eligible_for_submission(group,
-                                                                                            job):
+        """Grabs _JobOperations that are eligible to run from FlowGroups."""
+        for group in self._gather_flow_groups(names):
+            for job in self._aggregates[group.name]:
+                if (
+                    group._eligible(job, ignore_conditions) and
+                    self._eligible_for_submission(group, job) and
+                    self._verify_job_aggregate_via_CLI(job, jobs)
+                ):
                     yield group._create_submission_job_operation(
                         entrypoint=self._entrypoint,
                         default_directives=default_directives,
-                        job=job, index=0,
+                        jobs=job, index=0,
                         ignore_conditions_on_execution=ignore_conditions_on_execution)
 
-    def _get_pending_operations(self, jobs, operation_names=None,
+    def _get_pending_operations(self, jobs=None, operation_names=None,
                                 ignore_conditions=IgnoreConditions.NONE):
         "Get all pending operations for the given selection."
         assert not isinstance(operation_names, str)
@@ -2705,6 +2762,43 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _verify_group_compatibility(self, groups):
         """Verifies that all selected groups can be submitted together."""
         return all(a.isdisjoint(b) for a in groups for b in groups if a != b)
+
+    def _verify_aggregate_project(self, jobs):
+        """Verifies that all aggregates belongs to the same project."""
+        if jobs is None:
+            return True
+
+        for aggregates in self._aggregates.values():
+            for aggregate in aggregates:
+                _id = self._hash_job_aggregates(aggregate)
+                if _id in jobs:
+                    # jobs is a list converted from a set so we can expect that
+                    # an _id only appear once in jobs
+                    jobs.remove(_id)
+
+        if not len(jobs):
+            return True
+
+        raise LookupError(f"Did not find aggregates with id {' '.join(map(str, jobs))}")
+
+    def _verify_job_aggregate_via_CLI(self, aggregate, jobs):
+        """Verifies that all aggregates matches with the arguments provided from the
+        ``-j`` option of CLI"""
+        if jobs is None:
+            return True
+        elif self._hash_job_aggregates(aggregate) not in jobs:
+            # Return False if a user provided an id in the -j option
+            # and that id is not found.
+            return False
+
+        return True
+
+    def _hash_job_aggregates(self, jobs):
+        if isinstance(jobs, (signac.contrib.job.Job, str)):  # Is a job or already an id
+            return str(jobs)
+        elif len(jobs) == 1:
+            return str(jobs[0])
+        return 'agg-' + hash(tuple(map(str, jobs)))
 
     @contextlib.contextmanager
     def _potentially_buffered(self):
@@ -2915,8 +3009,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             :py:class:`~.IgnoreConditions`
         """
         # Regular argument checks and expansion
-        if jobs is None:
-            jobs = self  # select all jobs
+        if jobs is not None:
+            jobs = list(map(self._hash_job_aggregates, jobs))
+
+        self._verify_aggregate_project(deepcopy(jobs))
+
         if isinstance(names, str):
             raise ValueError(
                 "The 'names' argument must be a sequence of strings, however you "
@@ -3327,15 +3424,42 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if op.complete(job):
                 yield name
 
-    def _job_operations(self, job, ignore_conditions=IgnoreConditions.NONE):
-        "Yield instances of JobOperation constructed for specific jobs."
+    def _job_operations(self, jobs, group, ignore_conditions=IgnoreConditions.NONE):
+        "Yield instances of _JobOperation constructed for specific jobs and group."
+        yield from group._create_run_job_operations(entrypoint=self._entrypoint, jobs=jobs,
+                                                    default_directives=dict(),
+                                                    ignore_conditions=ignore_conditions,
+                                                    index=0)
+
+    def _next_operations(self, jobs=None, ignore_conditions=IgnoreConditions.NONE):
+        """Determine the next eligible operations for aggregates created
+        while initialization.
+
+        :param jobs:
+            The signac job handles.
+            By default all the aggregates are evaluated to get the next opeation associated.
+        :type jobs:
+            tuple of :class:`~signac.contrib.job.Job`
+        :param ignore_conditions:
+            Specify if pre and/or post conditions check is to be ignored for eligibility check.
+            The default is :py:class:`IgnoreConditions.NONE`.
+        :type ignore_conditions:
+            :py:class:`~.IgnoreConditions`
+        :yield:
+            All instances of :class:`~._JobOperation` jobs are eligible for.
+        """
         for name in self.operations:
             group = self._groups[name]
-            yield from group._create_run_job_operations(entrypoint=self._entrypoint, job=job,
-                                                        default_directives=dict(),
-                                                        ignore_conditions=ignore_conditions,
-                                                        index=0)
+            for aggregate in self._aggregates[group.name]:
+                if not self._verify_job_aggregate_via_CLI(aggregate, jobs):
+                    continue
+                yield from group._create_run_job_operations(entrypoint=self._entrypoint,
+                                                            jobs=aggregate,
+                                                            default_directives=dict(),
+                                                            ignore_conditions=ignore_conditions,
+                                                            index=0)
 
+    @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
     def next_operations(self, *jobs, ignore_conditions=IgnoreConditions.NONE):
         """Determine the next eligible operations for jobs.
 
@@ -3351,9 +3475,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :yield:
             All instances of :class:`~.JobOperation` jobs are eligible for.
         """
-        for job in jobs:
-            for op in self._job_operations(job, ignore_conditions):
-                yield op
+        for name in self.operations:
+            group = self._groups[name]
+            for aggregate in self._aggregates[group.name]:
+                # JobOperation is just meant to deal with a single job and not a aggregate
+                # of jobs. Hence we select aggregates with length == 1 and the job in that
+                # aggregate should be present in the jobs passed by a user.
+                if len(aggregate) > 1 and aggregate[0] not in jobs:
+                    continue
+                for op in self._job_operations(aggregate, group, ignore_conditions):
+                    yield JobOperation(op.id, op.name, op._jobs[0], op._cmd, op.directives)
 
     @classmethod
     def operation(cls, func, name=None):
@@ -3447,6 +3578,25 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 self._operations[name] = FlowOperation(name=name, **params)
                 self._operation_functions[name] = func
 
+    def generate_aggregates(self, operations=None):
+        """Generate aggregates for an operation provided by a user.
+        By default aggregates all the operations will be generated
+
+        :param operation:
+            Name of the operations for which aggregates are to be generated.
+        :type operation:
+            Sequence of str
+        """
+        if operations is None:
+            operations = self._groups
+
+        for op_name in operations:
+            # TODO: The logic needs to get changed in #336 from the
+            # below logic to make aggregates using group.aggregate(jobs).
+            if self._groups.get(op_name, None) is None:
+                raise ValueError(f'Invalid operation {op_name} provided by the user.')
+            self._aggregates[op_name] = [(job,) for job in self]
+
     @classmethod
     def make_group(cls, name, options=""):
         """Make a FlowGroup named ``name`` and return a decorator to make groups.
@@ -3519,8 +3669,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def groups(self):
         return self._groups
 
-    def _eligible_for_submission(self, flow_group, job):
-        """Determine if a flow_group is eligible for submission with a given job.
+    @property
+    def aggregates(self):
+        "A dictionary of aggregated jobs per group or an operation"
+        return self._aggregates
+
+    def _eligible_for_submission(self, flow_group, jobs):
+        """Determine if a flow_group is eligible for submission with a given
+        job-aggregate.
 
         By default, an operation is eligible for submission when it
         is not considered active, that means already queued or running.
@@ -3567,8 +3723,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 error = error.__cause__  # Always show the user traceback cause.
             traceback.print_exception(type(error), error, error.__traceback__)
         else:
+            if jobs is None:
+                length_jobs = len(self)
+            else:
+                length_jobs = len(jobs)
             # Use small offset to account for overhead with few jobs
-            delta_t = (time.time() - start - 0.5) / max(len(jobs), 1)
+            delta_t = (time.time() - start - 0.5) / max(length_jobs, 1)
             config_key = 'status_performance_warn_threshold'
             warn_threshold = flow_config.get_config_value(config_key)
             if not args['profile'] and delta_t > warn_threshold >= 0:
@@ -3587,9 +3747,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _main_next(self, args):
         "Determine the jobs that are eligible for a specific operation."
-        for job in self:
-            if args.name in {op.name for op in self.next_operations(job)}:
-                print(job)
+        for op in self._next_operations():
+            if args.name in op.name:
+                print(' '.join(map(str, op._jobs)))
 
     def _main_run(self, args):
         "Run all (or select) job operations."
@@ -3661,10 +3821,25 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         self.submit(jobs=jobs, names=names, **kwargs)
 
     def _main_exec(self, args):
-        if len(args.jobid):
-            jobs = [self.open_job(id=jid) for jid in args.jobid]
+        if args.jobid:
+            jobs = set()
+            for _id in args.jobid:
+                try:
+                    if self.open_job(id=_id):
+                        jobs.add(_id)
+                except KeyError as error:
+                    # TODO: The below commented code is to be included when we
+                    # introduce actual aggregation.
+                    # if "agg-" == id[0:4]:
+                    #     jobs.add(id)
+                    raise LookupError("Did not find job with id {}.".format(error))
+
+            self._verify_aggregate_project(deepcopy(jobs))
         else:
-            jobs = self
+            # No specific jobs selected by the user so accept all the jobs.
+            # See ``_verify_job_aggregate_via_CLI`` for more details.
+            jobs = None
+
         try:
             try:
                 operation_function = self._operation_functions[args.operation]
@@ -3678,27 +3853,43 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         except KeyError:
             raise KeyError("Unknown operation '{}'.".format(args.operation))
 
-        if getattr(operation_function, '_flow_aggregate', False):
-            operation_function(jobs)
-        else:
-            for job in jobs:
-                operation_function(job)
+        for job in self._aggregates[args.operation]:
+            if self._verify_job_aggregate_via_CLI(job, jobs):
+                operation_function(*job)
+                if jobs is not None:
+                    break
 
     def _select_jobs_from_args(self, args):
         "Select jobs with the given command line arguments ('-j/-f/--doc-filter')."
+        # TODO: This method needs to change the way it behave in #336.
+        # As we're storing aggregates while initializing the FlowProject instance
+        # This method must return the job-id/aggregate-id (`agg-hash(tuple(map(str, jobs)))`)
+        # We will then compare whether this is associated with the particular JobOperation
+        # instance or not.
         if args.job_id and (args.filter or args.doc_filter):
             raise ValueError(
                 "Cannot provide both -j/--job-id and -f/--filter or --doc-filter in combination.")
 
         if args.job_id:
-            try:
-                return [self.open_job(id=job_id) for job_id in args.job_id]
-            except KeyError as error:
-                raise LookupError("Did not find job with id {}.".format(error))
-        else:
+            jobs = set()  # set in order to avoid duplicate ids
+            for id in args.job_id:
+                try:
+                    if self.open_job(id=id):
+                        jobs.add(id)
+                except KeyError as error:
+                    # TODO: The below commented code is to be included when we
+                    # introduce actual aggregation.
+                    # if "agg-" == id[0:4]:
+                    #     jobs.add(id)
+                    # else:
+                    raise LookupError("Did not find job with id {}.".format(error))
+            return list(jobs)
+        elif args.filter or args.doc_filter:
             filter_ = parse_filter_arg(args.filter)
             doc_filter = parse_filter_arg(args.doc_filter)
-            return JobsCursor(self, filter_, doc_filter)
+            return list({str(job) for job in JobsCursor(self, filter_, doc_filter)})
+        else:
+            return None
 
     def main(self, parser=None):
         """Call this function to use the main command line interface.
@@ -3828,7 +4019,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         execution_group.add_argument(
             '--order',
             type=str,
-            choices=['none', 'by-job', 'cyclic', 'random'],
+            choices=['none', 'by-op', 'cyclic', 'random'],
             default=None,
             help="Specify the execution order of operations for each execution pass.")
         execution_group.add_argument(

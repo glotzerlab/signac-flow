@@ -144,7 +144,6 @@ class TestProjectBase():
                 project.open_job(dict(a=dict(a=a), b=b)).init()
         project._entrypoint = self.entrypoint
         project.generate_aggregates()
-        print(project)
         return project
 
 
@@ -1104,7 +1103,7 @@ class TestUnbufferedExecutionProject(TestExecutionProject):
 
 class TestExecutionDynamicProject(TestExecutionProject):
     project_class = _DynamicTestProject
-    expected_number_of_steps = 10
+    expected_number_of_steps = 7
 
 
 class TestUnbufferedExecutionDynamicProject(TestUnbufferedExecutionProject,

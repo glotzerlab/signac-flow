@@ -1254,8 +1254,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         self._register_groups()
 
         # Register all aggregates for all the groups with this project instance.
+        # Since an operation can change it's aggregator associated with it, we register
+        # the aggregates when we fetch the aggregates using the property method
+        # ``FlowProject.aggregates``
         self._aggregates = dict()
-        self.generate_aggregates()
 
     def _setup_template_environment(self):
         """Setup the jinja2 template environment.
@@ -1714,7 +1716,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             for group in tqdm(self._groups.values(),
                               desc="Fetching operation status",
                               total=len(self._groups), file=file):
-                aggregated_jobs = self._aggregates[group.name]
+                aggregated_jobs = self.aggregates[group.name]
                 for aggregate in tqdm(aggregated_jobs, total=len(aggregated_jobs),
                                       desc="Fetching aggregate info for aggregate",
                                       leave=False, file=file):
@@ -1739,7 +1741,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         result['operation_name'] = group.name
         status_dict = dict()
         errors = dict()
-        jobs = self._aggregates[group.name]
+        jobs = self.aggregates[group.name]
 
         fetched_jobs = self._fetch_aggregates(group)
 
@@ -2082,7 +2084,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if id[0: 4] != 'agg':
                 return self.open_job(id=id)
 
-            for aggregates in self._aggregates.values():
+            for aggregates in self.aggregates.values():
                 for jobs in aggregates:
                     if self._hash_job_aggregates(jobs) == id:
                         return jobs
@@ -2668,7 +2670,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 with self._potentially_buffered():
                     operations = []
                     for flow_group in flow_groups:
-                        for aggregate in self._aggregates[flow_group.name]:
+                        for aggregate in self.aggregates[flow_group.name]:
                             operations.extend(
                                 flow_group._create_run_job_operations(
                                     self._entrypoint, default_directives,
@@ -2739,7 +2741,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                    ignore_conditions_on_execution=IgnoreConditions.NONE):
         """Grabs _JobOperations that are eligible to run from FlowGroups."""
         for group in self._gather_flow_groups(names):
-            for job in self._aggregates[group.name]:
+            for job in self.aggregates[group.name]:
                 if (
                     group._eligible(job, ignore_conditions) and
                     self._eligible_for_submission(group, job) and
@@ -2768,7 +2770,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if jobs is None:
             return True
 
-        for aggregates in self._aggregates.values():
+        for aggregates in self.aggregates.values():
             for aggregate in aggregates:
                 _id = self._hash_job_aggregates(aggregate)
                 if _id in jobs:
@@ -3450,7 +3452,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         for name in self.operations:
             group = self._groups[name]
-            for aggregate in self._aggregates[group.name]:
+            for aggregate in self.aggregates[group.name]:
                 if not self._verify_job_aggregate_via_CLI(aggregate, jobs):
                     continue
                 yield from group._create_run_job_operations(entrypoint=self._entrypoint,
@@ -3477,7 +3479,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         for name in self.operations:
             group = self._groups[name]
-            for aggregate in self._aggregates[group.name]:
+            for aggregate in self.aggregates[group.name]:
                 # JobOperation is just meant to deal with a single job and not a aggregate
                 # of jobs. Hence we select aggregates with length == 1 and the job in that
                 # aggregate should be present in the jobs passed by a user.
@@ -3578,7 +3580,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 self._operations[name] = FlowOperation(name=name, **params)
                 self._operation_functions[name] = func
 
-    def generate_aggregates(self, operations=None):
+    def _generate_aggregates(self, operations=None):
         """Generate aggregates for an operation provided by a user.
         By default aggregates all the operations will be generated
 
@@ -3672,6 +3674,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     @property
     def aggregates(self):
         "A dictionary of aggregated jobs per group or an operation"
+        # Generate aggregates before returning in order to avoid returning
+        # invalid aggregates
+        self._generate_aggregates()
         return self._aggregates
 
     def _eligible_for_submission(self, flow_group, jobs):
@@ -3853,7 +3858,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         except KeyError:
             raise KeyError("Unknown operation '{}'.".format(args.operation))
 
-        for job in self._aggregates[args.operation]:
+        for job in self.aggregates[args.operation]:
             if self._verify_job_aggregate_via_CLI(job, jobs):
                 operation_function(*job)
                 if jobs is not None:

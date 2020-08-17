@@ -143,7 +143,6 @@ class TestProjectBase():
                 project.open_job(dict(a=a, b=b)).init()
                 project.open_job(dict(a=dict(a=a), b=b)).init()
         project._entrypoint = self.entrypoint
-        project.generate_aggregates()
         return project
 
 
@@ -164,7 +163,6 @@ class TestProjectStatusPerformance(TestProjectBase):
         project = self.project_class.get_project(root=self._tmp_dir.name)
         for i in range(1000):
             project.open_job(dict(i=i)).init()
-        project.generate_aggregates()
         return project
 
     def test_status_performance(self):
@@ -1103,7 +1101,7 @@ class TestUnbufferedExecutionProject(TestExecutionProject):
 
 class TestExecutionDynamicProject(TestExecutionProject):
     project_class = _DynamicTestProject
-    expected_number_of_steps = 7
+    expected_number_of_steps = 10
 
 
 class TestUnbufferedExecutionDynamicProject(TestUnbufferedExecutionProject,

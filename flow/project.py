@@ -1310,7 +1310,7 @@ class _FlowProjectClass(type):
                 @Project.operation
                 @Project.post(lambda job: job.doc.get('bye'))
                 def bye(job):
-                    print('bye' job)
+                    print('bye', job)
                     job.doc.bye = True
 
             The *bye*-operation would be considered complete and therefore no longer

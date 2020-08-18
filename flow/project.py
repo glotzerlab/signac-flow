@@ -28,6 +28,7 @@ from copy import deepcopy
 from itertools import islice
 from itertools import count
 from itertools import groupby
+from hashlib import md5
 from hashlib import sha1
 import multiprocessing
 import threading
@@ -1253,11 +1254,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         self._groups = dict()
         self._register_groups()
 
-        # Register all aggregates for all the groups with this project instance.
-        # Since an operation can change it's aggregator associated with it, we register
-        # the aggregates when we fetch the aggregates using the property method
-        # ``FlowProject.aggregates``
+        # Register all aggregates which are created for this project
         self._aggregates = dict()
+        self._aggregates_ids = dict()
+        self.generate_aggregates()
 
     def _setup_template_environment(self):
         """Setup the jinja2 template environment.
@@ -1806,9 +1806,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         or jobs specified by a user
 
         :param jobs:
-            IDs associated with either the jobs or an job-aggregate
+            The aggregates which a user requested to fetch status for
         :type jobs:
-            list of ids
+            list of aggregates
         :type fetched_jobs:
             Distinct jobs fetched from the ids provided in the ``jobs`` argument.
             This is used for fetching labels for a job because a label is not associated
@@ -1946,10 +1946,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             index[str(job)] = i
             i += 1
         for op_result in op_results:
-            for id, aggregates in op_result['aggregate_details'].items():
-                if not self._verify_job_aggregate_via_CLI(id.split(' '), jobs):
+            for id, aggregates_status in op_result['aggregate_details'].items():
+                aggregate = tuple(self.open_job(id=_id) for _id in id.split(' '))
+                if not self._verify_job_aggregate_via_CLI(aggregate, jobs):
                     continue
-                results[index[id]]['operations'][op_result['operation_name']] = aggregates
+                results[index[id]]['operations'][op_result['operation_name']] = aggregates_status
                 results[index[id]]['_operations_error'] = \
                     op_result['_operation_error_per_job'].get(id, None)
         for label_result in label_results:
@@ -2074,32 +2075,29 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             file = sys.stdout
         if err is None:
             err = sys.stderr
-        if jobs is not None:
-            jobs = list(map(self._hash_job_aggregates, jobs))
-
-        self._verify_aggregate_project(deepcopy(jobs))
-
-        def _get_jobs_from_aggregate_id(id):
-            # From a particular id - get distinct jobs/aggregares
-            if id[0: 4] != 'agg':
-                return self.open_job(id=id)
-
-            for aggregates in self.aggregates.values():
-                for jobs in aggregates:
-                    if self._hash_job_aggregates(jobs) == id:
-                        return jobs
 
         if jobs is not None:
-            v_jobs = list(map(_get_jobs_from_aggregate_id, jobs))
-            valid_jobs = []
-
-            for aggregate in v_jobs:
-                if isinstance(aggregate, signac.contrib.job.Job):
-                    valid_jobs.append(aggregate)
+            aggregates = set()  # Set in order to prevent duplicate entries
+            for job in jobs:
+                if isinstance(job, signac.contrib.job.Job):  # User can still pass signac jobs
+                    aggregates.add((job,))
                 else:
-                    assert isinstance(aggregate, tuple)
-                    for job in aggregate:
-                        valid_jobs.append(job)
+                    try:
+                        aggregates.add(tuple(job))  # An aggregate provided by the user
+                    except Exception:
+                        raise ValueError('Invalid aggregate provided by the user. If you want to '
+                                         'provide an aggregate, please pass a tuple of jobs '
+                                         'instead.')
+        else:
+            aggregates = None
+
+        self._verify_aggregate_project(aggregates)
+
+        if aggregates is not None:
+            valid_jobs = set()
+            for aggregate in aggregates:
+                for job in aggregate:
+                    valid_jobs.add(job)
         else:
             valid_jobs = self
 
@@ -2144,7 +2142,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             ]
 
             with prof(single=False):
-                tmp = self._fetch_status(jobs, valid_jobs, err, ignore_errors,
+                tmp = self._fetch_status(aggregates, valid_jobs, err, ignore_errors,
                                          status_parallelization)
 
             prof._mergeFileTiming()
@@ -2209,7 +2207,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     "results may be highly inaccurate.")
 
         else:
-            tmp = self._fetch_status(jobs, valid_jobs, err, ignore_errors, status_parallelization)
+            tmp = self._fetch_status(aggregates, valid_jobs, err, ignore_errors,
+                                     status_parallelization)
             profiling_results = None
 
         operations_errors = {s['_operations_error'] for s in tmp}
@@ -2589,9 +2588,21 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             :py:class:`~.IgnoreConditions`
         """
         if jobs is not None:
-            jobs = list(map(self._hash_job_aggregates, jobs))
+            aggregates = set()
+            for job in jobs:
+                if isinstance(job, signac.contrib.job.Job):
+                    aggregates.add((job,))
+                else:
+                    try:
+                        aggregates.add(tuple(job))  # An aggregate provided by the user
+                    except Exception:
+                        raise ValueError('Invalid aggregate provided by the user. If you want to '
+                                         'provide an aggregate, please pass a tuple of jobs '
+                                         'instead.')
+        else:
+            aggregates = None
 
-        self._verify_aggregate_project(deepcopy(jobs))
+        self._verify_aggregate_project(aggregates)
 
         # Get all matching FlowGroups
         if isinstance(names, str):
@@ -2625,7 +2636,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         reached_execution_limit = Event()
 
         def select(operation):
-            if not self._verify_job_aggregate_via_CLI(operation._jobs, jobs):
+            if not self._verify_job_aggregate_via_CLI(operation._jobs, aggregates):
                 return False
 
             if num is not None and select.total_execution_count >= num:
@@ -2708,10 +2719,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _generate_operations(self, cmd, jobs, requires=None):
         "Generate job-operations for a given 'direct' command."
         for job in jobs:
+            if len(job) > 1:
+                continue
             if requires and set(requires).difference(self.labels(job)):
                 continue
-            cmd_ = cmd.format(job=job)
-            yield JobOperation(name=cmd_.replace(' ', '-'), cmd=cmd_, job=job)
+            cmd_ = cmd.format(job=job[0])
+            yield _JobOperation(name=cmd_.replace(' ', '-'), cmd=cmd_, jobs=job)
 
     def _gather_flow_groups(self, names=None):
         """Grabs FlowGroups that match any of a set of names."""
@@ -2768,39 +2781,48 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _verify_aggregate_project(self, jobs):
         """Verifies that all aggregates belongs to the same project."""
         if jobs is None:
-            return True
+            return
 
-        for aggregates in self.aggregates.values():
-            for aggregate in aggregates:
-                _id = self._hash_job_aggregates(aggregate)
-                if _id in jobs:
-                    # jobs is a list converted from a set so we can expect that
-                    # an _id only appear once in jobs
-                    jobs.remove(_id)
+        jobs_ids = list(map(self.generate_hashed_aggregates, jobs))
 
-        if not len(jobs):
-            return True
+        for id in jobs_ids:
+            # jobs is a list converted from a set so we can
+            # expect that an aggregate id only appear once in
+            # jobs_ids
+            if not self._aggregates_ids.get(id, False):
+                raise LookupError(f"Did not find aggregate having id {id} in the project")
 
-        raise LookupError(f"Did not find aggregates with id {' '.join(map(str, jobs))}")
+    def _generate_aggregate_from_id(self, id):
+        try:
+            return self._aggregates_ids[id]
+        except KeyError:
+            raise LookupError(f"Did not find aggregate having id {id} in the project")
 
     def _verify_job_aggregate_via_CLI(self, aggregate, jobs):
         """Verifies that all aggregates matches with the arguments provided from the
-        ``-j`` option of CLI"""
+        ``-j`` option of CLI
+        """
         if jobs is None:
             return True
-        elif self._hash_job_aggregates(aggregate) not in jobs:
-            # Return False if a user provided an id in the -j option
-            # and that id is not found.
+        elif aggregate not in jobs:
+            # Return False if job/aggregate provided from the ``-j`` CLI option
+            # and that job/aggregate does not match.
             return False
 
         return True
 
-    def _hash_job_aggregates(self, jobs):
-        if isinstance(jobs, (signac.contrib.job.Job, str)):  # Is a job or already an id
-            return str(jobs)
-        elif len(jobs) == 1:
-            return str(jobs[0])
-        return 'agg-' + hash(tuple(map(str, jobs)))
+    def generate_hashed_aggregates(self, jobs):
+        """"Generate hashed id for an aggregate of jobs
+
+        :param jobs:
+            The signac job handles
+        :type jobs:
+            tuple
+        """
+        blob = json.dumps([job.id for job in jobs], sort_keys=True)
+        m = md5()
+        m.update(blob.encode())
+        return f'agg-{m.hexdigest()}'
 
     @contextlib.contextmanager
     def _potentially_buffered(self):
@@ -3012,9 +3034,24 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         # Regular argument checks and expansion
         if jobs is not None:
-            jobs = list(map(self._hash_job_aggregates, jobs))
+            aggregates = set()  # Set in order to prevent duplicate entries
+            for job in jobs:
+                if isinstance(job, signac.contrib.job.Job):  # User can still pass signac jobs
+                    aggregates.add((job,))
+                else:
+                    try:
+                        aggregates.add(tuple(job))  # An aggregate provided by the user
+                    except Exception:
+                        raise ValueError('Invalid aggregate provided by the user. If you want to '
+                                         'provide an aggregate, please pass a tuple of jobs '
+                                         'instead.')
+        else:
+            aggregates = None
 
-        self._verify_aggregate_project(deepcopy(jobs))
+        # Even though we create the aggregates from all the jobs in a FlowProject,
+        # a user can still pass in jobs / aggregates which are invalid.
+        # Hence, we need to verify them.
+        self._verify_aggregate_project(aggregates)
 
         if isinstance(names, str):
             raise ValueError(
@@ -3041,8 +3078,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Gather all pending operations.
         with self._potentially_buffered():
             default_directives = self._get_default_directives()
-            operations = self._get_submission_operations(jobs, default_directives, names,
-                                                         ignore_conditions,
+            operations = self._get_submission_operations(aggregates, default_directives,
+                                                         names, ignore_conditions,
                                                          ignore_conditions_on_execution)
         if num is not None:
             operations = list(islice(operations, num))
@@ -3580,24 +3617,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 self._operations[name] = FlowOperation(name=name, **params)
                 self._operation_functions[name] = func
 
-    def _generate_aggregates(self, operations=None):
-        """Generate aggregates for an operation provided by a user.
-        By default aggregates all the operations will be generated
-
-        :param operation:
-            Name of the operations for which aggregates are to be generated.
-        :type operation:
-            Sequence of str
-        """
-        if operations is None:
-            operations = self._groups
-
-        for op_name in operations:
+    def generate_aggregates(self):
+        """Generate aggregates for every operation or group in a FlowProject"""
+        for name in self._groups:
             # TODO: The logic needs to get changed in #336 from the
             # below logic to make aggregates using group.aggregate(jobs).
-            if self._groups.get(op_name, None) is None:
-                raise ValueError(f'Invalid operation {op_name} provided by the user.')
-            self._aggregates[op_name] = [(job,) for job in self]
+            self._aggregates[name] = []
+            for job in self:
+                self._aggregates[name].append((job,))
+                self._aggregates_ids[self.generate_hashed_aggregates((job,))] = (job,)
 
     @classmethod
     def make_group(cls, name, options=""):
@@ -3676,7 +3704,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         "A dictionary of aggregated jobs per group or an operation"
         # Generate aggregates before returning in order to avoid returning
         # invalid aggregates
-        self._generate_aggregates()
         return self._aggregates
 
     def _eligible_for_submission(self, flow_group, jobs):
@@ -3699,7 +3726,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _main_status(self, args):
         "Print status overview."
-        jobs = self._select_jobs_from_args(args)
+        aggregates = self._select_jobs_from_args(args)
         if args.compact and not args.unroll:
             logger.warn("The -1/--one-line argument is incompatible with "
                         "'--stack' and will be ignored.")
@@ -3712,9 +3739,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         start = time.time()
         try:
-            self.print_status(jobs=jobs, **args)
+            self.print_status(jobs=aggregates, **args)
         except NoSchedulerError:
-            self.print_status(jobs=jobs, **args)
+            self.print_status(jobs=aggregates, **args)
         except Exception as error:
             if show_traceback:
                 logger.error(
@@ -3728,10 +3755,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 error = error.__cause__  # Always show the user traceback cause.
             traceback.print_exception(type(error), error, error.__traceback__)
         else:
-            if jobs is None:
+            if aggregates is None:
                 length_jobs = len(self)
             else:
-                length_jobs = len(jobs)
+                length_jobs = len(aggregates)
             # Use small offset to account for overhead with few jobs
             delta_t = (time.time() - start - 0.5) / max(length_jobs, 1)
             config_key = 'status_performance_warn_threshold'
@@ -3759,13 +3786,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _main_run(self, args):
         "Run all (or select) job operations."
         # Select jobs:
-        jobs = self._select_jobs_from_args(args)
+        aggregate = self._select_jobs_from_args(args)
 
         # Setup partial run function, because we need to call this either
         # inside some context managers or not based on whether we need
         # to switch to the project root directory or not.
         run = functools.partial(self.run,
-                                jobs=jobs, names=args.operation_name, pretend=args.pretend,
+                                jobs=aggregate, names=args.operation_name, pretend=args.pretend,
                                 np=args.parallel, timeout=args.timeout, num=args.num,
                                 num_passes=args.num_passes, progress=args.progress,
                                 order=args.order,
@@ -3787,7 +3814,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             raise ValueError(
                 "Cannot use the -o/--operation-name and the --cmd options in combination!")
         # Select jobs:
-        jobs = self._select_jobs_from_args(args)
+        aggregates = self._select_jobs_from_args(args)
 
         # Gather all pending operations or generate them based on a direct command...
         with self._potentially_buffered():
@@ -3795,11 +3822,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 warnings.warn("The --cmd option for script is deprecated as of "
                               "0.9 and will be removed in 0.11.",
                               DeprecationWarning)
-                operations = self._generate_operations(args.cmd, jobs, args.requires)
+                operations = self._generate_operations(args.cmd, aggregates, args.requires)
             else:
                 names = args.operation_name if args.operation_name else None
                 default_directives = self._get_default_directives()
-                operations = self._get_submission_operations(jobs, default_directives, names,
+                operations = self._get_submission_operations(aggregates, default_directives, names,
                                                              args.ignore_conditions,
                                                              args.ignore_conditions_on_execution)
             operations = list(islice(operations, args.num))
@@ -3816,34 +3843,31 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         kwargs = vars(args)
 
         # Select jobs:
-        jobs = self._select_jobs_from_args(args)
+        aggregates = self._select_jobs_from_args(args)
 
         # Fetch the scheduler status.
         if not args.test:
-            self._fetch_scheduler_status(jobs)
+            self._fetch_scheduler_status(aggregates)
 
         names = args.operation_name if args.operation_name else None
-        self.submit(jobs=jobs, names=names, **kwargs)
+        self.submit(jobs=aggregates, names=names, **kwargs)
 
     def _main_exec(self, args):
         if args.jobid:
-            jobs = set()
+            aggregates = set()
             for _id in args.jobid:
+                if _id[0:4] == 'agg-':
+                    aggregates.add(self._generate_aggregate_from_id(_id))
                 try:
-                    if self.open_job(id=_id):
-                        jobs.add(_id)
-                except KeyError as error:
-                    # TODO: The below commented code is to be included when we
-                    # introduce actual aggregation.
-                    # if "agg-" == id[0:4]:
-                    #     jobs.add(id)
-                    raise LookupError("Did not find job with id {}.".format(error))
+                    aggregates.add((self.open_job(id=_id),))
+                except KeyError:
+                    raise LookupError(f'Did not find job with id {_id}.')
 
-            self._verify_aggregate_project(deepcopy(jobs))
+            self._verify_aggregate_project(aggregates)
         else:
             # No specific jobs selected by the user so accept all the jobs.
             # See ``_verify_job_aggregate_via_CLI`` for more details.
-            jobs = None
+            aggregates = None
 
         try:
             try:
@@ -3858,37 +3882,27 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         except KeyError:
             raise KeyError("Unknown operation '{}'.".format(args.operation))
 
-        for job in self.aggregates[args.operation]:
-            if self._verify_job_aggregate_via_CLI(job, jobs):
-                operation_function(*job)
-                if jobs is not None:
-                    break
+        for aggregate in self.aggregates[args.operation]:
+            if self._verify_job_aggregate_via_CLI(aggregate, aggregates):
+                operation_function(*aggregate)
 
     def _select_jobs_from_args(self, args):
         "Select jobs with the given command line arguments ('-j/-f/--doc-filter')."
-        # TODO: This method needs to change the way it behave in #336.
-        # As we're storing aggregates while initializing the FlowProject instance
-        # This method must return the job-id/aggregate-id (`agg-hash(tuple(map(str, jobs)))`)
-        # We will then compare whether this is associated with the particular JobOperation
-        # instance or not.
         if args.job_id and (args.filter or args.doc_filter):
             raise ValueError(
                 "Cannot provide both -j/--job-id and -f/--filter or --doc-filter in combination.")
 
         if args.job_id:
-            jobs = set()  # set in order to avoid duplicate ids
+            aggregate = set()  # set in order to avoid duplicate ids
             for id in args.job_id:
+                if id[0:4] == 'agg':
+                    aggregate.add(self._generate_aggregate_from_id(id))
+                    continue
                 try:
-                    if self.open_job(id=id):
-                        jobs.add(id)
+                    aggregate.add((self.open_job(id=id),))
                 except KeyError as error:
-                    # TODO: The below commented code is to be included when we
-                    # introduce actual aggregation.
-                    # if "agg-" == id[0:4]:
-                    #     jobs.add(id)
-                    # else:
                     raise LookupError("Did not find job with id {}.".format(error))
-            return list(jobs)
+            return list(aggregate)
         elif args.filter or args.doc_filter:
             filter_ = parse_filter_arg(args.filter)
             doc_filter = parse_filter_arg(args.doc_filter)

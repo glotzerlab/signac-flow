@@ -20,6 +20,7 @@ from functools import partial
 import signac
 import flow
 from flow import FlowProject, cmd, with_job, directives
+from flow import generate_hashed_aggregates
 from flow.scheduling.base import Scheduler
 from flow.scheduling.base import ClusterJob
 from flow.scheduling.base import JobStatus
@@ -144,6 +145,7 @@ class TestProjectBase():
                 project.open_job(dict(a=a, b=b)).init()
                 project.open_job(dict(a=dict(a=a), b=b)).init()
         project._entrypoint = self.entrypoint
+        project.register_aggregates()
         return project
 
 
@@ -164,6 +166,7 @@ class TestProjectStatusPerformance(TestProjectBase):
         project = self.project_class.get_project(root=self._tmp_dir.name)
         for i in range(1000):
             project.open_job(dict(i=i)).init()
+        project.register_aggregates()
         return project
 
     @pytest.mark.skipif(signac.__version__ < '1.3.0',
@@ -176,13 +179,14 @@ class TestProjectStatusPerformance(TestProjectBase):
         import timeit
 
         project = self.mock_project()
-
+        print('asgsg')
         MockScheduler.reset()
 
         time = timeit.timeit(
-            lambda: project._fetch_status(project, StringIO(),
+            lambda: project._fetch_status(None, project, StringIO(),
                                           ignore_errors=False), number=10)
 
+        print(time)
         assert time < 10
         MockScheduler.reset()
 
@@ -431,7 +435,7 @@ class TestProjectClass(TestProjectBase):
         project = self.mock_project(A)
         for job in project:
             job.doc.np = 3
-            for next_op in project._next_operations((job,)):
+            for next_op in project._next_operations([(job,)]):
                 assert 'mpirun -np 3 python' in next_op.cmd
             break
 
@@ -450,20 +454,20 @@ class TestProjectClass(TestProjectBase):
 
         # test setting neither nranks nor omp_num_threads
         for job in project:
-            for next_op in project._next_operations((job,)):
+            for next_op in project._next_operations([(job,)]):
                 assert next_op.directives['np'] == 1
 
         # test only setting nranks
         for i, job in enumerate(project):
             job.doc.nranks = i+1
-            for next_op in project._next_operations((job,)):
+            for next_op in project._next_operations([(job,)]):
                 assert next_op.directives['np'] == next_op.directives['nranks']
             del job.doc['nranks']
 
         # test only setting omp_num_threads
         for i, job in enumerate(project):
             job.doc.omp_num_threads = i+1
-            for next_op in project._next_operations((job,)):
+            for next_op in project._next_operations([(job,)]):
                 assert next_op.directives['np'] == next_op.directives['omp_num_threads']
             del job.doc['omp_num_threads']
 
@@ -472,7 +476,7 @@ class TestProjectClass(TestProjectBase):
             job.doc.omp_num_threads = i+1
             job.doc.nranks = i % 3 + 1
             expected_np = (i + 1) * (i % 3 + 1)
-            for next_op in project._next_operations((job,)):
+            for next_op in project._next_operations([(job,)]):
                 assert next_op.directives['np'] == expected_np
 
     def test_copy_conditions(self):
@@ -596,7 +600,7 @@ class TestProject(TestProjectBase):
         project = self.mock_project()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
         for job in project:
-            for i, op in enumerate(project._next_operations((job,))):
+            for i, op in enumerate(project._next_operations([(job,)])):
                 assert op._jobs == (job,)
                 if job in even_jobs:
                     assert op.name == ['op1', 'op2', 'op3'][i]
@@ -610,7 +614,7 @@ class TestProject(TestProjectBase):
             status = project.get_job_status(job)
             assert status['job_id'] == job.get_id()
             assert len(status['operations']) == len(project.operations)
-            for op in project._next_operations((job,)):
+            for op in project._next_operations([(job,)]):
                 assert op.name in status['operations']
                 op_status = status['operations'][op.name]
                 assert op_status['eligible'] == project.operations[op.name]._eligible((job,))
@@ -660,7 +664,7 @@ class TestProject(TestProjectBase):
     def test_script(self):
         project = self.mock_project()
         for job in project:
-            script = project._script(project._next_operations((job,)))
+            script = project._script(project._next_operations([(job,)]))
             if job.sp.b % 2 == 0:
                 assert str(job) in script
                 assert 'echo "hello"' in script
@@ -680,7 +684,7 @@ class TestProject(TestProjectBase):
             file.write("THIS IS A CUSTOM SCRIPT!\n")
             file.write("{% endblock %}\n")
         for job in project:
-            script = project._script(project._next_operations((job,)))
+            script = project._script(project._next_operations([(job,)]))
             assert "THIS IS A CUSTOM SCRIPT" in script
             if job.sp.b % 2 == 0:
                 assert str(job) in script
@@ -735,15 +739,15 @@ class TestExecutionProject(TestProjectBase):
 
     def test_pending_operations_order(self):
         # The execution order of local runs is internally assumed to be
-        # 'by-aggregate' by default. A failure of this unit tests means that
-        # a 'by-aggregate' order must be implemented explicitly within the
+        # 'by-op' by default. A failure of this unit tests means that
+        # a 'by-op' order must be implemented explicitly within the
         # FlowProject.run() function.
         project = self.mock_project()
-        ops = list(project._get_pending_operations(self.project.find_jobs()))
+        ops = list(project._get_pending_operations())
         # The length of the list of operations grouped by job is equal
         # to the length of its set if and only if the operations are grouped
         # by job already:
-        jobs_order_none = [op for op, _ in groupby(ops, key=lambda op: op)]
+        jobs_order_none = [name for name, _ in groupby(ops, key=lambda op: op.name)]
         assert len(jobs_order_none) == len(set(jobs_order_none))
 
     def test_run(self, subtests):
@@ -755,7 +759,7 @@ class TestExecutionProject(TestProjectBase):
         def sort_key(op):
             return op.name, op._jobs[0].get_id()
 
-        for order in (None, 'none', 'cyclic', 'by-aggregate', 'random', sort_key):
+        for order in (None, 'none', 'cyclic', 'by-op', 'random', sort_key):
             for job in self.project.find_jobs():  # clear
                 job.remove()
             with subtests.test(order=order):
@@ -776,6 +780,7 @@ class TestExecutionProject(TestProjectBase):
 
     def test_run_with_selection(self):
         project = self.mock_project()
+        print(project)
         output = StringIO()
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
@@ -910,7 +915,7 @@ class TestExecutionProject(TestProjectBase):
         project = self.mock_project()
         operations = []
         for job in project:
-            operations.extend(project._next_operations((job,)))
+            operations.extend(project._next_operations([(job,)]))
         assert len(list(MockScheduler.jobs())) == 0
         cluster_job_id = project._store_bundled(operations)
         with redirect_stderr(StringIO()):
@@ -991,7 +996,7 @@ class TestExecutionProject(TestProjectBase):
             if job not in even_jobs:
                 continue
             list(project.labels(job))
-            next_op = list(project._next_operations((job,)))[0]
+            next_op = list(project._next_operations([(job,)]))[0]
             assert next_op.name == 'op1'
             assert next_op._jobs == (job,)
         with redirect_stderr(StringIO()):
@@ -999,7 +1004,7 @@ class TestExecutionProject(TestProjectBase):
         assert len(list(MockScheduler.jobs())) == num_jobs_submitted
 
         for job in project:
-            next_op = list(project._next_operations((job,)))[0]
+            next_op = list(project._next_operations([(job,)]))[0]
             assert next_op.get_status() == JobStatus.submitted
 
         MockScheduler.step()
@@ -1007,7 +1012,7 @@ class TestExecutionProject(TestProjectBase):
         project._fetch_scheduler_status(file=StringIO())
 
         for job in project:
-            next_op = list(project._next_operations((job,)))[0]
+            next_op = list(project._next_operations([(job,)]))[0]
             assert next_op.get_status() == JobStatus.queued
 
         MockScheduler.step()
@@ -1023,7 +1028,7 @@ class TestExecutionProject(TestProjectBase):
         project = self.mock_project()
         operations = []
         for job in project:
-            operations.extend(project._next_operations((job,)))
+            operations.extend(project._next_operations([(job,)]))
         assert len(list(MockScheduler.jobs())) == 0
         cluster_job_id = project._store_bundled(operations)
         stderr = StringIO()
@@ -1179,7 +1184,7 @@ class TestProjectMainInterface(TestProjectBase):
                             op_lines.append(next(lines))
                         except StopIteration:
                             continue
-                    for op in project._next_operations((job,)):
+                    for op in project._next_operations([(job,)]):
                         assert any(op.name in op_line for op_line in op_lines)
 
     def test_main_script(self):
@@ -1231,7 +1236,7 @@ class TestGroupProject(TestProjectBase):
         project = self.mock_project()
         # For run mode single operation groups
         for job in project:
-            job_ops = project._get_submission_operations((job,), dict())
+            job_ops = project._get_submission_operations([(job,)], dict())
             script = project._script(job_ops)
             if job.sp.b % 2 == 0:
                 assert str(job) in script
@@ -1540,6 +1545,7 @@ class TestAggregationProjectMainInterface(TestProjectBase):
         for i in range(30):
             project.open_job(dict(i=i)).init()
         project._entrypoint = self.entrypoint
+        project.register_aggregates()
         return project
 
     def switch_to_cwd(self):
@@ -1565,29 +1571,27 @@ class TestAggregationProjectMainInterface(TestProjectBase):
             print(error.output, file=sys.stderr)
             raise
 
-    def generate_job_ids(self, jobs, compressed=False):
-        # This method is used for the aggregate tests
+    def generate_str_jobop(self, jobs):
+        # This method is supposed to replicate the job representation of an
+        # _JobOperation instance
         jobs = list(jobs)
-        if compressed:
-            max_len = 3
-            min_len_unique_id = jobs[0]._project.min_len_unique_id()
-            if len(jobs) > max_len:
-                shown = list(jobs[:max_len-2]) + ['...'] + list(jobs[-1:])
-            else:
-                shown = jobs
-            return f"[#{len(jobs)}]" \
-                   f"({', '.join([str(element)[:min_len_unique_id] for element in shown])})"
+        max_len = 3
+        min_len_unique_id = jobs[0]._project.min_len_unique_id()
+        if len(jobs) > max_len:
+            shown = list(jobs[:max_len-2]) + ['...'] + list(jobs[-1:])
         else:
-            return ' '.join(map(str, jobs))
+            shown = jobs
+        return f"[#{len(jobs)}]" \
+               f"({', '.join([str(element)[:min_len_unique_id] for element in shown])})"
 
     def test_main_run(self):
         project = self.mock_project()
         assert len(project)
         for job in project:
             assert not job.doc.get('sum', False)
-        self.call_subcmd('run -o agg_op1 -j {}'.format(
-            self.generate_job_ids(project)
-        ))
+        self.call_subcmd(
+            f'run -o agg_op1 -j {generate_hashed_aggregates(project)}'
+        )
         sum = 0
         for job in project:
             sum += job.sp.i
@@ -1598,23 +1602,24 @@ class TestAggregationProjectMainInterface(TestProjectBase):
     def test_main_script(self):
         project = self.mock_project()
         assert len(project)
+        hashed_aggregate_id = generate_hashed_aggregates(project)
         script_output = self.call_subcmd(
-            'script -o agg_op1 -j {}'.format(self.generate_job_ids(project))
+            f'script -o agg_op1 -j {hashed_aggregate_id}'
         ).decode().splitlines()
-        assert self.generate_job_ids(project, compressed=True) in '\n'.join(script_output)
-        assert '-o agg_op1' in '\n'.join(script_output)
+        assert self.generate_str_jobop(project) in '\n'.join(script_output)
+        assert f'-o agg_op1 -j {hashed_aggregate_id}' in '\n'.join(script_output)
 
     def test_main_submit(self):
         project = self.mock_project()
         assert len(project)
         # Assert that correct output for group submission is given
-        job_ids = self.generate_job_ids(project)
+        hashed_aggregate_id = generate_hashed_aggregates(project)
         submit_output = self.call_subcmd(
-            'submit -j {} -o agg_op1 --pretend'.format(job_ids)
+            f'submit -o agg_op1 -j {hashed_aggregate_id} --pretend'
         ).decode().splitlines()
         output_string = '\n'.join(submit_output)
-        assert self.generate_job_ids(project, compressed=True) in output_string
-        assert 'run -o agg_op1 -j {}'.format(job_ids) in output_string
+        assert self.generate_str_jobop(project) in output_string
+        assert f'run -o agg_op1 -j {hashed_aggregate_id}' in output_string
 
 
 class TestGroupAggregationProjectMainInterface(TestProjectBase):
@@ -1629,6 +1634,7 @@ class TestGroupAggregationProjectMainInterface(TestProjectBase):
         for i in range(30):
             project.open_job(dict(i=i)).init()
         project._entrypoint = self.entrypoint
+        project.register_aggregates()
         return project
 
     def switch_to_cwd(self):
@@ -1654,20 +1660,18 @@ class TestGroupAggregationProjectMainInterface(TestProjectBase):
             print(error.output, file=sys.stderr)
             raise
 
-    def generate_job_ids(self, jobs, compressed=False):
-        # This method is used for the aggregate tests
+    def generate_str_jobop(self, jobs):
+        # This method is supposed to replicate the job representation of an
+        # _JobOperation instance
         jobs = list(jobs)
-        if compressed:
-            max_len = 3
-            min_len_unique_id = jobs[0]._project.min_len_unique_id()
-            if len(jobs) > max_len:
-                shown = list(jobs[:max_len-2]) + ['...'] + list(jobs[-1:])
-            else:
-                shown = jobs
-            return f"[#{len(jobs)}]" \
-                   f"({', '.join([str(element)[:min_len_unique_id] for element in shown])})"
+        max_len = 3
+        min_len_unique_id = jobs[0]._project.min_len_unique_id()
+        if len(jobs) > max_len:
+            shown = list(jobs[:max_len-2]) + ['...'] + list(jobs[-1:])
         else:
-            return ' '.join(map(str, jobs))
+            shown = jobs
+        return f"[#{len(jobs)}]" \
+               f"({', '.join([str(element)[:min_len_unique_id] for element in shown])})"
 
     def test_main_run(self):
         project = self.mock_project()
@@ -1675,9 +1679,7 @@ class TestGroupAggregationProjectMainInterface(TestProjectBase):
         for job in project:
             assert not job.doc.get('average', False)
             assert not job.doc.get('test3', False)
-        self.call_subcmd('run -o group_agg -j {}'.format(
-            self.generate_job_ids(project)
-        ))
+        self.call_subcmd(f'run -o group_agg -j {generate_hashed_aggregates(project)}')
         for job in project:
             assert job.doc.get('average', False)
             assert job.doc.get('test3', False)
@@ -1685,20 +1687,20 @@ class TestGroupAggregationProjectMainInterface(TestProjectBase):
     def test_main_script(self):
         project = self.mock_project()
         assert len(project)
+        hashed_aggregate_id = generate_hashed_aggregates(project)
         script_output = self.call_subcmd(
-            'script -o group_agg -j {}'.format(self.generate_job_ids(project))
+            f'script -o group_agg -j {hashed_aggregate_id}'
         ).decode().splitlines()
-        assert self.generate_job_ids(project, compressed=True) in '\n'.join(script_output)
-        assert '-o group_agg' in '\n'.join(script_output)
+        assert self.generate_str_jobop(project) in '\n'.join(script_output)
+        assert f'-o group_agg -j {hashed_aggregate_id}' in '\n'.join(script_output)
 
     def test_main_submit(self):
         project = self.mock_project()
         assert len(project)
-        # Assert that correct output for group submission is given
-        job_ids = self.generate_job_ids(project)
+        hashed_aggregate_id = generate_hashed_aggregates(project)
         submit_output = self.call_subcmd(
-            'submit -j {} -o group_agg --pretend'.format(job_ids)
+            f'submit -o group_agg -j {hashed_aggregate_id} --pretend'
         ).decode().splitlines()
         output_string = '\n'.join(submit_output)
-        assert self.generate_job_ids(project, compressed=True) in output_string
-        assert 'run -o group_agg -j {}'.format(job_ids) in output_string
+        assert self.generate_str_jobop(project) in output_string
+        assert f'run -o group_agg -j {hashed_aggregate_id}' in output_string

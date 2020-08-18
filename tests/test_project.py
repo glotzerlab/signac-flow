@@ -143,7 +143,7 @@ class TestProjectBase():
                 project.open_job(dict(a=a, b=b)).init()
                 project.open_job(dict(a=dict(a=a), b=b)).init()
         project._entrypoint = self.entrypoint
-        project.generate_aggregates()
+        project.register_aggregates()
         return project
 
 
@@ -164,7 +164,7 @@ class TestProjectStatusPerformance(TestProjectBase):
         project = self.project_class.get_project(root=self._tmp_dir.name)
         for i in range(1000):
             project.open_job(dict(i=i)).init()
-        project.generate_aggregates()
+        project.register_aggregates()
         return project
 
     def test_status_performance(self):
@@ -964,14 +964,12 @@ class TestExecutionProject(TestProjectBase):
         with redirect_stderr(StringIO()):
             # Initial submission
             project.submit()
-            print(len(list(MockScheduler.jobs())))
             assert len(list(MockScheduler.jobs())) == num_jobs_submitted
 
             # Resubmit a bunch of times:
             for i in range(1, self.expected_number_of_steps + 3):
                 MockScheduler.step()
                 project.submit()
-                print(len(list(MockScheduler.jobs())))
                 if len(list(MockScheduler.jobs())) == 0:
                     break    # break when there are no jobs left
 

@@ -236,17 +236,22 @@ def _make_bundles(operations, size=None):
             break
 
 
-@deprecated(deprecated_in="0.9", removed_in="0.11", current_version=__version__)
-def make_bundles(operations, size=None):
-    """Utility function for the generation of bundles.
+def generate_hashed_aggregates(jobs):
+    """"Generate hashed id for an aggregate of jobs
 
-    This function splits an iterable of operations into equally
-    sized bundles and a possibly smaller final bundle.
+    :param jobs:
+        The signac job handles
+    :type jobs:
+        tuple
     """
-    return _make_bundles(operations, size)
+    if len(jobs) == 1:
+        return str(jobs[0])  # Return job id as it's already unique
+
+    blob = ''.join((job.id for job in jobs))
+    return f'agg-{md5(blob.encode()).hexdigest()}'
 
 
-class JobOperation(object):
+class _JobOperation(object):
     """This class represents the information needed to execute one group for one job.
 
     The execution or submission of a :py:class:`FlowGroup` uses a passed in command
@@ -777,7 +782,8 @@ class FlowGroup(object):
     def _submit_cmd(self, entrypoint, ignore_conditions, job=None):
         entrypoint = self._determine_entrypoint(entrypoint, dict(), job)
         cmd = "{} run -o {}".format(entrypoint, self.name)
-        cmd = cmd if job is None else cmd + ' -j {}'.format(job)
+        hashed_id = generate_hashed_aggregates(jobs) if jobs is not None else ''
+        cmd = cmd if jobs is None else cmd + f' -j {hashed_id}'
         cmd = cmd if self.options is None else cmd + ' ' + self.options
         if ignore_conditions != IgnoreConditions.NONE:
             return cmd.strip() + ' --ignore-conditions=' + str(ignore_conditions)
@@ -788,8 +794,9 @@ class FlowGroup(object):
         if isinstance(operation, FlowCmdOperation):
             return operation(job).lstrip()
         else:
-            entrypoint = self._determine_entrypoint(entrypoint, directives, job)
-            return '{} exec {} {}'.format(entrypoint, operation_name, job).lstrip()
+            entrypoint = self._determine_entrypoint(entrypoint, directives, jobs)
+            hashed_id = generate_hashed_aggregates(jobs)
+            return f"{entrypoint} exec {operation_name} {hashed_id}".lstrip()
 
     def __iter__(self):
         yield from self.operations.values()
@@ -2783,7 +2790,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if jobs is None:
             return
 
-        jobs_ids = list(map(self.generate_hashed_aggregates, jobs))
+        jobs_ids = list(map(generate_hashed_aggregates, jobs))
 
         for id in jobs_ids:
             # jobs is a list converted from a set so we can
@@ -2810,17 +2817,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             return False
 
         return True
-
-    def generate_hashed_aggregates(self, jobs):
-        """"Generate hashed id for an aggregate of jobs
-
-        :param jobs:
-            The signac job handles
-        :type jobs:
-            tuple
-        """
-        blob = ''.join((job.id for job in jobs))
-        return f'agg-{md5(blob.encode()).hexdigest()}'
 
     @contextlib.contextmanager
     def _potentially_buffered(self):
@@ -3623,7 +3619,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             self._aggregates[name] = []
             for job in self:
                 self._aggregates[name].append((job,))
-                self._aggregates_ids[self.generate_hashed_aggregates((job,))] = (job,)
+                self._aggregates_ids[generate_hashed_aggregates((job,))] = (job,)
 
     @classmethod
     def make_group(cls, name, options=""):

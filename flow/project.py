@@ -1410,7 +1410,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Register all aggregates which are created for this project
         self._aggregates = dict()
         self._aggregates_ids = dict()
-        self.generate_aggregates()
+        self.register_aggregates()
 
     def _setup_template_environment(self):
         """Setup the jinja2 template environment.
@@ -3005,10 +3005,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type jobs:
             tuple
         """
-        blob = json.dumps([job.id for job in jobs], sort_keys=True)
-        m = md5()
-        m.update(blob.encode())
-        return f'agg-{m.hexdigest()}'
+        blob = ''.join((job.id for job in jobs))
+        return f'agg-{md5(blob.encode()).hexdigest()}'
 
     @contextlib.contextmanager
     def _potentially_buffered(self):
@@ -3873,7 +3871,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             else:
                 self._operations[name] = FlowOperation(op_func=func, **params)
 
-    def generate_aggregates(self):
+    def register_aggregates(self):
         """Generate aggregates for every operation or group in a FlowProject"""
         for name in self._groups:
             # TODO: The logic needs to get changed in #336 from the
@@ -4011,10 +4009,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 error = error.__cause__  # Always show the user traceback cause.
             traceback.print_exception(type(error), error, error.__traceback__)
         else:
-            if aggregates is None:
-                length_jobs = len(self)
-            else:
-                length_jobs = len(aggregates)
+            length_jobs = len(self) if aggregates is None else len(aggregates)
             # Use small offset to account for overhead with few jobs
             delta_t = (time.time() - start - 0.5) / max(length_jobs, 1)
             config_key = 'status_performance_warn_threshold'
@@ -4112,7 +4107,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if args.jobid:
             aggregates = set()
             for _id in args.jobid:
-                if _id[0:4] == 'agg-':
+                if _id.startswith('agg'):
                     aggregates.add(self._generate_aggregate_from_id(_id))
                 try:
                     aggregates.add((self.open_job(id=_id),))
@@ -4151,7 +4146,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if args.job_id:
             aggregate = set()  # set in order to avoid duplicate ids
             for id in args.job_id:
-                if id[0:4] == 'agg':
+                if id.startswith('agg'):
                     aggregate.add(self._generate_aggregate_from_id(id))
                     continue
                 try:

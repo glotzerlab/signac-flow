@@ -778,7 +778,6 @@ class TestExecutionProject(TestProjectBase):
 
     def test_run_with_selection(self):
         project = self.mock_project()
-        print(project)
         output = StringIO()
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):

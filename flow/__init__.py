@@ -13,6 +13,7 @@ from . import scheduling
 from . import errors
 from . import testing
 from .aggregate import Aggregate
+from .aggregate import get_aggregate_id
 from .project import IgnoreConditions
 from .project import FlowProject
 from .project import JobOperation
@@ -20,7 +21,6 @@ from .project import label
 from .project import classlabel
 from .project import staticlabel
 from .project import make_aggregates
-from .project import generate_hashed_aggregates
 from .operations import cmd
 from .operations import directives
 from .operations import run
@@ -39,7 +39,7 @@ if get_config_value('import_packaged_environments', default=True):
 __all__ = [
     'Aggregate',
     'make_aggregates',
-    'generate_hashed_aggregates',
+    'get_aggregate_id',
     'environment',
     'scheduling',
     'errors',

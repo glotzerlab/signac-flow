@@ -20,7 +20,7 @@ from functools import partial
 import signac
 import flow
 from flow import FlowProject, cmd, with_job, directives
-from flow import generate_hashed_aggregates
+from flow import get_aggregate_id
 from flow.scheduling.base import Scheduler
 from flow.scheduling.base import ClusterJob
 from flow.scheduling.base import JobStatus
@@ -780,7 +780,6 @@ class TestExecutionProject(TestProjectBase):
 
     def test_run_with_selection(self):
         project = self.mock_project()
-        print(project)
         output = StringIO()
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
@@ -1590,7 +1589,7 @@ class TestAggregationProjectMainInterface(TestProjectBase):
         for job in project:
             assert not job.doc.get('sum', False)
         self.call_subcmd(
-            f'run -o agg_op1 -j {generate_hashed_aggregates(project)}'
+            f'run -o agg_op1 -j {get_aggregate_id(project)}'
         )
         sum = 0
         for job in project:
@@ -1602,7 +1601,7 @@ class TestAggregationProjectMainInterface(TestProjectBase):
     def test_main_script(self):
         project = self.mock_project()
         assert len(project)
-        hashed_aggregate_id = generate_hashed_aggregates(project)
+        hashed_aggregate_id = get_aggregate_id(project)
         script_output = self.call_subcmd(
             f'script -o agg_op1 -j {hashed_aggregate_id}'
         ).decode().splitlines()
@@ -1613,7 +1612,7 @@ class TestAggregationProjectMainInterface(TestProjectBase):
         project = self.mock_project()
         assert len(project)
         # Assert that correct output for group submission is given
-        hashed_aggregate_id = generate_hashed_aggregates(project)
+        hashed_aggregate_id = get_aggregate_id(project)
         submit_output = self.call_subcmd(
             f'submit -o agg_op1 -j {hashed_aggregate_id} --pretend'
         ).decode().splitlines()
@@ -1679,7 +1678,7 @@ class TestGroupAggregationProjectMainInterface(TestProjectBase):
         for job in project:
             assert not job.doc.get('average', False)
             assert not job.doc.get('test3', False)
-        self.call_subcmd(f'run -o group_agg -j {generate_hashed_aggregates(project)}')
+        self.call_subcmd(f'run -o group_agg -j {get_aggregate_id(project)}')
         for job in project:
             assert job.doc.get('average', False)
             assert job.doc.get('test3', False)
@@ -1687,7 +1686,7 @@ class TestGroupAggregationProjectMainInterface(TestProjectBase):
     def test_main_script(self):
         project = self.mock_project()
         assert len(project)
-        hashed_aggregate_id = generate_hashed_aggregates(project)
+        hashed_aggregate_id = get_aggregate_id(project)
         script_output = self.call_subcmd(
             f'script -o group_agg -j {hashed_aggregate_id}'
         ).decode().splitlines()
@@ -1697,7 +1696,7 @@ class TestGroupAggregationProjectMainInterface(TestProjectBase):
     def test_main_submit(self):
         project = self.mock_project()
         assert len(project)
-        hashed_aggregate_id = generate_hashed_aggregates(project)
+        hashed_aggregate_id = get_aggregate_id(project)
         submit_output = self.call_subcmd(
             f'submit -o group_agg -j {hashed_aggregate_id} --pretend'
         ).decode().splitlines()

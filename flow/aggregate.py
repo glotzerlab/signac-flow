@@ -2,6 +2,7 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 from collections.abc import Iterable
+from hashlib import md5
 from itertools import groupby
 from itertools import zip_longest
 from tqdm import tqdm
@@ -188,8 +189,27 @@ class MakeAggregate(Aggregate):
                         if job not in project:
                             raise ValueError(f'The signac job {str(job)} not found in {project}')
                     filter_aggregate.append(job)
-                nested_aggregates.append(tuple(filter_aggregate))
+                filter_aggregate = tuple(filter_aggregate)
+                if project is not None:
+                    project._aggregates_ids[get_aggregate_id(filter_aggregate)] = \
+                        filter_aggregate
+                nested_aggregates.append(filter_aggregate)
             except Exception:
                 raise ValueError("Invalid aggregator function provided by "
                                  "the user.")
         return nested_aggregates
+
+
+def get_aggregate_id(jobs):
+    """"Generate hashed id for an aggregate of jobs
+
+    :param jobs:
+        The signac job handles
+    :type jobs:
+        tuple
+    """
+    if len(jobs) == 1:
+        return str(jobs[0])  # Return job id as it's already unique
+
+    blob = ''.join((job.id for job in jobs))
+    return f'agg-{md5(blob.encode()).hexdigest()}'

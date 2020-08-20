@@ -2713,9 +2713,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _generate_operations(self, cmd, jobs, requires=None):
         "Generate job-operations for a given 'direct' command."
         for job in jobs:
-            if len(job) > 1:
-                continue
-            elif requires and set(requires).difference(self.labels(*job)):
+            if(
+                len(job) > 1 or
+                requires and set(requires).difference(self.labels(*job))
+            ):
                 continue
             cmd_ = cmd.format(job=job[0])
             yield _JobOperation(name=cmd_.replace(' ', '-'), cmd=cmd_, jobs=job)

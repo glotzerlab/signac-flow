@@ -179,7 +179,7 @@ class TestProjectStatusPerformance(TestProjectBase):
         import timeit
 
         project = self.mock_project()
-        print('asgsg')
+
         MockScheduler.reset()
 
         time = timeit.timeit(

@@ -2457,6 +2457,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                      status_parallelization, aggregates)
             profiling_results = None
 
+        # print(tmp)
+
         operations_errors = {s['_operations_error'] for s in tmp}
         labels_errors = {s['_labels_error'] for s in tmp}
         errors = list(filter(None, operations_errors.union(labels_errors)))
@@ -2571,15 +2573,18 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 context['operation_status_symbols'] = OPERATION_STATUS_SYMBOLS
 
         def _add_dummy_operation(job):
-            job['operations'][''] = {
+            job['operations'][''] = [{
                 'completed': False,
                 'eligible': False,
-                'scheduler_status': JobStatus.dummy}
+                'scheduler_status': JobStatus.dummy}]
 
         for job in context['jobs']:
-            has_eligible_ops = True
+            # If a job has no operation eligible then we add a dummy operation
+            # Where we show an empty list of operations
             for a in job['operations'].values():
                 has_eligible_ops = any([b['eligible'] for b in a])
+                if has_eligible_ops:
+                    break
             if not has_eligible_ops and not context['all_ops']:
                 _add_dummy_operation(job)
 

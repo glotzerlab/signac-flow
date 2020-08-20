@@ -1562,7 +1562,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             return operations[0].id
         else:
             h = '.'.join(op.id for op in operations)
-            bid = '{}/bundle/{}'.format(self, sha1(h.encode('utf-8')).hexdigest())
+            sep = getattr(self._environment, 'JOB_ID_SEPARATOR', '/')
+            bid = f"{self}{sep}bundle{sep}{sha1(h.encode('utf-8')).hexdigest()}"
             fn_bundle = self._fn_bundle(bid)
             os.makedirs(os.path.dirname(fn_bundle), exist_ok=True)
             with open(fn_bundle, 'w') as file:
@@ -1572,8 +1573,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _expand_bundled_jobs(self, scheduler_jobs):
         "Expand jobs which were submitted as part of a bundle."
+        sep = getattr(self._environment, 'JOB_ID_SEPARATOR', '/')
         for job in scheduler_jobs:
-            if job.name().startswith('{}/bundle/'.format(self)):
+            if job.name().startswith(f'{self}{sep}bundle{sep}'):
                 with open(self._fn_bundle(job.name())) as file:
                     for line in file:
                         yield ClusterJob(line.strip(), job.status())

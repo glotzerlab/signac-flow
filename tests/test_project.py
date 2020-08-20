@@ -47,10 +47,14 @@ def suspend_logging():
 class MockScheduler(Scheduler):
     _jobs = {}  # needs to be singleton
     _scripts = {}
+    _invalid_chars = []
 
     @classmethod
     def jobs(cls):
         for job in cls._jobs.values():
+            for char in cls._invalid_chars:
+                if char in job._id():
+                    raise RuntimeError(f"Invalid character in job id: {char}")
             yield job
 
     @classmethod
@@ -1391,7 +1395,62 @@ class TestGroupExecutionProject(TestProjectBase):
             project.submit_operations(_id=cluster_job_id, operations=operations)
         assert len(list(MockScheduler.jobs())) == 1
 
+    def test_submit_groups_invalid_char_with_error(self, monkeypatch):
+        monkeypatch.setattr(MockScheduler, '_invalid_chars', ['/'])
+        MockScheduler.reset()
+        project = self.mock_project()
+        operations = [project.groups['group1']._create_submission_job_operation(
+            project._entrypoint, dict(), job) for job in project]
+        assert len(list(MockScheduler.jobs())) == 0
+        cluster_job_id = project._store_bundled(operations)
+        with redirect_stderr(StringIO()):
+            project.submit_operations(_id=cluster_job_id, operations=operations)
+        with pytest.raises(RuntimeError):
+            assert len(list(MockScheduler.jobs())) == 1
+        MockScheduler.reset()
+
+    def test_submit_groups_invalid_char_avoid_error(self, monkeypatch):
+        monkeypatch.setattr(MockScheduler, '_invalid_chars', ['/'])
+        monkeypatch.setattr(MockEnvironment, 'JOB_ID_SEPARATOR', '-', raising=False)
+
+        MockScheduler.reset()
+        project = self.mock_project()
+        operations = [project.groups['group1']._create_submission_job_operation(
+            project._entrypoint, dict(), job) for job in project]
+        assert len(list(MockScheduler.jobs())) == 0
+        cluster_job_id = project._store_bundled(operations)
+        with redirect_stderr(StringIO()):
+            project.submit_operations(_id=cluster_job_id, operations=operations)
+        with pytest.raises(RuntimeError):
+            assert len(list(MockScheduler.jobs())) == 1
+        MockScheduler.reset()
+
     def test_submit(self):
+        MockScheduler.reset()
+        project = self.mock_project()
+        assert len(list(MockScheduler.jobs())) == 0
+        with redirect_stderr(StringIO()):
+            project.submit(names=['group1', 'group2'])
+        num_jobs_submitted = 2 * len(project)
+        assert len(list(MockScheduler.jobs())) == num_jobs_submitted
+        MockScheduler.reset()
+
+    def test_submit_invalid_char_with_error(self, monkeypatch):
+        monkeypatch.setattr(MockScheduler, '_invalid_chars', ['/'])
+        MockScheduler.reset()
+        project = self.mock_project()
+        assert len(list(MockScheduler.jobs())) == 0
+        with redirect_stderr(StringIO()):
+            project.submit(names=['group1', 'group2'])
+        num_jobs_submitted = 2 * len(project)
+        with pytest.raises(RuntimeError):
+            assert len(list(MockScheduler.jobs())) == num_jobs_submitted
+        MockScheduler.reset()
+
+    def test_submit_invalid_char_avoid_error(self, monkeypatch):
+        monkeypatch.setattr(MockScheduler, '_invalid_chars', ['/'])
+        monkeypatch.setattr(MockEnvironment, 'JOB_ID_SEPARATOR', '-', raising=False)
+
         MockScheduler.reset()
         project = self.mock_project()
         assert len(list(MockScheduler.jobs())) == 0

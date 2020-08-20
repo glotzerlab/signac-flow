@@ -247,7 +247,7 @@ def get_aggregate_id(jobs):
     if len(jobs) == 1:
         return str(jobs[0])  # Return job id as it's already unique
 
-    blob = ''.join((job.id for job in jobs))
+    blob = ''.join((job.get_id() for job in jobs))
     return f'agg-{md5(blob.encode()).hexdigest()}'
 
 
@@ -2561,6 +2561,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :param order:
             Specify the order of operations, possible values are:
                 * 'none' or None (no specific order)
+                * 'by-job' (operations are grouped by job)
                 * 'by-op' (operations are grouped by operation)
                 * 'cyclic' (order operations cyclic by job)
                 * 'random' (shuffle the execution order randomly)
@@ -2677,21 +2678,32 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if not operations:
                 break   # No more pending operations or execution limits reached.
 
+            def key_func_by_job(op):
+                # A clean way to implement the 'by-job' order is to sort aggregates by
+                # ids and the group them
+                return get_aggregate_id(op._jobs)
+
             # Optionally re-order operations for execution if order argument is provided:
             if callable(order):
                 operations = list(sorted(operations, key=order))
             elif order == 'cyclic':
                 groups = [list(group)
-                          for _, group in groupby(operations, key=lambda op: op.job)]
+                          for _, group in groupby(sorted(operations, key=key_func_by_job),
+                                                  key=key_func_by_job)]
                 operations = list(roundrobin(*groups))
             elif order == 'random':
                 random.shuffle(operations)
+            elif order == 'by-job':
+                groups = [list(group)
+                          for _, group in groupby(sorted(operations, key=key_func_by_job),
+                                                  key=key_func_by_job)]
+                operations = list(roundrobin(*groups))
             elif order is None or order in ('none', 'by-op'):
                 pass  # by-op is the default order
             else:
                 raise ValueError(
                     "Invalid value for the 'order' argument, valid arguments are "
-                    "'none', 'by-op', 'cyclic', 'random', None, or a callable.")
+                    "'none', 'by-op', 'by-job', 'cyclic', 'random', None, or a callable.")
 
             logger.info(
                 "Executing {} operation(s) (Pass # {:02d})...".format(len(operations), i_pass))
@@ -4021,7 +4033,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         execution_group.add_argument(
             '--order',
             type=str,
-            choices=['none', 'by-op', 'cyclic', 'random'],
+            choices=['none', 'by-op', 'by-job', 'cyclic', 'random'],
             default=None,
             help="Specify the execution order of operations for each execution pass.")
         execution_group.add_argument(

@@ -759,7 +759,7 @@ class TestExecutionProject(TestProjectBase):
         def sort_key(op):
             return op.name, op._jobs[0].get_id()
 
-        for order in (None, 'none', 'cyclic', 'by-op', 'random', sort_key):
+        for order in (None, 'none', 'cyclic', 'by-job', 'by-op', 'random', sort_key):
             for job in self.project.find_jobs():  # clear
                 job.remove()
             with subtests.test(order=order):

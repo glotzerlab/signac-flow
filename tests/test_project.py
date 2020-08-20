@@ -54,7 +54,7 @@ class MockScheduler(Scheduler):
         for job in cls._jobs.values():
             for char in cls._invalid_chars:
                 if char in job._id():
-                    raise RuntimeError(f"Invalid character in job id: {char}")
+                    raise RuntimeError("Invalid character in job id: " + char)
             yield job
 
     @classmethod

@@ -211,5 +211,5 @@ def get_aggregate_id(jobs):
     if len(jobs) == 1:
         return str(jobs[0])  # Return job id as it's already unique
 
-    blob = ''.join((job.id for job in jobs))
+    blob = ''.join((job.get_id() for job in jobs))
     return f'agg-{md5(blob.encode()).hexdigest()}'

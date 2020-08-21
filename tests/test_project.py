@@ -179,7 +179,6 @@ class TestProjectStatusPerformance(TestProjectBase):
             lambda: project._fetch_status(None, project, StringIO(),
                                           ignore_errors=False), number=10)
 
-        print(time)
         assert time < 10
         MockScheduler.reset()
 

@@ -28,6 +28,7 @@ from copy import deepcopy
 from itertools import islice
 from itertools import count
 from itertools import groupby
+from itertools import chain
 from hashlib import md5
 from hashlib import sha1
 import multiprocessing
@@ -1656,12 +1657,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         starting_dict = functools.partial(dict, scheduler_status=JobStatus.unknown)
         status_dict = defaultdict(starting_dict)
         for group in self._groups.values():
-            for aggregate in self.aggregates[group.name]:
-                if aggregate != jobs:
-                    continue
-                completed = group._complete(aggregate)
-                eligible = False if completed else group._eligible(aggregate)
-                scheduler_status = cached_status.get(group._generate_id(aggregate),
+            if jobs in self.aggregates[group.name]:
+                completed = group._complete(jobs)
+                eligible = False if completed else group._eligible(jobs)
+                scheduler_status = cached_status.get(group._generate_id(jobs),
                                                      JobStatus.unknown)
                 for operation in group.operations:
                     if scheduler_status >= status_dict[operation]['scheduler_status']:
@@ -1716,9 +1715,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 else:
                     raise
 
-        # if len(distinct_jobs) == 1:  # Doesn't break the current API
-        #     result['labels'] = result['labels'][str(distinct_jobs[0])]
-        #     result['_labels_error'] = result['_labels_error'][str(job)]
+        if len(distinct_jobs) == 1:  # Doesn't break the current API
+            result['labels'] = result['labels'][str(distinct_jobs[0])]
+            result['_labels_error'] = result['_labels_error'][str(job)]
 
         return result
 
@@ -1773,8 +1772,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         for job in tqdm(aggregates, desc="Collecting job status info for operation {}"
                         "".format(group.name), leave=False):
-            if errors.get(str(job[0]), None) is None:
-                errors[str(job[0])] = None
+            if errors.get(get_aggregate_id(job), None) is None:
+                errors[get_aggregate_id(job)] = None
             try:
                 _id = group._generate_id(job)
                 completed = group._complete(job)
@@ -1795,15 +1794,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         'completed': False
                         }
                 if ignore_errors:
-                    if errors[str(job[0])] is None:
-                        errors[str(job[0])] = str(error)
+                    if errors[get_aggregate_id(job)] is None:
+                        errors[get_aggregate_id(job)] = str(error)
                     else:
-                        errors[str(job[0])] += '\n' + str(error)
+                        errors[get_aggregate_id(job)] += '\n' + str(error)
                 else:
                     raise
 
         result['aggregate_details'] = status_dict
-        result['_operation_error_per_job'] = errors
+        result['_operation_error_per_aggregate'] = errors
         return result
 
     def _get_job_labels(self, job, ignore_errors=False):
@@ -1887,19 +1886,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         singleton_groups = [op for op in self.operations]
 
-        def _generate_results_with_tqdm(iterable, map=map, desc=None, len_itr=None):
-            if iterable == 'groups':
-                return list(tqdm(
-                    iterable=map(_get_group_status, singleton_groups),
-                    desc="Collecting operation status",
-                    total=len(singleton_groups), file=err))
-            elif iterable == 'job-labels':
-                return list(tqdm(
-                    iterable=map(_get_job_labels, distinct_jobs),
-                    desc="Collecting job label info", total=len(distinct_jobs), file=err))
-            else:
-                return list(tqdm(
-                    iterable=iterable, desc=desc, total=len_itr, file=err))
+        def _generate_results_with_tqdm(iterable, desc):
+            return list(tqdm(
+                iterable=iterable, desc=desc,
+                total=len(iterable), file=err))
 
         with self._potentially_buffered():
             try:
@@ -1964,7 +1954,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             results_entry['job_id'] = str(job)
             results_entry['operations'] = dict()
             results_entry['labels'] = list()
-            results_entry['_operations_error'] = list()
+            results_entry['_operations_error'] = None
             results_entry['_labels_error'] = list()
             results.append(results_entry)
             index[str(job)] = i
@@ -1975,8 +1965,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 if not self._verify_aggregate_in_jobs(aggregate, jobs):
                     continue
                 results[index[id]]['operations'][op_result['operation_name']] = aggregates_status
-                results[index[id]]['_operations_error'] = \
-                    op_result['_operation_error_per_job'].get(id, None)
+                error = op_result['_operation_error_per_aggregate'].get(id, None)
+                if error is None:
+                    continue
+                else:
+                    for job in aggregate:
+                        if results[index[str(job)]]['_operations_error'] is None:
+                            results[index[str(job)]]['_operations_error'] = error
+                        else:
+                            results[index[str(job)]]['_operations_error'] += '\n' + error
         for label_result in label_results:
             results[index[label_result['job_id']]]['labels'] = label_result['labels']
             results[index[label_result['job_id']]]['_labels_error'] = label_result['_labels_error']
@@ -2715,7 +2712,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 groups = [list(group)
                           for _, group in groupby(sorted(operations, key=key_func_by_job),
                                                   key=key_func_by_job)]
-                operations = list(roundrobin(*groups))
+                operations = list(chain(*groups))
             elif order is None or order in ('none', 'by-op'):
                 pass  # by-op is the default order
             else:
@@ -2798,7 +2795,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         for aggregate in aggregates:
             aggregate_id = get_aggregate_id(aggregate)
-            if not self._aggregates_ids.get(aggregate_id, False):
+            if aggregate_id not in self._aggregates_ids:
                 raise LookupError(f"Did not find the aggregate {aggregate} having "
                                   f"id {aggregate_id} in the project")
 

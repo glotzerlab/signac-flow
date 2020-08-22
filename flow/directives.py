@@ -72,8 +72,8 @@ class _DirectivesItem:
         value : any
             The value to be validated by the :class:`~._DirectivesItem`. Accepted
             values depend on the given instance. All `~._DirectivesItem`
-            instances support lazily validating callables of a single job that
-            return an acceptable value for the given `~._DirectivesItem`
+            instances support lazily validating callables of single (or multiple) jobs
+            that return an acceptable value for the given `~._DirectivesItem`
             instance.
 
         Returns
@@ -85,8 +85,8 @@ class _DirectivesItem:
         """
         if callable(value):
             @functools.wraps(value)
-            def validate_callable(job):
-                return self._validation(value(job))
+            def validate_callable(*jobs):
+                return self._validation(value(*jobs))
 
             return validate_callable
         else:
@@ -168,19 +168,19 @@ class _Directives(MutableMapping):
     def __repr__(self):
         return f"_Directives({str(self)})"
 
-    def update(self, other, aggregate=False, job=None, parallel=False):
+    def update(self, other, aggregate=False, jobs=None, parallel=False):
         if aggregate:
-            self._aggregate(other, job=job, parallel=parallel)
+            self._aggregate(other, jobs=jobs, parallel=parallel)
         else:
             super().update(other)
 
-    def evaluate(self, job):
+    def evaluate(self, jobs):
         for key, value in self.items():
-            self[key] = _evaluate(value, job)
+            self[key] = _evaluate(value, jobs)
 
-    def _aggregate(self, other, job=None, parallel=False):
-        self.evaluate(job)
-        other.evaluate(job)
+    def _aggregate(self, other, jobs=None, parallel=False):
+        self.evaluate(jobs)
+        other.evaluate(jobs)
         agg_func_attr = "_parallel" if parallel else "_serial"
         for name in self._defined_directives:
             agg_func = getattr(self._directive_definitions[name], agg_func_attr)
@@ -194,12 +194,12 @@ class _Directives(MutableMapping):
                                                           other_directive)
 
 
-def _evaluate(value, job=None):
+def _evaluate(value, jobs):
     if callable(value):
-        if job is None:
-            raise RuntimeError("job must be specified when evaluating a callable directive.")
+        if jobs is None:
+            raise RuntimeError("jobs must be specified when evaluating a callable directive.")
         else:
-            return value(job)
+            return value(*jobs)
     else:
         return value
 

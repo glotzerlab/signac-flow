@@ -261,5 +261,5 @@ class TestDirectives:
         for job in project:
             directives = _Directives(available_directives_list)
             directives.update({'processor_fraction': lambda job: round(job.sp.i/10, 1)})
-            directives.evaluate(job)
+            directives.evaluate((job,))
             assert directives['processor_fraction'] == round(job.sp.i/10, 1)

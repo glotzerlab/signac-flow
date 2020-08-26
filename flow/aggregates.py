@@ -3,11 +3,9 @@
 # This software is licensed under the BSD 3-Clause License.
 from collections.abc import Iterable
 from hashlib import md5
+from hashlib import sha1
 from itertools import groupby
 from itertools import zip_longest
-
-from flow import FlowProject
-from signac.contrib.project import Project
 
 
 class Aggregate:
@@ -62,7 +60,11 @@ class Aggregate:
         if select is not None and not callable(select):
             raise TypeError(f"Expected callable for select, got {type(select)}")
 
-        self._is_aggregate = getattr(aggregator, '_num', 0) != 1
+        if sort_by is None and select is None and not reverse_order:
+            self._is_aggregate = getattr(aggregator, '_num', 0) != 1
+        else:
+            self._is_aggregate = True
+
         self._aggregator = aggregator
         self._sort_by = sort_by
         self._reverse_order = reverse_order
@@ -82,8 +84,7 @@ class Aggregate:
             args = [iter(jobs)] * num
             return zip_longest(*args)
 
-        if num == 1 and sort_by == reverse_order == select is None:
-            setattr(aggregator, '_num', num)
+        setattr(aggregator, '_num', num)
 
         return cls(aggregator, sort_by, reverse_order, select)
 
@@ -129,10 +130,12 @@ class Aggregate:
 
         return cls(aggregator, sort_by, reverse_order, select)
 
-    def __eq__(self, other):
-        return self._aggregator.__code__.co_code == other._aggregator.__code__.co_code and \
-               self._select.__code__.co_code == other._select.__code__.co_code and \
-               self._sort_by == other._sort_by and self._reverse_order == other._reverse_order
+    def __hash__(self):
+        blob_l = map(hash, [self._aggregator, self._sort_by,
+                            self._reverse_order, self._select])
+        blob = ','.join(str(attr) for attr in blob_l)
+
+        return int(sha1(blob.encode('utf-8')).hexdigest(), 16)
 
     def _create_StoreAggregates(self):
         # We create the instance of _StoreAggregates or _StoreDefaultAggregates classes
@@ -175,10 +178,10 @@ class _StoreAggregates:
     def __call__(self, jobs):
         # If the instance of this class is called then we will
         # generate aggregates and store them in self._aggregates
-        if isinstance(jobs, (FlowProject, Project)):
-            project = jobs
-        else:  # Got a tuple of jobs
+        if isinstance(jobs, list):  # Got a tuple of jobs
             project = jobs[0]._project
+        else:  # Got a project
+            project = jobs
 
         aggregated_jobs = list(jobs)
         if self._aggregate._select is not None:
@@ -214,6 +217,10 @@ class _StoreAggregates:
 
         self._aggregates = nested_aggregates
 
+    def __hash__(self):
+        blob = str(hash(self._aggregate))
+        return int(sha1(blob.encode('utf-8')).hexdigest(), 16)
+
 
 class _StoreDefaultAggregate:
     """This class holds the information of the project associated with
@@ -234,10 +241,14 @@ class _StoreDefaultAggregate:
         # We have to store self._project is a instance of this class
         # is called. This is because we will then iterate over that
         # project in order to return an aggregates of one.
-        if isinstance(jobs, (FlowProject, Project)):
-            self._project = jobs
-        else:  # Got a tuple of jobs
+        if isinstance(jobs, list):  # Got a tuple of jobs
             self._project = jobs[0]._project
+        else:  # Got a project
+            self._project = jobs
+
+    def __hash__(self):
+        blob = str(self._project)
+        return int(sha1(blob.encode('utf-8')).hexdigest(), 16)
 
 
 def get_aggregate_id(jobs):

@@ -162,7 +162,7 @@ class TestStoreAggregate(AggregateProjectSetup):
         assert [tuple(helper_sort(project))] == list(aggregate_instance)
 
     def test_groups_of_valid_num(self, setUp, project):
-        valid_values = [1, 2, 3, 6]
+        valid_values = [1, 2, 3, 6, 12]
 
         total_jobs = len(project)
 

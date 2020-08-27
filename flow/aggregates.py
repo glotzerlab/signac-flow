@@ -8,24 +8,24 @@ from itertools import groupby
 from itertools import zip_longest
 
 
-class Aggregate:
-    r"""Decorator for operation functions that are to be aggregated.
-    By default, if the aggregator parameter is not passed,
+class aggregator:
+    r"""Decorator for operation function that is to be aggregated.
+    By default, if the ``aggregator_function`` is not passed,
     an aggregate of all jobs will be created.
 
     .. code-block:: python
 
-        @Aggregate()
+        @aggregator()
         @FlowProject.operation
         def foo(*jobs):
             print(len(jobs))
 
-    :param aggregator:
+    :param aggregator_function:
         Information describing how to aggregate jobs. Is a callable that
         takes in a list of jobs and can return or yield subsets of jobs as
         an iterable. The default behavior is creating a single aggregate
-        of all jobs
-    :type aggregator:
+        of all jobs.
+    :type aggregator_function:
         callable
     :param sort_by:
         Before aggregating, sort the jobs by a given statepoint parameter.
@@ -44,40 +44,42 @@ class Aggregate:
     :type select:
         callable or NoneType
     :param \*\*kwargs:
-        Additional information related to aggregator function.
+        Additional information related to aggregator_function function.
     """
 
-    def __init__(self, aggregator=None, sort_by=None, reverse_order=False, select=None,
-                 **kwargs):
-        if aggregator is None:
-            def aggregator(jobs):
+    def __init__(self, aggregator_function=None, sort_by=None, reverse_order=False,
+                 select=None, **kwargs):
+        if aggregator_function is None:
+            def aggregator_function(jobs):
                 return [jobs]
 
-        if not callable(aggregator):
-            raise TypeError(f"Expected callable for aggregator, got {type(aggregator)}")
+        if not callable(aggregator_function):
+            raise TypeError("Expected callable for aggregator_function, got "
+                            f"{type(aggregator_function)}")
         elif sort_by is not None and not isinstance(sort_by, str):
             raise TypeError(f"Expected string sort_by parameter, got {type(sort_by)}")
         elif select is not None and not callable(select):
             raise TypeError(f"Expected callable for select, got {type(select)}")
 
-        # For "non-aggregate" functions we set the Aggregate object equals to
-        # Aggregate.groupsof(1). If any other Aggregate object is associated with an
+        # For "non-aggregate" functions we set the aggregator object equals to
+        # aggregator.groupsof(1). If any other aggregator object is associated with an
         # operation function then mark that as a "aggregate operation" else it's a
         # "non-aggregate" operation.
         if sort_by is None and select is None and not reverse_order:
-            self._is_aggregate = getattr(aggregator, '_num', 0) != 1
+            self._is_aggregate = getattr(aggregator_function, '_num', 0) != 1
         else:
             self._is_aggregate = True
 
         self._kwargs = kwargs
-        self._aggregator = aggregator
+        self._aggregator_function = aggregator_function
         self._sort_by = sort_by
-        self._reverse_order = reverse_order
+        self._reverse_order = bool(reverse_order)
         self._select = select
 
     @classmethod
     def groupsof(cls, num=1, sort_by=None, reverse_order=False, select=None):
-        """signac jobs can be aggregated in groups of a number provided by an user.
+        """Decorator for operation function that aggregates signac jobs in groups of
+        a number provided by the user.
 
         By default aggregate of a single job is created.
 
@@ -92,13 +94,13 @@ class Aggregate:
 
         .. code-block:: python
 
-            @Aggregate.groupsof(num=2)
+            @aggregator.groupsof(num=2)
             @FlowProject.operation
             def foo(*jobs):
                 print(len(jobs))
 
         :param num:
-            Maximum possible length of an aggregate.
+            The default size of aggregates excluding the final aggregate.
         :type num:
             int
         :param sort_by:
@@ -127,38 +129,38 @@ class Aggregate:
         except TypeError:
             raise TypeError('The num parameter should be an integer')
 
-        def aggregator(jobs):
+        def aggregator_function(jobs):
             args = [iter(jobs)] * num
             return zip_longest(*args)
 
-        setattr(aggregator, '_num', num)
+        setattr(aggregator_function, '_num', num)
 
-        return cls(aggregator, sort_by, reverse_order, select, num=num)
+        return cls(aggregator_function, sort_by, reverse_order, select, num=num)
 
     @classmethod
     def groupby(cls, key, default=None, sort_by=None, reverse_order=False, select=None):
-        """signac jobs can be aggregated by a valid state point parameter.
+        """Decorator for operation function that aggregates signac jobs by grouping them
+        via a key.
 
-        Users can aggregate jobs by passing a single or a list of state point parameters
-        or a custom callable.
-        If a user provides a list of state point parameters then the default value, if passed,
-        expects a list of default values having length equal to the length of key passed.
-        By default, an error is raised if the key passed is invalid.
+        The below code-block provides an example on how to aggregate jobs having
+        common state point parameter 'sp' whose value, when not found, is replaced by a
+        default value of -1.
 
         .. code-block:: python
 
-            @Aggregate.groupby('sp', -1)
+            @aggregator.groupby(key='sp', default=-1)
             @FlowProject.operation
             def foo(*jobs):
                 print(len(jobs))
 
         :param key:
-            Parameter which specifies how the jobs should be aggregated.
+            Parameter which specifies how to group jobs based on a single
+            or a list of state point parameters or a custom callable.
         :type key:
             str, Iterable, or callable
-        :param key:
-            Default values used for grouping if invalid key is passed
-        :type key:
+        :param default:
+            Default values used for grouping if invalid key is passed.
+        :type default:
             str, Iterable, or callable
         :param sort_by:
             Before aggregating, sort the jobs by a given statepoint parameter.
@@ -207,11 +209,12 @@ class Aggregate:
             raise TypeError("Invalid key argument. Expected either str, Iterable "
                             f"or a callable, got {type(key)}")
 
-        def aggregator(jobs):
+        def aggregator_function(jobs):
             for key, group in groupby(sorted(jobs, key=keyfunction), key=keyfunction):
                 yield group
 
-        return cls(aggregator, sort_by, reverse_order, select, key=key, default=default)
+        return cls(aggregator_function, sort_by, reverse_order, select,
+                   key=key, default=default)
 
     def __eq__(self, other):
         if type(self) != type(other):
@@ -224,49 +227,55 @@ class Aggregate:
             return False
         elif(
             self._select == other._select and
-            self._aggregator == other._aggregator
+            self._aggregator_function == other._aggregator_function
         ):
             return True
 
         # Get unique id for _select attribute
         self_select = self._get_unique_function_id(self._select)
         other_select = self._get_unique_function_id(other._select)
-        # Get unique id for _aggregator attribute
-        self_aggregator = self._get_unique_function_id(self._aggregator)
-        other_aggregator = self._get_unique_function_id(other._aggregator)
+        # Get unique id for _aggregator_function attribute
+        self_aggregator_function = self._get_unique_function_id(self._aggregator_function)
+        other_aggregator_function = self._get_unique_function_id(other._aggregator_function)
 
-        if(
-            self_select == other_select and
-            self_aggregator == other_aggregator
-        ):
-            return True
-
-        return False
+        return self_select == other_select and \
+            self_aggregator_function == other_aggregator_function
 
     def __hash__(self):
-        blob_l = list(map(hash, [self._sort_by, self._reverse_order]))
-        # Get unique id for _aggregator and _select attributes
-        blob_l += list(map(self._get_unique_function_id, [self._aggregator, self._select]))
+        blob_l = [
+            hash(self._sort_by), hash(self._reverse_order),
+            self._get_unique_function_id(self._aggregator_function),
+            self._get_unique_function_id(self._select)
+        ]
         blob = ','.join(str(attr) for attr in blob_l)
 
         return int(sha1(blob.encode('utf-8')).hexdigest(), 16)
 
     def _get_unique_function_id(self, func):
+        """Generate unique id for the function passed. This id is used to generate hash
+        and compare the ``self._aggregator_function`` and ``self._select`` attributes
+        of instances of this class.
+        """
         try:
             return func.__code__.co_code
-        except Exception:  # Got partial function
-            return str(hash(func))
+        except Exception:  # Got something other than a function
+            return hash(func)
 
-    def _create_AggregatesStore(self, jobs):
+    def _create_AggregatesStore(self, project):
         """Create the instance of _AggregatesStore or _DefaultAggregateStore classes
         to make sure that we don't explicitly store the aggregates in the FlowProject.
 
         When iterated over these classes, an aggregate is yielded.
+
+        :param project:
+            A signac project used to fetch jobs for creating aggregates.
+        :type project:
+            :py:class:`flow.FlowProject` or :py:class:`signac.contrib.project.Project`
         """
         if not self._is_aggregate:
-            return _DefaultAggregateStore(jobs)
+            return _DefaultAggregateStore(project)
         else:
-            return _AggregatesStore(self, jobs)
+            return _AggregatesStore(self, project)
 
     def __call__(self, func=None):
         if callable(func):
@@ -280,34 +289,34 @@ class Aggregate:
 
 class _AggregatesStore:
     """This class holds the information of all the aggregates associated with
-    a :py:class:`Aggregate`.
+    a :py:class:`aggregator`.
 
     This is a callable class which, when called, generates all the aggregates.
     When iterated through it's instance, all the aggregates are yielded.
 
     :param aggregate:
-        Aggregate object associated with this class.
+        aggregator object associated with this class.
     :type aggregate:
-        :py:class:`Aggregate`
-    :param jobs:
-        The signac job handles
-    :type jobs:
-        Iterator
+        :py:class:`aggregator`
+    :param project:
+        A signac project used to fetch jobs for creating aggregates.
+    :type project:
+        :py:class:`flow.FlowProject` or :py:class:`signac.contrib.project.Project`
     """
-    def __init__(self, aggregate, jobs):
+    def __init__(self, aggregate, project):
         self._aggregate = aggregate
 
         # We need to register the aggregates for this instance using the
-        # jobs provided.
+        # project provided.
         self._aggregates = list()
         self._aggregate_ids = dict()
-        self._register_aggregates(jobs)
+        self._register_aggregates(project)
 
     def __iter__(self):
         yield from self._aggregates
 
     def __getitem__(self, id):
-        "Return an aggregate "
+        "Return an aggregate, if exists, using the id provided"
         try:
             return self._aggregate_ids[id]
         except KeyError:
@@ -319,14 +328,11 @@ class _AggregatesStore:
         instance of :py:class:`_AggregateStore`
 
         :param aggregate:
-            Aggregate of jobs
-        :type jobs:
+            An aggregate of jobs.
+        :type aggregate:
             tuple of :py:class:`signac.contrib.job.Job`
         """
-        if aggregate in self._aggregates:
-            return True
-        else:
-            return False
+        return get_aggregate_id(aggregate) in self._aggregate_ids
 
     def __len__(self):
         return len(self._aggregates)
@@ -340,75 +346,38 @@ class _AggregatesStore:
         blob = str(hash(self._aggregate))
         return int(sha1(blob.encode('utf-8')).hexdigest(), 16)
 
-    def _register_aggregates(self, jobs):
+    def _register_aggregates(self, project):
         """If the instance of this class is called then we will
-        generate aggregates and store them in self._aggregates
+        generate aggregates and store them in ``self._aggregates``.
         """
-        if isinstance(jobs, list):  # Got a tuple of jobs
-            project = jobs[0]._project
-        else:  # Got a project
-            project = jobs
-
-        aggregated_jobs = list(jobs)
-        if self._aggregate._select is not None:
-            aggregated_jobs = list(filter(self._aggregate._select, aggregated_jobs))
-        if self._aggregate._sort_by is not None:
-            aggregated_jobs = list(sorted(aggregated_jobs,
-                                          key=lambda job: job.sp[self._aggregate._sort_by],
-                                          reverse=bool(self._aggregate._reverse_order)))
-        aggregated_jobs = self._aggregate._aggregator([job for job in aggregated_jobs])
-        self._create_nested_aggregate_list(aggregated_jobs, project)
-
-    def _create_nested_aggregate_list(self, aggregated_jobs, project):
-        """This method converts the returned subset of jobs as an Iterable
-        from an aggregator function to a subset of jobs as tuple.
-        """
-        nested_aggregates = []
-
-        for aggregate in aggregated_jobs:
-            try:
-                filter_aggregate = []
-                for job in aggregate:
-                    if job is None:
-                        continue
-                    elif job not in project:
-                        raise LookupError(f'The signac job {job.get_id()} not found in {project}')
-                    filter_aggregate.append(job)
-                filter_aggregate = tuple(filter_aggregate)
-                # Store aggregate in this instance
-                nested_aggregates.append(filter_aggregate)
-                # Store aggregate by their ids in order to search through id
-                self._aggregate_ids[get_aggregate_id(filter_aggregate)] = filter_aggregate
-            except TypeError:  # aggregate is not iterable
-                raise ValueError("Invalid aggregator function provided by "
-                                 "the user.")
-
-        self._aggregates = nested_aggregates
+        make_aggregates = _MakeAggregates(self._aggregate, project)
+        aggregates, aggregate_ids = make_aggregates()
+        self._aggregates = aggregates
+        self._aggregate_ids = aggregate_ids
 
 
 class _DefaultAggregateStore:
     """This class holds the information of the project associated with
     an operation function aggregated by the default aggregates i.e.
-    :py:class:`Aggregate.groupsof(1)`.
+    :py:class:`aggregator.groupsof(1)`.
 
     When iterated through it's instance, it yields a tuple of a single job from
     the Project.
 
-    :param jobs:
-        The signac job handles
-    :type jobs:
-        Iterator
+    :param project:
+        A signac project used to fetch jobs for creating aggregates.
+    :type project:
+        :py:class:`flow.FlowProject` or :py:class:`signac.contrib.project.Project`
     """
-    def __init__(self, jobs):
-        self._project = None
-        self._register_project(jobs)
+    def __init__(self, project):
+        self._project = project
 
     def __iter__(self):
         for job in self._project:
             yield (job,)
 
     def __getitem__(self, id):
-        "Return a tuple of a single job via job id"
+        "Return a tuple of a single job via job id."
         try:
             return (self._project.open_job(id=id),)
         except KeyError:
@@ -416,12 +385,9 @@ class _DefaultAggregateStore:
 
     def __contains__(self, job):
         """Return whether the job is present in the project associated with this
-        instance of :py:class:`_DefaultAggregateStore`
+        instance of :py:class:`_DefaultAggregateStore`.
         """
-        if job in self._project:
-            return True
-        else:
-            return False
+        return job in self._project
 
     def __len__(self):
         return len(self._project)
@@ -431,21 +397,73 @@ class _DefaultAggregateStore:
                self._project == other._project
 
     def __hash__(self):
-        blob = str(self._project)
+        blob = self._project.id
         return int(sha1(blob.encode('utf-8')).hexdigest(), 16)
 
-    def _generate_aggregates(self, jobs):
+    def _register_aggregates(self, project):
         """We have to store self._project when this method is invoked
         This is because we will then iterate over that project in
         order to return an aggregates of one.
         """
-        self._register_project(jobs)
+        self._project = project
 
-    def _register_project(self, jobs):
-        if isinstance(jobs, list):  # Got a list of jobs
-            self._project = jobs[0]._project
-        else:  # Got a project
-            self._project = jobs
+
+class _MakeAggregates:
+    """This class acts as a funnctor which handles the creation of
+    aggregates using all the jobs in a project.
+
+    :param aggregate:
+        aggregator object associated with this class.
+    :type aggregate:
+        :py:class:`aggregator`
+    :param project:
+        A signac project used to fetch jobs for creating aggregates.
+    :type project:
+        :py:class:`flow.FlowProject` or :py:class:`signac.contrib.project.Project`
+    """
+    def __init__(self, aggregate, project):
+        self._aggregate = aggregate
+        self._project = project
+
+    def __call__(self):
+        jobs = list(self._project)
+
+        if self._aggregate._select is not None:
+            jobs = filter(self._aggregate._select, jobs)
+        if self._aggregate._sort_by is not None:
+            jobs = sorted(jobs,
+                          key=lambda job: job.sp[self._aggregate._sort_by],
+                          reverse=self._aggregate._reverse_order)
+        aggregated_jobs = self._aggregate._aggregator_function(jobs)
+        return self._create_nested_aggregate_list(aggregated_jobs)
+
+    def _create_nested_aggregate_list(self, aggregated_jobs):
+        """This method converts the returned subset of jobs as an Iterable
+        from an aggregator_function to an aggregate of jobs as tuple.
+        """
+        nested_aggregates = []
+        aggregate_ids = dict()
+
+        for aggregate in aggregated_jobs:
+            try:
+                filter_aggregate = tuple(filter(self._validate_and_filter_job, aggregate))
+                # Store aggregate in this instance
+                nested_aggregates.append(filter_aggregate)
+                # Store aggregate by their ids in order to search through id
+                aggregate_ids[get_aggregate_id(filter_aggregate)] = filter_aggregate
+            except TypeError:  # aggregate is not iterable
+                ValueError("Invalid aggregator_function provided by the user.")
+
+        return nested_aggregates, aggregate_ids
+
+    def _validate_and_filter_job(self, job):
+        "Validate whether a job is eligible to be a part of an aggregate or not."
+        if job is None:
+            return False
+        elif job in self._project:
+            return True
+        else:
+            raise LookupError(f'The signac job {job.get_id()} not found in {self._project}')
 
 
 def get_aggregate_id(jobs):

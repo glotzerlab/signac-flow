@@ -68,36 +68,17 @@ class TestAggregate(AggregateProjectSetup):
             with pytest.raises(TypeError):
                 Aggregate()(param)
 
-    def test_call_without_function(self):
+    def test_call_without_decorator(self):
         aggregate_instance = Aggregate()
         with pytest.raises(TypeError):
             aggregate_instance()
 
-    def test_call_with_function(self):
-        aggregate_instance = Aggregate()
-
-        def test_function(x):
-            return x
-
-        assert not getattr(test_function, '_flow_aggregate', False)
-        test_function = aggregate_instance(test_function)
-        assert getattr(test_function, '_flow_aggregate', False)
-
-    def test_with_decorator_with_pre_initialization(self):
-        aggregate_instance = Aggregate()
-
-        @aggregate_instance
-        def test_function(x):
-            return x
-
-        assert getattr(test_function, '_flow_aggregate', False)
-
-    def test_with_decorator_without_pre_initialization(self):
+    def test_call_with_decorator(self):
         @Aggregate()
         def test_function(x):
             return x
 
-        assert getattr(test_function, '_flow_aggregate', False)
+        assert hasattr(test_function, '_flow_aggregate')
 
     def test_groups_of_invalid_num(self):
         invalid_values = [{}, 'str', -1, -1.5]
@@ -109,154 +90,161 @@ class TestAggregate(AggregateProjectSetup):
         with pytest.raises(TypeError):
             Aggregate.groupby(1)
 
-    def test_groupby_with_valid_type_default_for_Iterable(self, setUp, project):
+    def test_groupby_with_valid_type_default_for_Iterable(self):
         Aggregate.groupby(['half', 'even'], default=[-1, -1])
 
-    def test_groupby_with_invalid_type_default_key_for_Iterable(self, setUp, project):
+    def test_groupby_with_invalid_type_default_key_for_Iterable(self):
         with pytest.raises(TypeError):
             Aggregate.groupby(['half', 'even'], default=-1)
 
-    def test_groupby_with_invalid_length_default_key_for_Iterable(self, setUp, project):
+    def test_groupby_with_invalid_length_default_key_for_Iterable(self):
         with pytest.raises(ValueError):
             Aggregate.groupby(['half', 'even'], default=[-1, -1, -1])
+
+    def test_aggregate_hashing(self):
+        # Since we need to store groups on a per aggregate basis in the project,
+        # we need to be sure that the aggregates are hashing and compared correctly.
+        # This test ensures this feature.
+        def helper_default_aggregator(jobs):
+            return [jobs]
+
+        def helper_non_default_aggregator(jobs):
+            for job in jobs:
+                yield (job,)
+
+        list_of_aggregates = [
+            Aggregate(), Aggregate(), Aggregate(helper_default_aggregator),
+            Aggregate(helper_non_default_aggregator), Aggregate(helper_non_default_aggregator),
+            Aggregate.groupsof(1), Aggregate.groupsof(1),
+            Aggregate.groupsof(2), Aggregate.groupsof(3), Aggregate.groupsof(4),
+            Aggregate.groupby('half'), Aggregate.groupby('half'), Aggregate.groupby('even'),
+            Aggregate.groupby('half', -1), Aggregate.groupby('even', -1),
+            Aggregate.groupby(['half', 'even'], default=[-1, -1])
+        ]
+
+        assert len(set(list_of_aggregates)) == 11
 
 
 # Test the _StoreAggregate and _StoreDefaultAggregate classes
 class TestStoreAggregate(AggregateProjectSetup):
 
-    def test_valid_aggregator_non_partial(self, setUp, project):
+    def test_valid_aggregator(self, setUp, project):
         # Return groups of 1
         def helper_aggregator(jobs):
             for job in jobs:
-                yield (job, )
+                yield (job,)
 
         aggregate_instance = Aggregate(helper_aggregator)
+        aggregate_instance = aggregate_instance._create_AggregatesStore(project)
 
-        aggregate_instance = aggregate_instance._create_StoreAggregates()
         aggregate_job_manual = helper_aggregator(project)
-        aggregate_instance(project)  # Generate Aggregates
 
         assert [aggregate for aggregate in aggregate_job_manual] == \
                list(aggregate_instance)
 
-    def test_valid_aggregator_partial(self, setUp, project):
+    def test_valid_lambda_aggregator(self, setUp, project):
         aggregate_instance = Aggregate(lambda jobs: [jobs])
-        aggregate_instance = aggregate_instance._create_StoreAggregates()
-        aggregate_instance(project)  # Generate Aggregates
+        aggregate_instance = aggregate_instance._create_AggregatesStore(project)
 
-        assert [tuple([job for job in project])] == \
-               list(aggregate_instance)
+        assert [tuple(project)] == list(aggregate_instance)
 
     def test_valid_sort_by(self, setUp, project):
         helper_sort = partial(sorted, key=lambda job: job.sp.i)
         aggregate_instance = Aggregate(sort_by='i')
-        aggregate_instance = aggregate_instance._create_StoreAggregates()
-        aggregate_instance(project)  # Generate Aggregates
+        aggregate_instance = aggregate_instance._create_AggregatesStore(project)
+
         assert [tuple(helper_sort(project))] == list(aggregate_instance)
 
     def test_valid_reversed_sort(self, setUp, project):
         helper_sort = partial(sorted, key=lambda job: job.sp.i, reverse=True)
         aggregate_instance = Aggregate(sort_by='i', reverse_order=True)
-        aggregate_instance = aggregate_instance._create_StoreAggregates()
-        aggregate_instance(project)  # Generate Aggregates
+        aggregate_instance = aggregate_instance._create_AggregatesStore(project)
         assert [tuple(helper_sort(project))] == list(aggregate_instance)
 
     def test_groups_of_valid_num(self, setUp, project):
-        valid_values = [1, 2, 3, 6, 12]
+        valid_values = [1, 2, 3, 6, 10]
+        expected_aggregates = [10, 5, 4, 2, 1]
 
-        total_jobs = len(project)
-
-        for valid_value in valid_values:
+        for i, valid_value in enumerate(valid_values):
             aggregate_instance = Aggregate.groupsof(valid_value)
-            aggregate_instance = aggregate_instance._create_StoreAggregates()
-            aggregate_instance(project)  # Generate Aggregates
-            if total_jobs % valid_value == 0:
-                length_of_aggregate = total_jobs/valid_value
-            else:
-                length_of_aggregate = int(total_jobs/valid_value) + 1
-            assert len(list(aggregate_instance)) == length_of_aggregate
+            aggregate_instance = aggregate_instance._create_AggregatesStore(project)
+            assert len(aggregate_instance) == expected_aggregates[i]
 
     def test_groupby_with_valid_string_key(self, setUp, project):
         aggregate_instance = Aggregate.groupby('even')
-        aggregate_instance = aggregate_instance._create_StoreAggregates()
-        aggregates = 0
-        aggregate_instance(project)  # Generate Aggregates
-        for agg in aggregate_instance:
-            aggregates += 1
-        assert aggregates == 2
+        aggregate_instance = aggregate_instance._create_AggregatesStore(project)
+        for aggregate in aggregate_instance:
+            even = aggregate[0].sp.even
+            for job in aggregate:
+                assert even == job.sp.even
+        assert len(aggregate_instance) == 2
 
     def test_groupby_with_invalid_string_key(self, setUp, project):
         aggregate_instance = Aggregate.groupby('invalid_key')
-        aggregate_instance = aggregate_instance._create_StoreAggregates()
         with pytest.raises(KeyError):
             # We will attempt to generate aggregates but will fail in
             # doing so due to the invalid key
-            aggregate_instance(project)
+            aggregate_instance._create_AggregatesStore(project)
 
     def test_groupby_with_default_key_for_string(self, setUp, project):
         aggregate_instance = Aggregate.groupby('half', default=-1)
-        aggregate_instance = aggregate_instance._create_StoreAggregates()
-        aggregate_instance(project)  # Generate Aggregates
-        aggregates = 0
-        for agg in aggregate_instance:
-            aggregates += 1
-        assert aggregates == 6
+        aggregate_instance = aggregate_instance._create_AggregatesStore(project)
+        for aggregate in aggregate_instance:
+            half = aggregate[0].sp.get('half', -1)
+            for job in aggregate:
+                assert half == job.sp.get('half', -1)
+        assert len(aggregate_instance) == 6
 
     def test_groupby_with_Iterable_key(self, setUp, project):
         aggregate_instance = Aggregate.groupby(['i', 'even'])
-        aggregate_instance = aggregate_instance._create_StoreAggregates()
-        aggregate_instance(project)  # Generate Aggregates
-        aggregates = 0
-        for agg in aggregate_instance:
-            aggregates += 1
-        assert aggregates == 10
+        aggregate_instance = aggregate_instance._create_AggregatesStore(project)
+        # No aggregation takes place
+        assert len(aggregate_instance) == 10
 
     def test_groupby_with_invalid_Iterable_key(self, setUp, project):
         aggregate_instance = Aggregate.groupby(['half', 'even'])
-        aggregate_instance = aggregate_instance._create_StoreAggregates()
         with pytest.raises(KeyError):
             # We will attempt to generate aggregates but will fail in
             # doing so due to the invalid keys
-            aggregate_instance(project)
+            aggregate_instance._create_AggregatesStore(project)
 
     def test_groupby_with_valid_default_key_for_Iterable(self, setUp, project):
         aggregate_instance = Aggregate.groupby(['half', 'even'], default=[-1, -1])
-        aggregate_instance = aggregate_instance._create_StoreAggregates()
-        aggregate_instance(project)  # Generate Aggregates
-        aggregates = 0
-        for agg in aggregate_instance:
-            aggregates += 1
-        assert aggregates == 6
+        aggregate_instance = aggregate_instance._create_AggregatesStore(project)
+        for aggregate in aggregate_instance:
+            half = aggregate[0].sp.get('half', -1)
+            even = aggregate[0].sp.get('even', -1)
+            for job in aggregate:
+                assert half == job.sp.get('half', -1) and even == job.sp.get('even', -1)
+        assert len(aggregate_instance) == 6
 
     def test_groupby_with_callable_key(self, setUp, project):
         def keyfunction(job):
             return job.sp['even']
 
         aggregate_instance = Aggregate.groupby(keyfunction)
-        aggregate_instance = aggregate_instance._create_StoreAggregates()
-        aggregate_instance(project)  # Generate Aggregates
-        aggregates = 0
-        for agg in aggregate_instance:
-            aggregates += 1
-        assert aggregates == 2
+        aggregate_instance = aggregate_instance._create_AggregatesStore(project)
+        for aggregate in aggregate_instance:
+            even = aggregate[0].sp.even
+            for job in aggregate:
+                assert even == job.sp.even
+        assert len(aggregate_instance) == 2
 
     def test_groupby_with_invalid_callable_key(self, setUp, project):
         def keyfunction(job):
             return job.sp['half']
         aggregate_instance = Aggregate.groupby(keyfunction)
-        aggregate_instance = aggregate_instance._create_StoreAggregates()
         with pytest.raises(KeyError):
             # We will attempt to generate aggregates but will fail in
             # doing so due to the invalid key
-            aggregate_instance(project)
+            aggregate_instance._create_AggregatesStore(project)
 
     def test_valid_select(self, setUp, project):
         def _select(job):
             return job.sp.i > 5
 
         aggregate_instance = Aggregate.groupsof(1, select=_select)
-        aggregate_instance = aggregate_instance._create_StoreAggregates()
-        aggregate_instance(project)
+        aggregate_instance = aggregate_instance._create_AggregatesStore(project)
         selected_jobs = []
         for job in project:
             if _select(job):

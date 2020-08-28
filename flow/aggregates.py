@@ -2,7 +2,6 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 from collections.abc import Iterable
-from hashlib import md5
 from hashlib import sha1
 from itertools import groupby
 from itertools import zip_longest
@@ -303,12 +302,12 @@ class _AggregatesStore:
     """
     def __init__(self, aggregator, project):
         self._aggregator = aggregator
-
+        self._project = project
         # We need to create a _MakeAggregate instance associated with this object
         # in order to generate aggregates whenever necessary.
         self._make_aggregates = _MakeAggregates(
             aggregator._aggregator_function, aggregator._sort_by,
-            aggregator._reverse_order, aggregator._select, project)
+            aggregator._reverse_order, aggregator._select)
 
         # We need to register the aggregates for this instance using the
         # project provided.
@@ -354,7 +353,39 @@ class _AggregatesStore:
         """If the instance of this class is called then we will
         generate aggregates and store them in ``self._aggregates``.
         """
-        self._aggregates, self._aggregate_ids = self._make_aggregates()
+        # Since we should always clear the aggregates before registering
+        # aggregates because we append the aggregates directly.
+        self._aggregates.clear()
+        self._aggregate_ids.clear()
+        aggregated_jobs = self._make_aggregates(self._project)
+        self._create_nested_aggregate_list(aggregated_jobs)
+
+    def _create_nested_aggregate_list(self, aggregated_jobs):
+        """signac-flow internally assumes every aggregate to be a tuple of jobs.
+
+        This method converts every aggregate in ``aggregated_jobs``, which may be of
+        any type, returned from an aggregator_function using the instance of
+        ``_MakeAggregates`` to an aggregate of jobs as tuple.
+        """
+        def _validate_and_filter_job(job):
+            "Validate whether a job is eligible to be a part of an aggregate or not."
+            if job is None:
+                return False
+            elif job in self._project:
+                return True
+            else:
+                raise LookupError(f'The signac job {job.get_id()} not found'
+                                  f'in {self._project}')
+
+        for aggregate in aggregated_jobs:
+            try:
+                filter_aggregate = tuple(filter(_validate_and_filter_job, aggregate))
+            except TypeError:  # aggregate is not iterable
+                ValueError("Invalid aggregator_function provided by the user.")
+            # Store aggregate in this instance
+            self._aggregates.append(filter_aggregate)
+            # Store aggregate by their ids in order to search through id
+            self._aggregate_ids[get_aggregate_id(filter_aggregate)] = filter_aggregate
 
 
 class _DefaultAggregateStore:
@@ -430,57 +461,22 @@ class _MakeAggregates:
         The ``select`` attribute associated with the :py:class:`aggregator`
     :type select:
         callable or NoneType
-    :param project:
-        A signac project used to fetch jobs for creating aggregates.
-    :type project:
-        :py:class:`flow.FlowProject` or :py:class:`signac.contrib.project.Project`
     """
-    def __init__(self, aggregator_function, sort_by, reverse_order, select, project):
+    def __init__(self, aggregator_function, sort_by, reverse_order, select):
         self._aggregator_function = aggregator_function
         self._sort_by = sort_by
         self._reverse_order = bool(reverse_order)
         self._select = select
-        self._project = project
 
-    def __call__(self):
-        jobs = list(self._project)
-
+    def __call__(self, project):
+        jobs = list(project)
         if self._select is not None:
             jobs = list(filter(self._select, jobs))
         if self._sort_by is not None:
             jobs = sorted(jobs,
                           key=lambda job: job.sp[self._sort_by],
                           reverse=self._reverse_order)
-        aggregated_jobs = self._aggregator_function(jobs)
-        return self._create_nested_aggregate_list(aggregated_jobs)
-
-    def _create_nested_aggregate_list(self, aggregated_jobs):
-        """This method converts the returned subset of jobs as an Iterable
-        from an aggregator_function to an aggregate of jobs as tuple.
-        """
-        nested_aggregates = []
-        aggregate_ids = dict()
-
-        for aggregate in aggregated_jobs:
-            try:
-                filter_aggregate = tuple(filter(self._validate_and_filter_job, aggregate))
-            except TypeError:  # aggregate is not iterable
-                ValueError("Invalid aggregator_function provided by the user.")
-            # Store aggregate in this instance
-            nested_aggregates.append(filter_aggregate)
-            # Store aggregate by their ids in order to search through id
-            aggregate_ids[get_aggregate_id(filter_aggregate)] = filter_aggregate
-
-        return nested_aggregates, aggregate_ids
-
-    def _validate_and_filter_job(self, job):
-        "Validate whether a job is eligible to be a part of an aggregate or not."
-        if job is None:
-            return False
-        elif job in self._project:
-            return True
-        else:
-            raise LookupError(f'The signac job {job.get_id()} not found in {self._project}')
+        yield from self._aggregator_function(jobs)
 
 
 def get_aggregate_id(jobs):
@@ -495,4 +491,4 @@ def get_aggregate_id(jobs):
         return jobs[0].get_id()  # Return job id as it's already unique
 
     blob = ','.join((job.get_id() for job in jobs))
-    return f'agg-{md5(blob.encode()).hexdigest()}'
+    return f'agg-{sha1(blob.encode()).hexdigest()}'

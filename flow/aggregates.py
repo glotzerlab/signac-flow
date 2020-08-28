@@ -302,18 +302,16 @@ class _AggregatesStore:
     """
     def __init__(self, aggregator, project):
         self._aggregator = aggregator
-        self._project = project
+
         # We need to create a _MakeAggregate instance associated with this object
         # in order to generate aggregates whenever necessary.
-        self._make_aggregates = _MakeAggregates(
-            aggregator._aggregator_function, aggregator._sort_by,
-            aggregator._reverse_order, aggregator._select)
+        self._make_aggregates = _MakeAggregates.initialize_with_aggregator(aggregator)
 
         # We need to register the aggregates for this instance using the
         # project provided.
         self._aggregates = list()
         self._aggregate_ids = dict()
-        self._register_aggregates()
+        self._register_aggregates(project)
 
     def __iter__(self):
         yield from self._aggregates
@@ -349,7 +347,7 @@ class _AggregatesStore:
         blob = str(hash(self._aggregate))
         return int(sha1(blob.encode('utf-8')).hexdigest(), 16)
 
-    def _register_aggregates(self):
+    def _register_aggregates(self, project):
         """If the instance of this class is called then we will
         generate aggregates and store them in ``self._aggregates``.
         """
@@ -357,10 +355,10 @@ class _AggregatesStore:
         # aggregates because we append the aggregates directly.
         self._aggregates.clear()
         self._aggregate_ids.clear()
-        aggregated_jobs = self._make_aggregates(self._project)
-        self._create_nested_aggregate_list(aggregated_jobs)
+        aggregated_jobs = self._make_aggregates(project)
+        self._create_nested_aggregate_list(aggregated_jobs, project)
 
-    def _create_nested_aggregate_list(self, aggregated_jobs):
+    def _create_nested_aggregate_list(self, aggregated_jobs, project):
         """signac-flow internally assumes every aggregate to be a tuple of jobs.
 
         This method converts every aggregate in ``aggregated_jobs``, which may be of
@@ -371,11 +369,11 @@ class _AggregatesStore:
             "Validate whether a job is eligible to be a part of an aggregate or not."
             if job is None:
                 return False
-            elif job in self._project:
+            elif job in project:
                 return True
             else:
                 raise LookupError(f'The signac job {job.get_id()} not found'
-                                  f'in {self._project}')
+                                  f'in {project}')
 
         for aggregate in aggregated_jobs:
             try:
@@ -469,14 +467,27 @@ class _MakeAggregates:
         self._select = select
 
     def __call__(self, project):
-        jobs = list(project)
-        if self._select is not None:
-            jobs = list(filter(self._select, jobs))
-        if self._sort_by is not None:
-            jobs = sorted(jobs,
+        if self._sort_by is None:
+            jobs = list(project)
+        else:
+            jobs = sorted(project,
                           key=lambda job: job.sp[self._sort_by],
                           reverse=self._reverse_order)
+        if self._select is not None:
+            jobs = list(filter(self._select, jobs))
         yield from self._aggregator_function(jobs)
+
+    @classmethod
+    def initialize_with_aggregator(cls, aggregator):
+        """Initialize this class using an aggregator object.
+
+        :param aggregator:
+            aggregator object associated with this class.
+        :type aggregator:
+            :py:class:`aggregator`
+        """
+        return cls(aggregator._aggregator_function, aggregator._sort_by,
+                   aggregator._reverse_order, aggregator._select)
 
 
 def get_aggregate_id(jobs):

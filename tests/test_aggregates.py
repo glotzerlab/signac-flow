@@ -105,6 +105,7 @@ class TestAggregate(AggregateProjectSetup):
         # Since we need to store groups on a per aggregate basis in the project,
         # we need to be sure that the aggregates are hashing and compared correctly.
         # This test ensures this feature.
+
         def helper_default_aggregator_function(jobs):
             return [jobs]
 
@@ -123,6 +124,10 @@ class TestAggregate(AggregateProjectSetup):
             aggregator.groupby(['half', 'even'], default=[-1, -1])
         ]
 
+        # The above list contains 11 distinct aggregator objects and some duplicates.
+        # When this list is converted to set, then these objects hashed first and
+        # then compared. Since sets don't carry duplicate values, we test whether the
+        # length of the set obtained from the list is equal to 11 or not.
         assert len(set(list_of_aggregates)) == 11
 
 
@@ -130,23 +135,20 @@ class TestAggregate(AggregateProjectSetup):
 class TestAggregateStoring(AggregateProjectSetup):
 
     def test_valid_aggregator_function(self, setUp, project):
-        # Return groups of 1
+        # Testing aggregator function returning aggregates of 1
         def helper_aggregator_function(jobs):
             for job in jobs:
                 yield (job,)
 
         aggregate_instance = aggregator(helper_aggregator_function)
         aggregate_instance = aggregate_instance._create_AggregatesStore(project)
-
         aggregate_job_manual = helper_aggregator_function(project)
-
         assert [aggregate for aggregate in aggregate_job_manual] == \
                list(aggregate_instance)
 
-    def test_valid_lambda_aggregator_function(self, setUp, project):
+        # Testing aggregator function returning aggregates of all the jobs
         aggregate_instance = aggregator(lambda jobs: [jobs])
         aggregate_instance = aggregate_instance._create_AggregatesStore(project)
-
         assert [tuple(project)] == list(aggregate_instance)
 
     def test_valid_sort_by(self, setUp, project):
@@ -164,20 +166,34 @@ class TestAggregateStoring(AggregateProjectSetup):
 
     def test_groups_of_valid_num(self, setUp, project):
         valid_values = [1, 2, 3, 6, 10]
-        expected_aggregates = [10, 5, 4, 2, 1]
-
+        # Expected length of aggregates which are made using the
+        # above valid values
+        expected_length_of_aggregates = [10, 5, 4, 2, 1]
+        # Expect length of each aggregate which are made using the
+        # above valid values. The zeroth index of the nested list denotes the
+        # length of all the aggregates expect the last one. The first index denotes
+        # to the length of the last aggregate formed.
+        expected_length_per_aggregate = [[1, 1], [2, 2], [3, 1], [6, 4], [10, 10]]
         for i, valid_value in enumerate(valid_values):
             aggregate_instance = aggregator.groupsof(valid_value)
             aggregate_instance = aggregate_instance._create_AggregatesStore(project)
-            assert len(aggregate_instance) == expected_aggregates[i]
+            expected_len = expected_length_of_aggregates[i]
+            assert len(aggregate_instance) == expected_len
+
+            # We also check the length of every aggregate in order to ensure
+            # proper aggregation.
+            for j, aggregate in enumerate(aggregate_instance):
+                if j == expected_len - 1:  # Checking for the last aggregate
+                    assert len(aggregate) == expected_length_per_aggregate[i][1]
+                else:
+                    assert len(aggregate) == expected_length_per_aggregate[i][0]
 
     def test_groupby_with_valid_string_key(self, setUp, project):
         aggregate_instance = aggregator.groupby('even')
         aggregate_instance = aggregate_instance._create_AggregatesStore(project)
         for aggregate in aggregate_instance:
             even = aggregate[0].sp.even
-            for job in aggregate:
-                assert even == job.sp.even
+            assert all(even == job.sp.even for job in aggregate)
         assert len(aggregate_instance) == 2
 
     def test_groupby_with_invalid_string_key(self, setUp, project):
@@ -192,14 +208,14 @@ class TestAggregateStoring(AggregateProjectSetup):
         aggregate_instance = aggregate_instance._create_AggregatesStore(project)
         for aggregate in aggregate_instance:
             half = aggregate[0].sp.get('half', -1)
-            for job in aggregate:
-                assert half == job.sp.get('half', -1)
+            assert all(half == job.sp.get('half', -1) for job in aggregate)
         assert len(aggregate_instance) == 6
 
     def test_groupby_with_Iterable_key(self, setUp, project):
         aggregate_instance = aggregator.groupby(['i', 'even'])
         aggregate_instance = aggregate_instance._create_AggregatesStore(project)
-        # No aggregation takes place
+        # No aggregation takes place hence this means we don't need to check
+        # whether all the aggregate members are equivalent.
         assert len(aggregate_instance) == 10
 
     def test_groupby_with_invalid_Iterable_key(self, setUp, project):
@@ -215,8 +231,10 @@ class TestAggregateStoring(AggregateProjectSetup):
         for aggregate in aggregate_instance:
             half = aggregate[0].sp.get('half', -1)
             even = aggregate[0].sp.get('even', -1)
-            for job in aggregate:
-                assert half == job.sp.get('half', -1) and even == job.sp.get('even', -1)
+            assert all(
+                half == job.sp.get('half', -1) and even == job.sp.get('even', -1)
+                for job in aggregate
+            )
         assert len(aggregate_instance) == 6
 
     def test_groupby_with_callable_key(self, setUp, project):
@@ -227,8 +245,7 @@ class TestAggregateStoring(AggregateProjectSetup):
         aggregate_instance = aggregate_instance._create_AggregatesStore(project)
         for aggregate in aggregate_instance:
             even = aggregate[0].sp.even
-            for job in aggregate:
-                assert even == job.sp.even
+            assert all(even == job.sp.even for job in aggregate)
         assert len(aggregate_instance) == 2
 
     def test_groupby_with_invalid_callable_key(self, setUp, project):

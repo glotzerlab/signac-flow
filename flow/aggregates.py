@@ -78,8 +78,7 @@ class aggregator:
 
     @classmethod
     def groupsof(cls, num=1, sort_by=None, reverse_order=False, select=None):
-        """Decorator for operation function that aggregates signac jobs in groups of
-        a number provided by the user.
+        """Aggregates jobs of a set group size.
 
         By default aggregate of a single job is created.
 
@@ -139,8 +138,7 @@ class aggregator:
 
     @classmethod
     def groupby(cls, key, default=None, sort_by=None, reverse_order=False, select=None):
-        """Decorator for operation function that aggregates signac jobs by grouping them
-        via a key.
+        """Aggregates jobs according to matching state point key values.
 
         The below code-block provides an example on how to aggregate jobs having
         common state point parameter 'sp' whose value, when not found, is replaced by a
@@ -252,9 +250,9 @@ class aggregator:
         return int(sha1(blob.encode('utf-8')).hexdigest(), 16)
 
     def _get_unique_function_id(self, func):
-        """Generate unique id for the function passed. This id is used to generate hash
-        and compare the ``self._aggregator_function`` and ``self._select`` attributes
-        of instances of this class.
+        """Generate unique id for the function passed. The id returned is used to generate
+        hash and compare arbitrary types which are callable like ``self._aggregator_function``
+        and ``self._select`` attributes.
         """
         try:
             return func.__code__.co_code
@@ -294,23 +292,29 @@ class _AggregatesStore:
     This is a callable class which, when called, generates all the aggregates.
     When iterated through it's instance, all the aggregates are yielded.
 
-    :param aggregate:
+    :param aggregator:
         aggregator object associated with this class.
-    :type aggregate:
+    :type aggregator:
         :py:class:`aggregator`
     :param project:
         A signac project used to fetch jobs for creating aggregates.
     :type project:
         :py:class:`flow.FlowProject` or :py:class:`signac.contrib.project.Project`
     """
-    def __init__(self, aggregate, project):
-        self._aggregate = aggregate
+    def __init__(self, aggregator, project):
+        self._aggregator = aggregator
+
+        # We need to create a _MakeAggregate instance associated with this object
+        # in order to generate aggregates whenever necessary.
+        self._make_aggregates = _MakeAggregates(
+            aggregator._aggregator_function, aggregator._sort_by,
+            aggregator._reverse_order, aggregator._select, project)
 
         # We need to register the aggregates for this instance using the
         # project provided.
         self._aggregates = list()
         self._aggregate_ids = dict()
-        self._register_aggregates(project)
+        self._register_aggregates()
 
     def __iter__(self):
         yield from self._aggregates
@@ -340,20 +344,17 @@ class _AggregatesStore:
     def __eq__(self, other):
         return type(self) == type(other) and \
                self._aggregates == other._aggregates and \
-               self._aggregate == other._aggregate
+               self._aggregator == other._aggregator
 
     def __hash__(self):
         blob = str(hash(self._aggregate))
         return int(sha1(blob.encode('utf-8')).hexdigest(), 16)
 
-    def _register_aggregates(self, project):
+    def _register_aggregates(self):
         """If the instance of this class is called then we will
         generate aggregates and store them in ``self._aggregates``.
         """
-        make_aggregates = _MakeAggregates(self._aggregate, project)
-        aggregates, aggregate_ids = make_aggregates()
-        self._aggregates = aggregates
-        self._aggregate_ids = aggregate_ids
+        self._aggregates, self._aggregate_ids = self._make_aggregates()
 
 
 class _DefaultAggregateStore:
@@ -412,29 +413,45 @@ class _MakeAggregates:
     """This class acts as a funnctor which handles the creation of
     aggregates using all the jobs in a project.
 
-    :param aggregate:
-        aggregator object associated with this class.
-    :type aggregate:
+    :param aggregator_function:
+        The ``aggregator_function`` attribute associated with the
         :py:class:`aggregator`
+    :type aggregator_function:
+        callable
+    :param sort_by:
+        The ``sort_by`` attribute associated with the :py:class:`aggregator`
+    :type sort_by:
+        str or NoneType
+    :param reverse_order:
+        The ``reverse_order`` attribute associated with the :py:class:`aggregator`
+    :type reverse_order:
+        bool
+    :param select:
+        The ``select`` attribute associated with the :py:class:`aggregator`
+    :type select:
+        callable or NoneType
     :param project:
         A signac project used to fetch jobs for creating aggregates.
     :type project:
         :py:class:`flow.FlowProject` or :py:class:`signac.contrib.project.Project`
     """
-    def __init__(self, aggregate, project):
-        self._aggregate = aggregate
+    def __init__(self, aggregator_function, sort_by, reverse_order, select, project):
+        self._aggregator_function = aggregator_function
+        self._sort_by = sort_by
+        self._reverse_order = bool(reverse_order)
+        self._select = select
         self._project = project
 
     def __call__(self):
         jobs = list(self._project)
 
-        if self._aggregate._select is not None:
-            jobs = filter(self._aggregate._select, jobs)
-        if self._aggregate._sort_by is not None:
+        if self._select is not None:
+            jobs = list(filter(self._select, jobs))
+        if self._sort_by is not None:
             jobs = sorted(jobs,
-                          key=lambda job: job.sp[self._aggregate._sort_by],
-                          reverse=self._aggregate._reverse_order)
-        aggregated_jobs = self._aggregate._aggregator_function(jobs)
+                          key=lambda job: job.sp[self._sort_by],
+                          reverse=self._reverse_order)
+        aggregated_jobs = self._aggregator_function(jobs)
         return self._create_nested_aggregate_list(aggregated_jobs)
 
     def _create_nested_aggregate_list(self, aggregated_jobs):
@@ -447,12 +464,12 @@ class _MakeAggregates:
         for aggregate in aggregated_jobs:
             try:
                 filter_aggregate = tuple(filter(self._validate_and_filter_job, aggregate))
-                # Store aggregate in this instance
-                nested_aggregates.append(filter_aggregate)
-                # Store aggregate by their ids in order to search through id
-                aggregate_ids[get_aggregate_id(filter_aggregate)] = filter_aggregate
             except TypeError:  # aggregate is not iterable
                 ValueError("Invalid aggregator_function provided by the user.")
+            # Store aggregate in this instance
+            nested_aggregates.append(filter_aggregate)
+            # Store aggregate by their ids in order to search through id
+            aggregate_ids[get_aggregate_id(filter_aggregate)] = filter_aggregate
 
         return nested_aggregates, aggregate_ids
 

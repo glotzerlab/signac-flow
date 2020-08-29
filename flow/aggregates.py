@@ -343,7 +343,6 @@ class _AggregatesStore:
 
     def __eq__(self, other):
         return type(self) == type(other) and \
-               self._aggregate_ids.keys() == other._aggregate_ids.keys() and \
                self._aggregator == other._aggregator
 
     def __hash__(self):

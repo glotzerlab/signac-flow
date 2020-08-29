@@ -7,6 +7,28 @@ import signac
 from flow.aggregates import aggregator
 
 
+@pytest.fixture
+def list_of_aggregates():
+    def helper_default_aggregator_function(jobs):
+        return [jobs]
+
+    def helper_non_default_aggregator_function(jobs):
+        for job in jobs:
+            yield (job,)
+
+    # The below list contains 9 distinct aggregator objects and some duplicates.
+    return [
+        aggregator(), aggregator(), aggregator(helper_default_aggregator_function),
+        aggregator(helper_non_default_aggregator_function),
+        aggregator(helper_non_default_aggregator_function),
+        aggregator.groupsof(1), aggregator.groupsof(1),
+        aggregator.groupsof(2), aggregator.groupsof(3), aggregator.groupsof(4),
+        aggregator.groupby('even'), aggregator.groupby('even'),
+        aggregator.groupby('half', -1), aggregator.groupby('half', -1),
+        aggregator.groupby(['half', 'even'], default=[-1, -1])
+    ]
+
+
 class AggregateProjectSetup:
     project_class = signac.Project
     entrypoint = dict(path='')
@@ -101,34 +123,14 @@ class TestAggregate(AggregateProjectSetup):
         with pytest.raises(ValueError):
             aggregator.groupby(['half', 'even'], default=[-1, -1, -1])
 
-    def test_aggregate_hashing(self):
+    def test_aggregate_hashing(self, list_of_aggregates):
         # Since we need to store groups on a per aggregate basis in the project,
         # we need to be sure that the aggregates are hashing and compared correctly.
         # This test ensures this feature.
-
-        def helper_default_aggregator_function(jobs):
-            return [jobs]
-
-        def helper_non_default_aggregator_function(jobs):
-            for job in jobs:
-                yield (job,)
-
-        list_of_aggregates = [
-            aggregator(), aggregator(), aggregator(helper_default_aggregator_function),
-            aggregator(helper_non_default_aggregator_function),
-            aggregator(helper_non_default_aggregator_function),
-            aggregator.groupsof(1), aggregator.groupsof(1),
-            aggregator.groupsof(2), aggregator.groupsof(3), aggregator.groupsof(4),
-            aggregator.groupby('half'), aggregator.groupby('half'), aggregator.groupby('even'),
-            aggregator.groupby('half', -1), aggregator.groupby('even', -1),
-            aggregator.groupby(['half', 'even'], default=[-1, -1])
-        ]
-
-        # The above list contains 11 distinct aggregator objects and some duplicates.
-        # When this list is converted to set, then these objects hashed first and
-        # then compared. Since sets don't carry duplicate values, we test whether the
-        # length of the set obtained from the list is equal to 11 or not.
-        assert len(set(list_of_aggregates)) == 11
+        # When list_of_aggregates is converted to set, then these objects are
+        # hashed first and then compared. Since sets don't carry duplicate values,
+        # we test whether the length of the set obtained from the list is equal to 9 or not.
+        assert len(set(list_of_aggregates)) == 9
 
 
 # Test the _AggregatesStore and _DefaultAggregateStore classes
@@ -269,36 +271,16 @@ class TestAggregateStoring(AggregateProjectSetup):
                 selected_jobs.append((job,))
         assert list(aggregate_instance) == selected_jobs
 
-    def test_storing_hashing(self, setUp, project):
+    def test_storing_hashing(self, setUp, project, list_of_aggregates):
         # Since we need to store groups on a per aggregate basis in the project,
         # we need to be sure that the aggregates are hashing and compared correctly.
         # This test ensures this feature.
-
         def _create_storing(aggregator):
             return aggregator._create_AggregatesStore(project)
 
-        def helper_default_aggregator_function(jobs):
-            return [jobs]
-
-        def helper_non_default_aggregator_function(jobs):
-            for job in jobs:
-                yield (job,)
-
-        list_of_aggregates = [
-            aggregator(), aggregator(), aggregator(helper_default_aggregator_function),
-            aggregator(helper_non_default_aggregator_function),
-            aggregator(helper_non_default_aggregator_function),
-            aggregator.groupsof(1), aggregator.groupsof(1),
-            aggregator.groupsof(2), aggregator.groupsof(3), aggregator.groupsof(4),
-            aggregator.groupby('even'), aggregator.groupby('even'),
-            aggregator.groupby('half', -1), aggregator.groupby('half', -1),
-            aggregator.groupby(['half', 'even'], default=[-1, -1])
-        ]
-
         list_of_storing = list(map(_create_storing, list_of_aggregates))
-
         # The above list contains 9 distinct storing objects and some duplicates.
-        # When this list is converted to set, then these objects hashed first and
+        # When this list is converted to set, then these objects are hashed first and
         # then compared. Since sets don't carry duplicate values, we test whether the
         # length of the set obtained from the list is equal to 9 or not.
         assert len(set(list_of_storing)) == 9

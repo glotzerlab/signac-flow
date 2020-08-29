@@ -42,10 +42,15 @@ class aggregator:
         The default behavior is no filtering.
     :type select:
         callable or NoneType
+    :param tag:
+        Additional information about the aggregator object which is a factor of
+        difference between two aggregator objects.
+    :type tag:
+        str or NoneType
     """
 
     def __init__(self, aggregator_function=None, sort_by=None, reverse_order=False,
-                 select=None, **kwargs):
+                 select=None, tag=None):
         if aggregator_function is None:
             def aggregator_function(jobs):
                 return [jobs]
@@ -58,19 +63,20 @@ class aggregator:
         elif select is not None and not callable(select):
             raise TypeError(f"Expected callable for select, got {type(select)}")
 
-        # For "non-aggregate" functions we set the aggregator object equals to
+        # For "non-aggregate" operations we set the aggregator object equals to
         # aggregator.groupsof(1). If any other aggregator object is associated with an
-        # operation function then mark that as a "aggregate operation" else it's a
+        # operation function then mark that as a "aggregate" operation else it's a
         # "non-aggregate" operation.
-        if sort_by is None and select is None and not reverse_order:
-            self._is_aggregate = getattr(aggregator_function, '_num', 0) != 1
-        else:
-            self._is_aggregate = True
-
+        self._is_aggregate = getattr(aggregator_function, '_groupby_is_aggregate', True)
         self._aggregator_function = aggregator_function
         self._sort_by = sort_by
         self._reverse_order = bool(reverse_order)
         self._select = select
+        # The idea of providing users with an additional tag attribute comes from the fact
+        # that the byte code of an aggregator function cannot truly differentiate it with
+        # some other aggregator function. Hence while checking the equality, we also
+        # check the equality based on tags provided by an user.
+        self._tag = tag
 
     @classmethod
     def groupsof(cls, num=1, sort_by=None, reverse_order=False, select=None):
@@ -128,9 +134,11 @@ class aggregator:
             args = [iter(jobs)] * num
             return zip_longest(*args)
 
-        setattr(aggregator_function, '_num', num)
+        # Special attribute for default aggregates in flow (Groups of 1)
+        if sort_by is None and select is None and not reverse_order:
+            setattr(aggregator_function, '_groupby_is_aggregate', num != 1)
 
-        return cls(aggregator_function, sort_by, reverse_order, select)
+        return cls(aggregator_function, sort_by, reverse_order, select, f'predefined-groupsof{num}')
 
     @classmethod
     def groupby(cls, key, default=None, sort_by=None, reverse_order=False, select=None):
@@ -207,10 +215,9 @@ class aggregator:
             for key, group in groupby(sorted(jobs, key=keyfunction), key=keyfunction):
                 yield group
 
-        setattr(aggregator_function, '_key', key)
-        setattr(aggregator_function, '_default', default)
+        tag = f'predefined-groupby-{key}-{default}'
 
-        return cls(aggregator_function, sort_by, reverse_order, select)
+        return cls(aggregator_function, sort_by, reverse_order, select, tag)
 
     def __eq__(self, other):
         if type(self) != type(other):
@@ -218,15 +225,7 @@ class aggregator:
         elif(
             self._sort_by != other._sort_by or
             self._reverse_order != other._reverse_order or
-            # Check equality of the _num attribute set in groupsof class method..
-            getattr(self._aggregator_function, '_num', None) !=
-            getattr(other._aggregator_function, '_num', None) or
-            # Check equality of the _key attribute set in groupby class method.
-            getattr(self._aggregator_function, '_key', None) !=
-            getattr(other._aggregator_function, '_key', None) or
-            # Check equality of the _default attribute set in groupby class method.
-            getattr(self._aggregator_function, '_default', None) !=
-            getattr(other._aggregator_function, '_default', None)
+            self._tag != other._tag
         ):
             return False
         elif(
@@ -247,7 +246,7 @@ class aggregator:
 
     def __hash__(self):
         blob_l = [
-            hash(self._sort_by), hash(self._reverse_order),
+            hash(self._sort_by), hash(self._reverse_order), hash(self._tag),
             self._get_unique_function_id(self._aggregator_function),
             self._get_unique_function_id(self._select)
         ]

@@ -289,10 +289,16 @@ class TestAggregateStoring(AggregateProjectSetup):
         def _create_storing(aggregator):
             return aggregator._create_AggregatesStore(project)
 
-        list_of_storing = list(map(_create_storing, list_of_aggregates))
+        list_of_storing = set(map(_create_storing, list_of_aggregates))
         for stored_aggregate in list_of_storing:
             for aggregate in stored_aggregate:
                 assert aggregate == stored_aggregate[get_aggregate_id(aggregate)]
+
+    def test_get_invalid_id(self, setUp, project):
+        aggregator_instance = aggregator()._create_AggregatesStore(project)
+        for job in project:
+            with pytest.raises(LookupError):
+                aggregator_instance[get_aggregate_id((job,))]
 
     def test_contains(self, setUp, project):
         aggregator_instance = aggregator()._create_AggregatesStore(project)

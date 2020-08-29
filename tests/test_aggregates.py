@@ -268,3 +268,37 @@ class TestAggregateStoring(AggregateProjectSetup):
             if _select(job):
                 selected_jobs.append((job,))
         assert list(aggregate_instance) == selected_jobs
+
+    def test_storing_hashing(self, setUp, project):
+        # Since we need to store groups on a per aggregate basis in the project,
+        # we need to be sure that the aggregates are hashing and compared correctly.
+        # This test ensures this feature.
+
+        def _create_storing(aggregator):
+            return aggregator._create_AggregatesStore(project)
+
+        def helper_default_aggregator_function(jobs):
+            return [jobs]
+
+        def helper_non_default_aggregator_function(jobs):
+            for job in jobs:
+                yield (job,)
+
+        list_of_aggregates = [
+            aggregator(), aggregator(), aggregator(helper_default_aggregator_function),
+            aggregator(helper_non_default_aggregator_function),
+            aggregator(helper_non_default_aggregator_function),
+            aggregator.groupsof(1), aggregator.groupsof(1),
+            aggregator.groupsof(2), aggregator.groupsof(3), aggregator.groupsof(4),
+            aggregator.groupby('even'), aggregator.groupby('even'),
+            aggregator.groupby('half', -1), aggregator.groupby('half', -1),
+            aggregator.groupby(['half', 'even'], default=[-1, -1])
+        ]
+
+        list_of_storing = list(map(_create_storing, list_of_aggregates))
+
+        # The above list contains 9 distinct storing objects and some duplicates.
+        # When this list is converted to set, then these objects hashed first and
+        # then compared. Since sets don't carry duplicate values, we test whether the
+        # length of the set obtained from the list is equal to 9 or not.
+        assert len(set(list_of_storing)) == 9

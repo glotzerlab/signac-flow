@@ -340,11 +340,11 @@ class _AggregatesStore:
 
     def __eq__(self, other):
         return type(self) == type(other) and \
-               self._aggregates == other._aggregates and \
+               self._aggregate_ids.keys() == other._aggregate_ids.keys() and \
                self._aggregator == other._aggregator
 
     def __hash__(self):
-        blob = str(hash(self._aggregate))
+        blob = str(hash(self._aggregator))
         return int(sha1(blob.encode('utf-8')).hexdigest(), 16)
 
     def _register_aggregates(self, project):
@@ -413,11 +413,14 @@ class _DefaultAggregateStore:
         except KeyError:
             raise LookupError(f"Did not find job with id {id}.")
 
-    def __contains__(self, job):
+    def __contains__(self, aggregate):
         """Return whether the job is present in the project associated with this
         instance of :py:class:`_DefaultAggregateStore`.
         """
-        return job in self._project
+        # signac-flow internally assumes every aggregate to be a tuple.
+        # Hence this method will also get a tuple as an input.
+        assert len(aggregate) == 1
+        return aggregate[0] in self._project
 
     def __len__(self):
         return len(self._project)
@@ -467,14 +470,15 @@ class _MakeAggregates:
         self._select = select
 
     def __call__(self, project):
+        jobs = project
+        if self._select is not None:
+            jobs = filter(self._select, jobs)
         if self._sort_by is None:
-            jobs = list(project)
+            jobs = list(jobs)
         else:
-            jobs = sorted(project,
+            jobs = sorted(jobs,
                           key=lambda job: job.sp[self._sort_by],
                           reverse=self._reverse_order)
-        if self._select is not None:
-            jobs = list(filter(self._select, jobs))
         yield from self._aggregator_function(jobs)
 
     @classmethod

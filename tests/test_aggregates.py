@@ -4,7 +4,7 @@ from functools import partial
 from tempfile import TemporaryDirectory
 
 import signac
-from flow.aggregates import aggregator
+from flow.aggregates import aggregator, get_aggregate_id
 
 
 @pytest.fixture
@@ -284,3 +284,18 @@ class TestAggregateStoring(AggregateProjectSetup):
         # then compared. Since sets don't carry duplicate values, we test whether the
         # length of the set obtained from the list is equal to 9 or not.
         assert len(set(list_of_storing)) == 9
+
+    def test_get_by_id(self, setUp, project, list_of_aggregates):
+        def _create_storing(aggregator):
+            return aggregator._create_AggregatesStore(project)
+
+        list_of_storing = list(map(_create_storing, list_of_aggregates))
+        for stored_aggregate in list_of_storing:
+            for aggregate in stored_aggregate:
+                assert aggregate == stored_aggregate[get_aggregate_id(aggregate)]
+
+    def test_contains(self, setUp, project):
+        aggregator_instance = aggregator()._create_AggregatesStore(project)
+        assert tuple(project) in aggregator_instance
+        for job in project:
+            assert not (job,) in aggregator_instance

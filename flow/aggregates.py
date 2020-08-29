@@ -430,7 +430,7 @@ class _DefaultAggregateStore:
                self._project == other._project
 
     def __hash__(self):
-        blob = self._project.id
+        blob = self._project.get_id()
         return int(sha1(blob.encode('utf-8')).hexdigest(), 16)
 
     def _register_aggregates(self, project):

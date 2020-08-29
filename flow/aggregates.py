@@ -63,11 +63,10 @@ class aggregator:
         elif select is not None and not callable(select):
             raise TypeError(f"Expected callable for select, got {type(select)}")
 
-        # For "non-aggregate" operations we set the aggregator object equals to
-        # aggregator.groupsof(1). If any other aggregator object is associated with an
-        # operation function then mark that as a "aggregate" operation else it's a
-        # "non-aggregate" operation.
-        self._is_aggregate = getattr(aggregator_function, '_groupby_is_aggregate', True)
+        # Set the `_is_aggregate` attribute to True by default. But if the "non-aggregate"
+        # aggregator object i.e. aggregator.groupsof(1) is created using the class method,
+        # then we explicitly set the `_is_aggregate` attribute to False.
+        self._is_aggregate = True
         self._aggregator_function = aggregator_function
         self._sort_by = sort_by
         self._reverse_order = bool(reverse_order)
@@ -75,7 +74,7 @@ class aggregator:
         # The idea of providing users with an additional tag attribute comes from the fact
         # that the byte code of an aggregator function cannot truly differentiate it with
         # some other aggregator function. Hence while checking the equality, we also
-        # check the equality based on tags provided by an user.
+        # check the equality based on tag provided by an user or us in a classmethod.
         self._tag = tag
 
     @classmethod
@@ -134,11 +133,13 @@ class aggregator:
             args = [iter(jobs)] * num
             return zip_longest(*args)
 
-        # Special attribute for default aggregates in flow (Groups of 1)
-        if sort_by is None and select is None and not reverse_order:
-            setattr(aggregator_function, '_groupby_is_aggregate', num != 1)
+        aggregator_obj = cls(aggregator_function, sort_by, reverse_order,
+                             select, f'groupsof{num}')
 
-        return cls(aggregator_function, sort_by, reverse_order, select, f'predefined-groupsof{num}')
+        if num == 1 and sort_by == select is None and not reverse_order:
+            aggregator_obj._is_aggregate = False
+
+        return aggregator_obj
 
     @classmethod
     def groupby(cls, key, default=None, sort_by=None, reverse_order=False, select=None):
@@ -215,9 +216,7 @@ class aggregator:
             for key, group in groupby(sorted(jobs, key=keyfunction), key=keyfunction):
                 yield group
 
-        tag = f'predefined-groupby-{key}-{default}'
-
-        return cls(aggregator_function, sort_by, reverse_order, select, tag)
+        return cls(aggregator_function, sort_by, reverse_order, select, f'groupby{key}-{default}')
 
     def __eq__(self, other):
         if type(self) != type(other):

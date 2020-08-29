@@ -289,19 +289,31 @@ class TestAggregateStoring(AggregateProjectSetup):
         def _create_storing(aggregator):
             return aggregator._create_AggregatesStore(project)
 
+        # The below set contains the default as well as manu non-default
+        # objects which stores aggregates.
         list_of_storing = set(map(_create_storing, list_of_aggregates))
         for stored_aggregate in list_of_storing:
             for aggregate in stored_aggregate:
                 assert aggregate == stored_aggregate[get_aggregate_id(aggregate)]
 
     def test_get_invalid_id(self, setUp, project):
+        jobs = tuple(project)
         aggregator_instance = aggregator()._create_AggregatesStore(project)
-        for job in project:
-            with pytest.raises(LookupError):
-                aggregator_instance[get_aggregate_id((job,))]
+        default_aggregator = aggregator.groupsof(1)._create_AggregatesStore(project)
+        # Test for an aggregate of single job for aggregator instance
+        with pytest.raises(LookupError):
+            aggregator_instance[get_aggregate_id((jobs[0],))]
+        # Test for an aggregate of all jobs for default aggregator
+        with pytest.raises(LookupError):
+            default_aggregator[get_aggregate_id(jobs)]
 
     def test_contains(self, setUp, project):
+        jobs = tuple(project)
         aggregator_instance = aggregator()._create_AggregatesStore(project)
-        assert tuple(project) in aggregator_instance
-        for job in project:
-            assert not (job,) in aggregator_instance
+        default_aggregator = aggregator.groupsof(1)._create_AggregatesStore(project)
+        # Test for an aggregate of all jobs
+        assert jobs in aggregator_instance
+        assert jobs not in default_aggregator
+        # Test for an aggregate of single job
+        assert not (jobs[0],) in aggregator_instance
+        assert (jobs[0],) in default_aggregator

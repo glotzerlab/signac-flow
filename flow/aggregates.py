@@ -42,8 +42,6 @@ class aggregator:
         The default behavior is no filtering.
     :type select:
         callable or NoneType
-    :param \*\*kwargs:
-        Additional information related to aggregator_function function.
     """
 
     def __init__(self, aggregator_function=None, sort_by=None, reverse_order=False,
@@ -69,7 +67,6 @@ class aggregator:
         else:
             self._is_aggregate = True
 
-        self._kwargs = kwargs
         self._aggregator_function = aggregator_function
         self._sort_by = sort_by
         self._reverse_order = bool(reverse_order)
@@ -133,7 +130,7 @@ class aggregator:
 
         setattr(aggregator_function, '_num', num)
 
-        return cls(aggregator_function, sort_by, reverse_order, select, num=num)
+        return cls(aggregator_function, sort_by, reverse_order, select)
 
     @classmethod
     def groupby(cls, key, default=None, sort_by=None, reverse_order=False, select=None):
@@ -210,8 +207,10 @@ class aggregator:
             for key, group in groupby(sorted(jobs, key=keyfunction), key=keyfunction):
                 yield group
 
-        return cls(aggregator_function, sort_by, reverse_order, select,
-                   key=key, default=default)
+        setattr(aggregator_function, '_key', key)
+        setattr(aggregator_function, '_default', default)
+
+        return cls(aggregator_function, sort_by, reverse_order, select)
 
     def __eq__(self, other):
         if type(self) != type(other):
@@ -219,7 +218,15 @@ class aggregator:
         elif(
             self._sort_by != other._sort_by or
             self._reverse_order != other._reverse_order or
-            self._kwargs != other._kwargs
+            # Check equality of the _num attribute set in groupsof class method..
+            getattr(self._aggregator_function, '_num', None) !=
+            getattr(other._aggregator_function, '_num', None) or
+            # Check equality of the _key attribute set in groupby class method.
+            getattr(self._aggregator_function, '_key', None) !=
+            getattr(other._aggregator_function, '_key', None) or
+            # Check equality of the _default attribute set in groupby class method.
+            getattr(self._aggregator_function, '_default', None) !=
+            getattr(other._aggregator_function, '_default', None)
         ):
             return False
         elif(
@@ -419,8 +426,7 @@ class _DefaultAggregateStore:
         """
         # signac-flow internally assumes every aggregate to be a tuple.
         # Hence this method will also get a tuple as an input.
-        assert len(aggregate) == 1
-        return aggregate[0] in self._project
+        return len(aggregate) == 1 and aggregate[0] in self._project
 
     def __len__(self):
         return len(self._project)

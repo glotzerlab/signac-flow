@@ -90,7 +90,7 @@ class aggregator:
         For instance, if 10 jobs are present in a project and they are aggregated in
         groups of 3, then the generated aggregates will have lengths 3, 3, 3, and 1.
 
-        The below code-block provides an example on how jobs can be aggregated in
+        The code block below provides an example on how jobs can be aggregated in
         groups of 2.
 
         .. code-block:: python

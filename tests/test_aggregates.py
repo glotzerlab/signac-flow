@@ -44,7 +44,7 @@ class AggregateProjectSetup:
     def mock_project(self):
         project = self.project_class.get_project(root=self._tmp_dir.name)
         for i in range(10):
-            even = i % 2 == 0
+            even = (i % 2) == 0
             if even:
                 project.open_job(dict(i=i, half=i / 2, even=even)).init()
             else:

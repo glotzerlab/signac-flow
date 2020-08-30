@@ -2,7 +2,7 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 from collections.abc import Iterable
-from hashlib import sha1
+from hashlib import md5
 from itertools import groupby
 from itertools import zip_longest
 
@@ -20,10 +20,9 @@ class aggregator:
             print(len(jobs))
 
     :param aggregator_function:
-        Information describing how to aggregate jobs. Is a callable that
-        takes in a list of jobs and can return or yield subsets of jobs as
-        an iterable. The default behavior is creating a single aggregate
-        of all jobs.
+        A callable that performs aggregation of jobs. It takes in a list of
+        jobs and can return or yield subsets of jobs as an iterable. The
+        default behavior is creating a single aggregate of all jobs.
     :type aggregator_function:
         callable
     :param sort_by:
@@ -38,13 +37,15 @@ class aggregator:
         bool
     :param select:
         Condition for filtering individual jobs. This is passed as the
-        callable argument to `filter`.
-        The default behavior is no filtering.
+        callable argument to `filter`. The default behavior is no filtering.
     :type select:
         callable or NoneType
     :param tag:
         Additional information about the aggregator object which is a factor of
-        difference between two aggregator objects.
+        difference between two aggregator objects. signac-flow uses byte code
+        to compare callables like `aggregator_function` and `select`. Since a
+        byte code cannot truly differentiate between callables hence the tag,
+        if provided, becomes a factor of differentiation.
     :type tag:
         str or NoneType
     """
@@ -83,11 +84,11 @@ class aggregator:
 
         By default aggregate of a single job is created.
 
-        If the number of jobs present in the project can't be divided by the number
-        provided by the user then the last aggregate will have the maximum possible
-        jobs in it.
-        For instace, if 10 jobs are present in a project and they are aggregated in groups
-        of 3 then the length of aggregates would be 3, 3, 3, 1.
+        If the number of jobs present in the project is not divisible by the number
+        provided by the user, the last aggregate will be smaller and contain all
+        remaining jobs.
+        For instance, if 10 jobs are present in a project and they are aggregated in
+        groups of 3, then the generated aggregates will have lengths 3, 3, 3, and 1.
 
         The below code-block provides an example on how jobs can be aggregated in
         groups of 2.
@@ -129,6 +130,8 @@ class aggregator:
         except TypeError:
             raise TypeError('The num parameter should be an integer')
 
+        # The idea of this method was originally implemented in #52 which was copied from:
+        # https://docs.python.org/3/library/itertools.html#itertools.zip_longest
         def aggregator_function(jobs):
             args = [iter(jobs)] * num
             return zip_longest(*args)
@@ -145,7 +148,7 @@ class aggregator:
     def groupby(cls, key, default=None, sort_by=None, reverse_order=False, select=None):
         """Aggregates jobs according to matching state point key values.
 
-        The below code-block provides an example on how to aggregate jobs having
+        The below code block provides an example of how to aggregate jobs having a
         common state point parameter 'sp' whose value, when not found, is replaced by a
         default value of -1.
 
@@ -157,8 +160,10 @@ class aggregator:
                 print(len(jobs))
 
         :param key:
-            Parameter which specifies how to group jobs based on a single
-            or a list of state point parameters or a custom callable.
+            The method by which jobs are grouped. It may be a state point
+            or a sequence of state points to group by specific state point
+            keys. It may also be an arbitrary callable of :class:`signac.Job`
+            when greater flexibility is needed.
         :type key:
             str, Iterable, or callable
         :param default:
@@ -221,15 +226,15 @@ class aggregator:
     def __eq__(self, other):
         if type(self) != type(other):
             return False
-        elif(
-            self._sort_by != other._sort_by or
-            self._reverse_order != other._reverse_order or
-            self._tag != other._tag
+        elif (
+             self._sort_by != other._sort_by or
+             self._reverse_order != other._reverse_order or
+             self._tag != other._tag
         ):
             return False
-        elif(
-            self._select == other._select and
-            self._aggregator_function == other._aggregator_function
+        elif (
+             self._select == other._select and
+             self._aggregator_function == other._aggregator_function
         ):
             return True
 
@@ -251,7 +256,7 @@ class aggregator:
         ]
         blob = ','.join(str(attr) for attr in blob_l)
 
-        return int(sha1(blob.encode('utf-8')).hexdigest(), 16)
+        return id(_hash(blob))
 
     def _get_unique_function_id(self, func):
         """Generate unique id for the function passed. The id returned is used to generate
@@ -264,10 +269,13 @@ class aggregator:
             return hash(func)
 
     def _create_AggregatesStore(self, project):
-        """Create the instance of _AggregatesStore or _DefaultAggregateStore classes
-        to make sure that we don't explicitly store the aggregates in the FlowProject.
+        """Create the actual collections of jobs to be sent to aggregate operations.
 
-        When iterated over these classes, an aggregate is yielded.
+        The :class:`aggregate` class is just a decorator that provides a signal for
+        operation functions that should be treated as aggregate operations and
+        information on how to perform the aggregation. This function generates
+        the classes that actually hold sequences of jobs to which aggregate
+        operations will be applied.
 
         :param project:
             A signac project used to fetch jobs for creating aggregates.
@@ -291,7 +299,7 @@ class aggregator:
 
 class _AggregatesStore:
     """This class holds the information of all the aggregates associated with
-    a :py:class:`aggregator`.
+    a :class:`aggregator`.
 
     This is a callable class which, when called, generates all the aggregates.
     When iterated through it's instance, all the aggregates are yielded.
@@ -345,7 +353,7 @@ class _AggregatesStore:
 
     def __hash__(self):
         blob = str(hash(self._aggregator))
-        return int(sha1(blob.encode('utf-8')).hexdigest(), 16)
+        return id(_hash(blob))
 
     def _register_aggregates(self, project):
         """If the instance of this class is called then we will
@@ -438,7 +446,7 @@ class _DefaultAggregateStore:
 
     def __hash__(self):
         blob = self._project.get_id()
-        return int(sha1(blob.encode('utf-8')).hexdigest(), 16)
+        return id(_hash(blob))
 
     def _register_aggregates(self, project):
         """We have to store self._project when this method is invoked
@@ -460,4 +468,8 @@ def get_aggregate_id(jobs):
         return jobs[0].get_id()  # Return job id as it's already unique
 
     blob = ','.join((job.get_id() for job in jobs))
-    return f'agg-{sha1(blob.encode()).hexdigest()}'
+    return f'agg-{_hash(blob)}'
+
+
+def _hash(blob):
+    return md5(blob.encode()).hexdigest()

@@ -256,7 +256,7 @@ class aggregator:
         ]
         blob = ','.join(str(attr) for attr in blob_l)
 
-        return id(_hash(blob))
+        return int(_hash(blob), 16)
 
     def _get_unique_function_id(self, func):
         """Generate unique id for the function passed. The id returned is used to generate
@@ -353,7 +353,7 @@ class _AggregatesStore:
 
     def __hash__(self):
         blob = str(hash(self._aggregator))
-        return id(_hash(blob))
+        return int(_hash(blob), 16)
 
     def _register_aggregates(self, project):
         """If the instance of this class is called then we will
@@ -446,7 +446,7 @@ class _DefaultAggregateStore:
 
     def __hash__(self):
         blob = self._project.get_id()
-        return id(_hash(blob))
+        return int(_hash(blob), 16)
 
     def _register_aggregates(self, project):
         """We have to store self._project when this method is invoked
@@ -472,4 +472,4 @@ def get_aggregate_id(jobs):
 
 
 def _hash(blob):
-    return md5(blob.encode()).hexdigest()
+    return md5(blob.encode('utf-8')).hexdigest()

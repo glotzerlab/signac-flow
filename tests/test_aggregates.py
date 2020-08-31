@@ -127,10 +127,12 @@ class TestAggregate(AggregateProjectSetup):
         # Since we need to store groups on a per aggregate basis in the project,
         # we need to be sure that the aggregates are hashing and compared correctly.
         # This test ensures this feature.
-        # When list_of_aggregates is converted to set, then these objects are
-        # hashed first and then compared. Since sets don't carry duplicate values,
-        # we test whether the length of the set obtained from the list is equal to 9 or not.
-        assert len(set(list_of_aggregates)) == 9
+        # list_of_aggregates contains 14 distinct storing objects (because and an
+        # aggregator object is differentiated on the basis of the `_is_aggregate` attribute).
+        # When this list is converted to set, then these objects are hashed first
+        # and then compared. Since sets don't carry duplicate values, we test
+        # whether the length of the set obtained from the list is equal to 14 or not.
+        assert len(set(list_of_aggregates)) == 14
 
 
 # Test the _AggregatesStore and _DefaultAggregateStore classes
@@ -279,11 +281,12 @@ class TestAggregateStoring(AggregateProjectSetup):
             return aggregator._create_AggregatesStore(project)
 
         list_of_storing = list(map(_create_storing, list_of_aggregates))
-        # The above list contains 9 distinct storing objects and some duplicates.
-        # When this list is converted to set, then these objects are hashed first and
-        # then compared. Since sets don't carry duplicate values, we test whether the
-        # length of the set obtained from the list is equal to 9 or not.
-        assert len(set(list_of_storing)) == 9
+        # The above list contains 14 distinct storing objects (because and a storing
+        # object is differentiated on the basis of the `_is_aggregate` attribute).
+        # When this list is converted to set, then these objects are hashed first
+        # and then compared. Since sets don't carry duplicate values, we test
+        # whether the length of the set obtained from the list is equal to 14 or not.
+        assert len(set(list_of_storing)) == 14
 
     def test_get_by_id(self, setUp, project, list_of_aggregates):
         def _create_storing(aggregator):

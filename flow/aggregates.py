@@ -40,18 +40,9 @@ class aggregator:
         callable argument to `filter`. The default behavior is no filtering.
     :type select:
         callable or NoneType
-    :param tag:
-        Additional information about the aggregator object which is a factor of
-        difference between two aggregator objects. signac-flow uses byte code
-        to compare callables like `aggregator_function` and `select`. Since a
-        byte code cannot truly differentiate between callables hence the tag,
-        if provided, becomes a factor of differentiation.
-    :type tag:
-        str or NoneType
     """
 
-    def __init__(self, aggregator_function=None, sort_by=None, reverse_order=False,
-                 select=None, tag=None):
+    def __init__(self, aggregator_function=None, sort_by=None, reverse_order=False, select=None):
         if aggregator_function is None:
             def aggregator_function(jobs):
                 return [jobs]
@@ -72,11 +63,6 @@ class aggregator:
         self._sort_by = sort_by
         self._reverse_order = bool(reverse_order)
         self._select = select
-        # The idea of providing users with an additional tag attribute comes from the fact
-        # that the byte code of an aggregator function cannot truly differentiate it with
-        # some other aggregator function. Hence while checking the equality, we also
-        # check the equality based on tag provided by an user or us in a classmethod.
-        self._tag = tag
 
     @classmethod
     def groupsof(cls, num=1, sort_by=None, reverse_order=False, select=None):
@@ -130,14 +116,13 @@ class aggregator:
         except TypeError:
             raise TypeError('The num parameter should be an integer')
 
-        # The idea of this method was originally implemented in #52 which was copied from:
+        # This method is similar to the `grouper` method which can be found in the link below
         # https://docs.python.org/3/library/itertools.html#itertools.zip_longest
         def aggregator_function(jobs):
             args = [iter(jobs)] * num
             return zip_longest(*args)
 
-        aggregator_obj = cls(aggregator_function, sort_by, reverse_order,
-                             select, f'groupsof{num}')
+        aggregator_obj = cls(aggregator_function, sort_by, reverse_order, select)
 
         if num == 1 and sort_by == select is None and not reverse_order:
             aggregator_obj._is_aggregate = False
@@ -221,36 +206,15 @@ class aggregator:
             for key, group in groupby(sorted(jobs, key=keyfunction), key=keyfunction):
                 yield group
 
-        return cls(aggregator_function, sort_by, reverse_order, select, f'groupby{key}-{default}')
+        return cls(aggregator_function, sort_by, reverse_order, select)
 
     def __eq__(self, other):
-        if type(self) != type(other):
-            return False
-        elif (
-             self._sort_by != other._sort_by or
-             self._reverse_order != other._reverse_order or
-             self._tag != other._tag
-        ):
-            return False
-        elif (
-             self._select == other._select and
-             self._aggregator_function == other._aggregator_function
-        ):
-            return True
-
-        # Get unique id for _select attribute
-        self_select = self._get_unique_function_id(self._select)
-        other_select = self._get_unique_function_id(other._select)
-        # Get unique id for _aggregator_function attribute
-        self_aggregator_function = self._get_unique_function_id(self._aggregator_function)
-        other_aggregator_function = self._get_unique_function_id(other._aggregator_function)
-
-        return self_select == other_select and \
-            self_aggregator_function == other_aggregator_function
+        return type(self) == type(other) and \
+               not self._is_aggregate and not other._is_aggregate
 
     def __hash__(self):
         blob_l = [
-            hash(self._sort_by), hash(self._reverse_order), hash(self._tag),
+            hash(self._sort_by), hash(self._reverse_order), hash(self._is_aggregate),
             self._get_unique_function_id(self._aggregator_function),
             self._get_unique_function_id(self._select)
         ]

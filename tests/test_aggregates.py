@@ -16,7 +16,7 @@ def list_of_aggregates():
         for job in jobs:
             yield (job,)
 
-    # The below list contains 9 distinct aggregator objects and some duplicates.
+    # The below list contains 14 distinct aggregator objects and some duplicates.
     return [
         aggregator(), aggregator(), aggregator(helper_default_aggregator_function),
         aggregator(helper_non_default_aggregator_function),

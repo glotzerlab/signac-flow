@@ -391,7 +391,7 @@ class _DefaultAggregateStore:
         try:
             return (self._project.open_job(id=id),)
         except KeyError:
-            raise LookupError(f"Did not find job with id {id}.")
+            raise LookupError(f"Did not find aggregate with id {id}.")
 
     def __contains__(self, aggregate):
         """Return whether the job is present in the project associated with this

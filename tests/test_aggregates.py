@@ -127,7 +127,7 @@ class TestAggregate(AggregateProjectSetup):
         # Since we need to store groups on a per aggregate basis in the project,
         # we need to be sure that the aggregates are hashing and compared correctly.
         # This test ensures this feature.
-        # list_of_aggregates contains 14 distinct storing objects (because and an
+        # list_of_aggregates contains 14 distinct storing objects (because an
         # aggregator object is differentiated on the basis of the `_is_aggregate` attribute).
         # When this list is converted to set, then these objects are hashed first
         # and then compared. Since sets don't carry duplicate values, we test
@@ -281,10 +281,10 @@ class TestAggregateStoring(AggregateProjectSetup):
             return aggregator._create_AggregatesStore(project)
 
         list_of_storing = list(map(_create_storing, list_of_aggregates))
-        # The above list contains 14 distinct storing objects (because and a storing
-        # object is differentiated on the basis of the `_is_aggregate` attribute).
-        # When this list is converted to set, then these objects are hashed first
-        # and then compared. Since sets don't carry duplicate values, we test
+        # The above list contains 14 distinct storing objects (because a storing
+        # object is differentiated on the basis of the `_is_aggregate` attribute of
+        # the aggregator). When this list is converted to set, then these objects are
+        # hashed first and then compared. Since sets don't carry duplicate values, we test
         # whether the length of the set obtained from the list is equal to 14 or not.
         assert len(set(list_of_storing)) == 14
 

@@ -167,6 +167,11 @@ class TestProjectStatusPerformance(TestProjectBase):
         project.register_aggregates()
         return project
 
+    @pytest.mark.skipif(signac.__version__ < '1.3.0',
+                        reason='Project.__contains__ was refactored to run in constant time '
+                               'in signac version 1.3.0. Generating status output relies on '
+                               'this check and is therefore very slow for signac versions '
+                               'below 1.3.0.')
     def test_status_performance(self):
         """Ensure that status updates take less than 1 second for a data space of 1000 jobs."""
         import timeit
@@ -296,31 +301,29 @@ class TestProjectClass(TestProjectBase):
         class C(A):
             pass
 
-        with pytest.deprecated_call():
-            @A.pre.always
-            @C.pre.always
-            @C.pre.always
-            @B.pre.always
-            @B.pre.always
-            @A.operation
-            @B.operation
-            def op1(job):
-                pass
+        @A.pre.true('test_A')
+        @C.pre.true('test_C')
+        @C.pre.true('test_C')
+        @B.pre.true('test_B')
+        @B.pre.true('test_B')
+        @A.operation
+        @B.operation
+        def op1(job):
+            pass
 
         assert len(A._collect_pre_conditions()[op1]) == 1
         assert len(B._collect_pre_conditions()[op1]) == 2
         assert len(C._collect_pre_conditions()[op1]) == 3
 
-        with pytest.deprecated_call():
-            @A.post.always
-            @C.post.always
-            @C.post.always
-            @B.post.always
-            @B.post.always
-            @A.operation
-            @B.operation
-            def op2(job):
-                pass
+        @A.post.true('test_A')
+        @C.post.true('test_C')
+        @C.post.true('test_C')
+        @B.post.true('test_B')
+        @B.post.true('test_B')
+        @A.operation
+        @B.operation
+        def op2(job):
+            pass
 
         assert len(A._collect_post_conditions()[op2]) == 1
         assert len(B._collect_post_conditions()[op2]) == 2
@@ -504,8 +507,8 @@ class TestProjectClass(TestProjectBase):
         op3_ = project.operations['op3']
         op4_ = project.operations['op4']
         for job in project:
-            assert not op3_.eligible(job)
-            assert not op4_.eligible(job)
+            assert not op3_._eligible((job,))
+            assert not op4_._eligible((job,))
 
         project.run(names=['op1'])
         for job in project:
@@ -513,13 +516,13 @@ class TestProjectClass(TestProjectBase):
             assert 'b' not in job.doc
             assert 'c' not in job.doc
             assert 'd' not in job.doc
-            assert not op3_.eligible(job)
-            assert not op4_.eligible(job)
+            assert not op3_._eligible((job,))
+            assert not op4_._eligible((job,))
 
         project.run(names=['op2'])
         for job in project:
-            assert op3_.eligible(job)
-            assert op4_.eligible(job)
+            assert op3_._eligible((job,))
+            assert op4_._eligible((job,))
 
         project.run()
         for job in project:
@@ -611,8 +614,8 @@ class TestProject(TestProjectBase):
             for op in project._next_operations([(job,)]):
                 assert op.name in status['operations']
                 op_status = status['operations'][op.name]
-                assert op_status['eligible'] == project.operations[op.name].eligible(job)
-                assert op_status['completed'] == project.operations[op.name].complete(job)
+                assert op_status['eligible'] == project.operations[op.name]._eligible((job,))
+                assert op_status['completed'] == project.operations[op.name]._complete((job,))
                 assert op_status['scheduler_status'] == JobStatus.unknown
 
     def test_project_status_homogeneous_schema(self):
@@ -751,7 +754,7 @@ class TestExecutionProject(TestProjectBase):
                 project.run(order='invalid-order')
 
         def sort_key(op):
-            return op.name, op.job.get_id()
+            return op.name, op._jobs[0].get_id()
 
         for order in (None, 'none', 'cyclic', 'by-job', 'by-op', 'random', sort_key):
             for job in self.project.find_jobs():  # clear
@@ -841,38 +844,30 @@ class TestExecutionProject(TestProjectBase):
         class C(A):
             pass
 
-        # Never post conditions are to prevent warnings on operations without
-        # post conditions
-        with pytest.deprecated_call():
-            @A.pre.never
-            @B.pre.always
-            @A.post.never
-            @B.post.never
-            @A.operation
-            @B.operation
-            def op1(job):
-                job.doc.op1 = True
+        @A.pre.never
+        @A.post.never
+        @B.post.never
+        @A.operation
+        @B.operation
+        def op1(job):
+            job.doc.op1 = True
 
-        with pytest.deprecated_call():
-            @A.pre.always
-            @B.pre.never
-            @A.post.never
-            @B.post.never
-            @A.operation
-            @B.operation
-            def op2(job):
-                job.doc.op2 = True
+        @B.pre.never
+        @A.post.never
+        @B.post.never
+        @A.operation
+        @B.operation
+        def op2(job):
+            job.doc.op2 = True
 
-        with pytest.deprecated_call():
-            @A.pre.always
-            @C.pre.never
-            @B.pre.never
-            @A.post.never
-            @B.post.never
-            @A.operation
-            @B.operation
-            def op3(job):
-                job.doc.op3 = True
+        @C.pre.never
+        @B.pre.never
+        @A.post.never
+        @B.post.never
+        @A.operation
+        @B.operation
+        def op3(job):
+            job.doc.op3 = True
 
         all_ops = set(['op1', 'op2', 'op3'])
         for project_class, bad_ops in zip(
@@ -920,7 +915,7 @@ class TestExecutionProject(TestProjectBase):
         assert len(list(MockScheduler.jobs())) == 0
         cluster_job_id = project._store_bundled(operations)
         with redirect_stderr(StringIO()):
-            project.submit_operations(_id=cluster_job_id, operations=operations)
+            project._submit_operations(_id=cluster_job_id, operations=operations)
         assert len(list(MockScheduler.jobs())) == 1
 
     def test_submit(self):
@@ -999,7 +994,7 @@ class TestExecutionProject(TestProjectBase):
             list(project.labels(job))
             next_op = list(project._next_operations([(job,)]))[0]
             assert next_op.name == 'op1'
-            assert next_op.job == job
+            assert next_op._jobs == (job,)
         with redirect_stderr(StringIO()):
             project.submit()
         assert len(list(MockScheduler.jobs())) == num_jobs_submitted
@@ -1034,7 +1029,7 @@ class TestExecutionProject(TestProjectBase):
         cluster_job_id = project._store_bundled(operations)
         stderr = StringIO()
         with redirect_stderr(stderr):
-            project.submit_operations(_id=cluster_job_id, operations=operations)
+            project._submit_operations(_id=cluster_job_id, operations=operations)
         assert len(list(MockScheduler.jobs())) == 1
         assert 'Some of the keys provided as part of the directives were not used by the template '
         'script, including: bad_directive\n' in stderr.getvalue()
@@ -1251,32 +1246,32 @@ class TestGroupProject(TestProjectBase):
         # For multiple operation groups and options
         for job in project:
             job_op1 = project.groups['group1']._create_submission_job_operation(
-                project._entrypoint, dict(), job)
-            script1 = project.script([job_op1])
+                project._entrypoint, dict(), (job,))
+            script1 = project._script((job_op1,))
             assert 'run -o group1 -j {}'.format(job) in script1
             job_op2 = project.groups['group2']._create_submission_job_operation(
-                project._entrypoint, dict(), job)
-            script2 = project.script([job_op2])
+                project._entrypoint, dict(), (job,))
+            script2 = project._script((job_op2,))
             assert '--num-passes=2' in script2
 
     def test_directives_hierarchy(self):
         project = self.mock_project()
         for job in project:
             # Test submit JobOperations
-            job_ops = project._get_submission_operations([job],
+            job_ops = project._get_submission_operations((job,),
                                                          project._get_default_directives(),
                                                          names=['group2'])
             assert all([job_op.directives.get('omp_num_threads', 0) == 4 for job_op in job_ops])
-            job_ops = project._get_submission_operations([job],
+            job_ops = project._get_submission_operations((job,),
                                                          project._get_default_directives(),
                                                          names=['op3'])
             assert all([job_op.directives.get('omp_num_threads', 0) == 1 for job_op in job_ops])
             # Test run JobOperations
             job_ops = project.groups['group2']._create_run_job_operations(
-                project._entrypoint, project._get_default_directives(), job)
+                project._entrypoint, project._get_default_directives(), (job,))
             assert all([job_op.directives.get('omp_num_threads', 0) == 4 for job_op in job_ops])
             job_ops = project.groups['op3']._create_run_job_operations(
-                project._entrypoint, project._get_default_directives(), job)
+                project._entrypoint, project._get_default_directives(), (job,))
             assert all([job_op.directives.get('omp_num_threads', 0) == 1 for job_op in job_ops])
 
     def test_submission_aggregation(self):
@@ -1386,11 +1381,11 @@ class TestGroupExecutionProject(TestProjectBase):
         MockScheduler.reset()
         project = self.mock_project()
         operations = [project.groups['group1']._create_submission_job_operation(
-            project._entrypoint, dict(), job) for job in project]
+            project._entrypoint, dict(), (job,)) for job in project]
         assert len(list(MockScheduler.jobs())) == 0
         cluster_job_id = project._store_bundled(operations)
         with redirect_stderr(StringIO()):
-            project.submit_operations(_id=cluster_job_id, operations=operations)
+            project._submit_operations(_id=cluster_job_id, operations=operations)
         assert len(list(MockScheduler.jobs())) == 1
 
     def test_submit(self):

@@ -277,8 +277,8 @@ class _AggregatesStore:
 
         # We need to register the aggregates for this instance using the
         # project provided.
-        self._aggregates = list()
-        self._aggregate_ids = dict()
+        self._aggregates = []
+        self._aggregate_ids = {}
         self._register_aggregates(project)
 
     def __iter__(self):

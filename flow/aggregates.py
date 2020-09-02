@@ -30,10 +30,10 @@ class aggregator:
         The default behavior is no sorting.
     :type sort_by:
         str or NoneType
-    :param reverse_order:
-        States if the jobs are to be sorted in reverse order.
-        The default value is False.
-    :type reverse_order:
+    :param sort_ascending:
+        States if the jobs are to be sorted in ascending order.
+        The default value is True.
+    :type sort_ascending:
         bool
     :param select:
         Condition for filtering individual jobs. This is passed as the
@@ -42,7 +42,7 @@ class aggregator:
         callable or NoneType
     """
 
-    def __init__(self, aggregator_function=None, sort_by=None, reverse_order=False, select=None):
+    def __init__(self, aggregator_function=None, sort_by=None, sort_ascending=True, select=None):
         if aggregator_function is None:
             def aggregator_function(jobs):
                 return [jobs]
@@ -61,11 +61,11 @@ class aggregator:
         self._is_aggregate = True
         self._aggregator_function = aggregator_function
         self._sort_by = sort_by
-        self._reverse_order = bool(reverse_order)
+        self._sort_ascending = bool(sort_ascending)
         self._select = select
 
     @classmethod
-    def groupsof(cls, num=1, sort_by=None, reverse_order=False, select=None):
+    def groupsof(cls, num=1, sort_by=None, sort_ascending=True, select=None):
         """Aggregates jobs of a set group size.
 
         By default aggregate of a single job is created.
@@ -95,10 +95,10 @@ class aggregator:
             The default behavior is no sorting.
         :type sort_by:
             str or NoneType
-        :param reverse_order:
-            States if the jobs are to be sorted in reverse order.
-            The default value is False.
-        :type reverse_order:
+        :param sort_ascending:
+            States if the jobs are to be sorted in ascending order.
+            The default value is True.
+        :type sort_ascending:
             bool
         :param select:
             Condition for filtering individual jobs. This is passed as the
@@ -122,15 +122,15 @@ class aggregator:
             args = [iter(jobs)] * num
             return zip_longest(*args)
 
-        aggregator_obj = cls(aggregator_function, sort_by, reverse_order, select)
+        aggregator_obj = cls(aggregator_function, sort_by, sort_ascending, select)
 
-        if num == 1 and sort_by == select is None and not reverse_order:
+        if num == 1 and sort_by == select is None and sort_ascending:
             aggregator_obj._is_aggregate = False
 
         return aggregator_obj
 
     @classmethod
-    def groupby(cls, key, default=None, sort_by=None, reverse_order=False, select=None):
+    def groupby(cls, key, default=None, sort_by=None, sort_ascending=True, select=None):
         """Aggregates jobs according to matching state point key values.
 
         The below code block provides an example of how to aggregate jobs having a
@@ -160,10 +160,10 @@ class aggregator:
             The default behavior is no sorting.
         :type sort_by:
             str or NoneType
-        :param reverse_order:
-            States if the jobs are to be sorted in reverse order.
-            The default value is False.
-        :type reverse_order:
+        :param sort_ascending:
+            States if the jobs are to be sorted in ascending order.
+            The default value is True.
+        :type sort_ascending:
             bool
         :param select:
             Condition for filtering individual jobs. This is passed as the
@@ -206,7 +206,7 @@ class aggregator:
             for key, group in groupby(sorted(jobs, key=keyfunction), key=keyfunction):
                 yield group
 
-        return cls(aggregator_function, sort_by, reverse_order, select)
+        return cls(aggregator_function, sort_by, sort_ascending, select)
 
     def __eq__(self, other):
         return type(self) == type(other) and \
@@ -214,7 +214,7 @@ class aggregator:
 
     def __hash__(self):
         blob_l = [
-            hash(self._sort_by), hash(self._reverse_order), hash(self._is_aggregate),
+            hash(self._sort_by), hash(self._sort_ascending), hash(self._is_aggregate),
             self._get_unique_function_id(self._aggregator_function),
             self._get_unique_function_id(self._select)
         ]
@@ -335,7 +335,7 @@ class _AggregatesStore:
         else:
             jobs = sorted(jobs,
                           key=lambda job: job.sp[self._aggregator._sort_by],
-                          reverse=self._aggregator._reverse_order)
+                          reverse=not self._aggregator._sort_ascending)
         yield from self._aggregator._aggregator_function(jobs)
 
     def _create_nested_aggregate_list(self, aggregated_jobs, project):

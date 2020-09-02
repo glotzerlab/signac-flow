@@ -162,9 +162,9 @@ class TestAggregateStoring(AggregateProjectSetup):
 
         assert [tuple(helper_sort(project))] == list(aggregate_instance)
 
-    def test_valid_reversed_sort(self, setUp, project):
+    def test_valid_descending_sort(self, setUp, project):
         helper_sort = partial(sorted, key=lambda job: job.sp.i, reverse=True)
-        aggregate_instance = aggregator(sort_by='i', reverse_order=True)
+        aggregate_instance = aggregator(sort_by='i', sort_ascending=False)
         aggregate_instance = aggregate_instance._create_AggregatesStore(project)
         assert [tuple(helper_sort(project))] == list(aggregate_instance)
 

@@ -1,10 +1,9 @@
 # Copyright (c) 2020 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-import itertools.groupby
+import itertools
 from collections.abc import Iterable
 from hashlib import md5
-from itertools import zip_longest
 
 
 class aggregator:
@@ -120,7 +119,7 @@ class aggregator:
         # https://docs.python.org/3/library/itertools.html#itertools.zip_longest
         def aggregator_function(jobs):
             args = [iter(jobs)] * num
-            return zip_longest(*args)
+            return itertools.zip_longest(*args)
 
         aggregator_obj = cls(aggregator_function, sort_by, sort_ascending, select)
 

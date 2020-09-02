@@ -209,8 +209,7 @@ class aggregator:
         return cls(aggregator_function, sort_by, sort_ascending, select)
 
     def __eq__(self, other):
-        return type(self) == type(other) and \
-               not self._is_aggregate and not other._is_aggregate
+        return type(self) == type(other) and not self._is_aggregate and not other._is_aggregate
 
     def __hash__(self):
         return hash((self._sort_by, self._sort_ascending, self._is_aggregate,

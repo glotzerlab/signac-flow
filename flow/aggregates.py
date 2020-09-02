@@ -261,7 +261,7 @@ class _AggregatesStore:
     a :class:`aggregator`.
 
     This is a callable class which, when called, generates all the aggregates.
-    When iterated through it's instance, all the aggregates are yielded.
+    Iterating over this class yields all aggregates.
 
     :param aggregator:
         aggregator object associated with this class.
@@ -361,11 +361,10 @@ class _AggregatesStore:
 
 class _DefaultAggregateStore:
     """This class holds the information of the project associated with
-    an operation function aggregated by the default aggregates i.e.
-    :py:class:`aggregator.groupsof(1)`.
+    an operation function using the default aggregator, i.e.
+    ``aggregator.groupsof(1)``.
 
-    When iterated through it's instance, it yields a tuple of a single job from
-    the Project.
+    Iterating over this class yields tuples each containing one job from the project.
 
     :param project:
         A signac project used to fetch jobs for creating aggregates.
@@ -412,7 +411,7 @@ class _DefaultAggregateStore:
 
 
 def get_aggregate_id(jobs):
-    """Generate hashed id for an aggregate of jobs
+    """Generate hashed id for an aggregate of jobs.
 
     :param jobs:
         The signac job handles

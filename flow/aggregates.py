@@ -1,9 +1,9 @@
 # Copyright (c) 2020 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
+import itertools.groupby
 from collections.abc import Iterable
 from hashlib import md5
-from itertools import groupby
 from itertools import zip_longest
 
 
@@ -203,7 +203,7 @@ class aggregator:
                             f"or a callable, got {type(key)}")
 
         def aggregator_function(jobs):
-            for key, group in groupby(sorted(jobs, key=keyfunction), key=keyfunction):
+            for key, group in itertools.groupby(sorted(jobs, key=keyfunction), key=keyfunction):
                 yield group
 
         return cls(aggregator_function, sort_by, sort_ascending, select)

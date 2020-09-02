@@ -260,7 +260,7 @@ class _AggregatesStore:
     a :class:`aggregator`.
 
     This is a callable class which, when called, generates all the aggregates.
-    Iterating over this class yields all aggregates.
+    Iterating over this object yields all aggregates.
 
     :param aggregator:
         aggregator object associated with this class.
@@ -363,7 +363,7 @@ class _DefaultAggregateStore:
     an operation function using the default aggregator, i.e.
     ``aggregator.groupsof(1)``.
 
-    Iterating over this class yields tuples each containing one job from the project.
+    Iterating over this object yields tuples each containing one job from the project.
 
     :param project:
         A signac project used to fetch jobs for creating aggregates.

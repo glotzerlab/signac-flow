@@ -213,14 +213,9 @@ class aggregator:
                not self._is_aggregate and not other._is_aggregate
 
     def __hash__(self):
-        blob_l = [
-            hash(self._sort_by), hash(self._sort_ascending), hash(self._is_aggregate),
-            self._get_unique_function_id(self._aggregator_function),
-            self._get_unique_function_id(self._select)
-        ]
-        blob = ','.join(str(attr) for attr in blob_l)
-
-        return int(_hash(blob), 16)
+        return hash((self._sort_by, self._sort_ascending, self._is_aggregate,
+                     self._get_unique_function_id(self._aggregator_function),
+                     self._get_unique_function_id(self._select)))
 
     def _get_unique_function_id(self, func):
         """Generate unique id for the function passed. The id returned is used to generate
@@ -228,8 +223,8 @@ class aggregator:
         and ``self._select`` attributes.
         """
         try:
-            return func.__code__.co_code
-        except Exception:  # Got something other than a function
+            return hash(func.__code__.co_code)
+        except AttributeError:  # Cannot access function's compiled bytecode
             return hash(func)
 
     def _create_AggregatesStore(self, project):
@@ -312,12 +307,10 @@ class _AggregatesStore:
         return len(self._aggregates)
 
     def __eq__(self, other):
-        return type(self) == type(other) and \
-               self._aggregator == other._aggregator
+        return type(self) == type(other) and self._aggregator == other._aggregator
 
     def __hash__(self):
-        blob = str(hash(self._aggregator))
-        return int(_hash(blob), 16)
+        return hash(self._aggregator)
 
     def _register_aggregates(self, project):
         """If the instance of this class is called then we will
@@ -405,12 +398,10 @@ class _DefaultAggregateStore:
         return len(self._project)
 
     def __eq__(self, other):
-        return type(self) == type(other) and \
-               self._project == other._project
+        return type(self) == type(other) and self._project == other._project
 
     def __hash__(self):
-        blob = self._project.get_id()
-        return int(_hash(blob), 16)
+        return hash(repr(self._project))
 
     def _register_aggregates(self, project):
         """We have to store self._project when this method is invoked

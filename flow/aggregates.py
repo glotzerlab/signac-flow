@@ -422,8 +422,5 @@ def get_aggregate_id(jobs):
         return jobs[0].get_id()  # Return job id as it's already unique
 
     blob = ','.join((job.get_id() for job in jobs))
-    return f'agg-{_hash(blob)}'
-
-
-def _hash(blob):
-    return md5(blob.encode('utf-8')).hexdigest()
+    hash_ = md5(blob.encode('utf-8')).hexdigest()
+    return f'agg-{hash_}'

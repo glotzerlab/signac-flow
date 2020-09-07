@@ -219,6 +219,10 @@ class aggregator:
         """Generate unique id for the function passed. The id returned is used to generate
         hash and compare arbitrary types which are callable like ``self._aggregator_function``
         and ``self._select`` attributes.
+
+        Since ``select`` and ``aggregator_function`` are internal hence hash for the similar
+        functions can also differ. Hence we need to generate byte code in order to be able to
+        equate the functions properly.
         """
         try:
             return hash(func.__code__.co_code)

@@ -1,10 +1,9 @@
 # Copyright (c) 2020 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
+import itertools
 from collections.abc import Iterable
 from hashlib import md5
-from itertools import groupby
-from itertools import zip_longest
 
 
 class aggregator:
@@ -30,10 +29,10 @@ class aggregator:
         The default behavior is no sorting.
     :type sort_by:
         str or NoneType
-    :param reverse_order:
-        States if the jobs are to be sorted in reverse order.
-        The default value is False.
-    :type reverse_order:
+    :param sort_ascending:
+        States if the jobs are to be sorted in ascending order.
+        The default value is True.
+    :type sort_ascending:
         bool
     :param select:
         Condition for filtering individual jobs. This is passed as the
@@ -42,7 +41,7 @@ class aggregator:
         callable or NoneType
     """
 
-    def __init__(self, aggregator_function=None, sort_by=None, reverse_order=False, select=None):
+    def __init__(self, aggregator_function=None, sort_by=None, sort_ascending=True, select=None):
         if aggregator_function is None:
             def aggregator_function(jobs):
                 return [jobs]
@@ -61,11 +60,11 @@ class aggregator:
         self._is_aggregate = True
         self._aggregator_function = aggregator_function
         self._sort_by = sort_by
-        self._reverse_order = bool(reverse_order)
+        self._sort_ascending = bool(sort_ascending)
         self._select = select
 
     @classmethod
-    def groupsof(cls, num=1, sort_by=None, reverse_order=False, select=None):
+    def groupsof(cls, num=1, sort_by=None, sort_ascending=True, select=None):
         """Aggregates jobs of a set group size.
 
         By default aggregate of a single job is created.
@@ -95,10 +94,10 @@ class aggregator:
             The default behavior is no sorting.
         :type sort_by:
             str or NoneType
-        :param reverse_order:
-            States if the jobs are to be sorted in reverse order.
-            The default value is False.
-        :type reverse_order:
+        :param sort_ascending:
+            States if the jobs are to be sorted in ascending order.
+            The default value is True.
+        :type sort_ascending:
             bool
         :param select:
             Condition for filtering individual jobs. This is passed as the
@@ -120,17 +119,17 @@ class aggregator:
         # https://docs.python.org/3/library/itertools.html#itertools.zip_longest
         def aggregator_function(jobs):
             args = [iter(jobs)] * num
-            return zip_longest(*args)
+            return itertools.zip_longest(*args)
 
-        aggregator_obj = cls(aggregator_function, sort_by, reverse_order, select)
+        aggregator_obj = cls(aggregator_function, sort_by, sort_ascending, select)
 
-        if num == 1 and sort_by == select is None and not reverse_order:
+        if num == 1 and sort_by == select is None and sort_ascending:
             aggregator_obj._is_aggregate = False
 
         return aggregator_obj
 
     @classmethod
-    def groupby(cls, key, default=None, sort_by=None, reverse_order=False, select=None):
+    def groupby(cls, key, default=None, sort_by=None, sort_ascending=True, select=None):
         """Aggregates jobs according to matching state point key values.
 
         The below code block provides an example of how to aggregate jobs having a
@@ -160,10 +159,10 @@ class aggregator:
             The default behavior is no sorting.
         :type sort_by:
             str or NoneType
-        :param reverse_order:
-            States if the jobs are to be sorted in reverse order.
-            The default value is False.
-        :type reverse_order:
+        :param sort_ascending:
+            States if the jobs are to be sorted in ascending order.
+            The default value is True.
+        :type sort_ascending:
             bool
         :param select:
             Condition for filtering individual jobs. This is passed as the
@@ -203,33 +202,31 @@ class aggregator:
                             f"or a callable, got {type(key)}")
 
         def aggregator_function(jobs):
-            for key, group in groupby(sorted(jobs, key=keyfunction), key=keyfunction):
+            for key, group in itertools.groupby(sorted(jobs, key=keyfunction), key=keyfunction):
                 yield group
 
-        return cls(aggregator_function, sort_by, reverse_order, select)
+        return cls(aggregator_function, sort_by, sort_ascending, select)
 
     def __eq__(self, other):
-        return type(self) == type(other) and \
-               not self._is_aggregate and not other._is_aggregate
+        return type(self) == type(other) and not self._is_aggregate and not other._is_aggregate
 
     def __hash__(self):
-        blob_l = [
-            hash(self._sort_by), hash(self._reverse_order), hash(self._is_aggregate),
-            self._get_unique_function_id(self._aggregator_function),
-            self._get_unique_function_id(self._select)
-        ]
-        blob = ','.join(str(attr) for attr in blob_l)
-
-        return int(_hash(blob), 16)
+        return hash((self._sort_by, self._sort_ascending, self._is_aggregate,
+                     self._get_unique_function_id(self._aggregator_function),
+                     self._get_unique_function_id(self._select)))
 
     def _get_unique_function_id(self, func):
         """Generate unique id for the function passed. The id returned is used to generate
         hash and compare arbitrary types which are callable like ``self._aggregator_function``
         and ``self._select`` attributes.
+
+        Since ``select`` and ``aggregator_function`` are internal hence hash for the similar
+        functions can also differ. Hence we need to generate byte code in order to be able to
+        equate the functions properly.
         """
         try:
-            return func.__code__.co_code
-        except Exception:  # Got something other than a function
+            return hash(func.__code__.co_code)
+        except AttributeError:  # Cannot access function's compiled bytecode
             return hash(func)
 
     def _create_AggregatesStore(self, project):
@@ -266,7 +263,7 @@ class _AggregatesStore:
     a :class:`aggregator`.
 
     This is a callable class which, when called, generates all the aggregates.
-    When iterated through it's instance, all the aggregates are yielded.
+    Iterating over this object yields all aggregates.
 
     :param aggregator:
         aggregator object associated with this class.
@@ -282,8 +279,8 @@ class _AggregatesStore:
 
         # We need to register the aggregates for this instance using the
         # project provided.
-        self._aggregates = list()
-        self._aggregate_ids = dict()
+        self._aggregates = []
+        self._aggregate_ids = {}
         self._register_aggregates(project)
 
     def __iter__(self):
@@ -312,12 +309,10 @@ class _AggregatesStore:
         return len(self._aggregates)
 
     def __eq__(self, other):
-        return type(self) == type(other) and \
-               self._aggregator == other._aggregator
+        return type(self) == type(other) and self._aggregator == other._aggregator
 
     def __hash__(self):
-        blob = str(hash(self._aggregator))
-        return int(_hash(blob), 16)
+        return hash(self._aggregator)
 
     def _register_aggregates(self, project):
         """If the instance of this class is called then we will
@@ -335,7 +330,7 @@ class _AggregatesStore:
         else:
             jobs = sorted(jobs,
                           key=lambda job: job.sp[self._aggregator._sort_by],
-                          reverse=self._aggregator._reverse_order)
+                          reverse=not self._aggregator._sort_ascending)
         yield from self._aggregator._aggregator_function(jobs)
 
     def _create_nested_aggregate_list(self, aggregated_jobs, project):
@@ -368,11 +363,10 @@ class _AggregatesStore:
 
 class _DefaultAggregateStore:
     """This class holds the information of the project associated with
-    an operation function aggregated by the default aggregates i.e.
-    :py:class:`aggregator.groupsof(1)`.
+    an operation function using the default aggregator, i.e.
+    ``aggregator.groupsof(1)``.
 
-    When iterated through it's instance, it yields a tuple of a single job from
-    the Project.
+    Iterating over this object yields tuples each containing one job from the project.
 
     :param project:
         A signac project used to fetch jobs for creating aggregates.
@@ -405,12 +399,10 @@ class _DefaultAggregateStore:
         return len(self._project)
 
     def __eq__(self, other):
-        return type(self) == type(other) and \
-               self._project == other._project
+        return type(self) == type(other) and self._project == other._project
 
     def __hash__(self):
-        blob = self._project.get_id()
-        return int(_hash(blob), 16)
+        return hash(repr(self._project))
 
     def _register_aggregates(self, project):
         """We have to store self._project when this method is invoked
@@ -421,7 +413,7 @@ class _DefaultAggregateStore:
 
 
 def get_aggregate_id(jobs):
-    """Generate hashed id for an aggregate of jobs
+    """Generate hashed id for an aggregate of jobs.
 
     :param jobs:
         The signac job handles
@@ -432,8 +424,5 @@ def get_aggregate_id(jobs):
         return jobs[0].get_id()  # Return job id as it's already unique
 
     blob = ','.join((job.get_id() for job in jobs))
-    return f'agg-{_hash(blob)}'
-
-
-def _hash(blob):
-    return md5(blob.encode('utf-8')).hexdigest()
+    hash_ = md5(blob.encode('utf-8')).hexdigest()
+    return f'agg-{hash_}'

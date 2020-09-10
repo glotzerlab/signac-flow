@@ -12,6 +12,8 @@ from . import environment
 from . import scheduling
 from . import errors
 from . import testing
+from .aggregates import aggregator
+from .aggregates import get_aggregate_id
 from .project import IgnoreConditions
 from .project import FlowProject
 from .project import JobOperation
@@ -34,6 +36,8 @@ if get_config_value('import_packaged_environments', default=True):
 
 
 __all__ = [
+    'aggregator',
+    'get_aggregate_id',
     'environment',
     'scheduling',
     'errors',

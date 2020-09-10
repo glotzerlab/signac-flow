@@ -143,7 +143,7 @@ class TestProjectBase():
                 project.open_job(dict(a=a, b=b)).init()
                 project.open_job(dict(a=dict(a=a), b=b)).init()
         project._entrypoint = self.entrypoint
-        project.register_aggregates()
+        project._register_aggregates()
         return project
 
 
@@ -164,7 +164,7 @@ class TestProjectStatusPerformance(TestProjectBase):
         project = self.project_class.get_project(root=self._tmp_dir.name)
         for i in range(1000):
             project.open_job(dict(i=i)).init()
-        project.register_aggregates()
+        project._register_aggregates()
         return project
 
     @pytest.mark.skipif(signac.__version__ < '1.3.0',

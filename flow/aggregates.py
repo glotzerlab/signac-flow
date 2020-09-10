@@ -44,7 +44,7 @@ class aggregator:
     def __init__(self, aggregator_function=None, sort_by=None, sort_ascending=True, select=None):
         if aggregator_function is None:
             def aggregator_function(jobs):
-                return [jobs]
+                return [jobs] if len(jobs) != 0 else []
 
         if not callable(aggregator_function):
             raise TypeError("Expected callable for aggregator_function, got "
@@ -250,6 +250,9 @@ class aggregator:
 
     def __call__(self, func=None):
         if callable(func):
+            if getattr(func, '_flow_aggregate', False):
+                raise RuntimeError("@aggregator should appear below the @FlowProject.operation "
+                                   "decorator in your script")
             setattr(func, '_flow_aggregate', self)
             return func
         else:

@@ -6,8 +6,10 @@ from ..environment import DefaultTorqueEnvironment
 
 
 class MangiEnvironment(DefaultTorqueEnvironment):
-    """Environment profile for the Mangi supercomputer at UMN.
-    https://www.msi.umn.edu/mangi , https://www.msi.umn.edu/queues
+    """Environment profile for the Mangi supercomputer at the Minnesota Supercomputing Institute (University of Minnesota).
+
+    Cluster information: https://www.msi.umn.edu/mangi
+    Queue information: https://www.msi.umn.edu/queues
     """
 
     hostname_pattern = r'.*\.msi\.umn\.edu'

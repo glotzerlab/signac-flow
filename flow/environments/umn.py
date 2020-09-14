@@ -17,4 +17,4 @@ class MangiEnvironment(DefaultTorqueEnvironment):
     cores_per_node = 1
 
 
-__all__ = ['MSIEnvironment']
+__all__ = ['MangiEnvironment']

@@ -2159,14 +2159,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             # Since pickling the project results in loss of necessary information. We
             # explicitly pickle all the necessary information and then mock them in the
             # serialized methods.
-            s_project = pickle.dumps(self.get_id())
+            s_root = pickle.dumps(self.root_directory())
             s_sp_cache = pickle.dumps(self._sp_cache)
             s_label_funcs = pickle.dumps(self._label_functions)
             s_groups = pickle.dumps(self._groups)
             s_groups_aggregate = pickle.dumps(self._stored_aggregators)
-            s_tasks_labels = [(pickle.loads, s_project, s_sp_cache, job.get_id(), ignore_errors,
+            s_tasks_labels = [(pickle.loads, s_root, s_sp_cache, job.get_id(), ignore_errors,
                                s_label_funcs) for job in jobs]
-            s_tasks_groups = [(pickle.loads, s_project, group, ignore_errors, cached_status,
+            s_tasks_groups = [(pickle.loads, s_root, group, ignore_errors, cached_status,
                                s_groups, s_groups_aggregate) for group in groups]
         except Exception as error:  # Masking all errors since they must be pickling related.
             raise self._PickleError(error)
@@ -2716,9 +2716,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             # Since pickling the project results in loss of necessary information. We
             # explicitly pickle all the necessary information and then mock them in the
             # serialized method.
-            s_project = pickle.dumps(self.get_id())
+            s_root = pickle.dumps(self.root_directory())
             s_ops = pickle.dumps(self._operations)
-            s_tasks = [(pickle.loads, s_project, self._dumps_op(op), s_ops)
+            s_tasks = [(pickle.loads, s_root, self._dumps_op(op), s_ops)
                        for op in tqdm(operations, desc='Serialize tasks', file=sys.stderr)]
         except Exception as error:  # Masking all errors since they must be pickling related.
             raise self._PickleError(error)
@@ -4528,7 +4528,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 def _execute_serialized_operation(loads, project, operation, operations):
     """Invoke the _execute_operation() method on a serialized project instance."""
     project = loads(project)
-    project = FlowProject.init_project(project)
+    project = FlowProject.get_project()
     # Mock ``project._operations`` before calling ``project._execute_operation``
     # because this FlowProject doesn't have any attribute associated with it
     # and ``project._execute_operation`` uses the ``project._operations`` attribute
@@ -4539,14 +4539,14 @@ def _execute_serialized_operation(loads, project, operation, operations):
 def _serialized_get_job_labels(s_task):
     """Invoke the _get_job_labels() method on a serialized project instance."""
     loads = s_task[0]
-    project = loads(s_task[1])
-    project = FlowProject.init_project(project)
-    project._sp_cache = loads(s_task[2])
+    root = loads(s_task[1])
+    project = FlowProject.get_project(root)
+    # project._sp_cache = loads(s_task[2])
     job = project.open_job(id=s_task[3])
     ignore_errors = s_task[4]
-    # Mock ``project._label_functions`` before calling ``project._get_job_labels``
-    # because this FlowProject doesn't have any attribute associated with it
-    # and ``project._get_job_labels`` uses the ``project._label_functions`` attribute
+    # # Mock ``project._label_functions`` before calling ``project._get_job_labels``
+    # # because this FlowProject doesn't have any attribute associated with it
+    # # and ``project._get_job_labels`` uses the ``project._label_functions`` attribute
     project._label_functions = loads(s_task[5])
     return project._get_job_labels(job, ignore_errors=ignore_errors)
 
@@ -4554,8 +4554,8 @@ def _serialized_get_job_labels(s_task):
 def _serialized_get_group_status(s_task):
     """Invoke the _get_group_status() method on a serialized project instance."""
     loads = s_task[0]
-    project = loads(s_task[1])
-    project = FlowProject.init_project(project)
+    root = loads(s_task[1])
+    project = FlowProject.get_project(root)
     group = s_task[2]
     ignore_errors = s_task[3]
     cached_status = s_task[4]

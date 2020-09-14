@@ -12,7 +12,7 @@ class MangiEnvironment(DefaultTorqueEnvironment):
     Queue information: https://www.msi.umn.edu/queues
     """
 
-    hostname_pattern = r'.*\.msi\.umn\.edu'
+    hostname_pattern = r'.*\.mangi\.msi\.umn\.edu'
     template = 'torque.sh'
     cores_per_node = 1
 

@@ -17,4 +17,5 @@ class MangiEnvironment(DefaultTorqueEnvironment):
     template = 'torque.sh'
     cores_per_node = 1
 
+
 __all__ = ['MangiEnvironment']

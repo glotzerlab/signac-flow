@@ -115,6 +115,15 @@ def init(project):
                 'bundle': [['mpi_op', 'omp_op']],
             }
         ],
+        'environments.umn.MangiEnvironment': [
+            {
+                'walltime': [None, 1],
+            },
+            {
+                'parallel': [False, True],
+                'bundle': [['mpi_op', 'omp_op']],
+            }
+        ],
     }
 
     for environment, parameter_combinations in environments.items():

@@ -124,4 +124,9 @@ contributors:
     family-names: Chandra
     given-names: Abhavya
     affiliation: "Indian Institute of Technology, Gandhinagar"
+  -
+    family-names: Singh
+    given-names: Ramanish
+    orcid: "https://orcid.org/0000-0002-7908-060X"
+    affiliation: "University of Minnesota"
 ...

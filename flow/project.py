@@ -1837,7 +1837,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             jobs = (job,)
             result['job_id'] = get_aggregate_id(jobs)
         else:
-            jobs = tuple(job)  # Avoid confusion for developers as an aggregate can also be passed
+            jobs = tuple(job)  # An aggregate can also be passed
             self._verify_aggregate_project(jobs)
             distinct_jobs = set([job for job in jobs])
             result['aggregate_id'] = get_aggregate_id(jobs)

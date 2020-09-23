@@ -1,7 +1,7 @@
 .. _umn:
 
-University of Minnesota, Minnesota Supercomputing Institute Mangi
-=================================================================
+University of Minnesota Mangi
+=============================
 
 `Link to official documentation <https://www.msi.umn.edu/mangi>`_
 

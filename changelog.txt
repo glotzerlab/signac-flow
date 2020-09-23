@@ -13,13 +13,9 @@ next
 
 Added
 +++++
-- Add environment profile for University of Minnesota, Minnesota
-Supercomputing Institude, Mangi supercomputer
-
-Added
-+++++
 
 - Added support for `pre-commit hooks <https://pre-commit.com/>`__ (#333).
+- Add environment profile for University of Minnesota, Minnesota Supercomputing Institute, Mangi supercomputer (#353).
 
 Changed
 +++++++

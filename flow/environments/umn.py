@@ -6,8 +6,10 @@ from ..environment import DefaultTorqueEnvironment
 
 
 class MangiEnvironment(DefaultTorqueEnvironment):
-    """Environment profile for the Mangi supercomputer
-    at the Minnesota Supercomputing Institute (University of Minnesota).
+    """Environment profile for the Mangi supercomputer.
+
+    Mangi is managed by the Minnesota Supercomputing Institute (University of
+    Minnesota).
 
     Cluster information: https://www.msi.umn.edu/mangi
 

@@ -10,6 +10,7 @@ class MangiEnvironment(DefaultTorqueEnvironment):
     at the Minnesota Supercomputing Institute (University of Minnesota).
 
     Cluster information: https://www.msi.umn.edu/mangi
+
     Queue information: https://www.msi.umn.edu/queues
     """
 

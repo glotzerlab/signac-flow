@@ -1,6 +1,6 @@
-=======
-Changes
-=======
+=========
+Changelog
+=========
 
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 The numbers in brackets denote the related GitHub issue and/or pull request.
@@ -26,6 +26,7 @@ Changed
 Fixed
 +++++
 - Serial execution on Summit correctly counts total node requirements (#342).
+- Fixed performance regression in job submission in large workspaces (#354).
 
 Removed
 +++++++

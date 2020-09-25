@@ -3027,11 +3027,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Gather all pending operations.
         with self._potentially_buffered():
             default_directives = self._get_default_directives()
-            operations = self._get_submission_operations(jobs, default_directives, names,
-                                                         ignore_conditions,
-                                                         ignore_conditions_on_execution)
-        if num is not None:
-            operations = list(islice(operations, num))
+            # The generator must be used *inside* the buffering context manager for performance reasons
+            operation_generator = self._get_submission_operations(
+                jobs, default_directives, names, ignore_conditions, ignore_conditions_on_execution)
+            # islice takes the first "num" elements from the generator, or all items if num is None
+            operations = list(islice(operation_generator, num))
 
         # Bundle them up and submit.
         for bundle in _make_bundles(operations, bundle_size):

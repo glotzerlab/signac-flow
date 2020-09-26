@@ -3039,12 +3039,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             operations = list(islice(operation_generator, num))
 
         # Bundle them up and submit.
-        for bundle in _make_bundles(operations, bundle_size):
-            status = self._submit_operations(operations=bundle, env=env, parallel=parallel,
-                                             force=force, walltime=walltime, **kwargs)
-            if status is not None:  # operations were submitted, store status
-                for operation in bundle:
-                    operation.set_status(status)
+        with self._potentially_buffered():
+            for bundle in _make_bundles(operations, bundle_size):
+                status = self._submit_operations(operations=bundle, env=env,
+                                                 parallel=parallel,
+                                                 force=force,
+                                                 walltime=walltime, **kwargs)
+                if status is not None:
+                    # Operations were submitted, store status
+                    for operation in bundle:
+                        operation.set_status(status)
 
     @classmethod
     def _add_submit_args(cls, parser):

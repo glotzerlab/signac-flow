@@ -3028,7 +3028,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         with self._potentially_buffered():
             default_directives = self._get_default_directives()
             # The generator must be used *inside* the buffering context manager
-            # for performance reasons
+            # for performance reasons.
             operation_generator = self._get_submission_operations(jobs,
                                                                   default_directives,
                                                                   names,

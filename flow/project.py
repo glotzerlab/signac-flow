@@ -3035,7 +3035,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                                                   ignore_conditions,
                                                                   ignore_conditions_on_execution)
             # islice takes the first "num" elements from the generator, or all
-            # items if num is None
+            # items if num is None.
             operations = list(islice(operation_generator, num))
 
         # Bundle them up and submit.

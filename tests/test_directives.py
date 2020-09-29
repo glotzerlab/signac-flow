@@ -40,7 +40,7 @@ def product_directive():
             return 0
         return value
 
-    product = _DirectivesItem(name='product', validation=val,
+    product = _DirectivesItem(name='product', validator=val,
                               default=10, serial=_no_aggregation,
                               parallel=_no_aggregation, finalize=finalize)
     return product
@@ -57,9 +57,7 @@ def non_default_directive_values():
 
 
 class TestItems:
-    """
-    Tests for _DirectivesItem class
-    """
+    """Tests for _DirectivesItem class."""
     def test_default(self):
         assert _NP._default == 1
         assert _NGPU._default == 0
@@ -88,11 +86,11 @@ class TestItems:
                 continue
             for i, value in enumerate(invalid_values[directive._name]):
                 with pytest.raises((ValueError, TypeError)):
-                    directive._validation(value)
+                    directive._validator(value)
 
     def test_defaults_are_valid(self, available_directives_list):
         for directive in available_directives_list:
-            directive._validation(directive._default)
+            directive._validator(directive._default)
 
     def test_serial(self):
         assert _NP._serial(4, 2) == 4
@@ -121,18 +119,16 @@ class TestItems:
         dict_directives['omp_num_threads'] = 4
         assert _NP._finalize(2, dict_directives) == 2
         assert _NP._finalize(1, dict_directives) == 8
-        dict_directives['nranks'] = lambda x: x**2
-        assert _NP._finalize(2, dict_directives) == 2
 
     def test_manual_item_default(self, product_directive):
         assert product_directive._default == 10
 
     def test_manual_item_validation(self, product_directive):
-        val = product_directive._validation(product_directive._default)
+        val = product_directive._validator(product_directive._default)
         assert product_directive._default == val
-        assert product_directive._validation(20) == 20
+        assert product_directive._validator(20) == 20
         with pytest.raises(ValueError):
-            product_directive._validation(0)
+            product_directive._validator(0)
 
     def test_manual_item_serial(self, product_directive):
         product_directive._serial(10, 20) == 10
@@ -149,9 +145,7 @@ class TestItems:
 
 
 class TestDirectives:
-    """
-    Tests for _Directives Class
-    """
+    """Tests for _Directives Class."""
     def test_get_directive(self, directives, available_directives_list):
         for item in available_directives_list:
             assert directives[item._name] == item._default

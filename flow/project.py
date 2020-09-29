@@ -396,9 +396,7 @@ class JobOperation(_JobOperation):
         self._cmd = cmd
 
         if directives is None:
-            base_directives = job._project._environment._get_default_directives()
-            base_directives.update(directives)
-            directives = base_directives
+            directives = job._project._environment._get_default_directives()
         else:
             directives = dict(directives)  # explicit copy
 
@@ -849,12 +847,12 @@ class FlowGroup(object):
         return "{} {}".format(entrypoint['executable'], entrypoint['path']).lstrip()
 
     def _resolve_directives(self, name, defaults, env):
-        base_directives = env._get_default_directives()
+        all_directives = env._get_default_directives()
         if name in self.operation_directives:
-            base_directives.update(self.operation_directives[name])
+            all_directives.update(self.operation_directives[name])
         else:
-            base_directives.update(defaults.get(name, dict()))
-        return base_directives
+            all_directives.update(defaults.get(name, dict()))
+        return all_directives
 
     def _submit_cmd(self, entrypoint, ignore_conditions, jobs=None):
         entrypoint = self._determine_entrypoint(entrypoint, dict(), jobs)
@@ -1146,7 +1144,7 @@ class FlowGroup(object):
         :rtype:
             Iterator[_JobOperation]
         """
-        # Assuming all the jobs belong to the same project
+        # Assuming all the jobs belong to the same FlowProject
         env = jobs[0]._project._environment
         for name, op in self.operations.items():
             if op._eligible(jobs, ignore_conditions):
@@ -1173,7 +1171,7 @@ class FlowGroup(object):
         This can lead to poor utilization of computing resources.
         """
         env = jobs[0]._project._environment
-        op_names = list(self.operations)
+        op_names = list(self.operations.keys())
         directives = self._resolve_directives(
             op_names[0], default_directives, env)
         for name in op_names[1:]:
@@ -2374,9 +2372,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _loads_op(self, blob):
         id, name, job_ids, cmd, directives = blob
         jobs = tuple(self.open_job(id=job_id) for job_id in job_ids)
-        base_directives = jobs[0]._project._environment._get_default_directives()
-        base_directives.update(directives)
-        return _JobOperation(id, name, jobs, cmd, base_directives)
+        all_directives = jobs[0]._project._environment._get_default_directives()
+        all_directives.update(directives)
+        return _JobOperation(id, name, jobs, cmd, all_directives)
 
     def _run_operations_in_parallel(self, pool, pickle, operations, progress, timeout):
         """Execute operations in parallel.

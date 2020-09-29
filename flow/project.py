@@ -3068,24 +3068,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # may accept either a signac job or an aggregate.
         # We convert that job / aggregate (which may be of any type (eg. list)) to an
         # aggregate of type ``tuple``
-
         if jobs is not None:
             aggregates = set()  # Set in order to prevent duplicate entries
-            for aggregate in jobs:
+            for job in jobs:
                 # User can still pass signac jobs
-                if isinstance(aggregate, signac.contrib.job.Job):
-                    if aggregate not in self:
-                        raise LookupError(f"Did not find the job {aggregate} in the project")
-                    aggregates.add((aggregate,))
-                else:
-                    try:
-                        aggregate = tuple(aggregate)
-                        if not self._verify_aggregate_project(aggregate):
-                            raise LookupError(f"Did not find aggregate {aggregate} in the project")
-                        aggregates.add(aggregate)  # An aggregate provided by the user
-                    except TypeError:
-                        raise TypeError('Invalid argument provided by a user. Please provide '
-                                        'a valid signac job or an aggregate of jobs instead.')
+                if job not in self:
+                    raise LookupError(f"Did not find the job {job} in the project")
+                # TODO: Add support for aggregates when passed into the jobs parameter.
+                aggregates.add((job,))
             return list(aggregates)
         else:
             return None
@@ -4234,9 +4224,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if args.job_id:
             aggregate = set()  # set in order to avoid duplicate ids
             for id in args.job_id:
-                if id.startswith('agg'):
-                    aggregate.add(self._get_aggregate_from_id(id))
-                    continue
+                # TODO: We need to add support for aggregation id parameter
+                # for the -j flag ('agg-...')
                 try:
                     aggregate.add((self.open_job(id=id),))
                 except KeyError as error:

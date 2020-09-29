@@ -2431,7 +2431,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             try:
                 self._operations[operation.name](*operation._jobs)
             except Exception as e:
-                assert len(self._jobs) == 1
+                assert len(operation._jobs) == 1
                 raise UserOperationError(
                     'An exception was raised during operation {operation.name} '
                     'for job {operation._jobs[0]}.'.format(operation=operation)) from e

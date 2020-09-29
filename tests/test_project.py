@@ -1244,12 +1244,12 @@ class TestGroupProject(TestProjectBase):
         # For multiple operation groups and options
         for job in project:
             job_op1 = project.groups['group1']._create_submission_job_operation(
-                project._entrypoint, dict(), (job,))
-            script1 = project._script((job_op1,))
+                project._entrypoint, project._get_default_directives(), (job,))
+            script1 = project._script([job_op1])
             assert 'run -o group1 -j {}'.format(job) in script1
             job_op2 = project.groups['group2']._create_submission_job_operation(
-                project._entrypoint, dict(), (job,))
-            script2 = project._script((job_op2,))
+                project._entrypoint, project._get_default_directives(), (job,))
+            script2 = project._script([job_op2])
             assert '--num-passes=2' in script2
 
     def test_directives_hierarchy(self):
@@ -1298,7 +1298,7 @@ class TestGroupProject(TestProjectBase):
         group = project.groups['group']
         job = [j for j in project][0]
         directives = group._get_submission_directives(project._get_default_directives(),
-                                                      job)
+                                                      (job,))
         assert all([directives['ngpu'] == 2, directives['nranks'] == 4,
                     directives['np'] == 4])
 
@@ -1379,7 +1379,8 @@ class TestGroupExecutionProject(TestProjectBase):
         MockScheduler.reset()
         project = self.mock_project()
         operations = [project.groups['group1']._create_submission_job_operation(
-            project._entrypoint, dict(), (job,)) for job in project]
+            project._entrypoint, project._get_default_directives(), (job,))
+            for job in project]
         assert len(list(MockScheduler.jobs())) == 0
         cluster_job_id = project._store_bundled(operations)
         with redirect_stderr(StringIO()):

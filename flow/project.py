@@ -267,10 +267,11 @@ class _JobOperation(object):
     :type cmd:
         callable or str
     :param directives:
-        A dictionary of additional parameters that provide instructions on how
-        to execute this operation, e.g., specifically required resources.
+        A :class:`flow.directives._Directives` object of additional parameters
+        that provide instructions on how to execute this operation, e.g.,
+        specifically required resources.
     :type directives:
-        :class:`dict`
+        :class:`flow.directives._Directives`
     """
 
     def __init__(self, id, name, jobs, cmd, directives=None):
@@ -281,17 +282,12 @@ class _JobOperation(object):
             raise ValueError("JobOperation cmd must be a callable or string.")
         self._cmd = cmd
 
-        if directives is None:
-            directives = dict()  # default argument
-        else:
-            directives = dict(directives)  # explicit copy
-
         # Keys which were explicitly set by the user, but are not evaluated by the
         # template engine are cause for concern and might hint at a bug in the template
         # script or ill-defined directives. We are therefore keeping track of all
         # keys set by the user and check whether they have been evaluated by the template
         # script engine later.
-        keys_set_by_user = set(directives)
+        keys_set_by_user = set(directives._user_directives)
 
         # We use a special dictionary that allows us to track all keys that have been
         # evaluated by the template engine and compare them to those explicitly set
@@ -389,7 +385,7 @@ class JobOperation(_JobOperation):
         A dictionary of additional parameters that provide instructions on how
         to execute this operation, e.g., specifically required resources.
     :type directives:
-        :class:`dict`
+        :class:`flow.directives._Directives`
     """
     def __init__(self, id, name, job, cmd, directives=None):
         self._id = id
@@ -400,7 +396,7 @@ class JobOperation(_JobOperation):
         self._cmd = cmd
 
         if directives is None:
-            directives = dict()  # default argument
+            directives = job._project._environment._get_default_directives()
         else:
             directives = dict(directives)  # explicit copy
 
@@ -850,37 +846,13 @@ class FlowGroup(object):
         self._set_entrypoint_item(entrypoint, directives, 'path', default_path, jobs)
         return "{} {}".format(entrypoint['executable'], entrypoint['path']).lstrip()
 
-    def _resolve_directives(self, name, defaults, jobs):
+    def _resolve_directives(self, name, defaults, env):
+        all_directives = env._get_default_directives()
         if name in self.operation_directives:
-            directives = deepcopy(self.operation_directives[name])
+            all_directives.update(self.operation_directives[name])
         else:
-            directives = deepcopy(defaults.get(name, dict()))
-        nranks = directives.get('nranks', 1)
-        nthreads = directives.get('omp_num_threads', 1)
-        if callable(nranks) or callable(nthreads):
-            def np_callable(*jobs):
-                nr = nranks(*jobs) if callable(nranks) else nranks
-                nt = nthreads(*jobs) if callable(nthreads) else nthreads
-                return nr*nt
-
-            directives.setdefault('np', np_callable)
-        else:
-            directives.setdefault('np', nranks*nthreads)
-
-        directives.setdefault('ngpu', 0)
-        directives.setdefault('nranks', 0)
-        directives.setdefault('omp_num_threads', 0)
-        directives.setdefault('processor_fraction', 1)
-
-        # Evaluate strings and callables for jobs:
-        def evaluate(value):
-            if value and callable(value):
-                return value(*jobs)
-            elif isinstance(value, str):
-                return value.format(*jobs)
-            else:
-                return value
-        return {key: evaluate(value) for key, value in directives.items()}
+            all_directives.update(defaults.get(name, dict()))
+        return all_directives
 
     def _submit_cmd(self, entrypoint, ignore_conditions, jobs=None):
         entrypoint = self._determine_entrypoint(entrypoint, dict(), jobs)
@@ -1172,9 +1144,13 @@ class FlowGroup(object):
         :rtype:
             Iterator[_JobOperation]
         """
+        # Assuming all the jobs belong to the same FlowProject
+        env = jobs[0]._project._environment
         for name, op in self.operations.items():
             if op._eligible(jobs, ignore_conditions):
-                directives = self._resolve_directives(name, default_directives, jobs)
+                directives = self._resolve_directives(
+                    name, default_directives, env)
+                directives.evaluate(jobs)
                 cmd = self._run_cmd(entrypoint=entrypoint, operation_name=name,
                                     operation=op, directives=directives, jobs=jobs)
                 job_op = _JobOperation(self._generate_id(jobs, name, index=index), name,
@@ -1194,17 +1170,16 @@ class FlowGroup(object):
         No checks are done to mitigate inappropriate aggregation of operations.
         This can lead to poor utilization of computing resources.
         """
-        directives = dict(ngpu=0, nranks=0, omp_num_threads=0, np=0)
-
-        for name in self.operations:
+        env = jobs[0]._project._environment
+        op_names = list(self.operations.keys())
+        directives = self._resolve_directives(
+            op_names[0], default_directives, env)
+        for name in op_names[1:]:
             # get directives for operation
-            op_dir = self._resolve_directives(name, default_directives, jobs)
-            # Find the correct number of processors for operation
-            directives['ngpu'] = max(directives['ngpu'], op_dir['ngpu'])
-            directives['nranks'] = max(directives['nranks'], op_dir['nranks'])
-            directives['omp_num_threads'] = max(directives['omp_num_threads'],
-                                                op_dir['omp_num_threads'])
-            directives['np'] = max(directives['np'], op_dir['np'])
+            directives.update(self._resolve_directives(name,
+                                                       default_directives,
+                                                       env),
+                              aggregate=True, jobs=jobs)
         return directives
 
 
@@ -2397,7 +2372,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _loads_op(self, blob):
         id, name, job_ids, cmd, directives = blob
         jobs = tuple(self.open_job(id=job_id) for job_id in job_ids)
-        return _JobOperation(id, name, jobs, cmd, directives)
+        all_directives = jobs[0]._project._environment._get_default_directives()
+        all_directives.update(directives)
+        return _JobOperation(id, name, jobs, cmd, all_directives)
 
     def _run_operations_in_parallel(self, pool, pickle, operations, progress, timeout):
         """Execute operations in parallel.
@@ -3603,15 +3580,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 func = op._op_func
 
             if hasattr(func, '_flow_groups'):
-                operation_directives = getattr(func, '_flow_group_operation_directives', dict())
+                op_directives = getattr(func, '_flow_group_operation_directives', dict())
                 for group_name in func._flow_groups:
+                    directives = op_directives.get(group_name)
                     self._groups[group_name].add_operation(
-                        op_name, op, operation_directives.get(group_name, None))
+                        op_name, op, directives)
 
             # For singleton groups add directives
-            self._groups[op_name].operation_directives[op_name] = getattr(func,
-                                                                          '_flow_directives',
-                                                                          dict())
+            directives = getattr(func, '_flow_directives', dict())
+            self._groups[op_name].operation_directives[op_name] = directives
 
     @property
     def operations(self):

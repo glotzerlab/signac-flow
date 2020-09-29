@@ -5,7 +5,7 @@ import pytest
 import sys
 
 from flow.directives import (
-    _Directives, _DirectivesItem, _NP, _NRANKS, _NGPU, _EXECUTABLE,
+    _Directives, _Directive, _NP, _NRANKS, _NGPU, _EXECUTABLE,
     _OMP_NUM_THREADS, _WALLTIME, _MEMORY, _PROCESSOR_FRACTION, _no_aggregation
 )
 from flow.errors import DirectivesError
@@ -40,7 +40,7 @@ def product_directive():
             return 0
         return value
 
-    product = _DirectivesItem(name='product', validator=val,
+    product = _Directive(name='product', validator=val,
                               default=10, serial=_no_aggregation,
                               parallel=_no_aggregation, finalize=finalize)
     return product
@@ -57,7 +57,7 @@ def non_default_directive_values():
 
 
 class TestItems:
-    """Tests for _DirectivesItem class."""
+    """Tests for _Directive class."""
     def test_default(self):
         assert _NP._default == 1
         assert _NGPU._default == 0

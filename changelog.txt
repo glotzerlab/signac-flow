@@ -13,7 +13,7 @@ next
 
 Added
 +++++
-
+- Added classes ``_Directives`` and ``_Directive`` that serve as a smart mapping for the environment, user-specified directives and a specification for environment directives respectively. (#283, #265)
 - Added support for `pre-commit hooks <https://pre-commit.com/>`__ (#333).
 
 Changed

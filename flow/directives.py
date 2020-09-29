@@ -276,7 +276,7 @@ _positive_real = _OnlyType(float, postprocess=_raise_below(1e-12))
 
 # Common directives and their instantiation as _Directive
 _NP = _Directive('np', validator=_natural_number,
-                      default=_NP_DEFAULT, finalize=_finalize_np)
+                 default=_NP_DEFAULT, finalize=_finalize_np)
 """The number of tasks to launch for a given operation i.e., the number of CPU
 cores to be requested for a given operation.
 
@@ -305,8 +305,8 @@ Expects a nonnegative integer.
 """
 
 _EXECUTABLE = _Directive('executable', validator=_OnlyType(str),
-                              default=sys.executable, serial=_no_aggregation,
-                              parallel=_no_aggregation)
+                         default=sys.executable, serial=_no_aggregation,
+                         parallel=_no_aggregation)
 """The path to the executable to be used for this operation.
 
 Expects a string pointing to a valid executable file in the
@@ -318,7 +318,7 @@ path to an executable Python script. Defaults to ``sys.executable``.
 """
 
 _WALLTIME = _Directive('walltime', validator=_nonnegative_real, default=12.,
-                            serial=operator.add, parallel=max)
+                       serial=operator.add, parallel=max)
 """The number of hours to request for executing this job.
 
 This directive expects a float representing the walltime in hours. Fractional
@@ -333,8 +333,8 @@ Expects a real number greater than zero.
 """
 
 _PROCESSOR_FRACTION = _Directive('processor_fraction',
-                                      validator=_OnlyType(float, postprocess=_is_fraction),
-                                      default=1., serial=_no_aggregation, parallel=_no_aggregation)
+                                 validator=_OnlyType(float, postprocess=_is_fraction),
+                                 default=1., serial=_no_aggregation, parallel=_no_aggregation)
 """Fraction of a resource to use on a single operation.
 
 If set to 0.5 for a bundled job with 20 operations (all with 'np' set to 1), 10

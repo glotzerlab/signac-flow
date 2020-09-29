@@ -81,7 +81,7 @@ class _DirectivesItem:
         any
             Returns a immediately validated value for the given directive, or if
             a callable was passed, a new callable is returned that wraps the
-            given callable with validator.
+            given callable with a validator.
         """
         if callable(value):
             @functools.wraps(value)
@@ -121,7 +121,7 @@ class _Directives(MutableMapping):
             raise TypeError(
                 f"Expected a _DirectivesItem object. Received {type(directive)}.")
         elif directive._name in self._directive_definitions:
-            raise ValueError(f"Cannot re-define directive name {directive._name}.")
+            raise ValueError(f"Cannot redefine directive name {directive._name}.")
         else:
             self._directive_definitions[directive._name] = directive
             self._defined_directives[directive._name] = directive._default
@@ -130,7 +130,7 @@ class _Directives(MutableMapping):
         try:
             self._defined_directives[key] = self._directive_definitions[key](value)
         except (KeyError, ValueError, TypeError) as err:
-            raise DirectivesError(f'Error setting directive "{key}"') from err
+            raise DirectivesError(f'Error setting directive {key}') from err
 
     def __getitem__(self, key):
         if key in self._defined_directives and key in self._directive_definitions:
@@ -219,7 +219,7 @@ class _OnlyType:
                 return self.type(v)
             except Exception:
                 raise TypeError(f"Expected an object of type {self.type}. "
-                                f"Received {v} of type {type(v)}")
+                                f"Received {v} of type {type(v)}.")
 
 
 def _raise_below(value):
@@ -229,7 +229,7 @@ def _raise_below(value):
                 raise ValueError
         except (TypeError, ValueError):
             raise ValueError(f"Expected a number greater than or equal to {value}. "
-                             f"Received {v}")
+                             f"Received {v}.")
         return v
 
     return is_greater_or_equal

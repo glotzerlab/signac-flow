@@ -15,9 +15,11 @@ following shell command:
 from . import incite
 from . import xsede
 from . import umich
+from . import umn
 
 __all__ = [
     'incite',
     'xsede',
     'umich',
+    'umn',
     ]

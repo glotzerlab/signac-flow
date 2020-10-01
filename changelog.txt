@@ -15,6 +15,7 @@ Added
 +++++
 - Added classes ``_Directives`` and ``_Directive`` that serve as a smart mapping for directives specified by the environment or user (#265, #283).
 - Added support for `pre-commit hooks <https://pre-commit.com/>`__ (#333).
+- Add environment profile for University of Minnesota, Minnesota Supercomputing Institute, Mangi supercomputer (#353).
 
 Changed
 +++++++

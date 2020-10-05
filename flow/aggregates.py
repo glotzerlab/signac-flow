@@ -250,9 +250,6 @@ class aggregator:
 
     def __call__(self, func=None):
         if callable(func):
-            if getattr(func, '_flow_aggregate', False):
-                raise RuntimeError("@aggregator should appear below the @FlowProject.operation "
-                                   "decorator in your script")
             setattr(func, '_flow_aggregate', self)
             return func
         else:

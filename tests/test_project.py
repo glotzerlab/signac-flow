@@ -20,7 +20,6 @@ from functools import partial
 import signac
 import flow
 from flow import FlowProject, cmd, with_job, directives
-from flow import get_aggregate_id
 from flow.scheduling.base import Scheduler
 from flow.scheduling.base import ClusterJob
 from flow.scheduling.base import JobStatus
@@ -34,7 +33,6 @@ from deprecation import fail_if_not_removed
 from define_test_project import _TestProject
 from define_test_project import _DynamicTestProject
 from define_dag_test_project import DagTestProject
-from define_aggregate_test_project import _AggregateTestProject
 
 
 @contextmanager
@@ -1529,143 +1527,3 @@ class TestGroupProjectMainInterface(TestProjectBase):
 
 class TestGroupDynamicProjectMainInterface(TestProjectMainInterface):
     project_class = _DynamicTestProject
-
-
-class TestAggregateBase(TestProjectBase):
-    project_class = _AggregateTestProject
-    entrypoint = dict(
-        path=os.path.realpath(os.path.join(os.path.dirname(__file__),
-                              'define_aggregate_test_project.py'))
-    )
-
-    def mock_project(self, config_overrides=None):
-        project = self.project_class.get_project(root=self._tmp_dir.name)
-        if config_overrides is not None:
-            def recursive_update(d, u):
-                for k, v in u.items():
-                    if isinstance(v, collections.abc.Mapping):
-                        d[k] = recursive_update(d.get(k, {}), v)
-                    else:
-                        d[k] = v
-                return d
-            config = project.config.copy()
-            config = recursive_update(config, config_overrides)
-            project = self.project_class(config=config)
-        for i in range(30):
-            project.open_job(dict(i=i)).init()
-        project._entrypoint = self.entrypoint
-        project._register_aggregates()
-        return project
-
-    def switch_to_cwd(self):
-        os.chdir(self.cwd)
-
-    @pytest.fixture(autouse=True)
-    def setup_main_interface(self, request):
-        self.project = self.mock_project()
-        self.cwd = os.getcwd()
-        os.chdir(self._tmp_dir.name)
-        request.addfinalizer(self.switch_to_cwd)
-
-    def call_subcmd(self, subcmd):
-        # Determine path to project module and construct command.
-        fn_script = inspect.getsourcefile(type(self.project))
-        _cmd = 'python {} {}'.format(fn_script, subcmd)
-        try:
-            with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
-                with switch_to_directory(self.project.root_directory()):
-                    return subprocess.check_output(_cmd.split(), stderr=subprocess.DEVNULL)
-        except subprocess.CalledProcessError as error:
-            print(error, file=sys.stderr)
-            print(error.output, file=sys.stderr)
-            raise
-
-    def generate_str_jobop(self, jobs):
-        # This method is supposed to replicate the job representation of a
-        # _JobOperation instance
-        jobs = list(jobs)
-        max_len = 3
-        min_len_unique_id = jobs[0]._project.min_len_unique_id()
-        if len(jobs) > max_len:
-            shown = list(jobs[:max_len-2]) + ['...'] + list(jobs[-1:])
-        else:
-            shown = jobs
-        return f"[#{len(jobs)}]" \
-               f"({', '.join([str(element)[:min_len_unique_id] for element in shown])})"
-
-
-class TestAggregationProjectMainInterface(TestAggregateBase):
-    def test_main_run(self):
-        project = self.mock_project()
-        assert len(project)
-        for job in project:
-            assert not job.doc.get('sum', False)
-        self.call_subcmd(
-            f'run -o agg_op1 -j {get_aggregate_id(project)}'
-        )
-        total = sum(job.sp.i for job in project)
-        assert all(job.doc['sum'] == total for job in project)
-
-    def test_main_script(self):
-        project = self.mock_project()
-        assert len(project)
-        hashed_aggregate_id = get_aggregate_id(project)
-        script_output = self.call_subcmd(
-            f'script -o agg_op1 -j {hashed_aggregate_id}'
-        ).decode().splitlines()
-        assert self.generate_str_jobop(project) in '\n'.join(script_output)
-        assert f'-o agg_op1 -j {hashed_aggregate_id}' in '\n'.join(script_output)
-
-    def test_main_submit(self):
-        project = self.mock_project()
-        assert len(project)
-        hashed_aggregate_id = get_aggregate_id(project)
-        submit_output = self.call_subcmd(
-            f'submit -o agg_op1 -j {hashed_aggregate_id} --pretend'
-        ).decode().splitlines()
-        output_string = '\n'.join(submit_output)
-        assert self.generate_str_jobop(project) in output_string
-        assert f'run -o agg_op1 -j {hashed_aggregate_id}' in output_string
-
-    def test_get_job_aggregate_status(self):
-        project = self.mock_project()
-        status = project.get_job_status(project)
-        status['aggregate-id'] = get_aggregate_id(project)
-        for ops in status['operations']:
-            assert ops == 'agg_op1'
-
-    def test_parallelized_project_status(self):
-        project = self.mock_project(
-            config_overrides={'flow': {'status_parallelization': 'process'}})
-        with redirect_stdout(StringIO()):
-            with redirect_stderr(StringIO()):
-                project.print_status(detailed=True)
-
-
-class TestGroupAggregationProjectMainInterface(TestAggregateBase):
-    def test_main_run(self):
-        project = self.mock_project()
-        assert len(project)
-        for job in project:
-            assert not job.doc.get('test2', False)
-            assert not job.doc.get('test3', False)
-        self.call_subcmd('run -o group1')
-        for job in project:
-            assert job.doc.get('test2', False) == 1
-            assert job.doc.get('test3', False) == 1
-
-    def test_main_script(self):
-        project = self.mock_project()
-        assert len(project)
-        script_output = self.call_subcmd(
-            'script -o group1'
-        ).decode().splitlines()
-        assert '-o group1' in '\n'.join(script_output)
-
-    def test_main_submit(self):
-        project = self.mock_project()
-        assert len(project)
-        submit_output = self.call_subcmd(
-            'submit -o group1 --pretend'
-        ).decode().splitlines()
-        assert 'run -o group1' in '\n'.join(submit_output)

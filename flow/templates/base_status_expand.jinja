@@ -8,18 +8,14 @@
 {% block detailed %}
 {{ super () }}
 {{ 'Operations: \n' }}
-| job_id | operation | aggregation_status | eligible | cluster_status |
-| ------ | --------- | ------------------ | -------- | -------------- |
+| job_id | operation | eligible | cluster_status |
+| ------ | --------- | -------- | -------------- |
 {% for job in jobs %}
-{% for key, ops in job['operations'].items() %}
+{% for key, value in job['operations'].items() if value | job_filter(scheduler_status_code, all_ops) %}
 {% if loop.first %}
-{% for value in ops if value | job_filter(scheduler_status_code, all_ops) %}
-| {{ job['job_id'] }} | {{ '%s' | highlight(value['eligible'], pretty) | format(key) }} | {{ value['aggregate_detail'] | highlight(value['aggregate_detail'], pretty) }} | {{ alias_bool[value['eligible']] }} | {{ scheduler_status_code[value['scheduler_status']] }} |
-{% endfor %}
+| {{ job['job_id'] }} | {{ '%s' | highlight(value['eligible'], pretty) | format(key) }} | {{ alias_bool[value['eligible']] }} | {{ scheduler_status_code[value['scheduler_status']] }} |
 {% else %}
-{% for value in ops if value | job_filter(scheduler_status_code, all_ops) %}
-|  | {{ '%s' | highlight(value['eligible'], pretty) | format(key) }} | {{ value['aggregate_detail'] | highlight(value['aggregate_detail'], pretty) }} | {{ alias_bool[value['eligible']] }} | {{ scheduler_status_code[value['scheduler_status']] }} |
-{% endfor %}
+|  | {{ '%s' | highlight(value['eligible'], pretty) | format(key) }} | {{ alias_bool[value['eligible']] }} | {{ scheduler_status_code[value['scheduler_status']] }} |
 {% endif %}
 {% endfor %}
 {% endfor %}

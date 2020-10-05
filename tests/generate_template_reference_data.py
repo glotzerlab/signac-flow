@@ -138,16 +138,6 @@ def _store_bundled(self, operations):
 flow.FlowProject._store_bundled = _store_bundled
 
 
-# We don't need to store the information of lost aggregates for
-# testing templates. Hence we need to mock this method in order to
-# avoid needing to make a file.
-def _store_aggregates(self, operations):
-    pass
-
-
-flow.FlowProject._store_aggregates = _store_aggregates
-
-
 def get_masked_flowproject(p):
     """Mock environment-dependent attributes and functions. Need to mock
     sys.executable before the FlowProject is instantiated, and then modify the

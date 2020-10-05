@@ -9,20 +9,17 @@
 {% set para_output = ns.field_parameters | format(*job['parameters'].values()) %}
 {% endif %}
 {% if all_ops %}
-{% set key, ops = job['operations'].items() | first() %}
-{% set value = ops | first() %}
-| {{ job['job_id'] }} | {{ field_operation | highlight(value['eligible'], pretty) | format(key, '[' + scheduler_status_code[value['scheduler_status']] + ']', '+(' + job['extra_num_operations'] | string() + ')') }} | {{ para_output }}{{ job['labels'] | join(', ') }} |
+{% set key, value = job['operations'].items() | first() %}
+| {{ job['job_id'] }} | {{ field_operation | highlight(value['eligible'], pretty) | format(key, '[' + scheduler_status_code[value['scheduler_status']] + ']', '+(' + extra_num_operations | string() + ')') }} | {{ para_output }}{{ job['labels'] | join(', ') }} |
 {% else %}
 {% set ns.extra_num_operation = -1 %}
 {% set ns.if_first_eligible_operation = True %}
-{% for key, ops in job['operations'].items() %}
-{% for value in ops if value | job_filter(scheduler_status_code, all_ops) %}
+{% for key, value in job['operations'].items() if value | job_filter(scheduler_status_code, all_ops) %}
 {% set ns.extra_num_operation = ns.extra_num_operation + 1 %}
 {% if loop.first %}
 {% set ns.first_operation_key = key %}
 {% set ns.first_operation_value = value %}
 {% endif %}
-{% endfor %}
 {% endfor %}
 | {{ job['job_id'] }} | {{ field_operation | highlight(ns.first_operation_value['eligible'], pretty) | format(ns.first_operation_key, '['+scheduler_status_code[ns.first_operation_value['scheduler_status']]+']', '+('+ns.extra_num_operation | string()+')') }} | {{ para_output }}{{ job['labels'] | join(', ') }} |
 {% endif %}

@@ -76,14 +76,14 @@ jobs:
     <<: *test-template
     environment:
       SIGNAC_VERSION: "~=1.0.0"
-  test-3.8-signac-1.2:
-    <<: *test-template
-    environment:
-      SIGNAC_VERSION: "~=1.2.0"
   test-3.8-signac-1.3:
     <<: *test-template
     environment:
       SIGNAC_VERSION: "~=1.3.0"
+  test-3.8-signac-1.4:
+    <<: *test-template
+    environment:
+      SIGNAC_VERSION: "~=1.4.0"
   test-3.7:
     <<: *test-template
     docker:
@@ -137,10 +137,10 @@ workflows:
       - test-3.8-signac-1.0:
           requires:
             - test-3.8
-      - test-3.8-signac-1.2:
+      - test-3.8-signac-1.3:
           requires:
             - test-3.8
-      - test-3.8-signac-1.3:
+      - test-3.8-signac-1.4:
           requires:
             - test-3.8
       - test-deploy-pypi:
@@ -152,8 +152,8 @@ workflows:
             - test-3.7
             - test-3.8
             - test-3.8-signac-1.0
-            - test-3.8-signac-1.2
             - test-3.8-signac-1.3
+            - test-3.8-signac-1.4
   deploy:
     jobs:
       - deploy-pypi:

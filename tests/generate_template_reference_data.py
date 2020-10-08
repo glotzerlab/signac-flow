@@ -144,9 +144,6 @@ def _store_bundled(self, operations):
         return bid
 
 
-flow.FlowProject._store_bundled = _store_bundled
-
-
 def get_masked_flowproject(p):
     """Mock environment-dependent attributes and functions. Need to mock
     sys.executable before the FlowProject is instantiated, and then modify the
@@ -228,6 +225,8 @@ def main(args):
 
 
 if __name__ == "__main__":
+    flow.FlowProject._store_bundled = _store_bundled
+
     parser = argparse.ArgumentParser(
         description="Generate reference submission scripts for various environments")
     parser.add_argument(

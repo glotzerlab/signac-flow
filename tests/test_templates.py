@@ -28,7 +28,9 @@ def find_envs():
 
 
 @pytest.mark.parametrize('env', find_envs())
-def test_env(env):
+def test_env(env, monkeypatch):
+    monkeypatch.setattr(flow.FlowProject, '_store_bundled', gen._store_bundled)
+
     # Force asserts to show the full file when failures occur.
     # Useful to debug errors that arise.
 

@@ -3078,7 +3078,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             '-p', '--parallel',
             action='store_true',
             help="Execute all operations in parallel.")
-        cls._add_direct_cmd_arg_group(parser)
         cls._add_template_arg_group(parser)
 
     @classmethod
@@ -3170,22 +3169,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             '-p', '--parallel',
             action='store_true',
             help="Execute all operations in a single bundle in parallel.")
-
-    @classmethod
-    def _add_direct_cmd_arg_group(cls, parser):
-        direct_cmd_group = parser.add_argument_group("direct cmd")
-        direct_cmd_group.add_argument(
-            '--cmd',
-            type=str,
-            help="Directly specify the command for an operation. "
-                 "For example: --cmd='echo {job._id}'. "
-                 "--cmd option is deprecated as of 0.9 and will be removed in 0.11.")
-        direct_cmd_group.add_argument(
-            '--requires',
-            type=str,
-            nargs='+',
-            help="Manually specify all labels that are required for the direct command "
-                 "to be considered eligible for execution.")
 
     def export_job_statuses(self, collection, statuses):
         "Export the job statuses to a database collection."

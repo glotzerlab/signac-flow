@@ -123,6 +123,7 @@ class IgnoreConditions(IntFlag):
     # This operator must be defined since IntFlag simply performs an integer
     # bitwise not on the underlying enum value, which is problematic in
     # twos-complement arithmetic. What we want is to only flip valid bits.
+
     def __invert__(self):
         # Compute the largest number of bits used to represent one of the flags
         # so that we can XOR the appropriate number.
@@ -302,11 +303,11 @@ class _JobOperation(object):
 
     def __repr__(self):
         return "{type}(name='{name}', jobs='{jobs}', cmd={cmd}, directives={directives})".format(
-                   type=type(self).__name__,
-                   name=self.name,
-                   jobs="[" + " ,".join(map(repr, self._jobs)) + "]",
-                   cmd=repr(self.cmd),
-                   directives=self.directives)
+            type=type(self).__name__,
+            name=self.name,
+            jobs="[" + " ,".join(map(repr, self._jobs)) + "]",
+            cmd=repr(self.cmd),
+            directives=self.directives)
 
     def __hash__(self):
         return int(sha1(self.id.encode('utf-8')).hexdigest(), 16)
@@ -387,6 +388,7 @@ class JobOperation(_JobOperation):
     :type directives:
         :class:`flow.directives._Directives`
     """
+
     def __init__(self, id, name, job, cmd, directives=None):
         self._id = id
         self.name = name
@@ -421,11 +423,11 @@ class JobOperation(_JobOperation):
 
     def __repr__(self):
         return "{type}(name='{name}', job='{job}', cmd={cmd}, directives={directives})".format(
-                   type=type(self).__name__,
-                   name=self.name,
-                   job=repr(self._jobs[0]),
-                   cmd=repr(self.cmd),
-                   directives=self.directives)
+            type=type(self).__name__,
+            name=self.name,
+            job=repr(self._jobs[0]),
+            cmd=repr(self.cmd),
+            directives=self.directives)
 
 
 class _SubmissionJobOperation(_JobOperation):
@@ -701,6 +703,7 @@ class FlowGroupEntry(object):
     :type options:
         str
     """
+
     def __init__(self, name, options=""):
         self.name = name
         self.options = options
@@ -1021,11 +1024,11 @@ class FlowGroup(object):
 
         separator = getattr(project._environment, 'JOB_ID_SEPARATOR', '/')
         readable_name = '{project}{sep}{jobs}{sep}{op_string}{sep}{index:04d}{sep}'.format(
-                    sep=separator,
-                    project=str(project)[:12],
-                    jobs=concat_jobs_str,
-                    op_string=op_string[:12],
-                    index=index)[:max_len]
+            sep=separator,
+            project=str(project)[:12],
+            jobs=concat_jobs_str,
+            op_string=op_string[:12],
+            index=index)[:max_len]
 
         # By appending the unique job_op_id, we ensure that each id is truly unique.
         return readable_name + job_op_id
@@ -1714,10 +1717,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             for operation in group.operations:
                 if scheduler_status >= status_dict[operation]['scheduler_status']:
                     status_dict[operation] = {
-                            'scheduler_status': scheduler_status,
-                            'eligible': eligible,
-                            'completed': completed
-                            }
+                        'scheduler_status': scheduler_status,
+                        'eligible': eligible,
+                        'completed': completed
+                    }
 
         for key in sorted(status_dict):
             yield key, status_dict[key]
@@ -3259,7 +3262,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                  "The '--no-parallelize' argument is deprecated. "
                  "Please use the status_parallelization configuration "
                  "instead (see above)."
-            )
+        )
         view_group.add_argument(
             '-o', '--output-format',
             type=str,

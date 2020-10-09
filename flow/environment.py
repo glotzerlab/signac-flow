@@ -16,7 +16,6 @@ import logging
 import importlib
 from collections import OrderedDict
 import importlib.machinery
-import warnings
 
 from signac.common import config
 

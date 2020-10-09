@@ -5,14 +5,15 @@ Changelog
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 The numbers in brackets denote the related GitHub issue and/or pull request.
 
-next
-====
+Version 0.11
+============
 
-next
-----
+[0.11.0] -- 2020-10-09
+----------------------
 
 Added
 +++++
+
 - Added classes ``_Directives`` and ``_Directive`` that serve as a smart mapping for directives specified by the environment or user (#265, #283).
 - Added support for `pre-commit hooks <https://pre-commit.com/>`__ (#333).
 - Add environment profile for University of Minnesota, Minnesota Supercomputing Institute, Mangi supercomputer (#353).
@@ -26,6 +27,7 @@ Changed
 
 Fixed
 +++++
+
 - Serial execution on Summit correctly counts total node requirements (#342).
 - Fixed performance regression in job submission in large workspaces (#354).
 
@@ -77,6 +79,7 @@ Changed
 
 Fixed
 +++++
+
 - Ensure that label names are used when displaying status (#263).
 - Fix node counting for large resource sets on Summit (#294).
 
@@ -178,12 +181,12 @@ Added
 - Add function to automatically print all varying state point parameters in the detailed status view triggered by providing option `-p/--parameters` without arguments (#19, #87).
 - Add clear environment notification when submitting job scripts (#43, #88).
 
-Fixes
+Fixed
 +++++
 
 - Fix issue where the scheduler status of job-operations would not be properly updated for *ineligible* operations (#96).
 
-Fixes (compute environments)
+Fixed (compute environments)
 ++++++++++++++++++++++++++++
 
 - Fix issue with the TORQUE scheduler that occured when there was no job scheduled at all on the system (for any user) (#92, #93).
@@ -203,7 +206,7 @@ Added
 - Add legend explaining the scheduler-related symbols to the detailed status view (#68).
 - Allow the specification of the number of tasks per resource set and additional jsrun arguments for Summit scripts.
 
-Fixes (general)
+Fixed (general)
 +++++++++++++++
 
 - Fixes issue where callable cmd-directives were not evaluated (#47).
@@ -213,7 +216,7 @@ Fixes (general)
 - Fixes issue where using the buffered mode would lead to confusing error messages when condition-functions would raise an AttributeError exception.
 - Fixes issue with erroneous unused-directive-keys-warning.
 
-Fixes (compute environments)
+Fixed (compute environments)
 ++++++++++++++++++++++++++++
 
 - Fixes issues with the Summit environment resource set calculation for parallel operations under specific conditions (#63).

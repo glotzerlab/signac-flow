@@ -38,6 +38,14 @@ Removed
 Version 0.10
 ============
 
+[0.10.1] -- 2020-08-20
+----------------------
+
+Fixed
++++++
+
+- Fix issue with the submission of bundled operations on cluster environments that do not allow slashes ('/') in cluster scheduler job names (#343).
+
 [0.10.0] -- 2020-06-27
 ----------------------
 

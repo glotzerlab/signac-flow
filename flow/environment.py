@@ -16,7 +16,6 @@ import logging
 import importlib
 from collections import OrderedDict
 import importlib.machinery
-import warnings
 
 from signac.common import config
 
@@ -227,10 +226,6 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         """
         if operation.directives.get('nranks'):
             return '{} -n {} '.format(cls.mpi_cmd, operation.directives['nranks'])
-        elif operation.directives.get('ngpu', 0) > 1:
-            warnings.warn("Setting ngpu directive without nranks will no longer use MPI "
-                          "in version 0.11.", DeprecationWarning)
-            return '{} -n {}'.format(cls.mpi_cmd, operation.directives['ngpu'])
         else:
             return ''
 

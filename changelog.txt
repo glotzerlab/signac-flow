@@ -139,7 +139,7 @@ Added
 - Enable option to always show the full traceback with ``show_traceback = on`` within the ``[flow]`` section of the signac configuration (#61, #144).
 - Add full launcher support for job submission on XSEDE Stampede2 for large parallel single processor jobs (#85, #91).
 
-Fixes
+Fixed
 +++++
 
 - Both the ``nranks`` and ``omp_num_threads`` directives properly support callables (#118).

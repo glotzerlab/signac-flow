@@ -41,7 +41,7 @@ jobs:
 
   test-3.8: &test-template
     environment:
-      SIGNAC_VERSION: ""
+      SIGNAC_VERSION: "signac"
     docker:
       - image: circleci/python:3.8
 
@@ -56,7 +56,7 @@ jobs:
             mkdir -p ./venv
             python -m virtualenv ./venv
             . venv/bin/activate
-            pip install signac${SIGNAC_VERSION}
+            pip install ${SIGNAC_VERSION}
             pip install -r requirements.txt
             pip install -r requirements-test.txt
             pip install -U coverage mock
@@ -75,15 +75,19 @@ jobs:
   test-3.8-signac-1.0:
     <<: *test-template
     environment:
-      SIGNAC_VERSION: "~=1.0.0"
+      SIGNAC_VERSION: "signac~=1.0.0"
   test-3.8-signac-1.3:
     <<: *test-template
     environment:
-      SIGNAC_VERSION: "~=1.3.0"
+      SIGNAC_VERSION: "signac~=1.3.0"
   test-3.8-signac-1.4:
     <<: *test-template
     environment:
-      SIGNAC_VERSION: "~=1.4.0"
+      SIGNAC_VERSION: "signac~=1.4.0"
+  test-3.8-signac-latest:
+    <<: *test-template
+    environment:
+      SIGNAC_VERSION: "git+ssh://git@github.com/glotzerlab/signac.git"
   test-3.7:
     <<: *test-template
     docker:
@@ -154,6 +158,16 @@ workflows:
             - test-3.8-signac-1.0
             - test-3.8-signac-1.3
             - test-3.8-signac-1.4
+  nightly:
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only:
+                - master
+    jobs:
+      - test-3.8-signac-latest
   deploy:
     jobs:
       - deploy-pypi:

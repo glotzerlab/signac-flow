@@ -147,7 +147,6 @@ workflows:
       - test-3.8-signac-1.4:
           requires:
             - test-3.8
-      - test-3.8-signac-latest
       - test-deploy-pypi:
           filters:
             branches:

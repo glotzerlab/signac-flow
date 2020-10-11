@@ -158,6 +158,7 @@ workflows:
             - test-3.8-signac-1.0
             - test-3.8-signac-1.3
             - test-3.8-signac-1.4
+            - test-3.8-signac-latest
   nightly:
     triggers:
       - schedule:

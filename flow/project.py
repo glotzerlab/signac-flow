@@ -127,6 +127,7 @@ class IgnoreConditions(IntFlag):
     # This operator must be defined since IntFlag simply performs an integer
     # bitwise not on the underlying enum value, which is problematic in
     # twos-complement arithmetic. What we want is to only flip valid bits.
+
     def __invert__(self):
         # Compute the largest number of bits used to represent one of the flags
         # so that we can XOR the appropriate number.
@@ -271,10 +272,11 @@ class _JobOperation(object):
     :type cmd:
         callable or str
     :param directives:
-        A dictionary of additional parameters that provide instructions on how
-        to execute this operation, e.g., specifically required resources.
+        A :class:`flow.directives._Directives` object of additional parameters
+        that provide instructions on how to execute this operation, e.g.,
+        specifically required resources.
     :type directives:
-        :class:`dict`
+        :class:`flow.directives._Directives`
     """
 
     def __init__(self, id, name, jobs, cmd, directives=None):
@@ -285,17 +287,12 @@ class _JobOperation(object):
             raise ValueError("JobOperation cmd must be a callable or string.")
         self._cmd = cmd
 
-        if directives is None:
-            directives = dict()  # default argument
-        else:
-            directives = dict(directives)  # explicit copy
-
         # Keys which were explicitly set by the user, but are not evaluated by the
         # template engine are cause for concern and might hint at a bug in the template
         # script or ill-defined directives. We are therefore keeping track of all
         # keys set by the user and check whether they have been evaluated by the template
         # script engine later.
-        keys_set_by_user = set(directives)
+        keys_set_by_user = set(directives._user_directives)
 
         # We use a special dictionary that allows us to track all keys that have been
         # evaluated by the template engine and compare them to those explicitly set
@@ -317,11 +314,11 @@ class _JobOperation(object):
 
     def __repr__(self):
         return "{type}(name='{name}', jobs='{jobs}', cmd={cmd}, directives={directives})".format(
-                   type=type(self).__name__,
-                   name=self.name,
-                   jobs="[" + " ,".join(map(repr, self._jobs)) + "]",
-                   cmd=repr(self.cmd),
-                   directives=self.directives)
+            type=type(self).__name__,
+            name=self.name,
+            jobs="[" + " ,".join(map(repr, self._jobs)) + "]",
+            cmd=repr(self.cmd),
+            directives=self.directives)
 
     def __hash__(self):
         return int(sha1(self.id.encode('utf-8')).hexdigest(), 16)
@@ -400,8 +397,9 @@ class JobOperation(_JobOperation):
         A dictionary of additional parameters that provide instructions on how
         to execute this operation, e.g., specifically required resources.
     :type directives:
-        :class:`dict`
+        :class:`flow.directives._Directives`
     """
+
     def __init__(self, id, name, job, cmd, directives=None):
         self._id = id
         self.name = name
@@ -411,7 +409,7 @@ class JobOperation(_JobOperation):
         self._cmd = cmd
 
         if directives is None:
-            directives = dict()  # default argument
+            directives = job._project._environment._get_default_directives()
         else:
             directives = dict(directives)  # explicit copy
 
@@ -436,11 +434,11 @@ class JobOperation(_JobOperation):
 
     def __repr__(self):
         return "{type}(name='{name}', job='{job}', cmd={cmd}, directives={directives})".format(
-                   type=type(self).__name__,
-                   name=self.name,
-                   job=repr(self._jobs[0]),
-                   cmd=repr(self.cmd),
-                   directives=self.directives)
+            type=type(self).__name__,
+            name=self.name,
+            job=repr(self._jobs[0]),
+            cmd=repr(self.cmd),
+            directives=self.directives)
 
 
 class _SubmissionJobOperation(_JobOperation):
@@ -866,37 +864,13 @@ class FlowGroup(object):
         self._set_entrypoint_item(entrypoint, directives, 'path', default_path, jobs)
         return "{} {}".format(entrypoint['executable'], entrypoint['path']).lstrip()
 
-    def _resolve_directives(self, name, defaults, jobs):
+    def _resolve_directives(self, name, defaults, env):
+        all_directives = env._get_default_directives()
         if name in self.operation_directives:
-            directives = deepcopy(self.operation_directives[name])
+            all_directives.update(self.operation_directives[name])
         else:
-            directives = deepcopy(defaults.get(name, dict()))
-        nranks = directives.get('nranks', 1)
-        nthreads = directives.get('omp_num_threads', 1)
-        if callable(nranks) or callable(nthreads):
-            def np_callable(*jobs):
-                nr = nranks(*jobs) if callable(nranks) else nranks
-                nt = nthreads(*jobs) if callable(nthreads) else nthreads
-                return nr*nt
-
-            directives.setdefault('np', np_callable)
-        else:
-            directives.setdefault('np', nranks*nthreads)
-
-        directives.setdefault('ngpu', 0)
-        directives.setdefault('nranks', 0)
-        directives.setdefault('omp_num_threads', 0)
-        directives.setdefault('processor_fraction', 1)
-
-        # Evaluate strings and callables for jobs:
-        def evaluate(value):
-            if value and callable(value):
-                return value(*jobs)
-            elif isinstance(value, str):
-                return value.format(*jobs)
-            else:
-                return value
-        return {key: evaluate(value) for key, value in directives.items()}
+            all_directives.update(defaults.get(name, dict()))
+        return all_directives
 
     def _submit_cmd(self, entrypoint, ignore_conditions, jobs=None):
         entrypoint = self._determine_entrypoint(entrypoint, dict(), jobs)
@@ -1064,9 +1038,12 @@ class FlowGroup(object):
             concat_jobs_str = str(jobs[0])[0:8]
 
         separator = getattr(project._environment, 'JOB_ID_SEPARATOR', '/')
-        readable_name = f'{str(project)[:12]}{separator}{self.name}{separator}' \
-                        f'{len(jobs)}{separator}{concat_jobs_str}{separator}{index:04d}' \
-                        f'{separator}'[:max_len]
+        readable_name = '{project}{sep}{jobs}{sep}{op_string}{sep}{index:04d}{sep}'.format(
+            sep=separator,
+            project=str(project)[:12],
+            jobs=concat_jobs_str,
+            op_string=op_string[:12],
+            index=index)[:max_len]
 
         # By appending the unique job_op_id, we ensure that each id is truly unique.
         return readable_name + job_op_id
@@ -1185,9 +1162,13 @@ class FlowGroup(object):
         :rtype:
             Iterator[_JobOperation]
         """
+        # Assuming all the jobs belong to the same FlowProject
+        env = jobs[0]._project._environment
         for name, op in self.operations.items():
             if op._eligible(jobs, ignore_conditions):
-                directives = self._resolve_directives(name, default_directives, jobs)
+                directives = self._resolve_directives(
+                    name, default_directives, env)
+                directives.evaluate(jobs)
                 cmd = self._run_cmd(entrypoint=entrypoint, operation_name=name,
                                     operation=op, directives=directives, jobs=jobs)
                 job_op = _JobOperation(self._generate_id(jobs, name, index=index), name,
@@ -1207,17 +1188,16 @@ class FlowGroup(object):
         No checks are done to mitigate inappropriate aggregation of operations.
         This can lead to poor utilization of computing resources.
         """
-        directives = dict(ngpu=0, nranks=0, omp_num_threads=0, np=0)
-
-        for name in self.operations:
+        env = jobs[0]._project._environment
+        op_names = list(self.operations.keys())
+        directives = self._resolve_directives(
+            op_names[0], default_directives, env)
+        for name in op_names[1:]:
             # get directives for operation
-            op_dir = self._resolve_directives(name, default_directives, jobs)
-            # Find the correct number of processors for operation
-            directives['ngpu'] = max(directives['ngpu'], op_dir['ngpu'])
-            directives['nranks'] = max(directives['nranks'], op_dir['nranks'])
-            directives['omp_num_threads'] = max(directives['omp_num_threads'],
-                                                op_dir['omp_num_threads'])
-            directives['np'] = max(directives['np'], op_dir['np'])
+            directives.update(self._resolve_directives(name,
+                                                       default_directives,
+                                                       env),
+                              aggregate=True, jobs=jobs)
         return directives
 
 
@@ -1323,7 +1303,7 @@ class _FlowProjectClass(type):
                 @Project.operation
                 @Project.post(lambda job: job.doc.get('bye'))
                 def bye(job):
-                    print('bye' job)
+                    print('bye', job)
                     job.doc.bye = True
 
             The *bye*-operation would be considered complete and therefore no longer
@@ -1704,8 +1684,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if len(operations) == 1:
             return operations[0].id
         else:
-            h = '.'.join(op.id for op in operations)
-            bid = '{}/bundle/{}'.format(self, sha1(h.encode('utf-8')).hexdigest())
+            sep = getattr(self._environment, 'JOB_ID_SEPARATOR', '/')
+            _id = sha1('.'.join(op.id for op in operations).encode('utf-8')).hexdigest()
+            bid = f"{self}{sep}bundle{sep}{_id}"
             fn_bundle = self._fn_bundle(bid)
             os.makedirs(os.path.dirname(fn_bundle), exist_ok=True)
             with open(fn_bundle, 'w') as file:
@@ -1715,8 +1696,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _expand_bundled_jobs(self, scheduler_jobs):
         "Expand jobs which were submitted as part of a bundle."
+        sep = getattr(self._environment, 'JOB_ID_SEPARATOR', '/')
+        bundle_prefix = f"{self}{sep}bundle{sep}"
         for job in scheduler_jobs:
-            if job.name().startswith('{}/bundle/'.format(self)):
+            if job.name().startswith(bundle_prefix):
                 with open(self._fn_bundle(job.name())) as file:
                     for line in file:
                         yield ClusterJob(line.strip(), job.status())
@@ -1755,10 +1738,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 for operation in group.operations:
                     if scheduler_status >= status_dict[operation]['scheduler_status']:
                         status_dict[operation] = {
-                                'scheduler_status': scheduler_status,
-                                'eligible': eligible,
-                                'completed': completed
-                                }
+                            'scheduler_status': scheduler_status,
+                            'eligible': eligible,
+                            'completed': completed
+                        }
 
         for key in sorted(status_dict):
             yield key, status_dict[key]
@@ -2563,7 +2546,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _loads_op(self, blob):
         id, name, job_ids, cmd, directives = blob
         jobs = tuple(self.open_job(id=job_id) for job_id in job_ids)
-        return _JobOperation(id, name, jobs, cmd, directives)
+        all_directives = jobs[0]._project._environment._get_default_directives()
+        all_directives.update(directives)
+        return _JobOperation(id, name, jobs, cmd, all_directives)
 
     def _run_operations_in_parallel(self, pool, pickle, operations, progress, timeout):
         """Execute operations in parallel.
@@ -2622,6 +2607,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             try:
                 self._operations[operation.name](operation._jobs)
             except Exception as e:
+                assert len(operation._jobs) == 1
                 raise UserOperationError(
                     'An exception was raised during operation {operation.name} '
                     f'for job or aggregate having id {get_aggregate_id(operation._jobs)}.'
@@ -2831,20 +2817,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "Executing {} operation(s) (Pass # {:02d})...".format(len(operations), i_pass))
             self._run_operations(operations, pretend=pretend,
                                  np=np, timeout=timeout, progress=progress)
-
-    def _generate_operations(self, cmd, aggregates, requires=None):
-        "Generate job-operations for a given 'direct' command."
-        if aggregates is None:
-            aggregates = _DefaultAggregateStore(self)
-
-        for aggregate in aggregates:
-            if(
-                len(aggregate) > 1 or
-                requires and set(requires).difference(self.labels(*aggregate))
-            ):
-                continue
-            cmd_ = cmd.format(job=aggregate[0])
-            yield _JobOperation(id=None, name=cmd_.replace(' ', '-'), cmd=cmd_, jobs=aggregate)
 
     def _gather_flow_groups(self, names=None):
         """Grabs FlowGroups that match any of a set of names."""
@@ -3257,19 +3229,28 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Gather all pending operations.
         with self._potentially_buffered():
             default_directives = self._get_default_directives()
-            operations = self._get_submission_operations(aggregates, default_directives,
-                                                         names, ignore_conditions,
-                                                         ignore_conditions_on_execution)
-        if num is not None:
-            operations = list(islice(operations, num))
+            # The generator must be used *inside* the buffering context manager
+            # for performance reasons.
+            operation_generator = self._get_submission_operations(aggregates,
+                                                                  default_directives,
+                                                                  names,
+                                                                  ignore_conditions,
+                                                                  ignore_conditions_on_execution)
+            # islice takes the first "num" elements from the generator, or all
+            # items if num is None.
+            operations = list(islice(operation_generator, num))
 
         # Bundle them up and submit.
-        for bundle in _make_bundles(operations, bundle_size):
-            status = self._submit_operations(operations=bundle, env=env, parallel=parallel,
-                                             force=force, walltime=walltime, **kwargs)
-            if status is not None:  # operations were submitted, store status
-                for operation in bundle:
-                    operation.set_status(status)
+        with self._potentially_buffered():
+            for bundle in _make_bundles(operations, bundle_size):
+                status = self._submit_operations(operations=bundle, env=env,
+                                                 parallel=parallel,
+                                                 force=force,
+                                                 walltime=walltime, **kwargs)
+                if status is not None:
+                    # Operations were submitted, store status
+                    for operation in bundle:
+                        operation.set_status(status)
 
     @classmethod
     def _add_submit_args(cls, parser):
@@ -3319,7 +3300,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             '-p', '--parallel',
             action='store_true',
             help="Execute all operations in parallel.")
-        cls._add_direct_cmd_arg_group(parser)
         cls._add_template_arg_group(parser)
 
     @classmethod
@@ -3412,22 +3392,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             action='store_true',
             help="Execute all operations in a single bundle in parallel.")
 
-    @classmethod
-    def _add_direct_cmd_arg_group(cls, parser):
-        direct_cmd_group = parser.add_argument_group("direct cmd")
-        direct_cmd_group.add_argument(
-            '--cmd',
-            type=str,
-            help="Directly specify the command for an operation. "
-                 "For example: --cmd='echo {job._id}'. "
-                 "--cmd option is deprecated as of 0.9 and will be removed in 0.11.")
-        direct_cmd_group.add_argument(
-            '--requires',
-            type=str,
-            nargs='+',
-            help="Manually specify all labels that are required for the direct command "
-                 "to be considered eligible for execution.")
-
     def export_job_statuses(self, collection, statuses):
         "Export the job statuses to a database collection."
         for status in statuses:
@@ -3517,7 +3481,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                  "The '--no-parallelize' argument is deprecated. "
                  "Please use the status_parallelization configuration "
                  "instead (see above)."
-            )
+        )
         view_group.add_argument(
             '-o', '--output-format',
             type=str,
@@ -3868,15 +3832,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 func = op._op_func
 
             if hasattr(func, '_flow_groups'):
-                operation_directives = getattr(func, '_flow_group_operation_directives', dict())
+                op_directives = getattr(func, '_flow_group_operation_directives', dict())
                 for group_name in func._flow_groups:
+                    directives = op_directives.get(group_name)
                     self._groups[group_name].add_operation(
-                        op_name, op, operation_directives.get(group_name, None))
+                        op_name, op, directives)
 
             # For singleton groups add directives
-            self._groups[op_name].operation_directives[op_name] = getattr(func,
-                                                                          '_flow_directives',
-                                                                          dict())
+            directives = getattr(func, '_flow_directives', dict())
+            self._groups[op_name].operation_directives[op_name] = directives
 
     @property
     def operations(self):
@@ -4003,28 +3967,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _main_script(self, args):
         "Generate a script for the execution of operations."
-        if args.requires and not args.cmd:
-            raise ValueError(
-                "The --requires option can only be used in combination with --cmd.")
-        if args.cmd and args.operation_name:
-            raise ValueError(
-                "Cannot use the -o/--operation-name and the --cmd options in combination!")
         # Select jobs:
         aggregates = self._select_jobs_from_args(args)
 
         # Gather all pending operations or generate them based on a direct command...
         with self._potentially_buffered():
-            if args.cmd:
-                warnings.warn("The --cmd option for script is deprecated as of "
-                              "0.10 and will be removed in 0.12.",
-                              DeprecationWarning)
-                operations = self._generate_operations(args.cmd, aggregates, args.requires)
-            else:
-                names = args.operation_name if args.operation_name else None
-                default_directives = self._get_default_directives()
-                operations = self._get_submission_operations(aggregates, default_directives, names,
-                                                             args.ignore_conditions,
-                                                             args.ignore_conditions_on_execution)
+            names = args.operation_name if args.operation_name else None
+            default_directives = self._get_default_directives()
+            operations = self._get_submission_operations(aggregates, default_directives, names,
+                                                         args.ignore_conditions,
+                                                         args.ignore_conditions_on_execution)
             operations = list(islice(operations, args.num))
 
         # Generate the script and print to screen.
@@ -4158,11 +4110,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         parser_status = subparsers.add_parser(
             'status',
             parents=[base_parser],
-            help="You can specify the parallelization of the status command "
-                 "by setting the flow.status_parallelization config "
-                 "value to 'thread' (default), 'none', or 'process'. You can do this by "
-                 "executing `signac config set flow.status_parallelization "
-                 "VALUE`.")
+            description="You can specify the parallelization of the status "
+                        "command by setting the flow.status_parallelization "
+                        "config value to 'thread' (default), 'none', or "
+                        "'process'. You can do this by executing `signac "
+                        "config set flow.status_parallelization VALUE`.")
         self._add_print_status_args(parser_status)
         parser_status.add_argument(
             '--profile',

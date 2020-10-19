@@ -13,6 +13,7 @@ Both files use the [citation file-format][1] for [person objects][2].
 [2] https://citation-file-format.github.io/1.0.3/specifications/#/person-objects
 """
 from dataclasses import dataclass
+from typing import Optional
 
 import click
 import json
@@ -24,7 +25,7 @@ class Contributor:
     last_names: str
     first_names: str
     affiliation: str
-    orcid: str = None
+    orcid: Optional[str] = None
 
     @classmethod
     def from_citation_author(cls, **citation):
@@ -39,11 +40,6 @@ class Contributor:
             affiliation=self.affiliation)
         if self.orcid:
             ret['orcid'] = self.orcid.lstrip('https://orcid.org/')
-        return ret
-
-    def as_zenodo_contributor(self):
-        ret = self.as_zenodo_creator()
-        ret['type'] = 'Other'
         return ret
 
 
@@ -70,7 +66,7 @@ def sync(ctx, in_place=False, check=True):
         zenodo = json.loads(file.read())
         zenodo_updated = zenodo.copy()
         zenodo_updated['creators'] = [a.as_zenodo_creator() for a in authors]
-        zenodo_updated['contributors'] = [c.as_zenodo_contributor()
+        zenodo_updated['contributors'] = [c.as_zenodo_creator()
                                           for c in contributors if c not in authors]
         for key in ('version', 'keywords'):
             zenodo_updated[key] = citation[key]

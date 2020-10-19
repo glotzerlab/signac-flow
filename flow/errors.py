@@ -12,6 +12,11 @@ class ConfigKeyError(KeyError):
     pass
 
 
+class DirectivesError(ValueError):
+    """Indicates that a directive was incorrectly set."""
+    pass
+
+
 class SubmitError(RuntimeError):
     "Indicates an error during cluster job submission."
     pass

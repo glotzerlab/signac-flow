@@ -34,9 +34,13 @@ class SummitEnvironment(DefaultLSFEnvironment):
     gpus_per_node = 6
 
     @template_filter
-    def calc_num_nodes(cls, resource_sets):
+    def calc_num_nodes(cls, resource_sets, parallel=False):
+        nodes_used_final = 0
         cores_used = gpus_used = nodes_used = 0
         for nsets, tasks, cpus_per_task, gpus in resource_sets:
+            if not parallel:
+                # In serial mode we reset for every operation.
+                cores_used = gpus_used = nodes_used = 0
             for _ in range(nsets):
                 cores_used += tasks * cpus_per_task
                 gpus_used += gpus
@@ -45,9 +49,17 @@ class SummitEnvironment(DefaultLSFEnvironment):
                     nodes_used += 1
                     cores_used = max(0, cores_used - cls.cores_per_node)
                     gpus_used = max(0, gpus_used - cls.gpus_per_node)
-        if cores_used > 0 or gpus_used > 0:
-            nodes_used += 1
-        return nodes_used
+            if not parallel:
+                #  Note that when running in serial the "leftovers" must be
+                #  accounted for on a per-operation basis.
+                if cores_used > 0 or gpus_used > 0:
+                    nodes_used += 1
+                nodes_used_final = max(nodes_used, nodes_used_final)
+        if parallel:
+            if cores_used > 0 or gpus_used > 0:
+                nodes_used += 1
+            nodes_used_final = nodes_used
+        return nodes_used_final
 
     @template_filter
     def guess_resource_sets(cls, operation):

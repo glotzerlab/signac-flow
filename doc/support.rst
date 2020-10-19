@@ -94,7 +94,7 @@ To run tests, execute:
 
 .. code-block:: bash
 
-    (signac-flow-dev) signac-flow $ python -m unittest discover tests/
+    (signac-flow-dev) signac-flow $ python -m pytest tests/
 
 
 Building documentation

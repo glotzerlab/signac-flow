@@ -28,13 +28,23 @@ def find_envs():
 
 
 @pytest.mark.parametrize('env', find_envs())
-def test_env(env):
+def test_env(env, monkeypatch):
+    monkeypatch.setattr(flow.FlowProject, '_store_bundled', gen._store_bundled)
+
     # Force asserts to show the full file when failures occur.
     # Useful to debug errors that arise.
 
     # Must import the data into the project.
     with signac.TemporaryProject(name=gen.PROJECT_NAME) as p:
         fp = gen.get_masked_flowproject(p)
+        # Here we set the appropriate executable for all the operations. This
+        # is necessary as otherwise the default executable between submitting
+        # and running could look different depending on the environment.
+        executable = '/usr/local/bin/python'
+        for group in fp.groups.values():
+            for op_key in group.operations:
+                if op_key in group.operation_directives:
+                    group.operation_directives[op_key]['executable'] = executable
         fp.import_from(origin=gen.ARCHIVE_DIR)
         jobs = fp.find_jobs(dict(environment=_env_name(env)))
         if not len(jobs):

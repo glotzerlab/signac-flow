@@ -44,7 +44,7 @@ class aggregator:
     def __init__(self, aggregator_function=None, sort_by=None, sort_ascending=True, select=None):
         if aggregator_function is None:
             def aggregator_function(jobs):
-                return [jobs] if len(jobs) != 0 else []
+                return [jobs] if jobs else []
 
         if not callable(aggregator_function):
             raise TypeError("Expected callable for aggregator_function, got "

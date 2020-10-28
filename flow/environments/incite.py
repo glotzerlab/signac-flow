@@ -5,7 +5,7 @@
 
 http://www.doeleadershipcomputing.org/
 """
-from ..environment import DefaultLSFEnvironment
+from ..environment import DefaultLSFEnvironment, DefaultSlurmEnvironment
 from ..environment import template_filter
 
 from math import gcd
@@ -114,4 +114,27 @@ class SummitEnvironment(DefaultLSFEnvironment):
         return mpi_prefix
 
 
-__all__ = ['SummitEnvironment']
+class RheaEnvironment(DefaultSlurmEnvironment):
+    """Environment profile for the Rhea supercomputer.
+
+    https://www.olcf.ornl.gov/olcf-system/rhea/
+    """
+    hostname_pattern = r'rhea.*\.ccs\.ornl\.gov'
+    template = 'rhea.sh'
+    mpi_cmd = 'srun'
+    cores_per_node = 16
+
+    @classmethod
+    def add_args(cls, parser):
+        super(RheaEnvironment, cls).add_args(parser)
+
+        # Note that while the CPU partition online is documented as either
+        # "rhea" or "default", the actual name for submission is "batch".
+        parser.add_argument(
+          '--partition',
+          choices=['batch', 'gpu'],
+          default='batch',
+          help="Specify the partition to submit to.")
+
+
+__all__ = ['SummitEnvironment', 'RheaEnvironment']

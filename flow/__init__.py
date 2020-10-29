@@ -35,11 +35,11 @@ if get_config_value('import_packaged_environments', default=True):
 
 
 __all__ = [
-    'get_aggregate_id',
     'environment',
     'scheduling',
     'errors',
     'testing',
+    'get_aggregate_id',
     'IgnoreConditions',
     'FlowProject',
     'JobOperation',

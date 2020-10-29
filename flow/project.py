@@ -2890,9 +2890,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for aggregates in self._stored_aggregates:
             try:
                 return aggregates[id]
-            except LookupError:  # Didn't found aggregate in this stored object
+            except LookupError:  # Didn't find aggregate in this stored object
                 pass
-        # Raise error as didn't found the id in any of the stored object
+        # Raise error as didn't find the id in any of the stored objects
         raise LookupError(f"Did not find aggregate having id {id} in the project")
 
     def _convert_aggregates_from_jobs(self, jobs):

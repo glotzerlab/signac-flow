@@ -2609,9 +2609,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             except Exception as e:
                 assert len(operation._jobs) == 1
                 raise UserOperationError(
-                    'An exception was raised during operation {operation.name} '
-                    f'for job or aggregate having id {get_aggregate_id(operation._jobs)}.'
-                    ''.format(operation=operation)) from e
+                    f'An exception was raised during operation {operation.name} '
+                    f'for job or aggregate with id {get_aggregate_id(operation._jobs)}.'
+                ) from e
 
     def _get_default_directives(self):
         return {name: self.groups[name].operation_directives.get(name, dict())

@@ -3655,15 +3655,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         for name in self.operations:
             group = self._groups[name]
-            stored_obj = self._get_aggregates(group.name)
-            # Since we yield JobOperation instance in the method hence we will only select
-            # those objects which stores the default aggregates.
-            if not isinstance(stored_obj, _DefaultAggregateStore):
+            aggregates_for_group = self._get_aggregates(group.name)
+
+            # Only yield JobOperation instances from the default aggregates
+            if not isinstance(aggregates_for_group, _DefaultAggregateStore):
                 continue
-            for aggregate in stored_obj:
-                # JobOperation is just meant to deal with a single job and not a aggregate
-                # of jobs. Hence the job in that aggregate should be present in the jobs
-                # passed by a user.
+
+            for aggregate in aggregates_for_group:
+                # JobOperation handles a single job and not an aggregate of
+                # jobs. Hence the single job in that aggregate should be
+                # present in the jobs passed by a user.
                 if aggregate[0] not in jobs:
                     continue
                 for op in self._job_operations(aggregate, group, ignore_conditions):

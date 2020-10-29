@@ -4330,7 +4330,7 @@ def _execute_serialized_operation(loads, project, operation, operations):
     project = loads(project)
     project = FlowProject.get_project()
     # Mock ``project._operations`` before calling ``project._execute_operation``
-    # because this FlowProject doesn't have any attribute associated with it
+    # because this FlowProject doesn't have any attributes associated with it
     # and ``project._execute_operation`` uses the ``project._operations`` attribute
     project._operations = loads(operations)
     project._execute_operation(project._loads_op(operation))
@@ -4344,9 +4344,9 @@ def _serialized_get_job_labels(s_task):
     # project._sp_cache = loads(s_task[2])
     job = project.open_job(id=s_task[3])
     ignore_errors = s_task[4]
-    # # Mock ``project._label_functions`` before calling ``project._get_job_labels``
-    # # because this FlowProject doesn't have any attribute associated with it
-    # # and ``project._get_job_labels`` uses the ``project._label_functions`` attribute
+    # Mock ``project._label_functions`` before calling ``project._get_job_labels``
+    # because this FlowProject doesn't have any attributes associated with it
+    # and ``project._get_job_labels`` uses the ``project._label_functions`` attribute
     project._label_functions = loads(s_task[5])
     return project._get_job_labels(job, ignore_errors=ignore_errors)
 
@@ -4360,7 +4360,7 @@ def _serialized_get_group_status(s_task):
     ignore_errors = s_task[3]
     cached_status = s_task[4]
     # Mock ``project._groups`` and ``project._stored_aggregates`` before calling
-    # ``project._get_group_status`` because this FlowProject doesn't have any attribute
+    # ``project._get_group_status`` because this FlowProject doesn't have any attributes
     # associated with it and ``project._get_group_status`` uses the
     # ``project._groups`` and ``project._stored_aggregates`` attributes
     project._groups = loads(s_task[5])

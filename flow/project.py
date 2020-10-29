@@ -2877,12 +2877,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _is_selected_aggregate(self, aggregate, jobs):
         """Verifies whether the aggregate is present in the provided jobs.
 
-        The None value to jobs indicates that no specific job is provided by the
-        user and hence aggregate is eligible for further evaluation.
+        Providing ``jobs=None`` indicates that no specific job is provided by
+        the user and hence ``aggregate`` is eligible for further evaluation.
 
         Always returns True if jobs is None.
         """
-        return True if jobs is None else (aggregate in jobs)
+        return (jobs is None) or (aggregate in jobs)
 
     def _get_aggregate_from_id(self, id):
         # Iterate over all the instances of stored aggregates and search for the

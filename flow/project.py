@@ -2893,12 +2893,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             except LookupError:  # Didn't find aggregate in this stored object
                 pass
         # Raise error as didn't find the id in any of the stored objects
-        raise LookupError(f"Did not find aggregate having id {id} in the project")
+        raise LookupError(f"Did not find aggregate with id {id} in the project")
 
     def _convert_aggregates_from_jobs(self, jobs):
         # The jobs parameter in public methods like ``run``, ``submit``, ``status`` may
         # accept either a signac job or an aggregate. We convert that job / aggregate
-        # (which may be of any type (eg. list)) to an aggregate of type ``tuple``.
+        # (which may be of any type (e.g. list)) to an aggregate of type ``tuple``.
         if jobs is not None:
             # aggregates must be a set to prevent duplicate entries
             aggregates = set()
@@ -2906,7 +2906,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 # User can still pass signac jobs.
                 if isinstance(aggregate, signac.contrib.job.Job):
                     if aggregate not in self:
-                        raise LookupError(f"Did not find the job {aggregate} in the project")
+                        raise LookupError(f"Did not find job {aggregate} in the project")
                     aggregates.add((aggregate,))
                 else:
                     try:
@@ -3643,8 +3643,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         :param jobs:
             The signac job handles.
-        :type job:
-            :class:`~signac.contrib.job.Job`
+        :type jobs:
+            Sequence of instances of :class:`.Job`.
         :param ignore_conditions:
             Specify if pre and/or post conditions check is to be ignored for eligibility check.
             The default is :py:class:`IgnoreConditions.NONE`.

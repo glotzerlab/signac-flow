@@ -3813,17 +3813,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for cls in type(self).__mro__:
             group_entries.extend(getattr(cls, '_GROUPS', []))
 
-        aggregators = {}
+        aggregators = defaultdict(list)
         # Initialize all groups without operations.
         # Also store the aggregates we need to store all the groups associated
         # with each aggregator.
         for entry in group_entries:
             self._groups[entry.name] = FlowGroup(entry.name, options=entry.options)
-            if not aggregators.get(entry.aggregator, False):
-                aggregators[entry.aggregator] = [entry.name]
-            else:
-                aggregators[entry.aggregator].append(entry.name)
-        self._aggregator_per_group = aggregators
+            aggregators[entry.aggregator].append(entry.name)
+        self._aggregator_per_group = dict(aggregators)
 
         # Add operations and directives to group
         for (op_name, op) in self._operations.items():

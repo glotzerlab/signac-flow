@@ -3944,13 +3944,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _main_run(self, args):
         "Run all (or select) job operations."
         # Select jobs:
-        aggregate = self._select_jobs_from_args(args)
+        aggregates = self._select_jobs_from_args(args)
 
         # Setup partial run function, because we need to call this either
         # inside some context managers or not based on whether we need
         # to switch to the project root directory or not.
         run = functools.partial(self.run,
-                                jobs=aggregate, names=args.operation_name, pretend=args.pretend,
+                                jobs=aggregates, names=args.operation_name, pretend=args.pretend,
                                 np=args.parallel, timeout=args.timeout, num=args.num,
                                 num_passes=args.num_passes, progress=args.progress,
                                 order=args.order,

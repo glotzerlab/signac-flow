@@ -2068,7 +2068,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :param jobs:
             Only execute operations for the given jobs, or all if the argument is omitted.
         :type jobs:
-            Sequence of instances :class:`.Job`.
+            Sequence of instances of :class:`.Job`.
         :param overview:
             Aggregate an overview of the project' status.
         :type overview:
@@ -2635,7 +2635,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Only execute operations for the given jobs or aggregates of jobs,
             or all if the argument is omitted.
         :type jobs:
-            Sequence of instances :class:`.Job` or aggregate of instances :class:`.Job`.
+            Sequence of instances of :class:`.Job` or aggregate of instances of :class:`.Job`.
         :param names:
             Only execute operations that are in the provided set of names, or all, if the
             argument is omitted.

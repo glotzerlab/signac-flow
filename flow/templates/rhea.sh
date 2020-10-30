@@ -22,4 +22,3 @@
 #SBATCH -A {{ account }}
 {% endif %}
 {% endblock %}
-

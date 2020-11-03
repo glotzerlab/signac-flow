@@ -2181,7 +2181,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             )
             status_parallelization = 'none'
         else:
-            status_parallelization = flow_config.get_config_value('status_parallelization')
+            status_parallelization = self.config['flow']['status_parallelization']
 
         # initialize jinja2 template environment and necessary filters
         template_environment = self._template_environment()

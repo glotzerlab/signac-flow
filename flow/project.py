@@ -306,7 +306,7 @@ class _JobOperation(object):
         max_len = 3
         min_len_unique_id = self._jobs[0]._project.min_len_unique_id()
         if len(self._jobs) > max_len:
-            shown = self._jobs[:max_len-2] + ('...',) + self._jobs[-1:]
+            shown = self._jobs[:max_len - 2] + ('...',) + self._jobs[-1:]
         else:
             shown = self._jobs
         return f"{self.name}[#{len(self._jobs)}]" \
@@ -1033,7 +1033,7 @@ class FlowGroup(object):
             raise ValueError("Value for MAX_LEN_ID is too small ({}).".format(self.MAX_LEN_ID))
 
         if len(jobs) > 1:
-            concat_jobs_str = str(jobs[0])[0:8]+'-'+str(jobs[-1])[0:8]
+            concat_jobs_str = str(jobs[0])[0:8] + '-' + str(jobs[-1])[0:8]
         else:
             concat_jobs_str = str(jobs[0])[0:8]
 
@@ -1732,7 +1732,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for group in self._groups.values():
             if jobs in self._get_aggregates(group.name):
                 completed = group._complete(jobs)
-                eligible = False if completed else group._eligible(jobs)
+                eligible = not completed and group._eligible(jobs)
                 scheduler_status = cached_status.get(group._generate_id(jobs),
                                                      JobStatus.unknown)
                 for operation in group.operations:
@@ -1743,8 +1743,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                             'completed': completed
                         }
 
-        for key in sorted(status_dict):
-            yield key, status_dict[key]
+        yield from sorted(status_dict.items())
 
     def get_job_status(self, job, ignore_errors=False, cached_status=None):
         "Return a dict with detailed information about the status of a job or an aggregate of jobs."
@@ -1828,19 +1827,19 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 completed = group._complete(aggregate)
                 eligible = False if completed else group._eligible(aggregate)
                 status_dict[get_aggregate_id(aggregate)] = {
-                        'scheduler_status': cached_status.get(job_op_id, JobStatus.unknown),
-                        'eligible': eligible,
-                        'completed': completed,
-                        }
+                    'scheduler_status': cached_status.get(job_op_id, JobStatus.unknown),
+                    'eligible': eligible,
+                    'completed': completed,
+                }
             except Exception as error:
                 msg = "Error while getting operations status for aggregate " \
                       "'{}': '{}'.".format(get_aggregate_id(aggregate), error)
                 logger.debug(msg)
                 status_dict[get_aggregate_id(aggregate)] = {
-                        'scheduler_status': JobStatus.unknown,
-                        'eligible': False,
-                        'completed': False,
-                        }
+                    'scheduler_status': JobStatus.unknown,
+                    'eligible': False,
+                    'completed': False,
+                }
                 if ignore_errors:
                     errors[get_aggregate_id(aggregate)] += str(error) + '\n'
                 else:
@@ -1849,7 +1848,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             'operation_name': group_name,
             'job_status_details': status_dict,
             '_operation_error_per_job': errors,
-            }
+        }
 
     def _get_job_labels(self, job, ignore_errors=False):
         "Return a dict with information about the labels of a job."
@@ -1966,9 +1965,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                             total=len(singleton_groups), file=err))
                 elif status_parallelization == 'none':
                     label_results = list(tqdm(
-                            iterable=map(get_job_labels, distinct_jobs),
-                            desc="Collecting job label info", total=len(distinct_jobs),
-                            file=err))
+                        iterable=map(get_job_labels, distinct_jobs),
+                        desc="Collecting job label info", total=len(distinct_jobs),
+                        file=err))
                     op_results = list(tqdm(
                         iterable=map(get_group_status, singleton_groups),
                         desc="Collecting operation status", total=len(singleton_groups),
@@ -3853,12 +3852,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """Return all aggregates associated with the FlowGroup.
 
         :param group:
-            Name of the FlowGroup for which the instance which stores the aggregates
-            instance is required
+            The name of the FlowGroup whose aggregate store will be returned.
         :type group:
             str
         :returns:
-            Instance which stores the aggregates associated with the FlowGroup
+            Aggregate store containing aggregates associated with the provided FlowGroup.
         :rtype:
             :py:class:`_DefaultAggregateStore`
         """

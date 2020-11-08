@@ -2873,7 +2873,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """Verifies that the aggregate belongs to the this project."""
         return any(aggregate in aggregates for aggregates in self._stored_aggregates)
 
-    def _is_selected_aggregate(self, aggregate, jobs):
+    @staticmethod
+    def _is_selected_aggregate(aggregate, jobs):
         """Verifies whether the aggregate is present in the provided jobs.
 
         Providing ``jobs=None`` indicates that no specific job is provided by

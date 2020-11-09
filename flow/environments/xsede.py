@@ -27,10 +27,10 @@ class CometEnvironment(DefaultSlurmEnvironment):
         super(CometEnvironment, cls).add_args(parser)
 
         parser.add_argument(
-          '--partition',
-          choices=['compute', 'gpu', 'gpu-shared', 'shared', 'large-shared', 'debug'],
-          default='shared',
-          help="Specify the partition to submit to.")
+            '--partition',
+            choices=['compute', 'gpu', 'gpu-shared', 'shared', 'large-shared', 'debug'],
+            default='shared',
+            help="Specify the partition to submit to.")
 
         parser.add_argument(
             '--job-output',
@@ -129,11 +129,11 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
     def add_args(cls, parser):
         super(BridgesEnvironment, cls).add_args(parser)
         parser.add_argument(
-          '--partition',
-          choices=['RM', 'RM-shared', 'RM-small', 'LM',
-                   'GPU', 'GPU-shared', 'GPU-small', 'GPU-AI'],
-          default='RM-shared',
-          help="Specify the partition to submit to.")
+            '--partition',
+            choices=['RM', 'RM-shared', 'RM-small', 'LM',
+                     'GPU', 'GPU-shared', 'GPU-small', 'GPU-AI'],
+            default='RM-shared',
+            help="Specify the partition to submit to.")
 
 
 __all__ = ['CometEnvironment', 'BridgesEnvironment', 'Stampede2Environment']

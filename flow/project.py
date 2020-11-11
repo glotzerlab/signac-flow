@@ -690,7 +690,7 @@ class FlowOperation(BaseFlowOperation):
         return "{type}(op_func='{op_func}')" \
                "".format(type=type(self).__name__, op_func=self._op_func)
 
-    def __call__(self, jobs):
+    def __call__(self, *jobs):
         return self._op_func(*jobs)
 
 
@@ -1824,26 +1824,27 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             errors.setdefault(get_aggregate_id(aggregate), '')
             try:
                 job_op_id = group._generate_id(aggregate)
+                scheduler_status = cached_status.get(job_op_id, JobStatus.unknown)
                 completed = group._complete(aggregate)
                 eligible = False if completed else group._eligible(aggregate)
-                status_dict[get_aggregate_id(aggregate)] = {
-                    'scheduler_status': cached_status.get(job_op_id, JobStatus.unknown),
-                    'eligible': eligible,
-                    'completed': completed,
-                }
             except Exception as error:
                 msg = "Error while getting operations status for aggregate " \
                       "'{}': '{}'.".format(get_aggregate_id(aggregate), error)
                 logger.debug(msg)
-                status_dict[get_aggregate_id(aggregate)] = {
-                    'scheduler_status': JobStatus.unknown,
-                    'eligible': False,
-                    'completed': False,
-                }
                 if ignore_errors:
                     errors[get_aggregate_id(aggregate)] += str(error) + '\n'
+                    scheduler_status = JobStatus.unknown
+                    completed = False
+                    eligible = False
                 else:
                     raise
+            finally:
+                status_dict[get_aggregate_id(aggregate)] = {
+                    'scheduler_status': scheduler_status,
+                    'eligible': eligible,
+                    'completed': completed,
+                }
+
         return {
             'operation_name': group_name,
             'job_status_details': status_dict,
@@ -2601,7 +2602,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "Executing operation '{}' with current interpreter "
                 "process ({}).".format(operation, os.getpid()))
             try:
-                self._operations[operation.name](operation._jobs)
+                self._operations[operation.name](*operation._jobs)
             except Exception as e:
                 assert len(operation._jobs) == 1
                 raise UserOperationError(
@@ -2885,8 +2886,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Iterate over all the instances of stored aggregates and search for the
         # aggregate in those instances.
         for aggregates in self._stored_aggregates:
-            if id in aggregates:
+            try:
                 return aggregates[id]
+            except LookupError:  # Didn't find aggregate in this stored object
+                pass
         # Raise error as didn't find the id in any of the stored objects
         raise LookupError(f"Did not find aggregate with id {id} in the project")
 
@@ -4002,7 +4005,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         for aggregate in self._get_aggregates(args.operation):
             if self._is_selected_aggregate(aggregate, aggregates):
-                operation_function(aggregate)
+                operation_function(*aggregate)
 
     def _select_jobs_from_args(self, args):
         "Select jobs with the given command line arguments ('-j/-f/--doc-filter/--jobid')."

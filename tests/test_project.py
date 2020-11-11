@@ -738,14 +738,12 @@ class TestExecutionProject(TestProjectBase):
 
     def test_pending_operations_order(self):
         # The execution order of local runs is internally assumed to be
-        # 'by-op' by default. A failure of this unit tests means that
-        # a 'by-op' order must be implemented explicitly within the
-        # FlowProject.run() function.
+        # 'by-op' by default.
         project = self.mock_project()
         ops = list(project._get_pending_operations())
-        # The length of the list of operations grouped by job is equal
-        # to the length of its set if and only if the operations are grouped
-        # by job already:
+        # The length of the list of job-operations grouped by operation is equal
+        # to the length of its set if and only if the job-operations are grouped
+        # by operations already:
         jobs_order_none = [name for name, _ in groupby(ops, key=lambda op: op.name)]
         assert len(jobs_order_none) == len(set(jobs_order_none))
 

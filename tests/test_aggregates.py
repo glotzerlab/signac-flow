@@ -63,7 +63,7 @@ class TestAggregate(AggregateProjectSetup):
         aggregate_instance = aggregator()
         test_list = (1, 2, 3, 4, 5)
         assert aggregate_instance._sort_by is None
-        assert aggregate_instance._aggregator_function(test_list) == [test_list]
+        assert aggregate_instance._aggregator_function(test_list) == tuple([test_list])
         assert aggregate_instance._select is None
 
     def test_invalid_aggregator_function(self, setUp, project):

@@ -1856,7 +1856,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         result['job_id'] = str(job)
         try:
             result['labels'] = sorted(set(self.labels(job)))
-            result['_labels_error'] = None
         except Exception as error:
             logger.debug("Error while determining labels for job '{}': '{}'.".format(job, error))
             if ignore_errors:
@@ -1864,6 +1863,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 result['_labels_error'] = str(error)
             else:
                 raise
+        else:
+            result['_labels_error'] = None
         return result
 
     def _fetch_status(self, aggregates, distinct_jobs, err, ignore_errors,

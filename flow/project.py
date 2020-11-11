@@ -1913,7 +1913,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                              ignore_errors=ignore_errors,
                                              cached_status=cached_status)
 
-        singleton_groups = [op for op in self.operations]
+        operation_names = list(self.operations.keys())
 
         with self._potentially_buffered():
             try:
@@ -1926,15 +1926,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                             desc="Collecting job label info", total=len(distinct_jobs),
                             file=err))
                         op_results = list(tqdm(
-                            iterable=pool.imap(get_group_status, singleton_groups),
-                            desc="Collecting operation status", total=len(singleton_groups),
+                            iterable=pool.imap(get_group_status, operation_names),
+                            desc="Collecting operation status", total=len(operation_names),
                             file=err))
                 elif status_parallelization == 'process':
                     with contextlib.closing(Pool()) as pool:
                         try:
                             import pickle
                             l_results, g_results = self._fetch_status_in_parallel(
-                                pool, pickle, distinct_jobs, singleton_groups, ignore_errors,
+                                pool, pickle, distinct_jobs, operation_names, ignore_errors,
                                 cached_status)
                         except Exception as error:
                             if not isinstance(error, (pickle.PickleError, self._PickleError)) and\
@@ -1952,7 +1952,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                             else:
                                 try:
                                     l_results, g_results = self._fetch_status_in_parallel(
-                                        pool, cloudpickle, distinct_jobs, singleton_groups,
+                                        pool, cloudpickle, distinct_jobs, operation_names,
                                         ignore_errors, cached_status)
                                 except self._PickleError as error:
                                     raise RuntimeError(
@@ -1963,15 +1963,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                             total=len(distinct_jobs), file=err))
                         op_results = list(tqdm(
                             iterable=g_results, desc="Collecting operation status",
-                            total=len(singleton_groups), file=err))
+                            total=len(operation_names), file=err))
                 elif status_parallelization == 'none':
                     label_results = list(tqdm(
                         iterable=map(get_job_labels, distinct_jobs),
                         desc="Collecting job label info", total=len(distinct_jobs),
                         file=err))
                     op_results = list(tqdm(
-                        iterable=map(get_group_status, singleton_groups),
-                        desc="Collecting operation status", total=len(singleton_groups),
+                        iterable=map(get_group_status, operation_names),
+                        desc="Collecting operation status", total=len(operation_names),
                         file=err))
                 else:
                     raise RuntimeError("Configuration value status_parallelization is invalid. "
@@ -1997,7 +1997,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
                 label_results = print_status(distinct_jobs, get_job_labels,
                                              "Collecting job label info")
-                op_results = print_status(singleton_groups, get_group_status,
+                op_results = print_status(operation_names, get_group_status,
                                           "Collecting operation status")
 
         results = []

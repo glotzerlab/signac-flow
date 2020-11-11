@@ -3890,8 +3890,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         start = time.time()
         try:
             self.print_status(jobs=aggregates, **args)
-        except NoSchedulerError:
-            self.print_status(jobs=aggregates, **args)
         except Exception as error:
             if show_traceback:
                 logger.error(

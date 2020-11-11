@@ -3597,14 +3597,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if op._complete((job,)):
                 yield name
 
-    def _job_operations(self, jobs, group, ignore_conditions=IgnoreConditions.NONE):
-        """Yield instances of _JobOperation constructed for the specific aggregate associated
-        with the group."""
-        yield from group._create_run_job_operations(entrypoint=self._entrypoint, jobs=jobs,
-                                                    default_directives=dict(),
-                                                    ignore_conditions=ignore_conditions,
-                                                    index=0)
-
     def _next_operations(self, jobs=None, ignore_conditions=IgnoreConditions.NONE):
         """Determine the next eligible operations for aggregates.
 
@@ -3627,10 +3619,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 if not self._is_selected_aggregate(aggregate, jobs):
                     continue
                 yield from group._create_run_job_operations(entrypoint=self._entrypoint,
-                                                            jobs=aggregate,
                                                             default_directives=dict(),
-                                                            ignore_conditions=ignore_conditions,
-                                                            index=0)
+                                                            jobs=aggregate,
+                                                            ignore_conditions=ignore_conditions)
 
     @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
     def next_operations(self, *jobs, ignore_conditions=IgnoreConditions.NONE):
@@ -3662,7 +3653,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 # present in the jobs passed by a user.
                 if aggregate[0] not in jobs:
                     continue
-                for op in self._job_operations(aggregate, group, ignore_conditions):
+
+                for op in group._create_run_job_operations(
+                    entrypoint=self._entrypoint, jobs=aggregate, default_directives={},
+                    ignore_conditions=ignore_conditions, index=0
+                ):
                     yield JobOperation(op.id, op.name, op._jobs[0], op._cmd, op.directives)
 
     @classmethod

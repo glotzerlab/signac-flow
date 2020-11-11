@@ -3906,7 +3906,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 error = error.__cause__  # Always show the user traceback cause.
             traceback.print_exception(type(error), error, error.__traceback__)
         else:
-            length_jobs = len(self) if aggregates is None else len(aggregates)
+            if aggregates is None:
+                length_jobs = sum(len(aggregate_store)
+                                  for aggregate_store in self._stored_aggregates)
+            else:
+                length_jobs = len(aggregates)
             # Use small offset to account for overhead with few jobs
             delta_t = (time.time() - start - 0.5) / max(length_jobs, 1)
             config_key = 'status_performance_warn_threshold'

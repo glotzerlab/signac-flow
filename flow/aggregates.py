@@ -387,11 +387,11 @@ class _DefaultAggregateStore:
             raise LookupError(f"Did not find aggregate with id {id}.")
 
     def __contains__(self, id):
-        """Return whether an aggregate is stored in the this
-        instance of :py:class:`_AggregateStore`
+        """Return whether the job is present in the project associated with this
+        instance of :py:class:`_DefaultAggregateStore`.
 
         :param id:
-            The id of an aggregate of jobs.
+            The job id.
         :type id:
             str
         """

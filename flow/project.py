@@ -1729,7 +1729,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         "Return a dict with information about job-operations for this aggregate."
         starting_dict = functools.partial(dict, scheduler_status=JobStatus.unknown)
         status_dict = defaultdict(starting_dict)
-        for group in self._groups.values():
+        operation_names = list(self.operations.keys())
+        groups = [self._groups[name] for name in operation_names]
+        for group in groups:
             if get_aggregate_id(jobs) in self._get_aggregates(group.name):
                 completed = group._complete(jobs)
                 eligible = not completed and group._eligible(jobs)

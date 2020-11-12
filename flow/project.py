@@ -3727,8 +3727,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         self.submit(jobs=jobs, names=names, **kwargs)
 
     def _main_exec(self, args):
-        if len(args.jobid):
-            jobs = [self.open_job(id=jid) for jid in args.jobid]
+        if len(args.job_id):
+            jobs = [self.open_job(id=jid) for jid in args.job_id]
         else:
             jobs = self
         try:
@@ -3947,7 +3947,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             choices=list(sorted(self._operations)),
             help="The operation to execute.")
         parser_exec.add_argument(
-            'jobid',
+            'job_id',
             type=str,
             nargs='*',
             help="The job ids, as registered in the signac project. "

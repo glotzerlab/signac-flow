@@ -4012,22 +4012,17 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _select_jobs_from_args(self, args):
         "Select jobs with the given command line arguments ('-j/-f/--doc-filter/--jobid')."
-        # Collecting command line argument variables
-        args_job_id = getattr(args, 'job_id', None)
-        args_jobid = getattr(args, 'jobid', None)
-        args_filter = getattr(args, 'filter', None)
-        args_doc_filter = getattr(args, 'doc_filter', None)
-
-        if args_job_id and (args_filter or args_doc_filter):
+        if (
+            not args.func == self._main_exec and
+            args.job_id and (args.filter or args.doc_filter)
+        ):
             raise ValueError(
                 "Cannot provide both -j/--job-id and -f/--filter or --doc-filter in combination.")
 
-        if args_job_id or args_jobid:
+        if args.job_id:
             # aggregates must be a set to prevent duplicate entries
             aggregates = set()
-            ids = args_jobid if args_jobid else args_job_id
-            # print(ids)
-            for id in ids:
+            for id in args.job_id:
                 # TODO: We need to add support for aggregation id parameter
                 # for the -j flag ('agg-...')
                 try:
@@ -4035,9 +4030,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 except KeyError as error:
                     raise LookupError("Did not find job with id {}.".format(error))
             return list(aggregates)
-        elif args_filter or args_doc_filter:
-            filter_ = parse_filter_arg(args_filter)
-            doc_filter = parse_filter_arg(args_doc_filter)
+        elif 'filter' in args or 'doc_filter' in args:
+            filter_ = parse_filter_arg(args.filter)
+            doc_filter = parse_filter_arg(args.doc_filter)
             return JobsCursor(self, filter_, doc_filter)
         else:
             return None
@@ -4226,7 +4221,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             choices=list(sorted(self._operations)),
             help="The operation to execute.")
         parser_exec.add_argument(
-            'jobid',
+            'job_id',
             type=str,
             nargs='*',
             help="The job ids, as registered in the signac project. "

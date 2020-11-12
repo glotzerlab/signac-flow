@@ -1730,7 +1730,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         starting_dict = functools.partial(dict, scheduler_status=JobStatus.unknown)
         status_dict = defaultdict(starting_dict)
         for group in self._groups.values():
-            if jobs in self._get_aggregates(group.name):
+            if get_aggregate_id(jobs) in self._get_aggregates(group.name):
                 completed = group._complete(jobs)
                 eligible = not completed and group._eligible(jobs)
                 scheduler_status = cached_status.get(group._generate_id(jobs),
@@ -2869,7 +2869,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _aggregate_is_in_project(self, aggregate):
         """Verifies that the aggregate belongs to the this project."""
-        return any(aggregate in aggregates for aggregates in self._stored_aggregates)
+        return any(get_aggregate_id(aggregate) in aggregates
+                   for aggregates in self._stored_aggregates)
 
     @staticmethod
     def _is_selected_aggregate(aggregate, jobs):
@@ -2886,10 +2887,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Iterate over all the instances of stored aggregates and search for the
         # aggregate in those instances.
         for aggregates in self._stored_aggregates:
-            try:
+            if id in aggregates:
                 return aggregates[id]
-            except LookupError:  # Didn't find aggregate in this stored object
-                pass
         # Raise error as didn't find the id in any of the stored objects
         raise LookupError(f"Did not find aggregate with id {id} in the project")
 

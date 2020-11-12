@@ -315,8 +315,8 @@ class TestAggregateStoring(AggregateProjectSetup):
         aggregator_instance = aggregator()._create_AggregatesStore(project)
         default_aggregator = aggregator.groupsof(1)._create_AggregatesStore(project)
         # Test for an aggregate of all jobs
-        assert jobs in aggregator_instance
-        assert jobs not in default_aggregator
+        assert get_aggregate_id(jobs) in aggregator_instance
+        assert get_aggregate_id(jobs) not in default_aggregator
         # Test for an aggregate of single job
-        assert not (jobs[0],) in aggregator_instance
-        assert (jobs[0],) in default_aggregator
+        assert not jobs[0].get_id() in aggregator_instance
+        assert jobs[0].get_id() in default_aggregator

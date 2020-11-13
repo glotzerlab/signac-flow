@@ -2,6 +2,8 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 import itertools
+
+from collections import MutableMapping
 from collections import OrderedDict
 from collections.abc import Iterable
 from hashlib import md5
@@ -45,7 +47,7 @@ class aggregator:
     def __init__(self, aggregator_function=None, sort_by=None, sort_ascending=True, select=None):
         if aggregator_function is None:
             def aggregator_function(jobs):
-                return tuple([jobs]) if jobs else ()
+                return (jobs,) if jobs else ()
 
         if not callable(aggregator_function):
             raise TypeError("Expected callable for aggregator_function, got "
@@ -259,7 +261,7 @@ class aggregator:
                             f'got {type(func)}.')
 
 
-class _AggregatesStore:
+class _AggregatesStore(MutableMapping):
     """This class holds the information of all the aggregates associated with
     a :class:`aggregator`.
 
@@ -285,7 +287,7 @@ class _AggregatesStore:
         self._register_aggregates(project)
 
     def __iter__(self):
-        yield from self._aggregate_per_id.values()
+        yield from self._aggregate_per_id
 
     def __getitem__(self, id):
         "Return an aggregate, if exists, using the id provided"
@@ -309,11 +311,26 @@ class _AggregatesStore:
     def __len__(self):
         return len(self._aggregate_per_id)
 
+    def __delitem__(self, key):
+        raise NotImplementedError("The use of 'del' method for this class is restricted")
+
+    def __setitem__(self, key):
+        raise NotImplementedError("The use of 'set' method for this class is restricted")
+
     def __eq__(self, other):
         return type(self) == type(other) and self._aggregator == other._aggregator
 
     def __hash__(self):
         return hash(self._aggregator)
+
+    def keys(self):
+        return self._aggregate_per_id.keys()
+
+    def values(self):
+        return self._aggregate_per_id.values()
+
+    def items(self):
+        return self._aggregate_per_id.items()
 
     def _register_aggregates(self, project):
         """If the instance of this class is called then we will
@@ -360,7 +377,7 @@ class _AggregatesStore:
             self._aggregate_per_id[get_aggregate_id(filter_aggregate)] = filter_aggregate
 
 
-class _DefaultAggregateStore:
+class _DefaultAggregateStore(MutableMapping):
     """This class holds the information of the project associated with
     an operation function using the default aggregator, i.e.
     ``aggregator.groupsof(1)``.
@@ -377,7 +394,7 @@ class _DefaultAggregateStore:
 
     def __iter__(self):
         for job in self._project:
-            yield (job,)
+            yield job.get_id()
 
     def __getitem__(self, id):
         "Return a tuple of a single job via job id."
@@ -405,11 +422,29 @@ class _DefaultAggregateStore:
     def __len__(self):
         return len(self._project)
 
+    def __delitem__(self, key):
+        raise NotImplementedError("The use of 'del' method for this class is restricted")
+
+    def __setitem__(self, key):
+        raise NotImplementedError("The use of 'set' method for this class is restricted")
+
     def __eq__(self, other):
         return type(self) == type(other) and self._project == other._project
 
     def __hash__(self):
         return hash(repr(self._project))
+
+    def keys(self):
+        for job in self._project:
+            yield job.get_id()
+
+    def values(self):
+        for job in self._project:
+            yield (job,)
+
+    def items(self):
+        for job in self._project:
+            yield (job.get_id(), (job,))
 
     def _register_aggregates(self, project):
         """We have to store self._project when this method is invoked

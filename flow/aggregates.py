@@ -290,7 +290,7 @@ class _AggregatesStore(Mapping):
         yield from self._aggregate_per_id
 
     def __getitem__(self, id):
-        """Return an aggregate, if exists, using the id provided."""
+        """Get the aggregate corresponding to the provided id."""
         try:
             return self._aggregate_per_id[id]
         except KeyError:

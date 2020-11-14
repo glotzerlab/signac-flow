@@ -298,7 +298,7 @@ class _AggregatesStore(MutableMapping):
                               'the FlowProject')
 
     def __contains__(self, id):
-        """Return whether an aggregate is stored in the this
+        """Return whether an aggregate is stored in this
         instance of :py:class:`_AggregateStore`
 
         :param id:

@@ -290,7 +290,7 @@ class _AggregatesStore(Mapping):
         yield from self._aggregate_per_id
 
     def __getitem__(self, id):
-        "Return an aggregate, if exists, using the id provided"
+        """Return an aggregate, if exists, using the id provided."""
         try:
             return self._aggregate_per_id[id]
         except KeyError:
@@ -298,8 +298,8 @@ class _AggregatesStore(Mapping):
                               'the FlowProject')
 
     def __contains__(self, id):
-        """Return whether an aggregate is stored in the this
-        instance of :py:class:`_AggregateStore`
+        """Return whether an aggregate is stored in this instance of
+        :py:class:`_AggregateStore`.
 
         :param id:
             The id of an aggregate of jobs.

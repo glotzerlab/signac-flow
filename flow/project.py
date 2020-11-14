@@ -2868,7 +2868,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return all(a.isdisjoint(b) for a in groups for b in groups if a != b)
 
     def _aggregate_is_in_project(self, aggregate):
-        """Verifies that the aggregate belongs to the this project."""
+        """Verifies that the aggregate belongs to this project."""
         return any(get_aggregate_id(aggregate) in aggregates
                    for aggregates in self._stored_aggregates)
 

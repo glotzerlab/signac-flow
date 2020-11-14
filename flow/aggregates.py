@@ -416,6 +416,8 @@ class _DefaultAggregateStore(MutableMapping):
             self._project.open_job(id=id)
         except KeyError:
             return False
+        except LookupError:
+            raise
         else:
             return True
 

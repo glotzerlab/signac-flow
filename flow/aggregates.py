@@ -3,7 +3,7 @@
 # This software is licensed under the BSD 3-Clause License.
 import itertools
 
-from collections import MutableMapping
+from collections import Mapping
 from collections import OrderedDict
 from collections.abc import Iterable
 from hashlib import md5
@@ -261,7 +261,7 @@ class aggregator:
                             f'got {type(func)}.')
 
 
-class _AggregatesStore(MutableMapping):
+class _AggregatesStore(Mapping):
     """This class holds the information of all the aggregates associated with
     a :class:`aggregator`.
 
@@ -310,12 +310,6 @@ class _AggregatesStore(MutableMapping):
 
     def __len__(self):
         return len(self._aggregate_per_id)
-
-    def __delitem__(self, key):
-        raise NotImplementedError("The use of 'del' method for this class is restricted")
-
-    def __setitem__(self, key):
-        raise NotImplementedError("The use of 'set' method for this class is restricted")
 
     def __eq__(self, other):
         return type(self) == type(other) and self._aggregator == other._aggregator
@@ -377,7 +371,7 @@ class _AggregatesStore(MutableMapping):
             self._aggregate_per_id[get_aggregate_id(filter_aggregate)] = filter_aggregate
 
 
-class _DefaultAggregateStore(MutableMapping):
+class _DefaultAggregateStore(Mapping):
     """This class holds the information of the project associated with
     an operation function using the default aggregator, i.e.
     ``aggregator.groupsof(1)``.
@@ -421,12 +415,6 @@ class _DefaultAggregateStore(MutableMapping):
 
     def __len__(self):
         return len(self._project)
-
-    def __delitem__(self, key):
-        raise NotImplementedError("The use of 'del' method for this class is restricted")
-
-    def __setitem__(self, key):
-        raise NotImplementedError("The use of 'set' method for this class is restricted")
 
     def __eq__(self, other):
         return type(self) == type(other) and self._project == other._project

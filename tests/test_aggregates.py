@@ -63,7 +63,7 @@ class TestAggregate(AggregateProjectSetup):
         aggregate_instance = aggregator()
         test_list = (1, 2, 3, 4, 5)
         assert aggregate_instance._sort_by is None
-        assert aggregate_instance._aggregator_function(test_list) == [test_list]
+        assert aggregate_instance._aggregator_function(test_list) == (test_list,)
         assert aggregate_instance._select is None
 
     def test_invalid_aggregator_function(self, setUp, project):
@@ -147,26 +147,24 @@ class TestAggregateStoring(AggregateProjectSetup):
         aggregate_instance = aggregator(helper_aggregator_function)
         aggregate_instance = aggregate_instance._create_AggregatesStore(project)
         aggregate_job_manual = helper_aggregator_function(project)
-        assert [aggregate for aggregate in aggregate_job_manual] == \
-               list(aggregate_instance)
+        assert tuple(aggregate_job_manual) == tuple(aggregate_instance.values())
 
         # Testing aggregator function returning aggregates of all the jobs
         aggregate_instance = aggregator(lambda jobs: [jobs])
         aggregate_instance = aggregate_instance._create_AggregatesStore(project)
-        assert [tuple(project)] == list(aggregate_instance)
+        assert (tuple(project),) == tuple(aggregate_instance.values())
 
     def test_valid_sort_by(self, setUp, project):
         helper_sort = partial(sorted, key=lambda job: job.sp.i)
         aggregate_instance = aggregator(sort_by='i')
         aggregate_instance = aggregate_instance._create_AggregatesStore(project)
-
-        assert [tuple(helper_sort(project))] == list(aggregate_instance)
+        assert (tuple(helper_sort(project)),) == tuple(aggregate_instance.values())
 
     def test_valid_descending_sort(self, setUp, project):
         helper_sort = partial(sorted, key=lambda job: job.sp.i, reverse=True)
         aggregate_instance = aggregator(sort_by='i', sort_ascending=False)
         aggregate_instance = aggregate_instance._create_AggregatesStore(project)
-        assert [tuple(helper_sort(project))] == list(aggregate_instance)
+        assert (tuple(helper_sort(project)),) == tuple(aggregate_instance.values())
 
     def test_groups_of_valid_num(self, setUp, project):
         valid_values = [1, 2, 3, 6, 10]
@@ -186,7 +184,7 @@ class TestAggregateStoring(AggregateProjectSetup):
 
             # We also check the length of every aggregate in order to ensure
             # proper aggregation.
-            for j, aggregate in enumerate(aggregate_instance):
+            for j, aggregate in enumerate(aggregate_instance.values()):
                 if j == expected_len - 1:  # Checking for the last aggregate
                     assert len(aggregate) == expected_length_per_aggregate[i][1]
                 else:
@@ -195,7 +193,7 @@ class TestAggregateStoring(AggregateProjectSetup):
     def test_groupby_with_valid_string_key(self, setUp, project):
         aggregate_instance = aggregator.groupby('even')
         aggregate_instance = aggregate_instance._create_AggregatesStore(project)
-        for aggregate in aggregate_instance:
+        for aggregate in aggregate_instance.values():
             even = aggregate[0].sp.even
             assert all(even == job.sp.even for job in aggregate)
         assert len(aggregate_instance) == 2
@@ -210,7 +208,7 @@ class TestAggregateStoring(AggregateProjectSetup):
     def test_groupby_with_default_key_for_string(self, setUp, project):
         aggregate_instance = aggregator.groupby('half', default=-1)
         aggregate_instance = aggregate_instance._create_AggregatesStore(project)
-        for aggregate in aggregate_instance:
+        for aggregate in aggregate_instance.values():
             half = aggregate[0].sp.get('half', -1)
             assert all(half == job.sp.get('half', -1) for job in aggregate)
         assert len(aggregate_instance) == 6
@@ -232,7 +230,7 @@ class TestAggregateStoring(AggregateProjectSetup):
     def test_groupby_with_valid_default_key_for_Iterable(self, setUp, project):
         aggregate_instance = aggregator.groupby(['half', 'even'], default=[-1, -1])
         aggregate_instance = aggregate_instance._create_AggregatesStore(project)
-        for aggregate in aggregate_instance:
+        for aggregate in aggregate_instance.values():
             half = aggregate[0].sp.get('half', -1)
             even = aggregate[0].sp.get('even', -1)
             assert all(
@@ -247,7 +245,7 @@ class TestAggregateStoring(AggregateProjectSetup):
 
         aggregate_instance = aggregator.groupby(keyfunction)
         aggregate_instance = aggregate_instance._create_AggregatesStore(project)
-        for aggregate in aggregate_instance:
+        for aggregate in aggregate_instance.values():
             even = aggregate[0].sp.even
             assert all(even == job.sp.even for job in aggregate)
         assert len(aggregate_instance) == 2
@@ -271,7 +269,7 @@ class TestAggregateStoring(AggregateProjectSetup):
         for job in project:
             if _select(job):
                 selected_jobs.append((job,))
-        assert list(aggregate_instance) == selected_jobs
+        assert list(aggregate_instance.values()) == selected_jobs
 
     def test_storing_hashing(self, setUp, project, list_of_aggregates):
         # Since we need to store groups on a per aggregate basis in the project,
@@ -296,7 +294,7 @@ class TestAggregateStoring(AggregateProjectSetup):
         # objects which stores aggregates.
         list_of_storing = set(map(_create_storing, list_of_aggregates))
         for stored_aggregate in list_of_storing:
-            for aggregate in stored_aggregate:
+            for aggregate in stored_aggregate.values():
                 assert aggregate == stored_aggregate[get_aggregate_id(aggregate)]
 
     def test_get_invalid_id(self, setUp, project):
@@ -315,8 +313,8 @@ class TestAggregateStoring(AggregateProjectSetup):
         aggregator_instance = aggregator()._create_AggregatesStore(project)
         default_aggregator = aggregator.groupsof(1)._create_AggregatesStore(project)
         # Test for an aggregate of all jobs
-        assert jobs in aggregator_instance
-        assert jobs not in default_aggregator
+        assert get_aggregate_id(jobs) in aggregator_instance
+        assert get_aggregate_id(jobs) not in default_aggregator
         # Test for an aggregate of single job
-        assert not (jobs[0],) in aggregator_instance
-        assert (jobs[0],) in default_aggregator
+        assert not jobs[0].get_id() in aggregator_instance
+        assert jobs[0].get_id() in default_aggregator

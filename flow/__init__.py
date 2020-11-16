@@ -12,6 +12,7 @@ from . import environment
 from . import scheduling
 from . import errors
 from . import testing
+from .aggregates import get_aggregate_id
 from .project import IgnoreConditions
 from .project import FlowProject
 from .project import JobOperation
@@ -38,6 +39,7 @@ __all__ = [
     'scheduling',
     'errors',
     'testing',
+    'get_aggregate_id',
     'IgnoreConditions',
     'FlowProject',
     'JobOperation',

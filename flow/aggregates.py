@@ -2,6 +2,9 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 import itertools
+
+from collections import Mapping
+from collections import OrderedDict
 from collections.abc import Iterable
 from hashlib import md5
 
@@ -44,7 +47,7 @@ class aggregator:
     def __init__(self, aggregator_function=None, sort_by=None, sort_ascending=True, select=None):
         if aggregator_function is None:
             def aggregator_function(jobs):
-                return [jobs]
+                return (jobs,) if jobs else ()
 
         if not callable(aggregator_function):
             raise TypeError("Expected callable for aggregator_function, got "
@@ -258,7 +261,7 @@ class aggregator:
                             f'got {type(func)}.')
 
 
-class _AggregatesStore:
+class _AggregatesStore(Mapping):
     """This class holds the information of all the aggregates associated with
     a :class:`aggregator`.
 
@@ -278,35 +281,35 @@ class _AggregatesStore:
         self._aggregator = aggregator
 
         # We need to register the aggregates for this instance using the
-        # project provided.
-        self._aggregates = []
-        self._aggregate_ids = {}
+        # project provided. After registering, we store the aggregates
+        # mapped with the ids using the `get_aggregate_id` method.
+        self._aggregate_per_id = OrderedDict()
         self._register_aggregates(project)
 
     def __iter__(self):
-        yield from self._aggregates
+        yield from self._aggregate_per_id
 
     def __getitem__(self, id):
-        "Return an aggregate, if exists, using the id provided"
+        """Get the aggregate corresponding to the provided id."""
         try:
-            return self._aggregate_ids[id]
+            return self._aggregate_per_id[id]
         except KeyError:
             raise LookupError(f'Unable to find the aggregate having id {id} in '
                               'the FlowProject')
 
-    def __contains__(self, aggregate):
-        """Return whether an aggregate is stored in the this
-        instance of :py:class:`_AggregateStore`
+    def __contains__(self, id):
+        """Return whether an aggregate is stored in this instance of
+        :py:class:`_AggregateStore`.
 
-        :param aggregate:
-            An aggregate of jobs.
-        :type aggregate:
-            tuple of :py:class:`signac.contrib.job.Job`
+        :param id:
+            The id of an aggregate of jobs.
+        :type id:
+            str
         """
-        return get_aggregate_id(aggregate) in self._aggregate_ids
+        return id in self._aggregate_per_id
 
     def __len__(self):
-        return len(self._aggregates)
+        return len(self._aggregate_per_id)
 
     def __eq__(self, other):
         return type(self) == type(other) and self._aggregator == other._aggregator
@@ -314,9 +317,18 @@ class _AggregatesStore:
     def __hash__(self):
         return hash(self._aggregator)
 
+    def keys(self):
+        return self._aggregate_per_id.keys()
+
+    def values(self):
+        return self._aggregate_per_id.values()
+
+    def items(self):
+        return self._aggregate_per_id.items()
+
     def _register_aggregates(self, project):
         """If the instance of this class is called then we will
-        generate aggregates and store them in ``self._aggregates``.
+        generate aggregates and store them in ``self._aggregate_per_id``.
         """
         aggregated_jobs = self._generate_aggregates(project)
         self._create_nested_aggregate_list(aggregated_jobs, project)
@@ -355,13 +367,11 @@ class _AggregatesStore:
                 filter_aggregate = tuple(filter(_validate_and_filter_job, aggregate))
             except TypeError:  # aggregate is not iterable
                 ValueError("Invalid aggregator_function provided by the user.")
-            # Store aggregate in this instance
-            self._aggregates.append(filter_aggregate)
             # Store aggregate by their ids in order to search through id
-            self._aggregate_ids[get_aggregate_id(filter_aggregate)] = filter_aggregate
+            self._aggregate_per_id[get_aggregate_id(filter_aggregate)] = filter_aggregate
 
 
-class _DefaultAggregateStore:
+class _DefaultAggregateStore(Mapping):
     """This class holds the information of the project associated with
     an operation function using the default aggregator, i.e.
     ``aggregator.groupsof(1)``.
@@ -378,7 +388,7 @@ class _DefaultAggregateStore:
 
     def __iter__(self):
         for job in self._project:
-            yield (job,)
+            yield job.get_id()
 
     def __getitem__(self, id):
         "Return a tuple of a single job via job id."
@@ -387,13 +397,23 @@ class _DefaultAggregateStore:
         except KeyError:
             raise LookupError(f"Did not find aggregate with id {id}.")
 
-    def __contains__(self, aggregate):
+    def __contains__(self, id):
         """Return whether the job is present in the project associated with this
         instance of :py:class:`_DefaultAggregateStore`.
+
+        :param id:
+            The job id.
+        :type id:
+            str
         """
-        # signac-flow internally assumes every aggregate to be a tuple.
-        # Hence this method will also get a tuple as an input.
-        return len(aggregate) == 1 and aggregate[0] in self._project
+        try:
+            self._project.open_job(id=id)
+        except KeyError:
+            return False
+        except LookupError:
+            raise
+        else:
+            return True
 
     def __len__(self):
         return len(self._project)
@@ -403,6 +423,18 @@ class _DefaultAggregateStore:
 
     def __hash__(self):
         return hash(repr(self._project))
+
+    def keys(self):
+        for job in self._project:
+            yield job.get_id()
+
+    def values(self):
+        for job in self._project:
+            yield (job,)
+
+    def items(self):
+        for job in self._project:
+            yield (job.get_id(), (job,))
 
     def _register_aggregates(self, project):
         """We have to store self._project when this method is invoked

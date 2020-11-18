@@ -14,6 +14,7 @@ Version 0.12
 Added
 +++++
 - Code is formatted with ``black`` and ``isort`` pre-commit hooks (#365).
+- Add official support for Python version 3.9 (#365).
 
 Changed
 +++++++

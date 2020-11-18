@@ -1,56 +1,59 @@
-# Python CircleCI 2.0 configuration file
+# CircleCI configuration file
 #
 # Check https://circleci.com/docs/2.0/language-python/ for more details
 #
-version: 2
+version: 2.1
+
+references:
+  restore_keys: &restore_keys
+    keys:
+      - python-env-v1-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "setup.py" }}-{{ checksum "requirements-test.txt" }}-{{ checksum "requirements-precommit.txt" }}-{{ checksum ".pre-commit-config.yaml" }}
+
+  save_key: &save_key
+    key: python-env-v1-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "setup.py" }}-{{ checksum "requirements-test.txt" }}-{{ checksum "requirements-precommit.txt" }}-{{ checksum ".pre-commit-config.yaml" }}
 
 jobs:
-  check-metadata:
+  pre-checks:
     docker:
-      - image: circleci/python:3.8
+      - image: circleci/python:3.9
 
     working_directory: ~/repo
 
     steps:
       - checkout
-      - run:
-          name: install-dev-requirements
-          command: |
-            pip install --user -U -r requirements-test.txt
-      - run:
-          name: check-citation-metadata
-          command: |
-            ./.sync-zenodo-metadata.py --check > /dev/null
 
-  pre-test-checks:
-    docker:
-      - image: circleci/python:3.8
+      - restore_cache:
+          <<: *restore_keys
 
-    working_directory: ~/repo
-
-    steps:
-      - checkout
       - run:
-          name: install-dev-requirements
+          name: Install pre-check dependencies
           command: |
-            pip install --user -U -r requirements-precommit.txt
+            pip install --progress-bar off --user -U -r requirements-precommit.txt
+
       - run:
           name: Run pre-checks
           command: |
-            pre-commit run --all-files
+            PRE_COMMIT_HOME=.pre-commit-cache pre-commit run --all-files --show-diff-on-failure
 
-  test-3.8: &test-template
+      - save_cache:
+          <<: *save_key
+          paths:
+            - ".pre-commit-cache"
+
+
+  linux-python-39: &test-template
     environment:
       SIGNAC_VERSION: "signac"
     docker:
-      - image: circleci/python:3.8
+      - image: circleci/python:3.9
 
     working_directory: ~/repo
 
     steps:
       - checkout
+
       - run:
-          name: install dependencies
+          name: Install dependencies
           command: |
             pip install -U virtualenv --user
             mkdir -p ./venv
@@ -72,34 +75,57 @@ jobs:
           path: test-reports
           destination: test-reports
 
-  test-3.8-signac-1.0:
+  linux-python-39-signac-1.0:
     <<: *test-template
     environment:
       SIGNAC_VERSION: "signac~=1.0.0"
-  test-3.8-signac-1.3:
+  linux-python-39-signac-1.3:
     <<: *test-template
     environment:
       SIGNAC_VERSION: "signac~=1.3.0"
-  test-3.8-signac-1.4:
+  linux-python-39-signac-1.4:
     <<: *test-template
     environment:
       SIGNAC_VERSION: "signac~=1.4.0"
-  test-3.8-signac-latest:
+  linux-python-39-signac-latest:
     <<: *test-template
     environment:
       SIGNAC_VERSION: "git+ssh://git@github.com/glotzerlab/signac.git"
-  test-3.7:
+  linux-python-38:
+    <<: *test-template
+    docker:
+      - image: circleci/python:3.8
+  linux-python-37:
     <<: *test-template
     docker:
       - image: circleci/python:3.7
-  test-3.6:
+  linux-python-36:
     <<: *test-template
     docker:
       - image: circleci/python:3.6
 
+  check-metadata:
+    docker:
+      - image: circleci/python:3.9
+
+    working_directory: ~/repo
+
+    steps:
+      - checkout
+
+      - run:
+          name: install-dev-requirements
+          command: |
+            pip install --user -U -r requirements-test.txt
+
+      - run:
+          name: check-citation-metadata
+          command: |
+            ./.sync-zenodo-metadata.py --check > /dev/null
+
   test-deploy-pypi:
     docker:
-      - image: circleci/python:3.8
+      - image: circleci/python:3.9
     working_directory: ~/repo
     steps:
       - checkout
@@ -110,7 +136,7 @@ jobs:
 
   deploy-pypi:
     docker:
-      - image: circleci/python:3.8
+      - image: circleci/python:3.9
     working_directory: ~/repo
     steps:
       - checkout
@@ -122,42 +148,46 @@ jobs:
 
 workflows:
   version: 2
-  pre-test-checks-and-tests:
+  test:
     jobs:
+      - pre-test-checks
+      - linux-python-39:
+          requires:
+            - pre-test-checks
+      - linux-python-38:
+          requires:
+            - pre-test-checks
+      - linux-python-37:
+          requires:
+            - pre-test-checks
+      - linux-python-36:
+          requires:
+            - pre-test-checks
+      - linux-python-39-signac-1.0:
+          requires:
+            - linux-python-39
+      - linux-python-39-signac-1.3:
+          requires:
+            - linux-python-39
+      - linux-python-39-signac-1.4:
+          requires:
+            - linux-python-39
       - check-metadata:
           filters:
             branches:
               only: /release\/.*/
-      - pre-test-checks
-      - test-3.6:
-          requires:
-            - pre-test-checks
-      - test-3.7:
-          requires:
-            - pre-test-checks
-      - test-3.8:
-          requires:
-            - pre-test-checks
-      - test-3.8-signac-1.0:
-          requires:
-            - test-3.8
-      - test-3.8-signac-1.3:
-          requires:
-            - test-3.8
-      - test-3.8-signac-1.4:
-          requires:
-            - test-3.8
       - test-deploy-pypi:
           filters:
             branches:
               only: /release\/.*/
           requires:
-            - test-3.6
-            - test-3.7
-            - test-3.8
-            - test-3.8-signac-1.0
-            - test-3.8-signac-1.3
-            - test-3.8-signac-1.4
+            - linux-python-39
+            - linux-python-38
+            - linux-python-37
+            - linux-python-36
+            - linux-python-39-signac-1.0
+            - linux-python-39-signac-1.3
+            - linux-python-39-signac-1.4
   nightly:
     triggers:
       - schedule:
@@ -167,7 +197,7 @@ workflows:
               only:
                 - master
     jobs:
-      - test-3.8-signac-latest
+      - linux-python-39-signac-latest
   deploy:
     jobs:
       - deploy-pypi:

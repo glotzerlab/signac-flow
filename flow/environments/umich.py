@@ -10,25 +10,29 @@ class GreatLakesEnvironment(DefaultSlurmEnvironment):
 
     https://arc-ts.umich.edu/greatlakes/
     """
-    hostname_pattern = r'gl(-login)?[0-9]+\.arc-ts\.umich\.edu'
-    template = 'umich-greatlakes.sh'
+
+    hostname_pattern = r"gl(-login)?[0-9]+\.arc-ts\.umich\.edu"
+    template = "umich-greatlakes.sh"
     cores_per_node = 1
 
     @classmethod
     def add_args(cls, parser):
-        super(GreatLakesEnvironment, cls).add_args(parser)
+        super().add_args(parser)
         parser.add_argument(
-            '--partition',
-            choices=('standard', 'gpu', 'largemem'),
-            default='standard',
-            help="Specify the partition to submit to. "
-                 "(default=standard)")
+            "--partition",
+            choices=("standard", "gpu", "largemem"),
+            default="standard",
+            help="Specify the partition to submit to. (default=standard)",
+        )
         parser.add_argument(
-            '--memory',
-            default='4g',
-            help=("Specify how much memory to reserve per node, e.g. \"4g\" for "
-                  "4 gigabytes or \"512m\" for 512 megabytes. Only relevant "
-                  "for shared queue jobs. (default=4g)"))
+            "--memory",
+            default="4g",
+            help=(
+                'Specify how much memory to reserve per node, e.g. "4g" for '
+                '4 gigabytes or "512m" for 512 megabytes. Only relevant '
+                "for shared queue jobs. (default=4g)"
+            ),
+        )
 
 
-__all__ = ['GreatLakesEnvironment']
+__all__ = ["GreatLakesEnvironment"]

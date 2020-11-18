@@ -5,9 +5,7 @@
 import logging
 import os
 
-from ..environment import DefaultSlurmEnvironment
-from ..environment import template_filter
-
+from ..environment import DefaultSlurmEnvironment, template_filter
 
 logger = logging.getLogger(__name__)
 
@@ -17,29 +15,34 @@ class CometEnvironment(DefaultSlurmEnvironment):
 
     http://www.sdsc.edu/services/hpc/hpc_systems.html#comet
     """
-    hostname_pattern = 'comet'
-    template = 'comet.sh'
+
+    hostname_pattern = "comet"
+    template = "comet.sh"
     cores_per_node = 24
-    mpi_cmd = 'ibrun'
+    mpi_cmd = "ibrun"
 
     @classmethod
     def add_args(cls, parser):
-        super(CometEnvironment, cls).add_args(parser)
+        super().add_args(parser)
 
         parser.add_argument(
-            '--partition',
-            choices=['compute', 'gpu', 'gpu-shared', 'shared', 'large-shared', 'debug'],
-            default='shared',
-            help="Specify the partition to submit to.")
+            "--partition",
+            choices=["compute", "gpu", "gpu-shared", "shared", "large-shared", "debug"],
+            default="shared",
+            help="Specify the partition to submit to.",
+        )
 
         parser.add_argument(
-            '--job-output',
-            help=('What to name the job output file. '
-                  'If omitted, uses the system default '
-                  '(slurm default is "slurm-%%j.out").'))
+            "--job-output",
+            help=(
+                "What to name the job output file. "
+                "If omitted, uses the system default "
+                '(slurm default is "slurm-%%j.out").'
+            ),
+        )
 
 
-_STAMPEDE_OFFSET = os.environ.get('_FLOW_STAMPEDE_OFFSET_`', 0)
+_STAMPEDE_OFFSET = os.environ.get("_FLOW_STAMPEDE_OFFSET_`", 0)
 
 
 class Stampede2Environment(DefaultSlurmEnvironment):
@@ -47,10 +50,11 @@ class Stampede2Environment(DefaultSlurmEnvironment):
 
     https://www.tacc.utexas.edu/systems/stampede2
     """
-    hostname_pattern = '.*stampede2'
-    template = 'stampede2.sh'
+
+    hostname_pattern = ".*stampede2"
+    template = "stampede2.sh"
     cores_per_node = 48
-    mpi_cmd = 'ibrun'
+    mpi_cmd = "ibrun"
     offset_counter = 0
     base_offset = _STAMPEDE_OFFSET
 
@@ -72,22 +76,34 @@ class Stampede2Environment(DefaultSlurmEnvironment):
         very limited support for direct modification of Python objects, and we need
         to be able to reset the offset between bundles."""
         cls.base_offset -= int(value)
-        return ''
+        return ""
 
     @classmethod
     def add_args(cls, parser):
-        super(Stampede2Environment, cls).add_args(parser)
+        super().add_args(parser)
         parser.add_argument(
-            '--partition',
-            choices=['development', 'normal', 'large', 'flat-quadrant',
-                     'skx-dev', 'skx-normal', 'skx-large', 'long'],
-            default='skx-normal',
-            help="Specify the partition to submit to.")
+            "--partition",
+            choices=[
+                "development",
+                "normal",
+                "large",
+                "flat-quadrant",
+                "skx-dev",
+                "skx-normal",
+                "skx-large",
+                "long",
+            ],
+            default="skx-normal",
+            help="Specify the partition to submit to.",
+        )
         parser.add_argument(
-            '--job-output',
-            help=('What to name the job output file. '
-                  'If omitted, uses the system default '
-                  '(slurm default is "slurm-%%j.out").'))
+            "--job-output",
+            help=(
+                "What to name the job output file. "
+                "If omitted, uses the system default "
+                '(slurm default is "slurm-%%j.out").'
+            ),
+        )
 
     @classmethod
     def _get_mpi_prefix(cls, operation, parallel):
@@ -104,14 +120,16 @@ class Stampede2Environment(DefaultSlurmEnvironment):
         :type mpi_prefix:
             str
         """
-        if operation.directives.get('nranks'):
-            prefix = '{} -n {} -o {} task_affinity '.format(
-                cls.mpi_cmd, operation.directives['nranks'],
-                cls.base_offset + cls.offset_counter)
+        if operation.directives.get("nranks"):
+            prefix = "{} -n {} -o {} task_affinity ".format(
+                cls.mpi_cmd,
+                operation.directives["nranks"],
+                cls.base_offset + cls.offset_counter,
+            )
             if parallel:
-                cls.offset_counter += operation.directives['nranks']
+                cls.offset_counter += operation.directives["nranks"]
         else:
-            prefix = ''
+            prefix = ""
         return prefix
 
 
@@ -120,20 +138,30 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
 
     https://portal.xsede.org/psc-bridges
     """
-    hostname_pattern = r'.*\.bridges\.psc\.edu$'
-    template = 'bridges.sh'
+
+    hostname_pattern = r".*\.bridges\.psc\.edu$"
+    template = "bridges.sh"
     cores_per_node = 28
-    mpi_cmd = 'mpirun'
+    mpi_cmd = "mpirun"
 
     @classmethod
     def add_args(cls, parser):
-        super(BridgesEnvironment, cls).add_args(parser)
+        super().add_args(parser)
         parser.add_argument(
-            '--partition',
-            choices=['RM', 'RM-shared', 'RM-small', 'LM',
-                     'GPU', 'GPU-shared', 'GPU-small', 'GPU-AI'],
-            default='RM-shared',
-            help="Specify the partition to submit to.")
+            "--partition",
+            choices=[
+                "RM",
+                "RM-shared",
+                "RM-small",
+                "LM",
+                "GPU",
+                "GPU-shared",
+                "GPU-small",
+                "GPU-AI",
+            ],
+            default="RM-shared",
+            help="Specify the partition to submit to.",
+        )
 
 
-__all__ = ['CometEnvironment', 'BridgesEnvironment', 'Stampede2Environment']
+__all__ = ["CometEnvironment", "BridgesEnvironment", "Stampede2Environment"]

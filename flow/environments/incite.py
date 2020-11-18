@@ -5,10 +5,9 @@
 
 http://www.doeleadershipcomputing.org/
 """
-from ..environment import DefaultLSFEnvironment
-from ..environment import template_filter
-
 from math import gcd
+
+from ..environment import DefaultLSFEnvironment, template_filter
 
 
 class SummitEnvironment(DefaultLSFEnvironment):
@@ -27,9 +26,10 @@ class SummitEnvironment(DefaultLSFEnvironment):
 
     https://www.olcf.ornl.gov/summit/
     """
-    hostname_pattern = r'.*\.summit\.olcf\.ornl\.gov'
-    template = 'summit.sh'
-    mpi_cmd = 'jsrun'
+
+    hostname_pattern = r".*\.summit\.olcf\.ornl\.gov"
+    template = "summit.sh"
+    mpi_cmd = "jsrun"
     cores_per_node = 42
     gpus_per_node = 6
 
@@ -44,8 +44,7 @@ class SummitEnvironment(DefaultLSFEnvironment):
             for _ in range(nsets):
                 cores_used += tasks * cpus_per_task
                 gpus_used += gpus
-                while (cores_used > cls.cores_per_node or
-                        gpus_used > cls.gpus_per_node):
+                while cores_used > cls.cores_per_node or gpus_used > cls.gpus_per_node:
                     nodes_used += 1
                     cores_used = max(0, cores_used - cls.cores_per_node)
                     gpus_used = max(0, gpus_used - cls.gpus_per_node)
@@ -63,15 +62,15 @@ class SummitEnvironment(DefaultLSFEnvironment):
 
     @template_filter
     def guess_resource_sets(cls, operation):
-        ntasks = max(operation.directives.get('nranks', 1), 1)
-        np = operation.directives.get('np', ntasks)
+        ntasks = max(operation.directives.get("nranks", 1), 1)
+        np = operation.directives.get("np", ntasks)
 
-        cpus_per_task = max(operation.directives.get('omp_num_threads', 1), 1)
+        cpus_per_task = max(operation.directives.get("omp_num_threads", 1), 1)
         # separate OMP threads (per resource sets) from tasks
         np //= cpus_per_task
 
-        np_per_task = max(1, np//ntasks)
-        ngpu = operation.directives.get('ngpu', 0)
+        np_per_task = max(1, np // ntasks)
+        ngpu = operation.directives.get("ngpu", 0)
         g = gcd(ngpu, ntasks)
         if ngpu >= ntasks:
             nsets = ngpu // (ngpu // g)
@@ -79,18 +78,20 @@ class SummitEnvironment(DefaultLSFEnvironment):
             nsets = ntasks // (ntasks // g)
 
         tasks_per_set = max(ntasks // nsets, 1)
-        tasks_per_set = max(tasks_per_set, operation.directives.get('rs_tasks', 1))
+        tasks_per_set = max(tasks_per_set, operation.directives.get("rs_tasks", 1))
 
         gpus_per_set = ngpu // nsets
-        cpus_per_set = tasks_per_set*cpus_per_task*np_per_task
+        cpus_per_set = tasks_per_set * cpus_per_task * np_per_task
 
         return nsets, tasks_per_set, cpus_per_set, gpus_per_set
 
     @classmethod
     def jsrun_options(cls, resource_set):
         nsets, tasks, cpus, gpus = resource_set
-        cuda_aware_mpi = "--smpiargs='-gpu'" if (nsets > 0 or tasks > 0) and gpus > 0 else ""
-        return '-n {} -a {} -c {} -g {} {}'.format(nsets, tasks, cpus, gpus, cuda_aware_mpi)
+        cuda_aware_mpi = (
+            "--smpiargs='-gpu'" if (nsets > 0 or tasks > 0) and gpus > 0 else ""
+        )
+        return f"-n {nsets} -a {tasks} -c {cpus} -g {gpus} {cuda_aware_mpi}"
 
     @classmethod
     def _get_mpi_prefix(cls, operation, parallel):
@@ -107,11 +108,11 @@ class SummitEnvironment(DefaultLSFEnvironment):
         :type mpi_prefix:
             str
         """
-        extra_args = str(operation.directives.get('extra_jsrun_args', ''))
+        extra_args = str(operation.directives.get("extra_jsrun_args", ""))
         resource_set = cls.guess_resource_sets(operation)
-        mpi_prefix = cls.mpi_cmd + ' ' + cls.jsrun_options(resource_set)
-        mpi_prefix += ' -d packed -b rs ' + extra_args + (' ' if extra_args else '')
+        mpi_prefix = cls.mpi_cmd + " " + cls.jsrun_options(resource_set)
+        mpi_prefix += " -d packed -b rs " + extra_args + (" " if extra_args else "")
         return mpi_prefix
 
 
-__all__ = ['SummitEnvironment']
+__all__ = ["SummitEnvironment"]

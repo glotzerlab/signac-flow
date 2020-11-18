@@ -9,27 +9,34 @@ subclassed to automatically detect specific computational environments.
 This enables the user to adjust their workflow based on the present
 environment, e.g. for the adjustment of scheduler submission scripts.
 """
+import importlib
+import importlib.machinery
+import logging
 import os
 import re
 import socket
-import logging
-import importlib
 from collections import OrderedDict
-import importlib.machinery
 
 from signac.common import config
 
+from .directives import (
+    _EXECUTABLE,
+    _NGPU,
+    _NP,
+    _NRANKS,
+    _OMP_NUM_THREADS,
+    _PROCESSOR_FRACTION,
+    _WALLTIME,
+    _Directives,
+)
+from .errors import NoSchedulerError
 from .scheduling.base import JobStatus
+from .scheduling.fakescheduler import FakeScheduler
 from .scheduling.lsf import LSFScheduler
+from .scheduling.simple_scheduler import SimpleScheduler
 from .scheduling.slurm import SlurmScheduler
 from .scheduling.torque import TorqueScheduler
-from .scheduling.simple_scheduler import SimpleScheduler
-from .scheduling.fakescheduler import FakeScheduler
 from .util import config as flow_config
-from .errors import NoSchedulerError
-from .directives import (
-    _Directives, _NP, _NGPU, _NRANKS, _OMP_NUM_THREADS, _WALLTIME, _EXECUTABLE,
-    _PROCESSOR_FRACTION)
 
 logger = logging.getLogger(__name__)
 
@@ -46,28 +53,27 @@ def setup(py_modules, **attrs):
     from setuptools.command.install import install
 
     class InstallAndConfig(install):
-
         def run(self):
-            super(InstallAndConfig, self).run()
+            super().run()
             cfg = config.read_config_file(config.FN_CONFIG)
             try:
-                envs = cfg['flow'].as_list('environment_modules')
+                envs = cfg["flow"].as_list("environment_modules")
             except KeyError:
                 envs = []
             new = set(py_modules).difference(envs)
             if new:
                 for name in new:
                     self.announce(
-                        msg="registering module '{}' in global signac configuration".format(name),
-                        level=2)
-                cfg.setdefault('flow', dict())
-                cfg['flow']['environment_modules'] = envs + list(new)
+                        msg=f"registering module '{name}' in global signac configuration",
+                        level=2,
+                    )
+                cfg.setdefault("flow", dict())
+                cfg["flow"]["environment_modules"] = envs + list(new)
                 cfg.write()
 
     return setuptools.setup(
-        py_modules=py_modules,
-        cmdclass={'install': InstallAndConfig},
-        **attrs)
+        py_modules=py_modules, cmdclass={"install": InstallAndConfig}, **attrs
+    )
 
 
 class ComputeEnvironmentType(type):
@@ -78,16 +84,16 @@ class ComputeEnvironmentType(type):
     """
 
     def __init__(cls, name, bases, dct):
-        if not hasattr(cls, 'registry'):
+        if not hasattr(cls, "registry"):
             cls.registry = OrderedDict()
         else:
             cls.registry[name] = cls
-        return super(ComputeEnvironmentType, cls).__init__(name, bases, dct)
+        return super().__init__(name, bases, dct)
 
 
 def template_filter(func):
     "Mark the function as a ComputeEnvironment template filter."
-    setattr(func, '_flow_template_filter', True)
+    setattr(func, "_flow_template_filter", True)
     return classmethod(func)
 
 
@@ -103,11 +109,12 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
     For example, if the hostname is my-server.com, one could identify the
     environment by setting the hostname_pattern to 'my-server'.
     """
+
     scheduler_type = None
     hostname_pattern = None
     submit_flags = None
-    template = 'base_script.sh'
-    mpi_cmd = 'mpiexec'
+    template = "base_script.sh"
+    mpi_cmd = "mpiexec"
 
     @classmethod
     def is_present(cls):
@@ -123,8 +130,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
             else:
                 return cls.scheduler_type.is_present()
         else:
-            return re.match(
-                cls.hostname_pattern, socket.getfqdn()) is not None
+            return re.match(cls.hostname_pattern, socket.getfqdn()) is not None
 
     @classmethod
     def get_scheduler(cls):
@@ -134,10 +140,11 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         different scheduler implementations.
         """
         try:
-            return getattr(cls, 'scheduler_type')()
+            return getattr(cls, "scheduler_type")()
         except (AttributeError, TypeError):
             raise NoSchedulerError(
-                "No scheduler defined for environment '{}'.".format(cls.__name__))
+                f"No scheduler defined for environment '{cls.__name__}'."
+            )
 
     @classmethod
     def submit(cls, script, flags=None, *args, **kwargs):
@@ -148,12 +155,12 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         """
         if flags is None:
             flags = []
-        env_flags = getattr(cls, 'submit_flags', [])
+        env_flags = getattr(cls, "submit_flags", [])
         if env_flags:
             flags.extend(env_flags)
         # parse the flag to check for --job-name
-        for flagi in flags:
-            if '--job-name' in flagi:
+        for flag in flags:
+            if "--job-name" in flag:
                 raise ValueError('Assignment of "--job-name" is not supported.')
         # Hand off the actual submission to the scheduler
         if cls.get_scheduler().submit(script, flags=flags, *args, **kwargs):
@@ -207,7 +214,9 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         :type omp_prefix:
             str
         """
-        return 'export OMP_NUM_THREADS={}; '.format(operation.directives['omp_num_threads'])
+        return "export OMP_NUM_THREADS={}; ".format(
+            operation.directives["omp_num_threads"]
+        )
 
     @classmethod
     def _get_mpi_prefix(cls, operation, parallel):
@@ -224,10 +233,10 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         :type mpi_prefix:
             str
         """
-        if operation.directives.get('nranks'):
-            return '{} -n {} '.format(cls.mpi_cmd, operation.directives['nranks'])
+        if operation.directives.get("nranks"):
+            return "{} -n {} ".format(cls.mpi_cmd, operation.directives["nranks"])
         else:
-            return ''
+            return ""
 
     @template_filter
     def get_prefix(cls, operation, parallel=False, mpi_prefix=None, cmd_prefix=None):
@@ -250,8 +259,8 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         :type prefix:
             str
         """
-        prefix = ''
-        if operation.directives.get('omp_num_threads'):
+        prefix = ""
+        if operation.directives.get("omp_num_threads"):
             prefix += cls._get_omp_prefix(operation)
         if mpi_prefix:
             prefix += mpi_prefix
@@ -266,8 +275,16 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
     @classmethod
     def _get_default_directives(cls):
         return _Directives(
-            [_NP, _NGPU, _NRANKS, _OMP_NUM_THREADS,
-             _EXECUTABLE, _WALLTIME, _PROCESSOR_FRACTION])
+            [
+                _NP,
+                _NGPU,
+                _NRANKS,
+                _OMP_NUM_THREADS,
+                _EXECUTABLE,
+                _WALLTIME,
+                _PROCESSOR_FRACTION,
+            ]
+        )
 
 
 class StandardEnvironment(ComputeEnvironment):
@@ -286,31 +303,32 @@ class TestEnvironment(ComputeEnvironment):
     the job submission script generation in environments without
     a real scheduler.
     """
+
     scheduler_type = FakeScheduler
 
 
 class SimpleSchedulerEnvironment(ComputeEnvironment):
     "An environment for the simple-scheduler scheduler."
     scheduler_type = SimpleScheduler
-    template = 'simple_scheduler.sh'
+    template = "simple_scheduler.sh"
 
 
 class TorqueEnvironment(ComputeEnvironment):
     "An environment with TORQUE scheduler."
     scheduler_type = TorqueScheduler
-    template = 'torque.sh'
+    template = "torque.sh"
 
 
 class SlurmEnvironment(ComputeEnvironment):
     "An environment with SLURM scheduler."
     scheduler_type = SlurmScheduler
-    template = 'slurm.sh'
+    template = "slurm.sh"
 
 
 class LSFEnvironment(ComputeEnvironment):
     "An environment with LSF scheduler."
     scheduler_type = LSFScheduler
-    template = 'lsf.sh'
+    template = "lsf.sh"
 
 
 class NodesEnvironment(ComputeEnvironment):
@@ -325,24 +343,24 @@ class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
 
     @classmethod
     def add_args(cls, parser):
-        super(DefaultTorqueEnvironment, cls).add_args(parser)
+        super().add_args(parser)
         parser.add_argument(
-            '-w', '--walltime',
-            type=float,
-            help="The wallclock time in hours.")
+            "-w", "--walltime", type=float, help="The wallclock time in hours."
+        )
         parser.add_argument(
-            '--hold',
-            action='store_true',
-            help="Submit jobs, but put them on hold.")
+            "--hold", action="store_true", help="Submit jobs, but put them on hold."
+        )
         parser.add_argument(
-            '--after',
+            "--after",
             type=str,
             help="Schedule this job to be executed after "
-                 "completion of a cluster job with this id.")
+            "completion of a cluster job with this id.",
+        )
         parser.add_argument(
-            '--no-copy-env',
-            action='store_true',
-            help="Do not copy current environment variables into compute node environment.")
+            "--no-copy-env",
+            action="store_true",
+            help="Do not copy current environment variables into compute node environment.",
+        )
 
 
 class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
@@ -350,25 +368,30 @@ class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
 
     @classmethod
     def add_args(cls, parser):
-        super(DefaultSlurmEnvironment, cls).add_args(parser)
+        super().add_args(parser)
         parser.add_argument(
-            '--memory',
-            help=("Specify how much memory to reserve per node, e.g. \"4g\" for 4 gigabytes "
-                  "or \"512m\" for 512 megabytes. Only relevant for shared queue jobs."))
+            "--memory",
+            help=(
+                'Specify how much memory to reserve per node, e.g. "4g" for 4 gigabytes '
+                'or "512m" for 512 megabytes. Only relevant for shared queue jobs.'
+            ),
+        )
         parser.add_argument(
-            '-w', '--walltime',
+            "-w",
+            "--walltime",
             type=float,
             default=12,
-            help="The wallclock time in hours.")
+            help="The wallclock time in hours.",
+        )
         parser.add_argument(
-            '--hold',
-            action='store_true',
-            help="Submit jobs, but put them on hold.")
+            "--hold", action="store_true", help="Submit jobs, but put them on hold."
+        )
         parser.add_argument(
-            '--after',
+            "--after",
             type=str,
             help="Schedule this job to be executed after "
-                 "completion of a cluster job with this id.")
+            "completion of a cluster job with this id.",
+        )
 
 
 class DefaultLSFEnvironment(NodesEnvironment, LSFEnvironment):
@@ -376,21 +399,23 @@ class DefaultLSFEnvironment(NodesEnvironment, LSFEnvironment):
 
     @classmethod
     def add_args(cls, parser):
-        super(DefaultLSFEnvironment, cls).add_args(parser)
+        super().add_args(parser)
         parser.add_argument(
-            '-w', '--walltime',
+            "-w",
+            "--walltime",
             type=float,
             default=12,
-            help="The wallclock time in hours.")
+            help="The wallclock time in hours.",
+        )
         parser.add_argument(
-            '--hold',
-            action='store_true',
-            help="Submit jobs, but put them on hold.")
+            "--hold", action="store_true", help="Submit jobs, but put them on hold."
+        )
         parser.add_argument(
-            '--after',
+            "--after",
             type=str,
             help="Schedule this job to be executed after "
-                 "completion of a cluster job with this id.")
+            "completion of a cluster job with this id.",
+        )
 
 
 class CPUEnvironment(ComputeEnvironment):
@@ -409,14 +434,14 @@ def _import_module(fn):
 
 def _import_modules(prefix):
     for fn in os.path.listdir(prefix):
-        if os.path.isfile(fn) and os.path.splitext(fn)[1] == '.py':
+        if os.path.isfile(fn) and os.path.splitext(fn)[1] == ".py":
             _import_module(os.path.join(prefix, fn))
 
 
 def _import_configured_environments():
     cfg = config.load_config(config.FN_CONFIG)
     try:
-        for name in cfg['flow'].as_list('environment_modules'):
+        for name in cfg["flow"].as_list("environment_modules"):
             try:
                 importlib.import_module(name)
             except ImportError as e:
@@ -453,27 +478,29 @@ def get_environment(test=False, import_configured=True):
         env_types = registered_environments(import_configured=import_configured)
         logger.debug(
             "List of registered environments:\n\t{}".format(
-                '\n\t'.join((str(env.__name__) for env in env_types))))
+                "\n\t".join(str(env.__name__) for env in env_types)
+            )
+        )
 
         # Select environment based on environment variable if set.
-        env_from_env_var = os.environ.get('SIGNAC_FLOW_ENVIRONMENT')
+        env_from_env_var = os.environ.get("SIGNAC_FLOW_ENVIRONMENT")
         if env_from_env_var:
             for env_type in env_types:
                 if env_type.__name__ == env_from_env_var:
                     return env_type
             else:
-                raise ValueError("Unknown environment '{}'.".format(env_from_env_var))
+                raise ValueError(f"Unknown environment '{env_from_env_var}'.")
 
         # Select based on DEBUG flag:
         for env_type in env_types:
-            if getattr(env_type, 'DEBUG', False):
-                logger.debug("Select environment '{}'; DEBUG=True.".format(env_type.__name__))
+            if getattr(env_type, "DEBUG", False):
+                logger.debug(f"Select environment '{env_type.__name__}'; DEBUG=True.")
                 return env_type
 
         # Default selection:
         for env_type in reversed(env_types):
             if env_type.is_present():
-                logger.debug("Select environment '{}'; is present.".format(env_type.__name__))
+                logger.debug(f"Select environment '{env_type.__name__}'; is present.")
                 return env_type
 
         # Otherwise, just return a standard environment

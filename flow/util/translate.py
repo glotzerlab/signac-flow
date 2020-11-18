@@ -12,6 +12,7 @@ def abbreviate(x, a):
         abbreviate.table[a] = x
         return a
 
+
 abbreviate.table = dict()  # noqa
 
 

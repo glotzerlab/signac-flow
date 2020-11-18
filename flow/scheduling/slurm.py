@@ -5,16 +5,14 @@
 
 This module implements the Scheduler and ClusterJob classes for SLURM.
 """
+import errno
 import getpass
+import logging
 import subprocess
 import tempfile
-import logging
-import errno
 
-from .base import Scheduler
-from .base import ClusterJob, JobStatus
 from ..errors import SubmitError
-
+from .base import ClusterJob, JobStatus, Scheduler
 
 logger = logging.getLogger(__name__)
 
@@ -24,30 +22,30 @@ def _fetch(user=None):
 
     def parse_status(s):
         s = s.strip()
-        if s == 'PD':
+        if s == "PD":
             return JobStatus.queued
-        elif s == 'R':
+        elif s == "R":
             return JobStatus.active
-        elif s in ['CG', 'CD', 'CA', 'TO']:
+        elif s in ["CG", "CD", "CA", "TO"]:
             return JobStatus.inactive
-        elif s in ['F', 'NF']:
+        elif s in ["F", "NF"]:
             return JobStatus.error
         return JobStatus.registered
 
     if user is None:
         user = getpass.getuser()
 
-    cmd = ['squeue', '-u', user, '-h', "--format=%2t%100j"]
+    cmd = ["squeue", "-u", user, "-h", "--format=%2t%100j"]
     try:
-        result = subprocess.check_output(cmd).decode('utf-8', errors='backslashreplace')
+        result = subprocess.check_output(cmd).decode("utf-8", errors="backslashreplace")
     except subprocess.CalledProcessError:
         raise
-    except IOError as error:
+    except OSError as error:
         if error.errno != errno.ENOENT:
             raise
         else:
             raise RuntimeError("SLURM not available.")
-    lines = result.split('\n')
+    lines = result.split("\n")
     for line in lines:
         if line:
             status = line[:2]
@@ -71,20 +69,22 @@ class SlurmScheduler(Scheduler):
     :type user:
         str
     """
+
     # The standard command used to submit jobs to the SLURM scheduler.
-    submit_cmd = ['sbatch']
+    submit_cmd = ["sbatch"]
 
     def __init__(self, user=None, **kwargs):
-        super(SlurmScheduler, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.user = user
 
     def jobs(self):
         "Yield cluster jobs by querying the scheduler."
         self._prevent_dos()
-        for job in _fetch(user=self.user):
-            yield job
+        yield from _fetch(user=self.user)
 
-    def submit(self, script, after=None, hold=False, pretend=False, flags=None, **kwargs):
+    def submit(
+        self, script, after=None, hold=False, pretend=False, flags=None, **kwargs
+    ):
         """Submit a job script for execution to the scheduler.
 
         :param script:
@@ -117,24 +117,26 @@ class SlurmScheduler(Scheduler):
 
         if after is not None:
             submit_cmd.extend(
-                ['-W', 'depend="afterany:{}"'.format(after.split('.')[0])])
+                ["-W", 'depend="afterany:{}"'.format(after.split(".")[0])]
+            )
 
         if hold:
-            submit_cmd += ['--hold']
+            submit_cmd += ["--hold"]
 
         if pretend:
-            print("# Submit command: {}".format('  '.join(submit_cmd)))
+            print("# Submit command: {}".format("  ".join(submit_cmd)))
             print(script)
             print()
         else:
             with tempfile.NamedTemporaryFile() as tmp_submit_script:
-                tmp_submit_script.write(str(script).encode('utf-8'))
+                tmp_submit_script.write(str(script).encode("utf-8"))
                 tmp_submit_script.flush()
                 try:
-                    subprocess.check_output(submit_cmd + [tmp_submit_script.name],
-                                            universal_newlines=True)
+                    subprocess.check_output(
+                        submit_cmd + [tmp_submit_script.name], universal_newlines=True
+                    )
                 except subprocess.CalledProcessError as e:
-                    raise SubmitError("sbatch error: {}".format(e.output))
+                    raise SubmitError(f"sbatch error: {e.output}")
 
                 return True
 
@@ -142,8 +144,8 @@ class SlurmScheduler(Scheduler):
     def is_present(cls):
         "Return True if it appears that a SLURM scheduler is available within the environment."
         try:
-            subprocess.check_output(['sbatch', '--version'], stderr=subprocess.STDOUT)
-        except (IOError, OSError):
+            subprocess.check_output(["sbatch", "--version"], stderr=subprocess.STDOUT)
+        except OSError:
             return False
         else:
             return True

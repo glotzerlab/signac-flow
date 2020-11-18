@@ -5,18 +5,16 @@
 
 This module implements the Scheduler and ClusterJob classes for TORQUE.
 """
-import io
 import errno
 import getpass
+import io
+import logging
 import subprocess
 import tempfile
-import logging
 import xml.etree.ElementTree as ET
 
-from .base import Scheduler
-from .base import ClusterJob, JobStatus
 from ..errors import SubmitError
-
+from .base import ClusterJob, JobStatus, Scheduler
 
 logger = logging.getLogger(__name__)
 
@@ -25,22 +23,23 @@ def _fetch(user=None):
     "Fetch the cluster job status information from the TORQUE scheduler."
     if user is None:
         user = getpass.getuser()
-    cmd = "qstat -fx -u {user}".format(user=user)
+    cmd = f"qstat -fx -u {user}"
     try:
         result = io.BytesIO(subprocess.check_output(cmd.split()))
         tree = ET.parse(source=result)
         return tree.getroot()
     except ET.ParseError as error:
-        if str(error) == 'no element found: line 1, column 0':
+        if str(error) == "no element found: line 1, column 0":
             logger.warn(
                 "No scheduler jobs, from any user(s), were detected. "
                 "This may be the result of a misconfiguration in the "
-                "environment.")
+                "environment."
+            )
             # Return empty, but well-formed result:
             return ET.parse(source=io.BytesIO(b"<Data></Data>"))
         else:
             raise
-    except (IOError, OSError) as error:
+    except OSError as error:
         if error.errno == errno.ENOENT:
             raise RuntimeError("Torque not available.")
         else:
@@ -54,23 +53,23 @@ class TorqueJob(ClusterJob):
         self.node = node
 
     def _id(self):
-        return self.node.find('Job_Id').text
+        return self.node.find("Job_Id").text
 
     def __str__(self):
         return str(self._id())
 
     def name(self):
-        return self.node.find('Job_Name').text
+        return self.node.find("Job_Name").text
 
     def status(self):
-        job_state = self.node.find('job_state').text
-        if job_state == 'R':
+        job_state = self.node.find("job_state").text
+        if job_state == "R":
             return JobStatus.active
-        if job_state == 'Q':
+        if job_state == "Q":
             return JobStatus.queued
-        if job_state == 'C':
+        if job_state == "C":
             return JobStatus.inactive
-        if job_state == 'H':
+        if job_state == "H":
             return JobStatus.held
         return JobStatus.registered
 
@@ -86,21 +85,24 @@ class TorqueScheduler(Scheduler):
     :type user:
         str
     """
+
     # The standard command used to submit jobs to the TORQUE scheduler.
-    submit_cmd = ['qsub']
+    submit_cmd = ["qsub"]
 
     def __init__(self, user=None, **kwargs):
-        super(TorqueScheduler, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.user = user
 
     def jobs(self):
         "Yield cluster jobs by querying the scheduler."
         self._prevent_dos()
         nodes = _fetch(user=self.user)
-        for node in nodes.findall('Job'):
+        for node in nodes.findall("Job"):
             yield TorqueJob(node)
 
-    def submit(self, script, after=None, pretend=False, hold=False, flags=None, *args, **kwargs):
+    def submit(
+        self, script, after=None, pretend=False, hold=False, flags=None, *args, **kwargs
+    ):
         """Submit a job script for execution to the scheduler.
 
         :param script:
@@ -132,36 +134,36 @@ class TorqueScheduler(Scheduler):
         submit_cmd = self.submit_cmd + flags
 
         if after is not None:
-            submit_cmd.extend(
-                ['-W', 'depend="afterok:{}"'.format(after.split('.')[0])])
+            submit_cmd.extend(["-W", 'depend="afterok:{}"'.format(after.split(".")[0])])
 
         if hold:
-            submit_cmd += ['-h']
+            submit_cmd += ["-h"]
 
         if pretend:
-            print("# Submit command: {}".format(' '.join(submit_cmd)))
+            print("# Submit command: {}".format(" ".join(submit_cmd)))
             print(script)
             print()
         else:
             with tempfile.NamedTemporaryFile() as tmp_submit_script:
-                tmp_submit_script.write(str(script).encode('utf-8'))
+                tmp_submit_script.write(str(script).encode("utf-8"))
                 tmp_submit_script.flush()
                 try:
                     output = subprocess.check_output(
-                        submit_cmd + [tmp_submit_script.name])
-                    jobsid = output.decode('utf-8').strip()
+                        submit_cmd + [tmp_submit_script.name]
+                    )
+                    jobsid = output.decode("utf-8").strip()
                 except subprocess.CalledProcessError as e:
-                    raise SubmitError("qsub error: {}".format(e.output()))
+                    raise SubmitError(f"qsub error: {e.output()}")
             return jobsid
 
     @classmethod
     def is_present(cls):
         "Return True if it appears that a TORQUE scheduler is available within the environment."
         try:
-            subprocess.check_output(['qsub', '--version'], stderr=subprocess.STDOUT)
+            subprocess.check_output(["qsub", "--version"], stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError:
             return True
-        except (IOError, OSError):
+        except OSError:
             return False
         else:
             return True

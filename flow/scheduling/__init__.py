@@ -7,10 +7,9 @@ from .lsf import LSFScheduler
 from .slurm import SlurmScheduler
 from .torque import TorqueScheduler
 
-
 __all__ = [
-    'FakeScheduler',
-    'LSFScheduler',
-    'SlurmScheduler',
-    'TorqueScheduler',
-    ]
+    "FakeScheduler",
+    "LSFScheduler",
+    "SlurmScheduler",
+    "TorqueScheduler",
+]

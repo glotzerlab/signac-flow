@@ -1,7 +1,8 @@
 # make separate python class for render_status
 from tqdm import tqdm
-from .util import mistune
+
 from .scheduling.base import JobStatus
+from .util import mistune
 
 
 class Renderer:
@@ -40,8 +41,17 @@ class Renderer:
         self.html_output = mistune.html(self.markdown_output)
         return self.html_output
 
-    def render(self, template, template_environment, context, detailed, expand,
-               unroll, compact, output_format):
+    def render(
+        self,
+        template,
+        template_environment,
+        context,
+        detailed,
+        expand,
+        unroll,
+        compact,
+        output_format,
+    ):
         """Render the status in different format for print_status.
 
         :param template:
@@ -82,15 +92,15 @@ class Renderer:
         # use Jinja2 template for status output
         if template is None:
             if detailed and expand:
-                template = 'status_expand.jinja'
+                template = "status_expand.jinja"
             elif detailed and not unroll:
-                template = 'status_stack.jinja'
+                template = "status_stack.jinja"
             elif detailed and compact:
-                template = 'status_compact.jinja'
+                template = "status_compact.jinja"
             else:
-                template = 'status.jinja'
+                template = "status.jinja"
 
-        def draw_progressbar(value, total, escape='', width=40):
+        def draw_progressbar(value, total, escape="", width=40):
             """Visualize progress with a progress bar.
 
             :param value:
@@ -108,8 +118,10 @@ class Renderer:
             """
 
             assert value >= 0 and total > 0
-            bar_format = escape + '|{{bar:{}}}'.format(width) + escape + '| {percentage:<0.2f}%'
-            return tqdm.format_meter(n=value, total=total, elapsed=0, bar_format=bar_format)
+            bar_format = escape + f"|{{bar:{width}}}" + escape + "| {percentage:<0.2f}%"
+            return tqdm.format_meter(
+                n=value, total=total, elapsed=0, bar_format=bar_format
+            )
 
         def job_filter(job_op, scheduler_status_code, all_ops):
             """Filter eligible jobs for status print.
@@ -128,8 +140,11 @@ class Renderer:
                 bool
             """
 
-            return scheduler_status_code[job_op['scheduler_status']] != 'U' or \
-                job_op['eligible'] or all_ops
+            return (
+                scheduler_status_code[job_op["scheduler_status"]] != "U"
+                or job_op["eligible"]
+                or all_ops
+            )
 
         def get_operation_status(operation_info, symbols):
             """Determine the status of an operation.
@@ -144,16 +159,16 @@ class Renderer:
                 dict
             """
 
-            if operation_info['scheduler_status'] >= JobStatus.active:
-                op_status = 'running'
-            elif operation_info['scheduler_status'] > JobStatus.inactive:
-                op_status = 'active'
-            elif operation_info['completed']:
-                op_status = 'completed'
-            elif operation_info['eligible']:
-                op_status = 'eligible'
+            if operation_info["scheduler_status"] >= JobStatus.active:
+                op_status = "running"
+            elif operation_info["scheduler_status"] > JobStatus.inactive:
+                op_status = "active"
+            elif operation_info["completed"]:
+                op_status = "completed"
+            elif operation_info["eligible"]:
+                op_status = "eligible"
             else:
-                op_status = 'ineligible'
+                op_status = "ineligible"
 
             return symbols[op_status]
 
@@ -174,23 +189,25 @@ class Renderer:
                 bool
             """
             if eligible and pretty:
-                return '**' + s + '**'
+                return "**" + s + "**"
             else:
                 return s
 
-        template_environment.filters['highlight'] = highlight
-        template_environment.filters['draw_progressbar'] = draw_progressbar
-        template_environment.filters['get_operation_status'] = get_operation_status
-        template_environment.filters['job_filter'] = job_filter
+        template_environment.filters["highlight"] = highlight
+        template_environment.filters["draw_progressbar"] = draw_progressbar
+        template_environment.filters["get_operation_status"] = get_operation_status
+        template_environment.filters["job_filter"] = job_filter
 
         template = template_environment.get_template(template)
         self.markdown_output = template.render(**context)
-        if output_format == 'terminal':
+        if output_format == "terminal":
             return self.generate_terminal_output()
-        elif output_format == 'markdown':
+        elif output_format == "markdown":
             return self.markdown_output
-        elif output_format == 'html':
+        elif output_format == "html":
             return self.generate_html_output()
         else:
-            raise ValueError('Output format not supported, valid options are '
-                             'terminal, markdown, or html.')
+            raise ValueError(
+                "Output format not supported, valid options are "
+                "terminal, markdown, or html."
+            )

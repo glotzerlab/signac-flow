@@ -4,14 +4,13 @@
 # This software is licensed under the BSD 3-Clause License.
 """Extract generated templates into a signac project for simplified inspection."""
 
-import os
 import argparse
+import os
 
-import signac
 import generate_template_reference_data as gen
+import signac
 
-PROJECT_DIR = os.path.join(
-    os.path.dirname(__file__), './template_reference_data')
+PROJECT_DIR = os.path.join(os.path.dirname(__file__), "./template_reference_data")
 
 
 def main(args):
@@ -19,6 +18,7 @@ def main(args):
         os.makedirs(PROJECT_DIR)
     elif args.force:
         import shutil
+
         shutil.rmtree(PROJECT_DIR)
         os.makedirs(PROJECT_DIR)
     else:
@@ -30,10 +30,12 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Generate reference submission scripts for various environments")
+        description="Generate reference submission scripts for various environments"
+    )
     parser.add_argument(
-        '-f', '--force',
-        action='store_true',
-        help="Recreate the unarchived data space even if the directory already exists."
+        "-f",
+        "--force",
+        action="store_true",
+        help="Recreate the unarchived data space even if the directory already exists.",
     )
     main(parser.parse_args())

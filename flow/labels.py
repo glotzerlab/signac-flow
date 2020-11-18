@@ -9,7 +9,7 @@ of a FlowProject class definition.
 """
 
 
-class label(object):
+class label:
     """Decorate a :class:`~.FlowProject` class function as a label function.
 
     For example:
@@ -40,7 +40,7 @@ class staticlabel(label):
     """
 
     def __call__(self, func):
-        return staticmethod(super(staticlabel, self).__call__(func))
+        return staticmethod(super().__call__(func))
 
 
 class classlabel(label):
@@ -50,8 +50,8 @@ class classlabel(label):
     """
 
     def __call__(self, func):
-        return classmethod(super(classlabel, self).__call__(func))
+        return classmethod(super().__call__(func))
 
 
 def _is_label_func(func):
-    return getattr(getattr(func, '__func__', func), '_label', False)
+    return getattr(getattr(func, "__func__", func), "_label", False)

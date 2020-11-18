@@ -2,6 +2,6 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 "Defines the API for the util sub package."
-from . import misc, translate, template_filters, mistune
+from . import misc, mistune, template_filters, translate
 
-__all__ = ['misc', 'translate', 'template_filters', 'mistune']
+__all__ = ["misc", "translate", "template_filters", "mistune"]

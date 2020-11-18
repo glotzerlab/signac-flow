@@ -8,6 +8,7 @@ import time
 
 class JobStatus(enum.IntEnum):
     """Classifies the job's execution status."""
+
     unknown = 1
     registered = 2
     inactive = 3
@@ -21,7 +22,7 @@ class JobStatus(enum.IntEnum):
     user = 128
 
 
-class ClusterJob(object):
+class ClusterJob:
     """This class represents a cluster job."""
 
     def __init__(self, jobid, status=None):
@@ -41,7 +42,7 @@ class ClusterJob(object):
         return self._status
 
 
-class Scheduler(object):
+class Scheduler:
     """Abstract base class for schedulers."""
 
     # The UNIX time stamp of the last scheduler query.
@@ -62,8 +63,7 @@ class Scheduler(object):
         """
         if cls._last_query is not None:
             if time.time() - cls._last_query < cls._dos_timeout:
-                raise RuntimeError(
-                    "Too many scheduler requests within a short time!")
+                raise RuntimeError("Too many scheduler requests within a short time!")
         cls._last_query = time.time()
 
     def jobs(self):

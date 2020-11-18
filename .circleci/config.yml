@@ -75,15 +75,15 @@ jobs:
           path: test-reports
           destination: test-reports
 
-  linux-python-39-signac-1.0:
+  linux-python-39-signac-10:
     <<: *test-template
     environment:
       SIGNAC_VERSION: "signac~=1.0.0"
-  linux-python-39-signac-1.3:
+  linux-python-39-signac-13:
     <<: *test-template
     environment:
       SIGNAC_VERSION: "signac~=1.3.0"
-  linux-python-39-signac-1.4:
+  linux-python-39-signac-14:
     <<: *test-template
     environment:
       SIGNAC_VERSION: "signac~=1.4.0"
@@ -163,13 +163,13 @@ workflows:
       - linux-python-36:
           requires:
             - pre-test-checks
-      - linux-python-39-signac-1.0:
+      - linux-python-39-signac-10:
           requires:
             - linux-python-39
-      - linux-python-39-signac-1.3:
+      - linux-python-39-signac-13:
           requires:
             - linux-python-39
-      - linux-python-39-signac-1.4:
+      - linux-python-39-signac-14:
           requires:
             - linux-python-39
       - check-metadata:
@@ -185,9 +185,9 @@ workflows:
             - linux-python-38
             - linux-python-37
             - linux-python-36
-            - linux-python-39-signac-1.0
-            - linux-python-39-signac-1.3
-            - linux-python-39-signac-1.4
+            - linux-python-39-signac-10
+            - linux-python-39-signac-13
+            - linux-python-39-signac-14
   nightly:
     triggers:
       - schedule:

@@ -5,6 +5,22 @@ Changelog
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 The numbers in brackets denote the related GitHub issue and/or pull request.
 
+Version 0.12
+============
+
+[0.12.0] -- 202x-xx-xx
+----------------------
+
+Added
++++++
+- Code is formatted with ``black`` and ``isort`` pre-commit hooks (#365).
+- Add official support for Python version 3.9 (#365).
+
+Changed
++++++++
+- Command line interface for ``exec`` changed parameter name from ``jobid`` to ``job_id`` (#363).
+
+
 Version 0.11
 ============
 

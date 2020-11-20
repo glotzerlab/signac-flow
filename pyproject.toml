@@ -1,0 +1,21 @@
+[tool.black]
+target-version = ['py36']
+include = '\.pyi?$'
+exclude = '''
+(
+  /(
+      \.eggs
+    | \.git
+    | \.mypy_cache
+    | \.tox
+    | \.venv
+    | build
+    | dist
+    | flow/util/mistune
+  )/
+)
+'''
+
+[tool.isort]
+profile = 'black'
+skip_glob = 'flow/util/mistune/*'

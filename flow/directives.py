@@ -1,7 +1,8 @@
-from collections.abc import MutableMapping
 import functools
 import operator
 import sys
+from collections.abc import MutableMapping
+
 from flow.errors import DirectivesError
 
 
@@ -48,8 +49,16 @@ class _Directive:
         Defaults to ``None``.
     """
 
-    def __init__(self, name, *, validator=None, default=None,
-                 serial=max, parallel=operator.add, finalize=None):
+    def __init__(
+        self,
+        name,
+        *,
+        validator=None,
+        default=None,
+        serial=max,
+        parallel=operator.add,
+        finalize=None,
+    ):
         self._name = name
         self._default = default
         self._serial = serial
@@ -84,6 +93,7 @@ class _Directive:
             given callable with a validator.
         """
         if callable(value):
+
             @functools.wraps(value)
             def validate_callable(*jobs):
                 return self._validator(value(*jobs))
@@ -119,7 +129,8 @@ class _Directives(MutableMapping):
     def _add_directive(self, directive):
         if not isinstance(directive, _Directive):
             raise TypeError(
-                f"Expected a _Directive object. Received {type(directive)}.")
+                f"Expected a _Directive object. Received {type(directive)}."
+            )
         elif directive._name in self._directive_definitions:
             raise ValueError(f"Cannot redefine directive name {directive._name}.")
         else:
@@ -130,7 +141,7 @@ class _Directives(MutableMapping):
         try:
             self._defined_directives[key] = self._directive_definitions[key](value)
         except (KeyError, ValueError, TypeError) as err:
-            raise DirectivesError(f'Error setting directive {key}') from err
+            raise DirectivesError(f"Error setting directive {key}") from err
 
     def __getitem__(self, key):
         if key in self._defined_directives and key in self._directive_definitions:
@@ -192,7 +203,9 @@ class _Directives(MutableMapping):
 def _evaluate(value, jobs):
     if callable(value):
         if jobs is None:
-            raise RuntimeError("jobs must be specified when evaluating a callable directive.")
+            raise RuntimeError(
+                "jobs must be specified when evaluating a callable directive."
+            )
         else:
             return value(*jobs)
     else:
@@ -218,8 +231,10 @@ class _OnlyType:
             try:
                 return self.type(v)
             except Exception:
-                raise TypeError(f"Expected an object of type {self.type}. "
-                                f"Received {v} of type {type(v)}.")
+                raise TypeError(
+                    f"Expected an object of type {self.type}. "
+                    f"Received {v} of type {type(v)}."
+                )
 
 
 def _raise_below(value):
@@ -228,8 +243,9 @@ def _raise_below(value):
             if v < value:
                 raise ValueError
         except (TypeError, ValueError):
-            raise ValueError(f"Expected a number greater than or equal to {value}. "
-                             f"Received {v}.")
+            raise ValueError(
+                f"Expected a number greater than or equal to {value}. Received {v}."
+            )
         return v
 
     return is_greater_or_equal
@@ -249,8 +265,8 @@ def _finalize_np(np, directives):
     """
     if callable(np) or np != _NP_DEFAULT:
         return np
-    nranks = directives.get('nranks', 1)
-    omp_num_threads = directives.get('omp_num_threads', 1)
+    nranks = directives.get("nranks", 1)
+    omp_num_threads = directives.get("omp_num_threads", 1)
     if callable(nranks) or callable(omp_num_threads):
         return np
     else:
@@ -275,8 +291,9 @@ _nonnegative_real = _OnlyType(float, postprocess=_raise_below(0))
 _positive_real = _OnlyType(float, postprocess=_raise_below(1e-12))
 
 # Common directives and their instantiation as _Directive
-_NP = _Directive('np', validator=_natural_number,
-                 default=_NP_DEFAULT, finalize=_finalize_np)
+_NP = _Directive(
+    "np", validator=_natural_number, default=_NP_DEFAULT, finalize=_finalize_np
+)
 """The number of tasks to launch for a given operation i.e., the number of CPU
 cores to be requested for a given operation.
 
@@ -285,28 +302,31 @@ the "nranks" or "omp_num_threads" directives and uses their product if it is
 greater than the current set value. Defaults to 1.
 """
 
-_NGPU = _Directive('ngpu', validator=_nonnegative_int, default=0)
+_NGPU = _Directive("ngpu", validator=_nonnegative_int, default=0)
 """The number of GPUs to use for this operation.
 
 Expects a nonnegative integer. Defaults to 0.
 """
 
-_NRANKS = _Directive('nranks', validator=_nonnegative_int, default=0)
+_NRANKS = _Directive("nranks", validator=_nonnegative_int, default=0)
 """The number of MPI ranks to use for this operation. Defaults to 0.
 
 Expects a nonnegative integer.
 """
 
-_OMP_NUM_THREADS = _Directive(
-    'omp_num_threads', validator=_nonnegative_int, default=0)
+_OMP_NUM_THREADS = _Directive("omp_num_threads", validator=_nonnegative_int, default=0)
 """The number of OpenMP threads to use for this operation. Defaults to 0.
 
 Expects a nonnegative integer.
 """
 
-_EXECUTABLE = _Directive('executable', validator=_OnlyType(str),
-                         default=sys.executable, serial=_no_aggregation,
-                         parallel=_no_aggregation)
+_EXECUTABLE = _Directive(
+    "executable",
+    validator=_OnlyType(str),
+    default=sys.executable,
+    serial=_no_aggregation,
+    parallel=_no_aggregation,
+)
 """The path to the executable to be used for this operation.
 
 Expects a string pointing to a valid executable file in the
@@ -317,8 +337,13 @@ the :py:class:`FlowProject` path is an empty string, the executable can be a
 path to an executable Python script. Defaults to ``sys.executable``.
 """
 
-_WALLTIME = _Directive('walltime', validator=_nonnegative_real, default=12.,
-                       serial=operator.add, parallel=max)
+_WALLTIME = _Directive(
+    "walltime",
+    validator=_nonnegative_real,
+    default=12.0,
+    serial=operator.add,
+    parallel=max,
+)
 """The number of hours to request for executing this job.
 
 This directive expects a float representing the walltime in hours. Fractional
@@ -326,15 +351,19 @@ values are supported. For example, a value of 0.5 will request 30 minutes of
 walltime. Defaults to 12 hours.
 """
 
-_MEMORY = _Directive('memory', validator=_positive_real, default=4)
+_MEMORY = _Directive("memory", validator=_positive_real, default=4)
 """The number of gigabytes of memory to request for this operation.
 
 Expects a real number greater than zero.
 """
 
-_PROCESSOR_FRACTION = _Directive('processor_fraction',
-                                 validator=_OnlyType(float, postprocess=_is_fraction),
-                                 default=1., serial=_no_aggregation, parallel=_no_aggregation)
+_PROCESSOR_FRACTION = _Directive(
+    "processor_fraction",
+    validator=_OnlyType(float, postprocess=_is_fraction),
+    default=1.0,
+    serial=_no_aggregation,
+    parallel=_no_aggregation,
+)
 """Fraction of a resource to use on a single operation.
 
 If set to 0.5 for a bundled job with 20 operations (all with 'np' set to 1), 10

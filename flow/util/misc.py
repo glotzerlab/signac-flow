@@ -1,10 +1,10 @@
 # Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-import os
-import json
 import argparse
+import json
 import logging
+import os
 from contextlib import contextmanager
 from itertools import cycle, islice
 
@@ -25,22 +25,22 @@ def _positive_int(value):
         if ivalue <= 0:
             raise argparse.ArgumentTypeError("Value must be positive.")
     except (TypeError, ValueError):
-        raise argparse.ArgumentTypeError(
-            "{} must be a positive integer.".format(value))
+        raise argparse.ArgumentTypeError(f"{value} must be a positive integer.")
     return ivalue
 
 
 def write_human_readable_statepoint(script, job):
     """Human-readable representation of a signac state point."""
-    script.write('# Statepoint:\n#\n')
-    sp_dump = json.dumps(job.statepoint(), indent=2).replace(
-        '{', '{{').replace('}', '}}')
+    script.write("# Statepoint:\n#\n")
+    sp_dump = (
+        json.dumps(job.statepoint(), indent=2).replace("{", "{{").replace("}", "}}")
+    )
     for line in sp_dump.splitlines():
-        script.write('# ' + line + '\n')
+        script.write("# " + line + "\n")
 
 
 @contextmanager
-def redirect_log(job, filename='run.log', formatter=None, logger=None):
+def redirect_log(job, filename="run.log", formatter=None, logger=None):
     """Redirect all messages logged via the logging interface to the given file.
 
     :param job:
@@ -61,11 +61,12 @@ def redirect_log(job, filename='run.log', formatter=None, logger=None):
     """
     if formatter is None:
         formatter = logging.Formatter(
-            '%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
+            "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
+        )
     if logger is None:
         logger = logging.getLogger()
 
-    filehandler = logging.FileHandler(filename=job.fn('run.log'))
+    filehandler = logging.FileHandler(filename=job.fn("run.log"))
     filehandler.setFormatter(formatter)
     logger.addHandler(filehandler)
     try:
@@ -78,27 +79,27 @@ def redirect_log(job, filename='run.log', formatter=None, logger=None):
 def add_path_to_environment_pythonpath(path):
     "Temporarily insert the current working directory into the environment PYTHONPATH variable."
     path = os.path.realpath(path)
-    pythonpath = os.environ.get('PYTHONPATH')
+    pythonpath = os.environ.get("PYTHONPATH")
     if pythonpath:
         for path_ in pythonpath:
             if os.path.isabs(path_) and os.path.realpath(path_) == path:
-                yield   # Path is already in PYTHONPATH, nothing to do here.
+                yield  # Path is already in PYTHONPATH, nothing to do here.
                 return
         try:
             # Append the current working directory to the PYTHONPATH.
-            tmp_path = [path] + pythonpath.split(':')
-            os.environ['PYTHONPATH'] = ':'.join(tmp_path)
+            tmp_path = [path] + pythonpath.split(":")
+            os.environ["PYTHONPATH"] = ":".join(tmp_path)
             yield
         finally:
-            os.environ['PYTHONPATH'] = pythonpath
+            os.environ["PYTHONPATH"] = pythonpath
             pass
     else:
         try:
             # The PYTHONPATH was previously not set, set to current working directory.
-            os.environ['PYTHONPATH'] = path
+            os.environ["PYTHONPATH"] = path
             yield
         finally:
-            del os.environ['PYTHONPATH']
+            del os.environ["PYTHONPATH"]
 
 
 @contextmanager
@@ -126,15 +127,15 @@ class TrackGetItemDict(dict):
 
     def __init__(self, *args, **kwargs):
         self._keys_used = set()
-        super(TrackGetItemDict, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def __getitem__(self, key):
         self._keys_used.add(key)
-        return super(TrackGetItemDict, self).__getitem__(key)
+        return super().__getitem__(key)
 
     def get(self, key, default=None):
         self._keys_used.add(key)
-        return super(TrackGetItemDict, self).get(key, default)
+        return super().get(key, default)
 
     @property
     def keys_used(self):

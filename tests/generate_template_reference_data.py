@@ -2,28 +2,28 @@
 # Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-import sys
-import os
-import io
-import operator
-import itertools
 import argparse
+import io
+import itertools
+import operator
+import os
+import sys
 from hashlib import sha1
 
-import signac
-import flow
-import flow.environments
 import jinja2
-
+import signac
 from define_template_test_project import TestProject
 from test_project import redirect_stdout
 
+import flow
+import flow.environments
 
 # Define a consistent submission name so that we can test that job names are
 # being correctly generated.
 PROJECT_NAME = "SubmissionTest"
-ARCHIVE_DIR = os.path.normpath(os.path.join(
-    os.path.dirname(__file__), './template_reference_data.tar.gz'))
+ARCHIVE_DIR = os.path.normpath(
+    os.path.join(os.path.dirname(__file__), "./template_reference_data.tar.gz")
+)
 PROJECT_DIRECTORY = "/home/user/project/"
 
 
@@ -36,7 +36,7 @@ def cartesian(**kwargs):
 
 def get_nested_attr(obj, attr, default=None):
     """Get nested attributes of an object."""
-    attrs = attr.split('.')
+    attrs = attr.split(".")
     for a in attrs:
         try:
             obj = getattr(obj, a)
@@ -61,68 +61,67 @@ def init(project):
     # bundling and parallelism must exist in the same test. The goal is to
     # construct a minimal covering set of all test cases.
     environments = {
-        'environment.StandardEnvironment': [],
-        'environments.xsede.CometEnvironment': [
+        "environment.StandardEnvironment": [],
+        "environments.xsede.CometEnvironment": [
             {
-                'partition': ['compute', 'shared', 'gpu'],
-                'walltime': [None, 1],
+                "partition": ["compute", "shared", "gpu"],
+                "walltime": [None, 1],
             },
             {
-                'partition': ['compute'],
-                'parallel': [False, True],
-                'bundle': [['mpi_op', 'omp_op']],
-            }
+                "partition": ["compute"],
+                "parallel": [False, True],
+                "bundle": [["mpi_op", "omp_op"]],
+            },
         ],
-        'environments.xsede.Stampede2Environment': [
+        "environments.xsede.Stampede2Environment": [
             {
-                'partition': ['skx-normal'],
-                'walltime': [None, 1],
+                "partition": ["skx-normal"],
+                "walltime": [None, 1],
             },
             {
-                'partition': ['skx-normal'],
-                'parallel': [False, True],
-                'bundle': [['mpi_op', 'mpi_op'],
-                           ['omp_op', 'omp_op']],
-            }
+                "partition": ["skx-normal"],
+                "parallel": [False, True],
+                "bundle": [["mpi_op", "mpi_op"], ["omp_op", "omp_op"]],
+            },
         ],
-        'environments.xsede.BridgesEnvironment': [
+        "environments.xsede.BridgesEnvironment": [
             {
-                'partition': ['RM', 'RM-Shared', 'GPU', 'GPU-AI'],
-                'walltime': [None, 1],
+                "partition": ["RM", "RM-Shared", "GPU", "GPU-AI"],
+                "walltime": [None, 1],
             },
             {
-                'partition': ['RM'],
-                'parallel': [False, True],
-                'bundle': [['mpi_op', 'omp_op']],
-            }
+                "partition": ["RM"],
+                "parallel": [False, True],
+                "bundle": [["mpi_op", "omp_op"]],
+            },
         ],
-        'environments.umich.GreatLakesEnvironment': [
+        "environments.umich.GreatLakesEnvironment": [
             {
-                'partition': ['standard', 'gpu'],
-                'walltime': [None, 1],
+                "partition": ["standard", "gpu"],
+                "walltime": [None, 1],
             },
             {
-                'parallel': [False, True],
-                'bundle': [['mpi_op', 'omp_op']],
-            }
+                "parallel": [False, True],
+                "bundle": [["mpi_op", "omp_op"]],
+            },
         ],
-        'environments.incite.SummitEnvironment': [
+        "environments.incite.SummitEnvironment": [
             {
-                'walltime': [None, 1],
+                "walltime": [None, 1],
             },
             {
-                'parallel': [False, True],
-                'bundle': [['mpi_op', 'omp_op']],
-            }
+                "parallel": [False, True],
+                "bundle": [["mpi_op", "omp_op"]],
+            },
         ],
-        'environments.umn.MangiEnvironment': [
+        "environments.umn.MangiEnvironment": [
             {
-                'walltime': [None, 1],
+                "walltime": [None, 1],
             },
             {
-                'parallel': [False, True],
-                'bundle': [['mpi_op', 'omp_op']],
-            }
+                "parallel": [False, True],
+                "bundle": [["mpi_op", "omp_op"]],
+            },
         ],
     }
 
@@ -139,8 +138,8 @@ def _store_bundled(self, operations):
     if len(operations) == 1:
         return operations[0].id
     else:
-        h = '.'.join(op.id for op in operations)
-        bid = '{}/bundle/{}'.format(self, sha1(h.encode('utf-8')).hexdigest())
+        h = ".".join(op.id for op in operations)
+        bid = "{}/bundle/{}".format(self, sha1(h.encode("utf-8")).hexdigest())
         return bid
 
 
@@ -148,9 +147,9 @@ def get_masked_flowproject(p):
     """Mock environment-dependent attributes and functions. Need to mock
     sys.executable before the FlowProject is instantiated, and then modify the
     root_directory and project_dir elements after creation."""
-    sys.executable = '/usr/local/bin/python'
+    sys.executable = "/usr/local/bin/python"
     fp = TestProject.get_project(root=p.root_directory())
-    fp._entrypoint.setdefault('path', 'generate_template_reference_data.py')
+    fp._entrypoint.setdefault("path", "generate_template_reference_data.py")
     fp.root_directory = lambda: PROJECT_DIRECTORY
     fp.config.project_dir = PROJECT_DIRECTORY
     return fp
@@ -160,11 +159,13 @@ def main(args):
     # If the ARCHIVE_DIR already exists, only recreate if forced.
     if os.path.exists(ARCHIVE_DIR):
         if args.force:
-            print("Removing existing archive '{}'.".format(ARCHIVE_DIR))
+            print(f"Removing existing archive '{ARCHIVE_DIR}'.")
             os.unlink(ARCHIVE_DIR)
         else:
-            print("Archive '{}' already exists, exiting. "
-                  "Use `-f/--force` to overwrite.".format(ARCHIVE_DIR))
+            print(
+                "Archive '{}' already exists, exiting. "
+                "Use `-f/--force` to overwrite.".format(ARCHIVE_DIR)
+            )
             return
 
     with signac.TemporaryProject(name=PROJECT_NAME) as p:
@@ -173,72 +174,88 @@ def main(args):
         # Here we set the appropriate executable for all the operations. This
         # is necessary as otherwise the default executable between submitting
         # and running could look different depending on the environment.
-        executable = '/usr/local/bin/python'
+        executable = "/usr/local/bin/python"
         for group in fp.groups.values():
             for op_key in group.operations:
                 if op_key in group.operation_directives:
-                    group.operation_directives[op_key]['executable'] = executable
+                    group.operation_directives[op_key]["executable"] = executable
         for job in fp:
             with job:
                 kwargs = job.statepoint()
-                env = get_nested_attr(flow, kwargs['environment'])
-                parameters = kwargs['parameters']
-                if 'bundle' in parameters:
-                    bundle = parameters.pop('bundle')
-                    fn = 'script_{}.sh'.format('_'.join(bundle))
+                env = get_nested_attr(flow, kwargs["environment"])
+                parameters = kwargs["parameters"]
+                if "bundle" in parameters:
+                    bundle = parameters.pop("bundle")
+                    fn = "script_{}.sh".format("_".join(bundle))
                     tmp_out = io.TextIOWrapper(io.BytesIO(), sys.stdout.encoding)
                     with redirect_stdout(tmp_out):
                         try:
                             fp.submit(
-                                env=env, jobs=[job], names=bundle, pretend=True,
-                                force=True, bundle_size=len(bundle), **parameters)
+                                env=env,
+                                jobs=[job],
+                                names=bundle,
+                                pretend=True,
+                                force=True,
+                                bundle_size=len(bundle),
+                                **parameters,
+                            )
                         except jinja2.TemplateError as e:
-                            print('ERROR:', e)  # Shows template error in output script
+                            print("ERROR:", e)  # Shows template error in output script
 
                     # Filter out non-header lines
                     tmp_out.seek(0)
-                    with open(fn, 'w') as f:
+                    with open(fn, "w") as f:
                         with redirect_stdout(f):
-                            print(tmp_out.read(), end='')
+                            print(tmp_out.read(), end="")
                 else:
                     for op in {**fp.operations, **fp.groups}:
-                        if 'partition' in parameters:
+                        if "partition" in parameters:
                             # Don't try to submit GPU operations to CPU partitions
                             # and vice versa.  We should be able to relax this
                             # requirement if we make our error checking more
                             # consistent.
-                            if operator.xor('gpu' in parameters['partition'].lower(),
-                                            'gpu' in op.lower()):
+                            if operator.xor(
+                                "gpu" in parameters["partition"].lower(),
+                                "gpu" in op.lower(),
+                            ):
                                 continue
-                        fn = 'script_{}.sh'.format(op)
+                        fn = f"script_{op}.sh"
                         tmp_out = io.TextIOWrapper(io.BytesIO(), sys.stdout.encoding)
                         with redirect_stdout(tmp_out):
                             try:
                                 fp.submit(
-                                    env=env, jobs=[job], names=[op],
-                                    pretend=True, force=True, **parameters)
+                                    env=env,
+                                    jobs=[job],
+                                    names=[op],
+                                    pretend=True,
+                                    force=True,
+                                    **parameters,
+                                )
                             except jinja2.TemplateError as e:
-                                print('ERROR:', e)  # Shows template error in output script
+                                print(
+                                    "ERROR:", e
+                                )  # Shows template error in output script
 
                         # Filter out non-header lines and the job-name line
                         tmp_out.seek(0)
-                        with open(fn, 'w') as f:
+                        with open(fn, "w") as f:
                             with redirect_stdout(f):
-                                print(tmp_out.read(), end='')
+                                print(tmp_out.read(), end="")
 
         # For compactness, we move the output into an ARCHIVE_DIR then delete the original data.
-        fp.export_to(
-            target=ARCHIVE_DIR)
+        fp.export_to(target=ARCHIVE_DIR)
 
 
 if __name__ == "__main__":
     flow.FlowProject._store_bundled = _store_bundled
 
     parser = argparse.ArgumentParser(
-        description="Generate reference submission scripts for various environments")
+        description="Generate reference submission scripts for various environments"
+    )
     parser.add_argument(
-        '-f', '--force',
-        action='store_true',
-        help="Recreate the data space even if the ARCHIVE_DIR already exists"
+        "-f",
+        "--force",
+        action="store_true",
+        help="Recreate the data space even if the ARCHIVE_DIR already exists",
     )
     main(parser.parse_args())

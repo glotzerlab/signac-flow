@@ -5,30 +5,28 @@
 
 This module implements the Scheduler and ClusterJob classes for LSF.
 """
+import errno
 import getpass
-import subprocess
-import tempfile
 import json
 import logging
-import errno
+import subprocess
+import tempfile
 
-from .base import Scheduler
-from .base import ClusterJob, JobStatus
-
+from .base import ClusterJob, JobStatus, Scheduler
 
 logger = logging.getLogger(__name__)
 
 
 def _parse_status(s):
-    if s in ['PEND', 'WAIT']:
+    if s in ["PEND", "WAIT"]:
         return JobStatus.queued
-    elif s == 'RUN':
+    elif s == "RUN":
         return JobStatus.active
-    elif s in ['SSUSP', 'USUSP', 'PSUSP']:
+    elif s in ["SSUSP", "USUSP", "PSUSP"]:
         return JobStatus.held
-    elif s == 'DONE':
+    elif s == "DONE":
         return JobStatus.inactive
-    elif s == 'EXIT':
+    elif s == "EXIT":
         return JobStatus.error
     return JobStatus.registered
 
@@ -39,12 +37,12 @@ def _fetch(user=None):
     if user is None:
         user = getpass.getuser()
 
-    cmd = ['bjobs', '-json', '-u', user]
+    cmd = ["bjobs", "-json", "-u", user]
     try:
-        result = json.loads(subprocess.check_output(cmd).decode('utf-8'))
+        result = json.loads(subprocess.check_output(cmd).decode("utf-8"))
     except subprocess.CalledProcessError:
         raise
-    except IOError as error:
+    except OSError as error:
         if error.errno != errno.ENOENT:
             raise
         else:
@@ -52,7 +50,7 @@ def _fetch(user=None):
     except json.decoder.JSONDecodeError:
         raise RuntimeError("Could not parse LSF JSON output.")
 
-    for record in result['RECORDS']:
+    for record in result["RECORDS"]:
         yield LSFJob(record)
 
 
@@ -61,11 +59,11 @@ class LSFJob(ClusterJob):
 
     def __init__(self, record):
         self.record = record
-        self._job_id = record['JOBID']
-        self._status = _parse_status(record['STAT'])
+        self._job_id = record["JOBID"]
+        self._status = _parse_status(record["STAT"])
 
     def name(self):
-        return self.record['JOB_NAME']
+        return self.record["JOB_NAME"]
 
 
 class LSFScheduler(Scheduler):
@@ -79,20 +77,22 @@ class LSFScheduler(Scheduler):
     :type user:
         str
     """
+
     # The standard command used to submit jobs to the LSF scheduler.
-    submit_cmd = ['bsub']
+    submit_cmd = ["bsub"]
 
     def __init__(self, user=None, **kwargs):
-        super(LSFScheduler, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.user = user
 
     def jobs(self):
         "Yield cluster jobs by querying the scheduler."
         self._prevent_dos()
-        for job in _fetch(user=self.user):
-            yield job
+        yield from _fetch(user=self.user)
 
-    def submit(self, script, after=None, hold=False, pretend=False, flags=None, **kwargs):
+    def submit(
+        self, script, after=None, hold=False, pretend=False, flags=None, **kwargs
+    ):
         """Submit a job script for execution to the scheduler.
 
         :param script:
@@ -124,19 +124,18 @@ class LSFScheduler(Scheduler):
         submit_cmd = self.submit_cmd + flags
 
         if after is not None:
-            submit_cmd.extend(
-                ['-w', '"done({})"'.format(after.split('.')[0])])
+            submit_cmd.extend(["-w", '"done({})"'.format(after.split(".")[0])])
 
         if hold:
-            submit_cmd += ['-H']
+            submit_cmd += ["-H"]
 
         if pretend:
-            print("# Submit command: {}".format('  '.join(submit_cmd)))
+            print("# Submit command: {}".format("  ".join(submit_cmd)))
             print(script)
             print()
         else:
             with tempfile.NamedTemporaryFile() as tmp_submit_script:
-                tmp_submit_script.write(str(script).encode('utf-8'))
+                tmp_submit_script.write(str(script).encode("utf-8"))
                 tmp_submit_script.flush()
                 subprocess.check_output(submit_cmd + [tmp_submit_script.name])
                 return True
@@ -145,8 +144,8 @@ class LSFScheduler(Scheduler):
     def is_present(cls):
         "Return True if it appears that an LSF scheduler is available within the environment."
         try:
-            subprocess.check_output(['bjobs', '-V'], stderr=subprocess.STDOUT)
-        except (IOError, OSError):
+            subprocess.check_output(["bjobs", "-V"], stderr=subprocess.STDOUT)
+        except OSError:
             return False
         else:
             return True

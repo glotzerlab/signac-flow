@@ -12,14 +12,11 @@ following shell command:
     signac config --global set flow.import_packaged_environments off
 
 """
-from . import incite
-from . import xsede
-from . import umich
-from . import umn
+from . import incite, umich, umn, xsede
 
 __all__ = [
-    'incite',
-    'xsede',
-    'umich',
-    'umn',
-    ]
+    "incite",
+    "umich",
+    "umn",
+    "xsede",
+]

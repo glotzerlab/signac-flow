@@ -6,17 +6,16 @@ a regular Python module with a command line interface, which can be used
 to execute functions defined within the same module, that operate on a
 signac data space.
 """
-import sys
 import argparse
-import logging
 import inspect
+import logging
 import subprocess
-from multiprocessing import Pool
+import sys
 from functools import wraps
-from tqdm import tqdm
+from multiprocessing import Pool
 
 from signac import get_project
-
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +41,10 @@ def cmd(func):
         prefixes to the shell command provided here.
     """
     if getattr(func, "_flow_with_job", False):
-        raise RuntimeError("@cmd should appear below the @with_job decorator in your script")
-    setattr(func, '_flow_cmd', True)
+        raise RuntimeError(
+            "@cmd should appear below the @with_job decorator in your script"
+        )
+    setattr(func, "_flow_cmd", True)
     return func
 
 
@@ -90,6 +91,7 @@ def with_job(func):
         def hello_cmd(job):
             return 'trap "cd `pwd`" EXIT && cd {} && echo "hello {job}"'.format(job.ws)
     """
+
     @wraps(func)
     def decorated(job):
         with job:
@@ -98,11 +100,11 @@ def with_job(func):
             else:
                 return func(job)
 
-    setattr(decorated, '_flow_with_job', True)
+    setattr(decorated, "_flow_with_job", True)
     return decorated
 
 
-class directives(object):
+class directives:
     """Decorator for operation functions to provide additional execution directives.
 
     Directives can for example be used to provide information about required resources
@@ -124,17 +126,17 @@ class directives(object):
 
     @classmethod
     def copy_from(cls, func):
-        return cls(** getattr(func, '_flow_directives', dict()))
+        return cls(**getattr(func, "_flow_directives", dict()))
 
     def __call__(self, func):
-        directives = getattr(func, '_flow_directives', dict())
+        directives = getattr(func, "_flow_directives", dict())
         directives.update(self.kwargs)
-        setattr(func, '_flow_directives', directives)
+        setattr(func, "_flow_directives", directives)
         return func
 
 
 def _get_operations(include_private=False):
-    """"Yields the name of all functions that qualify as an operation function.
+    """Yields the name of all functions that qualify as an operation function.
 
     The module is inspected and all functions that have only one argument
     is yielded. Unless the 'include_private' argument is True, all private
@@ -143,7 +145,7 @@ def _get_operations(include_private=False):
     """
     module = inspect.getmodule(inspect.currentframe().f_back.f_back)
     for name, obj in inspect.getmembers(module):
-        if not include_private and name.startswith('_'):
+        if not include_private and name.startswith("_"):
             continue
         if inspect.isfunction(obj):
             signature = inspect.getfullargspec(obj)
@@ -192,31 +194,37 @@ def run(parser=None):
         parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        'operation',
+        "operation",
         type=str,
         choices=list(_get_operations()),
-        help="The operation to execute.")
+        help="The operation to execute.",
+    )
     parser.add_argument(
-        'jobid',
+        "jobid",
         type=str,
-        nargs='*',
+        nargs="*",
         help="The job ids, as registered in the signac project. "
-             "Omit to default to all statepoints.")
+        "Omit to default to all statepoints.",
+    )
     parser.add_argument(
-        '--np',
+        "--np",
         type=int,
         default=1,
         help="Specify the number of cores to parallelize to (default=1) or 0 "
-             "to parallelize on as many cores as there are available.")
+        "to parallelize on as many cores as there are available.",
+    )
     parser.add_argument(
-        '-t', '--timeout',
+        "-t",
+        "--timeout",
         type=int,
         help="A timeout in seconds after which the parallel execution "
-             "of operations is canceled.")
+        "of operations is canceled.",
+    )
     parser.add_argument(
-        '--progress',
-        action='store_true',
-        help="Display a progress bar during execution.")
+        "--progress",
+        action="store_true",
+        help="Display a progress bar during execution.",
+    )
     args = parser.parse_args()
 
     project = get_project()
@@ -225,10 +233,10 @@ def run(parser=None):
         try:
             return project.open_job(id=_id)
         except KeyError:
-            msg = "Did not find job corresponding to id '{}'.".format(_id)
+            msg = f"Did not find job corresponding to id '{_id}'."
             raise KeyError(msg)
         except LookupError:
-            raise LookupError("Multiple matches for id '{}'.".format(_id))
+            raise LookupError(f"Multiple matches for id '{_id}'.")
 
     if len(args.jobid):
         try:
@@ -243,13 +251,14 @@ def run(parser=None):
     try:
         operation_func = getattr(module, args.operation)
     except AttributeError:
-        raise KeyError("Unknown operation '{}'.".format(args.operation))
+        raise KeyError(f"Unknown operation '{args.operation}'.")
 
-    if getattr(operation_func, '_flow_cmd', False):
+    if getattr(operation_func, "_flow_cmd", False):
 
         def operation(job):
             cmd = operation_func(job).format(job=job)
             subprocess.run(cmd, shell=True, timeout=args.timeout, check=True)
+
     else:
         operation = operation_func
 
@@ -266,4 +275,4 @@ def run(parser=None):
                 result.next(args.timeout)
 
 
-__all__ = ['cmd', 'directives', 'run']
+__all__ = ["cmd", "directives", "run"]

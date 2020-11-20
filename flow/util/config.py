@@ -7,7 +7,6 @@ from signac.common import config
 
 from ..errors import ConfigKeyError
 
-
 # Monkeypatch the signac config spec to include flow-specific fields.
 config.cfg += """
 [flow]
@@ -20,7 +19,7 @@ use_buffered_mode = boolean(default=True)
 """
 
 
-class _GetConfigValueNoneType(object):
+class _GetConfigValueNoneType:
     pass
 
 
@@ -42,13 +41,13 @@ def require_config_value(key, ns=None, default=_GET_CONFIG_VALUE_NONE):
     """
     try:
         if ns is None:
-            return config.load_config()['flow'][key]
+            return config.load_config()["flow"][key]
         else:
-            return config.load_config()['flow'][ns][key]
+            return config.load_config()["flow"][ns][key]
     except KeyError:
         if default is _GET_CONFIG_VALUE_NONE:
-            k = str(key) if ns is None else '{}.{}'.format(ns, key)
-            raise ConfigKeyError('flow.' + k)
+            k = str(key) if ns is None else f"{ns}.{key}"
+            raise ConfigKeyError("flow." + k)
         else:
             return default
 

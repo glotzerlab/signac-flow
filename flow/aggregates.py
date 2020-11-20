@@ -2,9 +2,7 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 import itertools
-
-from collections import Mapping
-from collections import OrderedDict
+from collections import Mapping, OrderedDict
 from collections.abc import Iterable
 from hashlib import md5
 
@@ -44,14 +42,19 @@ class aggregator:
         callable or NoneType
     """
 
-    def __init__(self, aggregator_function=None, sort_by=None, sort_ascending=True, select=None):
+    def __init__(
+        self, aggregator_function=None, sort_by=None, sort_ascending=True, select=None
+    ):
         if aggregator_function is None:
+
             def aggregator_function(jobs):
                 return (jobs,) if jobs else ()
 
         if not callable(aggregator_function):
-            raise TypeError("Expected callable for aggregator_function, got "
-                            f"{type(aggregator_function)}")
+            raise TypeError(
+                "Expected callable for aggregator_function, got "
+                f"{type(aggregator_function)}"
+            )
         elif sort_by is not None and not isinstance(sort_by, str):
             raise TypeError(f"Expected string sort_by parameter, got {type(sort_by)}")
         elif select is not None and not callable(select):
@@ -111,12 +114,12 @@ class aggregator:
         """
         try:
             if num != int(num):
-                raise ValueError('The num parameter should be an integer')
+                raise ValueError("The num parameter should be an integer")
             num = int(num)
             if num <= 0:
-                raise ValueError('The num parameter should have a value greater than 0')
+                raise ValueError("The num parameter should have a value greater than 0")
         except TypeError:
-            raise TypeError('The num parameter should be an integer')
+            raise TypeError("The num parameter should be an integer")
 
         # This method is similar to the `grouper` method which can be found in the link below
         # https://docs.python.org/3/library/itertools.html#itertools.zip_longest
@@ -176,47 +179,74 @@ class aggregator:
         """
         if isinstance(key, str):
             if default is None:
+
                 def keyfunction(job):
                     return job.sp[key]
+
             else:
+
                 def keyfunction(job):
                     return job.sp.get(key, default)
+
         elif isinstance(key, Iterable):
             keys = list(key)
             if default is None:
+
                 def keyfunction(job):
                     return [job.sp[key] for key in keys]
+
             else:
                 if isinstance(default, Iterable):
                     if len(default) != len(keys):
-                        raise ValueError("Expected length of default argument is "
-                                         f"{len(keys)}, got {len(default)}.")
+                        raise ValueError(
+                            "Expected length of default argument is "
+                            f"{len(keys)}, got {len(default)}."
+                        )
                 else:
-                    raise TypeError("Invalid default argument. Expected Iterable, "
-                                    f"got {type(default)}")
+                    raise TypeError(
+                        "Invalid default argument. Expected Iterable, "
+                        f"got {type(default)}"
+                    )
 
                 def keyfunction(job):
-                    return [job.sp.get(key, default_value)
-                            for key, default_value in zip(keys, default)]
+                    return [
+                        job.sp.get(key, default_value)
+                        for key, default_value in zip(keys, default)
+                    ]
+
         elif callable(key):
             keyfunction = key
         else:
-            raise TypeError("Invalid key argument. Expected either str, Iterable "
-                            f"or a callable, got {type(key)}")
+            raise TypeError(
+                "Invalid key argument. Expected either str, Iterable "
+                f"or a callable, got {type(key)}"
+            )
 
         def aggregator_function(jobs):
-            for key, group in itertools.groupby(sorted(jobs, key=keyfunction), key=keyfunction):
+            for key, group in itertools.groupby(
+                sorted(jobs, key=keyfunction), key=keyfunction
+            ):
                 yield group
 
         return cls(aggregator_function, sort_by, sort_ascending, select)
 
     def __eq__(self, other):
-        return type(self) == type(other) and not self._is_aggregate and not other._is_aggregate
+        return (
+            type(self) == type(other)
+            and not self._is_aggregate
+            and not other._is_aggregate
+        )
 
     def __hash__(self):
-        return hash((self._sort_by, self._sort_ascending, self._is_aggregate,
-                     self._get_unique_function_id(self._aggregator_function),
-                     self._get_unique_function_id(self._select)))
+        return hash(
+            (
+                self._sort_by,
+                self._sort_ascending,
+                self._is_aggregate,
+                self._get_unique_function_id(self._aggregator_function),
+                self._get_unique_function_id(self._select),
+            )
+        )
 
     def _get_unique_function_id(self, func):
         """Generate unique id for the function passed. The id returned is used to generate
@@ -253,12 +283,14 @@ class aggregator:
 
     def __call__(self, func=None):
         if callable(func):
-            setattr(func, '_flow_aggregate', self)
+            setattr(func, "_flow_aggregate", self)
             return func
         else:
-            raise TypeError('Invalid argument passed while calling '
-                            'the aggregate instance. Expected a callable, '
-                            f'got {type(func)}.')
+            raise TypeError(
+                "Invalid argument passed while calling "
+                "the aggregate instance. Expected a callable, "
+                f"got {type(func)}."
+            )
 
 
 class _AggregatesStore(Mapping):
@@ -277,6 +309,7 @@ class _AggregatesStore(Mapping):
     :type project:
         :py:class:`flow.FlowProject` or :py:class:`signac.contrib.project.Project`
     """
+
     def __init__(self, aggregator, project):
         self._aggregator = aggregator
 
@@ -294,8 +327,9 @@ class _AggregatesStore(Mapping):
         try:
             return self._aggregate_per_id[id]
         except KeyError:
-            raise LookupError(f'Unable to find the aggregate having id {id} in '
-                              'the FlowProject')
+            raise LookupError(
+                f"Unable to find the aggregate having id {id} in the FlowProject"
+            )
 
     def __contains__(self, id):
         """Return whether an aggregate is stored in this instance of
@@ -340,9 +374,11 @@ class _AggregatesStore(Mapping):
         if self._aggregator._sort_by is None:
             jobs = list(jobs)
         else:
-            jobs = sorted(jobs,
-                          key=lambda job: job.sp[self._aggregator._sort_by],
-                          reverse=not self._aggregator._sort_ascending)
+            jobs = sorted(
+                jobs,
+                key=lambda job: job.sp[self._aggregator._sort_by],
+                reverse=not self._aggregator._sort_ascending,
+            )
         yield from self._aggregator._aggregator_function(jobs)
 
     def _create_nested_aggregate_list(self, aggregated_jobs, project):
@@ -352,6 +388,7 @@ class _AggregatesStore(Mapping):
         any type, returned from an aggregator_function using the instance of
         ``_MakeAggregates`` to an aggregate of jobs as tuple.
         """
+
         def _validate_and_filter_job(job):
             "Validate whether a job is eligible to be a part of an aggregate or not."
             if job is None:
@@ -359,8 +396,9 @@ class _AggregatesStore(Mapping):
             elif job in project:
                 return True
             else:
-                raise LookupError(f'The signac job {job.get_id()} not found'
-                                  f'in {project}')
+                raise LookupError(
+                    f"The signac job {job.get_id()} not found in {project}"
+                )
 
         for aggregate in aggregated_jobs:
             try:
@@ -368,7 +406,9 @@ class _AggregatesStore(Mapping):
             except TypeError:  # aggregate is not iterable
                 ValueError("Invalid aggregator_function provided by the user.")
             # Store aggregate by their ids in order to search through id
-            self._aggregate_per_id[get_aggregate_id(filter_aggregate)] = filter_aggregate
+            self._aggregate_per_id[
+                get_aggregate_id(filter_aggregate)
+            ] = filter_aggregate
 
 
 class _DefaultAggregateStore(Mapping):
@@ -383,6 +423,7 @@ class _DefaultAggregateStore(Mapping):
     :type project:
         :py:class:`flow.FlowProject` or :py:class:`signac.contrib.project.Project`
     """
+
     def __init__(self, project):
         self._project = project
 
@@ -455,6 +496,6 @@ def get_aggregate_id(jobs):
     if len(jobs) == 1:
         return jobs[0].get_id()  # Return job id as it's already unique
 
-    blob = ','.join((job.get_id() for job in jobs))
-    hash_ = md5(blob.encode('utf-8')).hexdigest()
-    return f'agg-{hash_}'
+    blob = ",".join(job.get_id() for job in jobs)
+    hash_ = md5(blob.encode("utf-8")).hexdigest()
+    return f"agg-{hash_}"

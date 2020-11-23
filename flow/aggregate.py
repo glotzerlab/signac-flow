@@ -31,7 +31,7 @@ class Aggregate:
         callable
     :param sort:
         Before aggregating, sort the jobs by a given statepoint parameter.
-        The default behaviour is no sorting.
+        The default behavior is no sorting.
     :type sort:
         str or NoneType
     :param reverse:
@@ -42,7 +42,7 @@ class Aggregate:
     :param select:
         Condition for filtering individual jobs. This is passed as the
         callable argument to `filter`.
-        The default behaviour is no filtering.
+        The default behavior is no filtering.
     :type select:
         callable or NoneType
     """
@@ -156,7 +156,7 @@ class MakeAggregate(Aggregate):
         super(MakeAggregate, self).__init__(*args)
 
     def __call__(self, obj, group_name='unknown-operation', project=None):
-        "Return aggregated jobs"
+        "Return aggregated jobs."
         aggregated_jobs = list(obj)
         if self._select is not None:
             aggregated_jobs = list(filter(self._select, aggregated_jobs))
@@ -201,7 +201,7 @@ class MakeAggregate(Aggregate):
 
 
 def get_aggregate_id(jobs):
-    """"Generate hashed id for an aggregate of jobs
+    """Generate hashed id for an aggregate of jobs.
 
     :param jobs:
         The signac job handles

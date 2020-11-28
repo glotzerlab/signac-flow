@@ -37,7 +37,7 @@ from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
 from signac.contrib.filterparse import parse_filter_arg
 from signac.contrib.hashing import calc_id
 from signac.contrib.project import JobsCursor
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from .aggregates import _DefaultAggregateStore, aggregator, get_aggregate_id
 from .environment import get_environment

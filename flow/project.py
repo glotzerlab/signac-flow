@@ -544,29 +544,25 @@ class BaseFlowOperation:
 
     Every BaseFlowOperation is associated with a specific command.
 
-    Pre-requirements (pre) and post-conditions (post) can be used to
+    Pre-conditions (pre) and post-conditions (post) can be used to
     trigger an operation only when certain conditions are met. Conditions are unary
     callables, which expect an instance of job as their first and only positional
     argument and return either True or False.
 
-    An operation is considered "eligible" for execution when all pre-requirements
+    An operation is considered "eligible" for execution when all pre-conditions
     are met and when at least one of the post-conditions is not met.
-    Requirements are always met when the list of requirements is empty and
-    post-conditions are never met when the list of post-conditions is empty.
+    Pre-conditions are always met when the list of pre-conditions is empty.
+    Post-conditions are never met when the list of post-conditions is empty.
 
     .. note::
         This class should not be instantiated directly.
 
-    :param cmd:
-        The command to execute operation; should be a function of job.
-    :type cmd:
-        str or callable
     :param pre:
-        required conditions
+        List of pre-conditions.
     :type pre:
         sequence of callables
     :param post:
-        post-conditions to determine completion
+        List of post-conditions.
     :type post:
         sequence of callables
     """
@@ -577,22 +573,21 @@ class BaseFlowOperation:
         if post is None:
             post = []
 
-        self._prereqs = [_FlowCondition(cond) for cond in pre]
-        self._postconds = [_FlowCondition(cond) for cond in post]
-
-    def __str__(self):
-        return "{type}(cmd='{cmd}')".format(type=type(self).__name__, cmd=self._cmd)
+        self._preconditions = [_FlowCondition(cond) for cond in pre]
+        self._postconditions = [_FlowCondition(cond) for cond in post]
 
     def _eligible(self, jobs, ignore_conditions=IgnoreConditions.NONE):
-        """Eligible, when all pre-conditions are true and at least one post-condition is false,
-        or corresponding conditions are ignored.
+        """Determine eligibility of jobs.
+
+        Jobs are eligible when all pre-conditions are true and at least one
+        post-condition is false, or corresponding conditions are ignored.
 
         :param jobs:
             The signac job handles.
         :type jobs:
             tuple
         :param ignore_conditions:
-            Specify if pre and/or post conditions check is to be ignored for eligibility check.
+            Specify if pre and/or post conditions are to be ignored when determining eligibility.
             The default is :py:class:`IgnoreConditions.NONE`.
         :type ignore_conditions:
             :py:class:`~.IgnoreConditions`
@@ -600,26 +595,29 @@ class BaseFlowOperation:
         if type(ignore_conditions) != IgnoreConditions:
             raise ValueError(
                 "The ignore_conditions argument of FlowProject.run() "
-                "must be a member of class IgnoreConditions"
+                "must be a member of class IgnoreConditions."
             )
-        # len(self._prereqs) check for speed optimization
-        pre = (
-            (not len(self._prereqs))
+        # len(self._preconditions) check for speed optimization
+        preconditions_met = (
+            (not len(self._preconditions))
             or (ignore_conditions & IgnoreConditions.PRE)
-            or all(cond(jobs) for cond in self._prereqs)
+            or all(cond(jobs) for cond in self._preconditions)
         )
-        if pre and len(self._postconds):
-            post = (ignore_conditions & IgnoreConditions.POST) or any(
-                not cond(jobs) for cond in self._postconds
+        if preconditions_met and len(self._postconditions):
+            postconditions_unmet = (ignore_conditions & IgnoreConditions.POST) or any(
+                not cond(jobs) for cond in self._postconditions
             )
         else:
-            post = True
-        return pre and post
+            postconditions_unmet = True
+        return preconditions_met and postconditions_unmet
 
     @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
     def eligible(self, job, ignore_conditions=IgnoreConditions.NONE):
-        """Eligible, when all pre-conditions are true and at least one post-condition is false,
-        or corresponding conditions are ignored.
+        """Determine eligibility of jobs.
+
+        Jobs are eligible when all pre-conditions are true and at least one
+        post-condition is false, or corresponding conditions are ignored.
+
         :param job:
             The signac job handles.
         :type job:
@@ -633,15 +631,15 @@ class BaseFlowOperation:
         return self._eligible((job,), ignore_conditions)
 
     def _complete(self, jobs):
-        "True when all post-conditions are met."
-        if len(self._postconds):
-            return all(cond(jobs) for cond in self._postconds)
+        """True when all post-conditions are met."""
+        if len(self._postconditions):
+            return all(cond(jobs) for cond in self._postconditions)
         else:
             return False
 
     @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
     def complete(self, job):
-        "True when all post-conditions are met."
+        """True when all post-conditions are met."""
         return self._complete((job,))
 
 
@@ -659,6 +657,13 @@ class FlowCmdOperation(BaseFlowOperation):
 
     .. note::
         This class should not be instantiated directly.
+
+    :param cmd:
+        The command to execute the operation. Callable values should be a
+        function of ``job``. String values will be formatted with
+        ``cmd.format(job=job)``.
+    :type cmd:
+        str or callable
     """
 
     def __init__(self, cmd, pre=None, post=None):
@@ -1720,13 +1725,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         for i, (name1, op1) in enumerate(ops):
             for j, (name2, op2) in enumerate(ops[i:]):
-                postconds1 = unpack_conditions(to_callbacks(op1._postconds))
-                postconds2 = unpack_conditions(to_callbacks(op2._postconds))
-                prereqs1 = unpack_conditions(to_callbacks(op1._prereqs))
-                prereqs2 = unpack_conditions(to_callbacks(op2._prereqs))
-                if postconds1.intersection(prereqs2):
+                postconds1 = unpack_conditions(to_callbacks(op1._postconditions))
+                postconds2 = unpack_conditions(to_callbacks(op2._postconditions))
+                preconds1 = unpack_conditions(to_callbacks(op1._preconditions))
+                preconds2 = unpack_conditions(to_callbacks(op2._preconditions))
+                if postconds1.intersection(preconds2):
                     mat[i][j + i] = 1
-                elif prereqs1.intersection(postconds2):
+                elif preconds1.intersection(postconds2):
                     mat[j + i][i] = 1
         return mat
 
@@ -3063,7 +3068,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 )
 
                 # Warn if an operation has no post-conditions set.
-                has_post_conditions = len(self.operations[operation.name]._postconds)
+                has_post_conditions = len(
+                    self.operations[operation.name]._postconditions
+                )
                 if not has_post_conditions:
                     log(
                         f"Operation '{operation.name}' has no post-conditions!",
@@ -3984,11 +3991,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 yield label_name
 
     def add_operation(self, name, cmd, pre=None, post=None, **kwargs):
-        """
-        Add an operation to the workflow.
+        """Add an operation to the workflow.
 
         This method will add an instance of :py:class:`~.FlowOperation` to the
-        operations-dict of this project.
+        operations of this project.
 
         .. seealso::
 
@@ -4017,15 +4023,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             # Substitute job state point parameters:
             op = FlowOperation('hello', cmd='cd {job.ws}; hello {job.sp.a}')
 
-        Pre-requirements (pre) and post-conditions (post) can be used to
+        Pre-conditions (pre) and post-conditions (post) can be used to
         trigger an operation only when certain conditions are met. Conditions are unary
         callables, which expect an instance of job as their first and only positional
         argument and return either True or False.
 
-        An operation is considered "eligible" for execution when all pre-requirements
+        An operation is considered "eligible" for execution when all pre-conditions
         are met and when at least one of the post-conditions is not met.
-        Requirements are always met when the list of requirements is empty and
-        post-conditions are never met when the list of post-conditions is empty.
+        Pre-conditions are always met when the list of pre-conditions is empty.
+        Post-conditions are never met when the list of post-conditions is empty.
 
         Please note, eligibility in this contexts refers only to the workflow pipeline
         and not to other contributing factors, such as whether the job-operation is currently
@@ -4040,12 +4046,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type cmd:
             str or callable
         :param pre:
-            Required conditions.
+            List of pre-conditions.
         :type pre:
             sequence of callables
         :param post:
-            Post-conditions to determine completion.
-        :type pre:
+            List of post-conditions.
+        :type post:
             sequence of callables
         """
         if name in self.operations:

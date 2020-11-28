@@ -786,8 +786,8 @@ class FlowGroupEntry:
         if hasattr(func, "_flow_group_operation_directives"):
             if self.name in func._flow_group_operation_directives:
                 raise ValueError(
-                    "Cannot set directives because directives already exist for {} "
-                    "in group {}".format(func, self.name)
+                    f"Cannot set directives because directives already exist "
+                    f"for {func} in group {self.name}"
                 )
             else:
                 func._flow_group_operation_directives[self.name] = directives
@@ -1646,8 +1646,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             def foo_label(job):
                 return job.document.get('foo', False)
 
-        Finally, you can specify a different default label name by providing it as the first
-        argument to the ``label()`` decorator.
+        Finally, specify a label name by providing it as the first argument
+        to the ``label()`` decorator.
 
         :param label_name_or_func:
             A label name or callable.
@@ -1742,9 +1742,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 else:
                     if cf._flow_tag is None:
                         raise RuntimeError(
-                            "Condition {} was not tagged. To create a graph, ensure "
+                            f"Condition {cf} was not tagged. To create a graph, ensure "
                             "each base condition has a ``__code__`` attribute or "
-                            "manually specified tag.".format(cf)
+                            "manually specified tag."
                         )
                     callbacks.add(cf._flow_tag)
 
@@ -2046,8 +2046,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 eligible = False if completed else group._eligible(aggregate)
             except Exception as error:
                 msg = (
-                    "Error while getting operations status for aggregate "
-                    "'{}': '{}'.".format(aggregate_id, error)
+                    "Error while getting operation status for aggregate "
+                    f"'{aggregate_id}': '{error}'."
                 )
                 logger.debug(msg)
                 if ignore_errors:
@@ -2214,7 +2214,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                 except self._PickleError as error:
                                     raise RuntimeError(
                                         "Unable to parallelize execution due to a pickling "
-                                        "error: {}.".format(error)
+                                        f"error: {error}."
                                     )
                         label_results = list(
                             tqdm(
@@ -2252,7 +2252,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 else:
                     raise RuntimeError(
                         "Configuration value status_parallelization is invalid. "
-                        "You can set it to 'thread', 'parallel', or 'none'"
+                        "Valid choices are 'thread', 'parallel', or 'none'."
                     )
             except RuntimeError as error:
                 if "can't start new thread" not in error.args:
@@ -2499,7 +2499,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "The no_parallelize argument is deprecated as of 0.10 "
                 "and will be removed in 0.12. "
                 "Instead, set the status_parallelization configuration value to 'none'. "
-                "In order to do this from the CLI, you can execute "
+                "In order to do this from the CLI, execute "
                 "`signac config set flow.status_parallelization 'none'`\n",
                 file=sys.stderr,
             )
@@ -2561,11 +2561,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             for i, (line, code, hits, duration) in enumerate(sorted_hits):
                 impact = hits / total_num_hits
                 total_impact += impact
+                rank = i + 1
                 profiling_results.append(
-                    "{rank:>4} {impact:>6.0%} {code.co_filename}:"
-                    "{code.co_firstlineno}:{code.co_name}".format(
-                        rank=i + 1, impact=impact, code=code
-                    )
+                    f"{rank:>4} {impact:>6.0%} {code.co_filename}:"
+                    f"{code.co_firstlineno}:{code.co_name}"
                 )
                 if i > 10 or total_impact > 0.8:
                     break
@@ -2605,7 +2604,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     if total_impact > 0.8:
                         break
 
-            profiling_results.append("Total runtime: {}s".format(int(prof.total_time)))
+            profiling_results.append(f"Total runtime: {int(prof.total_time)}s")
             if prof.total_time < 20:
                 profiling_results.append(
                     "Warning: Profiler ran only for a short time, "
@@ -2625,12 +2624,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if errors:
             logger.warning(
                 "Some job status updates did not succeed due to errors. "
-                "Number of unique errors: {}. Use --debug to list all errors.".format(
-                    len(errors)
-                )
+                f"Number of unique errors: {len(errors)}. Use --debug to list all errors."
             )
             for i, error in enumerate(errors):
-                logger.debug("Status update error #{}: '{}'".format(i + 1, error))
+                logger.debug(f"Status update error #{i + 1}: '{error}'")
 
         if only_incomplete:
             # Remove all jobs from the status info, that have not a single
@@ -2847,14 +2844,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             for operation in operations:
                 self._execute_operation(operation, timeout, pretend)
         else:
-            logger.debug(
-                "Parallelized execution of {} operation(s).".format(len(operations))
-            )
+            logger.debug(f"Parallelized execution of {len(operations)} operation(s).")
             with contextlib.closing(
                 Pool(processes=cpu_count() if np < 0 else np)
             ) as pool:
                 logger.debug(
-                    "Parallelized execution of {} operation(s).".format(len(operations))
+                    f"Parallelized execution of {len(operations)} operation(s)."
                 )
                 try:
                     import pickle
@@ -2887,7 +2882,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         except self._PickleError as error:
                             raise RuntimeError(
                                 "Unable to parallelize execution due to a pickling "
-                                "error: {}.".format(error)
+                                f"error: {error}."
                             )
 
     @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
@@ -2987,15 +2982,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         ):
             # ... need to fork:
             logger.debug(
-                "Forking to execute operation '{}' with "
-                "cmd '{}'.".format(operation, operation.cmd)
+                f"Forking to execute operation '{operation}' with "
+                f"cmd '{operation.cmd}'."
             )
             subprocess.run(operation.cmd, shell=True, timeout=timeout, check=True)
         else:
             # ... executing operation in interpreter process as function:
             logger.debug(
-                "Executing operation '{}' with current interpreter "
-                "process ({}).".format(operation, os.getpid())
+                f"Executing operation '{operation}' with current interpreter "
+                f"process ({os.getpid()})."
             )
             try:
                 self._operations[operation.name](*operation._jobs)
@@ -3151,8 +3146,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 and select.num_executions.get(operation, 0) >= num_passes
             ):
                 log(
-                    "Operation '{}' exceeds max. # of allowed "
-                    "passes ({}).".format(operation, num_passes)
+                    f"Operation '{operation}' exceeds max. # of allowed "
+                    f"passes ({num_passes})."
                 )
 
                 # Warn if an operation has no post-conditions set.
@@ -3243,9 +3238,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 )
 
             logger.info(
-                "Executing {} operation(s) (Pass # {:02d})...".format(
-                    len(operations), i_pass
-                )
+                f"Executing {len(operations)} operation(s) (Pass #{i_pass:02d})..."
             )
             self._run_operations(
                 operations, pretend=pretend, np=np, timeout=timeout, progress=progress
@@ -3558,11 +3551,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 **kwargs,
             )
         except ConfigKeyError as error:
+            key = str(error)
             raise SubmitError(
-                "Unable to submit, because of a configuration error.\n"
-                "The following key is missing: {key}.\n"
-                "You can add the key to the configuration for example with:\n\n"
-                "  $ signac config --global set {key} VALUE\n".format(key=str(error))
+                f"Unable to submit, because of a configuration error.\n"
+                f"The following key is missing: {key}.\n"
+                f"Add the key to the configuration by executing:\n\n"
+                f"  $ signac config --global set {key} VALUE\n"
             )
         else:
             # Keys which were explicitly set by the user, but are not evaluated by the
@@ -3716,8 +3710,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Regular argument checks and expansion
         if isinstance(names, str):
             raise ValueError(
-                "The 'names' argument must be a sequence of strings, however you "
-                "provided a single string: {}.".format(names)
+                "The 'names' argument must be a sequence of strings, however "
+                f"a single string was provided: {names}."
             )
         if env is None:
             env = self._environment
@@ -3835,12 +3829,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         template_group = parser.add_argument_group(
             "templating",
             "The execution and submission scripts are always generated from a script "
-            "which is by default called '{default}' and located within the default "
+            f"which is by default called '{default}' and located within the default "
             "template directory. The system uses a default template if none is provided. "
             "The default template extends from a base template, which may be different "
             "depending on the local compute environment, e.g., 'slurm.sh' for an environment "
             "with SLURM scheduler. The name of the base template is provided with the "
-            "'base_script' template variable.".format(default=default),
+            "'base_script' template variable.",
         )
         template_group.add_argument(
             "--template",
@@ -3849,7 +3843,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             help="The name of the template file within the template directory. "
             "The standard template directory is '${{project_root}}/templates' and "
             "can be configured with the 'template_dir' configuration variable. "
-            "Default: '{}'.".format(default),
+            f"Default: '{default}'.",
         )
         template_group.add_argument(
             "--template-help",
@@ -4267,7 +4261,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if i and v.default is inspect.Parameter.empty:
                 raise ValueError(
                     "Only the first argument in an operation argument may not have "
-                    "a default value! ({})".format(name)
+                    f"a default value! ({name})"
                 )
         if not getattr(func, "_flow_aggregate", False):
             func._flow_aggregate = aggregator.groupsof(1)
@@ -4485,14 +4479,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         except Exception as error:
             if show_traceback:
                 logger.error(
-                    "Error during status update: {}\nUse '--ignore-errors' to "
-                    "complete the update anyways.".format(str(error))
+                    f"Error during status update: {str(error)}\nUse '--ignore-errors' to "
+                    "complete the update anyways."
                 )
             else:
                 logger.error(
-                    "Error during status update: {}\nUse '--ignore-errors' to "
+                    f"Error during status update: {str(error)}\nUse '--ignore-errors' to "
                     "complete the update anyways or '--show-traceback' to show "
-                    "the full traceback.".format(str(error))
+                    "the full traceback."
                 )
                 error = error.__cause__  # Always show the user traceback cause.
             traceback.print_exception(type(error), error, error.__traceback__)
@@ -4510,17 +4504,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if not args["profile"] and delta_t > warn_threshold >= 0:
                 print(
                     "WARNING: "
-                    "The status compilation took more than {}s per job. Consider "
-                    "using `--profile` to determine bottlenecks within your project "
-                    "workflow definition.\n"
-                    "Execute `signac config set flow.{} VALUE` to specify the "
-                    "warning threshold in seconds.\n"
-                    "To speed up the compilation, you can try executing "
+                    f"The status compilation took more than {warn_threshold}s per job. "
+                    "Consider using `--profile` to determine bottlenecks "
+                    "within the project workflow definition.\n"
+                    f"Execute `signac config set flow.{config_key} VALUE` to specify "
+                    "the warning threshold in seconds.\n"
+                    "To speed up the compilation, try executing "
                     "`signac config set flow.status_parallelization 'process'` to set "
                     "the status_parallelization config value to process."
-                    "Use -1 to completely suppress this warning.\n".format(
-                        warn_threshold, config_key
-                    ),
+                    "Use -1 to completely suppress this warning.\n",
                     file=sys.stderr,
                 )
 
@@ -4670,7 +4662,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if __name__ == '__main__':
                 MyProject().main()
 
-        You can then execute this script on the command line:
+        The project can then be executed on the command line:
 
         .. code-block:: bash
 
@@ -4718,11 +4710,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         parser_status = subparsers.add_parser(
             "status",
             parents=[base_parser],
-            description="You can specify the parallelization of the status "
-            "command by setting the flow.status_parallelization "
-            "config value to 'thread' (default), 'none', or "
-            "'process'. You can do this by executing `signac "
-            "config set flow.status_parallelization VALUE`.",
+            description="Parallelization of the status command can be "
+            "controlled by setting the flow.status_parallelization config "
+            "value to 'thread' (default), 'none', or 'process'. To do this, "
+            "execute `signac config set flow.status_parallelization VALUE`.",
         )
         self._add_print_status_args(parser_status)
         parser_status.add_argument(
@@ -4938,7 +4929,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         except (TimeoutError, subprocess.TimeoutExpired) as error:
             print(
                 "Error: Failed to complete execution due to "
-                "timeout ({}s).".format(args.timeout),
+                f"timeout ({args.timeout}s).",
                 file=sys.stderr,
             )
             _show_traceback_and_exit(error)
@@ -4965,7 +4956,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if str(error):
                 print(
                     "ERROR: Encountered error during program execution: "
-                    "'{}'\n".format(error),
+                    f"'{error}'\n",
                     file=sys.stderr,
                 )
             else:

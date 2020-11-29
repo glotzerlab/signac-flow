@@ -489,6 +489,8 @@ class _DefaultAggregateStore(Mapping):
         self._project.__dict__ = data["project_variables"]
 
     def __getstate__(self):
+        # We need to store project attributes in order as they get lost
+        # during the process of pickling.
         return {
             "project": self._project,
             "project_variables": self._project.__dict__.copy(),

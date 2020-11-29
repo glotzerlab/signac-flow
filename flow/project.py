@@ -2226,9 +2226,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         self, pool, pickle, jobs, groups, ignore_errors, cached_status
     ):
         try:
-            # Since pickling the project results in loss of necessary information. We
-            # explicitly pickle all the necessary information and then mock them in the
-            # serialized methods.
             s_project = pickle.dumps(self)
             s_tasks_labels = [
                 (

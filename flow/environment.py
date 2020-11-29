@@ -17,6 +17,7 @@ import re
 import socket
 from collections import OrderedDict
 
+from deprecation import deprecated
 from signac.common import config
 
 from .directives import (
@@ -37,6 +38,7 @@ from .scheduling.simple_scheduler import SimpleScheduler
 from .scheduling.slurm import SlurmScheduler
 from .scheduling.torque import TorqueScheduler
 from .util import config as flow_config
+from .version import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -418,11 +420,13 @@ class DefaultLSFEnvironment(NodesEnvironment, LSFEnvironment):
         )
 
 
+@deprecated(deprecated_in="0.12", removed_in="0.14", current_version=__version__)
 class CPUEnvironment(ComputeEnvironment):
     "An environment with CPUs."
     pass
 
 
+@deprecated(deprecated_in="0.12", removed_in="0.14", current_version=__version__)
 class GPUEnvironment(ComputeEnvironment):
     "An environment with GPUs."
     pass

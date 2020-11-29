@@ -19,7 +19,7 @@ Added
 Changed
 +++++++
 - Command line interface for ``exec`` changed parameter name from ``jobid`` to ``job_id`` (#363).
-
+- ``CPUEnvironment`` and ``GPUEnvironment`` classes are deprecated (#381).
 
 Version 0.11
 ============

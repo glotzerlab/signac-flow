@@ -13,7 +13,7 @@ def abbreviate(x, a):
         return a
 
 
-abbreviate.table = dict()  # noqa
+abbreviate.table = {}  # noqa
 
 
 def shorten(x, max_length=None):

@@ -126,10 +126,10 @@ class directives:
 
     @classmethod
     def copy_from(cls, func):
-        return cls(**getattr(func, "_flow_directives", dict()))
+        return cls(**getattr(func, "_flow_directives", {}))
 
     def __call__(self, func):
-        directives = getattr(func, "_flow_directives", dict())
+        directives = getattr(func, "_flow_directives", {})
         directives.update(self.kwargs)
         setattr(func, "_flow_directives", directives)
         return func

@@ -2,7 +2,7 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 import itertools
-from collections import Mapping, OrderedDict
+from collections import Mapping
 from collections.abc import Iterable
 from hashlib import md5
 
@@ -316,7 +316,7 @@ class _AggregatesStore(Mapping):
         # We need to register the aggregates for this instance using the
         # project provided. After registering, we store the aggregates
         # mapped with the ids using the `get_aggregate_id` method.
-        self._aggregate_per_id = OrderedDict()
+        self._aggregate_per_id = {}
         self._register_aggregates(project)
 
     def __iter__(self):

@@ -2229,17 +2229,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             # Since pickling the project results in loss of necessary information. We
             # explicitly pickle all the necessary information and then mock them in the
             # serialized methods.
-            s_root = pickle.dumps(self.root_directory())
-            s_label_funcs = pickle.dumps(self._label_functions)
-            s_groups = pickle.dumps(self._groups)
-            s_groups_aggregate = pickle.dumps(self._stored_aggregates)
+            s_project = pickle.dumps(self)
             s_tasks_labels = [
                 (
                     pickle.loads,
-                    s_root,
+                    s_project,
                     job.get_id(),
                     ignore_errors,
-                    s_label_funcs,
                     "fetch_labels",
                 )
                 for job in jobs
@@ -2247,12 +2243,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             s_tasks_groups = [
                 (
                     pickle.loads,
-                    s_root,
+                    s_project,
                     group,
                     ignore_errors,
                     cached_status,
-                    s_groups,
-                    s_groups_aggregate,
                     "fetch_status",
                 )
                 for group in groups
@@ -2834,23 +2828,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         "Indicates a pickling error while trying to parallelize the execution of operations."
         pass
 
-    @staticmethod
-    def _dumps_op(op):
-        return (
-            op.id,
-            op.name,
-            [job.get_id() for job in op._jobs],
-            op.cmd,
-            op.directives,
-        )
-
-    def _loads_op(self, blob):
-        id, name, job_ids, cmd, directives = blob
-        jobs = tuple(self.open_job(id=job_id) for job_id in job_ids)
-        all_directives = jobs[0]._project._environment._get_default_directives()
-        all_directives.update(directives)
-        return _JobOperation(id, name, jobs, cmd, all_directives)
-
     def _run_operations_in_parallel(self, pool, pickle, operations, progress, timeout):
         """Execute operations in parallel.
 
@@ -2862,10 +2839,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
 
         try:
-            s_root = pickle.dumps(self.root_directory())
-            s_ops = pickle.dumps(self._operations)
+            s_project = pickle.dumps(self)
             s_tasks = [
-                (pickle.loads, s_root, self._dumps_op(op), s_ops, "run_operations")
+                (pickle.loads, s_project, pickle.dumps(op), "run_operations")
                 for op in tqdm(operations, desc="Serialize tasks", file=sys.stderr)
             ]
         except Exception as error:  # Masking all errors since they must be pickling related.
@@ -4884,26 +4860,19 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             _show_traceback_and_exit(error)
 
 
-def _serializer(loads, root, *args):
-    root = loads(root)
-    project = FlowProject.get_project(root)
+def _serializer(loads, project, *args):
+    project = loads(project)
     if args[-1] == "run_operations":
         operation = args[0]
-        project._operations = loads(args[1])
-        project._execute_operation(project._loads_op(operation))
+        project._execute_operation(loads(operation))
     elif args[-1] == "fetch_labels":
         job = project.open_job(id=args[0])
         ignore_errors = args[1]
-        project._label_functions = loads(args[2])
         return project._get_job_labels(job, ignore_errors=ignore_errors)
     elif args[-1] == "fetch_status":
         group = args[0]
         ignore_errors = args[1]
         cached_status = args[2]
-        groups = loads(args[3])
-        project._groups = groups
-        groups_aggregate = loads(args[4])
-        project._stored_aggregates = groups_aggregate
         return project._get_group_status(group, ignore_errors, cached_status)
 
 

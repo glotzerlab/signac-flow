@@ -484,6 +484,23 @@ class _DefaultAggregateStore(Mapping):
         """
         self._project = project
 
+    def __setstate__(self, data):
+        self._project = data["project"]
+        self._project._config = data["project_config"]
+        self._project._sp_cache = data["project_sp_cache"]
+
+    def __getstate__(self):
+        # We need to specifically store project's configuration variable in
+        # order to make this instance hashable when serializing because ``repr``
+        # method for a project uses the config variable to fetch the project directory.
+        # Since the main purpose of this class is to only iterate over the jobs
+        # in the project, we also need to store the state point cache.
+        return {
+            "project": self._project,
+            "project_config": self._project._config,
+            "project_sp_cache": self._project._sp_cache,
+        }
+
 
 def get_aggregate_id(jobs):
     """Generate hashed id for an aggregate of jobs.

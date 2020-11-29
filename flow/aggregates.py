@@ -2,8 +2,7 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 import itertools
-from collections import Mapping
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from hashlib import md5
 
 

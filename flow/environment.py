@@ -10,7 +10,6 @@ This enables the user to adjust their workflow based on the present
 environment, e.g. for the adjustment of scheduler submission scripts.
 """
 import importlib
-import importlib.machinery
 import logging
 import os
 import re
@@ -430,16 +429,6 @@ class CPUEnvironment(ComputeEnvironment):
 class GPUEnvironment(ComputeEnvironment):
     "An environment with GPUs."
     pass
-
-
-def _import_module(fn):
-    return importlib.machinery.SourceFileLoader(fn, fn).load_module()
-
-
-def _import_modules(prefix):
-    for fn in os.path.listdir(prefix):
-        if os.path.isfile(fn) and os.path.splitext(fn)[1] == ".py":
-            _import_module(os.path.join(prefix, fn))
 
 
 def _import_configured_environments():

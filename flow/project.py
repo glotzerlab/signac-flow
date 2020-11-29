@@ -3782,8 +3782,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         )
 
     @classmethod
-    def _add_operation_selection_arg_group(cls, parser, operations=None):
-        "Add argument group to parser for job-operation selection."
+    def _add_operation_selection_arg_group(cls, parser):
+        """Add argument group to parser for job-operation selection."""
         selection_group = parser.add_argument_group(
             "job-operation selection",
             "By default, all eligible operations for all jobs are selected. Use "
@@ -4651,9 +4651,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             "run",
             parents=[base_parser],
         )
-        self._add_operation_selection_arg_group(
-            parser_run, list(sorted(self._operations))
-        )
+        self._add_operation_selection_arg_group(parser_run)
 
         execution_group = parser_run.add_argument_group("execution")
         execution_group.add_argument(

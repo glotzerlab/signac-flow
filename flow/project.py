@@ -1327,9 +1327,6 @@ class _FlowProjectClass(type):
 
             _parent_class = parent_class
 
-            def __init__(self, condition, tag=None):
-                super().__init__(condition, tag)
-
             def __call__(self, func):
                 operation_functions = [
                     operation[1]
@@ -1398,9 +1395,6 @@ class _FlowProjectClass(type):
             """
 
             _parent_class = parent_class
-
-            def __init__(self, condition, tag=None):
-                super().__init__(condition, tag)
 
             def __call__(self, func):
                 operation_functions = [

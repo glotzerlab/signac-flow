@@ -523,14 +523,14 @@ class _FlowCondition:
     def __call__(self, jobs):
         try:
             return self._callback(*jobs)
-        except Exception as e:
+        except Exception as error:
             assert len(jobs) == 1
             raise UserConditionError(
                 "An exception was raised while evaluating the condition {name} "
                 "for job {jobs}.".format(
                     name=self._callback.__name__, jobs=", ".join(map(str, jobs))
                 )
-            ) from e
+            ) from error
 
     def __hash__(self):
         return hash(self._callback)
@@ -2906,12 +2906,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             )
             try:
                 self._operations[operation.name](*operation._jobs)
-            except Exception as e:
+            except Exception as error:
                 assert len(operation._jobs) == 1
                 raise UserOperationError(
                     f"An exception was raised during operation {operation.name} "
                     f"for job or aggregate with id {get_aggregate_id(operation._jobs)}."
-                ) from e
+                ) from error
 
     def _get_default_directives(self):
         return {
@@ -3268,11 +3268,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 else:
                     try:
                         aggregate = tuple(aggregate)
-                    except TypeError:
+                    except TypeError as error:
                         raise TypeError(
-                            "Invalid argument provided by a user. Please provide "
-                            "a valid signac job or an aggregate of jobs instead."
-                        )
+                            "Invalid jobs argument. Please provide a valid "
+                            "signac job or aggregate of jobs."
+                        ) from error
                     else:
                         if not self._aggregate_is_in_project(aggregate):
                             raise LookupError(

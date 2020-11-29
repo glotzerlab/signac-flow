@@ -140,8 +140,8 @@ class _Directives(MutableMapping):
     def _set_defined_directive(self, key, value):
         try:
             self._defined_directives[key] = self._directive_definitions[key](value)
-        except (KeyError, ValueError, TypeError) as err:
-            raise DirectivesError(f"Error setting directive {key}") from err
+        except (KeyError, ValueError, TypeError) as error:
+            raise DirectivesError(f"Error setting directive {key}") from error
 
     def __getitem__(self, key):
         if key in self._defined_directives and key in self._directive_definitions:

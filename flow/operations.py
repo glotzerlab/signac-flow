@@ -15,7 +15,7 @@ from functools import wraps
 from multiprocessing import Pool
 
 from signac import get_project
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 logger = logging.getLogger(__name__)
 

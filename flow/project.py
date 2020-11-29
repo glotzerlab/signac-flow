@@ -281,7 +281,7 @@ class _JobOperation:
         self.name = name
         self._jobs = jobs
         if not (callable(cmd) or isinstance(cmd, str)):
-            raise ValueError("JobOperation cmd must be a callable or string.")
+            raise ValueError("cmd must be a callable or string.")
         self._cmd = cmd
 
         # Keys which were explicitly set by the user, but are not evaluated by the
@@ -316,7 +316,7 @@ class _JobOperation:
         return "{type}(name='{name}', jobs='{jobs}', cmd={cmd}, directives={directives})".format(
             type=type(self).__name__,
             name=self.name,
-            jobs="[" + " ,".join(map(repr, self._jobs)) + "]",
+            jobs="(" + ", ".join(map(repr, self._jobs)) + ")",
             cmd=repr(self.cmd),
             directives=self.directives,
         )
@@ -396,8 +396,9 @@ class JobOperation(_JobOperation):
     :type cmd:
         callable or str
     :param directives:
-        A dictionary of additional parameters that provide instructions on how
-        to execute this operation, e.g., specifically required resources.
+        A :class:`flow.directives._Directives` object of additional parameters
+        that provide instructions on how to execute this operation, e.g.,
+        specifically required resources.
     :type directives:
         :class:`flow.directives._Directives`
     """
@@ -1238,7 +1239,7 @@ class FlowGroup:
                     cmd=cmd,
                     directives=deepcopy(directives),
                 )
-                # Get the prefix, and if it's not NULL, set the fork directive
+                # Get the prefix, and if it's non-empty, set the fork directive
                 # to True since we must launch a separate process. Override
                 # the command directly.
                 prefix = jobs[0]._project._environment.get_prefix(job_op)
@@ -1254,9 +1255,13 @@ class FlowGroup:
         This can lead to poor utilization of computing resources.
         """
         env = jobs[0]._project._environment
-        op_names = list(self.operations.keys())
-        directives = self._resolve_directives(op_names[0], default_directives, env)
-        for name in op_names[1:]:
+        operation_names = list(self.operations.keys())
+        # The first operation's directives are evaluated, then all other
+        # operations' directives are applied as updates with aggregate=True
+        directives = self._resolve_directives(
+            operation_names[0], default_directives, env
+        )
+        for name in operation_names[1:]:
             # get directives for operation
             directives.update(
                 self._resolve_directives(name, default_directives, env),
@@ -1305,8 +1310,11 @@ class _FlowProjectClass(type):
     @staticmethod
     def _setup_pre_conditions_class(parent_class):
         class pre(_condition):
-            """Specify a function of job that must be true for this operation to
-            be eligible for execution. For example:
+            """Define and evaluate pre-conditions for operations.
+
+            A pre-condition is a function accepting an argument ``job`` that
+            must evaluate to True for this operation to be eligible for
+            execution. For example:
 
             .. code-block:: python
 
@@ -1377,8 +1385,11 @@ class _FlowProjectClass(type):
     @staticmethod
     def _setup_post_conditions_class(parent_class):
         class post(_condition):
-            """Specify a function of job that must evaluate to True for this operation
-            to be considered complete. For example:
+            """Define and evaluate post-conditions for operations.
+
+            A post-condition is a function accepting an argument ``job`` that
+            must evaluate to True for this operation to be considered
+            complete. For example:
 
             .. code-block:: python
 
@@ -2025,6 +2036,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Default value parallelizes using ``multiprocessing.ThreadPool()``
         :type status_parallelization:
             str
+        :returns:
+            A list of dictionaries containing job ids,
+            operations, labels, and any errors caught.
+        :rtype:
+            list
         """
         # The argument status_parallelization is used so that _fetch_status method
         # gets to know whether the deprecated argument no_parallelization passed
@@ -2831,8 +2847,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return self._run_operations(operations, pretend, np, timeout, progress)
 
     class _PickleError(Exception):
-        "Indicates a pickling error while trying to parallelize the execution of operations."
-        pass
+        """Indicates a pickling error while trying to parallelize the execution of operations."""
 
     @staticmethod
     def _dumps_op(op):
@@ -4324,6 +4339,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @property
     def groups(self):
+        """The dictionary of groups that have been added to the workflow."""
         return self._groups
 
     def _get_aggregate_store(self, group):
@@ -4433,10 +4449,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 )
 
     def _main_next(self, args):
-        "Determine the jobs that are eligible for a specific operation."
-        for op in self._next_operations():
-            if args.name in op.name:
-                print(get_aggregate_id(op._jobs))
+        """Determine the jobs that are eligible for a specific operation."""
+        for operation in self._next_operations():
+            if args.name in operation.name:
+                print(get_aggregate_id(operation._jobs))
 
     def _main_run(self, args):
         "Run all (or select) job operations."

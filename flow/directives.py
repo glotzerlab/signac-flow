@@ -9,10 +9,10 @@ from flow.errors import DirectivesError
 class _Directive:
     """The definition of a single directive.
 
-    Logic for validation of values when setting, defaults, and the ability for
-    directives to inspect other directives (such as using nranks and
-    omp_num_threads for finding np). This is only meant to work with the
-    internals of signac-flow.
+    Logic for validation of values when setting, defaults, and the ability
+    for directives to inspect other directives (such as using ``nranks`` and
+    ``omp_num_threads`` for computing ``np``). This is only meant to work
+    with the internals of signac-flow.
 
     The validation of a directive occurs before the call to ``finalize``. It is
     the caller's responsibility to ensure that finalized values are still valid.
@@ -178,12 +178,37 @@ class _Directives(MutableMapping):
         return f"_Directives({str(self)})"
 
     def update(self, other, aggregate=False, jobs=None, parallel=False):
+        """Update directives with another set of directives.
+
+        This method accounts for serial/parallel behavior and aggregation.
+
+        Parameters
+        ----------
+        other : :class:`~._Directives`
+            The other set of directives.
+        aggregate : bool
+            Whether to combine directives according to serial/parallel rules.
+        jobs :
+            The jobs used to evaluate directives.
+        parallel : bool
+            Whether to aggregate according to parallel rules.
+        """
         if aggregate:
             self._aggregate(other, jobs=jobs, parallel=parallel)
         else:
             super().update(other)
 
     def evaluate(self, jobs):
+        """Evaluate directives for the provided jobs.
+
+        This method updates the directives in place, replacing callable
+        directives with their evaluated values.
+
+        Parameters
+        ----------
+        jobs :
+            The jobs used to evaluate directives.
+        """
         for key, value in self.items():
             self[key] = _evaluate(value, jobs)
 
@@ -274,8 +299,12 @@ def _finalize_np(np, directives):
 
 
 # Helper validators for defining _Directive
-def _no_aggregation(v, o):
-    return v
+def _no_aggregation(value, _):
+    """Returns its first argument.
+
+    This is used for directives that ignore aggregation rules.
+    """
+    return value
 
 
 def _is_fraction(value):

@@ -4359,7 +4359,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         "Print status overview."
         aggregates = self._select_jobs_from_args(args)
         if args.compact and not args.unroll:
-            logger.warn(
+            logger.warning(
                 "The -1/--one-line argument is incompatible with "
                 "'--stack' and will be ignored."
             )

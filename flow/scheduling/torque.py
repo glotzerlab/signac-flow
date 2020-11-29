@@ -30,7 +30,7 @@ def _fetch(user=None):
         return tree.getroot()
     except ET.ParseError as error:
         if str(error) == "no element found: line 1, column 0":
-            logger.warn(
+            logger.warning(
                 "No scheduler jobs, from any user(s), were detected. "
                 "This may be the result of a misconfiguration in the "
                 "environment."

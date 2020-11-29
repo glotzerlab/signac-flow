@@ -439,7 +439,7 @@ class JobOperation(_JobOperation):
         return "{type}(name='{name}', job='{job}', cmd={cmd}, directives={directives})".format(
             type=type(self).__name__,
             name=self.name,
-            job=repr(self._jobs[0]),
+            job=repr(self.job),
             cmd=repr(self.cmd),
             directives=self.directives,
         )

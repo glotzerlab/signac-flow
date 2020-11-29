@@ -4048,13 +4048,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type pre:
             sequence of callables
         """
-        if name in self.operations:
-            raise KeyError("An operation with this identifier is already added.")
-        op = self.operations[name] = FlowCmdOperation(cmd=cmd, pre=pre, post=post)
-        if name in self._groups:
-            raise KeyError("A group with this identifier already exists.")
+        if name in self.operations or name in self._groups:
+            raise KeyError("An operation or group with this name already exists.")
+        operation = self.operations[name] = FlowCmdOperation(
+            cmd=cmd, pre=pre, post=post
+        )
         self._groups[name] = FlowGroup(
-            name, operations={name: op}, operation_directives=dict(name=kwargs)
+            name, operations={name: operation}, operation_directives=dict(name=kwargs)
         )
 
     def completed_operations(self, job):

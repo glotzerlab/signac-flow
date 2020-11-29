@@ -439,7 +439,7 @@ class JobOperation(_JobOperation):
         return "{type}(name='{name}', job='{job}', cmd={cmd}, directives={directives})".format(
             type=type(self).__name__,
             name=self.name,
-            job=repr(self._jobs[0]),
+            job=repr(self.job),
             cmd=repr(self.cmd),
             directives=self.directives,
         )
@@ -1327,9 +1327,6 @@ class _FlowProjectClass(type):
 
             _parent_class = parent_class
 
-            def __init__(self, condition, tag=None):
-                super().__init__(condition, tag)
-
             def __call__(self, func):
                 operation_functions = [
                     operation[1]
@@ -1398,9 +1395,6 @@ class _FlowProjectClass(type):
             """
 
             _parent_class = parent_class
-
-            def __init__(self, condition, tag=None):
-                super().__init__(condition, tag)
 
             def __call__(self, func):
                 operation_functions = [
@@ -3788,8 +3782,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         )
 
     @classmethod
-    def _add_operation_selection_arg_group(cls, parser, operations=None):
-        "Add argument group to parser for job-operation selection."
+    def _add_operation_selection_arg_group(cls, parser):
+        """Add argument group to parser for job-operation selection."""
         selection_group = parser.add_argument_group(
             "job-operation selection",
             "By default, all eligible operations for all jobs are selected. Use "
@@ -4365,7 +4359,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         "Print status overview."
         aggregates = self._select_jobs_from_args(args)
         if args.compact and not args.unroll:
-            logger.warn(
+            logger.warning(
                 "The -1/--one-line argument is incompatible with "
                 "'--stack' and will be ignored."
             )
@@ -4657,9 +4651,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             "run",
             parents=[base_parser],
         )
-        self._add_operation_selection_arg_group(
-            parser_run, list(sorted(self._operations))
-        )
+        self._add_operation_selection_arg_group(parser_run)
 
         execution_group = parser_run.add_argument_group("execution")
         execution_group.add_argument(

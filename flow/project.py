@@ -1269,7 +1269,7 @@ class FlowGroup:
 class _FlowProjectClass(type):
     """Metaclass for the FlowProject class."""
 
-    def __new__(metacls, name, bases, namespace, **kwargs):
+    def __new__(metacls, name, bases, namespace):
         cls = type.__new__(metacls, name, bases, dict(namespace))
 
         # All operation functions are registered with the operation() classmethod, which is

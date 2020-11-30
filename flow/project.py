@@ -3170,7 +3170,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             else:
                 continue
         operations = list(operations.values())
-        if not self._verify_group_compatibility(operations):
+        if not FlowProject._verify_group_compatibility(operations):
             raise ValueError(
                 "Cannot specify groups or operations that "
                 "will be included twice when using the"
@@ -3213,7 +3213,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             ):
                 yield op
 
-    def _verify_group_compatibility(self, groups):
+    @classmethod
+    def _verify_group_compatibility(cls, groups):
         """Verifies that all selected groups can be submitted together."""
         return all(a.isdisjoint(b) for a in groups for b in groups if a != b)
 

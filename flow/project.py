@@ -58,10 +58,10 @@ from .util import template_filters as tf
 from .util.misc import (
     TrackGetItemDict,
     _positive_int,
+    _to_hashable,
     add_cwd_to_environment_pythonpath,
     roundrobin,
     switch_to_directory,
-    to_hashable,
 )
 from .util.translate import abbreviate, shorten
 from .version import __version__
@@ -2573,7 +2573,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         for job in distinct_jobs
                         for key in job.sp.keys()
                         if len(
-                            {to_hashable(job.sp().get(key)) for job in distinct_jobs}
+                            {_to_hashable(job.sp().get(key)) for job in distinct_jobs}
                         )
                         > 1
                     }

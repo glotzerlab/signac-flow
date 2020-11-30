@@ -15,7 +15,7 @@ from functools import wraps
 from multiprocessing import Pool
 
 from signac import get_project
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -241,8 +241,8 @@ def run(parser=None):
     if len(args.jobid):
         try:
             jobs = [_open_job_by_id(jid) for jid in args.jobid]
-        except (KeyError, LookupError) as e:
-            print(e, file=sys.stderr)
+        except (KeyError, LookupError) as error:
+            print(error, file=sys.stderr)
             sys.exit(1)
     else:
         jobs = project

@@ -444,8 +444,8 @@ def _import_configured_environments():
         for name in cfg["flow"].as_list("environment_modules"):
             try:
                 importlib.import_module(name)
-            except ImportError as e:
-                logger.warning(e)
+            except ImportError as error:
+                logger.warning(error)
     except KeyError:
         pass
 

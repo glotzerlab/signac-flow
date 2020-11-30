@@ -80,16 +80,16 @@ def init(alias=None, template=None, root=None, out=None):
                 fn = os.path.join(root, fn)
             with open(fn, "x") as fw:
                 fw.write(code + "\n")
-        except OSError as e:
-            if e.errno == errno.EEXIST:
+        except OSError as error:
+            if error.errno == errno.EEXIST:
                 logger.error(
-                    "Error while trying to initialize flow project with alias '{alias}', "
-                    "a file named '{fn}' already exists!".format(alias=alias, fn=fn)
+                    f"Error while trying to initialize flow project with alias '{alias}', "
+                    f"a file named '{fn}' already exists!"
                 )
             else:
                 logger.error(
-                    "Error while trying to initialize flow project with alias '{alias}': "
-                    "'{error}'.".format(alias=alias, error=e)
+                    f"Error while trying to initialize flow project with alias '{alias}': "
+                    f"'{error}'."
                 )
         else:
             files_created.append(fn)

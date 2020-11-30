@@ -37,7 +37,7 @@ from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
 from signac.contrib.filterparse import parse_filter_arg
 from signac.contrib.hashing import calc_id
 from signac.contrib.project import JobsCursor
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from .aggregates import _DefaultAggregateStore, aggregator, get_aggregate_id
 from .environment import get_environment
@@ -439,7 +439,7 @@ class JobOperation(_JobOperation):
         return "{type}(name='{name}', job='{job}', cmd={cmd}, directives={directives})".format(
             type=type(self).__name__,
             name=self.name,
-            job=repr(self._jobs[0]),
+            job=repr(self.job),
             cmd=repr(self.cmd),
             directives=self.directives,
         )
@@ -523,14 +523,14 @@ class _FlowCondition:
     def __call__(self, jobs):
         try:
             return self._callback(*jobs)
-        except Exception as e:
+        except Exception as error:
             assert len(jobs) == 1
             raise UserConditionError(
                 "An exception was raised while evaluating the condition {name} "
                 "for job {jobs}.".format(
                     name=self._callback.__name__, jobs=", ".join(map(str, jobs))
                 )
-            ) from e
+            ) from error
 
     def __hash__(self):
         return hash(self._callback)
@@ -1327,9 +1327,6 @@ class _FlowProjectClass(type):
 
             _parent_class = parent_class
 
-            def __init__(self, condition, tag=None):
-                super().__init__(condition, tag)
-
             def __call__(self, func):
                 operation_functions = [
                     operation[1]
@@ -1398,9 +1395,6 @@ class _FlowProjectClass(type):
             """
 
             _parent_class = parent_class
-
-            def __init__(self, condition, tag=None):
-                super().__init__(condition, tag)
 
             def __call__(self, func):
                 operation_functions = [
@@ -2906,12 +2900,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             )
             try:
                 self._operations[operation.name](*operation._jobs)
-            except Exception as e:
+            except Exception as error:
                 assert len(operation._jobs) == 1
                 raise UserOperationError(
                     f"An exception was raised during operation {operation.name} "
                     f"for job or aggregate with id {get_aggregate_id(operation._jobs)}."
-                ) from e
+                ) from error
 
     def _get_default_directives(self):
         return {
@@ -3268,11 +3262,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 else:
                     try:
                         aggregate = tuple(aggregate)
-                    except TypeError:
+                    except TypeError as error:
                         raise TypeError(
-                            "Invalid argument provided by a user. Please provide "
-                            "a valid signac job or an aggregate of jobs instead."
-                        )
+                            "Invalid jobs argument. Please provide a valid "
+                            "signac job or aggregate of jobs."
+                        ) from error
                     else:
                         if not self._aggregate_is_in_project(aggregate):
                             raise LookupError(
@@ -3788,8 +3782,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         )
 
     @classmethod
-    def _add_operation_selection_arg_group(cls, parser, operations=None):
-        "Add argument group to parser for job-operation selection."
+    def _add_operation_selection_arg_group(cls, parser):
+        """Add argument group to parser for job-operation selection."""
         selection_group = parser.add_argument_group(
             "job-operation selection",
             "By default, all eligible operations for all jobs are selected. Use "
@@ -4365,7 +4359,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         "Print status overview."
         aggregates = self._select_jobs_from_args(args)
         if args.compact and not args.unroll:
-            logger.warn(
+            logger.warning(
                 "The -1/--one-line argument is incompatible with "
                 "'--stack' and will be ignored."
             )
@@ -4657,9 +4651,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             "run",
             parents=[base_parser],
         )
-        self._add_operation_selection_arg_group(
-            parser_run, list(sorted(self._operations))
-        )
+        self._add_operation_selection_arg_group(parser_run)
 
         execution_group = parser_run.add_argument_group("execution")
         execution_group.add_argument(

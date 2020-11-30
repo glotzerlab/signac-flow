@@ -2425,7 +2425,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             try:
                 import pprofile
             except ImportError:
-                raise RuntimeWarning(
+                raise ImportError(
                     "Profiling requires the pprofile package. "
                     "Install with `pip install pprofile`."
                 )

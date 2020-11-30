@@ -273,8 +273,8 @@ def _finalize_np(np, directives):
 
 
 # Helper validators for defining _Directive
-def _no_aggregation(v, o):
-    return v
+def _no_aggregation(value, other):
+    return value
 
 
 def _is_fraction(value):

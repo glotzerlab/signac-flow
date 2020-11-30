@@ -165,9 +165,22 @@ class _hashable_dict(dict):
 
 
 def _to_hashable(obj):
-    if type(obj) == list:
+    """Create a hash of passed type.
+
+    Parameters
+    ----------
+    obj
+        Object to create a hashable version of. Lists are converted
+        to tuples, and hashes are defined for dicts.
+
+    Returns
+    -------
+    Hash created for obj.
+
+    """
+    if type(obj) is list:
         return tuple(_to_hashable(_) for _ in obj)
-    elif type(obj) == dict:
+    elif type(obj) is dict:
         return _hashable_dict(obj)
     else:
         return obj

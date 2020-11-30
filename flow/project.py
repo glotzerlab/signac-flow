@@ -4534,6 +4534,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         else:
             return None
 
+    def __setstate__(self, data):
+        self.__dict__ = data
+
+    def __getstate__(self):
+        # Since there are limitations on pickling functions and we don't
+        # need to pickle the aggregator functions, we will delete that attribute.
+        result = self.__dict__.copy()
+        del result["_aggregator_per_group"]
+        return result
+
     def main(self, parser=None):
         """Call this function to use the main command line interface.
 

@@ -2861,7 +2861,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         pass
 
     @staticmethod
-    def _operation_to_tuple(operation):
+    def _job_operation_to_tuple(operation):
         return (
             operation.id,
             operation.name,
@@ -2870,7 +2870,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             operation.directives,
         )
 
-    def _operation_from_tuple(self, data):
+    def _job_operation_from_tuple(self, data):
         id, name, job_ids, cmd, directives = data
         jobs = tuple(self.open_job(id=job_id) for job_id in job_ids)
         all_directives = jobs[0]._project._environment._get_default_directives()
@@ -2894,7 +2894,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 (
                     pickle.loads,
                     serialized_root,
-                    self._operation_to_tuple(operation),
+                    self._job_operation_to_tuple(operation),
                     serialized_operations,
                     "run_operations",
                 )
@@ -4933,7 +4933,7 @@ def _serializer(loads, root, *args):
     if args[-1] == "run_operations":
         operation_data = args[0]
         project._operations = loads(args[1])
-        project._execute_operation(project._operation_from_tuple(operation_data))
+        project._execute_operation(project._job_operation_from_tuple(operation_data))
     elif args[-1] == "fetch_labels":
         job = project.open_job(id=args[0])
         ignore_errors = args[1]

@@ -853,7 +853,7 @@ class FlowGroup:
         # pretend submission output for templates.
         self.operations = {} if operations is None else dict(operations)
         if operation_directives is None:
-            self.operation_directives = dict()
+            self.operation_directives = {}
         else:
             self.operation_directives = operation_directives
 

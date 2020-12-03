@@ -341,8 +341,7 @@ class _JobOperation:
             # error, but not until then. If we don't fork then nothing errors,
             # and the user gets the expected result.
             return self._cmd()
-        else:
-            return self._cmd
+        return self._cmd
 
     def set_status(self, value):
         "Store the operation's status."
@@ -684,8 +683,7 @@ class FlowCmdOperation(BaseFlowOperation):
 
         if callable(self._cmd):
             return self._cmd(job).format(job=job)
-        else:
-            return self._cmd.format(job=job)
+        return self._cmd.format(job=job)
 
 
 class FlowOperation(BaseFlowOperation):
@@ -755,8 +753,7 @@ class FlowGroupEntry:
                     "Cannot register existing name {} with group {}"
                     "".format(func, self.name)
                 )
-            else:
-                func._flow_groups.append(self.name)
+            func._flow_groups.append(self.name)
         else:
             func._flow_groups = [self.name]
         return func
@@ -768,8 +765,7 @@ class FlowGroupEntry:
                     "Cannot set directives because directives already exist for {} "
                     "in group {}".format(func, self.name)
                 )
-            else:
-                func._flow_group_operation_directives[self.name] = directives
+            func._flow_group_operation_directives[self.name] = directives
         else:
             func._flow_group_operation_directives = {self.name: directives}
 
@@ -904,17 +900,13 @@ class FlowGroup:
         cmd = cmd if self.options is None else cmd + " " + self.options
         if ignore_conditions != IgnoreConditions.NONE:
             return cmd.strip() + " --ignore-conditions=" + str(ignore_conditions)
-        else:
-            return cmd.strip()
+        return cmd.strip()
 
     def _run_cmd(self, entrypoint, operation_name, operation, directives, jobs):
         if isinstance(operation, FlowCmdOperation):
             return operation(*jobs).lstrip()
-        else:
-            entrypoint = self._determine_entrypoint(entrypoint, directives, jobs)
-            return (
-                f"{entrypoint} exec {operation_name} {get_aggregate_id(jobs)}".lstrip()
-            )
+        entrypoint = self._determine_entrypoint(entrypoint, directives, jobs)
+        return f"{entrypoint} exec {operation_name} {get_aggregate_id(jobs)}".lstrip()
 
     def __iter__(self):
         yield from self.operations.values()
@@ -3275,8 +3267,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                             )
                         aggregates.add(aggregate)  # An aggregate provided by the user
             return list(aggregates)
-        else:
-            return None
+        return None
 
     @contextlib.contextmanager
     def _potentially_buffered(self):
@@ -4271,8 +4262,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         if name in cls._GROUP_NAMES:
             raise ValueError(f"Repeat definition of group with name '{name}'.")
-        else:
-            cls._GROUP_NAMES.add(name)
+        cls._GROUP_NAMES.add(name)
         group_entry = FlowGroupEntry(name, options, aggregator.groupsof(1))
         cls._GROUPS.append(group_entry)
         return group_entry
@@ -4898,6 +4888,7 @@ def _serializer(loads, root, *args):
         groups_aggregate = loads(args[4])
         project._stored_aggregates = groups_aggregate
         return project._get_group_status(group, ignore_errors, cached_status)
+    return None
 
 
 # Status-related helper functions

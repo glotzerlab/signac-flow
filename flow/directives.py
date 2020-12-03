@@ -99,8 +99,7 @@ class _Directive:
                 return self._validator(value(*jobs))
 
             return validate_callable
-        else:
-            return self._validator(value)
+        return self._validator(value)
 
 
 class _Directives(MutableMapping):
@@ -131,11 +130,10 @@ class _Directives(MutableMapping):
             raise TypeError(
                 f"Expected a _Directive object. Received {type(directive)}."
             )
-        elif directive._name in self._directive_definitions:
+        if directive._name in self._directive_definitions:
             raise ValueError(f"Cannot redefine directive name {directive._name}.")
-        else:
-            self._directive_definitions[directive._name] = directive
-            self._defined_directives[directive._name] = directive._default
+        self._directive_definitions[directive._name] = directive
+        self._defined_directives[directive._name] = directive._default
 
     def _set_defined_directive(self, key, value):
         try:
@@ -147,10 +145,9 @@ class _Directives(MutableMapping):
         if key in self._defined_directives and key in self._directive_definitions:
             value = self._defined_directives[key]
             return self._directive_definitions[key]._finalize(value, self)
-        elif key in self._user_directives:
+        if key in self._user_directives:
             return self._user_directives[key]
-        else:
-            raise KeyError(f"{key} not in directives.")
+        raise KeyError(f"{key} not in directives.")
 
     def __setitem__(self, key, value):
         if key in self._directive_definitions:
@@ -206,10 +203,8 @@ def _evaluate(value, jobs):
             raise RuntimeError(
                 "jobs must be specified when evaluating a callable directive."
             )
-        else:
-            return value(*jobs)
-    else:
-        return value
+        return value(*jobs)
+    return value
 
 
 class _OnlyType:
@@ -269,8 +264,7 @@ def _finalize_np(np, directives):
     omp_num_threads = directives.get("omp_num_threads", 1)
     if callable(nranks) or callable(omp_num_threads):
         return np
-    else:
-        return max(np, max(1, nranks) * max(1, omp_num_threads))
+    return max(np, max(1, nranks) * max(1, omp_num_threads))
 
 
 # Helper validators for defining _Directive
@@ -281,8 +275,7 @@ def _no_aggregation(v, o):
 def _is_fraction(value):
     if 0 <= value <= 1:
         return value
-    else:
-        raise ValueError("Value must be between 0 and 1.")
+    raise ValueError("Value must be between 0 and 1.")
 
 
 _natural_number = _OnlyType(int, postprocess=_raise_below(1))

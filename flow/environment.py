@@ -89,7 +89,7 @@ class ComputeEnvironmentType(type):
             cls.registry = OrderedDict()
         else:
             cls.registry[name] = cls
-        return super().__init__(name, bases, dct)
+        super().__init__(name, bases, dct)
 
 
 def template_filter(func):
@@ -128,10 +128,8 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         if cls.hostname_pattern is None:
             if cls.scheduler_type is None:
                 return False
-            else:
-                return cls.scheduler_type.is_present()
-        else:
-            return re.match(cls.hostname_pattern, socket.getfqdn()) is not None
+            return cls.scheduler_type.is_present()
+        return re.match(cls.hostname_pattern, socket.getfqdn()) is not None
 
     @classmethod
     def get_scheduler(cls):
@@ -166,6 +164,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         # Hand off the actual submission to the scheduler
         if cls.get_scheduler().submit(script, flags=flags, *args, **kwargs):
             return JobStatus.submitted
+        return None
 
     @classmethod
     def add_args(cls, parser):
@@ -236,8 +235,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         """
         if operation.directives.get("nranks"):
             return "{} -n {} ".format(cls.mpi_cmd, operation.directives["nranks"])
-        else:
-            return ""
+        return ""
 
     @template_filter
     def get_prefix(cls, operation, parallel=False, mpi_prefix=None, cmd_prefix=None):
@@ -466,35 +464,34 @@ def get_environment(test=False, import_configured=True):
     """
     if test:
         return TestEnvironment
-    else:
-        # Obtain a list of all registered environments
-        env_types = registered_environments(import_configured=import_configured)
-        logger.debug(
-            "List of registered environments:\n\t{}".format(
-                "\n\t".join(str(env.__name__) for env in env_types)
-            )
+
+    # Obtain a list of all registered environments
+    env_types = registered_environments(import_configured=import_configured)
+    logger.debug(
+        "List of registered environments:\n\t{}".format(
+            "\n\t".join(str(env.__name__) for env in env_types)
         )
+    )
 
-        # Select environment based on environment variable if set.
-        env_from_env_var = os.environ.get("SIGNAC_FLOW_ENVIRONMENT")
-        if env_from_env_var:
-            for env_type in env_types:
-                if env_type.__name__ == env_from_env_var:
-                    return env_type
-            else:
-                raise ValueError(f"Unknown environment '{env_from_env_var}'.")
-
-        # Select based on DEBUG flag:
+    # Select environment based on environment variable if set.
+    env_from_env_var = os.environ.get("SIGNAC_FLOW_ENVIRONMENT")
+    if env_from_env_var:
         for env_type in env_types:
-            if getattr(env_type, "DEBUG", False):
-                logger.debug(f"Select environment '{env_type.__name__}'; DEBUG=True.")
+            if env_type.__name__ == env_from_env_var:
                 return env_type
+        raise ValueError(f"Unknown environment '{env_from_env_var}'.")
 
-        # Default selection:
-        for env_type in reversed(env_types):
-            if env_type.is_present():
-                logger.debug(f"Select environment '{env_type.__name__}'; is present.")
-                return env_type
+    # Select based on DEBUG flag:
+    for env_type in env_types:
+        if getattr(env_type, "DEBUG", False):
+            logger.debug(f"Select environment '{env_type.__name__}'; DEBUG=True.")
+            return env_type
 
-        # Otherwise, just return a standard environment
-        return StandardEnvironment
+    # Default selection:
+    for env_type in reversed(env_types):
+        if env_type.is_present():
+            logger.debug(f"Select environment '{env_type.__name__}'; is present.")
+            return env_type
+
+    # Otherwise, just return a standard environment
+    return StandardEnvironment

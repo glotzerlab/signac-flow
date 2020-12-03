@@ -64,11 +64,11 @@ class _Directive:
         self._serial = serial
         self._parallel = parallel
 
-        def identity(v):
-            return v
+        def identity(value):
+            return value
 
-        def default_finalize(v, directives):
-            return v
+        def default_finalize(value, directives):
+            return value
 
         self._validator = identity if validator is None else validator
         self._finalize = default_finalize if finalize is None else finalize
@@ -209,39 +209,38 @@ def _evaluate(value, jobs):
 
 class _OnlyType:
     def __init__(self, type_, preprocess=None, postprocess=None):
-        def identity(v):
-            return v
+        def identity(value):
+            return value
 
         self.type = type_
         self.preprocess = identity if preprocess is None else preprocess
         self.postprocess = identity if postprocess is None else postprocess
 
-    def __call__(self, v):
-        return self.postprocess(self._validate(self.preprocess(v)))
+    def __call__(self, value):
+        return self.postprocess(self._validate(self.preprocess(value)))
 
-    def _validate(self, v):
-        if isinstance(v, self.type):
-            return v
-        else:
-            try:
-                return self.type(v)
-            except Exception:
-                raise TypeError(
-                    f"Expected an object of type {self.type}. "
-                    f"Received {v} of type {type(v)}."
-                )
-
-
-def _raise_below(value):
-    def is_greater_or_equal(v):
+    def _validate(self, value):
+        if isinstance(value, self.type):
+            return value
         try:
-            if v < value:
+            return self.type(value)
+        except Exception:
+            raise TypeError(
+                f"Expected an object of type {self.type}. "
+                f"Received {value} of type {type(value)}."
+            )
+
+
+def _raise_below(threshold):
+    def is_greater_or_equal(value):
+        try:
+            if value < threshold:
                 raise ValueError
         except (TypeError, ValueError):
             raise ValueError(
-                f"Expected a number greater than or equal to {value}. Received {v}."
+                f"Expected a number greater than or equal to {threshold}. Received {value}."
             )
-        return v
+        return value
 
     return is_greater_or_equal
 
@@ -268,8 +267,8 @@ def _finalize_np(np, directives):
 
 
 # Helper validators for defining _Directive
-def _no_aggregation(v, o):
-    return v
+def _no_aggregation(value, other):
+    return value
 
 
 def _is_fraction(value):

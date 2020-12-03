@@ -228,12 +228,13 @@ def _make_bundles(operations, size=None):
     This function splits an iterable of operations into equally
     sized bundles and a possibly smaller final bundle.
     """
-    n = None if size == 0 else size
+    if size == 0:
+        size = None
     operations = iter(operations)
     while True:
-        b = list(islice(operations, n))
-        if b:
-            yield b
+        bundle = list(islice(operations, size))
+        if bundle:
+            yield bundle
         else:
             break
 
@@ -574,8 +575,8 @@ class BaseFlowOperation:
         if post is None:
             post = []
 
-        self._prereqs = [_FlowCondition(cond) for cond in pre]
-        self._postconds = [_FlowCondition(cond) for cond in post]
+        self._preconditions = [_FlowCondition(cond) for cond in pre]
+        self._postconditions = [_FlowCondition(cond) for cond in post]
 
     def __str__(self):
         return "{type}(cmd='{cmd}')".format(type=type(self).__name__, cmd=self._cmd)
@@ -599,19 +600,19 @@ class BaseFlowOperation:
                 "The ignore_conditions argument of FlowProject.run() "
                 "must be a member of class IgnoreConditions."
             )
-        # len(self._prereqs) check for speed optimization
-        pre = (
-            (not len(self._prereqs))
+        # len(self._preconditions) check for speed optimization
+        met_preconditions = (
+            (len(self._preconditions) == 0)
             or (ignore_conditions & IgnoreConditions.PRE)
-            or all(cond(jobs) for cond in self._prereqs)
+            or all(cond(jobs) for cond in self._preconditions)
         )
-        if pre and len(self._postconds):
-            post = (ignore_conditions & IgnoreConditions.POST) or any(
-                not cond(jobs) for cond in self._postconds
+        if met_preconditions and len(self._postconditions) > 0:
+            unmet_postconditions = (ignore_conditions & IgnoreConditions.POST) or any(
+                not cond(jobs) for cond in self._postconditions
             )
         else:
-            post = True
-        return pre and post
+            unmet_postconditions = True
+        return met_preconditions and unmet_postconditions
 
     @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
     def eligible(self, job, ignore_conditions=IgnoreConditions.NONE):
@@ -630,11 +631,10 @@ class BaseFlowOperation:
         return self._eligible((job,), ignore_conditions)
 
     def _complete(self, jobs):
-        "True when all post-conditions are met."
-        if len(self._postconds):
-            return all(cond(jobs) for cond in self._postconds)
-        else:
-            return False
+        """True when all post-conditions are met."""
+        if len(self._postconditions) > 0:
+            return all(cond(jobs) for cond in self._postconditions)
+        return False
 
     @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
     def complete(self, job):
@@ -1208,20 +1208,22 @@ class FlowGroup:
         """
         # Assuming all the jobs belong to the same FlowProject
         env = jobs[0]._project._environment
-        for name, op in self.operations.items():
-            if op._eligible(jobs, ignore_conditions):
-                directives = self._resolve_directives(name, default_directives, env)
+        for operation_name, operation in self.operations.items():
+            if operation._eligible(jobs, ignore_conditions):
+                directives = self._resolve_directives(
+                    operation_name, default_directives, env
+                )
                 directives.evaluate(jobs)
                 cmd = self._run_cmd(
                     entrypoint=entrypoint,
-                    operation_name=name,
-                    operation=op,
+                    operation_name=operation_name,
+                    operation=operation,
                     directives=directives,
                     jobs=jobs,
                 )
                 job_op = _JobOperation(
-                    self._generate_id(jobs, name, index=index),
-                    name,
+                    self._generate_id(jobs, operation_name, index=index),
+                    operation_name,
                     jobs,
                     cmd=cmd,
                     directives=deepcopy(directives),
@@ -1681,34 +1683,48 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             in recursive calls to the function and appended to directly, but
             only returned at the end."""
             callbacks = set()
-            for cf in condition_functions:
-                # condition may not have __name__ attribute in cases where functools is used
-                # for condition creation
-                if hasattr(cf, "__name__") and cf.__name__ == "_flow_metacondition":
-                    callbacks = callbacks.union(unpack_conditions(cf._composed_of))
+            for condition_function in condition_functions:
+                # The condition function may not have a __name__ attribute in
+                # cases where functools is used for condition creation.
+                if (
+                    hasattr(condition_function, "__name__")
+                    and condition_function.__name__ == "_flow_metacondition"
+                ):
+                    callbacks = callbacks.union(
+                        unpack_conditions(condition_function._composed_of)
+                    )
                 else:
-                    if cf._flow_tag is None:
+                    if condition_function._flow_tag is None:
                         raise RuntimeError(
-                            "Condition {} was not tagged. To create a graph, ensure "
-                            "each base condition has a ``__code__`` attribute or "
-                            "manually specified tag.".format(cf)
+                            f"Condition {condition_function} was not tagged. "
+                            "To create a graph, ensure each base condition "
+                            "has a ``__code__`` attribute or manually "
+                            "specified tag."
                         )
-                    callbacks.add(cf._flow_tag)
+                    callbacks.add(condition_function._flow_tag)
 
             return callbacks
 
-        ops = list(self.operations.items())
-        mat = [[0 for _ in range(len(ops))] for _ in range(len(ops))]
+        operations = list(self.operations.values())
+        mat = [[0 for _ in range(len(operations))] for _ in range(len(operations))]
 
-        for i, (name1, op1) in enumerate(ops):
-            for j, (name2, op2) in enumerate(ops[i:]):
-                postconds1 = unpack_conditions(to_callbacks(op1._postconds))
-                postconds2 = unpack_conditions(to_callbacks(op2._postconds))
-                prereqs1 = unpack_conditions(to_callbacks(op1._prereqs))
-                prereqs2 = unpack_conditions(to_callbacks(op2._prereqs))
-                if postconds1.intersection(prereqs2):
+        for i, operation_i in enumerate(operations):
+            for j, operation_j in enumerate(operations[i:]):
+                postconditions_i = unpack_conditions(
+                    to_callbacks(operation_i._postconditions)
+                )
+                postconditions_j = unpack_conditions(
+                    to_callbacks(operation_j._postconditions)
+                )
+                preconditions_i = unpack_conditions(
+                    to_callbacks(operation_i._preconditions)
+                )
+                preconditions_j = unpack_conditions(
+                    to_callbacks(operation_j._preconditions)
+                )
+                if postconditions_i.intersection(preconditions_j):
                     mat[i][j + i] = 1
-                elif prereqs1.intersection(postconds2):
+                elif preconditions_i.intersection(postconditions_j):
                     mat[j + i][i] = 1
         return mat
 
@@ -1719,8 +1735,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         function.
         """
 
-        def predicate(m):
-            return inspect.ismethod(m) or inspect.isfunction(m)
+        def predicate(member):
+            return inspect.ismethod(member) or inspect.isfunction(member)
 
         class_label_functions = dict()
         for name, function in inspect.getmembers(type(self), predicate=predicate):
@@ -1745,12 +1761,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     "These are default aliases used within the status output."
 
     @classmethod
-    def _alias(cls, x):
-        "Use alias if specified."
+    def _alias(cls, name):
+        """Use alias if specified."""
         try:
-            return abbreviate(x, cls.ALIASES.get(x, x))
+            return abbreviate(name, cls.ALIASES.get(name, name))
         except TypeError:
-            return x
+            return name
 
     def _fn_bundle(self, bundle_id):
         "Return the canonical name to store bundle information."
@@ -1776,16 +1792,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         if len(operations) == 1:
             return operations[0].id
-        else:
-            sep = getattr(self._environment, "JOB_ID_SEPARATOR", "/")
-            _id = sha1(".".join(op.id for op in operations).encode("utf-8")).hexdigest()
-            bid = f"{self}{sep}bundle{sep}{_id}"
-            fn_bundle = self._fn_bundle(bid)
-            os.makedirs(os.path.dirname(fn_bundle), exist_ok=True)
-            with open(fn_bundle, "w") as file:
-                for operation in operations:
-                    file.write(operation.id + "\n")
-            return bid
+        sep = getattr(self._environment, "JOB_ID_SEPARATOR", "/")
+        _id = sha1(".".join(op.id for op in operations).encode("utf-8")).hexdigest()
+        bundle_id = f"{self}{sep}bundle{sep}{_id}"
+        fn_bundle = self._fn_bundle(bundle_id)
+        os.makedirs(os.path.dirname(fn_bundle), exist_ok=True)
+        with open(fn_bundle, "w") as file:
+            for operation in operations:
+                file.write(operation.id + "\n")
+        return bundle_id
 
     def _expand_bundled_jobs(self, scheduler_jobs):
         "Expand jobs which were submitted as part of a bundle."
@@ -2149,18 +2164,18 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     raise  # unrelated error
 
                 def print_status(iterable, fetch_status, description):
-                    t = time.time()
                     num_itr = len(iterable)
                     results = []
+                    start_time = time.time()
                     for i, itr in enumerate(iterable):
                         results.append(fetch_status(itr))
                         # The status interval 0.2 seconds is used since we expect the
                         # status for an aggregate to be fetched within that interval
-                        if time.time() - t > 0.2:
+                        if time.time() - start_time > 0.2:
                             tqdm.update(
                                 f"{description}: {i+1}/{num_itr}", end="\r", file=err
                             )
-                            t = time.time()
+                            start_time = time.time()
                     # Always print the completed progressbar.
                     print(f"{description}: {i+1}/{num_itr}", file=err)
                     return results
@@ -2185,15 +2200,17 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             index[job.get_id()] = i
 
         for op_result in op_results:
-            for id, aggregates_status in op_result["job_status_details"].items():
-                aggregate = self._get_aggregate_from_id(id)
+            for aggregate_id, aggregate_status in op_result[
+                "job_status_details"
+            ].items():
+                aggregate = self._get_aggregate_from_id(aggregate_id)
                 if not self._is_selected_aggregate(aggregate, aggregates):
                     continue
-                error = op_result["_operation_error_per_job"].get(id, None)
+                error = op_result["_operation_error_per_job"].get(aggregate_id, None)
                 for job in aggregate:
                     results[index[job.get_id()]]["operations"][
                         op_result["operation_name"]
-                    ] = aggregates_status
+                    ] = aggregate_status
                     results[index[job.get_id()]]["_operations_error"] = error
 
         for label_result in label_results:
@@ -2601,8 +2618,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             for status in statuses.values():
                 _add_parameters(status)
 
-            for i, para in enumerate(parameters):
-                parameters[i] = shorten(self._alias(str(para)), param_max_width)
+            for i, parameter in enumerate(parameters):
+                parameters[i] = shorten(self._alias(str(parameter)), param_max_width)
 
         if detailed:
             # get detailed view info
@@ -2667,13 +2684,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         op_counter = Counter()
         for job in context["jobs"]:
-            for k, v in job["operations"].items():
-                if k != "" and v["eligible"]:
-                    op_counter[k] += 1
+            for key, value in job["operations"].items():
+                if key != "" and value["eligible"]:
+                    op_counter[key] += 1
         context["op_counter"] = op_counter.most_common(eligible_jobs_max_lines)
-        n = len(op_counter) - len(context["op_counter"])
-        if n > 0:
-            context["op_counter"].append((f"[{n} more operations omitted]", ""))
+        num_omitted_operations = len(op_counter) - len(context["op_counter"])
+        if num_omitted_operations > 0:
+            context["op_counter"].append(
+                (f"[{num_omitted_operations} more operations omitted]", "")
+            )
 
         status_renderer = StatusRenderer()
 
@@ -2684,13 +2703,20 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # destructing the template environment. This causes subsequent calls to
         # print_status to fail (although _fetch_status calls will still
         # succeed).
-        te = (
+        template_environment_copy = (
             deepcopy(template_environment)
             if status_parallelization == "process"
             else template_environment
         )
         render_output = status_renderer.render(
-            template, te, context, detailed, expand, unroll, compact, output_format
+            template,
+            template_environment_copy,
+            context,
+            detailed,
+            expand,
+            unroll,
+            compact,
+            output_format,
         )
 
         print(render_output, file=file)
@@ -2823,17 +2849,17 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         pass
 
     @staticmethod
-    def _dumps_op(op):
+    def _job_operation_to_tuple(operation):
         return (
-            op.id,
-            op.name,
-            [job.get_id() for job in op._jobs],
-            op.cmd,
-            op.directives,
+            operation.id,
+            operation.name,
+            [job.get_id() for job in operation._jobs],
+            operation.cmd,
+            operation.directives,
         )
 
-    def _loads_op(self, blob):
-        id, name, job_ids, cmd, directives = blob
+    def _job_operation_from_tuple(self, data):
+        id, name, job_ids, cmd, directives = data
         jobs = tuple(self.open_job(id=job_id) for job_id in job_ids)
         all_directives = jobs[0]._project._environment._get_default_directives()
         all_directives.update(directives)
@@ -2850,16 +2876,24 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
 
         try:
-            s_root = pickle.dumps(self.root_directory())
-            s_ops = pickle.dumps(self._operations)
-            s_tasks = [
-                (pickle.loads, s_root, self._dumps_op(op), s_ops, "run_operations")
-                for op in tqdm(operations, desc="Serialize tasks", file=sys.stderr)
+            serialized_root = pickle.dumps(self.root_directory())
+            serialized_operations = pickle.dumps(self._operations)
+            serialized_tasks = [
+                (
+                    pickle.loads,
+                    serialized_root,
+                    self._job_operation_to_tuple(operation),
+                    serialized_operations,
+                    "run_operations",
+                )
+                for operation in tqdm(
+                    operations, desc="Serialize tasks", file=sys.stderr
+                )
             ]
         except Exception as error:  # Masking all errors since they must be pickling related.
             raise self._PickleError(error)
 
-        results = [pool.apply_async(_serializer, task) for task in s_tasks]
+        results = [pool.apply_async(_serializer, task) for task in serialized_tasks]
         for result in tqdm(results) if progress else results:
             result.get(timeout=timeout)
 
@@ -3051,7 +3085,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 )
 
                 # Warn if an operation has no post-conditions set.
-                has_post_conditions = len(self.operations[operation.name]._postconds)
+                has_post_conditions = len(
+                    self.operations[operation.name]._postconditions
+                )
                 if not has_post_conditions:
                     log(
                         f"Operation '{operation.name}' has no post-conditions!",
@@ -3106,10 +3142,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if not operations:
                 break  # No more pending operations or execution limits reached.
 
-            def key_func_by_job(op):
+            def key_func_by_job(operation):
                 # In order to group the aggregates in a by-job manner, we need
                 # to first sort the aggregates using their aggregate id.
-                return get_aggregate_id(op._jobs)
+                return get_aggregate_id(operation._jobs)
 
             # Optionally re-order operations for execution if order argument is provided:
             if callable(order):
@@ -3201,11 +3237,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     ):
         "Get all pending operations for the given selection."
         assert not isinstance(operation_names, str)
-        for op in self._next_operations(jobs, ignore_conditions):
+        for operation in self._next_operations(jobs, ignore_conditions):
+            # Return operations with names that match the provided list of
+            # regular expressions, or all operations if no names are specified.
             if operation_names is None or any(
-                re.fullmatch(n, op.name) for n in operation_names
+                re.fullmatch(operation_name, operation.name)
+                for operation_name in operation_names
             ):
-                yield op
+                yield operation
 
     @classmethod
     def _verify_group_compatibility(cls, groups):
@@ -4120,7 +4159,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 if aggregate[0] not in jobs:
                     continue
 
-                for op in group._create_run_job_operations(
+                for operation in group._create_run_job_operations(
                     entrypoint=self._entrypoint,
                     jobs=aggregate,
                     default_directives={},
@@ -4128,7 +4167,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     index=0,
                 ):
                     yield JobOperation(
-                        op.id, op.name, op._jobs[0], op._cmd, op.directives
+                        operation.id,
+                        operation.name,
+                        operation._jobs[0],
+                        operation._cmd,
+                        operation.directives,
                     )
 
     @classmethod
@@ -4157,8 +4200,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             raise ValueError(f"A group with name '{name}' is already registered.")
 
         signature = inspect.signature(func)
-        for i, (k, v) in enumerate(signature.parameters.items()):
-            if i and v.default is inspect.Parameter.empty:
+        for i, parameter_value in enumerate(signature.parameters.values()):
+            if i > 0 and parameter_value.default is inspect.Parameter.empty:
                 raise ValueError(
                     "Only the first argument in an operation argument may not have "
                     "a default value! ({})".format(name)
@@ -4877,9 +4920,9 @@ def _serializer(loads, root, *args):
     root = loads(root)
     project = FlowProject.get_project(root)
     if args[-1] == "run_operations":
-        operation = args[0]
+        operation_data = args[0]
         project._operations = loads(args[1])
-        project._execute_operation(project._loads_op(operation))
+        project._execute_operation(project._job_operation_from_tuple(operation_data))
     elif args[-1] == "fetch_labels":
         job = project.open_job(id=args[0])
         ignore_errors = args[1]

@@ -29,7 +29,7 @@ def update_status(job, scheduler_jobs=None):
     """Update the job's status dictionary."""
 
     # The status docs maps the scheduler job id to a distinct JobStatus value.
-    status_doc = job.document.setdefault("status", dict())
+    status_doc = job.document.setdefault("status", {})
 
     # Iterate through all entries within the job's status doc:
     for scheduler_job_id in status_doc:

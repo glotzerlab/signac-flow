@@ -22,7 +22,7 @@ import threading
 import time
 import traceback
 import warnings
-from collections import Counter, OrderedDict, defaultdict
+from collections import Counter, defaultdict
 from copy import deepcopy
 from enum import IntFlag
 from hashlib import sha1
@@ -294,9 +294,7 @@ class _JobOperation:
         # We use a special dictionary that allows us to track all keys that have been
         # evaluated by the template engine and compare them to those explicitly set
         # by the user. See also comment above.
-        self.directives = TrackGetItemDict(
-            {key: value for key, value in directives.items()}
-        )
+        self.directives = TrackGetItemDict(directives)
         self.directives._keys_set_by_user = keys_set_by_user
 
     def __str__(self):
@@ -847,13 +845,11 @@ class FlowGroup:
     def __init__(self, name, operations=None, operation_directives=None, options=""):
         self.name = name
         self.options = options
-        # An OrderedDict is not necessary here, but is used to ensure
-        # consistent ordering of pretend submission output for templates.
-        self.operations = (
-            OrderedDict() if operations is None else OrderedDict(operations)
-        )
+        # Requires Python >=3.6: dict must be ordered to ensure consistent
+        # pretend submission output for templates.
+        self.operations = {} if operations is None else dict(operations)
         if operation_directives is None:
-            self.operation_directives = dict()
+            self.operation_directives = {}
         else:
             self.operation_directives = operation_directives
 
@@ -1276,7 +1272,7 @@ class _FlowProjectClass(type):
         # All label functions are registered with the label() classmethod, which is intended
         # to be used as decorator function. The _LABEL_FUNCTIONS dict contains the function as
         # key and the label name as value, or None to use the default label name.
-        cls._LABEL_FUNCTIONS = OrderedDict()
+        cls._LABEL_FUNCTIONS = {}
 
         # Give the class a pre and post class that are aware of the class they
         # are in.
@@ -1463,11 +1459,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         self._template_environment_ = dict()
 
         # Register all label functions with this project instance.
-        self._label_functions = OrderedDict()
+        self._label_functions = {}
         self._register_labels()
 
         # Register all operation functions with this project instance.
-        self._operations = OrderedDict()
+        self._operations = {}
         self._register_operations()
 
         # Register all groups with this project instance.
@@ -1854,8 +1850,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 try:
                     cached_status = self.document["_status"]._as_dict()
                 except KeyError:
-                    cached_status = dict()
-            result["operations"] = OrderedDict(
+                    cached_status = {}
+            result["operations"] = dict(
                 self._get_operations_status((job,), cached_status)
             )
             result["_operations_error"] = None
@@ -2426,7 +2422,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             ]
 
             with prof(single=False):
-                tmp = self._fetch_status(
+                fetched_status = self._fetch_status(
                     aggregates,
                     distinct_jobs,
                     err,
@@ -2440,9 +2436,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             total_impact = 0
             hits = [
                 hit
-                for fn, ft in prof.merged_file_dict.items()
+                for fn, file_timing in prof.merged_file_dict.items()
                 if fn not in fn_filter
-                for hit in ft.iterHits()
+                for hit in file_timing.iterHits()
             ]
             sorted_hits = reversed(sorted(hits, key=lambda hit: hit[2]))
             total_num_hits = sum([hit[2] for hit in hits])
@@ -2466,17 +2462,17 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
             for module_fn in prof.merged_file_dict:
                 if re.match(profile, module_fn):
-                    ft = prof.merged_file_dict[module_fn]
+                    file_timing = prof.merged_file_dict[module_fn]
                 else:
                     continue
 
-                total_hits = ft.getTotalHitCount()
+                total_hits = file_timing.getTotalHitCount()
                 total_impact = 0
 
                 profiling_results.append(f"\nHits by line for '{module_fn}':")
                 profiling_results.append("-" * len(profiling_results[-1]))
 
-                hits = list(sorted(ft.iterHits(), key=lambda h: 1 / h[2]))
+                hits = list(sorted(file_timing.iterHits(), key=lambda h: 1 / h[2]))
                 for line, code, hits, duration in hits:
                     impact = hits / total_hits
                     total_impact += impact
@@ -2486,7 +2482,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     except OSError:
                         continue
                     hits_ = [
-                        ft.getHitStatsFor(line)[0]
+                        file_timing.getHitStatsFor(line)[0]
                         for line in range(start, start + len(lines))
                     ]
                     profiling_results.extend(
@@ -2507,13 +2503,17 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 )
 
         else:
-            tmp = self._fetch_status(
+            fetched_status = self._fetch_status(
                 aggregates, distinct_jobs, err, ignore_errors, status_parallelization
             )
             profiling_results = None
 
-        operations_errors = {s["_operations_error"] for s in tmp}
-        labels_errors = {s["_labels_error"] for s in tmp}
+        operations_errors = {
+            status_entry["_operations_error"] for status_entry in fetched_status
+        }
+        labels_errors = {
+            status_entry["_labels_error"] for status_entry in fetched_status
+        }
         errors = list(filter(None, operations_errors.union(labels_errors)))
 
         if errors:
@@ -2527,21 +2527,25 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 logger.debug("Status update error #{}: '{}'".format(i + 1, error))
 
         if only_incomplete:
-            # Remove all jobs from the status info, that have not a single
-            # eligible operation.
+            # Remove jobs with no eligible operations from the status info
 
-            def _incomplete(s):
-                return any(op["eligible"] for op in s["operations"].values())
+            def _incomplete(status_entry):
+                return any(
+                    operation["eligible"]
+                    for operation in status_entry["operations"].values()
+                )
 
-            tmp = list(filter(_incomplete, tmp))
+            fetched_status = list(filter(_incomplete, fetched_status))
 
-        statuses = OrderedDict([(s["job_id"], s) for s in tmp])
+        statuses = {
+            status_entry["job_id"]: status_entry for status_entry in fetched_status
+        }
 
         # If the dump_json variable is set, just dump all status info
         # formatted in JSON to screen.
         if dump_json:
             print(json.dumps(statuses, indent=4), file=file)
-            return
+            return None
 
         if overview:
             # get overview info:
@@ -2576,21 +2580,23 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             # get parameters info
 
             def _add_parameters(status):
-                sp = self.open_job(id=status["job_id"]).statepoint()
+                statepoint = self.open_job(id=status["job_id"]).statepoint()
 
-                def get(k, m):
-                    if m is None:
-                        return
-                    t = k.split(".")
-                    if len(t) > 1:
-                        return get(".".join(t[1:]), m.get(t[0]))
-                    else:
-                        return m.get(k)
+                def dotted_get(mapping, key):
+                    """Fetch a value from a nested mapping using a dotted key."""
+                    if mapping is None:
+                        return None
+                    tokens = key.split(".")
+                    if len(tokens) > 1:
+                        return dotted_get(mapping.get(tokens[0]), ".".join(tokens[1:]))
+                    return mapping.get(key)
 
-                status["parameters"] = OrderedDict()
-                for i, k in enumerate(parameters):
-                    v = shorten(str(self._alias(get(k, sp))), param_max_width)
-                    status["parameters"][k] = v
+                status["parameters"] = {}
+                for parameter in parameters:
+                    status["parameters"][parameter] = shorten(
+                        str(self._alias(dotted_get(statepoint, parameter))),
+                        param_max_width,
+                    )
 
             for status in statuses.values():
                 _add_parameters(status)
@@ -2606,27 +2612,23 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 num_operations = len(self._operations)
 
             if pretty:
-                OPERATION_STATUS_SYMBOLS = OrderedDict(
-                    [
-                        ("ineligible", "\u25cb"),  # open circle
-                        ("eligible", "\u25cf"),  # black circle
-                        ("active", "\u25b9"),  # open triangle
-                        ("running", "\u25b8"),  # black triangle
-                        ("completed", "\u2714"),  # check mark
-                    ]
-                )
-                "Pretty (unicode) symbols denoting the execution status of operations."
+                OPERATION_STATUS_SYMBOLS = {
+                    "ineligible": "\u25cb",  # open circle
+                    "eligible": "\u25cf",  # black circle
+                    "active": "\u25b9",  # open triangle
+                    "running": "\u25b8",  # black triangle
+                    "completed": "\u2714",  # check mark
+                }
+                # Pretty (unicode) symbols denoting the execution status of operations.
             else:
-                OPERATION_STATUS_SYMBOLS = OrderedDict(
-                    [
-                        ("ineligible", "-"),
-                        ("eligible", "+"),
-                        ("active", "*"),
-                        ("running", ">"),
-                        ("completed", "X"),
-                    ]
-                )
-                "Symbols denoting the execution status of operations."
+                OPERATION_STATUS_SYMBOLS = {
+                    "ineligible": "-",
+                    "eligible": "+",
+                    "active": "*",
+                    "running": ">",
+                    "completed": "X",
+                }
+                # ASCII symbols denoting the execution status of operations.
             operation_status_legend = " ".join(
                 f"[{v}]:{k}" for k, v in OPERATION_STATUS_SYMBOLS.items()
             )
@@ -3144,7 +3146,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _gather_flow_groups(self, names=None):
         """Grabs FlowGroups that match any of a set of names."""
-        operations = OrderedDict()
+        operations = {}
         # if no names are selected try all singleton groups
         if names is None:
             names = self._operations.keys()
@@ -4284,11 +4286,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         self._aggregator_per_group = dict(aggregators)
 
         # Add operations and directives to group
-        for (op_name, op) in self._operations.items():
-            if isinstance(op, FlowCmdOperation):
-                func = op._cmd
+        for operation_name, operation in self._operations.items():
+            if isinstance(operation, FlowCmdOperation):
+                func = operation._cmd
             else:
-                func = op._op_func
+                func = operation._op_func
 
             if hasattr(func, "_flow_groups"):
                 op_directives = getattr(
@@ -4296,11 +4298,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 )
                 for group_name in func._flow_groups:
                     directives = op_directives.get(group_name)
-                    self._groups[group_name].add_operation(op_name, op, directives)
+                    self._groups[group_name].add_operation(
+                        operation_name, operation, directives
+                    )
 
             # For singleton groups add directives
-            directives = getattr(func, "_flow_directives", dict())
-            self._groups[op_name].operation_directives[op_name] = directives
+            directives = getattr(func, "_flow_directives", {})
+            self._groups[operation_name].operation_directives[
+                operation_name
+            ] = directives
 
     @property
     def operations(self):

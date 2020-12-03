@@ -14,7 +14,6 @@ import logging
 import os
 import re
 import socket
-from collections import OrderedDict
 
 from deprecation import deprecated
 from signac.common import config
@@ -68,7 +67,7 @@ def setup(py_modules, **attrs):
                         msg=f"registering module '{name}' in global signac configuration",
                         level=2,
                     )
-                cfg.setdefault("flow", dict())
+                cfg.setdefault("flow", {})
                 cfg["flow"]["environment_modules"] = envs + list(new)
                 cfg.write()
 
@@ -86,7 +85,7 @@ class ComputeEnvironmentType(type):
 
     def __init__(cls, name, bases, dct):
         if not hasattr(cls, "registry"):
-            cls.registry = OrderedDict()
+            cls.registry = {}
         else:
             cls.registry[name] = cls
         super().__init__(name, bases, dct)

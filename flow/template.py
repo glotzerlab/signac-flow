@@ -60,12 +60,12 @@ def init(alias=None, template=None, root=None, out=None):
         trim_blocks=True,
     )
 
-    context = dict()
+    context = {}
     context["alias"] = alias
     context["project_class_name"] = project_class_name
 
     # render all templates
-    codes = dict()
+    codes = {}
 
     for fn, fn_template in TEMPLATES[template]:
         fn_ = fn.format(alias=alias)  # some of the filenames may depend on the alias

@@ -118,9 +118,9 @@ class _Directives(MutableMapping):
     """
 
     def __init__(self, environment_directives):
-        self._directive_definitions = dict()
-        self._defined_directives = dict()
-        self._user_directives = dict()
+        self._directive_definitions = {}
+        self._defined_directives = {}
+        self._user_directives = {}
 
         for directive in environment_directives:
             self._add_directive(directive)

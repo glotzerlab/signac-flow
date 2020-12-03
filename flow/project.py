@@ -1929,7 +1929,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         aggregate_store = self._get_aggregate_store(group.name)
         for aggregate_id, aggregate in tqdm(
             aggregate_store.items(),
-            desc="Collecting aggregate status info for operation {group.name}",
+            desc=f"Collecting aggregate status info for operation {group.name}",
             leave=False,
         ):
             errors.setdefault(aggregate_id, "")

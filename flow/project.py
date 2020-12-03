@@ -597,10 +597,10 @@ class BaseFlowOperation:
         :type ignore_conditions:
             :py:class:`~.IgnoreConditions`
         """
-        if type(ignore_conditions) != IgnoreConditions:
+        if not isinstance(ignore_conditions, IgnoreConditions):
             raise ValueError(
                 "The ignore_conditions argument of FlowProject.run() "
-                "must be a member of class IgnoreConditions"
+                "must be a member of class IgnoreConditions."
             )
         # len(self._prereqs) check for speed optimization
         pre = (
@@ -3024,10 +3024,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if num and num < 0:
             num = None
 
-        if type(ignore_conditions) != IgnoreConditions:
+        if not isinstance(ignore_conditions, IgnoreConditions):
             raise ValueError(
                 "The ignore_conditions argument of FlowProject.run() "
-                "must be a member of class IgnoreConditions"
+                "must be a member of class IgnoreConditions."
             )
 
         messages = list()
@@ -3636,10 +3636,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     "hours component: datetime.timedelta"
                 ):
                     raise
-        if type(ignore_conditions) != IgnoreConditions:
+        if not isinstance(ignore_conditions, IgnoreConditions):
             raise ValueError(
                 "The ignore_conditions argument of FlowProject.run() "
-                "must be a member of class IgnoreConditions"
+                "must be a member of class IgnoreConditions."
             )
 
         # Gather all pending operations.

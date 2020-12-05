@@ -164,11 +164,23 @@ class _hashable_dict(dict):
         return hash(tuple(sorted(self.items())))
 
 
-def to_hashable(obj):
-    # if isinstance(l, Sequence):
-    if type(obj) == list:
-        return tuple(to_hashable(_) for _ in obj)
-    elif type(obj) == dict:
+def _to_hashable(obj):
+    """Create a hash of passed type.
+
+    Parameters
+    ----------
+    obj
+        Object to create a hashable version of. Lists are converted
+        to tuples, and hashes are defined for dicts.
+
+    Returns
+    -------
+    Hash created for obj.
+
+    """
+    if type(obj) is list:
+        return tuple(_to_hashable(_) for _ in obj)
+    elif type(obj) is dict:
         return _hashable_dict(obj)
     else:
         return obj

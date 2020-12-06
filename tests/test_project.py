@@ -73,7 +73,7 @@ class MockScheduler(Scheduler):
 
     @classmethod
     def step(cls):
-        "Mock pushing of jobs through the queue."
+        """Mock pushing of jobs through the queue."""
         remove = set()
         for cid, job in cls._jobs.items():
             if job._status == JobStatus.inactive:

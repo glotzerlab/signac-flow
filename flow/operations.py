@@ -240,7 +240,7 @@ def run(parser=None):
 
     if len(args.job_id):
         try:
-            jobs = [_open_job_by_id(jid) for jid in args.job_id]
+            jobs = [_open_job_by_id(job_id) for job_id in args.job_id]
         except (KeyError, LookupError) as error:
             print(error, file=sys.stderr)
             sys.exit(1)

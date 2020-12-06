@@ -20,7 +20,10 @@ logger = logging.getLogger(__name__)
 
 
 def main_init(args):
-    "Initialize a FlowProject from one of the templates defined in the template module."
+    """Initialize a FlowProject from a template.
+
+    The available templates are defined in the template module.
+    """
     if not args.alias.isidentifier():
         raise ValueError(
             "The alias '{}' is not a valid Python identifier and can therefore "
@@ -37,9 +40,9 @@ def main_init(args):
         )
     try:
         return template.init(alias=args.alias, template=args.template)
-    except OSError as e:
+    except OSError as error:
         raise RuntimeError(
-            f"Error occurred while trying to initialize a flow project: {e}"
+            f"Error occurred while trying to initialize a flow project: {error}"
         )
 
 

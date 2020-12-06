@@ -2,8 +2,7 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 import itertools
-from collections import Mapping, OrderedDict
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from hashlib import md5
 
 
@@ -316,7 +315,7 @@ class _AggregatesStore(Mapping):
         # We need to register the aggregates for this instance using the
         # project provided. After registering, we store the aggregates
         # mapped with the ids using the `get_aggregate_id` method.
-        self._aggregate_per_id = OrderedDict()
+        self._aggregate_per_id = {}
         self._register_aggregates(project)
 
     def __iter__(self):
@@ -390,7 +389,7 @@ class _AggregatesStore(Mapping):
         """
 
         def _validate_and_filter_job(job):
-            "Validate whether a job is eligible to be a part of an aggregate or not."
+            """Validate whether a job is eligible to be in an aggregate."""
             if job is None:
                 return False
             elif job in project:
@@ -432,7 +431,7 @@ class _DefaultAggregateStore(Mapping):
             yield job.get_id()
 
     def __getitem__(self, id):
-        "Return a tuple of a single job via job id."
+        """Return an aggregate of one job from its job id."""
         try:
             return (self._project.open_job(id=id),)
         except KeyError:

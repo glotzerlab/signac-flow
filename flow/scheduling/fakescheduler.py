@@ -21,12 +21,12 @@ class FakeScheduler(Scheduler):
     """
 
     def jobs(self):
-        "Yields nothing, since the FakeScheduler does not actually schedule any jobs."
+        """Yields nothing, since the FakeScheduler does not actually schedule any jobs."""
         return
         yield
 
     def submit(self, script, **kwargs):
-        "Just print the script to screen."
+        """Just print the script to screen."""
         print(script)
 
     @classmethod

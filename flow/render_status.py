@@ -1,5 +1,5 @@
 # make separate python class for render_status
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from .scheduling.base import JobStatus
 from .util import mistune

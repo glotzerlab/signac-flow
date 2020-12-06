@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def _fetch(user=None):
-    "Fetch the cluster job status information from the SLURM scheduler."
+    """Fetch the cluster job status information from the SLURM scheduler."""
 
     def parse_status(s):
         s = s.strip()
@@ -54,7 +54,8 @@ def _fetch(user=None):
 
 
 class SlurmJob(ClusterJob):
-    "A SlurmJob is a ClusterJob managed by a SLURM scheduler."
+    """A SlurmJob is a ClusterJob managed by a SLURM scheduler."""
+
     pass
 
 
@@ -78,7 +79,7 @@ class SlurmScheduler(Scheduler):
         self.user = user
 
     def jobs(self):
-        "Yield cluster jobs by querying the scheduler."
+        """Yield cluster jobs by querying the scheduler."""
         self._prevent_dos()
         yield from _fetch(user=self.user)
 
@@ -142,7 +143,7 @@ class SlurmScheduler(Scheduler):
 
     @classmethod
     def is_present(cls):
-        "Return True if it appears that a SLURM scheduler is available within the environment."
+        """Return True if a SLURM scheduler is detected."""
         try:
             subprocess.check_output(["sbatch", "--version"], stderr=subprocess.STDOUT)
         except OSError:

@@ -30,13 +30,13 @@ TEMPLATES = {
 
 
 def init(alias=None, template=None, root=None, out=None):
-    "Initialize a templated FlowProject module."
+    """Initialize a templated FlowProject module."""
     if alias is None:
         alias = "project"
     elif not alias.isidentifier():
         raise ValueError(
-            "The alias '{}' is not a valid Python identifier and therefore "
-            "not be used as a FlowProject alias.".format(alias)
+            f"The alias '{alias}' is not a valid Python identifier and therefore "
+            "cannot be used as a FlowProject alias."
         )
     if template is None:
         template = "minimal"
@@ -60,12 +60,12 @@ def init(alias=None, template=None, root=None, out=None):
         trim_blocks=True,
     )
 
-    context = dict()
+    context = {}
     context["alias"] = alias
     context["project_class_name"] = project_class_name
 
     # render all templates
-    codes = dict()
+    codes = {}
 
     for fn, fn_template in TEMPLATES[template]:
         fn_ = fn.format(alias=alias)  # some of the filenames may depend on the alias
@@ -80,16 +80,16 @@ def init(alias=None, template=None, root=None, out=None):
                 fn = os.path.join(root, fn)
             with open(fn, "x") as fw:
                 fw.write(code + "\n")
-        except OSError as e:
-            if e.errno == errno.EEXIST:
+        except OSError as error:
+            if error.errno == errno.EEXIST:
                 logger.error(
-                    "Error while trying to initialize flow project with alias '{alias}', "
-                    "a file named '{fn}' already exists!".format(alias=alias, fn=fn)
+                    f"Error while trying to initialize flow project with alias '{alias}', "
+                    f"a file named '{fn}' already exists!"
                 )
             else:
                 logger.error(
-                    "Error while trying to initialize flow project with alias '{alias}': "
-                    "'{error}'.".format(alias=alias, error=e)
+                    f"Error while trying to initialize flow project with alias '{alias}': "
+                    f"'{error}'."
                 )
         else:
             files_created.append(fn)

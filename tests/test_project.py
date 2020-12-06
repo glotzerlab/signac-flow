@@ -1261,7 +1261,7 @@ class TestGroupProject(TestProjectBase):
         project = self.mock_project()
         # For run mode single operation groups
         for job in project:
-            job_ops = project._get_submission_operations([(job,)], dict())
+            job_ops = project._get_submission_operations([(job,)], {})
             script = project._script(job_ops)
             if job.sp.b % 2 == 0:
                 assert str(job) in script
@@ -1444,7 +1444,7 @@ class TestGroupExecutionProject(TestProjectBase):
         project = self.mock_project()
         operations = [
             project.groups["group1"]._create_submission_job_operation(
-                project._entrypoint, dict(), (job,)
+                project._entrypoint, {}, (job,)
             )
             for job in project
         ]
@@ -1464,7 +1464,7 @@ class TestGroupExecutionProject(TestProjectBase):
         project = self.mock_project()
         operations = [
             project.groups["group1"]._create_submission_job_operation(
-                project._entrypoint, dict(), (job,)
+                project._entrypoint, {}, (job,)
             )
             for job in project
         ]

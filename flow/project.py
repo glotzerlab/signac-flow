@@ -1657,7 +1657,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @classmethod
     def label(cls, label_name_or_func=None):
-        """Designate a function to be a label function of this class.
+        """Designate a function as a label function for this class.
 
         For example, we can define a label function like this:
 

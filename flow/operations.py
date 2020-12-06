@@ -1,10 +1,14 @@
 # Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-"""This module implements the run() function, which when called equips
-a regular Python module with a command line interface, which can be used
-to execute functions defined within the same module, that operate on a
-signac data space.
+"""Defines operation decorators and a simple command line interface ``run``.
+
+This module implements the run() function, which when called equips a regular
+Python module with a command line interface. This interface can be used to
+execute functions defined within the same module that operate on a signac data
+space.
+
+See also: :class:`~.FlowProject`.
 """
 import argparse
 import inspect
@@ -21,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 def cmd(func):
-    """Specifies that ``func`` returns a shell command.
+    """Indicate that ``func`` returns a shell command with this decorator.
 
     If this function is an operation function defined by :class:`~.FlowProject`, it will
     be interpreted to return a shell command, instead of executing the function itself.
@@ -49,7 +53,7 @@ def cmd(func):
 
 
 def with_job(func):
-    """Specifies that ``func(arg)`` will use ``arg`` as a context manager.
+    """Use ``arg`` as a context manager for ``func(arg)`` with this decorator.
 
     If this function is an operation function defined by :class:`~.FlowProject`, it will
     be the same as using ``with job:``.
@@ -136,7 +140,7 @@ class directives:
 
 
 def _get_operations(include_private=False):
-    """Yields the name of all functions that qualify as an operation function.
+    """Yield the name of all functions that qualify as an operation function.
 
     The module is inspected and all functions that have only one argument
     is yielded. Unless the 'include_private' argument is True, all private

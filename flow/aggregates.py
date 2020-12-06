@@ -1,13 +1,19 @@
 # Copyright (c) 2020 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
+"""Aggregation allows the definition of operations on multiple jobs.
+
+Operations each have a specific aggregator. The default aggregator uses
+individual jobs from the signac data space.
+"""
 import itertools
 from collections.abc import Iterable, Mapping
 from hashlib import md5
 
 
 class aggregator:
-    r"""Decorator for operation function that is to be aggregated.
+    """Decorator for operation function that is to be aggregated.
+
     By default, if the ``aggregator_function`` is not passed,
     an aggregate of all jobs will be created.
 
@@ -35,8 +41,8 @@ class aggregator:
     :type sort_ascending:
         bool
     :param select:
-        Condition for filtering individual jobs. This is passed as the
-        callable argument to `filter`. The default behavior is no filtering.
+        Condition for filtering individual jobs. This is passed as the callable
+        argument to :meth:`filter`. The default behavior is no filtering.
     :type select:
         callable or NoneType
     """
@@ -70,18 +76,18 @@ class aggregator:
 
     @classmethod
     def groupsof(cls, num=1, sort_by=None, sort_ascending=True, select=None):
-        """Aggregates jobs of a set group size.
+        """Aggregate jobs into groupings of a given size.
 
-        By default aggregate of a single job is created.
+        By default, aggregates of a single job are created.
 
-        If the number of jobs present in the project is not divisible by the number
-        provided by the user, the last aggregate will be smaller and contain all
-        remaining jobs.
-        For instance, if 10 jobs are present in a project and they are aggregated in
-        groups of 3, then the generated aggregates will have lengths 3, 3, 3, and 1.
+        If the number of jobs present in the project is not divisible by the
+        number provided by the user, the last aggregate will be smaller and
+        contain the remaining jobs. For instance, if 10 jobs are present in a
+        project and they are aggregated in groups of 3, then the generated
+        aggregates will have lengths 3, 3, 3, and 1.
 
-        The code block below provides an example on how jobs can be aggregated in
-        groups of 2.
+        The code block below provides an example on how jobs can be aggregated
+        in groups of 2.
 
         .. code-block:: python
 
@@ -135,7 +141,7 @@ class aggregator:
 
     @classmethod
     def groupby(cls, key, default=None, sort_by=None, sort_ascending=True, select=None):
-        """Aggregates jobs according to matching state point key values.
+        """Aggregate jobs according to matching state point values.
 
         The below code block provides an example of how to aggregate jobs having a
         common state point parameter 'sp' whose value, when not found, is replaced by a
@@ -248,13 +254,14 @@ class aggregator:
         )
 
     def _get_unique_function_id(self, func):
-        """Generate unique id for the function passed. The id returned is used to generate
-        hash and compare arbitrary types which are callable like ``self._aggregator_function``
-        and ``self._select`` attributes.
+        """Generate unique id for the provided function.
 
-        Since ``select`` and ``aggregator_function`` are internal hence hash for the similar
-        functions can also differ. Hence we need to generate byte code in order to be able to
-        equate the functions properly.
+        Hashing the bytecode allows for the comparison of internal functions
+        like ``self._aggregator_function`` or ``self._select`` that may have
+        the same definitions but different hashes.
+
+        It is possible for equivalent functions to have different ids if the
+        bytecode is not identical.
         """
         try:
             return hash(func.__code__.co_code)

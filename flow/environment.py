@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 
 def setup(py_modules, **attrs):
-    """Setup function for environment modules.
+    """Set up user-defined environment modules.
 
     Use this function in place of setuptools.setup to not only install
     an environment's module, but also register it with the global signac
@@ -290,7 +290,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
 
 class StandardEnvironment(ComputeEnvironment):
-    """This is a default environment which is always present."""
+    """Default environment which is always present."""
 
     @classmethod
     def is_present(cls):
@@ -298,7 +298,7 @@ class StandardEnvironment(ComputeEnvironment):
 
 
 class TestEnvironment(ComputeEnvironment):
-    """This is a test environment.
+    """Test environment.
 
     The test environment will print a mocked submission script
     and submission commands to screen. This enables testing of
@@ -451,7 +451,7 @@ def _import_configured_environments():
 
 
 def registered_environments(import_configured=True):
-    """Returns a list of registered environments."""
+    """Return a list of registered environments."""
     if import_configured:
         _import_configured_environments()
     return list(ComputeEnvironment.registry.values())

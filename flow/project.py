@@ -4128,7 +4128,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def add_operation(self, name, cmd, pre=None, post=None, **kwargs):
         """Add an operation to the workflow.
 
-        This method will add an instance of :py:class:`~.FlowOperation` to the
+        This method will add an instance of :py:class:`~.FlowCmdOperation` to the
         operations of this project.
 
         .. seealso::
@@ -4136,27 +4136,28 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             A Python function may be defined as an operation function directly using
             the :meth:`~.operation` decorator.
 
-        Any FlowOperation is associated with a specific command, which should be
-        a function of :py:class:`~signac.contrib.job.Job`. The command (cmd) can
-        be stated as function, either by using str-substitution based on a job's
-        attributes, or by providing a unary callable, which expects an instance
-        of job as its first and only positional argument.
+        A FlowCmdOperation is associated with a specific command, which
+        should be a function of :py:class:`~signac.contrib.job.Job`. The
+        command (cmd) can be stated as a function, either by using string
+        substitution based on a job's attributes, or by providing a unary
+        callable, which expects an instance of job as its first and only
+        positional argument.
 
-        For example, if we wanted to define a command for a program called 'hello',
-        which expects a job id as its first argument, we could construct the following
-        two equivalent operations:
+        For example, if we wanted to define a command for a program called
+        'hello', which expects a job id as its first argument, we could
+        construct the following two equivalent operations:
 
         .. code-block:: python
 
-            op = FlowOperation('hello', cmd='hello {job._id}')
-            op = FlowOperation('hello', cmd=lambda 'hello {}'.format(job._id))
+            op = FlowCmdOperation('hello', cmd='hello {job._id}')
+            op = FlowCmdOperation('hello', cmd=lambda 'hello {}'.format(job._id))
 
         Here are some more useful examples for str-substitutions:
 
         .. code-block:: python
 
             # Substitute job state point parameters:
-            op = FlowOperation('hello', cmd='cd {job.ws}; hello {job.sp.a}')
+            op = FlowCmdOperation('hello', cmd='cd {job.ws}; hello {job.sp.a}')
 
         Pre-conditions (pre) and post-conditions (post) can be used to
         trigger an operation only when certain conditions are met. Conditions are unary
@@ -4191,9 +4192,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         if name in self.operations or name in self._groups:
             raise KeyError("An operation or group with this name already exists.")
-        operation = self.operations[name] = FlowCmdOperation(
-            cmd=cmd, pre=pre, post=post
-        )
+        operation = FlowCmdOperation(cmd=cmd, pre=pre, post=post)
+        self.operations[name] = operation
         self._groups[name] = FlowGroup(
             name, operations={name: operation}, operation_directives=dict(name=kwargs)
         )

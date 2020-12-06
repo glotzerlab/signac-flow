@@ -32,7 +32,7 @@ def _parse_status(s):
 
 
 def _fetch(user=None):
-    "Fetch the cluster job status information from the LSF scheduler."
+    """Fetch the cluster job status information from the LSF scheduler."""
 
     if user is None:
         user = getpass.getuser()
@@ -55,7 +55,7 @@ def _fetch(user=None):
 
 
 class LSFJob(ClusterJob):
-    "An LSFJob is a ClusterJob managed by an LSF scheduler."
+    """An LSFJob is a ClusterJob managed by an LSF scheduler."""
 
     def __init__(self, record):
         self.record = record
@@ -86,7 +86,7 @@ class LSFScheduler(Scheduler):
         self.user = user
 
     def jobs(self):
-        "Yield cluster jobs by querying the scheduler."
+        """Yield cluster jobs by querying the scheduler."""
         self._prevent_dos()
         yield from _fetch(user=self.user)
 
@@ -142,7 +142,7 @@ class LSFScheduler(Scheduler):
 
     @classmethod
     def is_present(cls):
-        "Return True if it appears that an LSF scheduler is available within the environment."
+        """Return True if an LSF scheduler is detected."""
         try:
             subprocess.check_output(["bjobs", "-V"], stderr=subprocess.STDOUT)
         except OSError:

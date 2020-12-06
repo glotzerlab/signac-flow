@@ -77,7 +77,7 @@ def redirect_log(job, filename="run.log", formatter=None, logger=None):
 
 @contextmanager
 def add_path_to_environment_pythonpath(path):
-    "Temporarily insert the current working directory into the environment PYTHONPATH variable."
+    """Temporarily insert the current working directory into the environment PYTHONPATH variable."""
     path = os.path.realpath(path)
     pythonpath = os.environ.get("PYTHONPATH")
     if pythonpath:
@@ -110,7 +110,7 @@ def add_cwd_to_environment_pythonpath():
 
 @contextmanager
 def switch_to_directory(root=None):
-    "Temporarily switch into the given root directory (if not None)."
+    """Temporarily switch into the given root directory (if not None)."""
     if root is None:
         yield
     else:
@@ -139,7 +139,7 @@ class TrackGetItemDict(dict):
 
     @property
     def keys_used(self):
-        "Return all keys that have been accessed."
+        """Return all keys that have been accessed."""
         return self._keys_used.copy()
 
 

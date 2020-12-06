@@ -349,7 +349,7 @@ class NodesEnvironment(ComputeEnvironment):
 
 
 class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
-    """A default environment for environments with TORQUE scheduler."""
+    """Default environment for clusters with a TORQUE scheduler."""
 
     @classmethod
     def add_args(cls, parser):
@@ -375,7 +375,7 @@ class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
 
 
 class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
-    """A default environment for environments with SLURM scheduler."""
+    """Default environment for clusters with a SLURM scheduler."""
 
     @classmethod
     def add_args(cls, parser):
@@ -407,7 +407,7 @@ class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
 
 
 class DefaultLSFEnvironment(NodesEnvironment, LSFEnvironment):
-    """A default environment for environments with LSF scheduler."""
+    """Default environment for clusters with a LSF scheduler."""
 
     @classmethod
     def add_args(cls, parser):

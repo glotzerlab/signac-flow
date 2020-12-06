@@ -223,10 +223,14 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
         :param operation:
             The operation for which to add prefix.
+        :type operation:
+            :class:`flow._JobOperation`
         :param parallel:
             If True, operations are assumed to be executed in parallel, which means
             that the number of total tasks is the sum of all tasks instead of the
             maximum number of tasks. Default is set to False.
+        :type parallel:
+            bool
         :return mpi_prefix:
             The prefix should be added for the operation.
         :type mpi_prefix:
@@ -441,6 +445,7 @@ def _import_configured_environments():
 
 
 def registered_environments(import_configured=True):
+    """Returns a list of registered environments."""
     if import_configured:
         _import_configured_environments()
     return list(ComputeEnvironment.registry.values())

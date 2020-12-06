@@ -30,13 +30,13 @@ TEMPLATES = {
 
 
 def init(alias=None, template=None, root=None, out=None):
-    "Initialize a templated FlowProject module."
+    """Initialize a templated FlowProject module."""
     if alias is None:
         alias = "project"
     elif not alias.isidentifier():
         raise ValueError(
-            "The alias '{}' is not a valid Python identifier and therefore "
-            "not be used as a FlowProject alias.".format(alias)
+            f"The alias '{alias}' is not a valid Python identifier and therefore "
+            "cannot be used as a FlowProject alias."
         )
     if template is None:
         template = "minimal"

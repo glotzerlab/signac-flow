@@ -166,7 +166,7 @@ class _condition:
 
     @classmethod
     def isfile(cls, filename):
-        "True if the specified file exists for this job."
+        """True if the specified file exists for the job(s)."""
 
         def _isfile(*jobs):
             return all(job.isfile(filename) for job in jobs)
@@ -175,7 +175,7 @@ class _condition:
 
     @classmethod
     def true(cls, key):
-        """True if the specified key is present in the job document and
+        """True if the specified key is present in the job document(s) and
         evaluates to True."""
 
         def _document(*jobs):
@@ -185,7 +185,7 @@ class _condition:
 
     @classmethod
     def false(cls, key):
-        """True if the specified key is present in the job document and
+        """True if the specified key is present in the job document(s) and
         evaluates to False."""
 
         def _no_document(*jobs):
@@ -195,13 +195,13 @@ class _condition:
 
     @classmethod
     def never(cls, func):
-        "Returns False."
+        """Returns False."""
         cls.current_arbitrary_tag += 1
         return cls(lambda _: False, str(cls.current_arbitrary_tag))(func)
 
     @classmethod
     def not_(cls, condition):
-        """Returns ``not condition(job)`` for the provided condition function."""
+        """Returns ``not condition(*jobs)`` for the provided condition function."""
 
         def _not(*jobs):
             return not condition(*jobs)
@@ -282,7 +282,7 @@ class _JobOperation:
         self.name = name
         self._jobs = jobs
         if not (callable(cmd) or isinstance(cmd, str)):
-            raise ValueError("JobOperation cmd must be a callable or string.")
+            raise ValueError("cmd must be a callable or string.")
         self._cmd = cmd
 
         # Keys which were explicitly set by the user, but are not evaluated by the
@@ -315,7 +315,7 @@ class _JobOperation:
         return "{type}(name='{name}', jobs='{jobs}', cmd={cmd}, directives={directives})".format(
             type=type(self).__name__,
             name=self.name,
-            jobs="[" + " ,".join(map(repr, self._jobs)) + "]",
+            jobs="(" + ", ".join(map(repr, self._jobs)) + ")",
             cmd=repr(self.cmd),
             directives=self.directives,
         )
@@ -343,7 +343,7 @@ class _JobOperation:
         return self._cmd
 
     def set_status(self, value):
-        "Store the operation's status."
+        """Store the operation's status."""
         # Since #324 doesn't include actual aggregation, it is guaranteed that the length
         # of self._jobs is equal to 1, hence we won't be facing the problem for lost
         # aggregates. #335 introduces the concept of storing aggregates which will
@@ -355,7 +355,7 @@ class _JobOperation:
         )
 
     def get_status(self):
-        "Retrieve the operation's last known status."
+        """Retrieve the operation's last known status."""
         try:
             return JobStatus(self._jobs[0]._project.document["_status"][self.id])
         except KeyError:
@@ -394,8 +394,9 @@ class JobOperation(_JobOperation):
     :type cmd:
         callable or str
     :param directives:
-        A dictionary of additional parameters that provide instructions on how
-        to execute this operation, e.g., specifically required resources.
+        A :class:`flow.directives._Directives` object of additional parameters
+        that provide instructions on how to execute this operation, e.g.,
+        specifically required resources.
     :type directives:
         :class:`flow.directives._Directives`
     """
@@ -638,7 +639,7 @@ class BaseFlowOperation:
 
     @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
     def complete(self, job):
-        "True when all post-conditions are met."
+        """True when all post-conditions are met."""
         return self._complete((job,))
 
 
@@ -668,7 +669,7 @@ class FlowCmdOperation(BaseFlowOperation):
     def __call__(self, *jobs, **kwargs):
         job = kwargs.pop("job", None)
         if kwargs:
-            raise ValueError(f"Invalid key-word arguments: {', '.join(kwargs)}")
+            raise ValueError(f"Invalid keyword arguments: {', '.join(kwargs)}")
 
         if job is not None:
             warnings.warn(
@@ -1025,7 +1026,7 @@ class FlowGroup:
         return set(self).isdisjoint(set(group))
 
     def _generate_id(self, jobs, operation_name=None, index=0):
-        "Return an id, which identifies this group with respect to this job."
+        """Return an id, which identifies this group with respect to this job."""
         project = jobs[0]._project
 
         # The full name is designed to be truly unique for each job-group.
@@ -1228,7 +1229,7 @@ class FlowGroup:
                     cmd=cmd,
                     directives=deepcopy(directives),
                 )
-                # Get the prefix, and if it's not NULL, set the fork directive
+                # Get the prefix, and if it's non-empty, set the fork directive
                 # to True since we must launch a separate process. Override
                 # the command directly.
                 prefix = jobs[0]._project._environment.get_prefix(job_op)
@@ -1244,9 +1245,13 @@ class FlowGroup:
         This can lead to poor utilization of computing resources.
         """
         env = jobs[0]._project._environment
-        op_names = list(self.operations.keys())
-        directives = self._resolve_directives(op_names[0], default_directives, env)
-        for name in op_names[1:]:
+        operation_names = list(self.operations.keys())
+        # The first operation's directives are evaluated, then all other
+        # operations' directives are applied as updates with aggregate=True
+        directives = self._resolve_directives(
+            operation_names[0], default_directives, env
+        )
+        for name in operation_names[1:]:
             # get directives for operation
             directives.update(
                 self._resolve_directives(name, default_directives, env),
@@ -1295,8 +1300,11 @@ class _FlowProjectClass(type):
     @staticmethod
     def _setup_pre_conditions_class(parent_class):
         class pre(_condition):
-            """Specify a function of job that must be true for this operation to
-            be eligible for execution. For example:
+            """Define and evaluate pre-conditions for operations.
+
+            A pre-condition is a function accepting one or more jobs as
+            positional arguments (``*jobs``) that must evaluate to True for
+            this operation to be eligible for execution. For example:
 
             .. code-block:: python
 
@@ -1333,7 +1341,11 @@ class _FlowProjectClass(type):
 
             @classmethod
             def copy_from(cls, *other_funcs):
-                "True if and only if all pre conditions of other operation-function(s) are met."
+                """Copies pre-conditions from another operation.
+
+                True if and only if all pre conditions of other operation
+                function(s) are met.
+                """
                 return cls(
                     _create_all_metacondition(
                         cls._parent_class._collect_pre_conditions(), *other_funcs
@@ -1342,7 +1354,11 @@ class _FlowProjectClass(type):
 
             @classmethod
             def after(cls, *other_funcs):
-                "True if and only if all post conditions of other operation-function(s) are met."
+                """Pre-condition to run an operation after other operations.
+
+                True if and only if all post conditions of other operation
+                function(s) are met.
+                """
                 operation_functions = [
                     operation[1]
                     for operation in cls._parent_class._collect_operations()
@@ -1364,8 +1380,11 @@ class _FlowProjectClass(type):
     @staticmethod
     def _setup_post_conditions_class(parent_class):
         class post(_condition):
-            """Specify a function of job that must evaluate to True for this operation
-            to be considered complete. For example:
+            """Define and evaluate post-conditions for operations.
+
+            A post-condition is a function accepting one or more jobs as
+            positional arguments (``*jobs``) that must evaluate to True for
+            this operation to be considered complete. For example:
 
             .. code-block:: python
 
@@ -1402,7 +1421,11 @@ class _FlowProjectClass(type):
 
             @classmethod
             def copy_from(cls, *other_funcs):
-                "True if and only if all post conditions of other operation-function(s) are met."
+                """Copies post-conditions from another operation.
+
+                True if and only if all post conditions of other operation
+                function(s) are met.
+                """
                 return cls(
                     _create_all_metacondition(
                         cls._parent_class._collect_post_conditions(), *other_funcs
@@ -1548,13 +1571,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return self._template_environment_[environment]
 
     def _get_standard_template_context(self):
-        "Return the standard templating context for run and submission scripts."
+        """Return the standard templating context for run and submission scripts."""
         context = dict()
         context["project"] = self
         return context
 
     def _show_template_help_and_exit(self, template_environment, context):
-        "Print all context variables and filters to screen and exit."
+        """Print all context variables and filters to screen and exit."""
         from textwrap import TextWrapper
 
         wrapper = TextWrapper(width=90, break_long_words=False)
@@ -1747,7 +1770,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             self._label_functions[class_label_functions[name]] = None
 
     def _register_labels(self):
-        "Register all label functions registered with this class and its parent classes."
+        """Register all label functions registered with this class and its parent classes."""
         self._register_class_labels()
 
         for cls in type(self).__mro__:
@@ -1758,7 +1781,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for status, symbol in _FMT_SCHEDULER_STATUS.items()
         if status != JobStatus.dummy
     }
-    "These are default aliases used within the status output."
+    # These are default aliases used within the status output.
 
     @classmethod
     def _alias(cls, name):
@@ -1769,7 +1792,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             return name
 
     def _fn_bundle(self, bundle_id):
-        "Return the canonical name to store bundle information."
+        """Return the canonical name to store bundle information."""
         return os.path.join(self.root_directory(), ".bundles", bundle_id)
 
     def _store_bundled(self, operations):
@@ -1803,7 +1826,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return bundle_id
 
     def _expand_bundled_jobs(self, scheduler_jobs):
-        "Expand jobs which were submitted as part of a bundle."
+        """Expand jobs which were submitted as part of a bundle."""
         sep = getattr(self._environment, "JOB_ID_SEPARATOR", "/")
         bundle_prefix = f"{self}{sep}bundle{sep}"
         for job in scheduler_jobs:
@@ -1833,7 +1856,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         yield from self._expand_bundled_jobs(scheduler.jobs())
 
     def _get_operations_status(self, jobs, cached_status):
-        "Return a dict with information about job-operations for this aggregate."
+        """Return a dict with information about job-operations for this aggregate."""
         starting_dict = functools.partial(dict, scheduler_status=JobStatus.unknown)
         status_dict = defaultdict(starting_dict)
         operation_names = list(self.operations.keys())
@@ -1856,7 +1879,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         yield from sorted(status_dict.items())
 
     def get_job_status(self, job, ignore_errors=False, cached_status=None):
-        "Return a dict with detailed information about the status of a job or an aggregate of jobs."
+        """Get status of a job.
+
+        Returns a dict with detailed information about the status of a job or
+        an aggregate of jobs.
+        """
         # TODO: Add support for aggregates for this method.
         result = dict()
         result["job_id"] = str(job)
@@ -1891,7 +1918,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return result
 
     def _fetch_scheduler_status(self, jobs=None, file=None, ignore_errors=False):
-        "Update the status docs."
+        """Update the status docs."""
         if file is None:
             file = sys.stderr
         try:
@@ -1933,7 +1960,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             logger.info("Updated job status cache.")
 
     def _get_group_status(self, group_name, ignore_errors=False, cached_status=None):
-        "Return a dict with detailed information about the status of jobs per group."
+        """Return a dict with detailed information about the status of jobs per group."""
         group = self._groups[group_name]
         status_dict = dict()
         errors = dict()
@@ -1976,7 +2003,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         }
 
     def _get_job_labels(self, job, ignore_errors=False):
-        "Return a dict with information about the labels of a job."
+        """Return a dict with information about the labels of a job."""
         result = dict()
         result["job_id"] = str(job)
         try:
@@ -2022,6 +2049,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Default value parallelizes using ``multiprocessing.ThreadPool()``
         :type status_parallelization:
             str
+        :returns:
+            A list of dictionaries containing job ids,
+            operations, labels, and any errors caught.
+        :rtype:
+            list
         """
         # The argument status_parallelization is used so that _fetch_status method
         # gets to know whether the deprecated argument no_parallelization passed
@@ -2845,8 +2877,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return self._run_operations(operations, pretend, np, timeout, progress)
 
     class _PickleError(Exception):
-        "Indicates a pickling error while trying to parallelize the execution of operations."
-        pass
+        """Indicates a pickling error while trying to parallelize the execution of operations."""
 
     @staticmethod
     def _job_operation_to_tuple(operation):
@@ -3235,7 +3266,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _get_pending_operations(
         self, jobs=None, operation_names=None, ignore_conditions=IgnoreConditions.NONE
     ):
-        "Get all pending operations for the given selection."
+        """Get all pending operations for the given selection."""
         assert not isinstance(operation_names, str)
         for operation in self._next_operations(jobs, ignore_conditions):
             # Return operations with names that match the provided list of
@@ -3708,7 +3739,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @classmethod
     def _add_submit_args(cls, parser):
-        "Add arguments to submit sub command to parser."
+        """Add arguments to submit sub command to parser."""
         parser.add_argument(
             "flags", type=str, nargs="*", help="Flags to be forwarded to the scheduler."
         )
@@ -3763,7 +3794,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @classmethod
     def _add_template_arg_group(cls, parser, default="script.sh"):
-        "Add argument group to parser for template handling."
+        """Add argument group to parser for template handling."""
         template_group = parser.add_argument_group(
             "templating",
             "The execution and submission scripts are always generated from a script "
@@ -3869,7 +3900,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         )
 
     def export_job_statuses(self, collection, statuses):
-        "Export the job statuses to a database collection."
+        """Export the job statuses to a database collection."""
         for status in statuses:
             job = self.open_job(id=status["job_id"])
             status["statepoint"] = job.statepoint()
@@ -3879,7 +3910,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @classmethod
     def _add_print_status_args(cls, parser):
-        "Add arguments to parser for the :meth:`~.print_status` method."
+        """Add arguments to parser for the :meth:`~.print_status` method."""
         cls._add_job_selection_args(parser)
         view_group = parser.add_argument_group(
             "view", "Specify how to format the status display."
@@ -4130,12 +4161,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
     def next_operations(self, *jobs, ignore_conditions=IgnoreConditions.NONE):
-        """Determine the next eligible operations for jobs.
+        r"""Determine the next eligible operations for provided job(s).
 
-        :param jobs:
+        :param *jobs:
             The signac job handles.
-        :type jobs:
-            Sequence of instances of :class:`.Job`.
+        :type *jobs:
+            One or more instances of :class:`.Job`.
         :param ignore_conditions:
             Specify if pre and/or post conditions check is to be ignored for eligibility check.
             The default is :py:class:`IgnoreConditions.NONE`.
@@ -4222,7 +4253,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @classmethod
     def _collect_operations(cls):
-        "Collect all operations that were add via decorator."
+        """Collect all operations added with the ``@FlowProject.operation`` decorator."""
         operations = []
         for parent_class in cls.__mro__:
             operations.extend(getattr(parent_class, "_OPERATION_FUNCTIONS", []))
@@ -4230,7 +4261,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @classmethod
     def _collect_conditions(cls, attr):
-        "Collect conditions from attr using the mro hierarchy."
+        """Collect conditions from attr using the mro hierarchy."""
         ret = defaultdict(list)
         for parent_class in cls.__mro__:
             for func, conds in getattr(parent_class, attr, dict()).items():
@@ -4239,16 +4270,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @classmethod
     def _collect_pre_conditions(cls):
-        "Collect all pre-conditions that were added via decorator."
+        """Collect all pre-conditions added with the ``@FlowProject.pre`` decorator."""
         return cls._collect_conditions("_OPERATION_PRE_CONDITIONS")
 
     @classmethod
     def _collect_post_conditions(cls):
-        "Collect all post-conditions that were added via decorator."
+        """Collect all post-conditions added with the ``@FlowProject.post`` decorator."""
         return cls._collect_conditions("_OPERATION_POST_CONDITIONS")
 
     def _register_operations(self):
-        "Register all operation functions registered with this class and its parent classes."
+        """Register all operation functions registered with this class and its parent classes."""
         operations = self._collect_operations()
         pre_conditions = self._collect_pre_conditions()
         post_conditions = self._collect_post_conditions()
@@ -4313,7 +4344,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return group_entry
 
     def _register_groups(self):
-        "Register all groups and add the correct operations to each."
+        """Register all groups and add the correct operations to each."""
         group_entries = []
         # Gather all groups from class and parent classes.
         for cls in type(self).__mro__:
@@ -4353,11 +4384,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @property
     def operations(self):
-        "The dictionary of operations that have been added to the workflow."
+        """The dictionary of operations that have been added to the workflow."""
         return self._operations
 
     @property
     def groups(self):
+        """The dictionary of groups that have been added to the workflow."""
         return self._groups
 
     def _get_aggregate_store(self, group):
@@ -4396,7 +4428,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return True
 
     def _main_status(self, args):
-        "Print status overview."
+        """Print status overview."""
         aggregates = self._select_jobs_from_args(args)
         if args.compact and not args.unroll:
             logger.warning(
@@ -4467,13 +4499,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 )
 
     def _main_next(self, args):
-        "Determine the jobs that are eligible for a specific operation."
-        for op in self._next_operations():
-            if args.name in op.name:
-                print(get_aggregate_id(op._jobs))
+        """Determine the jobs that are eligible for a specific operation."""
+        for operation in self._next_operations():
+            if args.name in operation.name:
+                print(get_aggregate_id(operation._jobs))
 
     def _main_run(self, args):
-        "Run all (or select) job operations."
+        """Run all (or select) job operations."""
         # Select jobs:
         aggregates = self._select_jobs_from_args(args)
 
@@ -4502,7 +4534,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             run()
 
     def _main_script(self, args):
-        "Generate a script for the execution of operations."
+        """Generate a script for the execution of operations."""
         # Select jobs:
         aggregates = self._select_jobs_from_args(args)
 
@@ -4530,7 +4562,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         )
 
     def _main_submit(self, args):
-        "Submit jobs to a scheduler"
+        """Submit jobs to a scheduler."""
         if args.test:
             args.pretend = True
         kwargs = vars(args)
@@ -4567,7 +4599,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 operation_function(*aggregate)
 
     def _select_jobs_from_args(self, args):
-        "Select jobs with the given command line arguments ('-j/-f/--doc-filter/--jobid')."
+        """Select jobs with the given command line arguments ('-j/-f/--doc-filter/--jobid')."""
         if (
             not args.func == self._main_exec
             and args.job_id
@@ -4944,12 +4976,12 @@ def _serializer(loads, root, *args):
 
 
 def _update_status(args):
-    "Wrapper-function, that is probably obsolete."
+    """Wrapper-function, that is probably obsolete."""
     return update_status(*args)
 
 
 def _update_job_status(job, scheduler_jobs):
-    "Update the status entry for job."
+    """Update the status entry for job."""
     update_status(job, scheduler_jobs)
 
 

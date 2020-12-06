@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 def _fetch(user=None):
-    "Fetch the cluster job status information from the TORQUE scheduler."
+    """Fetch the cluster job status information from the TORQUE scheduler."""
     if user is None:
         user = getpass.getuser()
     cmd = f"qstat -fx -u {user}"
@@ -47,7 +47,7 @@ def _fetch(user=None):
 
 
 class TorqueJob(ClusterJob):
-    "Implementation of the abstract ClusterJob class for TORQUE schedulers."
+    """Implementation of the abstract ClusterJob class for TORQUE schedulers."""
 
     def __init__(self, node):
         self.node = node
@@ -94,7 +94,7 @@ class TorqueScheduler(Scheduler):
         self.user = user
 
     def jobs(self):
-        "Yield cluster jobs by querying the scheduler."
+        """Yield cluster jobs by querying the scheduler."""
         self._prevent_dos()
         nodes = _fetch(user=self.user)
         for node in nodes.findall("Job"):
@@ -158,7 +158,7 @@ class TorqueScheduler(Scheduler):
 
     @classmethod
     def is_present(cls):
-        "Return True if it appears that a TORQUE scheduler is available within the environment."
+        """Return True if a TORQUE scheduler is detected."""
         try:
             subprocess.check_output(["qsub", "--version"], stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError:

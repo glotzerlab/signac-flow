@@ -55,6 +55,7 @@ def _fetch(user=None):
 
 class SlurmJob(ClusterJob):
     """A SlurmJob is a ClusterJob managed by a SLURM scheduler."""
+
     pass
 
 

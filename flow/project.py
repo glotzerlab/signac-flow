@@ -1341,7 +1341,11 @@ class _FlowProjectClass(type):
 
             @classmethod
             def copy_from(cls, *other_funcs):
-                """True if and only if all pre conditions of other operation function(s) are met."""
+                """Copies pre-conditions from another operation.
+
+                True if and only if all pre conditions of other operation
+                function(s) are met.
+                """
                 return cls(
                     _create_all_metacondition(
                         cls._parent_class._collect_pre_conditions(), *other_funcs
@@ -1350,7 +1354,11 @@ class _FlowProjectClass(type):
 
             @classmethod
             def after(cls, *other_funcs):
-                """True if and only if all post conditions of other operation function(s) are met."""
+                """Pre-condition to run an operation after other operations.
+
+                True if and only if all post conditions of other operation
+                function(s) are met.
+                """
                 operation_functions = [
                     operation[1]
                     for operation in cls._parent_class._collect_operations()
@@ -1413,7 +1421,11 @@ class _FlowProjectClass(type):
 
             @classmethod
             def copy_from(cls, *other_funcs):
-                """True if and only if all post conditions of other operation function(s) are met."""
+                """Copies post-conditions from another operation.
+
+                True if and only if all post conditions of other operation
+                function(s) are met.
+                """
                 return cls(
                     _create_all_metacondition(
                         cls._parent_class._collect_post_conditions(), *other_funcs
@@ -1867,7 +1879,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         yield from sorted(status_dict.items())
 
     def get_job_status(self, job, ignore_errors=False, cached_status=None):
-        """Return a dict with detailed information about the status of a job or an aggregate of jobs."""
+        """Get status of a job.
+
+        Returns a dict with detailed information about the status of a job or
+        an aggregate of jobs.
+        """
         # TODO: Add support for aggregates for this method.
         result = dict()
         result["job_id"] = str(job)

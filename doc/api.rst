@@ -14,6 +14,7 @@ directly via the ``$ flow`` command.
 For more information, please see ``$ flow --help``.
 
 .. literalinclude:: cli-help.txt
+    :language: none
 
 
 The FlowProject

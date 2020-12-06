@@ -21,8 +21,6 @@ The FlowProject
 
 .. currentmodule:: flow
 
-.. autoclass:: FlowProject
-
 .. rubric:: Attributes
 
 .. autosummary::

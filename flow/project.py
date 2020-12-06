@@ -53,7 +53,7 @@ from .labels import _is_label_func, classlabel, label, staticlabel
 from .render_status import Renderer as StatusRenderer
 from .scheduling.base import ClusterJob, JobStatus
 from .util import config as flow_config
-from .util import template_filters as tf
+from .util import template_filters
 from .util.misc import (
     TrackGetItemDict,
     _positive_int,
@@ -1569,21 +1569,27 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         )
 
         # Setup standard filters that can be used to format context variables.
-        template_environment.filters["format_timedelta"] = tf.format_timedelta
-        template_environment.filters["identical"] = tf.identical
-        template_environment.filters["with_np_offset"] = tf.with_np_offset
-        template_environment.filters["calc_tasks"] = tf.calc_tasks
-        template_environment.filters["calc_num_nodes"] = tf.calc_num_nodes
-        template_environment.filters["check_utilization"] = tf.check_utilization
+        template_environment.filters[
+            "format_timedelta"
+        ] = template_filters.format_timedelta
+        template_environment.filters["identical"] = template_filters.identical
+        template_environment.filters["with_np_offset"] = template_filters.with_np_offset
+        template_environment.filters["calc_tasks"] = template_filters.calc_tasks
+        template_environment.filters["calc_num_nodes"] = template_filters.calc_num_nodes
+        template_environment.filters[
+            "check_utilization"
+        ] = template_filters.check_utilization
         template_environment.filters[
             "homogeneous_openmp_mpi_config"
-        ] = tf.homogeneous_openmp_mpi_config
+        ] = template_filters.homogeneous_openmp_mpi_config
         template_environment.filters["get_config_value"] = flow_config.get_config_value
         template_environment.filters[
             "require_config_value"
         ] = flow_config.require_config_value
-        template_environment.filters["get_account_name"] = tf.get_account_name
-        template_environment.filters["print_warning"] = tf.print_warning
+        template_environment.filters[
+            "get_account_name"
+        ] = template_filters.get_account_name
+        template_environment.filters["print_warning"] = template_filters.print_warning
         if "max" not in template_environment.filters:  # for jinja2 < 2.10
             template_environment.filters["max"] = max
         if "min" not in template_environment.filters:  # for jinja2 < 2.10

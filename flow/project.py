@@ -4678,7 +4678,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 operation_function(*aggregate)
 
     def _select_jobs_from_args(self, args):
-        """Select jobs with the given command line arguments ('-j/-f/--doc-filter/--jobid')."""
+        """Select jobs with the given command line arguments ('-j/-f/--doc-filter/--job-id')."""
         if (
             not args.func == self._main_exec
             and args.job_id

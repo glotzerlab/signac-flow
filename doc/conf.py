@@ -43,9 +43,9 @@ sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 # ones.
 extensions = [
     "sphinx.ext.autodoc",
+    "sphinx.ext.autosummary",
     "sphinx.ext.intersphinx",
     "sphinx.ext.viewcode",
-    "sphinx.ext.autosummary",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -318,4 +318,9 @@ intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
     "signac-docs": ("https://docs.signac.io/en/latest/", None),
     "signac": ("https://docs.signac.io/projects/core/en/latest/", None),
+}
+
+autodoc_default_options = {
+    "show-inheritance": True,
+    "autosummary": True,
 }

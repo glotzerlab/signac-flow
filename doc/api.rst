@@ -99,6 +99,20 @@ The FlowProject
 
 .. autoclass:: flow.IgnoreConditions
 
+Operations and Status
+---------------------
+
+.. autoclass:: flow.project.BaseFlowOperation
+    :members:
+
+.. autoclass:: flow.project.FlowOperation
+    :show-inheritance:
+    :members:
+
+.. autoclass:: flow.project.FlowCmdOperation
+    :show-inheritance:
+    :members:
+
 .. autoclass:: flow.render_status.Renderer
     :members: generate_terminal_output, generate_html_output, render
 
@@ -138,3 +152,10 @@ The FlowGroup
 
 .. autoclass:: flow.project.FlowGroup
    :members: add_operation, complete, eligible, isdisjoint
+
+Compute Environments
+--------------------
+
+.. automodule:: flow.environment
+    :members:
+    :undoc-members: DefaultSLURMEnvironment, DefaultToruqeEnvironment, DefaultLSFEnvironment

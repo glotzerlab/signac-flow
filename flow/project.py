@@ -1393,7 +1393,7 @@ class _FlowProjectClass(type):
 
             @classmethod
             def copy_from(cls, *other_funcs):
-                """Copy pre-conditions from another operation.
+                """Copy pre-conditions from other operation(s).
 
                 True if and only if all pre conditions of other operation
                 function(s) are met.
@@ -1471,7 +1471,7 @@ class _FlowProjectClass(type):
 
             @classmethod
             def copy_from(cls, *other_funcs):
-                """Copy post-conditions from another operation.
+                """Copy post-conditions from other operation(s).
 
                 True if and only if all post conditions of other operation
                 function(s) are met.

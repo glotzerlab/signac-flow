@@ -3,7 +3,7 @@
 # This software is licensed under the BSD 3-Clause License.
 """Detection of compute environments.
 
-This module provides the ComputeEnvironment class, which can be
+This module provides the :class:`ComputeEnvironment` class, which can be
 subclassed to automatically detect specific computational environments.
 
 This enables the user to adjust their workflow based on the present

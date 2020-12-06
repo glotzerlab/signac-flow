@@ -1845,7 +1845,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for status, symbol in _FMT_SCHEDULER_STATUS.items()
         if status != JobStatus.dummy
     }
-    # These are default aliases used within the status output.
+    """Default aliases used within the status output."""
 
     @classmethod
     def _alias(cls, name):

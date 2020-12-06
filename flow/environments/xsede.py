@@ -23,6 +23,7 @@ class CometEnvironment(DefaultSlurmEnvironment):
 
     @classmethod
     def add_args(cls, parser):
+        """Add arguments to parser."""
         super().add_args(parser)
 
         parser.add_argument(
@@ -83,6 +84,7 @@ class Stampede2Environment(DefaultSlurmEnvironment):
 
     @classmethod
     def add_args(cls, parser):
+        """Add arguments to parser."""
         super().add_args(parser)
         parser.add_argument(
             "--partition",
@@ -149,6 +151,7 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
 
     @classmethod
     def add_args(cls, parser):
+        """Add arguments to parser."""
         super().add_args(parser)
         parser.add_argument(
             "--partition",
@@ -167,4 +170,8 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
         )
 
 
-__all__ = ["CometEnvironment", "BridgesEnvironment", "Stampede2Environment"]
+__all__ = [
+    "CometEnvironment",
+    "Stampede2Environment",
+    "BridgesEnvironment",
+]

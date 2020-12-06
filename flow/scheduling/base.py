@@ -36,9 +36,11 @@ class ClusterJob:
         return str(self._id())
 
     def name(self):
+        """Return the name of the cluster job."""
         return self._id()
 
     def status(self):
+        """Return the status of the cluster job."""
         return self._status
 
 

@@ -140,6 +140,11 @@ class TrackGetItemDict(dict):
         return super().__getitem__(key)
 
     def get(self, key, default=None):
+        """Return the value for key if key is in the dictionary, else default.
+
+        If default is not given, it defaults to ``None``, so that this method
+        never raises a :class:`KeyError`.
+        """
         self._keys_used.add(key)
         return super().get(key, default)
 

@@ -17,6 +17,7 @@ class GreatLakesEnvironment(DefaultSlurmEnvironment):
 
     @classmethod
     def add_args(cls, parser):
+        """Add arguments to parser."""
         super().add_args(parser)
         parser.add_argument(
             "--partition",

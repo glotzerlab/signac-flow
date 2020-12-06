@@ -288,14 +288,22 @@ class aggregator:
             return _AggregatesStore(self, project)
 
     def __call__(self, func=None):
+        """Add this aggregator to a provided operation.
+
+        This call operator allows the class to be used as a decorator.
+
+        :param func:
+            The function to decorate.
+        :type func:
+            callable
+        """
         if callable(func):
             setattr(func, "_flow_aggregate", self)
             return func
         else:
             raise TypeError(
-                "Invalid argument passed while calling "
-                "the aggregate instance. Expected a callable, "
-                f"got {type(func)}."
+                "Invalid argument passed while calling the aggregate "
+                f"instance. Expected a callable, got {type(func)}."
             )
 
 

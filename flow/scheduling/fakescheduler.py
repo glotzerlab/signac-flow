@@ -25,9 +25,13 @@ class FakeScheduler(Scheduler):
         return None
 
     def submit(self, script, **kwargs):
-        """Just print the script to screen."""
+        """Print the script to screen."""
         print(script)
 
     @classmethod
     def is_present(cls):
+        """Return False.
+
+        The fake scheduler is never present unless manually specified.
+        """
         return False

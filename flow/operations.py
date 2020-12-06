@@ -130,9 +130,19 @@ class directives:
 
     @classmethod
     def copy_from(cls, func):
+        """Copy directives from another operation."""
         return cls(**getattr(func, "_flow_directives", {}))
 
     def __call__(self, func):
+        """Add directives to the function.
+
+        This call operator allows the class to be used as a decorator.
+
+        :param func:
+            The function to decorate.
+        :type func:
+            callable
+        """
         directives = getattr(func, "_flow_directives", {})
         directives.update(self.kwargs)
         setattr(func, "_flow_directives", directives)

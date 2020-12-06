@@ -294,6 +294,10 @@ class StandardEnvironment(ComputeEnvironment):
 
     @classmethod
     def is_present(cls):
+        """Determine whether this specific compute environment is present.
+
+        The standard environment is always present, so this returns True.
+        """
         return True
 
 
@@ -349,6 +353,7 @@ class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
 
     @classmethod
     def add_args(cls, parser):
+        """Add arguments to the parser."""
         super().add_args(parser)
         parser.add_argument(
             "-w", "--walltime", type=float, help="The wallclock time in hours."
@@ -374,6 +379,7 @@ class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
 
     @classmethod
     def add_args(cls, parser):
+        """Add arguments to the parser."""
         super().add_args(parser)
         parser.add_argument(
             "--memory",
@@ -405,6 +411,7 @@ class DefaultLSFEnvironment(NodesEnvironment, LSFEnvironment):
 
     @classmethod
     def add_args(cls, parser):
+        """Add arguments to the parser."""
         super().add_args(parser)
         parser.add_argument(
             "-w",

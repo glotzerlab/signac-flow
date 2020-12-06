@@ -62,6 +62,7 @@ class LSFJob(ClusterJob):
         self._status = _parse_status(record["STAT"])
 
     def name(self):
+        """Return the name of the cluster job."""
         return self.record["JOB_NAME"]
 
 

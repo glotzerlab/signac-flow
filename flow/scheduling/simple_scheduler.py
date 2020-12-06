@@ -19,18 +19,35 @@ class SimpleScheduler(Scheduler):
 
     @classmethod
     def is_present(cls):
+        """Return True if a SimpleScheduler is detected."""
         return bool(os.environ.get("SIMPLE_SCHEDULER"))
 
     def __init__(self):
         self.cmd = os.environ["SIMPLE_SCHEDULER"].split()
 
     def jobs(self):
+        """Yield cluster jobs by querying the scheduler."""
         cmd = self.cmd + ["status", "--json"]
         status = json.loads(subprocess.check_output(cmd).decode("utf-8"))
         for _id, doc in status.items():
             yield ClusterJob(doc["job_name"], JobStatus(doc["status"]))
 
     def submit(self, script, pretend=False, **kwargs):
+        """Submit a job script for execution to the scheduler.
+
+        :param script:
+            The job script submitted for execution.
+        :type script:
+            str
+        :param pretend:
+            If True, do not actually submit the script, but only simulate the submission.
+            Can be used to test whether the submission would be successful.
+            Please note: A successful "pretend" submission is not guaranteed to succeed.
+        :type pretend:
+            bool
+        :returns:
+            Returns True if the cluster job was successfully submitted, otherwise None.
+        """
         cmd = self.cmd + ["submit"]
         if pretend:
             print("# Submit command: {}".format(" ".join(cmd)))

@@ -736,6 +736,13 @@ class FlowOperation(BaseFlowOperation):
         return f"{type(self).__name__}(op_func='{self._op_func}')"
 
     def __call__(self, *jobs):
+        r"""Call the operation on the provided jobs.
+
+        :param \*jobs:
+            The jobs passed to the operation.
+        :type \*jobs:
+            One or more instances of :class:`.Job`.
+        """
         return self._op_func(*jobs)
 
 
@@ -773,7 +780,7 @@ class FlowGroupEntry:
     def __call__(self, func):
         """Add the function into the group's operations.
 
-        This call operator allows the group to be used as a decorator.
+        This call operator allows the class to be used as a decorator.
 
         :param func:
             The function to decorate.

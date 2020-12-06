@@ -123,7 +123,11 @@ def switch_to_directory(root=None):
 
 
 class TrackGetItemDict(dict):
-    "A dict that keeps track of which keys were accessed via __getitem__."
+    """A dict that tracks which keys have been accessed.
+
+    Keys accessed with ``__getitem__`` are stored in the property
+    :attr:`~.keys_used`.
+    """
 
     def __init__(self, *args, **kwargs):
         self._keys_used = set()

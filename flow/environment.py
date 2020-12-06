@@ -92,7 +92,7 @@ class ComputeEnvironmentType(type):
 
 
 def template_filter(func):
-    "Mark the function as a ComputeEnvironment template filter."
+    """Mark the function as a ComputeEnvironment template filter."""
     setattr(func, "_flow_template_filter", True)
     return classmethod(func)
 
@@ -290,7 +290,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
 
 class StandardEnvironment(ComputeEnvironment):
-    "This is a default environment, which is always present."
+    """This is a default environment which is always present."""
 
     @classmethod
     def is_present(cls):
@@ -310,25 +310,29 @@ class TestEnvironment(ComputeEnvironment):
 
 
 class SimpleSchedulerEnvironment(ComputeEnvironment):
-    "An environment for the simple-scheduler scheduler."
+    """An environment for the simple-scheduler scheduler."""
+
     scheduler_type = SimpleScheduler
     template = "simple_scheduler.sh"
 
 
 class TorqueEnvironment(ComputeEnvironment):
-    "An environment with TORQUE scheduler."
+    """An environment with TORQUE scheduler."""
+
     scheduler_type = TorqueScheduler
     template = "torque.sh"
 
 
 class SlurmEnvironment(ComputeEnvironment):
-    "An environment with SLURM scheduler."
+    """An environment with SLURM scheduler."""
+
     scheduler_type = SlurmScheduler
     template = "slurm.sh"
 
 
 class LSFEnvironment(ComputeEnvironment):
-    "An environment with LSF scheduler."
+    """An environment with LSF scheduler."""
+
     scheduler_type = LSFScheduler
     template = "lsf.sh"
 
@@ -341,7 +345,7 @@ class NodesEnvironment(ComputeEnvironment):
 
 
 class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
-    "A default environment for environments with TORQUE scheduler."
+    """A default environment for environments with TORQUE scheduler."""
 
     @classmethod
     def add_args(cls, parser):
@@ -366,7 +370,7 @@ class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
 
 
 class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
-    "A default environment for environments with SLURM scheduler."
+    """A default environment for environments with SLURM scheduler."""
 
     @classmethod
     def add_args(cls, parser):
@@ -397,7 +401,7 @@ class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
 
 
 class DefaultLSFEnvironment(NodesEnvironment, LSFEnvironment):
-    "A default environment for environments with LSF scheduler."
+    """A default environment for environments with LSF scheduler."""
 
     @classmethod
     def add_args(cls, parser):
@@ -422,13 +426,15 @@ class DefaultLSFEnvironment(NodesEnvironment, LSFEnvironment):
 
 @deprecated(deprecated_in="0.12", removed_in="0.14", current_version=__version__)
 class CPUEnvironment(ComputeEnvironment):
-    "An environment with CPUs."
+    """An environment with CPUs."""
+
     pass
 
 
 @deprecated(deprecated_in="0.12", removed_in="0.14", current_version=__version__)
 class GPUEnvironment(ComputeEnvironment):
-    "An environment with GPUs."
+    """An environment with GPUs."""
+
     pass
 
 

@@ -389,7 +389,7 @@ class _AggregatesStore(Mapping):
         """
 
         def _validate_and_filter_job(job):
-            "Validate whether a job is eligible to be a part of an aggregate or not."
+            """Validate whether a job is eligible to be in an aggregate."""
             if job is None:
                 return False
             elif job in project:
@@ -431,7 +431,7 @@ class _DefaultAggregateStore(Mapping):
             yield job.get_id()
 
     def __getitem__(self, id):
-        "Return a tuple of a single job via job id."
+        """Return an aggregate of one job from its job id."""
         try:
             return (self._project.open_job(id=id),)
         except KeyError:

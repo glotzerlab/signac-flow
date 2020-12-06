@@ -8,7 +8,8 @@ from jinja2.ext import Extension as Jinja2Extension
 
 
 class ConfigKeyError(KeyError):
-    "Indicates that a config key was not found."
+    """Indicates that a config key was not found."""
+
     pass
 
 
@@ -19,27 +20,31 @@ class DirectivesError(ValueError):
 
 
 class SubmitError(RuntimeError):
-    "Indicates an error during cluster job submission."
+    """Indicates an error during cluster job submission."""
+
     pass
 
 
 class NoSchedulerError(AttributeError):
-    "Indicates that there is no scheduler type defined for an environment class."
+    """Indicates that there is no scheduler type defined for an environment class."""
+
     pass
 
 
 class UserConditionError(RuntimeError):
-    "Indicates an error during evaluation of a FlowCondition."
+    """Indicates an error during evaluation of a FlowCondition."""
+
     pass
 
 
 class UserOperationError(RuntimeError):
-    "Indicates an error during execution of a FlowOperation."
+    """Indicates an error during execution of a FlowOperation."""
+
     pass
 
 
 class TemplateError(Jinja2Extension):
-    """Indicates errors in jinja2 templates"""
+    """Indicates an error in a jinja2 template."""
 
     # ref:http://jinja.pocoo.org/docs/2.10/extensions/#jinja-extensions
     tags = {"raise"}

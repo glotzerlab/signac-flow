@@ -1,4 +1,7 @@
-# make separate python class for render_status
+# Copyright (c) 2020 The Regents of the University of Michigan
+# All rights reserved.
+# This software is licensed under the BSD 3-Clause License.
+"""Status rendering logic."""
 from tqdm.auto import tqdm
 
 from .scheduling.base import JobStatus
@@ -25,7 +28,6 @@ class Renderer:
         :rtype:
             str
         """
-
         self.terminal_output = mistune.terminal(self.markdown_output)
         return self.terminal_output
 
@@ -37,7 +39,6 @@ class Renderer:
         :rtype:
             str
         """
-
         self.html_output = mistune.html(self.markdown_output)
         return self.html_output
 
@@ -88,8 +89,7 @@ class Renderer:
         :type output_format:
             str
         """
-
-        # use Jinja2 template for status output
+        # Use Jinja2 template for status output
         if template is None:
             if detailed and expand:
                 template = "status_expand.jinja"
@@ -116,7 +116,6 @@ class Renderer:
             :type width:
                 int
             """
-
             assert value >= 0 and total > 0
             bar_format = escape + f"|{{bar:{width}}}" + escape + "| {percentage:<0.2f}%"
             return tqdm.format_meter(
@@ -139,7 +138,6 @@ class Renderer:
             :type all_ops:
                 bool
             """
-
             return (
                 scheduler_status_code[job_op["scheduler_status"]] != "U"
                 or job_op["eligible"]
@@ -158,7 +156,6 @@ class Renderer:
             :type symbols:
                 dict
             """
-
             if operation_info["scheduler_status"] >= JobStatus.active:
                 op_status = "running"
             elif operation_info["scheduler_status"] > JobStatus.inactive:
@@ -172,12 +169,12 @@ class Renderer:
 
             return symbols[op_status]
 
-        def highlight(s, eligible, pretty):
-            """Change font to bold within jinja2 template
+        def highlight(string, eligible, pretty):
+            """Change font to bold within jinja2 template.
 
-            :param s:
+            :param string:
                 The string to be printed.
-            :type s:
+            :type string:
                 str
             :param eligible:
                 Boolean value for job eligibility.
@@ -189,9 +186,9 @@ class Renderer:
                 bool
             """
             if eligible and pretty:
-                return "**" + s + "**"
+                return "**" + string + "**"
             else:
-                return s
+                return string
 
         template_environment.filters["highlight"] = highlight
         template_environment.filters["draw_progressbar"] = draw_progressbar

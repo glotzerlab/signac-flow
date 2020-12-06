@@ -33,7 +33,6 @@ def _parse_status(s):
 
 def _fetch(user=None):
     """Fetch the cluster job status information from the LSF scheduler."""
-
     if user is None:
         user = getpass.getuser()
 

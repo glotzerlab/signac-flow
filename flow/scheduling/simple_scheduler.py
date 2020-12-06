@@ -1,6 +1,7 @@
 # Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
+"""Implementation of the scheduling system for the built-in simple scheduler."""
 import json
 import os
 import subprocess
@@ -10,6 +11,12 @@ from .base import ClusterJob, JobStatus, Scheduler
 
 
 class SimpleScheduler(Scheduler):
+    """Implementation of the abstract Scheduler class for SimpleScheduler.
+
+    This class allows us to submit cluster jobs to the built-in simple
+    scheduler and query their current status.
+    """
+
     @classmethod
     def is_present(cls):
         return bool(os.environ.get("SIMPLE_SCHEDULER"))

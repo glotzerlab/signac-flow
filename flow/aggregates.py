@@ -300,8 +300,7 @@ class aggregator:
 
 
 class _AggregatesStore(Mapping):
-    """This class holds the information of all the aggregates associated with
-    a :class:`aggregator`.
+    """Class containing all aggregates associated with a :class:`aggregator`.
 
     This is a callable class which, when called, generates all the aggregates.
     Iterating over this object yields all aggregates.
@@ -338,8 +337,7 @@ class _AggregatesStore(Mapping):
             )
 
     def __contains__(self, id):
-        """Return whether an aggregate is stored in this instance of
-        :py:class:`_AggregateStore`.
+        """Return whether this instance contains an aggregate (by aggregate id).
 
         :param id:
             The id of an aggregate of jobs.
@@ -367,8 +365,9 @@ class _AggregatesStore(Mapping):
         return self._aggregate_per_id.items()
 
     def _register_aggregates(self, project):
-        """If the instance of this class is called then we will
-        generate aggregates and store them in ``self._aggregate_per_id``.
+        """Register aggregates for a given project.
+
+        This is called at instantiation to generate and store aggregates.
         """
         aggregated_jobs = self._generate_aggregates(project)
         self._create_nested_aggregate_list(aggregated_jobs, project)
@@ -418,8 +417,10 @@ class _AggregatesStore(Mapping):
 
 
 class _DefaultAggregateStore(Mapping):
-    """This class holds the information of the project associated with
-    an operation function using the default aggregator, i.e.
+    """Aggregate storage wrapper for the default aggregator.
+
+    This class holds the information of the project associated with an
+    operation function using the default aggregator, i.e.
     ``aggregator.groupsof(1)``.
 
     Iterating over this object yields tuples each containing one job from the project.
@@ -445,8 +446,7 @@ class _DefaultAggregateStore(Mapping):
             raise LookupError(f"Did not find aggregate with id {id}.")
 
     def __contains__(self, id):
-        """Return whether the job is present in the project associated with this
-        instance of :py:class:`_DefaultAggregateStore`.
+        """Return whether this instance contains a job (by job id).
 
         :param id:
             The job id.
@@ -484,9 +484,10 @@ class _DefaultAggregateStore(Mapping):
             yield (job.get_id(), (job,))
 
     def _register_aggregates(self, project):
-        """We have to store self._project when this method is invoked
-        This is because we will then iterate over that project in
-        order to return an aggregates of one.
+        """Register aggregates for a given project.
+
+        A reference to the project is stored on instantiation, and iterated
+        over on-the-fly.
         """
         self._project = project
 

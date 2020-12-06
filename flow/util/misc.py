@@ -1,6 +1,7 @@
 # Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
+"""Miscellaneous utility functions."""
 import argparse
 import json
 import logging
@@ -104,6 +105,7 @@ def add_path_to_environment_pythonpath(path):
 
 @contextmanager
 def add_cwd_to_environment_pythonpath():
+    """Add current working directory to PYTHONPATH."""
     with add_path_to_environment_pythonpath(os.getcwd()):
         yield
 
@@ -148,6 +150,11 @@ class TrackGetItemDict(dict):
 
 
 def roundrobin(*iterables):
+    """Round robin iterator.
+
+    Cycles through a sequence of iterables, taking one item from each iterable
+    until all iterables are exhausted.
+    """
     # From: https://docs.python.org/3/library/itertools.html#itertools-recipes
     # roundrobin('ABC', 'D', 'EF') --> A D E B F C
     # Recipe credited to George Sakkis

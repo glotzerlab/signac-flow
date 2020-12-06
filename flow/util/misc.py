@@ -77,7 +77,7 @@ def redirect_log(job, filename="run.log", formatter=None, logger=None):
 
 @contextmanager
 def add_path_to_environment_pythonpath(path):
-    "Temporarily insert the current working directory into the environment PYTHONPATH variable."
+    """Temporarily insert the current working directory into the environment PYTHONPATH variable."""
     path = os.path.realpath(path)
     pythonpath = os.environ.get("PYTHONPATH")
     if pythonpath:
@@ -110,7 +110,7 @@ def add_cwd_to_environment_pythonpath():
 
 @contextmanager
 def switch_to_directory(root=None):
-    "Temporarily switch into the given root directory (if not None)."
+    """Temporarily switch into the given root directory (if not None)."""
     if root is None:
         yield
     else:
@@ -139,7 +139,7 @@ class TrackGetItemDict(dict):
 
     @property
     def keys_used(self):
-        "Return all keys that have been accessed."
+        """Return all keys that have been accessed."""
         return self._keys_used.copy()
 
 
@@ -164,11 +164,23 @@ class _hashable_dict(dict):
         return hash(tuple(sorted(self.items())))
 
 
-def to_hashable(obj):
-    # if isinstance(l, Sequence):
-    if type(obj) == list:
-        return tuple(to_hashable(_) for _ in obj)
-    elif type(obj) == dict:
+def _to_hashable(obj):
+    """Create a hash of passed type.
+
+    Parameters
+    ----------
+    obj
+        Object to create a hashable version of. Lists are converted
+        to tuples, and hashes are defined for dicts.
+
+    Returns
+    -------
+    Hash created for obj.
+
+    """
+    if type(obj) is list:
+        return tuple(_to_hashable(_) for _ in obj)
+    elif type(obj) is dict:
         return _hashable_dict(obj)
     else:
         return obj

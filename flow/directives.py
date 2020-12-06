@@ -9,10 +9,10 @@ from flow.errors import DirectivesError
 class _Directive:
     """The definition of a single directive.
 
-    Logic for validation of values when setting, defaults, and the ability for
-    directives to inspect other directives (such as using nranks and
-    omp_num_threads for finding np). This is only meant to work with the
-    internals of signac-flow.
+    Logic for validation of values when setting, defaults, and the ability
+    for directives to inspect other directives (such as using ``nranks`` and
+    ``omp_num_threads`` for computing ``np``). This is only meant to work
+    with the internals of signac-flow.
 
     The validation of a directive occurs before the call to ``finalize``. It is
     the caller's responsibility to ensure that finalized values are still valid.
@@ -64,11 +64,11 @@ class _Directive:
         self._serial = serial
         self._parallel = parallel
 
-        def identity(v):
-            return v
+        def identity(value):
+            return value
 
-        def default_finalize(v, directives):
-            return v
+        def default_finalize(value, directives):
+            return value
 
         self._validator = identity if validator is None else validator
         self._finalize = default_finalize if finalize is None else finalize
@@ -99,8 +99,7 @@ class _Directive:
                 return self._validator(value(*jobs))
 
             return validate_callable
-        else:
-            return self._validator(value)
+        return self._validator(value)
 
 
 class _Directives(MutableMapping):
@@ -119,9 +118,9 @@ class _Directives(MutableMapping):
     """
 
     def __init__(self, environment_directives):
-        self._directive_definitions = dict()
-        self._defined_directives = dict()
-        self._user_directives = dict()
+        self._directive_definitions = {}
+        self._defined_directives = {}
+        self._user_directives = {}
 
         for directive in environment_directives:
             self._add_directive(directive)
@@ -131,26 +130,24 @@ class _Directives(MutableMapping):
             raise TypeError(
                 f"Expected a _Directive object. Received {type(directive)}."
             )
-        elif directive._name in self._directive_definitions:
+        if directive._name in self._directive_definitions:
             raise ValueError(f"Cannot redefine directive name {directive._name}.")
-        else:
-            self._directive_definitions[directive._name] = directive
-            self._defined_directives[directive._name] = directive._default
+        self._directive_definitions[directive._name] = directive
+        self._defined_directives[directive._name] = directive._default
 
     def _set_defined_directive(self, key, value):
         try:
             self._defined_directives[key] = self._directive_definitions[key](value)
-        except (KeyError, ValueError, TypeError) as err:
-            raise DirectivesError(f"Error setting directive {key}") from err
+        except (KeyError, ValueError, TypeError) as error:
+            raise DirectivesError(f"Error setting directive {key}") from error
 
     def __getitem__(self, key):
         if key in self._defined_directives and key in self._directive_definitions:
             value = self._defined_directives[key]
             return self._directive_definitions[key]._finalize(value, self)
-        elif key in self._user_directives:
+        if key in self._user_directives:
             return self._user_directives[key]
-        else:
-            raise KeyError(f"{key} not in directives.")
+        raise KeyError(f"{key} not in directives.")
 
     def __setitem__(self, key, value):
         if key in self._directive_definitions:
@@ -178,12 +175,37 @@ class _Directives(MutableMapping):
         return f"_Directives({str(self)})"
 
     def update(self, other, aggregate=False, jobs=None, parallel=False):
+        """Update directives with another set of directives.
+
+        This method accounts for serial/parallel behavior and aggregation.
+
+        Parameters
+        ----------
+        other : :class:`~._Directives`
+            The other set of directives.
+        aggregate : bool
+            Whether to combine directives according to serial/parallel rules.
+        jobs :
+            The jobs used to evaluate directives.
+        parallel : bool
+            Whether to aggregate according to parallel rules.
+        """
         if aggregate:
             self._aggregate(other, jobs=jobs, parallel=parallel)
         else:
             super().update(other)
 
     def evaluate(self, jobs):
+        """Evaluate directives for the provided jobs.
+
+        This method updates the directives in place, replacing callable
+        directives with their evaluated values.
+
+        Parameters
+        ----------
+        jobs :
+            The jobs used to evaluate directives.
+        """
         for key, value in self.items():
             self[key] = _evaluate(value, jobs)
 
@@ -206,47 +228,44 @@ def _evaluate(value, jobs):
             raise RuntimeError(
                 "jobs must be specified when evaluating a callable directive."
             )
-        else:
-            return value(*jobs)
-    else:
-        return value
+        return value(*jobs)
+    return value
 
 
 class _OnlyType:
     def __init__(self, type_, preprocess=None, postprocess=None):
-        def identity(v):
-            return v
+        def identity(value):
+            return value
 
         self.type = type_
         self.preprocess = identity if preprocess is None else preprocess
         self.postprocess = identity if postprocess is None else postprocess
 
-    def __call__(self, v):
-        return self.postprocess(self._validate(self.preprocess(v)))
+    def __call__(self, value):
+        return self.postprocess(self._validate(self.preprocess(value)))
 
-    def _validate(self, v):
-        if isinstance(v, self.type):
-            return v
-        else:
-            try:
-                return self.type(v)
-            except Exception:
-                raise TypeError(
-                    f"Expected an object of type {self.type}. "
-                    f"Received {v} of type {type(v)}."
-                )
-
-
-def _raise_below(value):
-    def is_greater_or_equal(v):
+    def _validate(self, value):
+        if isinstance(value, self.type):
+            return value
         try:
-            if v < value:
+            return self.type(value)
+        except Exception:
+            raise TypeError(
+                f"Expected an object of type {self.type}. "
+                f"Received {value} of type {type(value)}."
+            )
+
+
+def _raise_below(threshold):
+    def is_greater_or_equal(value):
+        try:
+            if value < threshold:
                 raise ValueError
         except (TypeError, ValueError):
             raise ValueError(
-                f"Expected a number greater than or equal to {value}. Received {v}."
+                f"Expected a number greater than or equal to {threshold}. Received {value}."
             )
-        return v
+        return value
 
     return is_greater_or_equal
 
@@ -269,20 +288,22 @@ def _finalize_np(np, directives):
     omp_num_threads = directives.get("omp_num_threads", 1)
     if callable(nranks) or callable(omp_num_threads):
         return np
-    else:
-        return max(np, max(1, nranks) * max(1, omp_num_threads))
+    return max(np, max(1, nranks) * max(1, omp_num_threads))
 
 
 # Helper validators for defining _Directive
-def _no_aggregation(v, o):
-    return v
+def _no_aggregation(value, other):
+    """Returns its first argument.
+
+    This is used for directives that ignore aggregation rules.
+    """
+    return value
 
 
 def _is_fraction(value):
     if 0 <= value <= 1:
         return value
-    else:
-        raise ValueError("Value must be between 0 and 1.")
+    raise ValueError("Value must be between 0 and 1.")
 
 
 _natural_number = _OnlyType(int, postprocess=_raise_below(1))

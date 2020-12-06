@@ -200,7 +200,7 @@ def run(parser=None):
         help="The operation to execute.",
     )
     parser.add_argument(
-        "jobid",
+        "job_id",
         type=str,
         nargs="*",
         help="The job ids, as registered in the signac project. "
@@ -238,9 +238,9 @@ def run(parser=None):
         except LookupError:
             raise LookupError(f"Multiple matches for id '{_id}'.")
 
-    if len(args.jobid):
+    if len(args.job_id):
         try:
-            jobs = [_open_job_by_id(jid) for jid in args.jobid]
+            jobs = [_open_job_by_id(jid) for jid in args.job_id]
         except (KeyError, LookupError) as error:
             print(error, file=sys.stderr)
             sys.exit(1)

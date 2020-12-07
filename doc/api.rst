@@ -202,29 +202,29 @@ Schedulers
 
 .. automodule:: flow.scheduling
 
-.. autoclass:: flow.scheduling.JobStatus
+.. autoclass:: flow.scheduling.base.JobStatus
     :members:
     :undoc-members:
 
-.. autoclass:: flow.scheduling.ClusterJob
+.. autoclass:: flow.scheduling.base.ClusterJob
     :members:
 
-.. autoclass:: flow.scheduling.Scheduler
+.. autoclass:: flow.scheduling.base.Scheduler
     :members:
 
-.. autoclass:: flow.scheduling.FakeScheduler
+.. autoclass:: flow.scheduling.fakescheduler.FakeScheduler
     :members:
 
-.. autoclass:: flow.scheduling.LSFScheduler
+.. autoclass:: flow.scheduling.lsf.LSFScheduler
     :members:
 
-.. autoclass:: flow.scheduling.SimpleScheduler
+.. autoclass:: flow.scheduling.simple_scheduler.SimpleScheduler
     :members:
 
-.. autoclass:: flow.scheduling.SlurmScheduler
+.. autoclass:: flow.scheduling.slurm.SlurmScheduler
     :members:
 
-.. autoclass:: flow.scheduling.TorqueScheduler
+.. autoclass:: flow.scheduling.torque.TorqueScheduler
     :members:
 
 Error Classes

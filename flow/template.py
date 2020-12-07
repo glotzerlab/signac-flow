@@ -30,7 +30,7 @@ TEMPLATES = {
 
 
 def init(alias=None, template=None, root=None, out=None):
-    """Initialize a templated FlowProject module."""
+    """Initialize a templated :class:`~.FlowProject` module."""
     if alias is None:
         alias = "project"
     elif not alias.isidentifier():

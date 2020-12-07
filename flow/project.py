@@ -1507,18 +1507,18 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         A signac configuration, defaults to the configuration loaded
         from the current directory.
     :type config:
-        A signac config object.
+        :class:`signac.contrib.project._ProjectConfig`
     :param environment:
         An environment to use for scheduler submission. If ``None``, the
         environment is automatically identified. The default is ``None``.
     :type environment:
         :class:`flow.environment.ComputeEnvironment`
     :param entrypoint:
-        A dictionary with two possible keys: executable and path. Path
-        represents the filepath location of the script file (the script file
-        must call ``main``). Executable represents the location of the Python
-        interpreter used for the executable of `FlowOperation` that are Python
-        functions.
+        A dictionary with two possible keys: ``'executable'`` and ``'path'``.
+        The path represents the filepath location of the script file (the
+        script file must call :meth:`FlowProject.main`). The executable
+        represents the location of the Python interpreter used for the
+        execution of :class:`~.BaseFlowOperation` that are Python functions.
     :type entrypoint:
         dict
     """
@@ -4734,11 +4734,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """Call this function to use the main command line interface.
 
         In most cases one would want to call this function as part of the
-        class definition, e.g.:
+        class definition:
 
         .. code-block:: python
 
-             my_project.py
+            # my_project.py
             from flow import FlowProject
 
             class MyProject(FlowProject):

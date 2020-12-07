@@ -77,10 +77,12 @@ def setup(py_modules, **attrs):
 
 
 class ComputeEnvironmentType(type):
-    """Metaclass for the definition of ComputeEnvironments.
+    """Metaclass used for :class:`~.ComputeEnvironment`.
 
-    This metaclass automatically registers ComputeEnvironment definitions,
-    which enables the automatic determination of the present environment.
+    This metaclass automatically registers :class:`~.ComputeEnvironment`
+    definitions, which enables the automatic determination of the present
+    environment. The registry can be obtained from
+    :func:`~.registered_environments`.
     """
 
     def __init__(cls, name, bases, dct):

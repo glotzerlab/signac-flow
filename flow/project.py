@@ -97,7 +97,7 @@ _FMT_SCHEDULER_STATUS = {
     JobStatus.queued: "Q",
     JobStatus.active: "A",
     JobStatus.error: "E",
-    JobStatus.dummy: " ",
+    JobStatus.placeholder: " ",
 }
 
 
@@ -1844,7 +1844,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     ALIASES = {
         str(status).replace("JobStatus.", ""): symbol
         for status, symbol in _FMT_SCHEDULER_STATUS.items()
-        if status != JobStatus.dummy
+        if status != JobStatus.placeholder
     }
     """Default aliases used within the status output."""
 
@@ -2812,17 +2812,17 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 context["operation_status_legend"] = operation_status_legend
                 context["operation_status_symbols"] = OPERATION_STATUS_SYMBOLS
 
-        def _add_dummy_operation(job):
+        def _add_placeholder_operation(job):
             job["operations"][""] = {
                 "completed": False,
                 "eligible": False,
-                "scheduler_status": JobStatus.dummy,
+                "scheduler_status": JobStatus.placeholder,
             }
 
         for job in context["jobs"]:
             has_eligible_ops = any([v["eligible"] for v in job["operations"].values()])
             if not has_eligible_ops and not context["all_ops"]:
-                _add_dummy_operation(job)
+                _add_placeholder_operation(job)
 
         op_counter = Counter()
         for job in context["jobs"]:

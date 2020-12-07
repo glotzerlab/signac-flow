@@ -38,7 +38,7 @@ class UserConditionError(RuntimeError):
 
 
 class UserOperationError(RuntimeError):
-    """Indicates an error during execution of a FlowOperation."""
+    """Indicates an error during execution of a :class:`~.BaseFlowOperation`."""
 
     pass
 

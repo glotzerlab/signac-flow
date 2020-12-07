@@ -14,7 +14,7 @@ from hashlib import md5
 class aggregator:
     """Decorator for operation function that is to be aggregated.
 
-    By default, if the ``aggregator_function`` is not passed,
+    By default, if the ``aggregator_function`` is ``None``,
     an aggregate of all jobs will be created.
 
     .. code-block:: python
@@ -29,22 +29,22 @@ class aggregator:
         jobs and can return or yield subsets of jobs as an iterable. The
         default behavior is creating a single aggregate of all jobs.
     :type aggregator_function:
-        callable
+        callable or None
     :param sort_by:
         Before aggregating, sort the jobs by a given statepoint parameter.
         The default behavior is no sorting.
     :type sort_by:
-        str or NoneType
+        str or None
     :param sort_ascending:
-        States if the jobs are to be sorted in ascending order.
-        The default value is True.
+        States if the jobs are to be sorted in ascending order. The default
+        value is True.
     :type sort_ascending:
         bool
     :param select:
         Condition for filtering individual jobs. This is passed as the callable
-        argument to :meth:`filter`. The default behavior is no filtering.
+        argument to :func:`filter`. The default behavior is no filtering.
     :type select:
-        callable or NoneType
+        callable or None
     """
 
     def __init__(
@@ -104,7 +104,7 @@ class aggregator:
             Before aggregating, sort the jobs by a given statepoint parameter.
             The default behavior is no sorting.
         :type sort_by:
-            str or NoneType
+            str or None
         :param sort_ascending:
             States if the jobs are to be sorted in ascending order.
             The default value is True.
@@ -112,10 +112,10 @@ class aggregator:
             bool
         :param select:
             Condition for filtering individual jobs. This is passed as the
-            callable argument to `filter`.
-            The default behavior is no filtering.
+            callable argument to :func:`filter`. The default behavior is no
+            filtering.
         :type select:
-            callable or NoneType
+            callable or None
         """
         try:
             if num != int(num):
@@ -143,9 +143,9 @@ class aggregator:
     def groupby(cls, key, default=None, sort_by=None, sort_ascending=True, select=None):
         """Aggregate jobs according to matching state point values.
 
-        The below code block provides an example of how to aggregate jobs having a
-        common state point parameter 'sp' whose value, when not found, is replaced by a
-        default value of -1.
+        The below code block provides an example of how to aggregate jobs
+        having a common state point parameter ``'sp'`` whose value, if not
+        found, is replaced by a default value of -1.
 
         .. code-block:: python
 
@@ -155,32 +155,33 @@ class aggregator:
                 print(len(jobs))
 
         :param key:
-            The method by which jobs are grouped. It may be a state point
-            or a sequence of state points to group by specific state point
-            keys. It may also be an arbitrary callable of :class:`signac.Job`
-            when greater flexibility is needed.
+            The method by which jobs are grouped. It may be a state point or a
+            sequence of state points to group by specific state point keys. It
+            may also be an arbitrary callable of
+            :class:`~signac.contrib.job.Job` when greater flexibility is
+            needed.
         :type key:
             str, Iterable, or callable
         :param default:
-            Default values used for grouping if invalid key is passed.
+            Default value used for grouping if the key is missing or invalid.
         :type default:
             str, Iterable, or callable
         :param sort_by:
-            Before aggregating, sort the jobs by a given statepoint parameter.
-            The default behavior is no sorting.
+            State point parameter used to sort the jobs before grouping.
+            The default value is None, which does no sorting.
         :type sort_by:
-            str or NoneType
+            str or None
         :param sort_ascending:
-            States if the jobs are to be sorted in ascending order.
-            The default value is True.
+            Whether jobs are to be sorted in ascending order. The default
+            value is True.
         :type sort_ascending:
             bool
         :param select:
             Condition for filtering individual jobs. This is passed as the
-            callable argument to `filter`.
-            The default behavior is no filtering.
+            callable argument to :func:`filter`. The default behavior is no
+            filtering.
         :type select:
-            callable or NoneType
+            callable or None
         """
         if isinstance(key, str):
             if default is None:

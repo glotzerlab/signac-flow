@@ -156,8 +156,12 @@ The FlowGroup
 Aggregation
 -----------
 
+.. automodule:: flow.aggregates
+
 .. autoclass:: flow.aggregates.aggregator
     :members:
+
+.. autofunction:: flow.aggregates.get_aggregate_id
 
 Compute Environments
 --------------------

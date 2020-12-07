@@ -315,9 +315,10 @@ texinfo_documents = [
 # texinfo_no_detailmenu = False
 
 intersphinx_mapping = {
+    "jinja2": ("https://jinja.palletsprojects.com/", None),
     "python": ("https://docs.python.org/3", None),
-    "signac-docs": ("https://docs.signac.io/en/latest/", None),
     "signac": ("https://docs.signac.io/projects/core/en/latest/", None),
+    "signac-docs": ("https://docs.signac.io/en/latest/", None),
 }
 
 autodoc_default_options = {

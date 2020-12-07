@@ -151,11 +151,46 @@ The FlowGroup
 -------------
 
 .. autoclass:: flow.project.FlowGroup
-   :members: add_operation, complete, eligible, isdisjoint
+    :members: add_operation, complete, eligible, isdisjoint
 
 Compute Environments
 --------------------
 
 .. automodule:: flow.environment
+    :members: setup, ComputeEnvironmentType, template_filter, ComputeEnvironment, StandardEnvironment, TestEnvironment, SimpleSchedulerEnvironment, TorqueEnvironment, SlurmEnvironment, LSFEnvironment, NodesEnvironment, registered_environments
+
+Schedulers
+----------
+
+.. automodule:: flow.scheduling
+
+.. autoclass:: flow.scheduling.JobStatus
     :members:
-    :undoc-members: DefaultSLURMEnvironment, DefaultToruqeEnvironment, DefaultLSFEnvironment
+    :undoc-members:
+
+.. autoclass:: flow.scheduling.ClusterJob
+    :members:
+
+.. autoclass:: flow.scheduling.Scheduler
+    :members:
+
+.. autoclass:: flow.scheduling.FakeScheduler
+    :members:
+
+.. autoclass:: flow.scheduling.LSFScheduler
+    :members:
+
+.. autoclass:: flow.scheduling.SimpleScheduler
+    :members:
+
+.. autoclass:: flow.scheduling.SlurmScheduler
+    :members:
+
+.. autoclass:: flow.scheduling.TorqueScheduler
+    :members:
+
+Error Classes
+-------------
+
+.. automodule:: flow.errors
+    :members:

@@ -367,7 +367,7 @@ Expects a string pointing to a valid executable file in the
 current file system.
 
 By default this should point to a Python executable (interpreter); however, if
-the :py:class:`FlowProject` path is an empty string, the executable can be a
+the :class:`FlowProject` path is an empty string, the executable can be a
 path to an executable Python script. Defaults to ``sys.executable``.
 """
 

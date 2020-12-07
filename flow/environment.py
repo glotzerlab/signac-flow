@@ -186,7 +186,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         that are specific to a user's environment, e.g. account names.
 
         When a key is not configured and no default value is provided,
-        a :py:class:`~.errors.SubmitError` will be raised and the user will
+        a :class:`~.errors.SubmitError` will be raised and the user will
         be prompted to add the missing key to their configuration.
 
         Please note, that the key will be automatically expanded to
@@ -469,9 +469,9 @@ def registered_environments(import_configured=True):
 def get_environment(test=False, import_configured=True):
     """Attempt to detect the present environment.
 
-    This function iterates through all defined :py:class:`~.ComputeEnvironment`
+    This function iterates through all defined :class:`~.ComputeEnvironment`
     classes in reversed order of definition and returns the first
-    environment where the :py:meth:`~.ComputeEnvironment.is_present` method
+    environment where the :meth:`~.ComputeEnvironment.is_present` method
     returns True.
 
     :param test:

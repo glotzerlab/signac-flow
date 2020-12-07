@@ -281,7 +281,7 @@ class aggregator:
         :param project:
             A signac project used to fetch jobs for creating aggregates.
         :type project:
-            :py:class:`flow.FlowProject` or :py:class:`signac.contrib.project.Project`
+            :class:`flow.FlowProject` or :class:`signac.contrib.project.Project`
         """
         if not self._is_aggregate:
             return _DefaultAggregateStore(project)
@@ -317,11 +317,11 @@ class _AggregatesStore(Mapping):
     :param aggregator:
         aggregator object associated with this class.
     :type aggregator:
-        :py:class:`aggregator`
+        :class:`aggregator`
     :param project:
         A signac project used to fetch jobs for creating aggregates.
     :type project:
-        :py:class:`flow.FlowProject` or :py:class:`signac.contrib.project.Project`
+        :class:`flow.FlowProject` or :class:`signac.contrib.project.Project`
     """
 
     def __init__(self, aggregator, project):
@@ -437,7 +437,7 @@ class _DefaultAggregateStore(Mapping):
     :param project:
         A signac project used to fetch jobs for creating aggregates.
     :type project:
-        :py:class:`flow.FlowProject` or :py:class:`signac.contrib.project.Project`
+        :class:`flow.FlowProject` or :class:`signac.contrib.project.Project`
     """
 
     def __init__(self, project):

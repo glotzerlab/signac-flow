@@ -102,19 +102,11 @@ _FMT_SCHEDULER_STATUS = {
 
 
 class IgnoreConditions(IntFlag):
-    """Flags that determine which conditions are used to determine job eligibility.
+    """Flags that determine which conditions are used to determine job eligibility."""
 
-    The options include:
-
-        * IgnoreConditions.NONE: check all conditions
-        * IgnoreConditions.PRE: ignore pre conditions
-        * IgnoreConditions.POST: ignore post conditions
-        * IgnoreConditions.ALL: ignore all conditions
-    """
-
-    # This operator must be defined since IntFlag simply performs an integer
-    # bitwise not on the underlying enum value, which is problematic in
-    # twos-complement arithmetic. What we want is to only flip valid bits.
+    # The __invert__ operator must be defined since IntFlag simply performs an
+    # integer bitwise not on the underlying enum value, which is problematic in
+    # two's-complement arithmetic. What we want is to only flip valid bits.
 
     def __invert__(self):
         # Compute the largest number of bits used to represent one of the flags
@@ -123,9 +115,16 @@ class IgnoreConditions(IntFlag):
         return self.__class__((2 ** max_bits - 1) ^ self._value_)
 
     NONE = 0
+    """Check all conditions."""
+
     PRE = 1
+    """Ignore pre-conditions."""
+
     POST = 2
+    """Ignore post-conditions."""
+
     ALL = PRE | POST
+    """Ignore all conditions."""
 
     def __str__(self):
         return {
@@ -3102,8 +3101,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         operation will only be executed once per job. This is to avoid accidental
         infinite loops when no or faulty post conditions are provided.
 
-        See also: :meth:`~.run_operations`
-
         :param jobs:
             Only execute operations for the given jobs or aggregates of jobs,
             or all if the argument is omitted.
@@ -3120,13 +3117,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type pretend:
             bool
         :param np:
-            Parallelize to the specified number of processors. Use -1 to parallelize to all
-            available processing units.
+            Parallelize to the specified number of processors. Use -1 to
+            parallelize to all available processing units.
         :type np:
             int
         :param timeout:
-            An optional timeout for each operation in seconds after which execution will
-            be cancelled. Use -1 to indicate not timeout (the default).
+            An optional timeout for each operation in seconds after which
+            execution will be cancelled. Use -1 to indicate no timeout (the
+            default).
         :type timeout:
             int
         :param num:
@@ -3135,39 +3133,44 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type num:
             int
         :param num_passes:
-            The total number of one specific job-operation pair will not exceed this argument.
-            The default is 1, there is no limit if this argument is `None`.
+            The total number of executions of one specific job-operation pair
+            will not exceed this argument. The default is 1, there is no limit
+            if this argument is None.
         :type num_passes:
-            int
+            int or None
         :param progress:
             Show a progress bar during execution.
         :type progress:
             bool
         :param order:
-            Specify the order of operations, possible values are:
+            Specify the order of operations. Possible values are:
+
                 * 'none' or None (no specific order)
                 * 'by-job' (operations are grouped by job)
                 * 'by-op' (operations are grouped by operation)
                 * 'cyclic' (order operations cyclic by job)
                 * 'random' (shuffle the execution order randomly)
                 * callable (a callable returning a comparison key for an
-                            operation used to sort operations)
+                  operation used to sort operations)
 
-            The default value is `none`, which is equivalent to `by-op` in the current
-            implementation.
+            The default value is ``'none'``, which is equivalent to ``'by-op'``
+            in the current implementation.
 
             .. note::
-                Users are advised to not rely on a specific execution order, as a
-                substitute for defining the workflow in terms of pre- and post-conditions.
-                However, a specific execution order may be more performant in cases where
-                operations need to access and potentially lock shared resources.
+
+                Users are advised to not rely on a specific execution order as
+                a substitute for defining the workflow in terms of pre- and
+                post-conditions. However, a specific execution order may be
+                more performant in cases where operations need to access and
+                potentially lock shared resources.
+
         :type order:
-            str, callable, or NoneType
+            str, callable, or None
         :param ignore_conditions:
-            Specify if pre and/or post conditions check is to be ignored for eligibility check.
-            The default is :py:class:`IgnoreConditions.NONE`.
+            Specify if pre and/or post conditions check is to be ignored for
+            eligibility check. The default is :class:`IgnoreConditions.NONE`.
         :type ignore_conditions:
-            :py:class:`~.IgnoreConditions`
+            :class:`~.IgnoreConditions`
         """
         aggregates = self._convert_aggregates_from_jobs(jobs)
 

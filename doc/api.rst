@@ -98,6 +98,7 @@ The FlowProject
 .. automethod:: flow.FlowProject.pre.true
 
 .. autoclass:: flow.IgnoreConditions
+    :members:
 
 Operations and Status
 ---------------------

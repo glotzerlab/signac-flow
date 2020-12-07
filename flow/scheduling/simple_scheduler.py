@@ -13,8 +13,8 @@ from .base import ClusterJob, JobStatus, Scheduler
 class SimpleScheduler(Scheduler):
     """Implementation of the abstract Scheduler class for SimpleScheduler.
 
-    This class allows us to submit cluster jobs to the built-in simple
-    scheduler and query their current status.
+    This class can submit cluster jobs to the built-in simple scheduler and
+    query their current status.
     """
 
     @classmethod

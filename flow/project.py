@@ -105,6 +105,7 @@ class IgnoreConditions(IntFlag):
     """Flags that determine which conditions are used to determine job eligibility.
 
     The options include:
+
         * IgnoreConditions.NONE: check all conditions
         * IgnoreConditions.PRE: ignore pre conditions
         * IgnoreConditions.POST: ignore post conditions
@@ -299,9 +300,9 @@ class _JobOperation:
         # script engine later.
         keys_set_by_user = set(directives._user_directives)
 
-        # We use a special dictionary that allows us to track all keys that have been
-        # evaluated by the template engine and compare them to those explicitly set
-        # by the user. See also comment above.
+        # We use a special dictionary that tracks all keys that have been
+        # evaluated by the template engine and compare them to those explicitly
+        # set by the user. See also comment above.
         self.directives = TrackGetItemDict(directives)
         self.directives._keys_set_by_user = keys_set_by_user
 
@@ -426,9 +427,9 @@ class JobOperation(_JobOperation):
         # script engine later.
         keys_set_by_user = set(directives)
 
-        # We use a special dictionary that allows us to track all keys that have been
-        # evaluated by the template engine and compare them to those explicitly set
-        # by the user. See also comment above.
+        # We use a special dictionary that tracks all keys that have been
+        # evaluated by the template engine and compare them to those explicitly
+        # set by the user. See also comment above.
         self.directives = TrackGetItemDict(
             {key: value for key, value in directives.items()}
         )
@@ -1063,7 +1064,7 @@ class FlowGroup:
         :param group:
             The other FlowGroup to compare to.
         :type group:
-            :py:class:`flow.FlowGroup`
+            :py:class:`flow.project.FlowGroup`
         :return:
             Returns ``True`` if ``group`` and ``self`` share no operations,
             otherwise returns ``False``.

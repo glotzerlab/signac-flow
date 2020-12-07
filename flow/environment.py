@@ -47,7 +47,7 @@ def setup(py_modules, **attrs):
     Use this function in place of setuptools.setup to not only install
     an environment's module, but also register it with the global signac
     configuration. Once registered, the environment is automatically
-    imported when the :py:meth:`~.get_environment` function is called.
+    imported when the :meth:`~flow.get_environment` function is called.
     """
     import setuptools
     from setuptools.command.install import install
@@ -106,8 +106,8 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
     The default method for the detection of a specific environment is to
     provide a regular expression matching the environment's hostname.
-    For example, if the hostname is my-server.com, one could identify the
-    environment by setting the hostname_pattern to 'my-server'.
+    For example, if the hostname is ``my-server.com``, one could identify the
+    environment by setting the ``hostname_pattern`` to ``'my-server'``.
     """
 
     scheduler_type = None

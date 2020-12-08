@@ -103,7 +103,8 @@ class Stampede2Environment(DefaultSlurmEnvironment):
 
         Returns
         -------
-        str : Empty string (to render nothing in the jinja template).
+        str
+            Empty string (to render nothing in the jinja template).
 
         """
         cls.base_offset -= int(decrement)

@@ -11,15 +11,25 @@ from itertools import cycle, islice
 
 
 def _positive_int(value):
-    """Expect a command line argument to be a positive integer.
+    """Parse a command line argument as a positive integer.
 
-    Designed to be used in conjunction with an argparse.ArgumentParser.
+    Designed to be used in conjunction with :class:`argparse.ArgumentParser`.
 
-    :param value:
-        This function will raise an argparse.ArgumentTypeError if value
-        is not a positive integer.
-    :raises:
-        :class:`argparse.ArgumentTypeError`
+    Parameters
+    ----------
+    value : str
+        The value to parse.
+
+    Returns
+    -------
+    int
+        The provided value, cast to an integer.
+
+    Raises
+    ------
+    :class:`argparse.ArgumentTypeError`
+        If value cannot be cast to an integer or is negative.
+
     """
     try:
         ivalue = int(value)
@@ -44,21 +54,23 @@ def write_human_readable_statepoint(script, job):
 def redirect_log(job, filename="run.log", formatter=None, logger=None):
     """Redirect all messages logged via the logging interface to the given file.
 
-    :param job:
-        An instance of a signac job.
-    :type job:
-        :class:`signac.Project.Job`
-    :formatter:
-        The logging formatter to use, uses a default formatter if this argument
-        is not provided.
-    :type formatter:
-        :class:`logging.Formatter`
-    :param logger:
-        The instance of logger to which the new file log handler is added. Defaults
-        to the default logger returned by `logging.getLogger()` if this argument is
-        not provided.
-    :type logger:
-        :class:`logging.Logger`
+    This method is a context manager. The logging handler is removed when
+    exiting the context.
+
+    Parameters
+    ----------
+    job : :class:`signac.contrib.job.Job`
+        The signac job whose workspace will store the redirected logs.
+    filename : str
+        File name of the log. (Default value = "run.log")
+    formatter : :class:`logging.Formatter`
+        The logging formatter to use, uses a default formatter if None.
+        (Default value = None)
+    logger : :class:`logging.Logger`
+        The instance of logger to which the new file log handler is added.
+        Defaults to the default logger returned by :meth:`logging.getLogger` if
+        this argument is not provided.
+
     """
     if formatter is None:
         formatter = logging.Formatter(
@@ -78,7 +90,17 @@ def redirect_log(job, filename="run.log", formatter=None, logger=None):
 
 @contextmanager
 def add_path_to_environment_pythonpath(path):
-    """Temporarily insert the current working directory into the environment PYTHONPATH variable."""
+    """Insert the provided path into the environment PYTHONPATH variable.
+
+    This method is a context manager. It restores the previous PYTHONPATH when
+    exiting the context.
+
+    Parameters
+    ----------
+    path : str
+        Path to add to PYTHONPATH.
+
+    """
     path = os.path.realpath(path)
     pythonpath = os.environ.get("PYTHONPATH")
     if pythonpath:
@@ -112,7 +134,18 @@ def add_cwd_to_environment_pythonpath():
 
 @contextmanager
 def switch_to_directory(root=None):
-    """Temporarily switch into the given root directory (if not None)."""
+    """Temporarily switch into the given root directory (if not None).
+
+    This method is a context manager. It switches to the previous working
+    directory when exiting the context.
+
+    Parameters
+    ----------
+    root : str
+        Current working directory to use for within the context. (Default value
+        = None)
+
+    """
     if root is None:
         yield
     else:
@@ -185,13 +218,14 @@ def _to_hashable(obj):
 
     Parameters
     ----------
-    obj
-        Object to create a hashable version of. Lists are converted
-        to tuples, and hashes are defined for dicts.
+    obj :
+        Object to make hashable. Lists are converted to tuples, and hashes are
+        defined for dicts.
 
     Returns
     -------
-    Hash created for obj.
+    object
+        Hashable object.
 
     """
     if type(obj) is list:

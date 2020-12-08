@@ -37,20 +37,26 @@ class SimpleScheduler(Scheduler):
             yield ClusterJob(doc["job_name"], JobStatus(doc["status"]))
 
     def submit(self, script, pretend=False, **kwargs):
-        """Submit a job script for execution to the scheduler.
+        r"""Submit a job script for execution to the scheduler.
 
-        :param script:
+        Parameters
+        ----------
+        script : str
             The job script submitted for execution.
-        :type script:
-            str
-        :param pretend:
-            If True, do not actually submit the script, but only simulate the submission.
-            Can be used to test whether the submission would be successful.
-            A successful "pretend" submission is not guaranteed to succeed.
-        :type pretend:
-            bool
-        :returns:
-            Returns True if the cluster job was successfully submitted, otherwise None.
+        pretend : bool
+            If True, do not actually submit the script, but only simulate the
+            submission. Can be used to test whether the submission would be
+            successful. A successful "pretend" submission is not
+            guaranteed to succeed. (Default value = False)
+        \*\*kwargs :
+            Keyword arguments (ignored).
+
+        Returns
+        -------
+        bool
+            Returns True if the cluster job was successfully submitted,
+            otherwise None.
+
         """
         cmd = self.cmd + ["submit"]
         if pretend:

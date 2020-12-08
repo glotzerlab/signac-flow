@@ -290,11 +290,11 @@ class aggregator:
     def _create_AggregatesStore(self, project):
         """Create the actual collections of jobs to be sent to aggregate operations.
 
-        The :class:`aggregate` class is just a decorator that provides a signal for
-        operation functions that should be treated as aggregate operations and
-        information on how to perform the aggregation. This function generates
-        the classes that actually hold sequences of jobs to which aggregate
-        operations will be applied.
+        The :class:`aggregator` class is just a decorator that provides a
+        signal for operation functions that should be treated as aggregate
+        operations and information on how to perform the aggregation. This
+        function generates the classes that actually hold sequences of jobs to
+        which aggregate operations will be applied.
 
         Parameters
         ----------

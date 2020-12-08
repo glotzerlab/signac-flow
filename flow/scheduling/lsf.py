@@ -32,7 +32,20 @@ def _parse_status(s):
 
 
 def _fetch(user=None):
-    """Fetch the cluster job status information from the LSF scheduler."""
+    """Fetch the cluster job status information from the LSF scheduler.
+
+    Parameters
+    ----------
+    user : str
+        Limit the status information to cluster jobs submitted by user.
+        (Default value = None)
+
+    Yields
+    ------
+    :class:`~.LSFJob`
+        LSF cluster job.
+
+    """
     if user is None:
         user = getpass.getuser()
 
@@ -67,15 +80,18 @@ class LSFJob(ClusterJob):
 
 
 class LSFScheduler(Scheduler):
-    """Implementation of the abstract Scheduler class for LSF schedulers.
+    r"""Implementation of the abstract Scheduler class for LSF schedulers.
 
     This class can submit cluster jobs to a LSF scheduler and query their
     current status.
 
-    :param user:
+    Parameters
+    ----------
+    user : str
         Limit the status information to cluster jobs submitted by user.
-    :type user:
-        str
+    \*\*kwargs
+        Forwarded to the parent constructor.
+
     """
 
     # The standard command used to submit jobs to the LSF scheduler.
@@ -93,28 +109,34 @@ class LSFScheduler(Scheduler):
     def submit(
         self, script, after=None, hold=False, pretend=False, flags=None, **kwargs
     ):
-        """Submit a job script for execution to the scheduler.
+        r"""Submit a job script for execution to the scheduler.
 
-        :param script:
+        Parameters
+        ----------
+        script : str
             The job script submitted for execution.
-        :type script:
-            str
-        :param after:
-            Execute the submitted script after a job with this id has completed.
-        :type after:
-            str
-        :param pretend:
-            If True, do not actually submit the script, but only simulate the submission.
-            Can be used to test whether the submission would be successful.
-            Please note: A successful "pretend" submission is not guaranteed to succeed.
-        :type pretend:
-            bool
-        :param flags:
-            Additional arguments to pass through to the scheduler submission command.
-        :type flags:
-            list
-        :returns:
-            Returns True if the cluster job was successfully submitted, otherwise None.
+        after : str
+            Execute the submitted script after a job with this id has
+            completed. (Default value = None)
+        hold : bool
+            Whether to hold the job upon submission. (Default value = False)
+        pretend : bool
+            If True, do not actually submit the script, but only simulate the
+            submission. Can be used to test whether the submission would be
+            successful. Please note: A successful "pretend" submission is not
+            guaranteed to succeed. (Default value = False)
+        flags : list
+            Additional arguments to pass through to the scheduler submission
+            command. (Default value = None)
+        \*\*kwargs :
+            Additional keyword arguments (ignored).
+
+        Returns
+        -------
+        bool
+            Returns True if the cluster job was successfully submitted,
+            otherwise None.
+
         """
         if flags is None:
             flags = []

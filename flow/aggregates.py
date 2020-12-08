@@ -298,7 +298,7 @@ class aggregator:
 
         Parameters
         ----------
-        project : class:`flow.FlowProject` or :class:`signac.contrib.project.Project`
+        project : :class:`flow.FlowProject` or :class:`signac.contrib.project.Project`
             A signac project used to fetch jobs for creating aggregates.
 
         Returns
@@ -341,9 +341,9 @@ class _AggregatesStore(Mapping):
 
     Parameters
     ----------
-    aggregator : class:`aggregator`
+    aggregator : :class:`aggregator`
         aggregator object associated with this class.
-    project : class:`flow.FlowProject` or :class:`signac.contrib.project.Project`
+    project : :class:`flow.FlowProject` or :class:`signac.contrib.project.Project`
         A signac project used to fetch jobs for creating aggregates.
 
     """
@@ -460,7 +460,7 @@ class _DefaultAggregateStore(Mapping):
 
     Parameters
     ----------
-    project : class:`flow.FlowProject` or :class:`signac.contrib.project.Project`
+    project : :class:`flow.FlowProject` or :class:`signac.contrib.project.Project`
         A signac project used to fetch jobs for creating aggregates.
 
     """

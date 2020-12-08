@@ -277,7 +277,10 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         operation : :class:`flow.project._JobOperation`
             The operation to be prefixed.
         parallel : bool
-            Unused parameter. TODO: remove this.
+            If True, operations are assumed to be executed in parallel, which
+            means that the number of total tasks is the sum of all tasks
+            instead of the maximum number of tasks. Default is set to False.
+            :return mpi_prefix: The prefix should be added for the operation.
 
         Returns
         -------

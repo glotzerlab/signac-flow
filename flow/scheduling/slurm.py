@@ -121,7 +121,7 @@ class SlurmScheduler(Scheduler):
         flags : list
             Additional arguments to pass through to the scheduler submission
             command. (Default value = None)
-        \*\*kwargs :
+        \*\*kwargs
             Additional keyword arguments (ignored).
 
         Returns

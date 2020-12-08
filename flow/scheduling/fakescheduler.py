@@ -31,7 +31,7 @@ class FakeScheduler(Scheduler):
         ----------
         script : str
             Script to print.
-        \*\*kwargs :
+        \*\*kwargs
             Keyword arguments (ignored).
 
         """

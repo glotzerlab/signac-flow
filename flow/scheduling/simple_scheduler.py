@@ -48,7 +48,7 @@ class SimpleScheduler(Scheduler):
             submission. Can be used to test whether the submission would be
             successful. A successful "pretend" submission is not
             guaranteed to succeed. (Default value = False)
-        \*\*kwargs :
+        \*\*kwargs
             Keyword arguments (ignored).
 
         Returns

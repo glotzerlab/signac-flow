@@ -252,7 +252,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
     @classmethod
     def _get_omp_prefix(cls, operation):
-        """Get the OpenMP prefix based on the `omp_num_threads` directive.
+        """Get the OpenMP prefix based on the ``omp_num_threads`` directive.
 
         Parameters
         ----------
@@ -270,7 +270,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
     @classmethod
     def _get_mpi_prefix(cls, operation, parallel):
-        """Get the mpi prefix based on proper directives.
+        """Get the MPI prefix based on the ``nranks`` directives.
 
         Parameters
         ----------
@@ -290,7 +290,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
     @template_filter
     def get_prefix(cls, operation, parallel=False, mpi_prefix=None, cmd_prefix=None):
-        """Template filter for getting the prefix based on proper directives.
+        """Template filter generating a command prefix from directives.
 
         Parameters
         ----------

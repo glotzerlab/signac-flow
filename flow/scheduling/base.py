@@ -98,7 +98,10 @@ class Scheduler:
     def jobs(self):
         """Yield all cluster jobs.
 
-        :yields:
-            :class:`.ClusterJob`
+        Yields
+        ------
+        :class:`.ClusterJob`
+            Cluster job.
+
         """
         raise NotImplementedError()

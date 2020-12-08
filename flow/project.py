@@ -2507,7 +2507,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if err is None:
             err = sys.stderr
 
-        aggregates = self._convert_aggregates_from_jobs(jobs)
+        aggregates = self._convert_jobs_to_aggregates(jobs)
         if aggregates is not None:
             # Fetch all the distinct jobs from all the jobs or aggregate passed by the user.
             distinct_jobs = set()
@@ -3146,7 +3146,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type ignore_conditions:
             :py:class:`~.IgnoreConditions`
         """
-        aggregates = self._convert_aggregates_from_jobs(jobs)
+        aggregates = self._convert_jobs_to_aggregates(jobs)
 
         # Get all matching FlowGroups
         if isinstance(names, str):
@@ -3392,10 +3392,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Raise error as didn't find the id in any of the stored objects
         raise LookupError(f"Did not find aggregate with id {id} in the project")
 
-    def _convert_aggregates_from_jobs(self, jobs):
-        # The jobs parameter in public methods like ``run``, ``submit``, ``status`` may
-        # accept either a signac job or an aggregate. We convert that job / aggregate
-        # (which may be of any type (e.g. list)) to an aggregate of type ``tuple``.
+    def _convert_jobs_to_aggregates(self, jobs):
+        # The jobs parameter in public methods like ``run``, ``submit``, ``status`` currently
+        # accepts a sequence of signac jobs. We need to convert that sequence into a
+        # sequence of tuples containing single signac jobs.
+        # TODO: Add support for case when user passes a sequence of aggregates.
         if jobs is not None:
             # aggregates must be a set to prevent duplicate entries
             aggregates = set()
@@ -3758,7 +3759,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type ignore_conditions:
             :py:class:`~.IgnoreConditions`
         """
-        aggregates = self._convert_aggregates_from_jobs(jobs)
+        aggregates = self._convert_jobs_to_aggregates(jobs)
 
         # Regular argument checks and expansion
         if isinstance(names, str):
@@ -4700,6 +4701,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     raise LookupError(f"Did not find job with id {error}.")
             return list(aggregates)
         elif "filter" in args or "doc_filter" in args:
+            if not (args.filter or args.doc_filter):
+                return None
             filter_ = parse_filter_arg(args.filter)
             doc_filter = parse_filter_arg(args.doc_filter)
             return JobsCursor(self, filter_, doc_filter)

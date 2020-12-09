@@ -682,6 +682,7 @@ class FlowCmdOperation(BaseFlowOperation):
         return f"{type(self).__name__}(cmd='{self._cmd}')"
 
     def __call__(self, *jobs, **kwargs):
+        """Return the command formatted with the supplied job(s)."""
         job = kwargs.pop("job", None)
         if kwargs:
             raise ValueError(f"Invalid keyword arguments: {', '.join(kwargs)}")
@@ -734,7 +735,7 @@ class FlowOperation(BaseFlowOperation):
 
         Parameters
         ----------
-        \*jobs : One or more instances of :class:`.Job`.
+        \*jobs : One or more instances of :class:`~signac.contrib.job.Job`.
             The jobs passed to the operation.
 
         Returns

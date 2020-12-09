@@ -240,6 +240,7 @@ class aggregator:
         return cls(aggregator_function, sort_by, sort_ascending, select)
 
     def __eq__(self, other):
+        """Test equality with another aggregator."""
         return (
             type(self) == type(other)
             and not self._is_aggregate
@@ -247,6 +248,7 @@ class aggregator:
         )
 
     def __hash__(self):
+        """Hash this aggregator."""
         return hash(
             (
                 self._sort_by,

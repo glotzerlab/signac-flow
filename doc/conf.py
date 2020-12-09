@@ -20,6 +20,7 @@ class Mock(MagicMock):
 
     @classmethod
     def __getattr__(cls, name):
+        """Get mocked attribute."""
         if name == "_mock_methods":
             return []
         return Mock()

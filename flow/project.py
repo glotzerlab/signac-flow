@@ -726,6 +726,7 @@ class FlowOperation(BaseFlowOperation):
         self._op_func = op_func
 
     def __str__(self):
+        """Return string representing operation."""
         return f"{type(self).__name__}(op_func='{self._op_func}')"
 
     def __call__(self, *jobs):

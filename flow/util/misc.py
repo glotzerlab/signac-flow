@@ -169,6 +169,7 @@ class TrackGetItemDict(dict):
         super().__init__(*args, **kwargs)
 
     def __getitem__(self, key):
+        """Get item by key."""
         self._keys_used.add(key)
         return super().__getitem__(key)
 

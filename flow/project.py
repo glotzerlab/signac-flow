@@ -781,10 +781,16 @@ class FlowGroupEntry:
 
         This call operator allows the class to be used as a decorator.
 
-        :param func:
+        Parameters
+        ----------
+        func : callable
             The function to decorate.
-        :type func:
-            callable
+
+        Returns
+        -------
+        callable
+            The decorated function.
+
         """
         if hasattr(func, "_flow_groups"):
             if self.name in func._flow_groups:

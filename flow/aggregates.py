@@ -372,10 +372,16 @@ class _AggregatesStore(Mapping):
     def __contains__(self, id):
         """Return whether this instance contains an aggregate (by aggregate id).
 
-        :param id:
+        Parameters
+        ----------
+        id : str
             The id of an aggregate of jobs.
-        :type id:
-            str
+
+        Returns
+        -------
+        bool
+            Whether this instance contains an aggregate.
+
         """
         return id in self._aggregate_per_id
 

@@ -109,7 +109,8 @@ def template_filter(func):
 
     Returns
     -------
-    callable : Decorated function.
+    callable
+        Decorated function.
 
     """
     setattr(func, "_flow_template_filter", True)
@@ -184,7 +185,8 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
         Returns
         -------
-        JobStatus.submitted or None : Status of job, if submitted.
+        JobStatus.submitted or None
+            Status of job, if submitted.
 
         """
         if flags is None:
@@ -238,7 +240,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
         Returns
         -------
-        type
+        object
             The value or default value.
 
         Raises
@@ -261,7 +263,8 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
         Returns
         -------
-        str : The prefix to be added to the operation's command.
+        str
+            The prefix to be added to the operation's command.
 
         """
         return "export OMP_NUM_THREADS={}; ".format(
@@ -280,11 +283,11 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
             If True, operations are assumed to be executed in parallel, which
             means that the number of total tasks is the sum of all tasks
             instead of the maximum number of tasks. Default is set to False.
-            :return mpi_prefix: The prefix should be added for the operation.
 
         Returns
         -------
-        str : The prefix to be added to the operation's command.
+        str
+            The prefix to be added to the operation's command.
 
         """
         if operation.directives.get("nranks"):
@@ -312,7 +315,8 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
         Returns
         -------
-        str : The prefix to be added to the operation's command.
+        str
+            The prefix to be added to the operation's command.
 
         """
         prefix = ""
@@ -544,7 +548,8 @@ def registered_environments(import_configured=True):
 
     Returns
     -------
-    list : List of registered environments.
+    list
+        List of registered environments.
 
     """
     if import_configured:
@@ -570,7 +575,8 @@ def get_environment(test=False, import_configured=True):
 
     Returns
     -------
-    :class:`~.ComputeEnvironment` : The detected environment class.
+    :class:`~.ComputeEnvironment`
+        The detected environment class.
 
     """
     if test:

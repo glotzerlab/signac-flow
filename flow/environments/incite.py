@@ -158,11 +158,11 @@ class SummitEnvironment(DefaultLSFEnvironment):
             If True, operations are assumed to be executed in parallel, which
             means that the number of total tasks is the sum of all tasks
             instead of the maximum number of tasks. Default is set to False.
-            :return mpi_prefix: The prefix should be added for the operation.
 
         Returns
         -------
-        str : The prefix to be added to the operation's command.
+        str
+            The prefix to be added to the operation's command.
 
         """
         extra_args = str(operation.directives.get("extra_jsrun_args", ""))

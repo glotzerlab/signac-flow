@@ -82,7 +82,8 @@ class Stampede2Environment(DefaultSlurmEnvironment):
 
         Returns
         -------
-        int : The value of the base offset before incrementing.
+        int
+            The value of the base offset before incrementing.
 
         """
         cls.base_offset += increment
@@ -157,11 +158,11 @@ class Stampede2Environment(DefaultSlurmEnvironment):
             If True, operations are assumed to be executed in parallel, which
             means that the number of total tasks is the sum of all tasks
             instead of the maximum number of tasks. Default is set to False.
-            :return mpi_prefix: The prefix should be added for the operation.
 
         Returns
         -------
-        str : The prefix to be added to the operation's command.
+        str
+            The prefix to be added to the operation's command.
 
         """
         if operation.directives.get("nranks"):

@@ -377,7 +377,7 @@ class _JobOperation:
 class JobOperation(_JobOperation):
     """Class containing execution information for one group and one job.
 
-    The execution or submission of a :class:`FlowGroup` uses a passed-in command
+    The execution or submission of a :class:`~.FlowGroup` uses a passed-in command
     which can either be a string or function with no arguments that returns a shell
     executable command.  The shell executable command won't be used if it is
     determined that the group can be executed without forking.

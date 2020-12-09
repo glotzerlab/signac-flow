@@ -20,6 +20,7 @@ Changed
 +++++++
 - Command line interface for ``exec`` changed parameter name from ``jobid`` to ``job_id`` (#363).
 - Default environment for the umn mangi cluster changed from slurm to torque
+(#393).
 
 
 Version 0.11

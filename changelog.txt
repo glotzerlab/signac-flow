@@ -23,7 +23,7 @@ Changed
 Fixed
 +++++
 
-- Cache the fully qualified domain name during environment detection to fix a performance issue on macOS (#339, #394)
+- Cache the fully qualified domain name during environment detection to fix a performance issue on macOS (#339, #394).
 
 Version 0.11
 ============

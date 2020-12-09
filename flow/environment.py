@@ -44,8 +44,11 @@ logger = logging.getLogger(__name__)
 
 @lru_cache(maxsize=1)
 def _cached_fqdn():
-    """We cache this since fetching the fully qualified domain name can be
-    slow on macOS."""
+    """Return the fully qualified domain name.
+    
+    This value is cached because fetching the fully qualified domain name can
+    be slow on macOS.
+    """
     return socket.getfqdn()
 
 

@@ -15,6 +15,7 @@ import logging
 import os
 import re
 import socket
+from functools import lru_cache
 from collections import OrderedDict
 
 from signac.common import config
@@ -40,7 +41,7 @@ from .util import config as flow_config
 
 logger = logging.getLogger(__name__)
 
-_fqdn = None
+@lru_cache(maxsize=1)
 def _cached_fqdn():
     """Returns the fully qualified domain name.
 
@@ -48,11 +49,7 @@ def _cached_fqdn():
     and cache the value. If called again, return the cached value.
     Solves #339
     """
-    if _fqdn is None:
-        _fqdn = socket.getfqdn()
-        import pdb
-        pdb.set_trace()
-    return _fqdn
+    return socket.getfqdn()
 
 
 def setup(py_modules, **attrs):

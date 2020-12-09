@@ -186,7 +186,7 @@ class _condition:
 
     @classmethod
     def false(cls, key):
-        """Evaluate job document key for False value.
+        """Evaluate if a document key is False for the job(s).
 
         Returns True if the specified key is present in the job document(s) and
         evaluates to False.

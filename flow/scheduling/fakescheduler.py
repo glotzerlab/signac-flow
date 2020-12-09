@@ -21,7 +21,7 @@ class FakeScheduler(Scheduler):
     """
 
     def jobs(self):
-        """Return None (no jobs are scheduled)."""
+        """Return None (no jobs are scheduled by the FakeScheduler)."""
         return None
 
     def submit(self, script, **kwargs):

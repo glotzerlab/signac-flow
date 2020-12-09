@@ -50,8 +50,8 @@ class JobStatus(enum.IntEnum):
 class ClusterJob:
     """Class representing a cluster job."""
 
-    def __init__(self, jobid, status=None):
-        self._job_id = jobid
+    def __init__(self, job_id, status=None):
+        self._job_id = job_id
         self._status = status
 
     def _id(self):

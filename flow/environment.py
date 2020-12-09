@@ -298,13 +298,13 @@ class StandardEnvironment(ComputeEnvironment):
     def is_present(cls):
         """Determine whether this specific compute environment is present.
 
-        The standard environment is always present, so this returns True.
+        The StandardEnvironment is always present, so this returns True.
         """
         return True
 
 
 class TestEnvironment(ComputeEnvironment):
-    """Test environment.
+    """Environment used for testing.
 
     The test environment will print a mocked submission script
     and submission commands to screen. This enables testing of

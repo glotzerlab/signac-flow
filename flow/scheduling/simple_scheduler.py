@@ -1,7 +1,7 @@
 # Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-"""Implementation of the scheduling system for the built-in simple scheduler."""
+"""Implementation of the scheduling system for the bundled ``simple-scheduler`` script."""
 import json
 import os
 import subprocess
@@ -11,7 +11,11 @@ from .base import ClusterJob, JobStatus, Scheduler
 
 
 class SimpleScheduler(Scheduler):
-    """Implementation of the abstract Scheduler class for SimpleScheduler.
+    """Implementation of the abstract Scheduler class for the bundled ``simple-scheduler``.
+
+    The package signac-flow includes a script in ``bin/simple-scheduler`` that
+    is a simple model of a cluster job scheduler. The ``simple-scheduler``
+    script is designed primarily for testing and demonstration.
 
     This class can submit cluster jobs to the built-in simple scheduler and
     query their current status.
@@ -42,7 +46,7 @@ class SimpleScheduler(Scheduler):
         :param pretend:
             If True, do not actually submit the script, but only simulate the submission.
             Can be used to test whether the submission would be successful.
-            Please note: A successful "pretend" submission is not guaranteed to succeed.
+            A successful "pretend" submission is not guaranteed to succeed.
         :type pretend:
             bool
         :returns:

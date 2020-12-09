@@ -51,7 +51,7 @@ class TemplateError(Jinja2Extension):
     tags = {"raise"}
 
     def parse(self, parser):
-        """Call :meth:`~.err` when the tag ``raise`` occurs in a template."""
+        """Call :meth:`~.err` when a template raises an Exception."""
         lineno = next(parser.stream).lineno
         args = [parser.parse_expression()]
         return jinja2.nodes.CallBlock(

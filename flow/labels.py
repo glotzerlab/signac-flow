@@ -27,6 +27,15 @@ class label:
         self.name = name
 
     def __call__(self, func):
+        """Add the function as a label.
+
+        This call operator allows the class to be used as a decorator.
+
+        :param func:
+            The function to decorate.
+        :type func:
+            callable
+        """
         func._label = True
         if self.name is not None:
             func._label_name = self.name
@@ -40,6 +49,15 @@ class staticlabel(label):
     """
 
     def __call__(self, func):
+        """Add the function as a label.
+
+        This call operator allows the class to be used as a decorator.
+
+        :param func:
+            The function to decorate.
+        :type func:
+            callable
+        """
         return staticmethod(super().__call__(func))
 
 
@@ -50,6 +68,15 @@ class classlabel(label):
     """
 
     def __call__(self, func):
+        """Add the function as a label.
+
+        This call operator allows the class to be used as a decorator.
+
+        :param func:
+            The function to decorate.
+        :type func:
+            callable
+        """
         return classmethod(super().__call__(func))
 
 

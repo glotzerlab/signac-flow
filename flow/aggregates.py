@@ -1,13 +1,20 @@
 # Copyright (c) 2020 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
+"""Aggregation allows the definition of operations on multiple jobs.
+
+Operations are each associated with an aggregator that determines how
+jobs are grouped before being passed as arguments to the operation. The
+default aggregator produces individual jobs.
+"""
 import itertools
 from collections.abc import Iterable, Mapping
 from hashlib import md5
 
 
 class aggregator:
-    r"""Decorator for operation function that is to be aggregated.
+    """Decorator for operation functions that operate on aggregates.
+
     By default, if the ``aggregator_function`` is not passed,
     an aggregate of all jobs will be created.
 
@@ -35,8 +42,8 @@ class aggregator:
     :type sort_ascending:
         bool
     :param select:
-        Condition for filtering individual jobs. This is passed as the
-        callable argument to `filter`. The default behavior is no filtering.
+        Condition for filtering individual jobs. This is passed as the callable
+        argument to :meth:`filter`. The default behavior is no filtering.
     :type select:
         callable or NoneType
     """
@@ -70,18 +77,18 @@ class aggregator:
 
     @classmethod
     def groupsof(cls, num=1, sort_by=None, sort_ascending=True, select=None):
-        """Aggregates jobs of a set group size.
+        """Aggregate jobs into groupings of a given size.
 
-        By default aggregate of a single job is created.
+        By default, creates aggregates consisting of a single job.
 
-        If the number of jobs present in the project is not divisible by the number
-        provided by the user, the last aggregate will be smaller and contain all
-        remaining jobs.
-        For instance, if 10 jobs are present in a project and they are aggregated in
-        groups of 3, then the generated aggregates will have lengths 3, 3, 3, and 1.
+        If the number of jobs present in the project is not divisible by the
+        number provided by the user, the last aggregate will be smaller and
+        contain the remaining jobs. For instance, if 10 jobs are present in a
+        project and they are aggregated in groups of 3, then the generated
+        aggregates will have lengths 3, 3, 3, and 1.
 
-        The code block below provides an example on how jobs can be aggregated in
-        groups of 2.
+        The code block below provides an example of how jobs can be aggregated
+        in groups of 2.
 
         .. code-block:: python
 
@@ -135,7 +142,7 @@ class aggregator:
 
     @classmethod
     def groupby(cls, key, default=None, sort_by=None, sort_ascending=True, select=None):
-        """Aggregates jobs according to matching state point key values.
+        """Aggregate jobs according to matching state point values.
 
         The below code block provides an example of how to aggregate jobs having a
         common state point parameter 'sp' whose value, when not found, is replaced by a
@@ -248,13 +255,15 @@ class aggregator:
         )
 
     def _get_unique_function_id(self, func):
-        """Generate unique id for the function passed. The id returned is used to generate
-        hash and compare arbitrary types which are callable like ``self._aggregator_function``
-        and ``self._select`` attributes.
+        """Generate unique id for the provided function.
 
-        Since ``select`` and ``aggregator_function`` are internal hence hash for the similar
-        functions can also differ. Hence we need to generate byte code in order to be able to
-        equate the functions properly.
+        Hashing the bytecode rather than directly hashing the function allows
+        for the comparison of internal functions like ``self._aggregator_function``
+        or ``self._select`` that may have the same definitions but different
+        hashes simply because they are distinct objects.
+
+        It is possible for equivalent functions to have different ids if the
+        bytecode is not identical.
         """
         try:
             return hash(func.__code__.co_code)
@@ -281,20 +290,27 @@ class aggregator:
             return _AggregatesStore(self, project)
 
     def __call__(self, func=None):
+        """Add this aggregator to a provided operation.
+
+        This call operator allows the class to be used as a decorator.
+
+        :param func:
+            The function to decorate.
+        :type func:
+            callable
+        """
         if callable(func):
             setattr(func, "_flow_aggregate", self)
             return func
         else:
             raise TypeError(
-                "Invalid argument passed while calling "
-                "the aggregate instance. Expected a callable, "
-                f"got {type(func)}."
+                "Invalid argument passed while calling the aggregate "
+                f"instance. Expected a callable, got {type(func)}."
             )
 
 
 class _AggregatesStore(Mapping):
-    """This class holds the information of all the aggregates associated with
-    a :class:`aggregator`.
+    """Class containing all aggregates associated with an :class:`aggregator`.
 
     This is a callable class which, when called, generates all the aggregates.
     Iterating over this object yields all aggregates.
@@ -331,8 +347,7 @@ class _AggregatesStore(Mapping):
             )
 
     def __contains__(self, id):
-        """Return whether an aggregate is stored in this instance of
-        :py:class:`_AggregateStore`.
+        """Return whether this instance contains an aggregate (by aggregate id).
 
         :param id:
             The id of an aggregate of jobs.
@@ -360,8 +375,9 @@ class _AggregatesStore(Mapping):
         return self._aggregate_per_id.items()
 
     def _register_aggregates(self, project):
-        """If the instance of this class is called then we will
-        generate aggregates and store them in ``self._aggregate_per_id``.
+        """Register aggregates for a given project.
+
+        This is called at instantiation to generate and store aggregates.
         """
         aggregated_jobs = self._generate_aggregates(project)
         self._create_nested_aggregate_list(aggregated_jobs, project)
@@ -411,8 +427,10 @@ class _AggregatesStore(Mapping):
 
 
 class _DefaultAggregateStore(Mapping):
-    """This class holds the information of the project associated with
-    an operation function using the default aggregator, i.e.
+    """Aggregate storage wrapper for the default aggregator.
+
+    This class holds the information of the project associated with an
+    operation function using the default aggregator, i.e.
     ``aggregator.groupsof(1)``.
 
     Iterating over this object yields tuples each containing one job from the project.
@@ -438,8 +456,7 @@ class _DefaultAggregateStore(Mapping):
             raise LookupError(f"Did not find aggregate with id {id}.")
 
     def __contains__(self, id):
-        """Return whether the job is present in the project associated with this
-        instance of :py:class:`_DefaultAggregateStore`.
+        """Return whether this instance contains a job (by job id).
 
         :param id:
             The job id.
@@ -477,9 +494,10 @@ class _DefaultAggregateStore(Mapping):
             yield (job.get_id(), (job,))
 
     def _register_aggregates(self, project):
-        """We have to store self._project when this method is invoked
-        This is because we will then iterate over that project in
-        order to return an aggregates of one.
+        """Register aggregates for a given project.
+
+        A reference to the project is stored on instantiation, and iterated
+        over on-the-fly.
         """
         self._project = project
 

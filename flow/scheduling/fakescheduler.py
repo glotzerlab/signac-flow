@@ -21,14 +21,17 @@ class FakeScheduler(Scheduler):
     """
 
     def jobs(self):
-        """Yields nothing, since the FakeScheduler does not actually schedule any jobs."""
-        return
-        yield
+        """Return None, since the FakeScheduler does not schedule any jobs."""
+        return None
 
     def submit(self, script, **kwargs):
-        """Just print the script to screen."""
+        """Print the script to screen."""
         print(script)
 
     @classmethod
     def is_present(cls):
+        """Return False.
+
+        The fake scheduler is never present unless manually specified.
+        """
         return False

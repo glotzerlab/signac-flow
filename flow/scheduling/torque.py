@@ -59,9 +59,11 @@ class TorqueJob(ClusterJob):
         return str(self._id())
 
     def name(self):
+        """Return the name of the cluster job."""
         return self.node.find("Job_Name").text
 
     def status(self):
+        """Return the status of the cluster job."""
         job_state = self.node.find("job_state").text
         if job_state == "R":
             return JobStatus.active

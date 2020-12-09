@@ -3,8 +3,9 @@
 # This software is licensed under the BSD 3-Clause License.
 """Aggregation allows the definition of operations on multiple jobs.
 
-Operations each have a specific aggregator. The default aggregator uses
-individual jobs from the signac data space.
+Operations are each associated with an aggregator that determines how
+jobs are grouped before being passed as arguments to the operation. The
+default aggregator produces individual jobs.
 """
 import itertools
 from collections.abc import Iterable, Mapping
@@ -12,7 +13,7 @@ from hashlib import md5
 
 
 class aggregator:
-    """Decorator for operation function that is to be aggregated.
+    """Decorator for operation functions that operate on aggregates.
 
     By default, if the ``aggregator_function`` is not passed,
     an aggregate of all jobs will be created.
@@ -78,7 +79,7 @@ class aggregator:
     def groupsof(cls, num=1, sort_by=None, sort_ascending=True, select=None):
         """Aggregate jobs into groupings of a given size.
 
-        By default, aggregates of a single job are created.
+        By default, creates aggregates consisting of a single job.
 
         If the number of jobs present in the project is not divisible by the
         number provided by the user, the last aggregate will be smaller and
@@ -86,7 +87,7 @@ class aggregator:
         project and they are aggregated in groups of 3, then the generated
         aggregates will have lengths 3, 3, 3, and 1.
 
-        The code block below provides an example on how jobs can be aggregated
+        The code block below provides an example of how jobs can be aggregated
         in groups of 2.
 
         .. code-block:: python
@@ -256,9 +257,10 @@ class aggregator:
     def _get_unique_function_id(self, func):
         """Generate unique id for the provided function.
 
-        Hashing the bytecode allows for the comparison of internal functions
-        like ``self._aggregator_function`` or ``self._select`` that may have
-        the same definitions but different hashes.
+        Hashing the bytecode rather than directly hashing the function allows
+        for the comparison of internal functions like ``self._aggregator_function``
+        or ``self._select`` that may have the same definitions but different
+        hashes simply because they are distinct objects.
 
         It is possible for equivalent functions to have different ids if the
         bytecode is not identical.
@@ -308,7 +310,7 @@ class aggregator:
 
 
 class _AggregatesStore(Mapping):
-    """Class containing all aggregates associated with a :class:`aggregator`.
+    """Class containing all aggregates associated with an :class:`aggregator`.
 
     This is a callable class which, when called, generates all the aggregates.
     Iterating over this object yields all aggregates.

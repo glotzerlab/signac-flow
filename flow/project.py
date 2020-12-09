@@ -749,12 +749,14 @@ class FlowOperation(BaseFlowOperation):
 class FlowGroupEntry:
     """A FlowGroupEntry registers operations for inclusion into a :py:class:`FlowGroup`.
 
-    Has two methods for adding operations: the call operator ``self()`` and
-    :meth:`~.with_directives`.  Using :meth:`~.with_directives` takes one
-    argument, ``directives``, which are applied to the operation when running
-    through the group. This overrides the default directives specified by
-    :meth:`flow.directives`. Calling the object directly will then use the
-    default directives.
+    Operation functions can be marked for inclusion into a :class:`FlowGroup`
+    by decorating the functions with a corresponding :class:`FlowGroupEntry`.
+    If the operation requires specific directives, :meth:`~.with_directives`
+    accepts keyword arguments that are mapped to directives and returns a
+    decorator that can be applied to the operation to mark it for inclusion in
+    the group and indicate that it should be executed using the specified
+    directives. This overrides the default directives specified by
+    :meth:`flow.directives`.
 
     :param name:
         The name of the :py:class:`FlowGroup` to be created.

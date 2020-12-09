@@ -42,7 +42,7 @@ class SimpleScheduler(Scheduler):
         :param pretend:
             If True, do not actually submit the script, but only simulate the submission.
             Can be used to test whether the submission would be successful.
-            Please note: A successful "pretend" submission is not guaranteed to succeed.
+            A successful "pretend" submission is not guaranteed to succeed.
         :type pretend:
             bool
         :returns:

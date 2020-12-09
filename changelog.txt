@@ -20,6 +20,10 @@ Changed
 +++++++
 - Command line interface for ``exec`` changed parameter name from ``jobid`` to ``job_id`` (#363).
 
+Fixed
++++++
+
+- Automatic environment detection no longer hangs as long if socket.fqdn times out (#339)
 
 Version 0.11
 ============

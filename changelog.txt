@@ -23,7 +23,7 @@ Changed
 Fixed
 +++++
 
-- Automatic environment detection no longer hangs as long if socket.fqdn times out (#339)
+- Cache the fully qualified domain name during environment detection to fix a performance issue on macOS (#339, #394)
 
 Version 0.11
 ============

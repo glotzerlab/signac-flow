@@ -44,12 +44,8 @@ logger = logging.getLogger(__name__)
 
 @lru_cache(maxsize=1)
 def _cached_fqdn():
-    """Returns the fully qualified domain name.
-
-    If called for the first time in a session, call socket.getfqdn
-    and cache the value. If called again, return the cached value.
-    Solves #339
-    """
+    """We cache this since fetching the fully qualified domain name can be
+    slow on macOS."""
     return socket.getfqdn()
 
 

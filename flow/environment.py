@@ -115,6 +115,21 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
     submit_flags = None
     template = "base_script.sh"
     mpi_cmd = "mpiexec"
+    fqdn = None
+
+
+    @classmethod
+    def _cached_fqdn(cls):
+        """Returns the fully qualified domain name.
+
+        If called for the first time in a session, call socket.getfqdn
+        and cache the value. If called again, return the cached value.
+        Solves #339
+        """
+        if cls.fqdn is None:
+            cls.fqdn = socket.getfqdn()
+        return cls.fqdn
+
 
     @classmethod
     def is_present(cls):
@@ -130,7 +145,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
             else:
                 return cls.scheduler_type.is_present()
         else:
-            return re.match(cls.hostname_pattern, socket.getfqdn()) is not None
+            return re.match(cls.hostname_pattern, cls._cached_fqdn()) is not None
 
     @classmethod
     def get_scheduler(cls):

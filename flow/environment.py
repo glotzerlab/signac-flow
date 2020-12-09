@@ -40,6 +40,20 @@ from .util import config as flow_config
 
 logger = logging.getLogger(__name__)
 
+_fqdn = None
+def _cached_fqdn():
+    """Returns the fully qualified domain name.
+
+    If called for the first time in a session, call socket.getfqdn
+    and cache the value. If called again, return the cached value.
+    Solves #339
+    """
+    if _fqdn is None:
+        _fqdn = socket.getfqdn()
+        import pdb
+        pdb.set_trace()
+    return _fqdn
+
 
 def setup(py_modules, **attrs):
     """Setup function for environment modules.
@@ -115,20 +129,9 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
     submit_flags = None
     template = "base_script.sh"
     mpi_cmd = "mpiexec"
-    fqdn = None
 
 
-    @classmethod
-    def _cached_fqdn(cls):
-        """Returns the fully qualified domain name.
 
-        If called for the first time in a session, call socket.getfqdn
-        and cache the value. If called again, return the cached value.
-        Solves #339
-        """
-        if cls.fqdn is None:
-            cls.fqdn = socket.getfqdn()
-        return cls.fqdn
 
 
     @classmethod
@@ -145,7 +148,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
             else:
                 return cls.scheduler_type.is_present()
         else:
-            return re.match(cls.hostname_pattern, cls._cached_fqdn()) is not None
+            return re.match(cls.hostname_pattern, _cached_fqdn()) is not None
 
     @classmethod
     def get_scheduler(cls):

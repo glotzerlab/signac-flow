@@ -41,6 +41,7 @@ from .util import config as flow_config
 
 logger = logging.getLogger(__name__)
 
+
 @lru_cache(maxsize=1)
 def _cached_fqdn():
     """Returns the fully qualified domain name.
@@ -126,10 +127,6 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
     submit_flags = None
     template = "base_script.sh"
     mpi_cmd = "mpiexec"
-
-
-
-
 
     @classmethod
     def is_present(cls):

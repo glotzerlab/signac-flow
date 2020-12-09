@@ -15,8 +15,8 @@ import logging
 import os
 import re
 import socket
-from functools import lru_cache
 from collections import OrderedDict
+from functools import lru_cache
 
 from signac.common import config
 

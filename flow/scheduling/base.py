@@ -41,7 +41,7 @@ class JobStatus(enum.IntEnum):
     """The cluster job is in an error or failed state."""
 
     placeholder = 127
-    """A placeholder state that is used internally."""
+    """A placeholder state that is used for status rendering when no operations are eligible."""
 
     user = 128
     """All user-defined states must be >=128 in value."""

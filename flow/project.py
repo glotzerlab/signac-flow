@@ -1515,7 +1515,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :class:`flow.environment.ComputeEnvironment`
     :param entrypoint:
         A dictionary with two possible keys: ``'executable'`` and ``'path'``.
-        The path represents the filepath location of the script file (the
+        The path represents the location of the script file (the
         script file must call :meth:`FlowProject.main`). The executable
         represents the location of the Python interpreter used for the
         execution of :class:`~.BaseFlowOperation` that are Python functions.
@@ -3106,7 +3106,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             or all if the argument is omitted.
         :type jobs:
             Sequence of instances of :class:`~signac.contrib.job.Job` or
-            aggregate of instances of :class:`~signac.contrib.job.Job`.
+            sequence of aggregates where each aggregate is a sequence
+            of :class:`~signac.contrib.job.Job`.
         :param names:
             Only execute operations that are in the provided set of names, or all, if the
             argument is omitted.

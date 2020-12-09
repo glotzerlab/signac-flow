@@ -32,13 +32,13 @@ class NoSchedulerError(AttributeError):
 
 
 class UserConditionError(RuntimeError):
-    """Indicates an error during evaluation of a FlowCondition."""
+    """Indicates an error during evaluation of a condition."""
 
     pass
 
 
 class UserOperationError(RuntimeError):
-    """Indicates an error during execution of a FlowOperation."""
+    """Indicates an error during execution of a :class:`~.BaseFlowOperation`."""
 
     pass
 
@@ -51,7 +51,7 @@ class TemplateError(Jinja2Extension):
     tags = {"raise"}
 
     def parse(self, parser):
-        """Call :meth:`TemplateError.err` when a template raises an Exception."""
+        """Call :meth:`~.err` when a template raises an Exception."""
         lineno = next(parser.stream).lineno
         args = [parser.parse_expression()]
         return jinja2.nodes.CallBlock(

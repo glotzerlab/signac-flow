@@ -14,14 +14,14 @@ logger = logging.getLogger(__name__)
 
 
 class FakeScheduler(Scheduler):
-    """Implementation of the abstract Scheduler class for a fake scheduler.
+    """Implementation of the abstract :class:`~.Scheduler` class for a fake scheduler.
 
     This scheduler does not actually schedule (or execute) any jobs, but it can be used
     to test the submission workflow.
     """
 
     def jobs(self):
-        """Return None, since the FakeScheduler does not schedule any jobs."""
+        """Return None (no jobs are scheduled by the FakeScheduler)."""
         return None
 
     def submit(self, script, **kwargs):
@@ -32,6 +32,6 @@ class FakeScheduler(Scheduler):
     def is_present(cls):
         """Return False.
 
-        The fake scheduler is never present unless manually specified.
+        The :class:`~.FakeScheduler` is never present unless manually specified.
         """
         return False

@@ -17,8 +17,8 @@ class SimpleScheduler(Scheduler):
     is a simple model of a cluster job scheduler. The ``simple-scheduler``
     script is designed primarily for testing and demonstration.
 
-    This class allows us to submit cluster jobs to the built-in simple
-    scheduler and query their current status.
+    This class can submit cluster jobs to the built-in simple scheduler and
+    query their current status.
     """
 
     @classmethod

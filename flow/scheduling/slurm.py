@@ -62,8 +62,8 @@ class SlurmJob(ClusterJob):
 class SlurmScheduler(Scheduler):
     """Implementation of the abstract Scheduler class for SLURM schedulers.
 
-    This class allows us to submit cluster jobs to a SLURM scheduler and query
-    their current status.
+    This class can submit cluster jobs to a SLURM scheduler and query their
+    current status.
 
     :param user:
         Limit the status information to cluster jobs submitted by user.

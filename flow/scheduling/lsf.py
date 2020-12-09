@@ -69,8 +69,8 @@ class LSFJob(ClusterJob):
 class LSFScheduler(Scheduler):
     """Implementation of the abstract Scheduler class for LSF schedulers.
 
-    This class allows us to submit cluster jobs to a LSF scheduler and query
-    their current status.
+    This class can submit cluster jobs to a LSF scheduler and query their
+    current status.
 
     :param user:
         Limit the status information to cluster jobs submitted by user.

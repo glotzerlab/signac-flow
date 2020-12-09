@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class CometEnvironment(DefaultSlurmEnvironment):
     """Environment profile for the Comet supercomputer.
 
-    http://www.sdsc.edu/services/hpc/hpc_systems.html#comet
+    https://www.sdsc.edu/services/hpc/hpc_systems.html#comet
     """
 
     hostname_pattern = "comet"

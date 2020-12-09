@@ -238,6 +238,49 @@ def _make_bundles(operations, size=None):
             break
 
 
+class AggregatesCursor:
+    """Utility class to iterate over aggregates stored in a FlowProject.
+
+    .. note::
+
+        This class is used by the :class:`~.FlowProject` class for the verification
+        of aggregates provided by the users and should not be instantiated by
+        users themselves.
+
+    Parameters
+    ----------
+    project : :class:`~.FlowProject`
+        A FlowProject
+    filter : dict
+        A mapping of key-value pairs that all indexed job state points are
+        compared against (Default value = None).
+    doc_filter : dict
+        A mapping of key-value pairs that all indexed job documents are
+        compared against (Default value = None).
+    """
+
+    def __init__(self, project, filter=None, doc_filter=None):
+        if filter or doc_filter:
+            filter_ = parse_filter_arg(filter)
+            doc_filter = parse_filter_arg(doc_filter)
+            self._job_cursor = JobsCursor(project, filter_, doc_filter)
+        else:
+            self._job_cursor = project
+
+    def __eq__(self, other):
+        return self._job_cursor == other._job_cursor
+
+    def __contains__(self, aggregate):
+        return len(aggregate) == 1 and aggregate[0] in self._job_cursor
+
+    def __len__(self):
+        return len(self._job_cursor)
+
+    def __iter__(self):
+        for job in self._job_cursor:
+            yield (job,)
+
+
 class _JobOperation:
     """This class represents the information needed to execute one group for one job.
 
@@ -1989,6 +2032,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type ignore_errors:
             bool
         """
+        if jobs is None:
+            jobs = AggregatesCursor(self)
+
         if file is None:
             file = sys.stderr
         try:
@@ -2508,14 +2554,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             err = sys.stderr
 
         aggregates = self._convert_jobs_to_aggregates(jobs)
-        if aggregates is not None:
-            # Fetch all the distinct jobs from all the jobs or aggregate passed by the user.
-            distinct_jobs = set()
-            for aggregate in aggregates:
-                for job in aggregate:
-                    distinct_jobs.add(job)
-        else:
-            distinct_jobs = self
+        # Fetch all the distinct jobs from all the jobs or aggregate passed by the user.
+        distinct_jobs = set()
+        for aggregate in aggregates:
+            for job in aggregate:
+                distinct_jobs.add(job)
 
         if eligible_jobs_max_lines is None:
             eligible_jobs_max_lines = flow_config.get_config_value(
@@ -3350,6 +3393,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         self, jobs=None, operation_names=None, ignore_conditions=IgnoreConditions.NONE
     ):
         """Get all pending operations for the given selection."""
+        if jobs is None:
+            jobs = AggregatesCursor(self)
         assert not isinstance(operation_names, str)
         for operation in self._next_operations(jobs, ignore_conditions):
             # Return operations with names that match the provided list of
@@ -3374,14 +3419,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @staticmethod
     def _is_selected_aggregate(aggregate, jobs):
-        """Verifies whether the aggregate is present in the provided jobs.
-
-        Providing ``jobs=None`` indicates that no specific job is provided by
-        the user and hence ``aggregate`` is eligible for further evaluation.
-
-        Always returns True if jobs is None.
-        """
-        return (jobs is None) or (aggregate in jobs)
+        """Verifies whether the aggregate is present in the provided jobs."""
+        return aggregate in jobs
 
     def _get_aggregate_from_id(self, id):
         # Iterate over all the instances of stored aggregates and search for the
@@ -3396,10 +3435,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # The jobs parameter in public methods like ``run``, ``submit``, ``status`` currently
         # accepts a sequence of signac jobs. We need to convert that sequence into a
         # sequence of tuples containing single signac jobs.
-        # TODO: Add support for case when user passes a sequence of aggregates.
-        if jobs is not None:
-            # aggregates must be a set to prevent duplicate entries
-            aggregates = set()
+
+        if jobs is None:
+            return AggregatesCursor(self)
+        elif isinstance(jobs, AggregatesCursor):
+            return jobs
+        else:
+            aggregates = []
             for aggregate in jobs:
                 # User can still pass signac jobs.
                 if isinstance(aggregate, signac.contrib.job.Job):
@@ -3407,7 +3449,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         raise LookupError(
                             f"Did not find job {aggregate} in the project"
                         )
-                    aggregates.add((aggregate,))
+                    aggregates.append((aggregate,))
                 else:
                     try:
                         aggregate = tuple(aggregate)
@@ -3421,9 +3463,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                             raise LookupError(
                                 f"Did not find aggregate {aggregate} in the project"
                             )
-                        aggregates.add(aggregate)  # An aggregate provided by the user
-            return list(aggregates)
-        return None
+                        aggregates.append(
+                            aggregate
+                        )  # An aggregate provided by the user
+            return aggregates
 
     @contextlib.contextmanager
     def _potentially_buffered(self):
@@ -4231,6 +4274,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :yield:
             All instances of :class:`~._JobOperation` jobs are eligible for.
         """
+        if jobs is None:
+            jobs = AggregatesCursor(self)
         for name in self.operations:
             group = self._groups[name]
             for aggregate in self._get_aggregate_store(group.name).values():
@@ -4700,14 +4745,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 except KeyError as error:
                     raise LookupError(f"Did not find job with id {error}.")
             return list(aggregates)
-        elif "filter" in args or "doc_filter" in args:
-            if not (args.filter or args.doc_filter):
-                return None
-            filter_ = parse_filter_arg(args.filter)
-            doc_filter = parse_filter_arg(args.doc_filter)
-            return JobsCursor(self, filter_, doc_filter)
-        else:
-            return None
+        elif args.func == self._main_exec:  # exec command used with job_id
+            return AggregatesCursor(self)
+        else:  # filter or doc filter provided
+            return AggregatesCursor(self, args.filter, args.doc_filter)
 
     def main(self, parser=None):
         """Call this function to use the main command line interface.

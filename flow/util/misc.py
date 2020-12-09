@@ -218,7 +218,7 @@ def _to_hashable(obj):
 
     Parameters
     ----------
-    obj :
+    obj
         Object to make hashable. Lists are converted to tuples, and hashes are
         defined for dicts.
 

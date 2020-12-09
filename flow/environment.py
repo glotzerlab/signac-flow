@@ -543,8 +543,8 @@ def registered_environments(import_configured=True):
     Parameters
     ----------
     import_configured : bool
-         Whether to import environments specified in the flow configuration.
-         (Default value = True)
+        Whether to import environments specified in the flow configuration.
+        (Default value = True)
 
     Returns
     -------
@@ -570,8 +570,8 @@ def get_environment(test=False, import_configured=True):
     test : bool
         Whether to return the TestEnvironment. (Default value = False)
     import_configured : bool
-         Whether to import environments specified in the flow configuration.
-         (Default value = True)
+        Whether to import environments specified in the flow configuration.
+        (Default value = True)
 
     Returns
     -------

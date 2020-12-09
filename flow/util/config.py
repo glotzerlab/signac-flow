@@ -34,7 +34,7 @@ def require_config_value(key, ns=None, default=_GET_CONFIG_VALUE_NONE):
         The environment specific configuration key.
     ns : str
         The namespace in which to look for the key. (Default value = None)
-    default :
+    default
         A default value in case the key cannot be found
         within the user's configuration.
 

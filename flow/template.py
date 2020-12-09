@@ -35,22 +35,25 @@ def init(alias=None, template=None, root=None, out=None):
     Parameters
     ----------
     alias : str
-         Python identifier used as a file name for the template output. Uses
-         ``"project"`` if None.  (Default value = None)
+        Python identifier used as a file name for the template output. Uses
+        ``"project"`` if None.  (Default value = None)
+
     template : str
-         Name of the template to use. Built-in templates are:
+        Name of the template to use. Built-in templates are:
 
-         * ``"minimal"``
-         * ``"example"``
-         * ``"testing"``
+        * ``"minimal"``
+        * ``"example"``
+        * ``"testing"``
 
-         Uses ``"minimal"`` if None. (Default value = None)
+        Uses ``"minimal"`` if None. (Default value = None)
+
     root : str
-         Directory where the output file is placed. Uses the current working
-         directory if None. (Default value = None)
+        Directory where the output file is placed. Uses the current working
+        directory if None. (Default value = None)
+
     out : file-like object
-         The stream where output is printed. Uses :obj:`sys.stderr` if None.
-         (Default value = None)
+        The stream where output is printed. Uses :obj:`sys.stderr` if None.
+        (Default value = None)
 
     Returns
     -------

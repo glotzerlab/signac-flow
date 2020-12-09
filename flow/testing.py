@@ -16,11 +16,11 @@ def make_project(alias="project", root=None, **kwargs):
     Parameters
     ----------
     alias : str
-         Python identifier used as a file name for the template output.
-         (Default value = ``"project"``)
+        Python identifier used as a file name for the template output.
+        (Default value = ``"project"``)
     root : str
-         Directory where the output file is placed. Uses the current working
-         directory if None. (Default value = None)
+        Directory where the output file is placed. Uses the current working
+        directory if None. (Default value = None)
     \*\*kwargs
         Keyword arguments forwarded to :meth:`signac.testing.init_jobs`.
 

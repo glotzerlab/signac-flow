@@ -88,9 +88,8 @@ class aggregator:
         project and they are aggregated in groups of 3, then the generated
         aggregates will have lengths 3, 3, 3, and 1.
 
-        Example
-        -------
-
+        Examples
+        --------
         The code block below shows how to aggregate jobs in groups of 2.
 
         .. code-block:: python
@@ -147,9 +146,8 @@ class aggregator:
     def groupby(cls, key, default=None, sort_by=None, sort_ascending=True, select=None):
         """Aggregate jobs according to matching state point values.
 
-        Example
-        -------
-
+        Examples
+        --------
         The code block below provides an example of how to aggregate jobs
         having a common state point parameter ``'sp'`` whose value, if not
         found, is replaced by a default value of -1.

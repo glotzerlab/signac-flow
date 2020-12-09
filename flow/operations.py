@@ -203,7 +203,6 @@ def run(parser=None):
 
         You can control the degree of parallelization with the ``--np`` argument.
 
-
     For more information, see:
 
     .. code-block:: bash

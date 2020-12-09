@@ -196,7 +196,7 @@ class _Directives(MutableMapping):
             The other set of directives.
         aggregate : bool
             Whether to combine directives according to serial/parallel rules.
-        jobs :
+        jobs
             The jobs used to evaluate directives.
         parallel : bool
             Whether to aggregate according to parallel rules.
@@ -215,7 +215,7 @@ class _Directives(MutableMapping):
 
         Parameters
         ----------
-        jobs :
+        jobs
             The jobs used to evaluate directives.
 
         """

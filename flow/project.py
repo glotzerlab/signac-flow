@@ -239,7 +239,6 @@ def _make_bundles(operations, size=None):
     ----------
     operations : iterable
         Iterable of operations.
-
     size : int
         Size of bundles. (Default value = None)
 
@@ -2581,8 +2580,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         output_format : str
             Status output format, supports:
             'terminal' (default), 'markdown' or 'html'.
-        no_parallelize :
-             (Default value = False)
+        no_parallelize : bool
+            Disable parallelization. (Default value = False)
 
         Returns
         -------
@@ -3162,7 +3161,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Parameters
         ----------
-        jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs.
+        jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
             Only execute operations for the given jobs or aggregates of jobs,
             or all if the argument is omitted. (Default value = None)
         names : iterable of :class:`str`
@@ -3630,7 +3629,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         env : :class:`~.ComputeEnvironment`
             The environment to use for submission. Uses the environment defined
             by the :class:`~.FlowProject` if None (Default value = None).
-        \*\*kwargs :
+        \*\*kwargs
             Additional keyword aruguments forwarded to :meth:`~.ComputeEnvironment.submit`.
 
         Returns
@@ -3742,7 +3741,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         env : :class:`~.ComputeEnvironment`
             The environment to use for submission. Uses the environment defined
             by the :class:`~.FlowProject` if None (Default value = None).
-        \*\*kwargs :
+        \*\*kwargs
             Additional keyword aruguments forwarded to :meth:`~.ComputeEnvironment.submit`.
 
         Returns
@@ -3794,21 +3793,21 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Execute all bundled operations in parallel. (Default value = False)
         force : bool
             Ignore all warnings or checks during submission, just submit. (Default value = False)
-        walltime :
+        walltime : :class:`datetime.timedelta`
             Specify the walltime in hours or as instance of
             :class:`datetime.timedelta`. (Default value = None)
         ignore_conditions : :class:`~.IgnoreConditions`
             Specify if preconditions and/or postconditions are to be ignored
             when determining eligibility. The default is
             :class:`IgnoreConditions.NONE`.
-        ignore_conditions_on_execution :
+        ignore_conditions_on_execution : :class:`~.IgnoreConditions`
             Specify if preconditions and/or postconditions are to be ignored
             when determining eligibility after submitting. The default is
             :class:`IgnoreConditions.NONE`.
         env : :class:`~.ComputeEnvironment`
             The environment to use for submission. Uses the environment defined
             by the :class:`~.FlowProject` if None (Default value = None).
-        \*\*kwargs :
+        \*\*kwargs
             Additional keyword aruguments forwarded to :meth:`~.ComputeEnvironment.submit`.
 
         """
@@ -4247,7 +4246,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             List of preconditions. (Default value = None)
         post : sequence of callables
             List of postconditions. (Default value = None)
-        \*\*kwargs :
+        \*\*kwargs
             Keyword arguments passed as directives.
 
         """

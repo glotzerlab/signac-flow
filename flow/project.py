@@ -3023,7 +3023,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Parameters
         ----------
-        operations : Sequence of instances of :class:`.JobOperation`
+        operations : Sequence of instances of :class:`~.JobOperation`
             The operations to execute (optional). (Default value = None)
         pretend : bool
             Do not actually execute the operations, but show the commands that
@@ -3721,7 +3721,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Parameters
         ----------
-        operations : A sequence of instances of :class:`.JobOperation`
+        operations : A sequence of instances of :class:`~.JobOperation`
             The operations to submit.
         _id : str
             The _id to be used for this submission. (Default value = None)

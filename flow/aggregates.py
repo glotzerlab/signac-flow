@@ -18,9 +18,8 @@ class aggregator:
     By default, if the ``aggregator_function`` is ``None``, an aggregate of all
     jobs will be created.
 
-    Example
-    -------
-
+    Examples
+    --------
     The code block below defines a :class:`~.FlowOperation` that prints the
     total length of the provided aggregate of jobs.
 

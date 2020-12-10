@@ -84,7 +84,7 @@ class SummitEnvironment(DefaultLSFEnvironment):
 
         Parameters
         ----------
-        operation : class:`flow.BaseFlowOperation`
+        operation : :class:`flow.BaseFlowOperation`
             The operation whose directives will be used to compute the resource
             set.
 

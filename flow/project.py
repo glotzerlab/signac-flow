@@ -471,7 +471,7 @@ class _SubmissionJobOperation(_JobOperation):
         first pass of :meth:`FlowProject.run` because all postconditions are
         met. These operations may be executed in subsequent iterations of the
         run loop.
-    \*\*kwargs :
+    \*\*kwargs
         Passed to the constructor of :class:`_JobOperation`.
 
     """
@@ -4325,7 +4325,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Yields
         ------
-        :class:`~.JobOperation` :
+        :class:`~.JobOperation`
             Eligible job operation.
 
         """

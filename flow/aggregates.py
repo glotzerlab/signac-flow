@@ -276,7 +276,7 @@ class aggregator:
 
         Returns
         -------
-        str :
+        str
             The hash of the function's bytecode if possible, otherwise the hash
             of the function.
 
@@ -302,7 +302,7 @@ class aggregator:
 
         Returns
         -------
-        :class:`~._DefaultAggregateStore` or :class:`~._AggregatesStore` :
+        :class:`~._DefaultAggregateStore` or :class:`~._AggregatesStore`
             The aggregate store.
 
         """
@@ -549,7 +549,7 @@ def get_aggregate_id(jobs):
 
     Returns
     -------
-    str :
+    str
         The generated aggregate id.
 
     """

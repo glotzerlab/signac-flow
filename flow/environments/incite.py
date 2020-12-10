@@ -129,7 +129,7 @@ class SummitEnvironment(DefaultLSFEnvironment):
 
         Parameters
         ----------
-        resource_set :
+        resource_set : tuple
             Tuple of *(Number of resource sets, tasks (MPI Ranks) per resource
             set, physical cores (CPUs) per resource set, GPUs per resource
             set)*.

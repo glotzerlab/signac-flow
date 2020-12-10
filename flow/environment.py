@@ -16,6 +16,7 @@ import os
 import re
 import socket
 from collections import OrderedDict
+from functools import lru_cache
 
 from signac.common import config
 
@@ -39,6 +40,15 @@ from .scheduling.torque import TorqueScheduler
 from .util import config as flow_config
 
 logger = logging.getLogger(__name__)
+
+
+@lru_cache(maxsize=1)
+def _cached_fqdn():
+    """Return the fully qualified domain name.
+    This value is cached because fetching the fully qualified domain name can
+    be slow on macOS.
+    """
+    return socket.getfqdn()
 
 
 def setup(py_modules, **attrs):
@@ -130,7 +140,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
             else:
                 return cls.scheduler_type.is_present()
         else:
-            return re.match(cls.hostname_pattern, socket.getfqdn()) is not None
+            return re.match(cls.hostname_pattern, _cached_fqdn()) is not None
 
     @classmethod
     def get_scheduler(cls):

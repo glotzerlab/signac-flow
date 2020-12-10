@@ -14,6 +14,7 @@ import logging
 import os
 import re
 import socket
+from functools import lru_cache
 
 from deprecation import deprecated
 from signac.common import config
@@ -39,6 +40,16 @@ from .util import config as flow_config
 from .version import __version__
 
 logger = logging.getLogger(__name__)
+
+
+@lru_cache(maxsize=1)
+def _cached_fqdn():
+    """Return the fully qualified domain name.
+
+    This value is cached because fetching the fully qualified domain name can
+    be slow on macOS.
+    """
+    return socket.getfqdn()
 
 
 def setup(py_modules, **attrs):
@@ -130,7 +141,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
             if cls.scheduler_type is None:
                 return False
             return cls.scheduler_type.is_present()
-        return re.match(cls.hostname_pattern, socket.getfqdn()) is not None
+        return re.match(cls.hostname_pattern, _cached_fqdn()) is not None
 
     @classmethod
     def get_scheduler(cls):

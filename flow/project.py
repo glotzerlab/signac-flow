@@ -56,6 +56,7 @@ from .util import config as flow_config
 from .util import template_filters
 from .util.misc import (
     TrackGetItemDict,
+    _cached_partial,
     _positive_int,
     _to_hashable,
     add_cwd_to_environment_pythonpath,
@@ -1176,7 +1177,7 @@ class FlowGroup:
         :rtype:
             :class:`_SubmissionJobOperation`
         """
-        unevaluated_cmd = functools.partial(
+        unevaluated_cmd = _cached_partial(
             self._submit_cmd,
             entrypoint=entrypoint,
             jobs=jobs,
@@ -1269,7 +1270,10 @@ class FlowGroup:
                     operation_name, default_directives, env
                 )
                 directives.evaluate(jobs)
-                cmd = self._run_cmd(
+                # Return an unevaluated command to make evaluation lazy and
+                # reduce side effects in callable FlowCmdOperations.
+                unevaluated_cmd = _cached_partial(
+                    self._run_cmd,
                     entrypoint=entrypoint,
                     operation_name=operation_name,
                     operation=operation,
@@ -1280,7 +1284,7 @@ class FlowGroup:
                     self._generate_id(jobs, operation_name, index=index),
                     operation_name,
                     jobs,
-                    cmd=cmd,
+                    cmd=unevaluated_cmd,
                     directives=deepcopy(directives),
                 )
                 # Get the prefix, and if it's non-empty, set the fork directive

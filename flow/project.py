@@ -1984,8 +1984,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             )
             result["_operations_error"] = None
         except Exception as error:
-            msg = f"Error while getting operations status for job '{job}': '{error}'."
-            logger.debug(msg)
+            logger.debug(
+                "Error while getting operations status for job '%s': '%s'.", job, error
+            )
             if ignore_errors:
                 result["operations"] = {}
                 result["_operations_error"] = str(error)
@@ -1995,7 +1996,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             result["labels"] = sorted(set(self.labels(job)))
             result["_labels_error"] = None
         except Exception as error:
-            logger.debug(f"Error while determining labels for job '{job}': '{error}'.")
+            logger.debug(
+                "Error while determining labels for job '%s': '%s'.", job, error
+            )
             if ignore_errors:
                 result["labels"] = []
                 result["_labels_error"] = str(error)
@@ -2053,7 +2056,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         except NoSchedulerError:
             logger.debug("No scheduler available.")
         except RuntimeError as error:
-            logger.warning(f"Error occurred while querying scheduler: '{error}'.")
+            logger.warning("Error occurred while querying scheduler: '%s'.", error)
             if not ignore_errors:
                 raise
         else:
@@ -2128,7 +2131,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         try:
             result["labels"] = sorted(set(self.labels(job)))
         except Exception as error:
-            logger.debug(f"Error while determining labels for job '{job}': '{error}'.")
+            logger.debug(
+                "Error while determining labels for job '%s': '%s'.", job, error
+            )
             if ignore_errors:
                 result["labels"] = []
                 result["_labels_error"] = str(error)
@@ -2684,11 +2689,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         if errors:
             logger.warning(
-                "Some job status updates did not succeed due to errors. "
-                f"Number of unique errors: {len(errors)}. Use --debug to list all errors."
+                "Some job status updates did not succeed due to errors. Number "
+                "of unique errors: %i. Use --debug to list all errors.",
+                len(errors),
             )
             for i, error in enumerate(errors):
-                logger.debug(f"Status update error #{i + 1}: '{error}'")
+                logger.debug("Status update error #%i: '%s'", i + 1, error)
 
         if only_incomplete:
             # Remove jobs with no eligible operations from the status info
@@ -2916,12 +2922,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             for operation in operations:
                 self._execute_operation(operation, timeout, pretend)
         else:
-            logger.debug(f"Parallelized execution of {len(operations)} operation(s).")
+            logger.debug("Parallelized execution of %i operation(s).", len(operations))
             with contextlib.closing(
                 Pool(processes=cpu_count() if np < 0 else np)
             ) as pool:
                 logger.debug(
-                    f"Parallelized execution of {len(operations)} operation(s)."
+                    "Parallelized execution of %i operation(s).", len(operations)
                 )
                 try:
                     import pickle
@@ -3045,7 +3051,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             print(operation.cmd)
             return None
 
-        logger.info(f"Execute operation '{operation}'...")
+        logger.info("Execute operation '%s'...", operation)
         # Check if we need to fork for operation execution...
         if (
             # The 'fork' directive was provided and evaluates to True:
@@ -3059,15 +3065,17 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         ):
             # ... need to fork:
             logger.debug(
-                f"Forking to execute operation '{operation}' with "
-                f"cmd '{operation.cmd}'."
+                "Forking to execute operation '%s' with cmd '%s'.",
+                operation,
+                operation.cmd,
             )
             subprocess.run(operation.cmd, shell=True, timeout=timeout, check=True)
         else:
             # ... executing operation in interpreter process as function:
             logger.debug(
-                f"Executing operation '{operation}' with current interpreter "
-                f"process ({os.getpid()})."
+                "Executing operation '%s' with current interpreter process (%s).",
+                operation,
+                os.getpid(),
             )
             try:
                 self._operations[operation.name](*operation._jobs)
@@ -3321,7 +3329,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 )
 
             logger.info(
-                f"Executing {len(operations)} operation(s) (Pass #{i_pass:02d})..."
+                "Executing %i operation(s) (Pass #%02d)...",
+                len(operations),
+                i_pass,
             )
             self._run_operations(
                 operations, pretend=pretend, np=np, timeout=timeout, progress=progress
@@ -3544,8 +3554,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # with signac-flow unless additional environment information is
         # detected.
 
-        logger.info(f"Use environment '{env}'.")
-        logger.info(f"Set 'base_script={env.template}'.")
+        logger.info("Use environment '%s'.", env)
+        logger.info("Set 'base_script=%s'.", env.template)
         context["base_script"] = env.template
         context["environment"] = env
         context["id"] = _id
@@ -3661,9 +3671,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if keys_unused:
                 logger.warning(
                     "Some of the keys provided as part of the directives were not used by "
-                    "the template script, including: {}".format(
-                        ", ".join(sorted(keys_unused))
-                    )
+                    "the template script, including: %s",
+                    ", ".join(sorted(keys_unused)),
                 )
             if pretend:
                 print(script)

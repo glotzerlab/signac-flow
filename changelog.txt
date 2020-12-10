@@ -13,14 +13,15 @@ Version 0.12
 
 Added
 +++++
+
 - Code is formatted with ``black`` and ``isort`` pre-commit hooks (#365).
 - Add official support for Python version 3.9 (#365).
 
 Changed
 +++++++
-- Command line interface for ``exec`` changed parameter name from ``jobid`` to ``job_id`` (#363).
-- Default environment for the umn mangi cluster changed from slurm to torque (#393).
 
+- Command line interface for ``exec`` changed parameter name from ``jobid`` to ``job_id`` (#363).
+- Default environment for the University of Minnesota Mangi cluster changed from SLURM to Torque (#393).
 
 Version 0.11
 ============

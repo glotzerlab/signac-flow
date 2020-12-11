@@ -1,3 +1,11 @@
+# Copyright (c) 2020 The Regents of the University of Michigan
+# All rights reserved.
+# This software is licensed under the BSD 3-Clause License.
+"""Directives define how workflows are executed.
+
+Directives affect both execution and submission, such as specifying the number
+of processors required for an operation.
+"""
 import functools
 import operator
 import sys
@@ -47,6 +55,7 @@ class _Directive:
         multiple ways to be set or are dependent in some way on other
         directives. If ``None`` or not provided, the set value is returned.
         Defaults to ``None``.
+
     """
 
     def __init__(
@@ -91,6 +100,7 @@ class _Directive:
             Returns a immediately validated value for the given directive, or if
             a callable was passed, a new callable is returned that wraps the
             given callable with a validator.
+
         """
         if callable(value):
 
@@ -115,6 +125,7 @@ class _Directives(MutableMapping):
         The sequence of all environment-specified directives. All other
         directives are user-specified and not validated. All environment
         directives must be specified at initialization.
+
     """
 
     def __init__(self, environment_directives):
@@ -189,6 +200,7 @@ class _Directives(MutableMapping):
             The jobs used to evaluate directives.
         parallel : bool
             Whether to aggregate according to parallel rules.
+
         """
         if aggregate:
             self._aggregate(other, jobs=jobs, parallel=parallel)
@@ -205,6 +217,7 @@ class _Directives(MutableMapping):
         ----------
         jobs :
             The jobs used to evaluate directives.
+
         """
         for key, value in self.items():
             self[key] = _evaluate(value, jobs)
@@ -293,7 +306,7 @@ def _finalize_np(np, directives):
 
 # Helper validators for defining _Directive
 def _no_aggregation(value, other):
-    """Returns its first argument.
+    """Return the first argument.
 
     This is used for directives that ignore aggregation rules.
     """
@@ -354,7 +367,7 @@ Expects a string pointing to a valid executable file in the
 current file system.
 
 By default this should point to a Python executable (interpreter); however, if
-the :py:class:`FlowProject` path is an empty string, the executable can be a
+the :class:`FlowProject` path is an empty string, the executable can be a
 path to an executable Python script. Defaults to ``sys.executable``.
 """
 

@@ -33,7 +33,6 @@ def _parse_status(s):
 
 def _fetch(user=None):
     """Fetch the cluster job status information from the LSF scheduler."""
-
     if user is None:
         user = getpass.getuser()
 
@@ -63,14 +62,15 @@ class LSFJob(ClusterJob):
         self._status = _parse_status(record["STAT"])
 
     def name(self):
+        """Return the name of the cluster job."""
         return self.record["JOB_NAME"]
 
 
 class LSFScheduler(Scheduler):
     """Implementation of the abstract Scheduler class for LSF schedulers.
 
-    This class allows us to submit cluster jobs to a LSF scheduler and query
-    their current status.
+    This class can submit cluster jobs to a LSF scheduler and query their
+    current status.
 
     :param user:
         Limit the status information to cluster jobs submitted by user.

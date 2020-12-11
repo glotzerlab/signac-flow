@@ -13,14 +13,22 @@ Version 0.12
 
 Added
 +++++
+
 - Code is formatted with ``black`` and ``isort`` pre-commit hooks (#365).
 - Add official support for Python version 3.9 (#365).
+- Documentation has been added for all public classes and methods (#387).
 - Added class ``AggregatesCursor`` in ``flow`` to iterate over all the aggregates present in a ``FlowProject`` (#390).
 
 Changed
 +++++++
+
 - Command line interface always uses ``--job-id`` instead of ``--jobid`` (#363, #386).
 - ``CPUEnvironment`` and ``GPUEnvironment`` classes are deprecated (#381).
+
+Fixed
++++++
+
+- Cache the fully qualified domain name during environment detection to fix a performance issue on macOS (#339, #394).
 
 Version 0.11
 ============

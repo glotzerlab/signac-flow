@@ -10,20 +10,45 @@ class JobStatus(enum.IntEnum):
     """Classifies the job's execution status."""
 
     unknown = 1
+    """Unknown cluster job status."""
+
     registered = 2
+    """The cluster job is registered with the scheduler, but no other status is known."""
+
     inactive = 3
+    """The cluster job is inactive.
+
+    This includes states like completed, cancelled, or timed out.
+    """
+
     submitted = 4
+    """The cluster job has been submitted.
+
+    Note that this state is never returned by a scheduler, but is an assumed
+    state immediately after a cluster job is submitted.
+    """
+
     held = 5
+    """The cluster job is held."""
+
     queued = 6
+    """The cluster job is queued."""
+
     active = 7
+    """The cluster job is actively running."""
+
     error = 8
-    dummy = 127
-    # All user statuses are >= 128.
+    """The cluster job is in an error or failed state."""
+
+    placeholder = 127
+    """A placeholder state that is used for status rendering when no operations are eligible."""
+
     user = 128
+    """All user-defined states must be >=128 in value."""
 
 
 class ClusterJob:
-    """This class represents a cluster job."""
+    """Class representing a cluster job."""
 
     def __init__(self, job_id, status=None):
         self._job_id = job_id
@@ -36,9 +61,11 @@ class ClusterJob:
         return str(self._id())
 
     def name(self):
+        """Return the name of the cluster job."""
         return self._id()
 
     def status(self):
+        """Return the status of the cluster job."""
         return self._status
 
 
@@ -48,18 +75,20 @@ class Scheduler:
     # The UNIX time stamp of the last scheduler query.
     _last_query = None
 
-    # The amount of time in seconds a user needs to wait, before we
-    # assume that repeated scheduler queries might risk a denial-of-service attack.
+    # The amount of time in seconds to wait between scheduler queries.
+    # Repeated scheduler queries might risk a denial-of-service attack.
     _dos_timeout = 10
 
     @classmethod
     def _prevent_dos(cls):
-        """This method should be called before querying the scheduler.
+        """Prevent denial of service by enforcing a back-off period.
 
-        If this method will raise an exception if it is called more than
-        once within a time window defined by the '_dos_timeout' class.
-        This is to prevent an (accidental) denial-of-service attack on
-        the scheduling system.
+        This method should *always* be called before querying the scheduler.
+
+        This method will raise an exception if it is called more than
+        once within a time window defined by the value of ``_dos_timeout``.
+        This is to prevent an (accidental) denial-of-service attack on the
+        scheduling system.
         """
         if cls._last_query is not None:
             if time.time() - cls._last_query < cls._dos_timeout:

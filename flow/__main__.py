@@ -1,7 +1,7 @@
 # Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-"""This module defines the main command line interface for signac-flow.
+"""The main command line interface for signac-flow.
 
 The interface is accessible via the `flow` command and allows users to
 initialize FlowProject class definitions directly from the command line.
@@ -47,7 +47,7 @@ def main_init(args):
 
 
 def main():
-    """Main entry function for the 'flow' command line tool.
+    """Define the 'flow' command line interface.
 
     This function defines the main 'flow' command line interface which can be used
     to initialize FlowProject modules from different templates as well as print the

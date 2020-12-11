@@ -32,13 +32,13 @@ class NoSchedulerError(AttributeError):
 
 
 class UserConditionError(RuntimeError):
-    """Indicates an error during evaluation of a FlowCondition."""
+    """Indicates an error during evaluation of a condition."""
 
     pass
 
 
 class UserOperationError(RuntimeError):
-    """Indicates an error during execution of a FlowOperation."""
+    """Indicates an error during execution of a :class:`~.BaseFlowOperation`."""
 
     pass
 
@@ -46,10 +46,12 @@ class UserOperationError(RuntimeError):
 class TemplateError(Jinja2Extension):
     """Indicates an error in a jinja2 template."""
 
-    # ref:http://jinja.pocoo.org/docs/2.10/extensions/#jinja-extensions
+    # Reference: https://jinja.palletsprojects.com/en/2.11.x/extensions/
+    # The tags are a set of strings that trigger the parse method.
     tags = {"raise"}
 
     def parse(self, parser):
+        """Call :meth:`~.err` when a template raises an Exception."""
         lineno = next(parser.stream).lineno
         args = [parser.parse_expression()]
         return jinja2.nodes.CallBlock(
@@ -57,4 +59,5 @@ class TemplateError(Jinja2Extension):
         ).set_lineno(lineno)
 
     def err(self, msg, caller):
+        """Raise a template error."""
         raise jinja2.TemplateError(msg)

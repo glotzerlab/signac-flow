@@ -35,6 +35,18 @@ class SummitEnvironment(DefaultLSFEnvironment):
 
     @template_filter
     def calc_num_nodes(cls, resource_sets, parallel=False):
+        """Compute the number of nodes needed.
+
+        :param resource_sets:
+            Resource sets for each operation, as a sequence of tuples of
+            (number of sets, number of tasks, CPUs per task, GPUs).
+        :type resource_sets:
+            iterable
+        :param parallel:
+            Whether operations should run in parallel or serial.
+        :type parallel:
+            bool
+        """
         nodes_used_final = 0
         cores_used = gpus_used = nodes_used = 0
         for nsets, tasks, cpus_per_task, gpus in resource_sets:
@@ -62,6 +74,14 @@ class SummitEnvironment(DefaultLSFEnvironment):
 
     @template_filter
     def guess_resource_sets(cls, operation):
+        """Determine the resources sets needed for an operation.
+
+        :param operation:
+            The operation whose directives will be used to compute the resource
+            set.
+        :type operation:
+            :class:`flow.BaseFlowOperation`
+        """
         ntasks = max(operation.directives.get("nranks", 1), 1)
         np = operation.directives.get("np", ntasks)
 
@@ -87,6 +107,7 @@ class SummitEnvironment(DefaultLSFEnvironment):
 
     @classmethod
     def jsrun_options(cls, resource_set):
+        """Return jsrun options for the provided resource set."""
         nsets, tasks, cpus, gpus = resource_set
         cuda_aware_mpi = (
             "--smpiargs='-gpu'" if (nsets > 0 or tasks > 0) and gpus > 0 else ""

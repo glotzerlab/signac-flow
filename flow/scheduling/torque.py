@@ -59,9 +59,11 @@ class TorqueJob(ClusterJob):
         return str(self._id())
 
     def name(self):
+        """Return the name of the cluster job."""
         return self.node.find("Job_Name").text
 
     def status(self):
+        """Return the status of the cluster job."""
         job_state = self.node.find("job_state").text
         if job_state == "R":
             return JobStatus.active
@@ -77,8 +79,8 @@ class TorqueJob(ClusterJob):
 class TorqueScheduler(Scheduler):
     """Implementation of the abstract Scheduler class for TORQUE schedulers.
 
-    This class allows us to submit cluster jobs to a TORQUE scheduler and query
-    their current status.
+    This class can submit cluster jobs to a TORQUE scheduler and query their
+    current status.
 
     :param user:
         Limit the status information to cluster jobs submitted by user.

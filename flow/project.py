@@ -97,23 +97,16 @@ _FMT_SCHEDULER_STATUS = {
     JobStatus.queued: "Q",
     JobStatus.active: "A",
     JobStatus.error: "E",
-    JobStatus.dummy: " ",
+    JobStatus.placeholder: " ",
 }
 
 
 class IgnoreConditions(IntFlag):
-    """Flags that determine which conditions are used to determine job eligibility.
+    """Flags that determine which conditions are used to determine job eligibility."""
 
-    The options include:
-        * IgnoreConditions.NONE: check all conditions
-        * IgnoreConditions.PRE: ignore pre conditions
-        * IgnoreConditions.POST: ignore post conditions
-        * IgnoreConditions.ALL: ignore all conditions
-    """
-
-    # This operator must be defined since IntFlag simply performs an integer
-    # bitwise not on the underlying enum value, which is problematic in
-    # twos-complement arithmetic. What we want is to only flip valid bits.
+    # The __invert__ operator must be defined since IntFlag simply performs an
+    # integer bitwise not on the underlying enum value, which is problematic in
+    # two's-complement arithmetic. What we want is to only flip valid bits.
 
     def __invert__(self):
         # Compute the largest number of bits used to represent one of the flags
@@ -122,9 +115,16 @@ class IgnoreConditions(IntFlag):
         return self.__class__((2 ** max_bits - 1) ^ self._value_)
 
     NONE = 0
+    """Check all conditions."""
+
     PRE = 1
+    """Ignore pre-conditions."""
+
     POST = 2
+    """Ignore post-conditions."""
+
     ALL = PRE | POST
+    """Ignore all conditions."""
 
     def __str__(self):
         return {
@@ -154,7 +154,6 @@ class _condition:
 
     def __init__(self, condition, tag=None):
         """Add tag to differentiate built-in conditions during graph detection."""
-
         if tag is None:
             try:
                 tag = condition.__code__.co_code
@@ -165,7 +164,7 @@ class _condition:
 
     @classmethod
     def isfile(cls, filename):
-        """True if the specified file exists for the job(s)."""
+        """Determine if the specified file exists for the job(s)."""
 
         def _isfile(*jobs):
             return all(job.isfile(filename) for job in jobs)
@@ -174,8 +173,11 @@ class _condition:
 
     @classmethod
     def true(cls, key):
-        """True if the specified key is present in the job document(s) and
-        evaluates to True."""
+        """Evaluate if a document key is True for the job(s).
+
+        Returns True if the specified key is present in the job document(s) and
+        evaluates to True.
+        """
 
         def _document(*jobs):
             return all(job.document.get(key, False) for job in jobs)
@@ -184,8 +186,11 @@ class _condition:
 
     @classmethod
     def false(cls, key):
-        """True if the specified key is present in the job document(s) and
-        evaluates to False."""
+        """Evaluate if a document key is False for the job(s).
+
+        Returns True if the specified key is present in the job document(s) and
+        evaluates to False.
+        """
 
         def _no_document(*jobs):
             return all(not job.document.get(key, False) for job in jobs)
@@ -194,13 +199,13 @@ class _condition:
 
     @classmethod
     def never(cls, func):
-        """Returns False."""
+        """Return False."""
         cls.current_arbitrary_tag += 1
         return cls(lambda _: False, str(cls.current_arbitrary_tag))(func)
 
     @classmethod
     def not_(cls, condition):
-        """Returns ``not condition(*jobs)`` for the provided condition function."""
+        """Return ``not condition(*jobs)`` for the provided condition function."""
 
         def _not(*jobs):
             return not condition(*jobs)
@@ -209,9 +214,12 @@ class _condition:
 
 
 def _create_all_metacondition(condition_dict, *other_funcs):
-    """Standard function for generating aggregate metaconditions that require
-    *all* provided conditions to be met. The resulting metacondition is
-    constructed with appropriate information for graph detection."""
+    """Generate metacondition requiring all provided conditions to be true.
+
+    This function generates an aggregate metaconditions that requires *all*
+    provided conditions to be met. The resulting metacondition is constructed
+    with appropriate information for graph detection.
+    """
     condition_list = [c for f in other_funcs for c in condition_dict[f]]
 
     def _flow_metacondition(*jobs):
@@ -222,10 +230,10 @@ def _create_all_metacondition(condition_dict, *other_funcs):
 
 
 def _make_bundles(operations, size=None):
-    """Utility function for the generation of bundles.
+    """Slice an iterable of operations into equally sized bundles.
 
-    This function splits an iterable of operations into equally
-    sized bundles and a possibly smaller final bundle.
+    This utility function splits an iterable of operations into equally sized
+    bundles. The final bundle may be smaller than the specified size.
     """
     if size == 0:
         size = None
@@ -251,6 +259,7 @@ class _AggregatesCursor:
     doc_filter : dict
         A mapping of key-value pairs that all indexed job documents are
         compared against (Default value = None).
+
     """
 
     def __init__(self, project, filter=None, doc_filter=None):
@@ -276,11 +285,11 @@ class _AggregatesCursor:
 
 
 class _JobOperation:
-    """This class represents the information needed to execute one group for one job.
+    """Class containing execution information for one group and one job.
 
-    The execution or submission of a :py:class:`FlowGroup` uses a passed-in command
+    The execution or submission of a :class:`FlowGroup` uses a passed-in command
     which can either be a string or function with no arguments that returns a shell
-    executable command.  The shell executable command won't be used if it is
+    executable command. The shell executable command won't be used if it is
     determined that the group can be executed without forking.
 
     .. note::
@@ -299,7 +308,7 @@ class _JobOperation:
     :param jobs:
         The jobs associated with this operation.
     :type jobs:
-        tuple of :class:`signac.contrib.job.Job`
+        tuple of :class:`~signac.contrib.job.Job`
     :param cmd:
         The command that executes this operation. Can be a callable that when
         evaluated returns a string.
@@ -328,9 +337,9 @@ class _JobOperation:
         # script engine later.
         keys_set_by_user = set(directives._user_directives)
 
-        # We use a special dictionary that allows us to track all keys that have been
-        # evaluated by the template engine and compare them to those explicitly set
-        # by the user. See also comment above.
+        # We use a special dictionary that tracks all keys that have been
+        # evaluated by the template engine and compare them to those explicitly
+        # set by the user. See also comment above.
         self.directives = TrackGetItemDict(directives)
         self.directives._keys_set_by_user = keys_set_by_user
 
@@ -398,9 +407,9 @@ class _JobOperation:
 
 @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
 class JobOperation(_JobOperation):
-    """This class represents the information needed to execute one group for one job.
+    """Class containing execution information for one group and one job.
 
-    The execution or submission of a :py:class:`FlowGroup` uses a passed-in command
+    The execution or submission of a :class:`FlowGroup` uses a passed-in command
     which can either be a string or function with no arguments that returns a shell
     executable command.  The shell executable command won't be used if it is
     determined that the group can be executed without forking.
@@ -421,7 +430,7 @@ class JobOperation(_JobOperation):
     :param job:
         The job associated with this operation.
     :type job:
-        :class:`signac.contrib.job.Job`
+        :class:`~signac.contrib.job.Job`
     :param cmd:
         The command that executes this operation. Can be a callable that when
         evaluated returns a string.
@@ -455,9 +464,9 @@ class JobOperation(_JobOperation):
         # script engine later.
         keys_set_by_user = set(directives)
 
-        # We use a special dictionary that allows us to track all keys that have been
-        # evaluated by the template engine and compare them to those explicitly set
-        # by the user. See also comment above.
+        # We use a special dictionary that tracks all keys that have been
+        # evaluated by the template engine and compare them to those explicitly
+        # set by the user. See also comment above.
         self.directives = TrackGetItemDict(
             {key: value for key, value in directives.items()}
         )
@@ -479,34 +488,34 @@ class JobOperation(_JobOperation):
 
 
 class _SubmissionJobOperation(_JobOperation):
-    R"""This class represents the information needed to submit one group for one job.
+    r"""Class containing submission information for one group and one job.
 
-    This class extends :py:class:`_JobOperation` to include a set of groups
+    This class extends :class:`_JobOperation` to include a set of groups
     that will be executed via the "run" command. These groups are known at
     submission time.
 
     :param \*args:
-        Passed to the constructor of :py:class:`_JobOperation`.
+        Passed to the constructor of :class:`_JobOperation`.
     :param eligible_operations:
-        A list of :py:class:`_JobOperation` that will be executed when this
+        A list of :class:`_JobOperation` that will be executed when this
         submitted job is executed.
     :type eligible_operations:
         list
     :param operations_with_unmet_preconditions:
-        A list of :py:class:`_JobOperation` that will not be executed in the
+        A list of :class:`_JobOperation` that will not be executed in the
         first pass of :meth:`FlowProject.run` due to unmet preconditions. These
         operations may be executed in subsequent iterations of the run loop.
     :type operations_with_unmet_preconditions:
         list
     :param operations_with_met_postconditions:
-        A list of :py:class:`_JobOperation` that will not be executed in the
+        A list of :class:`_JobOperation` that will not be executed in the
         first pass of :meth:`FlowProject.run` because all postconditions are
         met. These operations may be executed in subsequent iterations of the
         run loop.
     :type operations_with_met_postconditions:
         list
     :param \*\*kwargs:
-        Passed to the constructor of :py:class:`_JobOperation`.
+        Passed to the constructor of :class:`_JobOperation`.
     """
 
     def __init__(
@@ -621,9 +630,9 @@ class BaseFlowOperation:
             tuple
         :param ignore_conditions:
             Specify if pre and/or post conditions are to be ignored when determining eligibility.
-            The default is :py:class:`IgnoreConditions.NONE`.
+            The default is :class:`IgnoreConditions.NONE`.
         :type ignore_conditions:
-            :py:class:`~.IgnoreConditions`
+            :class:`~.IgnoreConditions`
         """
         if not isinstance(ignore_conditions, IgnoreConditions):
             raise ValueError(
@@ -656,22 +665,23 @@ class BaseFlowOperation:
         :type job:
             :class:`~signac.contrib.job.Job`
         :param ignore_conditions:
-            Specify if pre and/or post conditions check is to be ignored for eligibility check.
-            The default is :py:class:`IgnoreConditions.NONE`.
+            Specify if pre and/or post conditions check is to be ignored for
+            eligibility check.  The default is
+            :class:`IgnoreConditions.NONE`.
         :type ignore_conditions:
-            :py:class:`~.IgnoreConditions`
+            :class:`~.IgnoreConditions`
         """
         return self._eligible((job,), ignore_conditions)
 
     def _complete(self, jobs):
-        """True when all post-conditions are met."""
+        """Check if all post-conditions are met."""
         if len(self._postconditions) > 0:
             return all(cond(jobs) for cond in self._postconditions)
         return False
 
     @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
     def complete(self, job):
-        """True when all post-conditions are met."""
+        """Check if all post-conditions are met."""
         return self._complete((job,))
 
 
@@ -680,7 +690,7 @@ class FlowCmdOperation(BaseFlowOperation):
 
     When an operation has the ``@cmd`` directive specified, it is instantiated
     as a FlowCmdOperation. The operation should be a function of
-    :py:class:`~signac.contrib.job.Job`. The command (cmd) may
+    :class:`~signac.contrib.job.Job`. The command (cmd) may
     either be a unary callable that expects an instance of
     :class:`~signac.contrib.job.Job` as its only positional argument and returns
     a string containing valid shell commands, or the string of commands itself.
@@ -737,7 +747,7 @@ class FlowOperation(BaseFlowOperation):
 
     All operations without the ``@cmd`` directive use this class. The
     callable ``op_func`` should be a function of one or more instances of
-    :py:class:`~signac.contrib.job.Job`.
+    :class:`~signac.contrib.job.Job`.
 
     .. note::
         This class should not be instantiated directly.
@@ -764,32 +774,42 @@ class FlowOperation(BaseFlowOperation):
         return f"{type(self).__name__}(op_func='{self._op_func}')"
 
     def __call__(self, *jobs):
+        r"""Call the operation on the provided jobs.
+
+        :param \*jobs:
+            The jobs passed to the operation.
+        :type \*jobs:
+            One or more instances of :class:`.Job`.
+        """
         return self._op_func(*jobs)
 
 
 class FlowGroupEntry:
-    """A FlowGroupEntry registers operations for inclusion into a :py:class:`FlowGroup`.
+    """A FlowGroupEntry registers operations for inclusion into a :class:`FlowGroup`.
 
-    Has two methods for adding operations: ``self()`` and ``with_directives``.
-    Using ``with_directives`` takes one argument, ``directives``, which are
-    applied to the operation when running through the group. This overrides
-    the default directives specified by ``@flow.directives``. Calling the object
-    directly will then use the default directives.
+    Operation functions can be marked for inclusion into a :class:`FlowGroup`
+    by decorating the functions with a corresponding :class:`FlowGroupEntry`.
+    If the operation requires specific directives, :meth:`~.with_directives`
+    accepts keyword arguments that are mapped to directives and returns a
+    decorator that can be applied to the operation to mark it for inclusion in
+    the group and indicate that it should be executed using the specified
+    directives. This overrides the default directives specified by
+    :meth:`flow.directives`.
 
     :param name:
-        The name of the :py:class:`FlowGroup` to be created.
+        The name of the :class:`FlowGroup` to be created.
     :type name:
         str
     :param options:
-        The :py:meth:`FlowProject.run` options to pass when submitting the group.
+        The :meth:`FlowProject.run` options to pass when submitting the group.
         These will be included in all submissions. Submissions use run
         commands to execute.
     :type options:
         str
     :param aggregator:
-        aggregator object associated with the :py:class:`FlowGroup`
+        aggregator object associated with the :class:`FlowGroup`
     :type aggregator:
-        :py:class:`aggregator`
+        :class:`aggregator`
     """
 
     def __init__(self, name, options="", aggregator=aggregator.groupsof(1)):
@@ -798,7 +818,9 @@ class FlowGroupEntry:
         self.aggregator = aggregator
 
     def __call__(self, func):
-        """Decorator that adds the function into the group's operations.
+        """Add the function into the group's operations.
+
+        This call operator allows the class to be used as a decorator.
 
         :param func:
             The function to decorate.
@@ -827,7 +849,7 @@ class FlowGroupEntry:
             func._flow_group_operation_directives = {self.name: directives}
 
     def with_directives(self, directives):
-        """Returns a decorator that sets group specific directives to the operation.
+        """Return a decorator that sets group specific directives to the operation.
 
         :param directives:
             Directives to use for resource requests and running the operation
@@ -851,11 +873,11 @@ class FlowGroupEntry:
 class FlowGroup:
     """A FlowGroup represents a subset of a workflow for a project.
 
-    Any :py:class:`FlowGroup` is associated with one or more instances of
-    :py:class:`BaseFlowOperation`.
+    Any :class:`FlowGroup` is associated with one or more instances of
+    :class:`BaseFlowOperation`.
 
-    In the example below, the directives will be {'nranks': 4} for op1 and
-    {'nranks': 2, 'executable': 'python3'} for op2
+    In the example below, the directives will be ``{'nranks': 4}`` for op1 and
+    ``{'nranks': 2, 'executable': 'python3'}`` for op2
 
     .. code-block:: python
 
@@ -879,7 +901,7 @@ class FlowGroup:
         str
     :param operations:
         A dictionary of operations where the keys are operation names and
-        each value is a :py:class:`BaseFlowOperation`.
+        each value is a :class:`BaseFlowOperation`.
     :type operations:
         dict
     :param operation_directives:
@@ -991,9 +1013,9 @@ class FlowGroup:
         :param ignore_conditions:
             Specify if pre and/or post conditions are to be ignored while
             checking eligibility. The default is
-            :py:class:`IgnoreConditions.NONE`.
+            :class:`IgnoreConditions.NONE`.
         :type ignore_conditions:
-            :py:class:`~.IgnoreConditions`
+            :class:`~.IgnoreConditions`
         :return:
             Whether the group is eligible.
         :rtype:
@@ -1002,7 +1024,7 @@ class FlowGroup:
         return any(op._eligible(jobs, ignore_conditions) for op in self)
 
     def _complete(self, jobs):
-        """True when post-conditions are met for all operations in the group.
+        """Check if post-conditions are met for all operations in the group.
 
         :param jobs:
             The signac job handles.
@@ -1024,14 +1046,14 @@ class FlowGroup:
         associated operations is eligible.
 
         :param job:
-            A :class:`signac.contrib.job.Job` from the signac workspace.
+            A :class:`~signac.contrib.job.Job` from the signac workspace.
         :type job:
-            :class:`signac.contrib.job.Job`
+            :class:`~signac.contrib.job.Job`
         :param ignore_conditions:
             Specify if pre and/or post conditions are to be ignored while checking eligibility.
-            The default is :py:class:`IgnoreConditions.NONE`.
+            The default is :class:`IgnoreConditions.NONE`.
         :type ignore_conditions:
-            :py:class:`~.IgnoreConditions`
+            :class:`~.IgnoreConditions`
         :return:
             Whether the group is eligible.
         :rtype:
@@ -1041,12 +1063,12 @@ class FlowGroup:
 
     @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
     def complete(self, job):
-        """True when all BaseFlowOperation post-conditions are met.
+        """Check if all BaseFlowOperation post-conditions are met.
 
         :param job:
-            A :class:`signac.contrib.job.Job` from the signac workspace.
+            A :class:`~signac.contrib.job.Job` from the signac workspace.
         :type job:
-            :class:`signac.contrib.job.Job`
+            :class:`~signac.contrib.job.Job`
         :return:
             Whether the group is complete (all contained operations are
             complete).
@@ -1065,7 +1087,7 @@ class FlowGroup:
         :param operation:
             The workflow operation to add to the FlowGroup.
         :type operation:
-            :py:class:`BaseFlowOperation`
+            :class:`BaseFlowOperation`
         :param directives:
             The operation specific directives.
         :type directives:
@@ -1076,12 +1098,12 @@ class FlowGroup:
             self.operation_directives[name] = directives
 
     def isdisjoint(self, group):
-        """Returns whether two groups are disjoint (do not share any common operations).
+        """Return whether two groups are disjoint (do not share any common operations).
 
         :param group:
             The other FlowGroup to compare to.
         :type group:
-            :py:class:`flow.FlowGroup`
+            :class:`flow.project.FlowGroup`
         :return:
             Returns ``True`` if ``group`` and ``self`` share no operations,
             otherwise returns ``False``.
@@ -1168,29 +1190,29 @@ class FlowGroup:
         :param jobs:
             The jobs that the :class:`~._JobOperation` is based on.
         :type jobs:
-            tuple of :class:`signac.contrib.job.Job`
+            tuple of :class:`~signac.contrib.job.Job`
         :param ignore_conditions:
             Specify if pre and/or post conditions are to be ignored while
             checking eligibility. The default is
-            :py:class:`IgnoreConditions.NONE`.
+            :class:`IgnoreConditions.NONE`.
         :type ignore_conditions:
-            :py:class:`~.IgnoreConditions`
+            :class:`~.IgnoreConditions`
         :param ignore_conditions_on_execution:
             Specify if pre and/or post conditions are to be ignored while
             checking eligibility during execution (after submission). The
-            default is :py:class:`IgnoreConditions.NONE`.
+            default is :class:`IgnoreConditions.NONE`.
         :type ignore_conditions_on_execution:
-            :py:class:`~.IgnoreConditions`
+            :class:`~.IgnoreConditions`
         :param index:
             Index for the :class:`~._JobOperation`.
         :type index:
             int
         :return:
-            Returns a :py:class:`~._SubmissionJobOperation` for submitting the group. The
-            :py:class:`~._JobOperation` will have directives that have been collected
+            Returns a :class:`~._SubmissionJobOperation` for submitting the group. The
+            :class:`~._JobOperation` will have directives that have been collected
             appropriately from its contained operations.
         :rtype:
-            :py:class:`_SubmissionJobOperation`
+            :class:`_SubmissionJobOperation`
         """
         unevaluated_cmd = functools.partial(
             self._submit_cmd,
@@ -1200,9 +1222,12 @@ class FlowGroup:
         )
 
         def _get_run_ops(ignore_ops, additional_ignores_flag):
-            """Get operations that match the combination of the conditions required by
-            _create_submission_job_operation and the ignored flags, and remove operations
-            in the ignore_ops list."""
+            """Get all runnable operations.
+
+            Returns operations that match the combination of the conditions
+            required by ``_create_submission_job_operation`` and the ignored
+            flags, and remove operations in the ``ignore_ops`` list.
+            """
             return list(
                 set(
                     self._create_run_job_operations(
@@ -1264,13 +1289,13 @@ class FlowGroup:
         :param jobs:
             The jobs that the :class:`~._JobOperation` is based on.
         :type jobs:
-            tuple of :class:`signac.contrib.job.Job`
+            tuple of :class:`~signac.contrib.job.Job`
         :param index:
             Index for the :class:`~._JobOperation`.
         :type index:
             int
         :return:
-            Returns an iterator over eligible :py:class:`~._JobOperation`s.
+            Returns an iterator over eligible :class:`~._JobOperation`s.
         :rtype:
             Iterator[_JobOperation]
         """
@@ -1408,7 +1433,7 @@ class _FlowProjectClass(type):
 
             @classmethod
             def copy_from(cls, *other_funcs):
-                """Copies pre-conditions from another operation.
+                """Copy pre-conditions from other operation(s).
 
                 True if and only if all pre conditions of other operation
                 function(s) are met.
@@ -1486,7 +1511,7 @@ class _FlowProjectClass(type):
 
             @classmethod
             def copy_from(cls, *other_funcs):
-                """Copies post-conditions from another operation.
+                """Copy post-conditions from other operation(s).
 
                 True if and only if all post conditions of other operation
                 function(s) are met.
@@ -1522,18 +1547,18 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         A signac configuration, defaults to the configuration loaded
         from the current directory.
     :type config:
-        A signac config object.
+        :class:`signac.contrib.project._ProjectConfig`
     :param environment:
         An environment to use for scheduler submission. If ``None``, the
         environment is automatically identified. The default is ``None``.
     :type environment:
         :class:`flow.environment.ComputeEnvironment`
     :param entrypoint:
-        A dictionary with two possible keys: executable and path. Path
-        represents the filepath location of the script file (the script file
-        must call ``main``). Executable represents the location of the Python
-        interpreter used for the executable of `FlowOperation` that are Python
-        functions.
+        A dictionary with two possible keys: ``'executable'`` and ``'path'``.
+        The path represents the location of the script file (the
+        script file must call :meth:`FlowProject.main`). The executable
+        represents the location of the Python interpreter used for the
+        execution of :class:`~.BaseFlowOperation` that are Python functions.
     :type entrypoint:
         dict
     """
@@ -1573,7 +1598,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         self._register_aggregates()
 
     def _setup_template_environment(self):
-        """Setup the jinja2 template environment.
+        """Set up the jinja2 template environment.
 
         The templating system is used to generate templated scripts for the script()
         and _submit_operations() / submit() function and the corresponding command line
@@ -1672,7 +1697,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @classmethod
     def label(cls, label_name_or_func=None):
-        """Designate a function to be a label function of this class.
+        """Designate a function as a label function for this class.
 
         For example, we can define a label function like this:
 
@@ -1715,8 +1740,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return label_func
 
     def detect_operation_graph(self):
-        """Determine the directed acyclic graph defined by operation pre- and
-        post-conditions.
+        """Determine the directed acyclic graph given by operation conditions.
 
         In general, executing a given operation registered with a FlowProject
         just involves checking the operation's pre- and post-conditions to
@@ -1779,10 +1803,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             return [condition._callback for condition in conditions]
 
         def unpack_conditions(condition_functions):
-            """Identify any metaconditions in the list and reduce them to the
-            functions that they are composed of. The callbacks argument is used
-            in recursive calls to the function and appended to directly, but
-            only returned at the end."""
+            """Create a set of callbacks from condition functions.
+
+            Metaconditions in the list of condition functions are reduced into
+            the functions that they are composed of. All condition functions
+            must have a `_flow_tag` attribute defined.
+            """
             callbacks = set()
             for condition_function in condition_functions:
                 # The condition function may not have a __name__ attribute in
@@ -1830,10 +1856,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return mat
 
     def _register_class_labels(self):
-        """This function registers all label functions, which are part of the class definition.
+        """Register all label functions which are part of the class definition.
 
-        To register a class method or function as label function, use the generalized label()
-        function.
+        To register a class method or function as a label function, use the
+        :meth:`~.FlowProject.label()` class method as a decorator.
         """
 
         def predicate(member):
@@ -1857,9 +1883,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     ALIASES = {
         str(status).replace("JobStatus.", ""): symbol
         for status, symbol in _FMT_SCHEDULER_STATUS.items()
-        if status != JobStatus.dummy
+        if status != JobStatus.placeholder
     }
-    # These are default aliases used within the status output.
+    """Default aliases used within the status output."""
 
     @classmethod
     def _alias(cls, name):
@@ -1885,7 +1911,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :param operations:
             The operations to bundle.
         :type operations:
-            A sequence of instances of :py:class:`._JobOperation`
+            A sequence of instances of :class:`._JobOperation`
         :return:
             The bundle id.
         :rtype:
@@ -2157,26 +2183,25 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         ignore_errors,
         status_parallelization="thread",
     ):
-        """Fetch status associated for either all the jobs associated in a project
-        or jobs specified by a user
+        """Fetch status for the provided aggregates / jobs.
 
         :param aggregates:
             The aggregates for which a user requested to fetch status.
         :type aggregates:
             list
         :param distinct_jobs:
-            Distinct jobs fetched from the ids provided in the ``jobs`` argument.
-            This is used for fetching labels for a job because a label is not associated
-            with an aggregate.
+            Distinct jobs fetched from the ids provided in the ``jobs``
+            argument.  This is used for fetching labels for a job because a
+            label is not associated with an aggregate.
         :type distinct_jobs:
-            list of :py:class:`signac.contrib.job.Job`
+            list of :class:`~signac.contrib.job.Job`
         :param ignore_errors:
             Fetch status even if querying the scheduler fails.
         :type ignore_errors:
             bool
         :param status_parallelization:
-            Nature of parallelization for fetching the status.
-            Default value parallelizes using ``multiprocessing.ThreadPool()``
+            Parallelization mode for fetching the status. By default, thread
+            parallelism is used.
         :type status_parallelization:
             str
         :returns:
@@ -2459,7 +2484,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :param jobs:
             Only execute operations for the given jobs, or all if the argument is omitted.
         :type jobs:
-            Sequence of instances of :class:`.Job`.
+            Sequence of instances of :class:`~signac.contrib.job.Job`.
         :param overview:
             Aggregate an overview of the project' status.
         :type overview:
@@ -2540,7 +2565,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :return:
             A Renderer class object that contains the rendered string.
         :rtype:
-            :py:class:`~.Renderer`
+            :class:`~.Renderer`
         """
         if file is None:
             file = sys.stdout
@@ -2826,17 +2851,17 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 context["operation_status_legend"] = operation_status_legend
                 context["operation_status_symbols"] = OPERATION_STATUS_SYMBOLS
 
-        def _add_dummy_operation(job):
+        def _add_placeholder_operation(job):
             job["operations"][""] = {
                 "completed": False,
                 "eligible": False,
-                "scheduler_status": JobStatus.dummy,
+                "scheduler_status": JobStatus.placeholder,
             }
 
         for job in context["jobs"]:
             has_eligible_ops = any([v["eligible"] for v in job["operations"].values()])
             if not has_eligible_ops and not context["all_ops"]:
-                _add_dummy_operation(job)
+                _add_placeholder_operation(job)
 
         op_counter = Counter()
         for job in context["jobs"]:
@@ -3027,7 +3052,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         project instance and the operations before submitting them to the process pool to
         enable us to try different pool and pickle module combinations.
         """
-
         try:
             serialized_root = pickle.dumps(self.root_directory())
             serialized_operations = pickle.dumps(self._operations)
@@ -3117,13 +3141,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         operation will only be executed once per job. This is to avoid accidental
         infinite loops when no or faulty post conditions are provided.
 
-        See also: :meth:`~.run_operations`
-
         :param jobs:
             Only execute operations for the given jobs or aggregates of jobs,
             or all if the argument is omitted.
         :type jobs:
-            Sequence of instances of :class:`.Job` or aggregate of instances of :class:`.Job`.
+            Sequence of instances of :class:`~signac.contrib.job.Job` or
+            sequence of aggregates where each aggregate is a sequence
+            of :class:`~signac.contrib.job.Job`.
         :param names:
             Only execute operations that are in the provided set of names, or all, if the
             argument is omitted.
@@ -3134,13 +3158,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type pretend:
             bool
         :param np:
-            Parallelize to the specified number of processors. Use -1 to parallelize to all
-            available processing units.
+            Parallelize to the specified number of processors. Use -1 to
+            parallelize to all available processing units.
         :type np:
             int
         :param timeout:
-            An optional timeout for each operation in seconds after which execution will
-            be cancelled. Use -1 to indicate not timeout (the default).
+            An optional timeout for each operation in seconds after which
+            execution will be cancelled. Use -1 to indicate no timeout (the
+            default).
         :type timeout:
             int
         :param num:
@@ -3149,39 +3174,44 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type num:
             int
         :param num_passes:
-            The total number of one specific job-operation pair will not exceed this argument.
-            The default is 1, there is no limit if this argument is `None`.
+            The total number of executions of one specific job-operation pair
+            will not exceed this argument. The default is 1, there is no limit
+            if this argument is None.
         :type num_passes:
-            int
+            int or None
         :param progress:
             Show a progress bar during execution.
         :type progress:
             bool
         :param order:
-            Specify the order of operations, possible values are:
+            Specify the order of operations. Possible values are:
+
                 * 'none' or None (no specific order)
                 * 'by-job' (operations are grouped by job)
                 * 'by-op' (operations are grouped by operation)
                 * 'cyclic' (order operations cyclic by job)
                 * 'random' (shuffle the execution order randomly)
                 * callable (a callable returning a comparison key for an
-                            operation used to sort operations)
+                  operation used to sort operations)
 
-            The default value is `none`, which is equivalent to `by-op` in the current
-            implementation.
+            The default value is ``'none'``, which is equivalent to ``'by-op'``
+            in the current implementation.
 
             .. note::
-                Users are advised to not rely on a specific execution order, as a
-                substitute for defining the workflow in terms of pre- and post-conditions.
-                However, a specific execution order may be more performant in cases where
-                operations need to access and potentially lock shared resources.
+
+                Users are advised to not rely on a specific execution order as
+                a substitute for defining the workflow in terms of pre- and
+                post-conditions. However, a specific execution order may be
+                more performant in cases where operations need to access and
+                potentially lock shared resources.
+
         :type order:
-            str, callable, or NoneType
+            str, callable, or None
         :param ignore_conditions:
-            Specify if pre and/or post conditions check is to be ignored for eligibility check.
-            The default is :py:class:`IgnoreConditions.NONE`.
+            Specify if pre and/or post conditions check is to be ignored for
+            eligibility check. The default is :class:`IgnoreConditions.NONE`.
         :type ignore_conditions:
-            :py:class:`~.IgnoreConditions`
+            :class:`~.IgnoreConditions`
         """
         aggregates = self._convert_jobs_to_aggregates(jobs)
 
@@ -3401,11 +3431,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @classmethod
     def _verify_group_compatibility(cls, groups):
-        """Verifies that all selected groups can be submitted together."""
+        """Verify that all selected groups can be submitted together."""
         return all(a.isdisjoint(b) for a in groups for b in groups if a != b)
 
     def _aggregate_is_in_project(self, aggregate):
-        """Verifies that the aggregate belongs to this project."""
+        """Verify that the aggregate belongs to this project."""
         return any(
             get_aggregate_id(aggregate) in aggregates
             for aggregates in self._stored_aggregates
@@ -3413,7 +3443,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @staticmethod
     def _is_selected_aggregate(aggregate, jobs):
-        """Verifies whether the aggregate is present in the provided jobs."""
+        """Verify whether the aggregate is present in the provided jobs."""
         return aggregate in jobs
 
     def _get_aggregate_from_id(self, id):
@@ -3578,7 +3608,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :param operations:
             The operations to submit.
         :type operations:
-            A sequence of instances of :py:class:`._JobOperation`
+            A sequence of instances of :class:`._JobOperation`
         :param _id:
             The _id to be used for this submission.
         :type _id:
@@ -3695,7 +3725,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :param operations:
             The operations to submit.
         :type operations:
-            A sequence of instances of :py:class:`.JobOperation`
+            A sequence of instances of :class:`.JobOperation`
         :param _id:
             The _id to be used for this submission.
         :type _id:
@@ -3766,7 +3796,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :param jobs:
             Only submit operations associated with the provided jobs. Defaults to all jobs.
         :type jobs:
-            Sequence of instances :class:`.Job`.
+            Sequence of instances :class:`~signac.contrib.job.Job`.
         :param names:
             Only submit operations with any of the given names, defaults to all names.
         :type names:
@@ -3784,17 +3814,17 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type force:
             bool
         :param walltime:
-            Specify the walltime in hours or as instance of :py:class:`datetime.timedelta`.
+            Specify the walltime in hours or as instance of :class:`datetime.timedelta`.
         :param ignore_conditions:
             Specify if pre and/or post conditions check is to be ignored for eligibility check.
-            The default is :py:class:`IgnoreConditions.NONE`.
+            The default is :class:`IgnoreConditions.NONE`.
         :type ignore_conditions:
-            :py:class:`~.IgnoreConditions`
+            :class:`~.IgnoreConditions`
         :param ignore_conditions_on_execution:
             Specify if pre and/or post conditions check is to be ignored for eligibility check after
-            submitting. The default is :py:class:`IgnoreConditions.NONE`.
+            submitting. The default is :class:`IgnoreConditions.NONE`.
         :type ignore_conditions:
-            :py:class:`~.IgnoreConditions`
+            :class:`~.IgnoreConditions`
         """
         aggregates = self._convert_jobs_to_aggregates(jobs)
 
@@ -3995,7 +4025,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     @classmethod
     def _add_operation_bundling_arg_group(cls, parser):
         """Add argument group to parser for operation bundling."""
-
         bundling_group = parser.add_argument_group(
             "bundling",
             "Bundle multiple operations for execution, e.g., to submit them "
@@ -4137,7 +4166,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         )
 
     def labels(self, job):
-        """Yields all labels for the given ``job``.
+        """Yield all labels for the given ``job``.
 
         See also: :meth:`~.label`
         """
@@ -4166,7 +4195,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def add_operation(self, name, cmd, pre=None, post=None, **kwargs):
         """Add an operation to the workflow.
 
-        This method will add an instance of :py:class:`~.FlowOperation` to the
+        This method will add an instance of :class:`~.FlowOperation` to the
         operations of this project.
 
         .. seealso::
@@ -4175,7 +4204,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             the :meth:`~.operation` decorator.
 
         Any FlowOperation is associated with a specific command, which should be
-        a function of :py:class:`~signac.contrib.job.Job`. The command (cmd) can
+        a function of :class:`~signac.contrib.job.Job`. The command (cmd) can
         be stated as function, either by using str-substitution based on a job's
         attributes, or by providing a unary callable, which expects an instance
         of job as its first and only positional argument.
@@ -4262,9 +4291,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             tuple of :class:`~signac.contrib.job.Job`
         :param ignore_conditions:
             Specify if pre and/or post conditions check is to be ignored for eligibility check.
-            The default is :py:class:`IgnoreConditions.NONE`.
+            The default is :class:`IgnoreConditions.NONE`.
         :type ignore_conditions:
-            :py:class:`~.IgnoreConditions`
+            :class:`~.IgnoreConditions`
         :yield:
             All instances of :class:`~._JobOperation` jobs are eligible for.
         """
@@ -4286,15 +4315,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def next_operations(self, *jobs, ignore_conditions=IgnoreConditions.NONE):
         r"""Determine the next eligible operations for provided job(s).
 
-        :param *jobs:
+        :param \*jobs:
             The signac job handles.
-        :type *jobs:
-            One or more instances of :class:`.Job`.
+        :type \*jobs:
+            One or more instances of :class:`~signac.contrib.job.Job`.
         :param ignore_conditions:
             Specify if pre and/or post conditions check is to be ignored for eligibility check.
-            The default is :py:class:`IgnoreConditions.NONE`.
+            The default is :class:`IgnoreConditions.NONE`.
         :type ignore_conditions:
-            :py:class:`~.IgnoreConditions`
+            :class:`~.IgnoreConditions`
         :yield:
             All instances of :class:`~.JobOperation` jobs are eligible for.
         """
@@ -4424,7 +4453,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 self._operations[name] = FlowOperation(op_func=func, **params)
 
     def _register_aggregates(self):
-        """Generate aggregates for every operation or group in a FlowProject"""
+        """Generate aggregates for every operation or group in a FlowProject."""
         stored_aggregates = {}
         for _aggregator, groups in self._aggregator_per_group.items():
             stored_aggregates[_aggregator._create_AggregatesStore(self)] = groups
@@ -4455,9 +4484,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :type options:
             str
         :param aggregator_obj:
-            aggregator object associated with the :py:class:`FlowGroup`
+            aggregator object associated with the :class:`FlowGroup`
         :type aggregator_obj:
-            :py:class:`aggregator`
+            :class:`aggregator`
         """
         if name in cls._GROUP_NAMES:
             raise ValueError(f"Repeat definition of group with name '{name}'.")
@@ -4505,12 +4534,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @property
     def operations(self):
-        """The dictionary of operations that have been added to the workflow."""
+        """Get the dictionary of operations that have been added to the workflow."""
         return self._operations
 
     @property
     def groups(self):
-        """The dictionary of groups that have been added to the workflow."""
+        """Get the dictionary of groups that have been added to the workflow."""
         return self._groups
 
     def _get_aggregate_store(self, group):
@@ -4523,7 +4552,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         :returns:
             Aggregate store containing aggregates associated with the provided FlowGroup.
         :rtype:
-            :py:class:`_DefaultAggregateStore`
+            :class:`_DefaultAggregateStore`
         """
         for aggregate_store, groups in self._stored_aggregates.items():
             if group in groups:
@@ -4531,8 +4560,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return {}
 
     def _eligible_for_submission(self, flow_group, jobs):
-        """Determine if a flow_group is eligible for submission with a given
-        job-aggregate.
+        """Check flow_group eligibility for submission with a job-aggregate.
 
         By default, an operation is eligible for submission when it
         is not considered active, that means already queued or running.
@@ -4748,11 +4776,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """Call this function to use the main command line interface.
 
         In most cases one would want to call this function as part of the
-        class definition, e.g.:
+        class definition:
 
         .. code-block:: python
 
-             my_project.py
+            # my_project.py
             from flow import FlowProject
 
             class MyProject(FlowProject):

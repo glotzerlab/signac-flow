@@ -1,8 +1,7 @@
 # Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-"""Contains logic for working with flow related information
-stored in the signac config"""
+"""Contains logic for working with flow related information stored in the signac config."""
 from signac.common import config
 
 from ..errors import ConfigKeyError

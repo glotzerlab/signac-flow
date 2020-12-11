@@ -3,7 +3,7 @@
 # This software is licensed under the BSD 3-Clause License.
 """Detection of compute environments.
 
-This module provides the ComputeEnvironment class, which can be
+This module provides the :class:`ComputeEnvironment` class, which can be
 subclassed to automatically detect specific computational environments.
 
 This enables the user to adjust their workflow based on the present
@@ -14,6 +14,7 @@ import logging
 import os
 import re
 import socket
+from functools import lru_cache
 
 from deprecation import deprecated
 from signac.common import config
@@ -41,13 +42,23 @@ from .version import __version__
 logger = logging.getLogger(__name__)
 
 
+@lru_cache(maxsize=1)
+def _cached_fqdn():
+    """Return the fully qualified domain name.
+
+    This value is cached because fetching the fully qualified domain name can
+    be slow on macOS.
+    """
+    return socket.getfqdn()
+
+
 def setup(py_modules, **attrs):
-    """Setup function for environment modules.
+    """Set up user-defined environment modules.
 
     Use this function in place of setuptools.setup to not only install
     an environment's module, but also register it with the global signac
     configuration. Once registered, the environment is automatically
-    imported when the :py:meth:`~.get_environment` function is called.
+    imported when the :meth:`~flow.get_environment` function is called.
     """
     import setuptools
     from setuptools.command.install import install
@@ -77,10 +88,12 @@ def setup(py_modules, **attrs):
 
 
 class ComputeEnvironmentType(type):
-    """Metaclass for the definition of ComputeEnvironments.
+    """Metaclass used for :class:`~.ComputeEnvironment`.
 
-    This metaclass automatically registers ComputeEnvironment definitions,
-    which enables the automatic determination of the present environment.
+    This metaclass automatically registers :class:`~.ComputeEnvironment`
+    definitions, which enables the automatic determination of the present
+    environment. The registry can be obtained from
+    :func:`~.registered_environments`.
     """
 
     def __init__(cls, name, bases, dct):
@@ -106,8 +119,8 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
     The default method for the detection of a specific environment is to
     provide a regular expression matching the environment's hostname.
-    For example, if the hostname is my-server.com, one could identify the
-    environment by setting the hostname_pattern to 'my-server'.
+    For example, if the hostname is ``my-server.com``, one could identify the
+    environment by setting the ``hostname_pattern`` to ``'my-server'``.
     """
 
     scheduler_type = None
@@ -128,7 +141,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
             if cls.scheduler_type is None:
                 return False
             return cls.scheduler_type.is_present()
-        return re.match(cls.hostname_pattern, socket.getfqdn()) is not None
+        return re.match(cls.hostname_pattern, _cached_fqdn()) is not None
 
     @classmethod
     def get_scheduler(cls):
@@ -184,7 +197,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         that are specific to a user's environment, e.g. account names.
 
         When a key is not configured and no default value is provided,
-        a :py:class:`~.errors.SubmitError` will be raised and the user will
+        a :class:`~.errors.SubmitError` will be raised and the user will
         be prompted to add the missing key to their configuration.
 
         Please note, that the key will be automatically expanded to
@@ -290,15 +303,19 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
 
 class StandardEnvironment(ComputeEnvironment):
-    """This is a default environment which is always present."""
+    """Default environment which is always present."""
 
     @classmethod
     def is_present(cls):
+        """Determine whether this specific compute environment is present.
+
+        The StandardEnvironment is always present, so this returns True.
+        """
         return True
 
 
 class TestEnvironment(ComputeEnvironment):
-    """This is a test environment.
+    """Environment used for testing.
 
     The test environment will print a mocked submission script
     and submission commands to screen. This enables testing of
@@ -345,10 +362,11 @@ class NodesEnvironment(ComputeEnvironment):
 
 
 class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
-    """A default environment for environments with TORQUE scheduler."""
+    """Default environment for clusters with a TORQUE scheduler."""
 
     @classmethod
     def add_args(cls, parser):
+        """Add arguments to the parser."""
         super().add_args(parser)
         parser.add_argument(
             "-w", "--walltime", type=float, help="The wallclock time in hours."
@@ -370,10 +388,11 @@ class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
 
 
 class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
-    """A default environment for environments with SLURM scheduler."""
+    """Default environment for clusters with a SLURM scheduler."""
 
     @classmethod
     def add_args(cls, parser):
+        """Add arguments to the parser."""
         super().add_args(parser)
         parser.add_argument(
             "--memory",
@@ -401,10 +420,11 @@ class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
 
 
 class DefaultLSFEnvironment(NodesEnvironment, LSFEnvironment):
-    """A default environment for environments with LSF scheduler."""
+    """Default environment for clusters with a LSF scheduler."""
 
     @classmethod
     def add_args(cls, parser):
+        """Add arguments to the parser."""
         super().add_args(parser)
         parser.add_argument(
             "-w",
@@ -451,7 +471,7 @@ def _import_configured_environments():
 
 
 def registered_environments(import_configured=True):
-    """Returns a list of registered environments."""
+    """Return a list of registered environments."""
     if import_configured:
         _import_configured_environments()
     return list(ComputeEnvironment.registry.values())
@@ -460,9 +480,9 @@ def registered_environments(import_configured=True):
 def get_environment(test=False, import_configured=True):
     """Attempt to detect the present environment.
 
-    This function iterates through all defined :py:class:`~.ComputeEnvironment`
+    This function iterates through all defined :class:`~.ComputeEnvironment`
     classes in reversed order of definition and returns the first
-    environment where the :py:meth:`~.ComputeEnvironment.is_present` method
+    environment where the :meth:`~.ComputeEnvironment.is_present` method
     returns True.
 
     :param test:

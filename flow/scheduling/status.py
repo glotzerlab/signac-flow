@@ -1,6 +1,7 @@
 # Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
+"""Methods for determining and caching job status information."""
 import logging
 
 from .base import JobStatus
@@ -27,7 +28,6 @@ def _status_scheduler(scheduler_job_id, scheduler_jobs):
 
 def update_status(job, scheduler_jobs=None):
     """Update the job's status dictionary."""
-
     # The status docs maps the scheduler job id to a distinct JobStatus value.
     status_doc = job.document.setdefault("status", {})
 

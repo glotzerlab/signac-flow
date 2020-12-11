@@ -3632,7 +3632,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Show information about available template variables and filters and
             exit. (Default value = False)
         \*\*kwargs
-            Additional keyword aruguments forwarded to :meth:`~.ComputeEnvironment.submit`.
+            Additional keyword arguments forwarded to :meth:`~.ComputeEnvironment.submit`.
 
         Returns
         -------
@@ -3744,7 +3744,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Show information about available template variables and filters and
             exit. (Default value = False)
         \*\*kwargs
-            Additional keyword aruguments forwarded to :meth:`~.ComputeEnvironment.submit`.
+            Additional keyword arguments forwarded to :meth:`~.ComputeEnvironment.submit`.
 
         Returns
         -------
@@ -3810,7 +3810,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             The environment to use for submission. Uses the environment defined
             by the :class:`~.FlowProject` if None (Default value = None).
         \*\*kwargs
-            Additional keyword aruguments forwarded to :meth:`~.ComputeEnvironment.submit`.
+            Additional keyword arguments forwarded to :meth:`~.ComputeEnvironment.submit`.
 
         """
         aggregates = self._convert_aggregates_from_jobs(jobs)

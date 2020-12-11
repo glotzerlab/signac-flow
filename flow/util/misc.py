@@ -203,7 +203,7 @@ def _to_hashable(obj):
         return obj
 
 
-def _cached_partial(func, /, *args, maxsize=None, **kwargs):
+def _cached_partial(func, *args, maxsize=None, **kwargs):
     r"""Cache the results of a partial.
 
     Useful for wrapping functions that must only be evaluated lazily, one time.

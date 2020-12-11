@@ -3613,6 +3613,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             The operations to submit.
         _id : str
             The _id to be used for this submission. (Default value = None)
+        env : :class:`~.ComputeEnvironment`
+            The environment to use for submission. Uses the environment defined
+            by the :class:`~.FlowProject` if None (Default value = None).
         parallel : bool
             Execute all bundled operations in parallel. (Default value = False)
         flags : list
@@ -3628,9 +3631,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         show_template_help : bool
             Show information about available template variables and filters and
             exit. (Default value = False)
-        env : :class:`~.ComputeEnvironment`
-            The environment to use for submission. Uses the environment defined
-            by the :class:`~.FlowProject` if None (Default value = None).
         \*\*kwargs
             Additional keyword aruguments forwarded to :meth:`~.ComputeEnvironment.submit`.
 
@@ -3725,6 +3725,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             The operations to submit.
         _id : str
             The _id to be used for this submission. (Default value = None)
+        env : :class:`~.ComputeEnvironment`
+            The environment to use for submission. Uses the environment defined
+            by the :class:`~.FlowProject` if None (Default value = None).
         parallel : bool
             Execute all bundled operations in parallel. (Default value = False)
         flags : list
@@ -3740,9 +3743,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         show_template_help : bool
             Show information about available template variables and filters and
             exit. (Default value = False)
-        env : :class:`~.ComputeEnvironment`
-            The environment to use for submission. Uses the environment defined
-            by the :class:`~.FlowProject` if None (Default value = None).
         \*\*kwargs
             Additional keyword aruguments forwarded to :meth:`~.ComputeEnvironment.submit`.
 

@@ -238,14 +238,8 @@ def _make_bundles(operations, size=None):
             break
 
 
-class AggregatesCursor:
+class _AggregatesCursor:
     """Utility class to iterate over aggregates stored in a FlowProject.
-
-    .. note::
-
-        This class is used by the :class:`~.FlowProject` class for the verification
-        of aggregates provided by the users and should not be instantiated by
-        users themselves.
 
     Parameters
     ----------
@@ -2033,7 +2027,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             bool
         """
         if jobs is None:
-            jobs = AggregatesCursor(self)
+            jobs = _AggregatesCursor(self)
 
         if file is None:
             file = sys.stderr
@@ -3394,7 +3388,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     ):
         """Get all pending operations for the given selection."""
         if jobs is None:
-            jobs = AggregatesCursor(self)
+            jobs = _AggregatesCursor(self)
         assert not isinstance(operation_names, str)
         for operation in self._next_operations(jobs, ignore_conditions):
             # Return operations with names that match the provided list of
@@ -3437,8 +3431,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # sequence of tuples containing single signac jobs.
 
         if jobs is None:
-            return AggregatesCursor(self)
-        elif isinstance(jobs, AggregatesCursor):
+            return _AggregatesCursor(self)
+        elif isinstance(jobs, _AggregatesCursor):
             return jobs
         else:
             aggregates = []
@@ -4275,7 +4269,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             All instances of :class:`~._JobOperation` jobs are eligible for.
         """
         if jobs is None:
-            jobs = AggregatesCursor(self)
+            jobs = _AggregatesCursor(self)
         for name in self.operations:
             group = self._groups[name]
             for aggregate in self._get_aggregate_store(group.name).values():
@@ -4738,7 +4732,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             # aggregates must be a set to prevent duplicate entries
             aggregates = set()
             for id in args.job_id:
-                # TODO: We need to add support for aggregation id parameter
+                # TODO: We need to add support for aggregation id parameter`
                 # for the -j flag ('agg-...')
                 try:
                     aggregates.add((self.open_job(id=id),))
@@ -4746,9 +4740,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     raise LookupError(f"Did not find job with id {error}.")
             return list(aggregates)
         elif args.func == self._main_exec:  # exec command used with job_id
-            return AggregatesCursor(self)
+            return _AggregatesCursor(self)
         else:  # filter or doc filter provided
-            return AggregatesCursor(self, args.filter, args.doc_filter)
+            return _AggregatesCursor(self, args.filter, args.doc_filter)
 
     def main(self, parser=None):
         """Call this function to use the main command line interface.

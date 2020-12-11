@@ -262,7 +262,7 @@ def _make_bundles(operations, size=None):
 class _JobOperation:
     """Class containing execution information for one group and one job.
 
-    The execution or submission of a :class:`FlowGroup` uses a passed-in command
+    The execution or submission of a :class:`~.FlowGroup` uses a passed-in command
     which can either be a string or function with no arguments that returns a shell
     executable command. The shell executable command won't be used if it is
     determined that the group can be executed without forking.
@@ -541,9 +541,9 @@ class _FlowCondition:
 
 
 class BaseFlowOperation:
-    """A BaseFlowOperation represents a data space operation acting on any job.
+    """A :class:`~.BaseFlowOperation` represents a data space operation acting on any job.
 
-    Every BaseFlowOperation is associated with a specific command.
+    Every :class:`~.BaseFlowOperation` is associated with a specific command.
 
     Preconditions (pre) and postconditions (post) can be used to trigger an
     operation only when certain conditions are met. Conditions are unary
@@ -839,10 +839,10 @@ class FlowGroupEntry:
 
 
 class FlowGroup:
-    """A FlowGroup represents a subset of a workflow for a project.
+    """A :class:`~.FlowGroup` represents a subset of a workflow for a project.
 
     A :class:`FlowGroup` is associated with one or more instances of
-    :class:`BaseFlowOperation`.
+    :class:`~.BaseFlowOperation`.
 
     Examples
     --------
@@ -871,7 +871,7 @@ class FlowGroup:
         The name of the group to be used when calling from the command line.
     operations : dict
         A dictionary of operations where the keys are operation names and
-        each value is a :class:`BaseFlowOperation`.
+        each value is a :class:`~.BaseFlowOperation`.
     operation_directives : dict
         A dictionary of additional parameters that provide instructions on how
         to execute a particular operation, e.g., specifically required
@@ -968,8 +968,8 @@ class FlowGroup:
     def _eligible(self, jobs, ignore_conditions=IgnoreConditions.NONE):
         """Determine if at least one operation is eligible.
 
-        A :class:`~.FlowGroup` is eligible for execution if at least one of its
-        associated operations is eligible.
+        A :class:`~.FlowGroup` is eligible for execution if at least one of
+        its associated operations is eligible.
 
         Parameters
         ----------
@@ -1009,8 +1009,8 @@ class FlowGroup:
     def eligible(self, job, ignore_conditions=IgnoreConditions.NONE):
         """Determine if at least one operation is eligible.
 
-        A FlowGroup is eligible for execution if at least one of its
-        associated operations is eligible.
+        A :class:`~.FlowGroup` is eligible for execution if at least one of
+        its associated operations is eligible.
 
         Parameters
         ----------
@@ -1031,7 +1031,7 @@ class FlowGroup:
 
     @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
     def complete(self, job):
-        """Check if all BaseFlowOperation postconditions are met.
+        """Check if all :class:`~.BaseFlowOperation` postconditions are met.
 
         Parameters
         ----------
@@ -1054,7 +1054,7 @@ class FlowGroup:
         ----------
         name : str
             The name of the operation.
-        operation : :class:`BaseFlowOperation`
+        operation : :class:`~.BaseFlowOperation`
             The workflow operation to add to the :class:`~.FlowGroup`.
         directives : dict
             The operation specific directives. (Default value = None)
@@ -1071,8 +1071,8 @@ class FlowGroup:
 
         Parameters
         ----------
-        group : :class:`flow.project.FlowGroup`
-            The other FlowGroup to compare to.
+        group : :class:`~.FlowGroup`
+            The other :class:`~.FlowGroup` to compare to.
 
         Returns
         -------
@@ -1160,7 +1160,7 @@ class FlowGroup:
         ignore_conditions_on_execution=IgnoreConditions.NONE,
         index=0,
     ):
-        """Create a _JobOperation object from the FlowGroup.
+        """Create a _JobOperation object from the :class:`~.FlowGroup`.
 
         Creates a _JobOperation for use in submitting and scripting.
 
@@ -1263,7 +1263,7 @@ class FlowGroup:
         ignore_conditions=IgnoreConditions.NONE,
         index=0,
     ):
-        """Create _JobOperation object(s) from the FlowGroup.
+        """Create _JobOperation object(s) from the :class:`~.FlowGroup`.
 
         Yields a _JobOperation for each contained operation given proper
         conditions are met.
@@ -3365,7 +3365,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             )
 
     def _gather_flow_groups(self, names=None):
-        """Grabs FlowGroups that match any of a set of names."""
+        r"""Grabs :class:`~.FlowGroup`\ s that match any of a set of names."""
         operations = {}
         # if no names are selected try all singleton groups
         if names is None:
@@ -3400,7 +3400,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         ignore_conditions=IgnoreConditions.NONE,
         ignore_conditions_on_execution=IgnoreConditions.NONE,
     ):
-        """Grabs _JobOperations that are eligible to run from FlowGroups."""
+        r"""Grabs eligible :class:`~._JobOperation`\ s from :class:`~.FlowGroup`s."""
         for group in self._gather_flow_groups(names):
             for aggregate in self._get_aggregate_store(group.name).values():
                 if (
@@ -3609,7 +3609,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Parameters
         ----------
-        operations : A sequence of instances of :class:`._JobOperation`
+        operations : A sequence of instances of :class:`~._JobOperation`
             The operations to submit.
         _id : str
             The _id to be used for this submission. (Default value = None)
@@ -4477,10 +4477,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @classmethod
     def make_group(cls, name, options=""):
-        """Make a FlowGroup named ``name`` and return a decorator to make groups.
+        r"""Make a :class:`~.FlowGroup` named ``name`` and return a decorator to make groups.
 
-        FlowGroups group operations together for running and submitting
-        JobOperations.
+        A :class:`~.FlowGroup` is used to group operations together for
+        running and submitting :class:`~.JobOperation`\ s.
 
         Examples
         --------
@@ -4564,17 +4564,17 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return self._groups
 
     def _get_aggregate_store(self, group):
-        """Return aggregate store associated with the FlowGroup.
+        """Return aggregate store associated with the :class:`~.FlowGroup`.
 
         Parameters
         ----------
         group : str
-            The name of the FlowGroup whose aggregate store will be returned.
+            The name of the :class:`~.FlowGroup` whose aggregate store will be returned.
 
         Returns
         -------
         :class:`_DefaultAggregateStore`
-            Aggregate store containing aggregates associated with the provided FlowGroup.
+            Aggregate store containing aggregates associated with the provided :class:`~.FlowGroup`.
 
         """
         for aggregate_store, groups in self._stored_aggregates.items():

@@ -3406,6 +3406,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # aggregate in those instances.
         for aggregate_store in self._stored_aggregates:
             try:
+                # Assume the id exists and skip the __contains__ check for
+                # performance. If the id doesn't exist in this aggregate_store,
+                # it will raise an exception that can be ignored.
                 return aggregate_store[id]
             except KeyError:
                 pass

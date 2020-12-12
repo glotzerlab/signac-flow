@@ -1962,6 +1962,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """Expand jobs which were submitted as part of a bundle."""
         sep = getattr(self._environment, "JOB_ID_SEPARATOR", "/")
         bundle_prefix = f"{self}{sep}bundle{sep}"
+        if scheduler_jobs is None:
+            return
         for job in scheduler_jobs:
             if job.name().startswith(bundle_prefix):
                 with open(self._fn_bundle(job.name())) as file:

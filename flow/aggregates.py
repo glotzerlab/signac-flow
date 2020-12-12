@@ -483,8 +483,7 @@ class _DefaultAggregateStore(Mapping):
         self._hash_repr = hash(repr(project))
 
     def __iter__(self):
-        for job in self._project:
-            yield job.get_id()
+        yield from self.keys()
 
     def __getitem__(self, id):
         """Return an aggregate of one job from its job id.

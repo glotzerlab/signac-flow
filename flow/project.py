@@ -2174,6 +2174,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for aggregate_id, aggregate in tqdm(
             aggregate_store.items(),
             desc=f"Collecting aggregate status info for operation {group.name}",
+            total=len(aggregate_store),
             leave=False,
         ):
             errors.setdefault(aggregate_id, "")

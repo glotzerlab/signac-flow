@@ -58,6 +58,7 @@ class ClusterJob:
         return self._job_id
 
     def __str__(self):
+        """Return job ID string."""
         return str(self._id())
 
     def name(self):
@@ -98,7 +99,10 @@ class Scheduler:
     def jobs(self):
         """Yield all cluster jobs.
 
-        :yields:
-            :class:`.ClusterJob`
+        Yields
+        ------
+        :class:`.ClusterJob`
+            Cluster job.
+
         """
         raise NotImplementedError()

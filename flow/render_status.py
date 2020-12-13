@@ -9,10 +9,10 @@ from .util import mistune
 
 
 class Renderer:
-    """A class for rendering status in different format.
+    """A class for rendering status in a specified style and format.
 
-    This class provides method and string output for rendering status output in different format,
-    currently supports: terminal, markdown and html
+    This class provides the :meth:`.render` method for rendering status output
+    in different formats, and currently supports terminal, Markdown and HTML.
     """
 
     def __init__(self):
@@ -23,21 +23,23 @@ class Renderer:
     def generate_terminal_output(self):
         """Get status string in format for terminal.
 
-        :return:
+        Returns
+        -------
+        str
             Status string in format for terminal.
-        :rtype:
-            str
+
         """
         self.terminal_output = mistune.terminal(self.markdown_output)
         return self.terminal_output
 
     def generate_html_output(self):
-        """Get status string in html format.
+        """Get status string in HTML format.
 
-        :return:
-            Status string in html format.
-        :rtype:
-            str
+        Returns
+        -------
+        str
+            Status string in HTML format.
+
         """
         self.html_output = mistune.html(self.markdown_output)
         return self.html_output
@@ -53,41 +55,34 @@ class Renderer:
         compact,
         output_format,
     ):
-        """Render the status in different format for print_status.
+        """Render the status.
 
-        :param template:
+        Parameters
+        ----------
+        template : str
             User provided Jinja2 template file.
-        :type template:
-            str
-        :param template_environment:
+        template_environment : :class:`jinja2.Environment`
             Template environment.
-        :type template_environment:
-            :class:`jinja2.Environment`
-        :param context:
-            Context that includes all the information for rendering status output.
-        :type context:
-            dict
-        :param detailed:
+        context : dict
+            Context that includes all the information for rendering status
+            output.
+        detailed : bool
             Print a detailed status of each job.
-        :type detailed:
-            bool
-        :param expand:
+        expand : bool
             Present labels and operations in two separate tables.
-        :type expand:
-            bool
-        :param unroll:
+        unroll : bool
             Separate columns for jobs and the corresponding operations.
-        :type unroll:
-            bool
-        :param compact:
+        compact : bool
             Print a compact version of the output.
-        :type compact:
-            bool
-        :param output_format:
+        output_format : str
             Rendering output format, supports:
-            'terminal' (default), 'markdown' or 'html'.
-        :type output_format:
-            str
+            ``'terminal'`` (default), ``'markdown'``, or ``'html'``.
+
+        Returns
+        -------
+        str
+            Status output.
+
         """
         # Use Jinja2 template for status output
         if template is None:
@@ -103,18 +98,22 @@ class Renderer:
         def draw_progressbar(value, total, escape="", width=40):
             """Visualize progress with a progress bar.
 
-            :param value:
+            Parameters
+            ----------
+            value : int
                 The current progress as a fraction of total.
-            :type value:
-                int
-            :param total:
+            total : int
                 The maximum value that 'value' may obtain.
-            :type total:
-                int
-            :param width:
-                The character width of the drawn progress bar.
-            :type width:
-                int
+            width : int
+                The character width of the drawn progress bar. (Default value = 40)
+            escape : str
+                Escape character needed for some formats. (Default value = "")
+
+            Returns
+            -------
+            str
+                Formatted progress bar.
+
             """
             assert value >= 0 and total > 0
             bar_format = escape + f"|{{bar:{width}}}" + escape + "| {percentage:<0.2f}%"
@@ -125,18 +124,20 @@ class Renderer:
         def job_filter(job_op, scheduler_status_code, all_ops):
             """Filter eligible jobs for status print.
 
-            :param job_op:
+            Parameters
+            ----------
+            job_op : dict
                 Operation information for a job.
-            :type job_op:
-                dict
-            :param scheduler_status_code:
+            scheduler_status_code : dict
                 Dictionary information for status code.
-            :type scheduler_status_code:
-                dict
-            :param all_ops:
+            all_ops : bool
                 Boolean value indicate if all operations should be displayed.
-            :type all_ops:
-                bool
+
+            Returns
+            -------
+            bool
+                Whether the job is eligible to print.
+
             """
             return (
                 scheduler_status_code[job_op["scheduler_status"]] != "U"
@@ -147,14 +148,18 @@ class Renderer:
         def get_operation_status(operation_info, symbols):
             """Determine the status of an operation.
 
-            :param operation_info:
+            Parameters
+            ----------
+            operation_info : dict
                 Dictionary containing operation information.
-            :type operation_info:
-                dict
-            :param symbols:
-                Dictionary containing code for different job status.
-            :type symbols:
-                dict
+            symbols : dict
+                Dictionary containing code for different job statuses.
+
+            Returns
+            -------
+            str
+                The symbol for the job status.
+
             """
             if operation_info["scheduler_status"] >= JobStatus.active:
                 op_status = "running"
@@ -172,18 +177,20 @@ class Renderer:
         def highlight(string, eligible, pretty):
             """Change font to bold within jinja2 template.
 
-            :param string:
+            Parameters
+            ----------
+            string : str
                 The string to be printed.
-            :type string:
-                str
-            :param eligible:
+            eligible : bool
                 Boolean value for job eligibility.
-            :type eligible:
-                bool
-            :param pretty:
+            pretty : bool
                 Prettify the output.
-            :type pretty:
-                bool
+
+            Returns
+            -------
+            str
+                The highlighted (bold font) string.
+
             """
             if eligible and pretty:
                 return "**" + string + "**"

@@ -15,8 +15,13 @@ from hashlib import md5
 class aggregator:
     """Decorator for operation functions that operate on aggregates.
 
-    By default, if the ``aggregator_function`` is ``None``,
-    an aggregate of all jobs will be created.
+    By default, if the ``aggregator_function`` is ``None``, an aggregate of all
+    jobs will be created.
+
+    Examples
+    --------
+    The code block below defines a :class:`~.FlowOperation` that prints the
+    total length of the provided aggregate of jobs.
 
     .. code-block:: python
 
@@ -25,27 +30,22 @@ class aggregator:
         def foo(*jobs):
             print(len(jobs))
 
-    :param aggregator_function:
+    Parameters
+    ----------
+    aggregator_function : callable or None
         A callable that performs aggregation of jobs. It takes in a list of
         jobs and can return or yield subsets of jobs as an iterable. The
         default behavior is creating a single aggregate of all jobs.
-    :type aggregator_function:
-        callable or None
-    :param sort_by:
+    sort_by : str or None
         Before aggregating, sort the jobs by a given statepoint parameter.
         The default behavior is no sorting.
-    :type sort_by:
-        str or None
-    :param sort_ascending:
+    sort_ascending : bool
         States if the jobs are to be sorted in ascending order. The default
         value is True.
-    :type sort_ascending:
-        bool
-    :param select:
+    select : callable or None
         Condition for filtering individual jobs. This is passed as the callable
         argument to :func:`filter`. The default behavior is no filtering.
-    :type select:
-        callable or None
+
     """
 
     def __init__(
@@ -87,8 +87,9 @@ class aggregator:
         project and they are aggregated in groups of 3, then the generated
         aggregates will have lengths 3, 3, 3, and 1.
 
-        The code block below provides an example of how jobs can be aggregated
-        in groups of 2.
+        Examples
+        --------
+        The code block below shows how to aggregate jobs in groups of 2.
 
         .. code-block:: python
 
@@ -97,26 +98,26 @@ class aggregator:
             def foo(*jobs):
                 print(len(jobs))
 
-        :param num:
+        Parameters
+        ----------
+        num : int
             The default size of aggregates excluding the final aggregate.
-        :type num:
-            int
-        :param sort_by:
+        sort_by : str or None
             Before aggregating, sort the jobs by a given statepoint parameter.
             The default behavior is no sorting.
-        :type sort_by:
-            str or None
-        :param sort_ascending:
+        sort_ascending : bool
             States if the jobs are to be sorted in ascending order.
             The default value is True.
-        :type sort_ascending:
-            bool
-        :param select:
+        select : callable or None
             Condition for filtering individual jobs. This is passed as the
             callable argument to :func:`filter`. The default behavior is no
             filtering.
-        :type select:
-            callable or None
+
+        Returns
+        -------
+        aggregator : :class:`~.aggregator`
+            The :meth:`~.groupsof` aggregator.
+
         """
         try:
             if num != int(num):
@@ -144,7 +145,9 @@ class aggregator:
     def groupby(cls, key, default=None, sort_by=None, sort_ascending=True, select=None):
         """Aggregate jobs according to matching state point values.
 
-        The below code block provides an example of how to aggregate jobs
+        Examples
+        --------
+        The code block below provides an example of how to aggregate jobs
         having a common state point parameter ``'sp'`` whose value, if not
         found, is replaced by a default value of -1.
 
@@ -155,34 +158,32 @@ class aggregator:
             def foo(*jobs):
                 print(len(jobs))
 
-        :param key:
+        Parameters
+        ----------
+        key : str, Iterable, or callable
             The method by which jobs are grouped. It may be a state point or a
             sequence of state points to group by specific state point keys. It
             may also be an arbitrary callable of
             :class:`~signac.contrib.job.Job` when greater flexibility is
             needed.
-        :type key:
-            str, Iterable, or callable
-        :param default:
+        default : str, Iterable, or callable
             Default value used for grouping if the key is missing or invalid.
-        :type default:
-            str, Iterable, or callable
-        :param sort_by:
+        sort_by : str or None
             State point parameter used to sort the jobs before grouping.
             The default value is None, which does no sorting.
-        :type sort_by:
-            str or None
-        :param sort_ascending:
+        sort_ascending : bool
             Whether jobs are to be sorted in ascending order. The default
             value is True.
-        :type sort_ascending:
-            bool
-        :param select:
+        select : callable or None
             Condition for filtering individual jobs. This is passed as the
             callable argument to :func:`filter`. The default behavior is no
             filtering.
-        :type select:
-            callable or None
+
+        Returns
+        -------
+        aggregator : :class:`~.aggregator`
+            The :meth:`~.groupby` aggregator.
+
         """
         if isinstance(key, str):
             if default is None:
@@ -238,6 +239,7 @@ class aggregator:
         return cls(aggregator_function, sort_by, sort_ascending, select)
 
     def __eq__(self, other):
+        """Test equality with another aggregator."""
         return (
             type(self) == type(other)
             and not self._is_aggregate
@@ -245,6 +247,7 @@ class aggregator:
         )
 
     def __hash__(self):
+        """Hash this aggregator."""
         return hash(
             (
                 self._sort_by,
@@ -265,6 +268,18 @@ class aggregator:
 
         It is possible for equivalent functions to have different ids if the
         bytecode is not identical.
+
+        Parameters
+        ----------
+        func : callable
+            The function to be hashed.
+
+        Returns
+        -------
+        str
+            The hash of the function's bytecode if possible, otherwise the hash
+            of the function.
+
         """
         try:
             return hash(func.__code__.co_code)
@@ -274,16 +289,22 @@ class aggregator:
     def _create_AggregatesStore(self, project):
         """Create the actual collections of jobs to be sent to aggregate operations.
 
-        The :class:`aggregate` class is just a decorator that provides a signal for
-        operation functions that should be treated as aggregate operations and
-        information on how to perform the aggregation. This function generates
-        the classes that actually hold sequences of jobs to which aggregate
-        operations will be applied.
+        The :class:`aggregator` class is just a decorator that provides a
+        signal for operation functions that should be treated as aggregate
+        operations and information on how to perform the aggregation. This
+        function generates the classes that actually hold sequences of jobs to
+        which aggregate operations will be applied.
 
-        :param project:
+        Parameters
+        ----------
+        project : :class:`flow.FlowProject` or :class:`signac.contrib.project.Project`
             A signac project used to fetch jobs for creating aggregates.
-        :type project:
-            :class:`flow.FlowProject` or :class:`signac.contrib.project.Project`
+
+        Returns
+        -------
+        :class:`~._DefaultAggregateStore` or :class:`~._AggregatesStore`
+            The aggregate store.
+
         """
         if not self._is_aggregate:
             return _DefaultAggregateStore(project)
@@ -295,10 +316,11 @@ class aggregator:
 
         This call operator allows the class to be used as a decorator.
 
-        :param func:
+        Parameters
+        ----------
+        func : callable
             The function to decorate.
-        :type func:
-            callable
+
         """
         if callable(func):
             setattr(func, "_flow_aggregate", self)
@@ -316,14 +338,13 @@ class _AggregatesStore(Mapping):
     This is a callable class which, when called, generates all the aggregates.
     Iterating over this object yields all aggregates.
 
-    :param aggregator:
+    Parameters
+    ----------
+    aggregator : :class:`aggregator`
         aggregator object associated with this class.
-    :type aggregator:
-        :class:`aggregator`
-    :param project:
+    project : :class:`flow.FlowProject` or :class:`signac.contrib.project.Project`
         A signac project used to fetch jobs for creating aggregates.
-    :type project:
-        :class:`flow.FlowProject` or :class:`signac.contrib.project.Project`
+
     """
 
     def __init__(self, aggregator, project):
@@ -350,10 +371,16 @@ class _AggregatesStore(Mapping):
     def __contains__(self, id):
         """Return whether this instance contains an aggregate (by aggregate id).
 
-        :param id:
+        Parameters
+        ----------
+        id : str
             The id of an aggregate of jobs.
-        :type id:
-            str
+
+        Returns
+        -------
+        bool
+            Whether this instance contains an aggregate.
+
         """
         return id in self._aggregate_per_id
 
@@ -436,10 +463,11 @@ class _DefaultAggregateStore(Mapping):
 
     Iterating over this object yields tuples each containing one job from the project.
 
-    :param project:
+    Parameters
+    ----------
+    project : :class:`flow.FlowProject` or :class:`signac.contrib.project.Project`
         A signac project used to fetch jobs for creating aggregates.
-    :type project:
-        :class:`flow.FlowProject` or :class:`signac.contrib.project.Project`
+
     """
 
     def __init__(self, project):
@@ -450,7 +478,14 @@ class _DefaultAggregateStore(Mapping):
             yield job.get_id()
 
     def __getitem__(self, id):
-        """Return an aggregate of one job from its job id."""
+        """Return an aggregate of one job from its job id.
+
+        Parameters
+        ----------
+        id : str
+            The job id.
+
+        """
         try:
             return (self._project.open_job(id=id),)
         except KeyError:
@@ -459,10 +494,11 @@ class _DefaultAggregateStore(Mapping):
     def __contains__(self, id):
         """Return whether this instance contains a job (by job id).
 
-        :param id:
+        Parameters
+        ----------
+        id : str
             The job id.
-        :type id:
-            str
+
         """
         try:
             self._project.open_job(id=id)
@@ -506,10 +542,16 @@ class _DefaultAggregateStore(Mapping):
 def get_aggregate_id(jobs):
     """Generate hashed id for an aggregate of jobs.
 
-    :param jobs:
-        The signac job handles
-    :type jobs:
-        tuple
+    Parameters
+    ----------
+    jobs : tuple of :class:`~signac.contrib.job.Job`
+        The signac job handles.
+
+    Returns
+    -------
+    str
+        The generated aggregate id.
+
     """
     if len(jobs) == 1:
         return jobs[0].get_id()  # Return job id as it's already unique

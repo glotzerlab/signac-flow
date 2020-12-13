@@ -31,10 +31,16 @@ class label:
 
         This call operator allows the class to be used as a decorator.
 
-        :param func:
+        Parameters
+        ----------
+        func : callable
             The function to decorate.
-        :type func:
-            callable
+
+        Returns
+        -------
+        callable
+            The decorated function.
+
         """
         func._label = True
         if self.name is not None:
@@ -53,10 +59,16 @@ class staticlabel(label):
 
         This call operator allows the class to be used as a decorator.
 
-        :param func:
+        Parameters
+        ----------
+        func : callable
             The function to decorate.
-        :type func:
-            callable
+
+        Returns
+        -------
+        callable
+            The decorated function.
+
         """
         return staticmethod(super().__call__(func))
 
@@ -72,10 +84,16 @@ class classlabel(label):
 
         This call operator allows the class to be used as a decorator.
 
-        :param func:
+        Parameters
+        ----------
+        func : callable
             The function to decorate.
-        :type func:
-            callable
+
+        Returns
+        -------
+        callable
+            The decorated function.
+
         """
         return classmethod(super().__call__(func))
 

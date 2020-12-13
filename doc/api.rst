@@ -109,10 +109,12 @@ Operations and Status
 .. autoclass:: flow.project.FlowOperation
     :show-inheritance:
     :members:
+    :special-members: __call__
 
 .. autoclass:: flow.project.FlowCmdOperation
     :show-inheritance:
     :members:
+    :special-members: __call__
 
 .. autoclass:: flow.project.JobOperation
     :members:
@@ -120,6 +122,20 @@ Operations and Status
 .. autoclass:: flow.render_status.Renderer
     :members: generate_terminal_output, generate_html_output, render
 
+Labels
+------
+
+.. autoclass:: flow.label
+    :members:
+    :special-members: __call__
+
+.. autoclass:: flow.staticlabel
+    :members:
+    :special-members: __call__
+
+.. autoclass:: flow.classlabel
+    :members:
+    :special-members: __call__
 
 @flow.cmd
 ---------
@@ -135,6 +151,8 @@ Operations and Status
 ----------------
 
 .. autoclass:: directives
+    :members:
+    :special-members: __call__
 
 flow.run()
 ----------
@@ -157,6 +175,10 @@ The FlowGroup
 .. autoclass:: flow.project.FlowGroup
     :members:
 
+.. autoclass:: flow.project.FlowGroupEntry
+    :members:
+    :special-members: __call__
+
 Aggregation
 -----------
 
@@ -164,6 +186,7 @@ Aggregation
 
 .. autoclass:: flow.aggregates.aggregator
     :members:
+    :special-members: __call__
 
 .. autofunction:: flow.aggregates.get_aggregate_id
 

@@ -55,7 +55,7 @@ def _cached_fqdn():
 def setup(py_modules, **attrs):
     """Set up user-defined environment modules.
 
-    Use this function in place of setuptools.setup to not only install
+    Use this function in place of :meth:`setuptools.setup` to not only install
     an environment's module, but also register it with the global signac
     configuration. Once registered, the environment is automatically
     imported when the :meth:`~flow.get_environment` function is called.
@@ -105,7 +105,25 @@ class ComputeEnvironmentType(type):
 
 
 def template_filter(func):
-    """Mark the function as a ComputeEnvironment template filter."""
+    """Decorate a function as a :class:`~.ComputeEnvironment` template filter.
+
+    This decorator is applied to methods defined in a subclass of
+    :class:`~.ComputeEnvironment` that are used in that environment's
+    templates. The decorated function becomes a class method that is available
+    as a :ref:`jinja2 filter <jinja2:filters>` in templates rendered by a
+    :class:`~.FlowProject` with that :class:`~.ComputeEnvironment`.
+
+    Parameters
+    ----------
+    func : callable
+        Function to decorate.
+
+    Returns
+    -------
+    callable
+        Decorated function.
+
+    """
     setattr(func, "_flow_template_filter", True)
     return classmethod(func)
 
@@ -159,10 +177,28 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
     @classmethod
     def submit(cls, script, flags=None, *args, **kwargs):
-        """Submit a job submission script to the environment's scheduler.
+        r"""Submit a job submission script to the environment's scheduler.
 
         Scripts should be submitted to the environment, instead of directly
         to the scheduler to allow for environment specific post-processing.
+
+        Parameters
+        ----------
+        script : str
+            The script to submit.
+        flags : list
+            A list of additional flags to provide to the scheduler.
+            (Default value = None)
+        \*args
+            Positional arguments forwarded to the scheduler's submit method.
+        \*\*kwargs
+            Keyword arguments forwarded to the scheduler's submit method.
+
+        Returns
+        -------
+        JobStatus.submitted or None
+            Status of job, if submitted.
+
         """
         if flags is None:
             flags = []
@@ -182,10 +218,11 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
     def add_args(cls, parser):
         """Add arguments related to this compute environment to an argument parser.
 
-        :param parser:
-            The argument parser to add arguments to.
-        :type parser:
-            :class:`argparse.ArgumentParser`
+        Parameters
+        ----------
+        parser : :class:`argparse.ArgumentParser`
+            The argument parser where arguments will be added.
+
         """
         return
 
@@ -204,27 +241,42 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         be specific to this environment definition. For example, a
         key should be ``'account'``, not ``'MyEnvironment.account'``.
 
-        :param key: The environment specific configuration key.
-        :type key: str
-        :param default: A default value in case the key cannot be found
+        Parameters
+        ----------
+        key : str
+            The environment specific configuration key.
+        default : str
+            A default value in case the key cannot be found
             within the user's configuration.
-        :type default: str
-        :return: The value or default value.
-        :raises SubmitError: If the key is not in the user's configuration
+
+        Returns
+        -------
+        object
+            The value or default value.
+
+        Raises
+        ------
+        SubmitError
+            If the key is not in the user's configuration
             and no default value is provided.
+
         """
         return flow_config.require_config_value(key, ns=cls.__name__, default=default)
 
     @classmethod
     def _get_omp_prefix(cls, operation):
-        """Get the OpenMP prefix based on the `omp_num_threads` directive.
+        """Get the OpenMP prefix based on the ``omp_num_threads`` directive.
 
-        :param operation:
-            The operation for which to add prefix.
-        :return omp_prefix:
-            The prefix should be added for the operation.
-        :type omp_prefix:
-            str
+        Parameters
+        ----------
+        operation : :class:`flow.project._JobOperation`
+            The operation to be prefixed.
+
+        Returns
+        -------
+        str
+            The prefix to be added to the operation's command.
+
         """
         return "export OMP_NUM_THREADS={}; ".format(
             operation.directives["omp_num_threads"]
@@ -232,22 +284,22 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
     @classmethod
     def _get_mpi_prefix(cls, operation, parallel):
-        """Get the mpi prefix based on proper directives.
+        """Get the MPI prefix based on the ``nranks`` directives.
 
-        :param operation:
-            The operation for which to add prefix.
-        :type operation:
-            :class:`flow._JobOperation`
-        :param parallel:
-            If True, operations are assumed to be executed in parallel, which means
-            that the number of total tasks is the sum of all tasks instead of the
-            maximum number of tasks. Default is set to False.
-        :type parallel:
-            bool
-        :return mpi_prefix:
-            The prefix should be added for the operation.
-        :type mpi_prefix:
-            str
+        Parameters
+        ----------
+        operation : :class:`flow.project._JobOperation`
+            The operation to be prefixed.
+        parallel : bool
+            If True, operations are assumed to be executed in parallel, which
+            means that the number of total tasks is the sum of all tasks
+            instead of the maximum number of tasks. Default is set to False.
+
+        Returns
+        -------
+        str
+            The prefix to be added to the operation's command.
+
         """
         if operation.directives.get("nranks"):
             return "{} -n {} ".format(cls.mpi_cmd, operation.directives["nranks"])
@@ -255,24 +307,28 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
     @template_filter
     def get_prefix(cls, operation, parallel=False, mpi_prefix=None, cmd_prefix=None):
-        """Template filter for getting the prefix based on proper directives.
+        """Template filter generating a command prefix from directives.
 
-        :param operation:
-            The operation for which to add prefix.
-        :param parallel:
+        Parameters
+        ----------
+        operation : :class:`flow.project._JobOperation`
+            The operation to be prefixed.
+        parallel : bool
             If True, operations are assumed to be executed in parallel, which means
             that the number of total tasks is the sum of all tasks instead of the
             maximum number of tasks. Default is set to False.
-        :param mpi_prefix:
+        mpi_prefix : str
             User defined mpi_prefix string. Default is set to None.
             This will be deprecated and removed in the future.
-        :param cmd_prefix:
+        cmd_prefix : str
             User defined cmd_prefix string. Default is set to None.
             This will be deprecated and removed in the future.
-        :return prefix:
-            The prefix should be added for the operation.
-        :type prefix:
-            str
+
+        Returns
+        -------
+        str
+            The prefix to be added to the operation's command.
+
         """
         prefix = ""
         if operation.directives.get("omp_num_threads"):
@@ -357,7 +413,8 @@ class LSFEnvironment(ComputeEnvironment):
 class NodesEnvironment(ComputeEnvironment):
     """A compute environment consisting of multiple compute nodes.
 
-    Each compute node is assumed to have a specific number of compute units, e.g., CPUs.
+    Each compute node is assumed to have a specific number of compute units,
+    e.g., CPUs.
     """
 
 
@@ -366,7 +423,14 @@ class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
 
     @classmethod
     def add_args(cls, parser):
-        """Add arguments to the parser."""
+        """Add arguments to the parser.
+
+        Parameters
+        ----------
+        parser : :class:`argparse.ArgumentParser`
+            The argument parser where arguments will be added.
+
+        """
         super().add_args(parser)
         parser.add_argument(
             "-w", "--walltime", type=float, help="The wallclock time in hours."
@@ -392,7 +456,14 @@ class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
 
     @classmethod
     def add_args(cls, parser):
-        """Add arguments to the parser."""
+        """Add arguments to the parser.
+
+        Parameters
+        ----------
+        parser : :class:`argparse.ArgumentParser`
+            The argument parser where arguments will be added.
+
+        """
         super().add_args(parser)
         parser.add_argument(
             "--memory",
@@ -424,7 +495,14 @@ class DefaultLSFEnvironment(NodesEnvironment, LSFEnvironment):
 
     @classmethod
     def add_args(cls, parser):
-        """Add arguments to the parser."""
+        """Add arguments to the parser.
+
+        Parameters
+        ----------
+        parser : :class:`argparse.ArgumentParser`
+            The argument parser where arguments will be added.
+
+        """
         super().add_args(parser)
         parser.add_argument(
             "-w",
@@ -471,7 +549,20 @@ def _import_configured_environments():
 
 
 def registered_environments(import_configured=True):
-    """Return a list of registered environments."""
+    """Return a list of registered environments.
+
+    Parameters
+    ----------
+    import_configured : bool
+        Whether to import environments specified in the flow configuration.
+        (Default value = True)
+
+    Returns
+    -------
+    list
+        List of registered environments.
+
+    """
     if import_configured:
         _import_configured_environments()
     return list(ComputeEnvironment.registry.values())
@@ -485,12 +576,19 @@ def get_environment(test=False, import_configured=True):
     environment where the :meth:`~.ComputeEnvironment.is_present` method
     returns True.
 
-    :param test:
-        Whether to return the TestEnvironment.
-    :type test:
-        bool
-    :returns:
+    Parameters
+    ----------
+    test : bool
+        Whether to return the TestEnvironment. (Default value = False)
+    import_configured : bool
+        Whether to import environments specified in the flow configuration.
+        (Default value = True)
+
+    Returns
+    -------
+    :class:`~.ComputeEnvironment`
         The detected environment class.
+
     """
     if test:
         return TestEnvironment

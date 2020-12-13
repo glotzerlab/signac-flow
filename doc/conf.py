@@ -20,6 +20,7 @@ class Mock(MagicMock):
 
     @classmethod
     def __getattr__(cls, name):
+        """Get mocked attribute."""
         if name == "_mock_methods":
             return []
         return Mock()
@@ -45,6 +46,7 @@ extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
     "sphinx.ext.intersphinx",
+    "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
 ]
 

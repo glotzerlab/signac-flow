@@ -25,7 +25,16 @@ class FakeScheduler(Scheduler):
         return None
 
     def submit(self, script, **kwargs):
-        """Print the script to screen."""
+        r"""Print the script to screen.
+
+        Parameters
+        ----------
+        script : str
+            Script to print.
+        \*\*kwargs
+            Keyword arguments (ignored).
+
+        """
         print(script)
 
     @classmethod

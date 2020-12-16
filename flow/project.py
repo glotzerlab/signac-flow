@@ -314,14 +314,13 @@ class _JobOperation:
     def __str__(self):
         assert len(self._jobs) > 0
         max_len = 3
-        min_len_unique_id = self._jobs[0]._project.min_len_unique_id()
         if len(self._jobs) > max_len:
             shown = self._jobs[: max_len - 2] + ("...",) + self._jobs[-1:]
         else:
             shown = self._jobs
         return (
             f"{self.name}[#{len(self._jobs)}]"
-            f"({', '.join([str(element)[:min_len_unique_id] for element in shown])})"
+            f"({', '.join([str(element) for element in shown])})"
         )
 
     def __repr__(self):

@@ -7,6 +7,7 @@ import json
 import logging
 import os
 from contextlib import contextmanager
+from functools import lru_cache, partial
 from itertools import cycle, islice
 
 
@@ -235,3 +236,29 @@ def _to_hashable(obj):
         return _hashable_dict(obj)
     else:
         return obj
+
+
+def _cached_partial(func, *args, maxsize=None, **kwargs):
+    r"""Cache the results of a partial.
+
+    Useful for wrapping functions that must only be evaluated lazily, one time.
+
+    Parameters
+    ----------
+    func : callable
+        The function to call.
+    \*args
+        Positional arguments bound to the function.
+    maxsize : int
+        The maximum size of the LRU cache, or None for no limit. (Default value
+        = None)
+    \*\*kwargs
+        Keyword arguments bound to the function.
+
+    Returns
+    -------
+    callable
+        Function with bound arguments and cached return values.
+
+    """
+    return lru_cache(maxsize=maxsize)(partial(func, *args, **kwargs))

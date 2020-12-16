@@ -3,7 +3,6 @@
 # This software is licensed under the BSD 3-Clause License.
 """Miscellaneous utility functions."""
 import argparse
-import json
 import logging
 import os
 from contextlib import contextmanager
@@ -39,16 +38,6 @@ def _positive_int(value):
     except (TypeError, ValueError):
         raise argparse.ArgumentTypeError(f"{value} must be a positive integer.")
     return ivalue
-
-
-def write_human_readable_statepoint(script, job):
-    """Human-readable representation of a signac state point."""
-    script.write("# Statepoint:\n#\n")
-    sp_dump = (
-        json.dumps(job.statepoint(), indent=2).replace("{", "{{").replace("}", "}}")
-    )
-    for line in sp_dump.splitlines():
-        script.write("# " + line + "\n")
 
 
 @contextmanager

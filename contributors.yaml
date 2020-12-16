@@ -129,4 +129,9 @@ contributors:
     given-names: Ramanish
     orcid: "https://orcid.org/0000-0002-7908-060X"
     affiliation: "University of Minnesota"
+  -
+    family-names: Jones
+    given-names: Gabrielle
+    orcid: "https://orcid.org/0000-0002-8041-4873"
+    affiliation: "University of Michigan"
 ...

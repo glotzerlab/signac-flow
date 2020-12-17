@@ -2176,6 +2176,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             leave=False,
         ):
             errors.setdefault(aggregate_id, "")
+            scheduler_status = JobStatus.unknown
+            completed = False
+            eligible = False
             try:
                 job_op_id = group._generate_id(aggregate)
                 scheduler_status = cached_status.get(job_op_id, JobStatus.unknown)
@@ -2189,9 +2192,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 logger.debug(msg)
                 if ignore_errors:
                     errors[aggregate_id] += str(error) + "\n"
-                    scheduler_status = JobStatus.unknown
-                    completed = False
-                    eligible = False
                 else:
                     raise
             finally:
@@ -2417,6 +2417,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     num_itr = len(iterable)
                     results = []
                     start_time = time.time()
+                    i = 0
                     for i, itr in enumerate(iterable):
                         results.append(fetch_status(itr))
                         # The status interval 0.2 seconds is used since we expect the

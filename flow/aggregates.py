@@ -447,7 +447,7 @@ class _AggregatesStore(Mapping):
             try:
                 filter_aggregate = tuple(filter(_validate_and_filter_job, aggregate))
             except TypeError:  # aggregate is not iterable
-                ValueError("Invalid aggregator_function provided by the user.")
+                raise ValueError("Invalid aggregator_function provided by the user.")
             # Store aggregate by their ids in order to search through id
             self._aggregate_per_id[
                 get_aggregate_id(filter_aggregate)

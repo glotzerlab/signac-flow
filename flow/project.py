@@ -3471,8 +3471,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Iterate over all the instances of stored aggregates and search for the
         # aggregate in those instances.
         for aggregate_store in self._stored_aggregates:
-            if id in aggregate_store:
+            try:
                 return aggregate_store[id]
+            except KeyError:
+                pass
         # Raise error as didn't find the id in any of the stored objects
         raise LookupError(f"Did not find aggregate with id {id} in the project")
 

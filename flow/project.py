@@ -6,6 +6,7 @@
 The FlowProject is a signac Project that allows the user to define a workflow.
 """
 import argparse
+import cloudpickle
 import contextlib
 import datetime
 import functools
@@ -2077,53 +2078,21 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 elif status_parallelization == "process":
                     with contextlib.closing(Pool()) as pool:
                         try:
-                            import pickle
-
-                            l_results, g_results = self._fetch_status_in_parallel(
+                            (
+                                l_results,
+                                g_results,
+                            ) = self._fetch_status_in_parallel(
                                 pool,
-                                pickle,
                                 distinct_jobs,
                                 operation_names,
                                 ignore_errors,
                                 cached_status,
                             )
-                        except Exception as error:
-                            if (
-                                not isinstance(
-                                    error, (pickle.PickleError, self._PickleError)
-                                )
-                                and "pickle" not in str(error).lower()
-                            ):
-                                raise  # most likely not a pickle related error...
-
-                            try:
-                                import cloudpickle
-                            except ImportError:  # The cloudpickle package is not available.
-                                logger.error(
-                                    "Unable to parallelize execution due to a "
-                                    "pickling error. "
-                                    "\n\n - Try to install the 'cloudpickle' package, "
-                                    "e.g., with 'pip install cloudpickle'!\n"
-                                )
-                                raise error
-                            else:
-                                try:
-                                    (
-                                        l_results,
-                                        g_results,
-                                    ) = self._fetch_status_in_parallel(
-                                        pool,
-                                        cloudpickle,
-                                        distinct_jobs,
-                                        operation_names,
-                                        ignore_errors,
-                                        cached_status,
-                                    )
-                                except self._PickleError as error:
-                                    raise RuntimeError(
-                                        "Unable to parallelize execution due to a pickling "
-                                        "error: {}.".format(error)
-                                    )
+                        except self._PickleError as error:
+                            raise RuntimeError(
+                                "Unable to parallelize execution due to a pickling "
+                                "error: {}.".format(error)
+                            )
                         label_results = list(
                             tqdm(
                                 iterable=l_results,
@@ -2223,13 +2192,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return results
 
     def _fetch_status_in_parallel(
-        self, pool, pickle, jobs, groups, ignore_errors, cached_status
+        self, pool, jobs, groups, ignore_errors, cached_status
     ):
         try:
-            s_project = pickle.dumps(self)
+            s_project = cloudpickle.dumps(self)
             s_tasks_labels = [
                 (
-                    pickle.loads,
+                    cloudpickle.loads,
                     s_project,
                     job.get_id(),
                     ignore_errors,
@@ -2239,7 +2208,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             ]
             s_tasks_groups = [
                 (
-                    pickle.loads,
+                    cloudpickle.loads,
                     s_project,
                     group,
                     ignore_errors,
@@ -2756,38 +2725,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     "Parallelized execution of {} operation(s).".format(len(operations))
                 )
                 try:
-                    import pickle
-
                     self._run_operations_in_parallel(
-                        pool, pickle, operations, progress, timeout
+                        pool, operations, progress, timeout
                     )
-                    logger.debug("Used cPickle module for serialization.")
-                except Exception as error:
-                    if (
-                        not isinstance(error, (pickle.PickleError, self._PickleError))
-                        and "pickle" not in str(error).lower()
-                    ):
-                        raise  # most likely not a pickle related error...
-
-                    try:
-                        import cloudpickle
-                    except ImportError:  # The cloudpickle package is not available.
-                        logger.error(
-                            "Unable to parallelize execution due to a pickling error. "
-                            "\n\n - Try to install the 'cloudpickle' package, e.g., with "
-                            "'pip install cloudpickle'!\n"
-                        )
-                        raise error
-                    else:
-                        try:
-                            self._run_operations_in_parallel(
-                                pool, cloudpickle, operations, progress, timeout
-                            )
-                        except self._PickleError as error:
-                            raise RuntimeError(
-                                "Unable to parallelize execution due to a pickling "
-                                "error: {}.".format(error)
-                            )
+                except self._PickleError as error:
+                    raise RuntimeError(
+                        "Unable to parallelize execution due to a pickling "
+                        "error: {}.".format(error)
+                    )
 
     @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
     def run_operations(
@@ -2825,20 +2770,19 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         "Indicates a pickling error while trying to parallelize the execution of operations."
         pass
 
-    def _run_operations_in_parallel(self, pool, pickle, operations, progress, timeout):
+    def _run_operations_in_parallel(self, pool, operations, progress, timeout):
         """Execute operations in parallel.
 
         This function executes the given list of operations with the provided process pool.
 
         Since pickling of the project instance is likely to fail, we manually pickle the
-        project instance and the operations before submitting them to the process pool to
-        enable us to try different pool and pickle module combinations.
+        project instance and the operations before submitting them to the process pool.
         """
 
         try:
-            s_project = pickle.dumps(self)
+            s_project = cloudpickle.dumps(self)
             s_tasks = [
-                (pickle.loads, s_project, pickle.dumps(op), "run_operations")
+                (cloudpickle.loads, s_project, cloudpickle.dumps(op), "run_operations")
                 for op in tqdm(operations, desc="Serialize tasks", file=sys.stderr)
             ]
         except Exception as error:  # Masking all errors since they must be pickling related.
@@ -4533,16 +4477,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             return JobsCursor(self, filter_, doc_filter)
         else:
             return None
-
-    def __setstate__(self, data):
-        self.__dict__ = data
-
-    def __getstate__(self):
-        # Since there are limitations on pickling functions and we don't
-        # need to pickle the aggregator functions, we will delete that attribute.
-        result = self.__dict__.copy()
-        del result["_aggregator_per_group"]
-        return result
 
     def main(self, parser=None):
         """Call this function to use the main command line interface.

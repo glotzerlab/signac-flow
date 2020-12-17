@@ -489,10 +489,9 @@ class _DefaultAggregateStore(Mapping):
         self._project.__dict__ = data["project_attributes"]
 
     def __getstate__(self):
-        # We need to store project attributes in order as they get lost
+        # We also need to store project attributes as they get lost
         # during the process of pickling.
         project_attributes = self._project.__dict__.copy()
-        del project_attributes["_aggregator_per_group"]
         return {
             "project": self._project,
             "project_attributes": project_attributes,

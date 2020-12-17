@@ -2442,7 +2442,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         index = {}
         for i, job in enumerate(distinct_jobs):
             results_entry = {}
-            results_entry["job_id"] = str(job)
+            results_entry["job_id"] = job.get_id()
             results_entry["operations"] = {}
             results_entry["_operations_error"] = None
             results_entry["labels"] = []

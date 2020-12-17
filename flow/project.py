@@ -2183,7 +2183,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 job_op_id = group._generate_id(aggregate)
                 scheduler_status = cached_status.get(job_op_id, JobStatus.unknown)
                 completed = group._complete(aggregate)
-                eligible = False if completed else group._eligible(aggregate)
+                eligible = not completed and group._eligible(aggregate)
             except Exception as error:
                 msg = (
                     "Error while getting operation status for aggregate "

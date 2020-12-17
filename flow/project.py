@@ -4112,6 +4112,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _main_script(self, args):
         "Generate a script for the execution of operations."
+        print(
+            "WARNING: "
+            "The script argument is deprecated as of 0.12 "
+            "and will be removed in 0.14. "
+            "Use `python project.py submit --pretend` instead.",
+            file=sys.stderr,
+        )
+
         # Select jobs:
         jobs = self._select_jobs_from_args(args)
 

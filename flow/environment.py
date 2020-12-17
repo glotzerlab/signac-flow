@@ -3,20 +3,20 @@
 # This software is licensed under the BSD 3-Clause License.
 """Detection of compute environments.
 
-This module provides the ComputeEnvironment class, which can be
+This module provides the :class:`ComputeEnvironment` class, which can be
 subclassed to automatically detect specific computational environments.
 
 This enables the user to adjust their workflow based on the present
 environment, e.g. for the adjustment of scheduler submission scripts.
 """
 import importlib
-import importlib.machinery
 import logging
 import os
 import re
 import socket
-from collections import OrderedDict
+from functools import lru_cache
 
+from deprecation import deprecated
 from signac.common import config
 
 from .directives import (
@@ -37,17 +37,28 @@ from .scheduling.simple_scheduler import SimpleScheduler
 from .scheduling.slurm import SlurmScheduler
 from .scheduling.torque import TorqueScheduler
 from .util import config as flow_config
+from .version import __version__
 
 logger = logging.getLogger(__name__)
 
 
-def setup(py_modules, **attrs):
-    """Setup function for environment modules.
+@lru_cache(maxsize=1)
+def _cached_fqdn():
+    """Return the fully qualified domain name.
 
-    Use this function in place of setuptools.setup to not only install
+    This value is cached because fetching the fully qualified domain name can
+    be slow on macOS.
+    """
+    return socket.getfqdn()
+
+
+def setup(py_modules, **attrs):
+    """Set up user-defined environment modules.
+
+    Use this function in place of :meth:`setuptools.setup` to not only install
     an environment's module, but also register it with the global signac
     configuration. Once registered, the environment is automatically
-    imported when the :py:meth:`~.get_environment` function is called.
+    imported when the :meth:`~flow.get_environment` function is called.
     """
     import setuptools
     from setuptools.command.install import install
@@ -67,7 +78,7 @@ def setup(py_modules, **attrs):
                         msg=f"registering module '{name}' in global signac configuration",
                         level=2,
                     )
-                cfg.setdefault("flow", dict())
+                cfg.setdefault("flow", {})
                 cfg["flow"]["environment_modules"] = envs + list(new)
                 cfg.write()
 
@@ -77,22 +88,42 @@ def setup(py_modules, **attrs):
 
 
 class ComputeEnvironmentType(type):
-    """Metaclass for the definition of ComputeEnvironments.
+    """Metaclass used for :class:`~.ComputeEnvironment`.
 
-    This metaclass automatically registers ComputeEnvironment definitions,
-    which enables the automatic determination of the present environment.
+    This metaclass automatically registers :class:`~.ComputeEnvironment`
+    definitions, which enables the automatic determination of the present
+    environment. The registry can be obtained from
+    :func:`~.registered_environments`.
     """
 
     def __init__(cls, name, bases, dct):
         if not hasattr(cls, "registry"):
-            cls.registry = OrderedDict()
+            cls.registry = {}
         else:
             cls.registry[name] = cls
-        return super().__init__(name, bases, dct)
+        super().__init__(name, bases, dct)
 
 
 def template_filter(func):
-    "Mark the function as a ComputeEnvironment template filter."
+    """Decorate a function as a :class:`~.ComputeEnvironment` template filter.
+
+    This decorator is applied to methods defined in a subclass of
+    :class:`~.ComputeEnvironment` that are used in that environment's
+    templates. The decorated function becomes a class method that is available
+    as a :ref:`jinja2 filter <jinja2:filters>` in templates rendered by a
+    :class:`~.FlowProject` with that :class:`~.ComputeEnvironment`.
+
+    Parameters
+    ----------
+    func : callable
+        Function to decorate.
+
+    Returns
+    -------
+    callable
+        Decorated function.
+
+    """
     setattr(func, "_flow_template_filter", True)
     return classmethod(func)
 
@@ -106,8 +137,8 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
     The default method for the detection of a specific environment is to
     provide a regular expression matching the environment's hostname.
-    For example, if the hostname is my-server.com, one could identify the
-    environment by setting the hostname_pattern to 'my-server'.
+    For example, if the hostname is ``my-server.com``, one could identify the
+    environment by setting the ``hostname_pattern`` to ``'my-server'``.
     """
 
     scheduler_type = None
@@ -127,10 +158,8 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         if cls.hostname_pattern is None:
             if cls.scheduler_type is None:
                 return False
-            else:
-                return cls.scheduler_type.is_present()
-        else:
-            return re.match(cls.hostname_pattern, socket.getfqdn()) is not None
+            return cls.scheduler_type.is_present()
+        return re.match(cls.hostname_pattern, _cached_fqdn()) is not None
 
     @classmethod
     def get_scheduler(cls):
@@ -148,10 +177,28 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
     @classmethod
     def submit(cls, script, flags=None, *args, **kwargs):
-        """Submit a job submission script to the environment's scheduler.
+        r"""Submit a job submission script to the environment's scheduler.
 
         Scripts should be submitted to the environment, instead of directly
         to the scheduler to allow for environment specific post-processing.
+
+        Parameters
+        ----------
+        script : str
+            The script to submit.
+        flags : list
+            A list of additional flags to provide to the scheduler.
+            (Default value = None)
+        \*args
+            Positional arguments forwarded to the scheduler's submit method.
+        \*\*kwargs
+            Keyword arguments forwarded to the scheduler's submit method.
+
+        Returns
+        -------
+        JobStatus.submitted or None
+            Status of job, if submitted.
+
         """
         if flags is None:
             flags = []
@@ -165,15 +212,17 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         # Hand off the actual submission to the scheduler
         if cls.get_scheduler().submit(script, flags=flags, *args, **kwargs):
             return JobStatus.submitted
+        return None
 
     @classmethod
     def add_args(cls, parser):
         """Add arguments related to this compute environment to an argument parser.
 
-        :param parser:
-            The argument parser to add arguments to.
-        :type parser:
-            :class:`argparse.ArgumentParser`
+        Parameters
+        ----------
+        parser : :class:`argparse.ArgumentParser`
+            The argument parser where arguments will be added.
+
         """
         return
 
@@ -185,34 +234,49 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         that are specific to a user's environment, e.g. account names.
 
         When a key is not configured and no default value is provided,
-        a :py:class:`~.errors.SubmitError` will be raised and the user will
+        a :class:`~.errors.SubmitError` will be raised and the user will
         be prompted to add the missing key to their configuration.
 
         Please note, that the key will be automatically expanded to
         be specific to this environment definition. For example, a
         key should be ``'account'``, not ``'MyEnvironment.account'``.
 
-        :param key: The environment specific configuration key.
-        :type key: str
-        :param default: A default value in case the key cannot be found
+        Parameters
+        ----------
+        key : str
+            The environment specific configuration key.
+        default : str
+            A default value in case the key cannot be found
             within the user's configuration.
-        :type default: str
-        :return: The value or default value.
-        :raises SubmitError: If the key is not in the user's configuration
+
+        Returns
+        -------
+        object
+            The value or default value.
+
+        Raises
+        ------
+        SubmitError
+            If the key is not in the user's configuration
             and no default value is provided.
+
         """
         return flow_config.require_config_value(key, ns=cls.__name__, default=default)
 
     @classmethod
     def _get_omp_prefix(cls, operation):
-        """Get the OpenMP prefix based on the `omp_num_threads` directive.
+        """Get the OpenMP prefix based on the ``omp_num_threads`` directive.
 
-        :param operation:
-            The operation for which to add prefix.
-        :return omp_prefix:
-            The prefix should be added for the operation.
-        :type omp_prefix:
-            str
+        Parameters
+        ----------
+        operation : :class:`flow.project._JobOperation`
+            The operation to be prefixed.
+
+        Returns
+        -------
+        str
+            The prefix to be added to the operation's command.
+
         """
         return "export OMP_NUM_THREADS={}; ".format(
             operation.directives["omp_num_threads"]
@@ -220,44 +284,51 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
     @classmethod
     def _get_mpi_prefix(cls, operation, parallel):
-        """Get the mpi prefix based on proper directives.
+        """Get the MPI prefix based on the ``nranks`` directives.
 
-        :param operation:
-            The operation for which to add prefix.
-        :param parallel:
-            If True, operations are assumed to be executed in parallel, which means
-            that the number of total tasks is the sum of all tasks instead of the
-            maximum number of tasks. Default is set to False.
-        :return mpi_prefix:
-            The prefix should be added for the operation.
-        :type mpi_prefix:
-            str
+        Parameters
+        ----------
+        operation : :class:`flow.project._JobOperation`
+            The operation to be prefixed.
+        parallel : bool
+            If True, operations are assumed to be executed in parallel, which
+            means that the number of total tasks is the sum of all tasks
+            instead of the maximum number of tasks. Default is set to False.
+
+        Returns
+        -------
+        str
+            The prefix to be added to the operation's command.
+
         """
         if operation.directives.get("nranks"):
             return "{} -n {} ".format(cls.mpi_cmd, operation.directives["nranks"])
-        else:
-            return ""
+        return ""
 
     @template_filter
     def get_prefix(cls, operation, parallel=False, mpi_prefix=None, cmd_prefix=None):
-        """Template filter for getting the prefix based on proper directives.
+        """Template filter generating a command prefix from directives.
 
-        :param operation:
-            The operation for which to add prefix.
-        :param parallel:
+        Parameters
+        ----------
+        operation : :class:`flow.project._JobOperation`
+            The operation to be prefixed.
+        parallel : bool
             If True, operations are assumed to be executed in parallel, which means
             that the number of total tasks is the sum of all tasks instead of the
             maximum number of tasks. Default is set to False.
-        :param mpi_prefix:
+        mpi_prefix : str
             User defined mpi_prefix string. Default is set to None.
             This will be deprecated and removed in the future.
-        :param cmd_prefix:
+        cmd_prefix : str
             User defined cmd_prefix string. Default is set to None.
             This will be deprecated and removed in the future.
-        :return prefix:
-            The prefix should be added for the operation.
-        :type prefix:
-            str
+
+        Returns
+        -------
+        str
+            The prefix to be added to the operation's command.
+
         """
         prefix = ""
         if operation.directives.get("omp_num_threads"):
@@ -288,15 +359,19 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
 
 class StandardEnvironment(ComputeEnvironment):
-    "This is a default environment, which is always present."
+    """Default environment which is always present."""
 
     @classmethod
     def is_present(cls):
+        """Determine whether this specific compute environment is present.
+
+        The StandardEnvironment is always present, so this returns True.
+        """
         return True
 
 
 class TestEnvironment(ComputeEnvironment):
-    """This is a test environment.
+    """Environment used for testing.
 
     The test environment will print a mocked submission script
     and submission commands to screen. This enables testing of
@@ -308,25 +383,29 @@ class TestEnvironment(ComputeEnvironment):
 
 
 class SimpleSchedulerEnvironment(ComputeEnvironment):
-    "An environment for the simple-scheduler scheduler."
+    """An environment for the simple-scheduler scheduler."""
+
     scheduler_type = SimpleScheduler
     template = "simple_scheduler.sh"
 
 
 class TorqueEnvironment(ComputeEnvironment):
-    "An environment with TORQUE scheduler."
+    """An environment with TORQUE scheduler."""
+
     scheduler_type = TorqueScheduler
     template = "torque.sh"
 
 
 class SlurmEnvironment(ComputeEnvironment):
-    "An environment with SLURM scheduler."
+    """An environment with SLURM scheduler."""
+
     scheduler_type = SlurmScheduler
     template = "slurm.sh"
 
 
 class LSFEnvironment(ComputeEnvironment):
-    "An environment with LSF scheduler."
+    """An environment with LSF scheduler."""
+
     scheduler_type = LSFScheduler
     template = "lsf.sh"
 
@@ -334,15 +413,24 @@ class LSFEnvironment(ComputeEnvironment):
 class NodesEnvironment(ComputeEnvironment):
     """A compute environment consisting of multiple compute nodes.
 
-    Each compute node is assumed to have a specific number of compute units, e.g., CPUs.
+    Each compute node is assumed to have a specific number of compute units,
+    e.g., CPUs.
     """
 
 
 class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
-    "A default environment for environments with TORQUE scheduler."
+    """Default environment for clusters with a TORQUE scheduler."""
 
     @classmethod
     def add_args(cls, parser):
+        """Add arguments to the parser.
+
+        Parameters
+        ----------
+        parser : :class:`argparse.ArgumentParser`
+            The argument parser where arguments will be added.
+
+        """
         super().add_args(parser)
         parser.add_argument(
             "-w", "--walltime", type=float, help="The wallclock time in hours."
@@ -364,10 +452,18 @@ class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
 
 
 class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
-    "A default environment for environments with SLURM scheduler."
+    """Default environment for clusters with a SLURM scheduler."""
 
     @classmethod
     def add_args(cls, parser):
+        """Add arguments to the parser.
+
+        Parameters
+        ----------
+        parser : :class:`argparse.ArgumentParser`
+            The argument parser where arguments will be added.
+
+        """
         super().add_args(parser)
         parser.add_argument(
             "--memory",
@@ -395,10 +491,18 @@ class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
 
 
 class DefaultLSFEnvironment(NodesEnvironment, LSFEnvironment):
-    "A default environment for environments with LSF scheduler."
+    """Default environment for clusters with a LSF scheduler."""
 
     @classmethod
     def add_args(cls, parser):
+        """Add arguments to the parser.
+
+        Parameters
+        ----------
+        parser : :class:`argparse.ArgumentParser`
+            The argument parser where arguments will be added.
+
+        """
         super().add_args(parser)
         parser.add_argument(
             "-w",
@@ -418,24 +522,18 @@ class DefaultLSFEnvironment(NodesEnvironment, LSFEnvironment):
         )
 
 
+@deprecated(deprecated_in="0.12", removed_in="0.14", current_version=__version__)
 class CPUEnvironment(ComputeEnvironment):
-    "An environment with CPUs."
+    """An environment with CPUs."""
+
     pass
 
 
+@deprecated(deprecated_in="0.12", removed_in="0.14", current_version=__version__)
 class GPUEnvironment(ComputeEnvironment):
-    "An environment with GPUs."
+    """An environment with GPUs."""
+
     pass
-
-
-def _import_module(fn):
-    return importlib.machinery.SourceFileLoader(fn, fn).load_module()
-
-
-def _import_modules(prefix):
-    for fn in os.path.listdir(prefix):
-        if os.path.isfile(fn) and os.path.splitext(fn)[1] == ".py":
-            _import_module(os.path.join(prefix, fn))
 
 
 def _import_configured_environments():
@@ -444,13 +542,27 @@ def _import_configured_environments():
         for name in cfg["flow"].as_list("environment_modules"):
             try:
                 importlib.import_module(name)
-            except ImportError as e:
-                logger.warning(e)
+            except ImportError as error:
+                logger.warning(error)
     except KeyError:
         pass
 
 
 def registered_environments(import_configured=True):
+    """Return a list of registered environments.
+
+    Parameters
+    ----------
+    import_configured : bool
+        Whether to import environments specified in the flow configuration.
+        (Default value = True)
+
+    Returns
+    -------
+    list
+        List of registered environments.
+
+    """
     if import_configured:
         _import_configured_environments()
     return list(ComputeEnvironment.registry.values())
@@ -459,49 +571,55 @@ def registered_environments(import_configured=True):
 def get_environment(test=False, import_configured=True):
     """Attempt to detect the present environment.
 
-    This function iterates through all defined :py:class:`~.ComputeEnvironment`
+    This function iterates through all defined :class:`~.ComputeEnvironment`
     classes in reversed order of definition and returns the first
-    environment where the :py:meth:`~.ComputeEnvironment.is_present` method
+    environment where the :meth:`~.ComputeEnvironment.is_present` method
     returns True.
 
-    :param test:
-        Whether to return the TestEnvironment.
-    :type test:
-        bool
-    :returns:
+    Parameters
+    ----------
+    test : bool
+        Whether to return the TestEnvironment. (Default value = False)
+    import_configured : bool
+        Whether to import environments specified in the flow configuration.
+        (Default value = True)
+
+    Returns
+    -------
+    :class:`~.ComputeEnvironment`
         The detected environment class.
+
     """
     if test:
         return TestEnvironment
-    else:
-        # Obtain a list of all registered environments
-        env_types = registered_environments(import_configured=import_configured)
-        logger.debug(
-            "List of registered environments:\n\t{}".format(
-                "\n\t".join(str(env.__name__) for env in env_types)
-            )
+
+    # Obtain a list of all registered environments
+    env_types = registered_environments(import_configured=import_configured)
+    logger.debug(
+        "List of registered environments:\n\t{}".format(
+            "\n\t".join(str(env.__name__) for env in env_types)
         )
+    )
 
-        # Select environment based on environment variable if set.
-        env_from_env_var = os.environ.get("SIGNAC_FLOW_ENVIRONMENT")
-        if env_from_env_var:
-            for env_type in env_types:
-                if env_type.__name__ == env_from_env_var:
-                    return env_type
-            else:
-                raise ValueError(f"Unknown environment '{env_from_env_var}'.")
-
-        # Select based on DEBUG flag:
+    # Select environment based on environment variable if set.
+    env_from_env_var = os.environ.get("SIGNAC_FLOW_ENVIRONMENT")
+    if env_from_env_var:
         for env_type in env_types:
-            if getattr(env_type, "DEBUG", False):
-                logger.debug(f"Select environment '{env_type.__name__}'; DEBUG=True.")
+            if env_type.__name__ == env_from_env_var:
                 return env_type
+        raise ValueError(f"Unknown environment '{env_from_env_var}'.")
 
-        # Default selection:
-        for env_type in reversed(env_types):
-            if env_type.is_present():
-                logger.debug(f"Select environment '{env_type.__name__}'; is present.")
-                return env_type
+    # Select based on DEBUG flag:
+    for env_type in env_types:
+        if getattr(env_type, "DEBUG", False):
+            logger.debug(f"Select environment '{env_type.__name__}'; DEBUG=True.")
+            return env_type
 
-        # Otherwise, just return a standard environment
-        return StandardEnvironment
+    # Default selection:
+    for env_type in reversed(env_types):
+        if env_type.is_present():
+            logger.debug(f"Select environment '{env_type.__name__}'; is present.")
+            return env_type
+
+    # Otherwise, just return a standard environment
+    return StandardEnvironment

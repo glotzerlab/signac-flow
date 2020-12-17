@@ -20,7 +20,20 @@ logger = logging.getLogger(__name__)
 
 
 def _fetch(user=None):
-    "Fetch the cluster job status information from the TORQUE scheduler."
+    """Fetch the cluster job status information from the TORQUE scheduler.
+
+    Parameters
+    ----------
+    user : str
+        Limit the status information to cluster jobs submitted by user.
+        (Default value = None)
+
+    Yields
+    ------
+    :class:`~.TorqueJob`
+        Torque cluster job.
+
+    """
     if user is None:
         user = getpass.getuser()
     cmd = f"qstat -fx -u {user}"
@@ -30,7 +43,7 @@ def _fetch(user=None):
         return tree.getroot()
     except ET.ParseError as error:
         if str(error) == "no element found: line 1, column 0":
-            logger.warn(
+            logger.warning(
                 "No scheduler jobs, from any user(s), were detected. "
                 "This may be the result of a misconfiguration in the "
                 "environment."
@@ -47,7 +60,7 @@ def _fetch(user=None):
 
 
 class TorqueJob(ClusterJob):
-    "Implementation of the abstract ClusterJob class for TORQUE schedulers."
+    """Implementation of the abstract ClusterJob class for TORQUE schedulers."""
 
     def __init__(self, node):
         self.node = node
@@ -55,13 +68,8 @@ class TorqueJob(ClusterJob):
     def _id(self):
         return self.node.find("Job_Id").text
 
-    def __str__(self):
-        return str(self._id())
-
-    def name(self):
-        return self.node.find("Job_Name").text
-
     def status(self):
+        """Return the status of the cluster job."""
         job_state = self.node.find("job_state").text
         if job_state == "R":
             return JobStatus.active
@@ -75,15 +83,18 @@ class TorqueJob(ClusterJob):
 
 
 class TorqueScheduler(Scheduler):
-    """Implementation of the abstract Scheduler class for TORQUE schedulers.
+    r"""Implementation of the abstract Scheduler class for TORQUE schedulers.
 
-    This class allows us to submit cluster jobs to a TORQUE scheduler and query
-    their current status.
+    This class can submit cluster jobs to a TORQUE scheduler and query their
+    current status.
 
-    :param user:
+    Parameters
+    ----------
+    user : str
         Limit the status information to cluster jobs submitted by user.
-    :type user:
-        str
+    \*\*kwargs
+        Forwarded to the parent constructor.
+
     """
 
     # The standard command used to submit jobs to the TORQUE scheduler.
@@ -94,7 +105,7 @@ class TorqueScheduler(Scheduler):
         self.user = user
 
     def jobs(self):
-        "Yield cluster jobs by querying the scheduler."
+        """Yield cluster jobs by querying the scheduler."""
         self._prevent_dos()
         nodes = _fetch(user=self.user)
         for node in nodes.findall("Job"):
@@ -103,28 +114,36 @@ class TorqueScheduler(Scheduler):
     def submit(
         self, script, after=None, pretend=False, hold=False, flags=None, *args, **kwargs
     ):
-        """Submit a job script for execution to the scheduler.
+        r"""Submit a job script for execution to the scheduler.
 
-        :param script:
+        Parameters
+        ----------
+        script : str
             The job script submitted for execution.
-        :type script:
-            str
-        :param after:
-            Execute the submitted script after a job with this id has completed.
-        :type after:
-            str
-        :param pretend:
-            If True, do not actually submit the script, but only simulate the submission.
-            Can be used to test whether the submission would be successful.
-            Please note: A successful "pretend" submission is not guaranteed to succeed.
-        :type pretend:
-            bool
-        :param flags:
-            Additional arguments to pass through to the scheduler submission command.
-        :type flags:
-            list
-        :returns:
-            The cluster job id if the script was successfully submitted, otherwise None.
+        after : str
+            Execute the submitted script after a job with this id has
+            completed. (Default value = None)
+        pretend : bool
+            If True, do not actually submit the script, but only simulate the
+            submission.  Can be used to test whether the submission would be
+            successful.  Please note: A successful "pretend" submission is not
+            guaranteed to succeed. (Default value = False)
+        hold : bool
+            Whether to hold the job upon submission. (Default value = False)
+        flags : list
+            Additional arguments to pass through to the scheduler submission
+            command. (Default value = None)
+        \*args
+            Additional positional arguments (ignored).
+        \*\*kwargs
+            Additional keyword arguments (ignored).
+
+        Returns
+        -------
+        str
+            The cluster job id if the script was successfully submitted,
+            otherwise None.
+
         """
         if flags is None:
             flags = []
@@ -158,7 +177,7 @@ class TorqueScheduler(Scheduler):
 
     @classmethod
     def is_present(cls):
-        "Return True if it appears that a TORQUE scheduler is available within the environment."
+        """Return True if a TORQUE scheduler is detected."""
         try:
             subprocess.check_output(["qsub", "--version"], stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError:

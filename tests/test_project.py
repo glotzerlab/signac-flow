@@ -73,7 +73,7 @@ class MockScheduler(Scheduler):
 
     @classmethod
     def step(cls):
-        "Mock pushing of jobs through the queue."
+        """Mock pushing of jobs through the queue."""
         remove = set()
         for cid, job in cls._jobs.items():
             if job._status == JobStatus.inactive:
@@ -291,11 +291,11 @@ class TestProjectClass(TestProjectBase):
         assert len(c._label_functions) == 1
 
     def test_conditions_with_inheritance(self):
-        """Tests the inheritance of pre/post conditions.
+        """Tests the inheritance of preconditions/postconditions.
 
-        Class A should only have one pre/post condition, while class C that
-        inherits from A should have three, and class B should just have two
-        explicitly defined. Proper execution is tested in the
+        Class A should only have one precondition/postcondition, while class C
+        that inherits from A should have three, and class B should just have
+        two explicitly defined. Proper execution is tested in the
         TestExecutionProject.
         """
 
@@ -529,7 +529,7 @@ class TestProjectClass(TestProjectBase):
             assert job.doc.b
             assert job.doc.c
 
-    def test_pre_post_condition(self):
+    def test_precondition_postcondition(self):
         class A(FlowProject):
             pass
 
@@ -1080,8 +1080,8 @@ class TestExecutionProject(TestProjectBase):
         assert len(project)
         with redirect_stderr(StringIO()):
             for state, expected_evaluation in [
-                (0b0000, 0b1000),  # First pre-condition is not met
-                (0b0001, 0b1000),  # means only the first pre-cond.
+                (0b0000, 0b1000),  # First precondition is not met
+                (0b0001, 0b1000),  # means only the first precondition
                 (0b0010, 0b1000),  # should be evaluated.
                 (0b0011, 0b1000),
                 (0b0100, 0b1000),
@@ -1089,12 +1089,12 @@ class TestExecutionProject(TestProjectBase):
                 (0b0110, 0b1000),
                 (0b0111, 0b1000),
                 (0b1000, 0b1100),  # The first, but not the second
-                (0b1001, 0b1100),  # pre-condition is met, need to evaluate
-                (0b1010, 0b1100),  # both pre-conditions, but not post-conditions.
+                (0b1001, 0b1100),  # precondition is met, need to evaluate
+                (0b1010, 0b1100),  # both preconditions, but not postconditions.
                 (0b1011, 0b1100),
-                (0b1100, 0b1110),  # Both pre-conditions met, evaluate
-                (0b1101, 0b1110),  # first post-condition.
-                (0b1110, 0b1111),  # All pre-conditions and 1st post-condition
+                (0b1100, 0b1110),  # Both preconditions met, evaluate
+                (0b1101, 0b1110),  # first postcondition.
+                (0b1110, 0b1111),  # All preconditions and 1st postcondition
                 # are met, need to evaluate all.
                 (0b1111, 0b1111),  # All conditions met, need to evaluate all.
             ]:
@@ -1183,9 +1183,9 @@ class TestProjectMainInterface(TestProjectBase):
 
     def test_main_next(self):
         assert len(self.project)
-        jobids = set(self.call_subcmd("next op1").decode().split())
+        job_ids = set(self.call_subcmd("next op1").decode().split())
         even_jobs = [job.get_id() for job in self.project if job.sp.b % 2 == 0]
-        assert jobids == set(even_jobs)
+        assert job_ids == set(even_jobs)
 
     def test_main_status(self):
         assert len(self.project)
@@ -1261,7 +1261,7 @@ class TestGroupProject(TestProjectBase):
         project = self.mock_project()
         # For run mode single operation groups
         for job in project:
-            job_ops = project._get_submission_operations([(job,)], dict())
+            job_ops = project._get_submission_operations([(job,)], {})
             script = project._script(job_ops)
             if job.sp.b % 2 == 0:
                 assert str(job) in script
@@ -1444,7 +1444,7 @@ class TestGroupExecutionProject(TestProjectBase):
         project = self.mock_project()
         operations = [
             project.groups["group1"]._create_submission_job_operation(
-                project._entrypoint, dict(), (job,)
+                project._entrypoint, {}, (job,)
             )
             for job in project
         ]
@@ -1464,7 +1464,7 @@ class TestGroupExecutionProject(TestProjectBase):
         project = self.mock_project()
         operations = [
             project.groups["group1"]._create_submission_job_operation(
-                project._entrypoint, dict(), (job,)
+                project._entrypoint, {}, (job,)
             )
             for job in project
         ]

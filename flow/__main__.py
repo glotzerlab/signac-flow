@@ -1,7 +1,7 @@
 # Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-"""This module defines the main command line interface for signac-flow.
+"""The main command line interface for signac-flow.
 
 The interface is accessible via the `flow` command and allows users to
 initialize FlowProject class definitions directly from the command line.
@@ -20,7 +20,10 @@ logger = logging.getLogger(__name__)
 
 
 def main_init(args):
-    "Initialize a FlowProject from one of the templates defined in the template module."
+    """Initialize a FlowProject from a template.
+
+    The available templates are defined in the template module.
+    """
     if not args.alias.isidentifier():
         raise ValueError(
             "The alias '{}' is not a valid Python identifier and can therefore "
@@ -37,14 +40,14 @@ def main_init(args):
         )
     try:
         return template.init(alias=args.alias, template=args.template)
-    except OSError as e:
+    except OSError as error:
         raise RuntimeError(
-            f"Error occurred while trying to initialize a flow project: {e}"
+            f"Error occurred while trying to initialize a flow project: {error}"
         )
 
 
 def main():
-    """Main entry function for the 'flow' command line tool.
+    """Define the 'flow' command line interface.
 
     This function defines the main 'flow' command line interface which can be used
     to initialize FlowProject modules from different templates as well as print the

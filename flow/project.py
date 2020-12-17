@@ -6,7 +6,6 @@
 The FlowProject is a signac Project that allows the user to define a workflow.
 """
 import argparse
-import cloudpickle
 import contextlib
 import datetime
 import functools
@@ -31,6 +30,7 @@ from itertools import chain, count, groupby, islice
 from multiprocessing import Event, Pool, TimeoutError, cpu_count
 from multiprocessing.pool import ThreadPool
 
+import cloudpickle
 import jinja2
 import signac
 from deprecation import deprecated
@@ -2078,10 +2078,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 elif status_parallelization == "process":
                     with contextlib.closing(Pool()) as pool:
                         try:
-                            (
-                                l_results,
-                                g_results,
-                            ) = self._fetch_status_in_parallel(
+                            (l_results, g_results,) = self._fetch_status_in_parallel(
                                 pool,
                                 distinct_jobs,
                                 operation_names,

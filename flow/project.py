@@ -4116,7 +4116,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             "WARNING: "
             "The script argument is deprecated as of 0.12 "
             "and will be removed in 0.14. "
-            "Use \"submit --pretend\" instead.",
+            'Use "submit --pretend" instead.',
             file=sys.stderr,
         )
 

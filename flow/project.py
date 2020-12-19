@@ -2956,7 +2956,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 except self._PickleError as error:
                     raise RuntimeError(
                         "Unable to parallelize execution due to a pickling "
-                        "error: {}.".format(error)
+                        f"error: {error}."
                     )
 
     @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)

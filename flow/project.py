@@ -2177,11 +2177,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             leave=False,
         ):
             errors.setdefault(aggregate_id, "")
+            scheduler_status = JobStatus.unknown
+            completed = False
+            eligible = False
             try:
                 job_op_id = group._generate_id(aggregate)
                 scheduler_status = cached_status.get(job_op_id, JobStatus.unknown)
                 completed = group._complete(aggregate)
-                eligible = False if completed else group._eligible(aggregate)
+                eligible = not completed and group._eligible(aggregate)
             except Exception as error:
                 msg = (
                     "Error while getting operation status for aggregate "
@@ -2190,9 +2193,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 logger.debug(msg)
                 if ignore_errors:
                     errors[aggregate_id] += str(error) + "\n"
-                    scheduler_status = JobStatus.unknown
-                    completed = False
-                    eligible = False
                 else:
                     raise
             finally:
@@ -2383,6 +2383,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     num_itr = len(iterable)
                     results = []
                     start_time = time.time()
+                    i = 0
                     for i, itr in enumerate(iterable):
                         results.append(fetch_status(itr))
                         # The status interval 0.2 seconds is used since we expect the
@@ -2407,7 +2408,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         index = {}
         for i, job in enumerate(distinct_jobs):
             results_entry = {}
-            results_entry["job_id"] = str(job)
+            results_entry["job_id"] = job.get_id()
             results_entry["operations"] = {}
             results_entry["_operations_error"] = None
             results_entry["labels"] = []
@@ -3400,8 +3401,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Iterate over all the instances of stored aggregates and search for the
         # aggregate in those instances.
         for aggregate_store in self._stored_aggregates:
-            if id in aggregate_store:
+            try:
                 return aggregate_store[id]
+            except KeyError:
+                pass
         # Raise error as didn't find the id in any of the stored objects
         raise LookupError(f"Did not find aggregate with id {id} in the project")
 

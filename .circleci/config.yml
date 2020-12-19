@@ -62,10 +62,10 @@ jobs:
             python -m pip install --progress-bar off ${SIGNAC_VERSION}
             python -m pip install --progress-bar off -r requirements.txt
             python -m pip install --progress-bar off -r requirements-test.txt
-            python -m pip install --progress-bar off -U codecov mock
+            python -m pip install --progress-bar off -U codecov
 
       - run:
-          name: run tests
+          name: Run tests
           command: |
             . venv/bin/activate
             python -m pytest --cov=flow --cov-report=xml tests/ -v

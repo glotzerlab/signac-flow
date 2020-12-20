@@ -24,6 +24,7 @@ Changed
 - Command line interface always uses ``--job-id`` instead of ``--jobid`` (#363, #386).
 - ``CPUEnvironment`` and ``GPUEnvironment`` classes are deprecated (#381).
 - Docstrings are now written in `numpydoc style <https://numpydoc.readthedocs.io/en/latest/format.html>`__ (#392).
+- Default environment for the University of Minnesota Mangi cluster changed from SLURM to Torque (#393).
 
 Fixed
 +++++

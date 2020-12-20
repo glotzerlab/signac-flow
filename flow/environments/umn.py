@@ -2,10 +2,10 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 """Environments for the Minnesota Supercomputing Institute at University of Minnesota."""
-from ..environment import DefaultTorqueEnvironment
+from ..environment import DefaultSlurmEnvironment
 
 
-class MangiEnvironment(DefaultTorqueEnvironment):
+class MangiEnvironment(DefaultSlurmEnvironment):
     """Environment profile for the Mangi supercomputer.
 
     Mangi is managed by the Minnesota Supercomputing Institute (University of
@@ -17,7 +17,7 @@ class MangiEnvironment(DefaultTorqueEnvironment):
     """
 
     hostname_pattern = r".*\.mangi\.msi\.umn\.edu"
-    template = "torque.sh"
+    template = "slurm.sh"
     cores_per_node = 1
 
 

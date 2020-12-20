@@ -68,7 +68,7 @@ jobs:
           name: Run tests
           command: |
             . venv/bin/activate
-            python -m pytest --cov=flow --cov-report=xml tests/ -v
+            python -m pytest --cov=flow --cov-config=setup.cfg --cov-report=xml tests/ -v
             codecov
 
       - store_artifacts:

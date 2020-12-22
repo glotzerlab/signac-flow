@@ -480,7 +480,7 @@ class _DefaultAggregateStore(Mapping):
         # the time of unpickling. This means that this class cannot be
         # unpickled unless we pre-emptively compute and store the repr used to
         # distinguish this instance's hash.
-        self._hash_repr = repr(project)
+        self._hash_repr = hash(repr(project))
 
     def __iter__(self):
         for job in self._project:
@@ -525,7 +525,7 @@ class _DefaultAggregateStore(Mapping):
         return type(self) == type(other) and self._project == other._project
 
     def __hash__(self):
-        return hash(self._hash_repr)
+        return self._hash_repr
 
     def keys(self):
         for job in self._project:

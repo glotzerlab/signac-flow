@@ -275,15 +275,13 @@ class _JobOperation:
         :class:`flow.directives._Directives`
     """
 
-    def __init__(self, id, name, jobs, cmd, directives):
+    def __init__(self, id, name, jobs, cmd, directives=None):
         self._id = id
         self.name = name
         self._jobs = jobs
         if not (callable(cmd) or isinstance(cmd, str)):
             raise ValueError("JobOperation cmd must be a callable or string.")
         self._cmd = cmd
-
-        directives.evaluate(jobs)
 
         # Keys which were explicitly set by the user, but are not evaluated by the
         # template engine are cause for concern and might hint at a bug in the template

@@ -472,6 +472,15 @@ class _DefaultAggregateStore(Mapping):
 
     def __init__(self, project):
         self._project = project
+        # Below, we store repr(project), which defines the hash of this class.
+        # This class must be hashable because it is used as a dict key.
+        # However, when unpickling a FlowProject, this object's hash must be
+        # computed *before* the FlowProject is fully initialized. Thus, it is
+        # not possible to execute repr(project) when hashing the instance at
+        # the time of unpickling. This means that this class cannot be
+        # unpickled unless we pre-emptively compute and store the repr used to
+        # distinguish this instance's hash.
+        self._hash_repr = repr(project)
 
     def __iter__(self):
         for job in self._project:
@@ -516,7 +525,7 @@ class _DefaultAggregateStore(Mapping):
         return type(self) == type(other) and self._project == other._project
 
     def __hash__(self):
-        return hash(repr(self._project))
+        return hash(self._hash_repr)
 
     def keys(self):
         for job in self._project:
@@ -537,19 +546,6 @@ class _DefaultAggregateStore(Mapping):
         over on-the-fly.
         """
         self._project = project
-
-    def __setstate__(self, data):
-        self._project = data["project"]
-        self._project.__dict__ = data["project_attributes"]
-
-    def __getstate__(self):
-        # We also need to store project attributes as they get lost
-        # during the process of pickling.
-        project_attributes = self._project.__dict__.copy()
-        return {
-            "project": self._project,
-            "project_attributes": project_attributes,
-        }
 
 
 def get_aggregate_id(jobs):

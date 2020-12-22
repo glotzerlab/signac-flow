@@ -59,17 +59,17 @@ jobs:
             mkdir -p ./venv
             python -m virtualenv ./venv
             . venv/bin/activate
-            pip install ${SIGNAC_VERSION}
-            pip install -r requirements.txt
-            pip install -r requirements-test.txt
-            pip install -U coverage mock
+            python -m pip install --progress-bar off ${SIGNAC_VERSION}
+            python -m pip install --progress-bar off -r requirements.txt
+            python -m pip install --progress-bar off -r requirements-test.txt
+            python -m pip install --progress-bar off -U codecov
 
       - run:
-          name: run tests
+          name: Run tests
           command: |
             . venv/bin/activate
-            coverage run --source=flow/ -m pytest -v tests/
-            coverage report -i --include="flow*"
+            python -m pytest --cov=flow --cov-config=setup.cfg --cov-report=xml tests/ -v
+            codecov
 
       - store_artifacts:
           path: test-reports

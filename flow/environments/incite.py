@@ -37,15 +37,21 @@ class SummitEnvironment(DefaultLSFEnvironment):
     def calc_num_nodes(cls, resource_sets, parallel=False):
         """Compute the number of nodes needed.
 
-        :param resource_sets:
+        Parameters
+        ----------
+        resource_sets : iterable of tuples
             Resource sets for each operation, as a sequence of tuples of
-            (number of sets, number of tasks, CPUs per task, GPUs).
-        :type resource_sets:
-            iterable
-        :param parallel:
-            Whether operations should run in parallel or serial.
-        :type parallel:
-            bool
+            *(Number of resource sets, tasks (MPI Ranks) per resource set,
+            physical cores (CPUs) per resource set, GPUs per resource set)*.
+        parallel : bool
+            Whether operations should run in parallel or serial. (Default value
+            = False)
+
+        Returns
+        -------
+        int
+            Number of nodes needed.
+
         """
         nodes_used_final = 0
         cores_used = gpus_used = nodes_used = 0
@@ -76,11 +82,23 @@ class SummitEnvironment(DefaultLSFEnvironment):
     def guess_resource_sets(cls, operation):
         """Determine the resources sets needed for an operation.
 
-        :param operation:
+        Parameters
+        ----------
+        operation : :class:`flow.BaseFlowOperation`
             The operation whose directives will be used to compute the resource
             set.
-        :type operation:
-            :class:`flow.BaseFlowOperation`
+
+        Returns
+        -------
+        int
+            Number of resource sets.
+        int
+            Number of tasks (MPI ranks) per resource set.
+        int
+            Number of physical cores (CPUs) per resource set.
+        int
+            Number of GPUs per resource set.
+
         """
         ntasks = max(operation.directives.get("nranks", 1), 1)
         np = operation.directives.get("np", ntasks)
@@ -107,7 +125,21 @@ class SummitEnvironment(DefaultLSFEnvironment):
 
     @classmethod
     def jsrun_options(cls, resource_set):
-        """Return jsrun options for the provided resource set."""
+        """Return jsrun options for the provided resource set.
+
+        Parameters
+        ----------
+        resource_set : tuple
+            Tuple of *(Number of resource sets, tasks (MPI Ranks) per resource
+            set, physical cores (CPUs) per resource set, GPUs per resource
+            set)*.
+
+        Returns
+        -------
+        str
+            Resource set options.
+
+        """
         nsets, tasks, cpus, gpus = resource_set
         cuda_aware_mpi = (
             "--smpiargs='-gpu'" if (nsets > 0 or tasks > 0) and gpus > 0 else ""
@@ -116,18 +148,22 @@ class SummitEnvironment(DefaultLSFEnvironment):
 
     @classmethod
     def _get_mpi_prefix(cls, operation, parallel):
-        """Get the mpi prefix based on proper directives.
+        """Get the jsrun options based on directives.
 
-        :param operation:
-            The operation for which to add prefix.
-        :param parallel:
-            If True, operations are assumed to be executed in parallel, which means
-            that the number of total tasks is the sum of all tasks instead of the
-            maximum number of tasks. Default is set to False.
-        :return mpi_prefix:
-            The prefix should be added for the operation.
-        :type mpi_prefix:
-            str
+        Parameters
+        ----------
+        operation : :class:`flow.project._JobOperation`
+            The operation to be prefixed.
+        parallel : bool
+            If True, operations are assumed to be executed in parallel, which
+            means that the number of total tasks is the sum of all tasks
+            instead of the maximum number of tasks. Default is set to False.
+
+        Returns
+        -------
+        str
+            The prefix to be added to the operation's command.
+
         """
         extra_args = str(operation.directives.get("extra_jsrun_args", ""))
         resource_set = cls.guess_resource_sets(operation)

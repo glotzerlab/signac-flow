@@ -26,17 +26,29 @@ _GET_CONFIG_VALUE_NONE = _GetConfigValueNoneType()
 
 
 def require_config_value(key, ns=None, default=_GET_CONFIG_VALUE_NONE):
-    """Request a value from the user's configuration, fail if not available.
+    """Request a value from the user's configuration, failing if not available.
 
-    :param key: The environment specific configuration key.
-    :type key: str
-    :param ns: The namespace in which to look for the key.
-    :type ns: str
-    :param default: A default value in case the key cannot be found
+    Parameters
+    ----------
+    key : str
+        The environment specific configuration key.
+    ns : str
+        The namespace in which to look for the key. (Default value = None)
+    default
+        A default value in case the key cannot be found
         within the user's configuration.
-    :return: The value or default value.
-    :raises ConfigKeyError: If the key is not in the user's configuration
+
+    Returns
+    -------
+    object
+        The value or default value.
+
+    Raises
+    ------
+    :class:`~.ConfigKeyError`
+        If the key is not in the user's configuration
         and no default value is provided.
+
     """
     try:
         if ns is None:
@@ -54,12 +66,20 @@ def require_config_value(key, ns=None, default=_GET_CONFIG_VALUE_NONE):
 def get_config_value(key, ns=None, default=None):
     """Request a value from the user's configuration.
 
-    :param key: The configuration key.
-    :type key: str
-    :param ns: The namespace in which to look for the key.
-    :type ns: str
-    :param default: A default value in case the key cannot be found
-        within the user's configuration.
-    :return: The value if found, None if not found.
+    Parameters
+    ----------
+    key : str
+        The configuration key.
+    ns : str
+        The namespace in which to look for the key. (Default value = None)
+    default
+        A default value returned if the key cannot be found within the user
+        configuration.
+
+    Returns
+    -------
+    object
+        The value if found, None if not found.
+
     """
     return require_config_value(key=key, ns=ns, default=default)

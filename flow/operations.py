@@ -138,10 +138,16 @@ class directives:
 
         This call operator allows the class to be used as a decorator.
 
-        :param func:
+        Parameters
+        ----------
+        func : callable
             The function to decorate.
-        :type func:
-            callable
+
+        Returns
+        -------
+        callable
+            The decorated function.
+
         """
         directives = getattr(func, "_flow_directives", {})
         directives.update(self.kwargs)
@@ -196,7 +202,6 @@ def run(parser=None):
     .. note::
 
         You can control the degree of parallelization with the ``--np`` argument.
-
 
     For more information, see:
 

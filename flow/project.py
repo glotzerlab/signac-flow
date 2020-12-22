@@ -2648,7 +2648,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         aggregates = self._convert_jobs_to_aggregates(jobs)
         # Fetch all the distinct jobs from all the jobs or aggregate passed by the user.
-        distinct_jobs = set(job for job in aggregate for aggregate in aggregates)
+        distinct_jobs = set(job for aggregate in aggregates for job in aggregate)
 
         if eligible_jobs_max_lines is None:
             eligible_jobs_max_lines = flow_config.get_config_value(

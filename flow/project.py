@@ -266,7 +266,7 @@ class _AggregatesCursor:
     Parameters
     ----------
     project : :class:`~.FlowProject`
-        A FlowProject
+        A FlowProject whose jobs are aggregated.
     filter : dict
         A mapping of key-value pairs that all indexed job state points are
         compared against (Default value = None).

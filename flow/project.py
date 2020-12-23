@@ -395,32 +395,9 @@ class JobOperation(_JobOperation):
     """
 
     def __init__(self, id, name, job, cmd, directives=None):
-        self._id = id
-        self.name = name
-        self._jobs = (job,)
-        if not (callable(cmd) or isinstance(cmd, str)):
-            raise ValueError("JobOperation cmd must be a callable or string.")
-        self._cmd = cmd
-
         if directives is None:
             directives = job._project._environment._get_default_directives()
-        else:
-            directives = dict(directives)  # explicit copy
-
-        # Keys which were explicitly set by the user, but are not evaluated by the
-        # template engine are cause for concern and might hint at a bug in the template
-        # script or ill-defined directives. We are therefore keeping track of all
-        # keys set by the user and check whether they have been evaluated by the template
-        # script engine later.
-        keys_set_by_user = set(directives)
-
-        # We use a special dictionary that allows us to track all keys that have been
-        # evaluated by the template engine and compare them to those explicitly set
-        # by the user. See also comment above.
-        self.directives = TrackGetItemDict(
-            {key: value for key, value in directives.items()}
-        )
-        self.directives._keys_set_by_user = keys_set_by_user
+        super().__init__(id, name, (job,), cmd, directives)
 
     @property
     def job(self):

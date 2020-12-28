@@ -277,19 +277,19 @@ class _AggregatesCursor:
     """
 
     def __init__(self, project, filter=None, doc_filter=None):
-        self._job_cursor = JobsCursor(project, filter, doc_filter)
+        self._jobs_cursor = JobsCursor(project, filter, doc_filter)
 
     def __eq__(self, other):
-        return self._job_cursor == other._job_cursor
+        return self._jobs_cursor == other._jobs_cursor
 
     def __contains__(self, aggregate):
-        return len(aggregate) == 1 and aggregate[0] in self._job_cursor
+        return len(aggregate) == 1 and aggregate[0] in self._jobs_cursor
 
     def __len__(self):
-        return len(self._job_cursor)
+        return len(self._jobs_cursor)
 
     def __iter__(self):
-        for job in self._job_cursor:
+        for job in self._jobs_cursor:
             yield (job,)
 
 

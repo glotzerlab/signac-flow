@@ -294,7 +294,7 @@ class _AggregatesCursor:
             return False
         if self._filter is None and self._doc_filter is None:
             # Using the Project's __contains__ method is fastest if no
-            # filtering is needed. This is a backport of a PR to signac that
+            # filtering is needed. This is a backport of PR 449 to signac that
             # optimizes the JobsCursor __contains__ method, and is required for
             # sufficient performance with earlier versions of signac.
             return aggregate[0] in self._project

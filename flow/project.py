@@ -3505,41 +3505,45 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         raise LookupError(f"Did not find aggregate with id {id} in the project")
 
     def _convert_jobs_to_aggregates(self, jobs):
-        # The jobs parameter in public methods like ``run``, ``submit``, ``status`` currently
-        # accepts a sequence of signac jobs. We need to convert that sequence into a
-        # sequence of tuples containing single signac jobs.
+        """Convert sequences of signac jobs to aggregates.
 
+        The ``jobs`` parameter in public methods like :meth:`~.run`,
+        :meth:`~.submit`, and :meth:`~.print_status` accepts a sequence of
+        signac jobs. This method converts that sequence into a sequence of
+        aggregates (tuples containing single signac jobs).
+        """
         if jobs is None:
             return _AggregatesCursor(self)
         elif isinstance(jobs, _AggregatesCursor):
             return jobs
-        else:
-            aggregates = []
-            for aggregate in jobs:
-                # User can still pass signac jobs.
-                if isinstance(aggregate, signac.contrib.job.Job):
-                    if aggregate not in self:
-                        raise LookupError(
-                            f"Did not find job {aggregate} in the project"
-                        )
-                    aggregates.append((aggregate,))
+
+        # Handle user-provided jobs/aggregates
+        aggregates = []
+        for aggregate in jobs:
+            if isinstance(aggregate, signac.contrib.job.Job):
+                # aggregate is a single signac job.
+                if aggregate not in self:
+                    raise LookupError(f"Did not find job {aggregate} in the project")
+                aggregates.append((aggregate,))
+            else:
+                try:
+                    aggregate = tuple(aggregate)
+                    assert all(
+                        isinstance(job, signac.contrib.job.Job) for job in aggregate
+                    )
+                except (AssertionError, TypeError) as error:
+                    raise TypeError(
+                        "Invalid jobs argument. Please provide a valid "
+                        "signac job or aggregate of jobs."
+                    ) from error
                 else:
-                    try:
-                        aggregate = tuple(aggregate)
-                    except TypeError as error:
-                        raise TypeError(
-                            "Invalid jobs argument. Please provide a valid "
-                            "signac job or aggregate of jobs."
-                        ) from error
-                    else:
-                        if not self._aggregate_is_in_project(aggregate):
-                            raise LookupError(
-                                f"Did not find aggregate {aggregate} in the project"
-                            )
-                        aggregates.append(
-                            aggregate
-                        )  # An aggregate provided by the user
-            return aggregates
+                    # aggregate is a tuple of signac jobs.
+                    if not self._aggregate_is_in_project(aggregate):
+                        raise LookupError(
+                            f"Did not find aggregate {aggregate} in the project."
+                        )
+                    aggregates.append(aggregate)
+        return aggregates
 
     @contextlib.contextmanager
     def _potentially_buffered(self):

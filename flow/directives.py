@@ -354,23 +354,6 @@ _OMP_NUM_THREADS = _Directive("omp_num_threads", validator=_nonnegative_int, def
 Expects a nonnegative integer.
 """
 
-_EXECUTABLE = _Directive(
-    "executable",
-    validator=_OnlyType(str),
-    default=sys.executable,
-    serial=_no_aggregation,
-    parallel=_no_aggregation,
-)
-"""The path to the executable to be used for this operation.
-
-Expects a string pointing to a valid executable file in the
-current file system.
-
-By default this should point to a Python executable (interpreter); however, if
-the :class:`FlowProject` path is an empty string, the executable can be a
-path to an executable Python script. Defaults to ``sys.executable``.
-"""
-
 _WALLTIME = _Directive(
     "walltime",
     validator=_nonnegative_real,
@@ -407,3 +390,24 @@ CPUs will be used. Defaults to 1.
 
     This can be particularly useful on Stampede2's launcher.
 """
+
+
+def _GET_EXECUTABLE():
+    """Return the path to the executable to be used for an operation.
+
+    The executable directive expects a string pointing to a valid executable
+    file in the current file system.
+
+    When called, by default this should point to a Python executable (interpreter);
+    however, if the :class:`FlowProject` path is an empty string, the executable
+    can be a path to an executable Python script. Defaults to ``sys.executable``.
+    """
+    # Evaluate the excutable directive at call-time instead of definition time.
+    # This is because we mock `sys.executable` while generating template reference data.
+    return _Directive(
+        "executable",
+        validator=_OnlyType(str),
+        default=sys.executable,
+        serial=_no_aggregation,
+        parallel=_no_aggregation,
+    )

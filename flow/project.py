@@ -277,14 +277,27 @@ class _AggregatesCursor:
 
     """
 
+    # This class currently only handles aggregates of size 1 (jobs).
+
     def __init__(self, project, filter=None, doc_filter=None):
+        self._project = project
+        self._filter = filter
+        self._doc_filter = doc_filter
         self._jobs_cursor = JobsCursor(project, filter, doc_filter)
 
     def __eq__(self, other):
         return self._jobs_cursor == other._jobs_cursor
 
     def __contains__(self, aggregate):
-        return len(aggregate) == 1 and aggregate[0] in self._jobs_cursor
+        if len(aggregate) != 1:
+            # Exit early if this is not an aggregate of 1 job
+            return False
+        if self._filter is None and self._doc_filter is None:
+            # Using the Project's __contains__ method is fastest if no
+            # filtering is needed
+            return aggregate[0] in self._project
+        # Slow path: requires O(N) iteration over the JobsCursor
+        return aggregate[0] in self._jobs_cursor
 
     def __len__(self):
         return len(self._jobs_cursor)

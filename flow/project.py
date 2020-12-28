@@ -277,12 +277,7 @@ class _AggregatesCursor:
     """
 
     def __init__(self, project, filter=None, doc_filter=None):
-        if filter or doc_filter:
-            filter_ = parse_filter_arg(filter)
-            doc_filter = parse_filter_arg(doc_filter)
-            self._job_cursor = JobsCursor(project, filter_, doc_filter)
-        else:
-            self._job_cursor = project
+        self._job_cursor = JobsCursor(project, filter, doc_filter)
 
     def __eq__(self, other):
         return self._job_cursor == other._job_cursor
@@ -4844,17 +4839,21 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             # aggregates must be a set to prevent duplicate entries
             aggregates = set()
             for id in args.job_id:
-                # TODO: We need to add support for aggregation id parameter`
+                # TODO: We need to add support for aggregation id parameter
                 # for the -j flag ('agg-...')
                 try:
                     aggregates.add((self.open_job(id=id),))
                 except KeyError as error:
                     raise LookupError(f"Did not find job with id {error}.")
             return list(aggregates)
-        elif args.func == self._main_exec:  # exec command used with job_id
+        elif args.func == self._main_exec:
+            # exec command used with job_id
             return _AggregatesCursor(self)
-        else:  # filter or doc filter provided
-            return _AggregatesCursor(self, args.filter, args.doc_filter)
+        else:
+            # filter or doc filter provided
+            filter_ = parse_filter_arg(args.filter)
+            doc_filter = parse_filter_arg(args.doc_filter)
+            return _AggregatesCursor(self, filter_, doc_filter)
 
     def main(self, parser=None):
         """Call this function to use the main command line interface.

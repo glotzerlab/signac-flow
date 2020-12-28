@@ -2176,7 +2176,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 for aggregate in tqdm(
                     aggregate_store.values(),
                     total=len(aggregate_store),
-                    desc="Fetching aggregate info for aggregate",
+                    desc="Fetching aggregate info",
                     leave=False,
                     file=file,
                 ):

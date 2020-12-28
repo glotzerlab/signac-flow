@@ -277,7 +277,7 @@ class _AggregatesCursor:
 
     """
 
-    # This class currently only handles aggregates of size 1 (jobs).
+    # This class currently only handles aggregates of size 1 (single jobs).
 
     def __init__(self, project, filter=None, doc_filter=None):
         self._project = project

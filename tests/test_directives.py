@@ -8,7 +8,7 @@ import pytest
 
 from flow import FlowProject
 from flow.directives import (
-    _EXECUTABLE,
+    _GET_EXECUTABLE,
     _MEMORY,
     _NGPU,
     _NP,
@@ -30,7 +30,7 @@ def available_directives_list():
         _NRANKS,
         _NGPU,
         _OMP_NUM_THREADS,
-        _EXECUTABLE,
+        _GET_EXECUTABLE(),
         _WALLTIME,
         _MEMORY,
         _PROCESSOR_FRACTION,
@@ -102,7 +102,7 @@ class TestItems:
         assert _NGPU._default == 0
         assert _NRANKS._default == 0
         assert _OMP_NUM_THREADS._default == 0
-        assert _EXECUTABLE._default == sys.executable
+        assert _GET_EXECUTABLE()._default == sys.executable
         assert _WALLTIME._default == 12.0
         assert _MEMORY._default == 4
         assert _PROCESSOR_FRACTION._default == 1.0
@@ -137,7 +137,7 @@ class TestItems:
         assert _NRANKS._serial(4, 2) == 4
         assert _NGPU._serial(4, 2) == 4
         assert _OMP_NUM_THREADS._serial(4, 2) == 4
-        assert _EXECUTABLE._serial("Path1", "Path2") == "Path1"
+        assert _GET_EXECUTABLE()._serial("Path1", "Path2") == "Path1"
         assert _WALLTIME._serial(4, 2) == 6
         assert _MEMORY._serial(4, 2) == 4
         assert _PROCESSOR_FRACTION._serial(0.4, 0.2) == 0.4
@@ -147,7 +147,7 @@ class TestItems:
         assert _NRANKS._parallel(4, 2) == 6
         assert _NGPU._parallel(4, 2) == 6
         assert _OMP_NUM_THREADS._parallel(4, 2) == 6
-        assert _EXECUTABLE._parallel("Path1", "Path2") == "Path1"
+        assert _GET_EXECUTABLE()._parallel("Path1", "Path2") == "Path1"
         assert _WALLTIME._parallel(4, 2) == 4
         assert _MEMORY._parallel(4, 2) == 6
         assert _PROCESSOR_FRACTION._parallel(0.4, 0.2) == 0.4

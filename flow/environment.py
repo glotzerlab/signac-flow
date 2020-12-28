@@ -20,7 +20,7 @@ from deprecation import deprecated
 from signac.common import config
 
 from .directives import (
-    _EXECUTABLE,
+    _GET_EXECUTABLE,
     _NGPU,
     _NP,
     _NRANKS,
@@ -351,7 +351,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
                 _NGPU,
                 _NRANKS,
                 _OMP_NUM_THREADS,
-                _EXECUTABLE,
+                _GET_EXECUTABLE(),
                 _WALLTIME,
                 _PROCESSOR_FRACTION,
             ]

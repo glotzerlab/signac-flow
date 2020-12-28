@@ -2583,11 +2583,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Parameters
         ----------
-        jobs : Sequence of instances of :class:`~signac.contrib.job.Job`.
-            Only execute operations for the given jobs, or all if the argument
-            is omitted. (Default value = None)
+        jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
+            Only print status for the given jobs or aggregates of jobs,
+            or all if the argument is None. (Default value = None)
         overview : bool
-            Aggregate an overview of the project' status. (Default value = True)
+            Display an overview of the project status. (Default value = True)
         overview_max_lines : int
             Limit the number of overview lines. (Default value = None)
         detailed : bool
@@ -3207,10 +3207,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         ----------
         jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
             Only execute operations for the given jobs or aggregates of jobs,
-            or all if the argument is omitted. (Default value = None)
+            or all if the argument is None. (Default value = None)
         names : iterable of :class:`str`
             Only execute operations that are in the provided set of names, or
-            all if the argument is omitted. (Default value = None)
+            all if the argument is None. (Default value = None)
         pretend : bool
             Do not actually execute the operations, but show the commands that
             would have been executed. (Default value = False)
@@ -3831,8 +3831,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         ----------
         bundle_size : int
             Specify the number of operations to be bundled into one submission, defaults to 1.
-        jobs : Sequence of instances :class:`~signac.contrib.job.Job`.
-            Only submit operations associated with the provided jobs. Defaults to all jobs.
+        jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
+            Only submit operations for the given jobs or aggregates of jobs,
+            or all if the argument is None. (Default value = None)
         names : Sequence of :class:`str`
             Only submit operations with any of the given names, defaults to all names.
         num : int
@@ -4998,7 +4999,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             nargs="?",
             const="-1",
             help="Specify the number of cores to parallelize to. Defaults to all available "
-            "processing units if argument is omitted.",
+            "processing units.",
         )
         execution_group.add_argument(
             "--order",
@@ -5073,7 +5074,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             type=str,
             nargs="*",
             help="The job ids, as registered in the signac project. "
-            "Omit to default to all statepoints.",
+            "Defaults to all jobs.",
         )
         parser_exec.set_defaults(func=self._main_exec)
 

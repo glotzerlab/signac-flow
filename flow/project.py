@@ -30,6 +30,7 @@ from itertools import chain, count, groupby, islice
 from multiprocessing import Event, Pool, TimeoutError, cpu_count
 from multiprocessing.pool import ThreadPool
 
+import cloudpickle
 import jinja2
 import signac
 from deprecation import deprecated
@@ -2313,7 +2314,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                                 file=err,
                             )
                         )
-                        op_results = list(
+                        group_results = list(
                             tqdm(
                                 iterable=pool.imap(get_group_status, operation_names),
                                 desc="Collecting operation status",
@@ -2324,64 +2325,32 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 elif status_parallelization == "process":
                     with contextlib.closing(Pool()) as pool:
                         try:
-                            import pickle
-
-                            l_results, g_results = self._fetch_status_in_parallel(
+                            (
+                                label_results,
+                                group_results,
+                            ) = self._fetch_status_in_parallel(
                                 pool,
-                                pickle,
                                 distinct_jobs,
                                 operation_names,
                                 ignore_errors,
                                 cached_status,
                             )
-                        except Exception as error:
-                            if (
-                                not isinstance(
-                                    error, (pickle.PickleError, self._PickleError)
-                                )
-                                and "pickle" not in str(error).lower()
-                            ):
-                                raise  # most likely not a pickle related error...
-
-                            try:
-                                import cloudpickle
-                            except ImportError:  # The cloudpickle package is not available.
-                                logger.error(
-                                    "Unable to parallelize execution due to a "
-                                    "pickling error. "
-                                    "\n\n - Try to install the 'cloudpickle' package, "
-                                    "e.g., with 'pip install cloudpickle'!\n"
-                                )
-                                raise error
-                            else:
-                                try:
-                                    (
-                                        l_results,
-                                        g_results,
-                                    ) = self._fetch_status_in_parallel(
-                                        pool,
-                                        cloudpickle,
-                                        distinct_jobs,
-                                        operation_names,
-                                        ignore_errors,
-                                        cached_status,
-                                    )
-                                except self._PickleError as error:
-                                    raise RuntimeError(
-                                        "Unable to parallelize execution due to a pickling "
-                                        f"error: {error}."
-                                    )
+                        except self._PickleError as error:
+                            raise RuntimeError(
+                                "Unable to parallelize execution due to a pickling "
+                                f"error: {error}."
+                            )
                         label_results = list(
                             tqdm(
-                                iterable=l_results,
+                                iterable=label_results,
                                 desc="Collecting job label info",
                                 total=len(distinct_jobs),
                                 file=err,
                             )
                         )
-                        op_results = list(
+                        group_results = list(
                             tqdm(
-                                iterable=g_results,
+                                iterable=group_results,
                                 desc="Collecting operation status",
                                 total=len(operation_names),
                                 file=err,
@@ -2396,7 +2365,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                             file=err,
                         )
                     )
-                    op_results = list(
+                    group_results = list(
                         tqdm(
                             iterable=map(get_group_status, operation_names),
                             desc="Collecting operation status",
@@ -2434,7 +2403,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 label_results = print_status(
                     distinct_jobs, get_job_labels, "Collecting job label info"
                 )
-                op_results = print_status(
+                group_results = print_status(
                     operation_names, get_group_status, "Collecting operation status"
                 )
 
@@ -2450,7 +2419,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             results.append(results_entry)
             index[job.get_id()] = i
 
-        for op_result in op_results:
+        for op_result in group_results:
             for aggregate_id, aggregate_status in op_result[
                 "job_status_details"
             ].items():
@@ -2473,36 +2442,27 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return results
 
     def _fetch_status_in_parallel(
-        self, pool, pickle, jobs, groups, ignore_errors, cached_status
+        self, pool, jobs, groups, ignore_errors, cached_status
     ):
         try:
-            # Since pickling the project results in loss of necessary information. We
-            # explicitly pickle all the necessary information and then mock them in the
-            # serialized methods.
-            s_root = pickle.dumps(self.root_directory())
-            s_label_funcs = pickle.dumps(self._label_functions)
-            s_groups = pickle.dumps(self._groups)
-            s_groups_aggregate = pickle.dumps(self._stored_aggregates)
-            s_tasks_labels = [
+            serialized_project = cloudpickle.dumps(self)
+            serialized_tasks_labels = [
                 (
-                    pickle.loads,
-                    s_root,
+                    cloudpickle.loads,
+                    serialized_project,
                     job.get_id(),
                     ignore_errors,
-                    s_label_funcs,
                     "fetch_labels",
                 )
                 for job in jobs
             ]
-            s_tasks_groups = [
+            serialized_tasks_groups = [
                 (
-                    pickle.loads,
-                    s_root,
+                    cloudpickle.loads,
+                    serialized_project,
                     group,
                     ignore_errors,
                     cached_status,
-                    s_groups,
-                    s_groups_aggregate,
                     "fetch_status",
                 )
                 for group in groups
@@ -2510,8 +2470,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         except Exception as error:  # Masking all errors since they must be pickling related.
             raise self._PickleError(error)
 
-        label_results = pool.starmap(_serializer, s_tasks_labels)
-        group_results = pool.starmap(_serializer, s_tasks_groups)
+        label_results = pool.starmap(_serializer, serialized_tasks_labels)
+        group_results = pool.starmap(_serializer, serialized_tasks_groups)
 
         return label_results, group_results
 
@@ -2990,38 +2950,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     "Parallelized execution of %i operation(s).", len(operations)
                 )
                 try:
-                    import pickle
-
                     self._run_operations_in_parallel(
-                        pool, pickle, operations, progress, timeout
+                        pool, operations, progress, timeout
                     )
-                    logger.debug("Used cPickle module for serialization.")
-                except Exception as error:
-                    if (
-                        not isinstance(error, (pickle.PickleError, self._PickleError))
-                        and "pickle" not in str(error).lower()
-                    ):
-                        raise  # most likely not a pickle related error...
-
-                    try:
-                        import cloudpickle
-                    except ImportError:  # The cloudpickle package is not available.
-                        logger.error(
-                            "Unable to parallelize execution due to a pickling error. "
-                            "\n\n - Try to install the 'cloudpickle' package, e.g., with "
-                            "'pip install cloudpickle'!\n"
-                        )
-                        raise error
-                    else:
-                        try:
-                            self._run_operations_in_parallel(
-                                pool, cloudpickle, operations, progress, timeout
-                            )
-                        except self._PickleError as error:
-                            raise RuntimeError(
-                                "Unable to parallelize execution due to a pickling "
-                                f"error: {error}."
-                            )
+                except self._PickleError as error:
+                    raise RuntimeError(
+                        "Unable to parallelize execution due to a pickling "
+                        f"error: {error}."
+                    )
 
     @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
     def run_operations(
@@ -3070,7 +3006,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         all_directives.update(directives)
         return _JobOperation(id, name, jobs, cmd, all_directives)
 
-    def _run_operations_in_parallel(self, pool, pickle, operations, progress, timeout):
+    def _run_operations_in_parallel(self, pool, operations, progress, timeout):
         """Execute operations in parallel.
 
         This function executes the given list of operations with the provided
@@ -3078,18 +3014,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Since pickling of the project instance is likely to fail, we manually
         pickle the project instance and the operations before submitting them
-        to the process pool to enable us to try different pool and pickle
-        module combinations.
+        to the process pool.
         """
         try:
-            serialized_root = pickle.dumps(self.root_directory())
-            serialized_operations = pickle.dumps(self._operations)
+            serialized_project = cloudpickle.dumps(self)
             serialized_tasks = [
                 (
-                    pickle.loads,
-                    serialized_root,
+                    cloudpickle.loads,
+                    serialized_project,
                     self._job_operation_to_tuple(operation),
-                    serialized_operations,
                     "run_operations",
                 )
                 for operation in tqdm(
@@ -5147,26 +5080,19 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             _show_traceback_and_exit(error)
 
 
-def _serializer(loads, root, *args):
-    root = loads(root)
-    project = FlowProject.get_project(root)
+def _serializer(loads, project, *args):
+    project = loads(project)
     if args[-1] == "run_operations":
         operation_data = args[0]
-        project._operations = loads(args[1])
         project._execute_operation(project._job_operation_from_tuple(operation_data))
     elif args[-1] == "fetch_labels":
         job = project.open_job(id=args[0])
         ignore_errors = args[1]
-        project._label_functions = loads(args[2])
         return project._get_job_labels(job, ignore_errors=ignore_errors)
     elif args[-1] == "fetch_status":
         group = args[0]
         ignore_errors = args[1]
         cached_status = args[2]
-        groups = loads(args[3])
-        project._groups = groups
-        groups_aggregate = loads(args[4])
-        project._stored_aggregates = groups_aggregate
         return project._get_group_status(group, ignore_errors, cached_status)
     return None
 

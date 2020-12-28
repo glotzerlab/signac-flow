@@ -17,7 +17,7 @@ Added
 - Code is formatted with ``black`` and ``isort`` pre-commit hooks (#365).
 - Add official support for Python version 3.9 (#365).
 - Documentation has been added for all public classes and methods (#387).
-- Added class ``AggregatesCursor`` in ``flow`` to iterate over all the aggregates present in a ``FlowProject`` (#390).
+- Added internal class ``_AggregatesCursor`` to iterate over aggregates (#390).
 
 Changed
 +++++++

@@ -3373,8 +3373,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 continue
             groups = [
                 group
-                for gname, group in self.groups.items()
-                if re.fullmatch(name, gname)
+                for group_name, group in self.groups.items()
+                if re.fullmatch(name, group_name)
             ]
             if len(groups) > 0:
                 for group in groups:

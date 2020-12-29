@@ -189,19 +189,19 @@ class aggregator:
             if default is None:
 
                 def keyfunction(job):
-                    return job.sp[key]
+                    return job.statepoint[key]
 
             else:
 
                 def keyfunction(job):
-                    return job.sp.get(key, default)
+                    return job.statepoint.get(key, default)
 
         elif isinstance(key, Iterable):
             keys = list(key)
             if default is None:
 
                 def keyfunction(job):
-                    return [job.sp[key] for key in keys]
+                    return [job.statepoint[key] for key in keys]
 
             else:
                 if isinstance(default, Iterable):
@@ -218,7 +218,7 @@ class aggregator:
 
                 def keyfunction(job):
                     return [
-                        job.sp.get(key, default_value)
+                        job.statepoint.get(key, default_value)
                         for key, default_value in zip(keys, default)
                     ]
 
@@ -419,7 +419,7 @@ class _AggregatesStore(Mapping):
         else:
             jobs = sorted(
                 jobs,
-                key=lambda job: job.sp[self._aggregator._sort_by],
+                key=lambda job: job.statepoint[self._aggregator._sort_by],
                 reverse=not self._aggregator._sort_ascending,
             )
         yield from self._aggregator._aggregator_function(jobs)

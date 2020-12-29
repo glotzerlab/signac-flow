@@ -40,7 +40,6 @@ jobs:
           paths:
             - ".pre-commit-cache"
 
-
   linux-python-39: &test-template
     environment:
       SIGNAC_VERSION: "signac"

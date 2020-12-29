@@ -37,7 +37,7 @@ def cmd(func):
         @FlowProject.operation
         @flow.cmd
         def hello(job):
-            return "echo {job._id}"
+            return "echo {job.id}"
 
     .. note::
         The final shell command generated for :meth:`~.FlowProject.run` or

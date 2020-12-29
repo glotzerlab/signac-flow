@@ -80,7 +80,7 @@ variable, for example in the project configuration file. The current template di
 {template_dir}
 
 All template variables can be placed within a template using the standard jinja2
-syntax, e.g., the project root directory can be written like this: {{{{ project._rd }}}}.
+syntax, e.g., the project root directory can be written as: {{{{ project.root_directory() }}}}.
 The available template variables are:
 {template_vars}
 
@@ -2109,7 +2109,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         try:
             if cached_status is None:
                 try:
-                    cached_status = self.document["_status"]._as_dict()
+                    cached_status = self.document["_status"]()
                 except KeyError:
                     cached_status = {}
             result["operations"] = dict(
@@ -2339,7 +2339,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         self._fetch_scheduler_status(aggregates, err, ignore_errors)
         # Get status dict for all selected aggregates
         try:
-            cached_status = self.document["_status"]._as_dict()
+            cached_status = self.document["_status"]()
         except KeyError:
             cached_status = {}
 
@@ -2810,9 +2810,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     {
                         key
                         for job in distinct_jobs
-                        for key in job.sp.keys()
+                        for key in job.statepoint.keys()
                         if len(
-                            {_to_hashable(job.sp().get(key)) for job in distinct_jobs}
+                            {
+                                _to_hashable(job.statepoint().get(key))
+                                for job in distinct_jobs
+                            }
                         )
                         > 1
                     }
@@ -4218,8 +4221,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         .. code-block:: python
 
-            op = FlowOperation('hello', cmd='hello {job._id}')
-            op = FlowOperation('hello', cmd=lambda 'hello {}'.format(job._id))
+            op = FlowOperation('hello', cmd='hello {job.id}')
+            op = FlowOperation('hello', cmd=lambda 'hello {}'.format(job.id))
 
         Here are some more useful examples for str-substitutions:
 

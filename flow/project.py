@@ -1192,13 +1192,6 @@ class FlowGroup:
         # By appending the unique job_op_id, we ensure that each id is truly unique.
         return readable_name + job_op_id
 
-    def _get_status(self, jobs, cached_status):
-        """For a given job-aggregate, check the group's submission status."""
-        try:
-            return JobStatus(cached_status[self._generate_id(jobs)])
-        except KeyError:
-            return JobStatus.unknown
-
     def _create_submission_job_operation(
         self,
         entrypoint,
@@ -2208,7 +2201,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         status[submit_id] = int(
                             scheduler_info.get(submit_id, JobStatus.unknown)
                         )
-            self.document._status.update(status)
+            self.document["_status"].update(status)
         except NoSchedulerError:
             logger.debug("No scheduler available.")
         except RuntimeError as error:
@@ -4694,12 +4687,19 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         if flow_group is None or jobs is None:
             return False
-        if flow_group._get_status(jobs, cached_status) >= JobStatus.submitted:
+
+        def _group_is_submitted(flow_group):
+            """Check if group has been submitted for the provided jobs."""
+            group_id = flow_group._generate_id(jobs)
+            job_status = JobStatus(cached_status.get(group_id, JobStatus.unknown))
+            return job_status >= JobStatus.submitted
+
+        if _group_is_submitted(flow_group):
             return False
         group_ops = set(flow_group)
         for other_group in self._groups.values():
             if group_ops & set(other_group):
-                if other_group._get_status(jobs, cached_status) >= JobStatus.submitted:
+                if _group_is_submitted(other_group):
                     return False
         return True
 

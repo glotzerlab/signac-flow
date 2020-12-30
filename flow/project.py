@@ -1234,7 +1234,7 @@ class FlowGroup:
 
         Returns
         -------
-        :class:`_SubmissionJobOperation`
+        :class:`~._SubmissionJobOperation`
             Returns a :class:`~._SubmissionJobOperation` for submitting the
             group. The :class:`~._JobOperation` will have directives that have
             been collected appropriately from its contained operations.
@@ -2064,8 +2064,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         starting_dict = functools.partial(dict, scheduler_status=JobStatus.unknown)
         status_dict = defaultdict(starting_dict)
-        operation_names = list(self.operations.keys())
-        groups = [self._groups[name] for name in operation_names]
+
+        groups = [self._groups[name] for name in self.operations]
         for group in groups:
             if get_aggregate_id(jobs) in self._get_aggregate_store(group.name):
                 completed = group._complete(jobs)
@@ -2344,8 +2344,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             cached_status = {}
 
         get_job_labels = functools.partial(
-            self._get_job_labels, ignore_errors=ignore_errors
+            self._get_job_labels,
+            ignore_errors=ignore_errors,
         )
+
         get_group_status = functools.partial(
             self._get_group_status,
             ignore_errors=ignore_errors,
@@ -3163,8 +3165,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Only execute operations for the given jobs or aggregates of jobs,
             or all if the argument is None. (Default value = None)
         names : iterable of :class:`str`
-            Only execute operations that are in the provided set of names, or
-            all if the argument is None. (Default value = None)
+            Only execute operations that match the provided set of names
+            (interpreted as regular expressions), or all if the argument is
+            None. (Default value = None)
         pretend : bool
             Do not actually execute the operations, but show the commands that
             would have been executed. (Default value = False)
@@ -3363,7 +3366,23 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             )
 
     def _gather_flow_groups(self, names=None):
-        r"""Grabs :class:`~.FlowGroup`\ s that match any of a set of names."""
+        r"""Grabs :class:`~.FlowGroup`\ s that match any of a set of names.
+
+        The provided names can be any regular expressions that fully match a group name.
+
+        Parameters
+        ----------
+        names : iterable of :class:`str`
+            Only select operations that match the provided set of names
+            (interpreted as regular expressions), or all if the argument is
+            None. (Default value = None)
+
+        Returns
+        -------
+        list
+            List of groups matching the provided names.
+
+        """
         operations = {}
         # if no names are selected try all singleton groups
         if names is None:
@@ -3384,9 +3403,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         operations = list(operations.values())
         if not FlowProject._verify_group_compatibility(operations):
             raise ValueError(
-                "Cannot specify groups or operations that "
-                "will be included twice when using the"
-                " -o/--operation option."
+                "Cannot specify groups or operations that will be included "
+                "twice when using the -o/--operation option."
             )
         return operations
 
@@ -3795,8 +3813,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
             Only submit operations for the given jobs or aggregates of jobs,
             or all if the argument is None. (Default value = None)
-        names : Sequence of :class:`str`
-            Only submit operations with any of the given names, defaults to all names.
+        names : iterable of :class:`str`
+            Only submit operations that match the provided set of names
+            (interpreted as regular expressions), or all if the argument is
+            None. (Default value = None)
         num : int
             Limit the total number of submitted operations, defaults to no limit.
         parallel : bool

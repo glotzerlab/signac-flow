@@ -1262,7 +1262,11 @@ class TestGroupProject(TestProjectBase):
         project = self.mock_project()
         # For run mode single operation groups
         for job in project:
-            job_ops = project._get_submission_operations([(job,)], {})
+            job_ops = project._get_submission_operations(
+                aggregates=[(job,)],
+                default_directives={},
+                cached_status={},
+            )
             script = project._script(job_ops)
             if job.sp.b % 2 == 0:
                 assert str(job) in script
@@ -1291,13 +1295,19 @@ class TestGroupProject(TestProjectBase):
         for job in project:
             # Test submit JobOperations
             job_ops = project._get_submission_operations(
-                (job,), project._get_default_directives(), names=["group2"]
+                aggregates=(job,),
+                default_directives=project._get_default_directives(),
+                cached_status={},
+                names=["group2"],
             )
             assert all(
                 [job_op.directives.get("omp_num_threads", 0) == 4 for job_op in job_ops]
             )
             job_ops = project._get_submission_operations(
-                (job,), project._get_default_directives(), names=["op3"]
+                aggregates=(job,),
+                default_directives=project._get_default_directives(),
+                cached_status={},
+                names=["op3"],
             )
             assert all(
                 [job_op.directives.get("omp_num_threads", 0) == 1 for job_op in job_ops]

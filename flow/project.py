@@ -4663,7 +4663,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return {}
 
     def _eligible_for_submission(self, flow_group, jobs, cached_status):
-        """Check group eligibility for submission with a job/aggregate.
+        """Check group eligibility for submission with a job or aggregate.
 
         By default, an operation is eligible for submission when it
         is not considered active, that means already queued or running.

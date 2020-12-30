@@ -270,7 +270,8 @@ class _JobOperation:
     :param directives:
         A :class:`flow.directives._Directives` object of additional parameters
         that provide instructions on how to execute this operation, e.g.,
-        specifically required resources.
+        specifically required resources. This is expected to be evaluated (i.e.
+        all callable directives should be evalauted to concrete value).
     :type directives:
         :class:`flow.directives._Directives`
     """
@@ -282,8 +283,6 @@ class _JobOperation:
         if not (callable(cmd) or isinstance(cmd, str)):
             raise ValueError("JobOperation cmd must be a callable or string.")
         self._cmd = cmd
-
-        directives.evaluate(jobs)
 
         # Keys which were explicitly set by the user, but are not evaluated by the
         # template engine are cause for concern and might hint at a bug in the template
@@ -395,9 +394,11 @@ class JobOperation(_JobOperation):
     """
 
     def __init__(self, id, name, job, cmd, directives=None):
-        if directives is None:
-            directives = job._project._environment._get_default_directives()
-        super().__init__(id, name, (job,), cmd, directives)
+        complete_directives = job._project._environment._get_default_directives()
+        if directives is not None:
+            complete_directives.update(directives)
+        complete_directives.evaluate(job)
+        super().__init__(id, name, (job,), cmd, complete_directives)
 
     @property
     def job(self):
@@ -1218,6 +1219,7 @@ class FlowGroup:
         env = jobs[0]._project._environment
         op_names = list(self.operations.keys())
         directives = self._resolve_directives(op_names[0], default_directives, env)
+        directives.evaluate(jobs)
         for name in op_names[1:]:
             # get directives for operation
             directives.update(

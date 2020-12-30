@@ -1295,34 +1295,46 @@ class TestGroupProject(TestProjectBase):
         cached_status = project._get_cached_status()
         for job in project:
             # Test submit JobOperations
-            job_ops = project._get_submission_operations(
-                aggregates=[(job,)],
-                default_directives=project._get_default_directives(),
-                cached_status=cached_status,
-                names=["group2"],
+            job_ops = list(
+                project._get_submission_operations(
+                    aggregates=[(job,)],
+                    default_directives=project._get_default_directives(),
+                    cached_status=cached_status,
+                    names=["group2"],
+                )
             )
+            assert len(job_ops) == 1
             assert all(
                 [job_op.directives.get("omp_num_threads", 0) == 4 for job_op in job_ops]
             )
-            job_ops = project._get_submission_operations(
-                aggregates=[(job,)],
-                default_directives=project._get_default_directives(),
-                cached_status=cached_status,
-                names=["op3"],
+            job_ops = list(
+                project._get_submission_operations(
+                    aggregates=[(job,)],
+                    default_directives=project._get_default_directives(),
+                    cached_status=cached_status,
+                    names=["op3"],
+                )
             )
+            assert len(job_ops) == 1
             assert all(
                 [job_op.directives.get("omp_num_threads", 0) == 1 for job_op in job_ops]
             )
             # Test run JobOperations
-            job_ops = project.groups["group2"]._create_run_job_operations(
-                project._entrypoint, project._get_default_directives(), (job,)
+            job_ops = list(
+                project.groups["group2"]._create_run_job_operations(
+                    project._entrypoint, project._get_default_directives(), (job,)
+                )
             )
+            assert len(job_ops) == 1
             assert all(
                 [job_op.directives.get("omp_num_threads", 0) == 4 for job_op in job_ops]
             )
-            job_ops = project.groups["op3"]._create_run_job_operations(
-                project._entrypoint, project._get_default_directives(), (job,)
+            job_ops = list(
+                project.groups["op3"]._create_run_job_operations(
+                    project._entrypoint, project._get_default_directives(), (job,)
+                )
             )
+            assert len(job_ops) == 1
             assert all(
                 [job_op.directives.get("omp_num_threads", 0) == 1 for job_op in job_ops]
             )

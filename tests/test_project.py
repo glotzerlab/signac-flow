@@ -25,6 +25,7 @@ from deprecation import fail_if_not_removed
 import flow
 from flow import FlowProject, cmd, directives, init, with_job
 from flow.environment import ComputeEnvironment
+from flow.project import _AggregatesCursor
 from flow.scheduling.base import ClusterJob, JobStatus, Scheduler
 from flow.util.misc import (
     add_cwd_to_environment_pythonpath,
@@ -190,7 +191,7 @@ class TestProjectStatusPerformance(TestProjectBase):
 
         time = timeit.timeit(
             lambda: project._fetch_status(
-                None, project, StringIO(), ignore_errors=False
+                _AggregatesCursor(project), project, StringIO(), ignore_errors=False
             ),
             number=10,
         )

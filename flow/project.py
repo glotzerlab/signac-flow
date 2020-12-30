@@ -261,6 +261,54 @@ def _make_bundles(operations, size=None):
             break
 
 
+class _AggregatesCursor:
+    """Utility class to iterate over aggregates stored in a FlowProject.
+
+    Parameters
+    ----------
+    project : :class:`~.FlowProject`
+        A FlowProject whose jobs are aggregated.
+    filter : dict
+        A mapping of key-value pairs that all indexed job state points are
+        compared against (Default value = None).
+    doc_filter : dict
+        A mapping of key-value pairs that all indexed job documents are
+        compared against (Default value = None).
+
+    """
+
+    # This class currently only handles aggregates of size 1 (single jobs).
+
+    def __init__(self, project, filter=None, doc_filter=None):
+        self._project = project
+        self._filter = filter
+        self._doc_filter = doc_filter
+        self._jobs_cursor = JobsCursor(project, filter, doc_filter)
+
+    def __eq__(self, other):
+        return self._jobs_cursor == other._jobs_cursor
+
+    def __contains__(self, aggregate):
+        if len(aggregate) != 1:
+            # Exit early if this is not an aggregate of 1 job
+            return False
+        if self._filter is None and self._doc_filter is None:
+            # Using the Project's __contains__ method is fastest if no
+            # filtering is needed. This is a backport of PR 449 to signac that
+            # optimizes the JobsCursor __contains__ method, and is required for
+            # sufficient performance with earlier versions of signac.
+            return aggregate[0] in self._project
+        # Slow path: requires O(N) iteration over the JobsCursor
+        return aggregate[0] in self._jobs_cursor
+
+    def __len__(self):
+        return len(self._jobs_cursor)
+
+    def __iter__(self):
+        for job in self._jobs_cursor:
+            yield (job,)
+
+
 class _JobOperation:
     """Class containing execution information for one group and one job.
 
@@ -2105,6 +2153,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Whether to ignore exceptions raised during status check. (Default value = False)
 
         """
+        if jobs is None:
+            jobs = _AggregatesCursor(self)
+
         if file is None:
             file = sys.stderr
         try:
@@ -2127,7 +2178,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 for aggregate in tqdm(
                     aggregate_store.values(),
                     total=len(aggregate_store),
-                    desc="Fetching aggregate info for aggregate",
+                    desc="Fetching aggregate info",
                     leave=False,
                     file=file,
                 ):
@@ -2510,11 +2561,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Parameters
         ----------
-        jobs : Sequence of instances of :class:`~signac.contrib.job.Job`.
-            Only execute operations for the given jobs, or all if the argument
-            is omitted. (Default value = None)
+        jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
+            Only print status for the given jobs or aggregates of jobs,
+            or all if the argument is None. (Default value = None)
         overview : bool
-            Aggregate an overview of the project' status. (Default value = True)
+            Display an overview of the project status. (Default value = True)
         overview_max_lines : int
             Limit the number of overview lines. (Default value = None)
         detailed : bool
@@ -2568,15 +2619,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if err is None:
             err = sys.stderr
 
-        aggregates = self._convert_aggregates_from_jobs(jobs)
-        if aggregates is not None:
-            # Fetch all the distinct jobs from all the jobs or aggregate passed by the user.
-            distinct_jobs = set()
-            for aggregate in aggregates:
-                for job in aggregate:
-                    distinct_jobs.add(job)
-        else:
-            distinct_jobs = self
+        aggregates = self._convert_jobs_to_aggregates(jobs)
+        # Fetch all the distinct jobs from all the jobs or aggregate passed by the user.
+        distinct_jobs = {job for aggregate in aggregates for job in aggregate}
 
         if eligible_jobs_max_lines is None:
             eligible_jobs_max_lines = flow_config.get_config_value(
@@ -3116,10 +3161,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         ----------
         jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
             Only execute operations for the given jobs or aggregates of jobs,
-            or all if the argument is omitted. (Default value = None)
+            or all if the argument is None. (Default value = None)
         names : iterable of :class:`str`
             Only execute operations that are in the provided set of names, or
-            all if the argument is omitted. (Default value = None)
+            all if the argument is None. (Default value = None)
         pretend : bool
             Do not actually execute the operations, but show the commands that
             would have been executed. (Default value = False)
@@ -3167,7 +3212,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             :class:`IgnoreConditions.NONE`.
 
         """
-        aggregates = self._convert_aggregates_from_jobs(jobs)
+        aggregates = self._convert_jobs_to_aggregates(jobs)
 
         # Get all matching FlowGroups
         if isinstance(names, str):
@@ -3328,8 +3373,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 continue
             groups = [
                 group
-                for gname, group in self.groups.items()
-                if re.fullmatch(name, gname)
+                for group_name, group in self.groups.items()
+                if re.fullmatch(name, group_name)
             ]
             if len(groups) > 0:
                 for group in groups:
@@ -3373,6 +3418,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         self, jobs=None, operation_names=None, ignore_conditions=IgnoreConditions.NONE
     ):
         """Get all pending operations for the given selection."""
+        if jobs is None:
+            jobs = _AggregatesCursor(self)
         assert not isinstance(operation_names, str)
         for operation in self._next_operations(jobs, ignore_conditions):
             # Return operations with names that match the provided list of
@@ -3397,14 +3444,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @staticmethod
     def _is_selected_aggregate(aggregate, jobs):
-        """Verify whether the aggregate is present in the provided jobs.
-
-        Providing ``jobs=None`` indicates that no specific job is provided by
-        the user and hence ``aggregate`` is eligible for further evaluation.
-
-        Always returns True if jobs is None.
-        """
-        return (jobs is None) or (aggregate in jobs)
+        """Verify whether the aggregate is present in the provided jobs."""
+        return aggregate in jobs
 
     def _get_aggregate_from_id(self, id):
         # Iterate over all the instances of stored aggregates and search for the
@@ -3420,37 +3461,46 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Raise error as didn't find the id in any of the stored objects
         raise LookupError(f"Did not find aggregate with id {id} in the project")
 
-    def _convert_aggregates_from_jobs(self, jobs):
-        # The jobs parameter in public methods like ``run``, ``submit``, ``status`` may
-        # accept either a signac job or an aggregate. We convert that job / aggregate
-        # (which may be of any type (e.g. list)) to an aggregate of type ``tuple``.
-        if jobs is not None:
-            # aggregates must be a set to prevent duplicate entries
-            aggregates = set()
-            for aggregate in jobs:
-                # User can still pass signac jobs.
-                if isinstance(aggregate, signac.contrib.job.Job):
-                    if aggregate not in self:
-                        raise LookupError(
-                            f"Did not find job {aggregate} in the project"
-                        )
-                    aggregates.add((aggregate,))
+    def _convert_jobs_to_aggregates(self, jobs):
+        """Convert sequences of signac jobs to aggregates.
+
+        The ``jobs`` parameter in public methods like :meth:`~.run`,
+        :meth:`~.submit`, and :meth:`~.print_status` accepts a sequence of
+        signac jobs. This method converts that sequence into a sequence of
+        aggregates (tuples containing single signac jobs).
+        """
+        if jobs is None:
+            return _AggregatesCursor(self)
+        elif isinstance(jobs, _AggregatesCursor):
+            return jobs
+
+        # Handle user-provided jobs/aggregates
+        aggregates = []
+        for aggregate in jobs:
+            if isinstance(aggregate, signac.contrib.job.Job):
+                # aggregate is a single signac job.
+                if aggregate not in self:
+                    raise LookupError(f"Did not find job {aggregate} in the project")
+                aggregates.append((aggregate,))
+            else:
+                try:
+                    aggregate = tuple(aggregate)
+                    assert all(
+                        isinstance(job, signac.contrib.job.Job) for job in aggregate
+                    )
+                except (AssertionError, TypeError) as error:
+                    raise TypeError(
+                        "Invalid jobs argument. Please provide a valid "
+                        "signac job or aggregate of jobs."
+                    ) from error
                 else:
-                    try:
-                        aggregate = tuple(aggregate)
-                    except TypeError as error:
-                        raise TypeError(
-                            "Invalid jobs argument. Please provide a valid "
-                            "signac job or aggregate of jobs."
-                        ) from error
-                    else:
-                        if not self._aggregate_is_in_project(aggregate):
-                            raise LookupError(
-                                f"Did not find aggregate {aggregate} in the project"
-                            )
-                        aggregates.add(aggregate)  # An aggregate provided by the user
-            return list(aggregates)
-        return None
+                    # aggregate is a tuple of signac jobs.
+                    if not self._aggregate_is_in_project(aggregate):
+                        raise LookupError(
+                            f"Did not find aggregate {aggregate} in the project."
+                        )
+                    aggregates.append(aggregate)
+        return aggregates
 
     @contextlib.contextmanager
     def _potentially_buffered(self):
@@ -3742,8 +3792,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         ----------
         bundle_size : int
             Specify the number of operations to be bundled into one submission, defaults to 1.
-        jobs : Sequence of instances :class:`~signac.contrib.job.Job`.
-            Only submit operations associated with the provided jobs. Defaults to all jobs.
+        jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
+            Only submit operations for the given jobs or aggregates of jobs,
+            or all if the argument is None. (Default value = None)
         names : Sequence of :class:`str`
             Only submit operations with any of the given names, defaults to all names.
         num : int
@@ -3770,7 +3821,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Additional keyword arguments forwarded to :meth:`~.ComputeEnvironment.submit`.
 
         """
-        aggregates = self._convert_aggregates_from_jobs(jobs)
+        aggregates = self._convert_jobs_to_aggregates(jobs)
 
         # Regular argument checks and expansion
         if isinstance(names, str):
@@ -4255,6 +4306,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             All eligible operations for the provided jobs.
 
         """
+        if jobs is None:
+            jobs = _AggregatesCursor(self)
         for name in self.operations:
             group = self._groups[name]
             for aggregate in self._get_aggregate_store(group.name).values():
@@ -4755,12 +4808,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 except KeyError as error:
                     raise LookupError(f"Did not find job with id {error}.")
             return list(aggregates)
-        elif "filter" in args or "doc_filter" in args:
+        elif args.func == self._main_exec:
+            # exec command used with job_id
+            return _AggregatesCursor(self)
+        else:
+            # filter or doc filter provided
             filter_ = parse_filter_arg(args.filter)
             doc_filter = parse_filter_arg(args.doc_filter)
-            return JobsCursor(self, filter_, doc_filter)
-        else:
-            return None
+            return _AggregatesCursor(self, filter_, doc_filter)
 
     def main(self, parser=None):
         """Call this function to use the main command line interface.
@@ -4905,7 +4960,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             nargs="?",
             const="-1",
             help="Specify the number of cores to parallelize to. Defaults to all available "
-            "processing units if argument is omitted.",
+            "processing units.",
         )
         execution_group.add_argument(
             "--order",
@@ -4980,7 +5035,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             type=str,
             nargs="*",
             help="The job ids, as registered in the signac project. "
-            "Omit to default to all statepoints.",
+            "Defaults to all jobs.",
         )
         parser_exec.set_defaults(func=self._main_exec)
 

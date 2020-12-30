@@ -1292,21 +1292,22 @@ class TestGroupProject(TestProjectBase):
 
     def test_directives_hierarchy(self):
         project = self.mock_project()
+        cached_status = project._get_cached_status()
         for job in project:
             # Test submit JobOperations
             job_ops = project._get_submission_operations(
-                aggregates=(job,),
+                aggregates=[(job,)],
                 default_directives=project._get_default_directives(),
-                cached_status={},
+                cached_status=cached_status,
                 names=["group2"],
             )
             assert all(
                 [job_op.directives.get("omp_num_threads", 0) == 4 for job_op in job_ops]
             )
             job_ops = project._get_submission_operations(
-                aggregates=(job,),
+                aggregates=[(job,)],
                 default_directives=project._get_default_directives(),
-                cached_status={},
+                cached_status=cached_status,
                 names=["op3"],
             )
             assert all(

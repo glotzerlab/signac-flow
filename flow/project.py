@@ -4824,9 +4824,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         with self._potentially_buffered():
             names = args.operation_name if args.operation_name else None
             default_directives = self._get_default_directives()
+            cached_status = self._get_cached_status()
             operations = self._get_submission_operations(
                 aggregates,
                 default_directives,
+                cached_status,
                 names,
                 args.ignore_conditions,
                 args.ignore_conditions_on_execution,

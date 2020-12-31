@@ -271,7 +271,7 @@ class _JobOperation:
         A :class:`flow.directives._Directives` object of additional parameters
         that provide instructions on how to execute this operation, e.g.,
         specifically required resources. This is expected to be evaluated (i.e.
-        all callable directives should be evalauted to concrete value).
+        all callable directives should evaluate to concrete values).
     :type directives:
         :class:`flow.directives._Directives`
     """

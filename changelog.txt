@@ -26,7 +26,7 @@ Changed
 Fixed
 +++++
 
-- Ensure that directives are always evaluated before running or submitting (#408).
+- Ensure that directives are always evaluated before running or submitting (#408, #409).
 - Cache the fully qualified domain name during environment detection to fix a performance issue on macOS (#339, #394).
 
 Removed

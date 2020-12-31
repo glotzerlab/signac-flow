@@ -2033,17 +2033,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         yield from self._expand_bundled_jobs(scheduler.jobs())
 
-    def _get_cached_status(self, cached_status=None):
+    def _get_cached_status(self):
         """Fetch all status information.
 
-        If the provided ``cached_status`` is not None, it is directly
-        returned. Otherwise, the project document key ``_status`` is
-        returned.
-
-        Parameters
-        ----------
-        cached_status : dict
-            Existing cached status information. (Default value = None)
+        The project document key ``_status`` is returned as a plain dict, or an
+        empty dict if no status information is present.
 
         Returns
         -------
@@ -2053,8 +2047,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             :class:`~.JobStatus`.
 
         """
-        if cached_status is not None:
-            return cached_status
         try:
             return self.document["_status"]()
         except KeyError:
@@ -2122,7 +2114,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         """
         # TODO: Add support for aggregates for this method.
-        cached_status = self._get_cached_status(cached_status)
+        if cached_status is None:
+            cached_status = self._get_cached_status()
         result = {}
         result["job_id"] = str(job)
         try:

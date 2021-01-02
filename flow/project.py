@@ -9,6 +9,7 @@ import argparse
 import contextlib
 import datetime
 import functools
+import hashlib
 import inspect
 import json
 import logging
@@ -36,7 +37,6 @@ import signac
 from deprecation import deprecated
 from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
 from signac.contrib.filterparse import parse_filter_arg
-from signac.contrib.hashing import calc_id
 from signac.contrib.project import JobsCursor
 from tqdm.auto import tqdm
 
@@ -1158,11 +1158,16 @@ class FlowGroup:
         else:
             op_string = operation_name
 
-        full_name = "{}%{}%{}%{}".format(
-            project.root_directory(), "-".join(map(str, jobs)), op_string, index
+        full_name = '"{}%{}%{}%{}"'.format(
+            project.root_directory(),
+            "-".join([job.get_id() for job in jobs]),
+            op_string,
+            index,
         )
         # The job_op_id is a hash computed from the unique full name.
-        job_op_id = calc_id(full_name)
+        m = hashlib.md5()
+        m.update(full_name.encode())
+        job_op_id = m.hexdigest()
 
         # The actual job id is then constructed from a readable part and the job_op_id,
         # ensuring that the job-op is still somewhat identifiable, but guaranteed to

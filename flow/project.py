@@ -2368,7 +2368,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         with self._potentially_buffered():
             try:
                 if status_parallelization == "thread":
-                    with contextlib.closing(ThreadPool()) as pool:
+                    with ThreadPool() as pool:
                         # First attempt at parallelized status determination.
                         # This may fail on systems that don't allow threads.
                         label_results = list(
@@ -2388,7 +2388,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                             )
                         )
                 elif status_parallelization == "process":
-                    with contextlib.closing(Pool()) as pool:
+                    with Pool() as pool:
                         try:
                             (
                                 label_results,
@@ -3005,9 +3005,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 self._execute_operation(operation, timeout, pretend)
         else:
             logger.debug("Parallelized execution of %i operation(s).", len(operations))
-            with contextlib.closing(
-                Pool(processes=cpu_count() if np < 0 else np)
-            ) as pool:
+            with Pool(processes=cpu_count() if np < 0 else np) as pool:
                 logger.debug(
                     "Parallelized execution of %i operation(s).", len(operations)
                 )

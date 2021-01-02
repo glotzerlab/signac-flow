@@ -644,6 +644,15 @@ class TestProject(TestProjectBase):
                 with redirect_stderr(StringIO()):
                     project.print_status(parameters=parameters, detailed=True)
 
+    def test_thread_parallelized_project_status_homogeneous_schema(self):
+        project = self.mock_project(
+            config_overrides={"flow": {"status_parallelization": "thread"}}
+        )
+        for parameters in (None, True, ["a"], ["b"], ["a", "b"]):
+            with redirect_stdout(StringIO()):
+                with redirect_stderr(StringIO()):
+                    project.print_status(parameters=parameters, detailed=True)
+
     def test_process_parallelized_project_status_homogeneous_schema(self):
         project = self.mock_project(
             config_overrides={"flow": {"status_parallelization": "process"}}

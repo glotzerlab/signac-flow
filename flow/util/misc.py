@@ -251,3 +251,46 @@ def _cached_partial(func, *args, maxsize=None, **kwargs):
 
     """
     return lru_cache(maxsize=maxsize)(partial(func, *args, **kwargs))
+
+
+class bidict(dict):
+    r"""A bidirectional dictionary.
+
+    The attribute ``inverse`` contains the inverse mapping, where the inverse
+    values are :class:`set`\ s of keys with that value.
+
+    Both keys and values must be hashable.
+    A key is associated with one or more values.
+    A value is associated with exactly one key.
+    Assignment must follow key-value order.
+    Don't modify the inverse mapping directly.
+
+    """
+
+    # Based on: https://stackoverflow.com/a/21894086
+    def __new__(cls, *args, **kwargs):
+        """Create a new instance."""
+        instance = super().__new__(cls, *args, **kwargs)
+        # The inverse dictionary must be created in __new__ so that it exists
+        # during unpickling.
+        instance.inverse = {}
+        return instance
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for key, value in self.items():
+            self.inverse.setdefault(value, []).append(key)
+
+    def __setitem__(self, key, value):
+        """Assign a value to the provided key."""
+        if key in self:
+            self.inverse[self[key]].remove(key)
+        super().__setitem__(key, value)
+        self.inverse.setdefault(value, []).append(key)
+
+    def __delitem__(self, key):
+        """Delete the provided key."""
+        self.inverse.setdefault(self[key], []).remove(key)
+        if self[key] in self.inverse and not self.inverse[self[key]]:
+            del self.inverse[self[key]]
+        super().__delitem__(key)

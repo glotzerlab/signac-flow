@@ -61,6 +61,7 @@ from .util.misc import (
     _positive_int,
     _to_hashable,
     add_cwd_to_environment_pythonpath,
+    bidict,
     roundrobin,
     switch_to_directory,
 )
@@ -1629,14 +1630,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         self._operations = {}
         self._register_operations()
 
-        # Register all groups with this project instance.
+        # Register all groups and aggregates with this project instance.
         self._groups = {}
-        self._aggregator_per_group = {}
+        self._group_to_aggregator = bidict()
         self._register_groups()
-
-        # Register all aggregates which are created for this project
-        self._stored_aggregates = {}
-        self._register_aggregates()
 
     def _setup_template_environment(self):
         """Set up the jinja2 template environment.
@@ -2082,7 +2079,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         groups = [self._groups[name] for name in self.operations]
         for group in groups:
-            if get_aggregate_id(jobs) in self._get_aggregate_store(group.name):
+            if get_aggregate_id(jobs) in self._group_to_aggregator[group]:
                 completed = group._complete(jobs)
                 eligible = not completed and group._eligible(jobs)
                 scheduler_status = cached_status.get(
@@ -2186,7 +2183,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 total=len(self._groups),
                 file=file,
             ):
-                aggregate_store = self._get_aggregate_store(group.name)
+                aggregate_store = self._group_to_aggregator[group]
                 for aggregate in tqdm(
                     aggregate_store.values(),
                     total=len(aggregate_store),
@@ -2235,7 +2232,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         group = self._groups[group_name]
         status_dict = {}
         errors = {}
-        aggregate_store = self._get_aggregate_store(group.name)
+        aggregate_store = self._group_to_aggregator[group]
         for aggregate_id, aggregate in tqdm(
             aggregate_store.items(),
             desc=f"Collecting aggregate status info for operation {group.name}",
@@ -3314,9 +3311,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 with self._potentially_buffered():
                     operations = []
                     for flow_group in flow_groups:
-                        for aggregate in self._get_aggregate_store(
-                            flow_group.name
-                        ).values():
+                        aggregate_store = self._group_to_aggregator[flow_group]
+                        for aggregate in aggregate_store.values():
                             operations.extend(
                                 flow_group._create_run_job_operations(
                                     self._entrypoint,
@@ -3461,20 +3457,32 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             been collected appropriately from its contained operations.
 
         """
-        for group in self._gather_flow_groups(names):
-            for aggregate in self._get_aggregate_store(group.name).values():
-                if (
-                    group._eligible(aggregate, ignore_conditions)
-                    and self._eligible_for_submission(group, aggregate, cached_status)
-                    and self._is_selected_aggregate(aggregate, aggregates)
-                ):
-                    yield group._create_submission_job_operation(
-                        entrypoint=self._entrypoint,
-                        default_directives=default_directives,
-                        jobs=aggregate,
-                        index=0,
-                        ignore_conditions_on_execution=ignore_conditions_on_execution,
-                    )
+        submission_groups = set(self._gather_flow_groups(names))
+        for (
+            aggregate_store,
+            aggregate_groups,
+        ) in self._group_to_aggregator.inverse.items():
+            matching_groups = set(aggregate_groups) & submission_groups
+            if not matching_groups:
+                # Skip iteration over aggregate store if no groups match the
+                # specified names
+                continue
+            for aggregate in aggregate_store.values():
+                for group in matching_groups:
+                    if (
+                        group._eligible(aggregate, ignore_conditions)
+                        and self._eligible_for_submission(
+                            group, aggregate, cached_status
+                        )
+                        and self._is_selected_aggregate(aggregate, aggregates)
+                    ):
+                        yield group._create_submission_job_operation(
+                            entrypoint=self._entrypoint,
+                            default_directives=default_directives,
+                            jobs=aggregate,
+                            index=0,
+                            ignore_conditions_on_execution=ignore_conditions_on_execution,
+                        )
 
     def _get_pending_operations(
         self, jobs=None, operation_names=None, ignore_conditions=IgnoreConditions.NONE
@@ -3501,7 +3509,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """Verify that the aggregate belongs to this project."""
         return any(
             get_aggregate_id(aggregate) in aggregates
-            for aggregates in self._stored_aggregates
+            for aggregates in self._group_to_aggregator.inverse
         )
 
     @staticmethod
@@ -3512,7 +3520,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _get_aggregate_from_id(self, id):
         # Iterate over all the instances of stored aggregates and search for the
         # aggregate in those instances.
-        for aggregate_store in self._stored_aggregates:
+        for aggregate_store in self._group_to_aggregator.inverse:
             try:
                 # Assume the id exists and skip the __contains__ check for
                 # performance. If the id doesn't exist in this aggregate_store,
@@ -4376,7 +4384,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             jobs = _AggregatesCursor(self)
         for name in self.operations:
             group = self._groups[name]
-            for aggregate in self._get_aggregate_store(group.name).values():
+            aggregate_store = self._group_to_aggregator[group]
+            for aggregate in aggregate_store.values():
                 if not self._is_selected_aggregate(aggregate, jobs):
                     continue
                 yield from group._create_run_job_operations(
@@ -4407,7 +4416,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         for name in self.operations:
             group = self._groups[name]
-            aggregate_store = self._get_aggregate_store(group.name)
+            aggregate_store = self._group_to_aggregator[group]
 
             # Only yield JobOperation instances from the default aggregates
             if not isinstance(aggregate_store, _DefaultAggregateStore):
@@ -4544,13 +4553,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             else:
                 self._operations[name] = FlowOperation(op_func=func, **params)
 
-    def _register_aggregates(self):
-        """Generate aggregates for every operation or group in a FlowProject."""
-        stored_aggregates = {}
-        for _aggregator, groups in self._aggregator_per_group.items():
-            stored_aggregates[_aggregator._create_AggregatesStore(self)] = groups
-        self._stored_aggregates = stored_aggregates
-
     @classmethod
     def make_group(cls, name, options=""):
         r"""Make a :class:`~.FlowGroup` named ``name`` and return a decorator to make groups.
@@ -4593,20 +4595,26 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return group_entry
 
     def _register_groups(self):
-        """Register all groups and add the correct operations to each."""
+        """Register all groups.
+
+        Operations are assigned to each group.
+
+        Aggregators are created for each group and tracked in a bidirectional mapping.
+
+        """
         group_entries = []
         # Gather all groups from class and parent classes.
         for cls in type(self).__mro__:
             group_entries.extend(getattr(cls, "_GROUPS", []))
 
-        aggregators = defaultdict(list)
-        # Initialize all groups without operations.
-        # Also store the aggregates we need to store all the groups associated
-        # with each aggregator.
+        # Initialize all groups without operations. Also store the aggregators
+        # associated with each group.
         for entry in group_entries:
-            self._groups[entry.name] = FlowGroup(entry.name, options=entry.options)
-            aggregators[entry.aggregator].append(entry.name)
-        self._aggregator_per_group = dict(aggregators)
+            group = FlowGroup(entry.name, options=entry.options)
+            self._groups[entry.name] = group
+            self._group_to_aggregator[group] = entry.aggregator._create_AggregatesStore(
+                self
+            )
 
         # Add operations and directives to group
         for operation_name, operation in self._operations.items():
@@ -4638,25 +4646,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def groups(self):
         """Get the dictionary of groups that have been added to the workflow."""
         return self._groups
-
-    def _get_aggregate_store(self, group):
-        """Return aggregate store associated with the :class:`~.FlowGroup`.
-
-        Parameters
-        ----------
-        group : str
-            The name of the :class:`~.FlowGroup` whose aggregate store will be returned.
-
-        Returns
-        -------
-        :class:`_DefaultAggregateStore`
-            Aggregate store containing aggregates associated with the provided :class:`~.FlowGroup`.
-
-        """
-        for aggregate_store, groups in self._stored_aggregates.items():
-            if group in groups:
-                return aggregate_store
-        return {}
 
     def _eligible_for_submission(self, flow_group, jobs, cached_status):
         """Check group eligibility for submission with a job or aggregate.
@@ -4745,7 +4734,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         else:
             if aggregates is None:
                 length_jobs = sum(
-                    len(aggregate_store) for aggregate_store in self._stored_aggregates
+                    len(aggregate_store)
+                    for aggregate_store in self._group_to_aggregator.inverse
                 )
             else:
                 length_jobs = len(aggregates)
@@ -4874,7 +4864,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         except KeyError:
             raise KeyError(f"Unknown operation '{args.operation}'.")
 
-        for aggregate in self._get_aggregate_store(args.operation).values():
+        group = self._groups[args.operation]
+        aggregate_store = self._group_to_aggregator[group]
+        for aggregate in aggregate_store.values():
             if self._is_selected_aggregate(aggregate, aggregates):
                 operation_function(*aggregate)
 

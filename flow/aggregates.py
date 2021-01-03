@@ -549,13 +549,13 @@ class _DefaultAggregateStore(Mapping):
         self._project = project
 
 
-def get_aggregate_id(jobs):
+def get_aggregate_id(aggregate):
     """Generate hashed id for an aggregate of jobs.
 
     Parameters
     ----------
-    jobs : tuple of :class:`~signac.contrib.job.Job`
-        The signac job handles.
+    aggregate : tuple of :class:`~signac.contrib.job.Job`
+        Aggregate of signac jobs.
 
     Returns
     -------
@@ -563,9 +563,9 @@ def get_aggregate_id(jobs):
         The generated aggregate id.
 
     """
-    if len(jobs) == 1:
-        return jobs[0].get_id()  # Return job id as it's already unique
+    if len(aggregate) == 1:
+        return aggregate[0].get_id()  # Return job id as it's already unique
 
-    blob = ",".join(job.get_id() for job in jobs)
+    blob = ",".join(job.get_id() for job in aggregate)
     hash_ = md5(blob.encode("utf-8")).hexdigest()
     return f"agg-{hash_}"

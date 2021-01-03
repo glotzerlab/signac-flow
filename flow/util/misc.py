@@ -269,7 +269,7 @@ class bidict(dict):
 
     # Based on: https://stackoverflow.com/a/21894086
     def __new__(cls, *args, **kwargs):
-        """Create a new instance."""
+        """Create a bidict instance."""
         instance = super().__new__(cls, *args, **kwargs)
         # The inverse dictionary must be created in __new__ so that it exists
         # during unpickling.

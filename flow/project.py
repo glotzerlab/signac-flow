@@ -3230,8 +3230,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if names is None:
             names = list(self.operations)
 
-        flow_groups = self._gather_flow_groups(names)
-
         # Get default directives
         default_directives = self._get_default_directives()
 
@@ -3310,17 +3308,26 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 # Change groups to available run _JobOperation(s)
                 with self._potentially_buffered():
                     operations = []
-                    for flow_group in flow_groups:
-                        aggregate_store = self._group_to_aggregator[flow_group]
+                    run_groups = set(self._gather_flow_groups(names))
+                    for (
+                        aggregate_store,
+                        aggregate_groups,
+                    ) in self._group_to_aggregator.inverse.items():
+                        matching_groups = set(aggregate_groups) & run_groups
+                        if not matching_groups:
+                            # Skip iteration over aggregate store if no groups match the
+                            # specified names
+                            continue
                         for aggregate in aggregate_store.values():
-                            operations.extend(
-                                flow_group._create_run_job_operations(
-                                    self._entrypoint,
-                                    default_directives,
-                                    aggregate,
-                                    ignore_conditions,
+                            for group in matching_groups:
+                                operations.extend(
+                                    group._create_run_job_operations(
+                                        self._entrypoint,
+                                        default_directives,
+                                        aggregate,
+                                        ignore_conditions,
+                                    )
                                 )
-                            )
                     operations = list(filter(select, operations))
             finally:
                 if messages:

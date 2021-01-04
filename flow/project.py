@@ -9,7 +9,6 @@ import argparse
 import contextlib
 import datetime
 import functools
-import hashlib
 import inspect
 import json
 import logging
@@ -26,7 +25,7 @@ import warnings
 from collections import Counter, defaultdict
 from copy import deepcopy
 from enum import IntFlag
-from hashlib import sha1
+from hashlib import md5, sha1
 from itertools import chain, count, groupby, islice
 from multiprocessing import Event, Pool, TimeoutError, cpu_count
 from multiprocessing.pool import ThreadPool
@@ -384,7 +383,7 @@ class _JobOperation:
         )
 
     def __hash__(self):
-        return int(sha1(self.id.encode("utf-8")).hexdigest(), 16)
+        return hash(self.id)
 
     def __eq__(self, other):
         return self.id == other.id
@@ -1159,16 +1158,14 @@ class FlowGroup:
         else:
             op_string = operation_name
 
-        full_name = '"{}%{}%{}%{}"'.format(
+        full_name = "{}%{}%{}%{}".format(
             project.root_directory(),
             "-".join([job.get_id() for job in jobs]),
             op_string,
             index,
         )
         # The job_op_id is a hash computed from the unique full name.
-        m = hashlib.md5()
-        m.update(full_name.encode())
-        job_op_id = m.hexdigest()
+        job_op_id = md5(full_name.encode("utf-8")).hexdigest()
 
         # The actual job id is then constructed from a readable part and the job_op_id,
         # ensuring that the job-op is still somewhat identifiable, but guaranteed to

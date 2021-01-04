@@ -2052,7 +2052,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             return {}
 
     def _generate_selected_aggregate_groups(
-        self, selected_aggregates=None, selected_groups=None
+        self, selected_aggregates=None, selected_groups=None, tqdm_kwargs=None
     ):
         """Yield selected aggregates and groups.
 
@@ -2062,6 +2062,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Aggregates to select.
         selected_groups : set of :class:`~.FlowGroup`.
             Groups to select.
+        tqdm_kwargs : dict or None
+            A dict of keyword arguments to the tqdm progress bar used for
+            iterating over aggregates. If None, no progress bar will be
+            shown. (Default value = None)
 
         Yields
         ------
@@ -2071,27 +2075,45 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Selected group.
 
         """
+
+        def aggregate_progress_wrapper(aggregates):
+            """Show progress bar if keyword arguments are provided."""
+            if tqdm_kwargs is not None:
+                return tqdm(
+                    aggregates,
+                    total=len(aggregates),
+                    **tqdm_kwargs,
+                )
+            else:
+                return aggregates
+
         for (
             aggregate_store,
             aggregate_groups,
         ) in self._group_to_aggregator.inverse.items():
-            matching_groups = set(aggregate_groups)
             if selected_groups is not None:
-                # Filter out groups that are not selected
-                matching_groups &= selected_groups
+                # Filter out groups that are not selected. The order of
+                # aggregate_groups must be preserved. Using an intersection of
+                # ordered sets would be preferable but would require a
+                # dependency.
+                matching_groups = [
+                    group for group in aggregate_groups if group in selected_groups
+                ]
+            else:
+                matching_groups = aggregate_groups
             if len(matching_groups) == 0:
                 # Skip aggregate store if no groups are selected
                 continue
             if selected_aggregates is not None:
                 # Use selected aggregates in the aggregate store
-                for aggregate in selected_aggregates:
+                for aggregate in aggregate_progress_wrapper(selected_aggregates):
                     aggregate_id = get_aggregate_id(aggregate)
                     if aggregate_id in aggregate_store:
                         for group in matching_groups:
                             yield aggregate, group
             else:
                 # Use all aggregates in the aggregate store
-                for aggregate in aggregate_store.values():
+                for aggregate in aggregate_progress_wrapper(aggregate_store.values()):
                     for group in matching_groups:
                         yield aggregate, group
 
@@ -2120,7 +2142,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         single_operation_groups = {self._groups[name] for name in self.operations}
 
-        for aggregate, group in self._generate_selected_aggregate_operations(
+        for aggregate, group in self._generate_selected_aggregate_groups(
             selected_aggregates=[jobs],
             selected_groups=single_operation_groups,
         ):
@@ -2140,7 +2162,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         yield from sorted(status_dict.items())
 
     def _get_aggregate_status(
-        self, aggregate, aggregate_store=None, ignore_errors=False, cached_status=None
+        self, aggregate, aggregate_store, cached_status, ignore_errors=False
     ):
         """Return status information about an aggregate.
 
@@ -2155,12 +2177,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             store, this method should be called for each aggregate store and
             the results should be manually merged. If None, the default
             aggregate store will be used.
-        ignore_errors : bool
-            Whether to ignore exceptions raised during status check. (Default value = False)
         cached_status : dict
             Dictionary of cached status information. The keys are uniquely
             generated ids for each group and job. The values are instances of
             :class:`~.JobStatus`. (Default value = None)
+        ignore_errors : bool
+            Whether to ignore exceptions raised during status check. (Default value = False)
 
         Returns
         -------
@@ -2168,8 +2190,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             A dictionary containing job status for all jobs.
 
         """
-        if cached_status is None:
-            cached_status = self._get_cached_status()
         aggregate_id = get_aggregate_id(aggregate)
         result = {
             "job_id": aggregate_id,
@@ -2212,6 +2232,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             A dictionary containing job status for all jobs.
 
         """
+        if cached_status is None:
+            cached_status = self._get_cached_status()
         result = self._get_aggregate_status(
             aggregate=(job,),
             aggregate_store=None,
@@ -2261,25 +2283,18 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             }
             status = {}
             print("Query scheduler...", file=file)
-            for group in tqdm(
-                self._groups.values(),
-                desc="Fetching operation status",
-                total=len(self._groups),
-                file=file,
+            for aggregate, group in self._generate_selected_aggregate_groups(
+                selected_aggregates=jobs,
+                tqdm_kwargs={
+                    "desc": "Fetching scheduler status for jobs/aggregates",
+                    "file": file,
+                },
             ):
-                aggregate_store = self._group_to_aggregator[group]
-                for aggregate in tqdm(
-                    aggregate_store.values(),
-                    total=len(aggregate_store),
-                    desc="Fetching aggregate info",
-                    leave=False,
-                    file=file,
-                ):
-                    if self._is_selected_aggregate(aggregate, jobs):
-                        submit_id = group._generate_id(aggregate)
-                        status[submit_id] = int(
-                            scheduler_info.get(submit_id, JobStatus.unknown)
-                        )
+                submit_id = group._generate_id(aggregate)
+                status[submit_id] = int(
+                    scheduler_info.get(submit_id, JobStatus.unknown)
+                )
+
             self.document["_status"].update(status)
         except NoSchedulerError:
             logger.debug("No scheduler available.")
@@ -3578,13 +3593,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """Verify that all selected groups can be submitted together."""
         return all(a.isdisjoint(b) for a in groups for b in groups if a != b)
 
-    def _aggregate_is_in_project(self, aggregate):
-        """Verify that the aggregate belongs to this project."""
-        return any(
-            get_aggregate_id(aggregate) in aggregates
-            for aggregates in self._group_to_aggregator.inverse
-        )
-
     @staticmethod
     def _is_selected_aggregate(aggregate, jobs):
         """Verify whether the aggregate is present in the provided jobs."""
@@ -3638,11 +3646,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     ) from error
                 else:
                     # aggregate is a tuple of signac jobs.
-                    if not self._aggregate_is_in_project(aggregate):
-                        raise LookupError(
-                            f"Did not find aggregate {aggregate} in the project."
-                        )
-                    aggregates.append(aggregate)
+                    # Ensure that the aggregate exists in one of the aggregate
+                    # stores associated with this project. This will raise an
+                    # error if not.
+                    aggregate_from_id = self._get_aggregate_from_id(
+                        get_aggregate_id(aggregate)
+                    )
+                    aggregates.append(aggregate_from_id)
         return aggregates
 
     @contextlib.contextmanager
@@ -4455,18 +4465,18 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         if jobs is None:
             jobs = _AggregatesCursor(self)
-        for name in self.operations:
-            group = self._groups[name]
-            aggregate_store = self._group_to_aggregator[group]
-            for aggregate in aggregate_store.values():
-                if not self._is_selected_aggregate(aggregate, jobs):
-                    continue
-                yield from group._create_run_job_operations(
-                    entrypoint=self._entrypoint,
-                    default_directives={},
-                    jobs=aggregate,
-                    ignore_conditions=ignore_conditions,
-                )
+        single_operation_groups = {self._groups[name] for name in self.operations}
+
+        for aggregate, group in self._generate_selected_aggregate_groups(
+            selected_aggregates=jobs,
+            selected_groups=single_operation_groups,
+        ):
+            yield from group._create_run_job_operations(
+                entrypoint=self._entrypoint,
+                default_directives={},
+                jobs=aggregate,
+                ignore_conditions=ignore_conditions,
+            )
 
     @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
     def next_operations(self, *jobs, ignore_conditions=IgnoreConditions.NONE):

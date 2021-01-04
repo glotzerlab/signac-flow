@@ -1352,7 +1352,7 @@ class TestGroupProject(TestProjectBase):
                 [job_op.directives.get("omp_num_threads", 0) == 1 for job_op in job_ops]
             )
 
-    def test_submission_aggregation(self):
+    def test_submission_combine_directives(self):
         class A(flow.FlowProject):
             pass
 

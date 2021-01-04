@@ -1629,7 +1629,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Register all groups and aggregates with this project instance.
         self._groups = {}
-        self._group_to_aggregator = _bidict()
+        self._group_to_aggregate_store = _bidict()
         self._register_groups()
 
     def _setup_template_environment(self):
@@ -2052,7 +2052,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             return {}
 
     def _generate_selected_aggregate_groups(
-        self, selected_aggregates=None, selected_groups=None, tqdm_kwargs=None
+        self,
+        selected_aggregates=None,
+        selected_groups=None,
+        tqdm_kwargs=None,
     ):
         """Yield selected aggregates and groups.
 
@@ -2087,15 +2090,39 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             else:
                 return aggregates
 
+        if (
+            selected_groups is not None
+            and len(selected_groups) >= 0
+            and len(self._group_to_aggregate_store.inverse) > 1
+            and len(
+                {self._group_to_aggregate_store[group] for group in selected_groups}
+            )
+            == 1
+        ):
+            # All selected groups have the same aggregate store, so it is sufficient
+            # to only iterate over that aggregate store.
+            selected_aggregate_store = self._group_to_aggregate_store[
+                next(iter(selected_groups))
+            ]
+            aggregate_stores = {
+                selected_aggregate_store: self._group_to_aggregate_store.inverse[
+                    selected_aggregate_store
+                ],
+            }
+        else:
+            # Use all aggregate stores.
+            aggregate_stores = self._group_to_aggregate_store.inverse
+
         for (
             aggregate_store,
             aggregate_groups,
-        ) in self._group_to_aggregator.inverse.items():
+        ) in aggregate_stores.items():
             if selected_groups is not None:
                 # Filter out groups that are not selected. The order of
                 # aggregate_groups must be preserved. Using an intersection of
                 # ordered sets would be preferable but would require a
                 # dependency.
+                selected_groups = set(selected_groups)
                 matching_groups = [
                     group for group in aggregate_groups if group in selected_groups
                 ]
@@ -2236,7 +2263,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             cached_status = self._get_cached_status()
         result = self._get_aggregate_status(
             aggregate=(job,),
-            aggregate_store=None,
             ignore_errors=ignore_errors,
             cached_status=cached_status,
         )
@@ -2331,7 +2357,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         group = self._groups[group_name]
         status_dict = {}
         errors = {}
-        aggregate_store = self._group_to_aggregator[group]
+        aggregate_store = self._group_to_aggregate_store[group]
         for aggregate_id, aggregate in tqdm(
             aggregate_store.items(),
             desc=f"Collecting aggregate status info for operation {group.name}",
@@ -3597,7 +3623,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _get_aggregate_from_id(self, id):
         # Iterate over all the instances of stored aggregates and search for the
         # aggregate id in those instances.
-        for aggregate_store in self._group_to_aggregator.inverse:
+        # aggregate in those instances.
+        for aggregate_store in self._group_to_aggregate_store.inverse:
             try:
                 # Assume the id exists and skip the __contains__ check for
                 # performance. If the id doesn't exist in this aggregate_store,
@@ -4495,7 +4522,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         for name in self.operations:
             group = self._groups[name]
-            aggregate_store = self._group_to_aggregator[group]
+            aggregate_store = self._group_to_aggregate_store[group]
 
             # Only yield JobOperation instances from the default aggregates
             if not isinstance(aggregate_store, _DefaultAggregateStore):
@@ -4697,7 +4724,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 created_aggregate_stores[
                     entry.aggregator
                 ] = entry.aggregator._create_AggregatesStore(self)
-            self._group_to_aggregator[group] = created_aggregate_stores[
+            self._group_to_aggregate_store[group] = created_aggregate_stores[
                 entry.aggregator
             ]
 
@@ -4820,7 +4847,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if aggregates is None:
                 length_jobs = sum(
                     len(aggregate_store)
-                    for aggregate_store in self._group_to_aggregator.inverse
+                    for aggregate_store in self._group_to_aggregate_store.inverse
                 )
             else:
                 length_jobs = len(aggregates)
@@ -4950,7 +4977,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             raise KeyError(f"Unknown operation '{args.operation}'.")
 
         group = self._groups[args.operation]
-        aggregate_store = self._group_to_aggregator[group]
+        aggregate_store = self._group_to_aggregate_store[group]
         for aggregate in aggregate_store.values():
             if self._is_selected_aggregate(aggregate, aggregates):
                 operation_function(*aggregate)

@@ -26,7 +26,7 @@ from collections import Counter, defaultdict
 from copy import deepcopy
 from enum import IntFlag
 from hashlib import md5, sha1
-from itertools import chain, count, groupby, islice
+from itertools import count, groupby, islice
 from multiprocessing import Event, Pool, TimeoutError, cpu_count
 from multiprocessing.pool import ThreadPool
 
@@ -3295,13 +3295,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
             * 'none' or None (no specific order)
             * 'by-job' (operations are grouped by job)
-            * 'by-op' (operations are grouped by operation)
             * 'cyclic' (order operations cyclic by job)
             * 'random' (shuffle the execution order randomly)
             * callable (a callable returning a comparison key for an
               operation used to sort operations)
 
-            The default value is ``'none'``, which is equivalent to ``'by-op'``
+            The default value is ``'none'``, which is equivalent to ``'by-job'``
             in the current implementation.
 
             .. note::
@@ -3436,25 +3435,22 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             # Optionally re-order operations for execution if order argument is provided:
             if callable(order):
                 operations = list(sorted(operations, key=order))
-            elif order == "random":
-                random.shuffle(operations)
-            elif order in ("by-job", "cyclic"):
+            elif order == "cyclic":
                 groups = [
                     list(group)
                     for _, group in groupby(
                         sorted(operations, key=key_func_by_job), key=key_func_by_job
                     )
                 ]
-                if order == "cyclic":
-                    operations = list(roundrobin(*groups))
-                else:
-                    operations = list(chain(*groups))
-            elif order is None or order in ("none", "by-op"):
-                pass  # by-op is the default order
+                operations = list(roundrobin(*groups))
+            elif order == "random":
+                random.shuffle(operations)
+            elif order is None or order in ("none", "by-job"):
+                pass  # by-job is the default order
             else:
                 raise ValueError(
                     "Invalid value for the 'order' argument, valid arguments are "
-                    "'none', 'by-op', 'by-job', 'cyclic', 'random', None, or a callable."
+                    "'none', 'by-job', 'cyclic', 'random', None, or a callable."
                 )
 
             logger.info(
@@ -5138,7 +5134,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         execution_group.add_argument(
             "--order",
             type=str,
-            choices=["none", "by-op", "by-job", "cyclic", "random"],
+            choices=["none", "by-job", "cyclic", "random"],
             default=None,
             help="Specify the execution order of operations for each execution pass.",
         )

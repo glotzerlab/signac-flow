@@ -260,8 +260,8 @@ class bidict(dict):
     values are :class:`set`\ s of keys with that value.
 
     Both keys and values must be hashable.
-    A key is associated with one or more values.
-    A value is associated with exactly one key.
+    A key is associated with exactly one value.
+    A value is associated with one or more keys.
     Assignment must follow key-value order.
     Don't modify the inverse mapping directly.
 

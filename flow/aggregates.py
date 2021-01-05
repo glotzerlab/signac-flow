@@ -521,7 +521,9 @@ class _DefaultAggregateStore(Mapping):
         return len(self._project)
 
     def __eq__(self, other):
-        return type(self) == type(other) and self._project_repr == other._project_repr
+        if not isinstance(other, type(self)):
+            return NotImplemented
+        return self._project_repr == other._project_repr
 
     def __hash__(self):
         return hash(self._project_repr)

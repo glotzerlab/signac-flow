@@ -4615,13 +4615,19 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             group_entries.extend(getattr(cls, "_GROUPS", []))
 
         # Initialize all groups without operations. Also store the aggregators
-        # associated with each group.
+        # associated with each group. The aggregate stores are cached so that
+        # equivalent aggregators only generate once.
+        created_aggregate_stores = {}
         for entry in group_entries:
             group = FlowGroup(entry.name, options=entry.options)
             self._groups[entry.name] = group
-            self._group_to_aggregator[group] = entry.aggregator._create_AggregatesStore(
-                self
-            )
+            if entry.aggregator not in created_aggregate_stores:
+                created_aggregate_stores[
+                    entry.aggregator
+                ] = entry.aggregator._create_AggregatesStore(self)
+            self._group_to_aggregator[group] = created_aggregate_stores[
+                entry.aggregator
+            ]
 
         # Add operations and directives to group
         for operation_name, operation in self._operations.items():

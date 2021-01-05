@@ -2063,7 +2063,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         ----------
         selected_aggregates : iterable of aggregates
             Aggregates to select.
-        selected_groups : set of :class:`~.FlowGroup`.
+        selected_groups : set of :class:`~.FlowGroup`
             Groups to select.
         tqdm_kwargs : dict or None
             A dict of keyword arguments to the tqdm progress bar used for
@@ -2094,20 +2094,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             selected_groups is not None
             and len(selected_groups) >= 0
             and len(self._group_to_aggregate_store.inverse) > 1
-            and len(
-                {self._group_to_aggregate_store[group] for group in selected_groups}
-            )
-            == 1
         ):
-            # All selected groups have the same aggregate store, so it is sufficient
-            # to only iterate over that aggregate store.
-            selected_aggregate_store = self._group_to_aggregate_store[
-                next(iter(selected_groups))
-            ]
+            # Use only aggregate stores for the selected groups.
+            selected_aggregate_stores = {
+                self._group_to_aggregate_store[group] for group in selected_groups
+            }
             aggregate_stores = {
-                selected_aggregate_store: self._group_to_aggregate_store.inverse[
-                    selected_aggregate_store
-                ],
+                aggregate_store: self._group_to_aggregate_store.inverse[aggregate_store]
+                for aggregate_store in selected_aggregate_stores
             }
         else:
             # Use all aggregate stores.
@@ -2122,7 +2116,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 # aggregate_groups must be preserved. Using an intersection of
                 # ordered sets would be preferable but would require a
                 # dependency.
-                selected_groups = set(selected_groups)
                 matching_groups = [
                     group for group in aggregate_groups if group in selected_groups
                 ]

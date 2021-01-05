@@ -290,7 +290,8 @@ class bidict(dict):
 
     def __delitem__(self, key):
         """Delete the provided key."""
-        self.inverse.setdefault(self[key], []).remove(key)
-        if self[key] in self.inverse and not self.inverse[self[key]]:
-            del self.inverse[self[key]]
+        value = self[key]
+        self.inverse[value].remove(key)
+        if value in self.inverse and not self.inverse[value]:
+            del self.inverse[value]
         super().__delitem__(key)

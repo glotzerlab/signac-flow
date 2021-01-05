@@ -2072,6 +2072,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Yields
         ------
+        aggregate_id : str
+            Selected aggregate id.
         aggregate : tuple of :class:`~signac.contrib.job.Job`
             Selected aggregate.
         group : :class:`~.FlowGroup`
@@ -2130,20 +2132,22 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     aggregate_id = get_aggregate_id(aggregate)
                     if aggregate_id in aggregate_store:
                         for group in matching_groups:
-                            yield aggregate, group
+                            yield aggregate_id, aggregate, group
             else:
                 # Use all aggregates in the aggregate store
-                for aggregate in aggregate_progress_wrapper(aggregate_store.values()):
+                for aggregate_id, aggregate in aggregate_progress_wrapper(
+                    aggregate_store.items()
+                ):
                     for group in matching_groups:
-                        yield aggregate, group
+                        yield aggregate_id, aggregate, group
 
-    def _get_operations_status(self, jobs, cached_status):
-        """Return a dict with information about job-operations for this aggregate.
+    def _get_aggregate_group_status(self, aggregate, cached_status):
+        """Fetch group status for this aggregate.
 
         Parameters
         ----------
-        jobs : :class:`~signac.contrib.job.Job` or aggregate of jobs
-            The signac job or aggregate.
+        aggregate : tuple of :class:`~signac.contrib.job.Job`
+            Aggregate for which status information is fetched.
         cached_status : dict
             Dictionary of cached status information. The keys are uniquely
             generated ids for each group and job. The values are instances of
@@ -2162,14 +2166,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         single_operation_groups = {self._groups[name] for name in self.operations}
 
-        for aggregate, group in self._generate_selected_aggregate_groups(
-            selected_aggregates=[jobs],
+        for aggregate_id, aggregate, group, in self._generate_selected_aggregate_groups(
+            selected_aggregates=[aggregate],
             selected_groups=single_operation_groups,
         ):
-            completed = group._complete(jobs)
-            eligible = not completed and group._eligible(jobs)
+            completed = group._complete(aggregate)
+            eligible = not completed and group._eligible(aggregate)
             scheduler_status = cached_status.get(
-                group._generate_id(jobs), JobStatus.unknown
+                group._generate_id(aggregate), JobStatus.unknown
             )
             for operation in group.operations:
                 if scheduler_status >= status_dict[operation]["scheduler_status"]:
@@ -2181,22 +2185,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         yield from sorted(status_dict.items())
 
-    def _get_aggregate_status(
-        self, aggregate, aggregate_store, cached_status, ignore_errors=False
-    ):
+    def _get_aggregate_status(self, aggregate, cached_status, ignore_errors=False):
         """Return status information about an aggregate.
 
         Parameters
         ----------
-        aggregate : :class:`~signac.contrib.job.Job`
-            The signac job.
-        aggregate_store :
-            The aggregate store containing this aggregate. This is used to
-            efficiently determine the groups whose status needs to be
-            checked. If an aggregate is contained in more than one aggregate
-            store, this method should be called for each aggregate store and
-            the results should be manually merged. If None, the default
-            aggregate store will be used.
+        aggregate : tuple of :class:`~signac.contrib.job.Job`
+            Aggregate for which status information is fetched.
         cached_status : dict
             Dictionary of cached status information. The keys are uniquely
             generated ids for each group and job. The values are instances of
@@ -2218,7 +2213,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         }
         try:
             result["operations"] = dict(
-                self._get_operations_status(aggregate, cached_status)
+                self._get_aggregate_group_status(aggregate, cached_status)
             )
         except Exception as error:
             logger.debug(
@@ -2302,7 +2297,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             }
             status = {}
             print("Query scheduler...", file=file)
-            for aggregate, group in self._generate_selected_aggregate_groups(
+            for (
+                aggregate_id,
+                aggregate,
+                group,
+            ) in self._generate_selected_aggregate_groups(
                 selected_aggregates=jobs,
                 tqdm_kwargs={
                     "desc": "Fetching scheduler status for jobs/aggregates",
@@ -3426,7 +3425,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 with self._potentially_buffered():
                     operations = []
                     run_groups = set(self._gather_flow_groups(names))
-                    for aggregate, group in self._generate_selected_aggregate_groups(
+                    for (
+                        aggregate_id,
+                        aggregate,
+                        group,
+                    ) in self._generate_selected_aggregate_groups(
                         selected_groups=run_groups,
                     ):
                         operations.extend(
@@ -3571,14 +3574,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         """
         submission_groups = set(self._gather_flow_groups(names))
-        for aggregate, group in self._generate_selected_aggregate_groups(
+        for aggregate_id, aggregate, group, in self._generate_selected_aggregate_groups(
+            selected_aggregates=aggregates,
             selected_groups=submission_groups,
         ):
-            if (
-                group._eligible(aggregate, ignore_conditions)
-                and self._eligible_for_submission(group, aggregate, cached_status)
-                and self._is_selected_aggregate(aggregate, aggregates)
-            ):
+            if group._eligible(
+                aggregate, ignore_conditions
+            ) and self._eligible_for_submission(group, aggregate, cached_status):
                 yield group._create_submission_job_operation(
                     entrypoint=self._entrypoint,
                     default_directives=default_directives,
@@ -4483,7 +4485,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             jobs = _AggregatesCursor(self)
         single_operation_groups = {self._groups[name] for name in self.operations}
 
-        for aggregate, group in self._generate_selected_aggregate_groups(
+        for aggregate_id, aggregate, group, in self._generate_selected_aggregate_groups(
             selected_aggregates=jobs,
             selected_groups=single_operation_groups,
         ):
@@ -4969,11 +4971,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         except KeyError:
             raise KeyError(f"Unknown operation '{args.operation}'.")
 
-        group = self._groups[args.operation]
-        aggregate_store = self._group_to_aggregate_store[group]
-        for aggregate in aggregate_store.values():
-            if self._is_selected_aggregate(aggregate, aggregates):
-                operation_function(*aggregate)
+        for aggregate_id, aggregate, group in self._generate_selected_aggregate_groups(
+            selected_aggregates=aggregates,
+            selected_groups={self._groups[args.operation]},
+        ):
+            operation_function(*aggregate)
 
     def _select_jobs_from_args(self, args):
         """Select jobs with the given command line arguments ('-j/-f/--doc-filter/--job-id')."""

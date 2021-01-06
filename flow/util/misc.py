@@ -253,7 +253,7 @@ def _cached_partial(func, *args, maxsize=None, **kwargs):
     return lru_cache(maxsize=maxsize)(partial(func, *args, **kwargs))
 
 
-class bidict(dict):
+class _bidict(dict):
     r"""A bidirectional dictionary.
 
     The attribute ``inverse`` contains the inverse mapping, where the inverse

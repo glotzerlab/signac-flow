@@ -57,11 +57,11 @@ from .util import config as flow_config
 from .util import template_filters
 from .util.misc import (
     TrackGetItemDict,
+    _bidict,
     _cached_partial,
     _positive_int,
     _to_hashable,
     add_cwd_to_environment_pythonpath,
-    bidict,
     roundrobin,
     switch_to_directory,
 )
@@ -1632,7 +1632,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Register all groups and aggregates with this project instance.
         self._groups = {}
-        self._group_to_aggregator = bidict()
+        self._group_to_aggregator = _bidict()
         self._register_groups()
 
     def _setup_template_environment(self):

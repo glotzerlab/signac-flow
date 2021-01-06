@@ -2250,48 +2250,64 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         result["_labels_error"] = labels_result["_labels_error"]
         return result
 
-    def _fetch_scheduler_status(self, aggregates, file=None, ignore_errors=False):
+    def _fetch_scheduler_status(
+        self,
+        aggregates=None,
+        groups=None,
+        file=None,
+        ignore_errors=False,
+        status_callback=None,
+    ):
         """Update the status docs.
 
         Parameters
         ----------
-        aggregates : sequence of tuples of :class:`~signac.contrib.job.Job`
-            The aggregates whose scheduler status will be updated.
+        selected_aggregates : sequence of tuples of :class:`~signac.contrib.job.Job`
+            The aggregates whose scheduler status will be updated. If None,
+            the default aggregates (all individual jobs) will be used.
+        selected_groups : set of :class:`~.FlowGroup`
+            The groups whose scheduler status will be updated. If None, all
+            groups' status will be updated.
         file : file-like object
             File where status information is printed. If ``None``,
             ``sys.stderr`` is used. The default is ``None``.
         ignore_errors : bool
             Whether to ignore exceptions raised during status check. (Default value = False)
+        status_callback : callable
+            A callback with parameters ``aggregate_id, aggregate, group, scheduler_status``.
 
         """
+        if aggregates is None:
+            aggregates = _AggregatesCursor(self)
         if file is None:
             file = sys.stderr
         try:
             scheduler = self._environment.get_scheduler()
-
-            self.document.setdefault("_status", {})
+            print("Query scheduler...", file=file)
             scheduler_info = {
                 scheduler_job.name(): scheduler_job.status()
                 for scheduler_job in self.scheduler_jobs(scheduler)
             }
             status = {}
-            print("Query scheduler...", file=file)
             for (
                 aggregate_id,
                 aggregate,
                 group,
             ) in self._generate_selected_aggregate_groups(
                 selected_aggregates=aggregates,
+                selected_groups=groups,
                 tqdm_kwargs={
                     "desc": "Fetching scheduler status",
                     "file": file,
                 },
             ):
                 submit_id = group._generate_id(aggregate)
-                status[submit_id] = int(
-                    scheduler_info.get(submit_id, JobStatus.unknown)
-                )
+                scheduler_status = scheduler_info.get(submit_id, JobStatus.unknown)
+                status[submit_id] = int(scheduler_status)
+                if status_callback is not None:
+                    status_callback(aggregate_id, aggregate, group, scheduler_status)
 
+            self.document.setdefault("_status", {})
             self.document["_status"].update(status)
         except NoSchedulerError:
             logger.debug("No scheduler available.")
@@ -2433,9 +2449,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Returns
         -------
-        list
-            A list of dictionaries containing job ids,
-            operations, labels, and any errors caught.
+        status_results : list
+            A list of dictionaries containing keys ``aggregate_id``,
+            ``groups``, and ``_error``.
+        job_labels : list
+            A list of dictionaries containing keys ``job_id``, ``labels``,
+            and ``_labels_error``.
 
         """
         # The argument status_parallelization is used so that _fetch_status method
@@ -2444,21 +2463,59 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # setting self.config['flow']['status_parallelization']='none' if the argument
         # is True. But the later functionality will last the rest of the session but in order
         # to do proper deprecation, it is not required for now.
-
-        # Update the project's status cache
-        self._fetch_scheduler_status(
-            aggregates=aggregates, file=err, ignore_errors=ignore_errors
-        )
-        # Get project status cache
-        cached_status = self._get_cached_status()
-
         if status_parallelization not in ("thread", "process", "none"):
             raise RuntimeError(
                 "Configuration value status_parallelization is invalid. "
                 "Valid choices are 'thread', 'process', or 'none'."
             )
 
+        status_results = []
+
+        def compute_conditions(aggregate_id, aggregate, group, scheduler_status):
+            # Only single-operation groups are supported for status fetching
+            assert len(group.operations) == 1
+
+            status = {}
+            error_text = None
+            try:
+                status["scheduler_status"] = scheduler_status
+                status["completed"] = group._complete(aggregate)
+                status["eligible"] = not status["completed"] and group._eligible(
+                    aggregate
+                )
+            except Exception as error:
+                logger.debug(
+                    "Error while getting operations status for job '%s': '%s'.",
+                    aggregate_id,
+                    error,
+                )
+                if ignore_errors:
+                    error_text = str(error)
+                else:
+                    raise
+            result = {
+                "aggregate_id": aggregate_id,
+                "group_name": group.name,
+                "status": status,
+                "_error": error_text,
+            }
+            status_results.append(result)
+
+        single_operation_groups = {self._groups[name] for name in self.operations}
+        # Update the project's status cache
+        with self._potentially_buffered():
+            self._fetch_scheduler_status(
+                aggregates=aggregates,
+                groups=single_operation_groups,
+                file=err,
+                ignore_errors=ignore_errors,
+                status_callback=compute_conditions,
+            )
+
         """
+        # Get project status cache
+        cached_status = self._get_cached_status()
+
         get_job_labels = functools.partial(
             self._get_job_labels,
             ignore_errors=ignore_errors,
@@ -2580,46 +2637,18 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 )
         """
 
-        status_results = []
-        single_operation_groups = {self._groups[name] for name in self.operations}
         with self._potentially_buffered():
+            """
             for (
                 aggregate_id,
                 aggregate,
                 group,
             ) in self._generate_selected_aggregate_groups(
+                selected_aggregates=aggregates,
                 selected_groups=single_operation_groups,
             ):
-                # Only single-operation groups are supported for status fetching
-                assert len(group.operations) == 1
-
-                status = {}
-                error_text = None
-                try:
-                    status["scheduler_status"] = cached_status.get(
-                        group._generate_id(aggregate), JobStatus.unknown
-                    )
-                    status["completed"] = group._complete(aggregate)
-                    status["eligible"] = not status["completed"] and group._eligible(
-                        aggregate
-                    )
-                except Exception as error:
-                    logger.debug(
-                        "Error while getting operations status for job '%s': '%s'.",
-                        aggregate_id,
-                        error,
-                    )
-                    if ignore_errors:
-                        error_text = str(error)
-                    else:
-                        raise
-                result = {
-                    "aggregate_id": aggregate_id,
-                    "group_name": group.name,
-                    "status": status,
-                    "_error": error_text,
-                }
-                status_results.append(result)
+                pass
+            """
 
             job_labels = [
                 self._get_job_labels(job=job, ignore_errors=ignore_errors)

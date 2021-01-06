@@ -536,21 +536,16 @@ class _SubmissionJobOperation(_JobOperation):
         super().__init__(*args, **kwargs)
 
         if eligible_operations is None:
-            self.eligible_operations = []
-        else:
-            self.eligible_operations = eligible_operations
+            eligible_operations = []
+        self.eligible_operations = eligible_operations
 
         if operations_with_unmet_preconditions is None:
-            self.operations_with_unmet_preconditions = []
-        else:
-            self.operations_with_unmet_preconditions = (
-                operations_with_unmet_preconditions
-            )
+            operations_with_unmet_preconditions = []
+        self.operations_with_unmet_preconditions = operations_with_unmet_preconditions
 
         if operations_with_met_postconditions is None:
-            self.operations_with_met_postconditions = []
-        else:
-            self.operations_with_met_postconditions = operations_with_met_postconditions
+            operations_with_met_postconditions = []
+        self.operations_with_met_postconditions = operations_with_met_postconditions
 
 
 class _FlowCondition:

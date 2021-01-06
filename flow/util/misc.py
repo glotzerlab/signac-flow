@@ -284,7 +284,10 @@ class bidict(dict):
     def __setitem__(self, key, value):
         """Assign a value to the provided key."""
         if key in self:
-            self.inverse[self[key]].remove(key)
+            old_value = self[key]
+            self.inverse[old_value].remove(key)
+            if len(self.inverse[old_value]) == 0:
+                del self.inverse[old_value]
         super().__setitem__(key, value)
         self.inverse.setdefault(value, []).append(key)
 
@@ -292,6 +295,6 @@ class bidict(dict):
         """Delete the provided key."""
         value = self[key]
         self.inverse[value].remove(key)
-        if value in self.inverse and not self.inverse[value]:
+        if len(self.inverse[value]) == 0:
             del self.inverse[value]
         super().__delitem__(key)

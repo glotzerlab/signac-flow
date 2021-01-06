@@ -2984,12 +2984,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 logger.debug("Status update error #%i: '%s'", i + 1, error)
 
         if only_incomplete:
-            # Remove jobs with no eligible operations from the status info
+            # Remove jobs with no eligible groups from the status info
 
             def _incomplete(status_entry):
                 return any(
-                    operation["eligible"]
-                    for operation in status_entry["operations"].values()
+                    group["eligible"] for group in status_entry["groups"].values()
                 )
 
             status_results = list(filter(_incomplete, status_results))
@@ -3119,7 +3118,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 context["operation_status_symbols"] = OPERATION_STATUS_SYMBOLS
 
         def _add_placeholder_operation(job):
-            job["operations"][""] = {
+            job["groups"][""] = {
                 "completed": False,
                 "eligible": False,
                 "scheduler_status": JobStatus.placeholder,

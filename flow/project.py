@@ -2246,18 +2246,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             ignore_errors=ignore_errors,
             cached_status=cached_status,
         )
-        result["labels"] = []
-        result["_labels_error"] = None
-        try:
-            result["labels"] = sorted(set(self.labels(job)))
-        except Exception as error:
-            logger.debug(
-                "Error while determining labels for job '%s': '%s'.", job, error
-            )
-            if ignore_errors:
-                result["_labels_error"] = str(error)
-            else:
-                raise
+        labels_result = self._get_job_labels(job, ignore_errors=ignore_errors)
+        result["labels"] = labels_result["labels"]
+        result["_labels_error"] = labels_result["_labels_error"]
         return result
 
     def _fetch_scheduler_status(self, jobs=None, file=None, ignore_errors=False):

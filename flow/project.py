@@ -2428,8 +2428,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         ignore_errors : bool
             Fetch status even if querying the scheduler fails.
         status_parallelization : str
-            Parallelization mode for fetching the status. By default, thread
-            parallelism is used.
+            Parallelization mode for fetching the status. Allowed values are
+            "thread", "process", or "none." (Default value = "thread")
 
         Returns
         -------

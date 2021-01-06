@@ -2479,9 +2479,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             error_text = None
             try:
                 status["scheduler_status"] = scheduler_status
-                status["completed"] = group._complete(aggregate)
+                completed = group._complete(aggregate)
+                status["completed"] = completed
+                eligible_ignore_conditions = (
+                    IgnoreConditions.NONE if completed else IgnoreConditions.POST
+                )
                 status["eligible"] = not status["completed"] and group._eligible(
-                    aggregate
+                    aggregate, ignore_conditions=eligible_ignore_conditions
                 )
             except Exception as error:
                 logger.debug(

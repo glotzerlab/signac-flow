@@ -2586,7 +2586,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "job_status_details"
             ].items():
                 aggregate = self._get_aggregate_from_id(aggregate_id)
-                if not self._is_selected_aggregate(aggregate, aggregates):
+                if aggregate not in aggregates:
                     continue
                 error = op_result["_operation_error_per_job"].get(aggregate_id, None)
                 for job in aggregate:
@@ -3352,7 +3352,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         reached_execution_limit = Event()
 
         def select(operation):
-            if not self._is_selected_aggregate(operation._jobs, aggregates):
+            if operation._jobs not in aggregates:
                 return False
 
             if num is not None and select.total_execution_count >= num:
@@ -3593,11 +3593,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _verify_group_compatibility(cls, groups):
         """Verify that all selected groups can be submitted together."""
         return all(a.isdisjoint(b) for a in groups for b in groups if a != b)
-
-    @staticmethod
-    def _is_selected_aggregate(aggregate, jobs):
-        """Verify whether the aggregate is present in the provided jobs."""
-        return aggregate in jobs
 
     def _get_aggregate_from_id(self, id):
         # Iterate over all the instances of stored aggregates and search for the

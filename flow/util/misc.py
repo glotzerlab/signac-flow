@@ -264,6 +264,7 @@ class _bidict(MutableMapping):
     A key is associated with exactly one value.
     A value is associated with one or more keys.
     The inverse mapping should not be modified directly.
+    The list of inverse values (keys) must be insertion-ordered.
 
     """
 

@@ -2250,13 +2250,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         result["_labels_error"] = labels_result["_labels_error"]
         return result
 
-    def _fetch_scheduler_status(self, jobs=None, file=None, ignore_errors=False):
+    def _fetch_scheduler_status(self, aggregates, file=None, ignore_errors=False):
         """Update the status docs.
 
         Parameters
         ----------
-        jobs : sequence of :class:`~signac.contrib.job.Job` or aggregates of jobs
-            The signac job or aggregate. (Default value = None)
+        aggregates : sequence of tuples of :class:`~signac.contrib.job.Job`
+            The aggregates whose scheduler status will be updated.
         file : file-like object
             File where status information is printed. If ``None``,
             ``sys.stderr`` is used. The default is ``None``.
@@ -2264,9 +2264,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Whether to ignore exceptions raised during status check. (Default value = False)
 
         """
-        if jobs is None:
-            jobs = _AggregatesCursor(self)
-
         if file is None:
             file = sys.stderr
         try:
@@ -2284,7 +2281,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 aggregate,
                 group,
             ) in self._generate_selected_aggregate_groups(
-                selected_aggregates=jobs,
+                selected_aggregates=aggregates,
                 tqdm_kwargs={
                     "desc": "Fetching scheduler status",
                     "file": file,
@@ -2449,7 +2446,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # to do proper deprecation, it is not required for now.
 
         # Update the project's status cache
-        self._fetch_scheduler_status(aggregates, err, ignore_errors)
+        self._fetch_scheduler_status(
+            aggregates=aggregates, file=err, ignore_errors=ignore_errors
+        )
         # Get project status cache
         cached_status = self._get_cached_status()
 
@@ -5005,7 +5004,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Fetch the scheduler status.
         if not args.test:
-            self._fetch_scheduler_status(aggregates)
+            self._fetch_scheduler_status(aggregates=aggregates)
 
         names = args.operation_name if args.operation_name else None
         self.submit(jobs=aggregates, names=names, **kwargs)

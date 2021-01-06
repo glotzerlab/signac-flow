@@ -2286,7 +2286,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             ) in self._generate_selected_aggregate_groups(
                 selected_aggregates=jobs,
                 tqdm_kwargs={
-                    "desc": "Fetching scheduler status for jobs/aggregates",
+                    "desc": "Fetching scheduler status",
                     "file": file,
                 },
             ):
@@ -2453,6 +2453,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Get project status cache
         cached_status = self._get_cached_status()
 
+        if status_parallelization not in ("thread", "process", "none"):
+            raise RuntimeError(
+                "Configuration value status_parallelization is invalid. "
+                "Valid choices are 'thread', 'process', or 'none'."
+            )
+
+        """
         get_job_labels = functools.partial(
             self._get_job_labels,
             ignore_errors=ignore_errors,
@@ -2572,7 +2579,73 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 group_results = print_status(
                     operation_names, get_group_status, "Collecting operation status"
                 )
+        """
 
+        status_results = []
+        single_operation_groups = {self._groups[name] for name in self.operations}
+        with self._potentially_buffered():
+            for (
+                aggregate_id,
+                aggregate,
+                group,
+            ) in self._generate_selected_aggregate_groups(
+                selected_groups=single_operation_groups,
+            ):
+                # Only single-operation groups are supported for status fetching
+                assert len(group.operations) == 1
+
+                status = {}
+                error_text = None
+                try:
+                    status["scheduler_status"] = cached_status.get(
+                        group._generate_id(aggregate), JobStatus.unknown
+                    )
+                    status["completed"] = group._complete(aggregate)
+                    status["eligible"] = not status["completed"] and group._eligible(
+                        aggregate
+                    )
+                except Exception as error:
+                    logger.debug(
+                        "Error while getting operations status for job '%s': '%s'.",
+                        aggregate_id,
+                        error,
+                    )
+                    if ignore_errors:
+                        error_text = str(error)
+                    else:
+                        raise
+                result = {
+                    "aggregate_id": aggregate_id,
+                    "group_name": group.name,
+                    "status": status,
+                    "_error": error_text,
+                }
+                status_results.append(result)
+
+            job_labels = [
+                self._get_job_labels(job=job, ignore_errors=ignore_errors)
+                for job in distinct_jobs
+            ]
+
+        status_results_combined = []
+        for aggregate_id, aggregate_results in groupby(
+            sorted(status_results, key=lambda result: result["aggregate_id"]),
+            key=lambda result: result["aggregate_id"],
+        ):
+            status_results_combined.append(
+                {
+                    "aggregate_id": aggregate_id,
+                    "groups": {
+                        result["group_name"]: result["status"]
+                        for result in aggregate_results
+                    },
+                    # TODO: fix operations error propagation (bdice is not
+                    # sure what that data is supposed to look like)
+                    "_error": None,
+                }
+            )
+
+        """
         results = []
         index = {}
         for i, job in enumerate(distinct_jobs):
@@ -2604,8 +2677,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             results[index[label_result["job_id"]]]["_labels_error"] = label_result[
                 "_labels_error"
             ]
+        """
 
-        return results
+        return status_results_combined, job_labels
 
     def _fetch_status_in_parallel(
         self, pool, jobs, groups, ignore_errors, cached_status
@@ -2779,7 +2853,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             ]
 
             with prof(single=False):
-                fetched_status = self._fetch_status(
+                status_results, job_labels = self._fetch_status(
                     aggregates,
                     distinct_jobs,
                     err,
@@ -2859,17 +2933,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 )
 
         else:
-            fetched_status = self._fetch_status(
+            status_results, job_labels = self._fetch_status(
                 aggregates, distinct_jobs, err, ignore_errors, status_parallelization
             )
             profiling_results = None
 
-        operations_errors = {
-            status_entry["_operations_error"] for status_entry in fetched_status
-        }
-        labels_errors = {
-            status_entry["_labels_error"] for status_entry in fetched_status
-        }
+        operations_errors = {status_entry["_error"] for status_entry in status_results}
+        labels_errors = {status_entry["_labels_error"] for status_entry in job_labels}
         errors = list(filter(None, operations_errors.union(labels_errors)))
 
         if errors:
@@ -2890,10 +2960,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     for operation in status_entry["operations"].values()
                 )
 
-            fetched_status = list(filter(_incomplete, fetched_status))
+            status_results = list(filter(_incomplete, status_results))
 
         statuses = {
-            status_entry["job_id"]: status_entry for status_entry in fetched_status
+            status_entry["aggregate_id"]: status_entry
+            for status_entry in status_results
         }
 
         # If the dump_json variable is set, just dump all status info
@@ -2905,7 +2976,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if overview:
             # get overview info:
             progress = defaultdict(int)
-            for status in statuses.values():
+            for status in job_labels:
                 for label in status["labels"]:
                     progress[label] += 1
             progress_sorted = list(
@@ -2938,7 +3009,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             # get parameters info
 
             def _add_parameters(status):
-                statepoint = self.open_job(id=status["job_id"]).statepoint()
+                aggregate_id = status["aggregate_id"]
+                if aggregate_id.startswith("agg-"):
+                    # TODO: Fill parameters with empty values (or shared values?)
+                    raise ValueError("Cannot show parameters for aggregates.")
+                statepoint = self.open_job(id=aggregate_id).statepoint()
 
                 def dotted_get(mapping, key):
                     """Fetch a value from a nested mapping using a dotted key."""
@@ -3019,15 +3094,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             }
 
         for job in context["jobs"]:
-            has_eligible_ops = any([v["eligible"] for v in job["operations"].values()])
+            has_eligible_ops = any([v["eligible"] for v in job["groups"].values()])
             if not has_eligible_ops and not context["all_ops"]:
                 _add_placeholder_operation(job)
 
         op_counter = Counter()
         for job in context["jobs"]:
-            for key, value in job["operations"].items():
-                if key != "" and value["eligible"]:
-                    op_counter[key] += 1
+            for group_name, group_status in job["groups"].items():
+                if group_name != "" and group_status["eligible"]:
+                    op_counter[group_name] += 1
         context["op_counter"] = op_counter.most_common(eligible_jobs_max_lines)
         num_omitted_operations = len(op_counter) - len(context["op_counter"])
         if num_omitted_operations > 0:

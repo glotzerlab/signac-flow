@@ -45,7 +45,7 @@
 {% if parameters %}
 {% set para_output = ns.field_parameters | format(*job['parameters'].values()) %}
 {% endif %}
-{% for key, value in job['operations'].items() if value | job_filter(scheduler_status_code, all_ops) %}
+{% for key, value in job['groups'].items() if value | job_filter(scheduler_status_code, all_ops) %}
 {% if loop.first %}
 | {{job['job_id']}} | {{ field_operation | highlight(value['eligible'], pretty) | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }} | {{ para_output }}{{ job['labels'] | join(', ') }} |
 {% else %}

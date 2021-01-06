@@ -1158,35 +1158,32 @@ class FlowGroup:
         else:
             op_string = operation_name
 
+        aggregate_id = get_aggregate_id(jobs)
         full_name = "{}%{}%{}%{}".format(
             project.root_directory(),
-            "-".join([job.get_id() for job in jobs]),
+            aggregate_id,
             op_string,
             index,
         )
         # The job_op_id is a hash computed from the unique full name.
         job_op_id = md5(full_name.encode("utf-8")).hexdigest()
 
-        # The actual job id is then constructed from a readable part and the job_op_id,
-        # ensuring that the job-op is still somewhat identifiable, but guaranteed to
-        # be unique. The readable name is based on the project id, job id, operation name,
-        # and the index number. All names and the id itself are restricted in length
-        # to guarantee that the id does not get too long.
+        # The actual job id is then constructed from a readable part and the
+        # job_op_id, ensuring that the job-op is still somewhat identifiable,
+        # but guaranteed to be unique. The readable name is based on the
+        # project id, aggregate id, operation name, and the index number. All
+        # names and the id itself are restricted in length to guarantee that
+        # the id does not get too long.
         max_len = self.MAX_LEN_ID - len(job_op_id)
         if max_len < len(job_op_id):
             raise ValueError(f"Value for MAX_LEN_ID is too small ({self.MAX_LEN_ID}).")
 
-        if len(jobs) > 1:
-            concat_jobs_str = str(jobs[0])[0:8] + "-" + str(jobs[-1])[0:8]
-        else:
-            concat_jobs_str = str(jobs[0])[0:8]
-
         separator = getattr(project._environment, "JOB_ID_SEPARATOR", "/")
         readable_name = (
-            "{project}{sep}{jobs}{sep}{op_string}{sep}{index:04d}{sep}".format(
+            "{project}{sep}{aggregate_id}{sep}{op_string}{sep}{index:04d}{sep}".format(
                 sep=separator,
                 project=str(project)[:12],
-                jobs=concat_jobs_str,
+                aggregate_id=aggregate_id,
                 op_string=op_string[:12],
                 index=index,
             )[:max_len]

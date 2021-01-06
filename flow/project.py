@@ -2163,7 +2163,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             selected_groups=single_operation_groups,
         ):
             completed = group._complete(aggregate)
-            eligible = not completed and group._eligible(aggregate)
+            eligible_ignore_conditions = (
+                IgnoreConditions.POST if completed else IgnoreConditions.NONE
+            )
+            eligible = not completed and group._eligible(
+                aggregate, ignore_conditions=eligible_ignore_conditions
+            )
             scheduler_status = cached_status.get(
                 group._generate_id(aggregate), JobStatus.unknown
             )
@@ -2347,7 +2352,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 job_op_id = group._generate_id(aggregate)
                 scheduler_status = cached_status.get(job_op_id, JobStatus.unknown)
                 completed = group._complete(aggregate)
-                eligible = not completed and group._eligible(aggregate)
+                eligible_ignore_conditions = (
+                    IgnoreConditions.POST if completed else IgnoreConditions.NONE
+                )
+                eligible = not completed and group._eligible(
+                    aggregate, ignore_conditions=eligible_ignore_conditions
+                )
             except Exception as error:
                 msg = (
                     "Error while getting operation status for aggregate "

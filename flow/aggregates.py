@@ -472,15 +472,15 @@ class _DefaultAggregateStore(Mapping):
 
     def __init__(self, project):
         self._project = project
-        # Below, we store repr(project), which defines the hash of this class.
-        # This class must be hashable because it is used as a dict key.
-        # However, when unpickling a FlowProject, this object's hash must be
-        # computed *before* the FlowProject is fully initialized. Thus, it is
-        # not possible to execute repr(project) when hashing the instance at
-        # the time of unpickling. This means that this class cannot be
-        # unpickled unless we pre-emptively compute and store the repr used to
-        # distinguish this instance's hash.
-        self._hash_repr = hash(repr(project))
+        # Below, we store repr(project), which defines the hash and equality
+        # operators of this class. This class must be hashable because it is
+        # used as a dict key. However, when unpickling a FlowProject, this
+        # object's hash must be computed *before* the FlowProject is fully
+        # initialized. Thus, it is not possible to execute repr(project) when
+        # hashing the instance at the time of unpickling. This means that this
+        # class cannot be unpickled unless we pre-emptively compute and store
+        # the repr.
+        self._project_repr = repr(project)
 
     def __iter__(self):
         yield from self.keys()
@@ -521,10 +521,12 @@ class _DefaultAggregateStore(Mapping):
         return len(self._project)
 
     def __eq__(self, other):
-        return type(self) == type(other) and self._project == other._project
+        if not isinstance(other, type(self)):
+            return NotImplemented
+        return self._project_repr == other._project_repr
 
     def __hash__(self):
-        return self._hash_repr
+        return hash(self._project_repr)
 
     def keys(self):
         for job in self._project:

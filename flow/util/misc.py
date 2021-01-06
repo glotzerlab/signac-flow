@@ -5,6 +5,7 @@
 import argparse
 import logging
 import os
+from collections.abc import MutableMapping
 from contextlib import contextmanager
 from functools import lru_cache, partial
 from itertools import cycle, islice
@@ -251,3 +252,54 @@ def _cached_partial(func, *args, maxsize=None, **kwargs):
 
     """
     return lru_cache(maxsize=maxsize)(partial(func, *args, **kwargs))
+
+
+class _bidict(MutableMapping):
+    r"""A bidirectional dictionary.
+
+    The attribute ``inverse`` contains the inverse mapping, where the inverse
+    values are stored as a :class:`list` of keys with that value.
+
+    Both keys and values must be hashable.
+    A key is associated with exactly one value.
+    A value is associated with one or more keys.
+    The inverse mapping should not be modified directly.
+    The list of inverse values (keys) must be insertion-ordered.
+
+    """
+
+    # Based on: https://stackoverflow.com/a/21894086
+
+    def __init__(self, *args, **kwargs):
+        self._data = dict(*args, **kwargs)
+        self.inverse = {}
+        for key, value in self._data.items():
+            self.inverse.setdefault(value, []).append(key)
+
+    def __getitem__(self, key):
+        """Get a value from the provided key."""
+        return self._data[key]
+
+    def __setitem__(self, key, value):
+        """Assign a value to the provided key."""
+        if key in self._data:
+            old_value = self._data[key]
+            self.inverse[old_value].remove(key)
+            if len(self.inverse[old_value]) == 0:
+                del self.inverse[old_value]
+        self._data[key] = value
+        self.inverse.setdefault(value, []).append(key)
+
+    def __delitem__(self, key):
+        """Delete the provided key."""
+        value = self._data[key]
+        self.inverse[value].remove(key)
+        if len(self.inverse[value]) == 0:
+            del self.inverse[value]
+        del self._data[key]
+
+    def __iter__(self):
+        yield from self._data
+
+    def __len__(self):
+        return len(self._data)

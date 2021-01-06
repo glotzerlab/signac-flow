@@ -5,6 +5,7 @@
 import argparse
 import logging
 import os
+from collections.abc import MutableMapping
 from contextlib import contextmanager
 from functools import lru_cache, partial
 from itertools import cycle, islice
@@ -253,48 +254,51 @@ def _cached_partial(func, *args, maxsize=None, **kwargs):
     return lru_cache(maxsize=maxsize)(partial(func, *args, **kwargs))
 
 
-class _bidict(dict):
+class _bidict(MutableMapping):
     r"""A bidirectional dictionary.
 
     The attribute ``inverse`` contains the inverse mapping, where the inverse
-    values are :class:`set`\ s of keys with that value.
+    values are stored as a :class:`list` of keys with that value.
 
     Both keys and values must be hashable.
     A key is associated with exactly one value.
     A value is associated with one or more keys.
-    Assignment must follow key-value order.
-    Don't modify the inverse mapping directly.
+    The inverse mapping should not be modified directly.
 
     """
 
     # Based on: https://stackoverflow.com/a/21894086
-    def __new__(cls, *args, **kwargs):
-        """Create a bidict instance."""
-        instance = super().__new__(cls, *args, **kwargs)
-        # The inverse dictionary must be created in __new__ so that it exists
-        # during unpickling.
-        instance.inverse = {}
-        return instance
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        for key, value in self.items():
+        self._data = dict(*args, **kwargs)
+        self.inverse = {}
+        for key, value in self._data.items():
             self.inverse.setdefault(value, []).append(key)
+
+    def __getitem__(self, key):
+        """Get a value from the provided key."""
+        return self._data[key]
 
     def __setitem__(self, key, value):
         """Assign a value to the provided key."""
-        if key in self:
-            old_value = self[key]
+        if key in self._data:
+            old_value = self._data[key]
             self.inverse[old_value].remove(key)
             if len(self.inverse[old_value]) == 0:
                 del self.inverse[old_value]
-        super().__setitem__(key, value)
+        self._data[key] = value
         self.inverse.setdefault(value, []).append(key)
 
     def __delitem__(self, key):
         """Delete the provided key."""
-        value = self[key]
+        value = self._data[key]
         self.inverse[value].remove(key)
         if len(self.inverse[value]) == 0:
             del self.inverse[value]
-        super().__delitem__(key)
+        del self._data[key]
+
+    def __iter__(self):
+        yield from self._data
+
+    def __len__(self):
+        return len(self._data)

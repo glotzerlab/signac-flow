@@ -1254,18 +1254,18 @@ class FlowGroup:
                 Runnable operations.
 
             """
-            return list(
-                set(
-                    self._create_run_job_operations(
-                        entrypoint=entrypoint,
-                        default_directives=default_directives,
-                        jobs=jobs,
-                        ignore_conditions=ignore_conditions_on_execution
-                        | additional_ignores_flag,
-                    )
+            ignore_ops = set(ignore_ops)
+            return [
+                op
+                for op in self._create_run_job_operations(
+                    entrypoint=entrypoint,
+                    default_directives=default_directives,
+                    jobs=jobs,
+                    ignore_conditions=ignore_conditions_on_execution
+                    | additional_ignores_flag,
                 )
-                - set(ignore_ops)
-            )
+                if op not in ignore_ops
+            ]
 
         submission_directives = self._get_submission_directives(
             default_directives, jobs
@@ -3460,7 +3460,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             elif order == "random":
                 random.shuffle(operations)
             elif order is None or order in ("none", "by-job"):
-                pass  # by-job is the default order
+                # by-job is the default order
+                pass
             else:
                 raise ValueError(
                     "Invalid value for the 'order' argument, valid arguments are "

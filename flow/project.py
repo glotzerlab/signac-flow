@@ -2256,6 +2256,32 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         result["_labels_error"] = labels_result["_labels_error"]
         return result
 
+    def _query_scheduler(self, file, ignore_errors):
+        """Query the scheduler for job status.
+
+        Parameters
+        ----------
+        file : file-like object
+            File where status information is printed.
+        ignore_errors : bool
+            Whether to ignore exceptions raised during status check.
+
+        """
+        try:
+            scheduler = self._environment.get_scheduler()
+            print("Querying scheduler...", file=file)
+            return {
+                scheduler_job.name(): scheduler_job.status()
+                for scheduler_job in self.scheduler_jobs(scheduler)
+            }
+        except NoSchedulerError:
+            logger.debug("No scheduler available.")
+        except RuntimeError as error:
+            logger.warning("Error occurred while querying scheduler: '%s'.", error)
+            if not ignore_errors:
+                raise
+        return None
+
     def _fetch_scheduler_status(
         self,
         aggregates=None,
@@ -2287,42 +2313,29 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             aggregates = _AggregatesCursor(self)
         if file is None:
             file = sys.stderr
-        try:
-            scheduler = self._environment.get_scheduler()
-            print("Query scheduler...", file=file)
-            scheduler_info = {
-                scheduler_job.name(): scheduler_job.status()
-                for scheduler_job in self.scheduler_jobs(scheduler)
-            }
-            status = {}
-            for (
-                aggregate_id,
-                aggregate,
-                group,
-            ) in self._generate_selected_aggregate_groups(
-                selected_aggregates=aggregates,
-                selected_groups=groups,
-                tqdm_kwargs={
-                    "desc": "Fetching scheduler status",
-                    "file": file,
-                },
-            ):
-                submit_id = group._generate_id(aggregate)
-                scheduler_status = scheduler_info.get(submit_id, JobStatus.unknown)
-                status[submit_id] = int(scheduler_status)
-                if status_callback is not None:
-                    status_callback(aggregate_id, aggregate, group, scheduler_status)
+        scheduler_info = self._query_scheduler(file=file, ignore_errors=ignore_errors)
+        status = {}
+        for (
+            aggregate_id,
+            aggregate,
+            group,
+        ) in self._generate_selected_aggregate_groups(
+            selected_aggregates=aggregates,
+            selected_groups=groups,
+            tqdm_kwargs={
+                "desc": "Fetching scheduler status",
+                "file": file,
+            },
+        ):
+            submit_id = group._generate_id(aggregate)
+            scheduler_status = scheduler_info.get(submit_id, JobStatus.unknown)
+            status[submit_id] = int(scheduler_status)
+            if status_callback is not None:
+                status_callback(aggregate_id, aggregate, group, scheduler_status)
 
-            self.document.setdefault("_status", {})
-            self.document["_status"].update(status)
-        except NoSchedulerError:
-            logger.debug("No scheduler available.")
-        except RuntimeError as error:
-            logger.warning("Error occurred while querying scheduler: '%s'.", error)
-            if not ignore_errors:
-                raise
-        else:
-            logger.info("Updated job status cache.")
+        self.document.setdefault("_status", {})
+        self.document["_status"].update(status)
+        logger.info("Updated job status cache.")
 
     def _get_group_status(self, group_name, cached_status, ignore_errors=False):
         """Return status information about a group.

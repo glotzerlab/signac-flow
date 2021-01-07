@@ -404,23 +404,6 @@ class _JobOperation:
             return self._cmd()
         return self._cmd
 
-    def set_status(self, value):
-        """Store the operation's status."""
-        # Since #324 doesn't include actual aggregation, it is guaranteed that the length
-        # of self._jobs is equal to 1, hence we won't be facing the problem for lost
-        # aggregates. #335 introduces the concept of storing aggregates which will
-        # help retrieve the information of lost aggregates. The storage of aggregates
-        # will be similar to bundles hence no change will be made to this method.
-        # This comment should be removed after #335 gets merged.
-        self._jobs[0]._project.document.setdefault("_status", {})[self.id] = int(value)
-
-    def get_status(self):
-        """Retrieve the operation's last known status."""
-        try:
-            return JobStatus(self._jobs[0]._project.document["_status"][self.id])
-        except KeyError:
-            return JobStatus.unknown
-
 
 @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
 class JobOperation(_JobOperation):
@@ -2035,6 +2018,29 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             return self.document["_status"]()
         except KeyError:
             return {}
+
+    @contextlib.contextmanager
+    def _update_cached_status(self):
+        """Context manager used to update cached project status.
+
+        When entered, this context manager yields an empty dictionary. The
+        keys in this dictionary are unique generated ids for a given group
+        and aggregate, and the value is an instance of :class:`~.JobStatus`.
+        When the context exits, this information is used to update the
+        project document's cached status.
+
+        Yields
+        ------
+        dict
+            Empty dictionary where status information should be stored.
+
+        """
+        status_update = {}
+        try:
+            yield status_update
+        finally:
+            self.document.setdefault("_status", {})
+            self.document["_status"].update(status_update)
 
     def _generate_selected_aggregate_groups(
         self,
@@ -4133,19 +4139,20 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Bundle them up and submit.
         with self._potentially_buffered():
-            for bundle in _make_bundles(operations, bundle_size):
-                status = self._submit_operations(
-                    operations=bundle,
-                    env=env,
-                    parallel=parallel,
-                    force=force,
-                    walltime=walltime,
-                    **kwargs,
-                )
-                if status is not None:
-                    # Operations were submitted, store status
-                    for operation in bundle:
-                        operation.set_status(status)
+            with self._update_cached_status() as status_update:
+                for bundle in _make_bundles(operations, bundle_size):
+                    status = self._submit_operations(
+                        operations=bundle,
+                        env=env,
+                        parallel=parallel,
+                        force=force,
+                        walltime=walltime,
+                        **kwargs,
+                    )
+                    if status is not None:
+                        # Operations were submitted, store status
+                        for operation in bundle:
+                            status_update[operation.id] = status
 
     @classmethod
     def _add_submit_args(cls, parser):

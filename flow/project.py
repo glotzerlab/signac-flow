@@ -2294,10 +2294,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Parameters
         ----------
-        selected_aggregates : sequence of tuples of :class:`~signac.contrib.job.Job`
+        aggregates : sequence of tuples of :class:`~signac.contrib.job.Job`
             The aggregates whose scheduler status will be updated. If None,
             the default aggregates (all individual jobs) will be used.
-        selected_groups : set of :class:`~.FlowGroup`
+        groups : set of :class:`~.FlowGroup`
             The groups whose scheduler status will be updated. If None, all
             groups' status will be updated.
         file : file-like object

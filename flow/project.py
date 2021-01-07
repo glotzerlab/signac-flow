@@ -2090,12 +2090,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             and len(self._group_to_aggregate_store.inverse) > 1
         ):
             # Use only aggregate stores for the selected groups.
-            selected_aggregate_stores = {
+            aggregate_stores_of_selected_groups = {
                 self._group_to_aggregate_store[group] for group in selected_groups
             }
             aggregate_stores = {
                 aggregate_store: self._group_to_aggregate_store.inverse[aggregate_store]
-                for aggregate_store in selected_aggregate_stores
+                for aggregate_store in aggregate_stores_of_selected_groups
             }
         else:
             # Use all aggregate stores.

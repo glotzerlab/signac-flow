@@ -2314,27 +2314,24 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if file is None:
             file = sys.stderr
         scheduler_info = self._query_scheduler(file=file, ignore_errors=ignore_errors)
-        status = {}
-        for (
-            aggregate_id,
-            aggregate,
-            group,
-        ) in self._generate_selected_aggregate_groups(
-            selected_aggregates=aggregates,
-            selected_groups=groups,
-            tqdm_kwargs={
-                "desc": "Fetching scheduler status",
-                "file": file,
-            },
-        ):
-            submit_id = group._generate_id(aggregate)
-            scheduler_status = scheduler_info.get(submit_id, JobStatus.unknown)
-            status[submit_id] = int(scheduler_status)
-            if status_callback is not None:
-                status_callback(aggregate_id, aggregate, group, scheduler_status)
-
-        self.document.setdefault("_status", {})
-        self.document["_status"].update(status)
+        with self._update_cached_status() as status_update:
+            for (
+                aggregate_id,
+                aggregate,
+                group,
+            ) in self._generate_selected_aggregate_groups(
+                selected_aggregates=aggregates,
+                selected_groups=groups,
+                tqdm_kwargs={
+                    "desc": "Fetching scheduler status",
+                    "file": file,
+                },
+            ):
+                submit_id = group._generate_id(aggregate)
+                scheduler_status = scheduler_info.get(submit_id, JobStatus.unknown)
+                status_update[submit_id] = int(scheduler_status)
+                if status_callback is not None:
+                    status_callback(aggregate_id, aggregate, group, scheduler_status)
         logger.info("Updated job status cache.")
 
     def _get_group_status(self, group_name, cached_status, ignore_errors=False):

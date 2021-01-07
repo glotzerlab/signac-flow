@@ -2523,14 +2523,25 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         single_operation_groups = {self._groups[name] for name in self.operations}
         # Update the project's status cache
+        scheduler_info = self._query_scheduler(file=err, ignore_errors=ignore_errors)
         with self._potentially_buffered():
-            self._fetch_scheduler_status(
-                aggregates=aggregates,
-                groups=single_operation_groups,
-                file=err,
-                ignore_errors=ignore_errors,
-                status_callback=compute_conditions,
-            )
+            with self._update_cached_status() as status_update:
+                for (
+                    aggregate_id,
+                    aggregate,
+                    group,
+                ) in self._generate_selected_aggregate_groups(
+                    selected_aggregates=aggregates,
+                    selected_groups=single_operation_groups,
+                    tqdm_kwargs={
+                        "desc": "Fetching scheduler status",
+                        "file": err,
+                    },
+                ):
+                    submit_id = group._generate_id(aggregate)
+                    scheduler_status = scheduler_info.get(submit_id, JobStatus.unknown)
+                    status_update[submit_id] = int(scheduler_status)
+                    compute_conditions(aggregate_id, aggregate, group, scheduler_status)
 
         """
         # Get project status cache

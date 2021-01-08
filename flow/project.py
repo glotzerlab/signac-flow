@@ -2115,11 +2115,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 matching_groups = [
                     group for group in aggregate_groups if group in selected_groups
                 ]
+                if len(matching_groups) == 0:
+                    # Skip aggregate store if no groups are selected
+                    continue
             else:
                 matching_groups = aggregate_groups
-            if len(matching_groups) == 0:
-                # Skip aggregate store if no groups are selected
-                continue
             if selected_aggregates is not None:
                 # Use selected aggregates in the aggregate store
                 for aggregate in aggregate_progress_wrapper(selected_aggregates):

@@ -338,8 +338,8 @@ class _JobOperation:
         A `dict` object of additional parameters that provide instructions on
         how to execute this operation, e.g., specifically required resources.
     user_directives : set
-        User specified directives that were not part of the environment's
-        standard directives.
+        Keys in ``directives`` that correspond to user-specified directives
+        that are not part of the environment's standard directives.
     """
 
     def __init__(self, id, name, jobs, cmd, directives, user_directives):

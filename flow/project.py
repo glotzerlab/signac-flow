@@ -2345,6 +2345,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 raise
         return {}
 
+    # TODO: This can be removed in this PR!
     def _fetch_scheduler_status(
         self,
         aggregates=None,
@@ -2377,7 +2378,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if file is None:
             file = sys.stderr
         scheduler_info = self._query_scheduler_status(
-            file=file, ignore_errors=ignore_errors
+            err=file, ignore_errors=ignore_errors
         )
         for (
             scheduler_id,
@@ -2398,6 +2399,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 status_callback(aggregate_id, aggregate, group, scheduler_status)
         logger.info("Updated job status cache.")
 
+    # TODO: This can be removed in this PR! Need to add parallel behavior first.
     def _get_group_status(self, group_name, cached_status, ignore_errors=False):
         """Return status information about a group.
 

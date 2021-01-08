@@ -3425,6 +3425,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         aggregate,
                         group,
                     ) in self._generate_selected_aggregate_groups(
+                        selected_aggregates=aggregates,
                         selected_groups=run_groups,
                     ):
                         operations.extend(

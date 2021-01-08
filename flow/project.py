@@ -2158,6 +2158,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         starting_dict = functools.partial(dict, scheduler_status=JobStatus.unknown)
         status_dict = defaultdict(starting_dict)
 
+        # TODO: Add support for groups that are not single operations.
         single_operation_groups = {self._groups[name] for name in self.operations}
 
         for aggregate_id, aggregate, group, in self._generate_selected_aggregate_groups(

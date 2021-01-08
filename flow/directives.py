@@ -132,6 +132,7 @@ class _Directives(MutableMapping):
         self._directive_definitions = {}
         self._defined_directives = {}
         self._user_directives = {}
+        self._evaluated = False
 
         for directive in environment_directives:
             self._add_directive(directive)
@@ -165,6 +166,7 @@ class _Directives(MutableMapping):
             self._set_defined_directive(key, value)
         else:
             self._user_directives[key] = value
+        self._evaluated = False
 
     def __delitem__(self, key):
         if key in self._directive_definitions:
@@ -219,8 +221,10 @@ class _Directives(MutableMapping):
             The jobs used to evaluate directives.
 
         """
-        for key, value in self.items():
-            self[key] = _evaluate(value, jobs)
+        if not self._evaluated:
+            for key, value in self.items():
+                self[key] = _evaluate(value, jobs)
+            self._evaluated = True
 
     def _aggregate(self, other, jobs=None, parallel=False):
         self.evaluate(jobs)

@@ -352,8 +352,14 @@ class _JobOperation:
 
         # We use a special dictionary that tracks all keys that have been
         # evaluated by the template engine and compare them to those explicitly
-        # set by the user. See also comment above.
+        # set by the user. See also comment below.
         self.directives = TrackGetItemDict(directives)
+
+        # Keys which were explicitly set by the user, but are not evaluated by
+        # the template engine are cause for concern and might hint at a bug in
+        # the template script or ill-defined directives. We are therefore
+        # keeping track of all keys set by the user and check whether they have
+        # been evaluated by the template script engine later.
         self.directives._keys_set_by_user = user_directives
 
     def __str__(self):

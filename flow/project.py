@@ -333,14 +333,15 @@ class _JobOperation:
     cmd : callable or str
         The command that executes this operation. Can be a callable that when
         evaluated returns a string.
-    directives : :class:`flow.directives._Directives`
-        A :class:`flow.directives._Directives` object of additional parameters
-        that provide instructions on how to execute this operation, e.g.,
-        specifically required resources.
-
+    directives : dict
+        A `dict` object of additional parameters that provide instructions on
+        how to execute this operation, e.g., specifically required resources.
+    user_directives : set
+        Keys in ``directives`` that correspond to user-specified directives
+        that are not part of the environment's standard directives.
     """
 
-    def __init__(self, id, name, jobs, cmd, directives=None):
+    def __init__(self, id, name, jobs, cmd, directives, user_directives):
         self._id = id
         self.name = name
         self._jobs = jobs
@@ -348,18 +349,17 @@ class _JobOperation:
             raise ValueError("cmd must be a callable or string.")
         self._cmd = cmd
 
-        # Keys which were explicitly set by the user, but are not evaluated by the
-        # template engine are cause for concern and might hint at a bug in the template
-        # script or ill-defined directives. We are therefore keeping track of all
-        # keys set by the user and check whether they have been evaluated by the template
-        # script engine later.
-        keys_set_by_user = set(directives._user_directives)
-
         # We use a special dictionary that tracks all keys that have been
         # evaluated by the template engine and compare them to those explicitly
-        # set by the user. See also comment above.
+        # set by the user. See also comment below.
         self.directives = TrackGetItemDict(directives)
-        self.directives._keys_set_by_user = keys_set_by_user
+
+        # Keys which were explicitly set by the user, but are not evaluated by
+        # the template engine are cause for concern and might hint at a bug in
+        # the template script or ill-defined directives. We are therefore
+        # keeping track of all keys set by the user and check whether they have
+        # been evaluated by the template script engine later.
+        self.directives._keys_set_by_user = user_directives
 
     def __str__(self):
         assert len(self._jobs) > 0
@@ -1283,7 +1283,8 @@ class FlowGroup:
             self.name,
             jobs,
             cmd=unevaluated_cmd,
-            directives=submission_directives,
+            directives=dict(submission_directives),
+            user_directives=set(submission_directives.user_keys),
             eligible_operations=eligible_operations,
             operations_with_unmet_preconditions=operations_with_unmet_preconditions,
             operations_with_met_postconditions=operations_with_met_postconditions,
@@ -1350,7 +1351,8 @@ class FlowGroup:
                     operation_name,
                     jobs,
                     cmd=unevaluated_cmd,
-                    directives=deepcopy(directives),
+                    directives=dict(directives),
+                    user_directives=set(directives.user_keys),
                 )
                 # Get the prefix, and if it's non-empty, set the fork directive
                 # to True since we must launch a separate process. Override
@@ -3169,9 +3171,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _job_operation_from_tuple(self, data):
         id, name, job_ids, cmd, directives = data
         jobs = tuple(self.open_job(id=job_id) for job_id in job_ids)
-        all_directives = jobs[0]._project._environment._get_default_directives()
-        all_directives.update(directives)
-        return _JobOperation(id, name, jobs, cmd, all_directives)
+        return _JobOperation(
+            id, name, jobs, cmd, directives, directives._keys_set_by_user
+        )
 
     def _run_operations_in_parallel(self, pool, operations, progress, timeout):
         """Execute operations in parallel.

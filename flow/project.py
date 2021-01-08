@@ -3610,7 +3610,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _get_aggregate_from_id(self, id):
         # Iterate over all the instances of stored aggregates and search for the
         # aggregate id in those instances.
-        # aggregate in those instances.
         for aggregate_store in self._group_to_aggregate_store.inverse:
             try:
                 # Assume the id exists and skip the __contains__ check for

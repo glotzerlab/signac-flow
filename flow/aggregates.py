@@ -566,6 +566,6 @@ def get_aggregate_id(aggregate):
     if len(aggregate) == 1:
         return aggregate[0].get_id()  # Return job id as it's already unique
 
-    blob = ",".join(job.get_id() for job in aggregate)
-    hash_ = md5(blob.encode("utf-8")).hexdigest()
+    id_string = ",".join(job.get_id() for job in aggregate)
+    hash_ = md5(id_string.encode("utf-8")).hexdigest()
     return f"agg-{hash_}"

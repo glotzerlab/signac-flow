@@ -1294,7 +1294,7 @@ class FlowGroup:
             self.name,
             jobs,
             cmd=unevaluated_cmd,
-            directives={**submission_directives},
+            directives=dict(submission_directives),
             user_directives=set(submission_directives.user_keys),
             eligible_operations=eligible_operations,
             operations_with_unmet_preconditions=operations_with_unmet_preconditions,
@@ -1362,7 +1362,7 @@ class FlowGroup:
                     operation_name,
                     jobs,
                     cmd=unevaluated_cmd,
-                    directives={**directives},
+                    directives=dict(directives),
                     user_directives=set(directives.user_keys),
                 )
                 # Get the prefix, and if it's non-empty, set the fork directive

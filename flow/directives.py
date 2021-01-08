@@ -234,6 +234,11 @@ class _Directives(MutableMapping):
             if other_directive is not None:
                 self._defined_directives[name] = agg_func(directive, other_directive)
 
+    @property
+    def user_keys(self):  # noqa: D401
+        """A generator of user specified keys."""
+        return (key for key in self._user_directives)
+
 
 def _evaluate(value, jobs):
     if callable(value):

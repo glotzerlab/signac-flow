@@ -3522,6 +3522,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             help="Execute all operations in a single bundle in parallel.",
         )
 
+    @deprecated(deprecated_in="0.12", removed_in="0.14", current_version=__version__)
     def export_job_statuses(self, collection, statuses):
         "Export the job statuses to a database collection."
         for status in statuses:

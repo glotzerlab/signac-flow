@@ -770,13 +770,17 @@ class TestExecutionProject(TestProjectBase):
 
     def test_pending_operations_order(self):
         # The execution order of local runs is internally assumed to be
-        # 'by-op' by default.
+        # "by-job" by default. A failure of this unit test means that a
+        # "by-job" order must be implemented explicitly within the
+        # FlowProject.run() function.
         project = self.mock_project()
         ops = list(project._get_pending_operations())
-        # The length of the list of job-operations grouped by operation is equal
+        # The length of the list of operations grouped by job is equal
         # to the length of its set if and only if the job-operations are grouped
-        # by operations already:
-        jobs_order_none = [name for name, _ in groupby(ops, key=lambda op: op.name)]
+        # by job already.
+        jobs_order_none = [
+            job.get_id() for job, _ in groupby(ops, key=lambda op: op._jobs[0])
+        ]
         assert len(jobs_order_none) == len(set(jobs_order_none))
 
     def test_run_invalid_order(self):
@@ -1348,7 +1352,7 @@ class TestGroupProject(TestProjectBase):
                 [job_op.directives.get("omp_num_threads", 0) == 1 for job_op in job_ops]
             )
 
-    def test_submission_aggregation(self):
+    def test_submission_combine_directives(self):
         class A(flow.FlowProject):
             pass
 

@@ -22,6 +22,7 @@ Changed
 
 - Command line interface for ``exec`` changed parameter name from ``jobid`` to ``job_id`` (#363).
 - Default environment for the University of Minnesota Mangi cluster changed from SLURM to Torque (#393).
+- Deprecated method ``export_job_statuses`` (#402).
 
 Fixed
 +++++

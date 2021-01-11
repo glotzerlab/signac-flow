@@ -2166,11 +2166,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             selected_groups=single_operation_groups,
         ):
             completed = group._complete(aggregate)
-            eligible_ignore_conditions = (
-                IgnoreConditions.POST if completed else IgnoreConditions.NONE
-            )
+            # If the group is not completed, it is sufficient to determine
+            # eligibility while ignoring postconditions (we know at least
+            # one postcondition is not met).
             eligible = not completed and group._eligible(
-                aggregate, ignore_conditions=eligible_ignore_conditions
+                aggregate, ignore_conditions=IgnoreConditions.POST
             )
             scheduler_status = cached_status.get(
                 group._generate_id(aggregate), JobStatus.unknown
@@ -2355,11 +2355,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 job_op_id = group._generate_id(aggregate)
                 scheduler_status = cached_status.get(job_op_id, JobStatus.unknown)
                 completed = group._complete(aggregate)
-                eligible_ignore_conditions = (
-                    IgnoreConditions.POST if completed else IgnoreConditions.NONE
-                )
+                # If the group is not completed, it is sufficient to determine
+                # eligibility while ignoring postconditions (we know at least
+                # one postcondition is not met).
                 eligible = not completed and group._eligible(
-                    aggregate, ignore_conditions=eligible_ignore_conditions
+                    aggregate, ignore_conditions=IgnoreConditions.POST
                 )
             except Exception as error:
                 msg = (

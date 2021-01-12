@@ -8,9 +8,10 @@ import os
 from collections.abc import MutableMapping
 from contextlib import contextmanager
 from functools import lru_cache, partial
-from itertools import cycle, islice
+from itertools import cycle, islice, repeat
 
-from tqdm.contrib.concurrent import process_map, thread_map
+import cloudpickle
+from tqdm.contrib.concurrent import process_map, thread_map  # noqa: F401
 
 
 def _positive_int(value):
@@ -320,7 +321,28 @@ def _get_parallel_executor(parallelization="thread"):
     if parallelization == "thread":
         parallel_executor = thread_map
     elif parallelization == "process":
-        parallel_executor = process_map
+        print(
+            "Process parallelism currently does not work. This will execute in serial."
+        )
+
+        def parallel_executor(fn, *iterables, **kwargs):
+            pickled_iterables = [repeat(cloudpickle.loads)]
+            pickled_iterables.extend(
+                [map(cloudpickle.dumps, iterable) for iterable in iterables]
+            )
+
+            def unpickled_fn(loads, *pickled_args):
+                unpickled_args = [loads(arg) for arg in pickled_args]
+                print(unpickled_args)
+                return fn(*unpickled_args)
+
+            # return process_map(
+            #     unpickled_fn,
+            #     *pickled_iterables,
+            #     **kwargs,
+            # )
+            return list(map(unpickled_fn, *pickled_iterables))
+
     else:
 
         def parallel_executor(fn, *iterables, **kwargs):

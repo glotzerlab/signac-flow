@@ -2553,7 +2553,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "Valid choices are 'thread', 'process', or 'none'."
             )
 
-        parallel_executor = _get_parallel_executor(status_parallelization)  # noqa: F841
+        parallel_executor = _get_parallel_executor(status_parallelization)
 
         status_results = []
         single_operation_groups = {self._groups[name] for name in self.operations}
@@ -2561,54 +2561,57 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         scheduler_info = self._query_scheduler_status(
             err=err, ignore_errors=ignore_errors
         )
-        with self._potentially_buffered():
-            for (
-                scheduler_id,
-                scheduler_status,
-                aggregate_id,
-                aggregate,
-                group,
-            ) in self._generate_selected_aggregate_groups_with_status(
-                scheduler_info=scheduler_info,
-                selected_aggregates=aggregates,
-                selected_groups=single_operation_groups,
-                tqdm_kwargs={
-                    "desc": "Fetching scheduler status",
-                    "file": err,
-                },
-            ):
-                # Only single-operation groups are supported for status fetching
-                assert len(group.operations) == 1
 
-                status = {}
-                error_text = None
-                try:
-                    status["scheduler_status"] = scheduler_status
-                    completed = group._complete(aggregate)
-                    status["completed"] = completed
-                    # If the group is not completed, it is sufficient to determine
-                    # eligibility while ignoring postconditions (we know at least
-                    # one postcondition is not met).
-                    status["eligible"] = not completed and group._eligible(
-                        aggregate, ignore_conditions=IgnoreConditions.POST
-                    )
-                except Exception as error:
-                    logger.debug(
-                        "Error while getting operations status for job '%s': '%s'.",
-                        aggregate_id,
-                        error,
-                    )
-                    if ignore_errors:
-                        error_text = str(error)
-                    else:
-                        raise
-                result = {
-                    "aggregate_id": aggregate_id,
-                    "group_name": group.name,
-                    "status": status,
-                    "_error": error_text,
-                }
-                status_results.append(result)
+        def compute_status(data):
+            scheduler_id, scheduler_status, aggregate_id, aggregate, group = data
+            # Only single-operation groups are supported for status fetching
+            assert len(group.operations) == 1
+
+            status = {}
+            error_text = None
+            try:
+                status["scheduler_status"] = scheduler_status
+                completed = group._complete(aggregate)
+                status["completed"] = completed
+                # If the group is not completed, it is sufficient to determine
+                # eligibility while ignoring postconditions (we know at least
+                # one postcondition is not met).
+                status["eligible"] = not completed and group._eligible(
+                    aggregate, ignore_conditions=IgnoreConditions.POST
+                )
+            except Exception as error:
+                logger.debug(
+                    "Error while getting operations status for job '%s': '%s'.",
+                    aggregate_id,
+                    error,
+                )
+                if ignore_errors:
+                    error_text = str(error)
+                else:
+                    raise
+            result = {
+                "aggregate_id": aggregate_id,
+                "group_name": group.name,
+                "status": status,
+                "_error": error_text,
+            }
+            return result
+
+        with self._potentially_buffered():
+            aggregate_group_generator = (
+                self._generate_selected_aggregate_groups_with_status(
+                    scheduler_info=scheduler_info,
+                    selected_aggregates=aggregates,
+                    selected_groups=single_operation_groups,
+                    tqdm_kwargs={
+                        "desc": "Fetching scheduler status",
+                        "file": err,
+                    },
+                )
+            )
+            status_results = parallel_executor(
+                compute_status, aggregate_group_generator, total=None
+            )
 
         with self._potentially_buffered():
             job_labels = [

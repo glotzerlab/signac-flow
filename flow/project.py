@@ -2347,128 +2347,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 raise
         return {}
 
-    # TODO: This can be removed in this PR!
-    def _fetch_scheduler_status(
-        self,
-        aggregates=None,
-        groups=None,
-        file=None,
-        ignore_errors=False,
-    ):
-        """Update the status docs.
-
-        Parameters
-        ----------
-        aggregates : sequence of tuples of :class:`~signac.contrib.job.Job`
-            The aggregates whose scheduler status will be updated. If None,
-            the default aggregates (all individual jobs) will be used.
-        groups : set of :class:`~.FlowGroup`
-            The groups whose scheduler status will be updated. If None, all
-            groups' status will be updated.
-        file : file-like object
-            File where status information is printed. If ``None``,
-            ``sys.stderr`` is used. The default is ``None``.
-        ignore_errors : bool
-            Whether to ignore exceptions raised during status check. (Default value = False)
-
-        """
-        if aggregates is None:
-            aggregates = _AggregatesCursor(self)
-        if file is None:
-            file = sys.stderr
-        scheduler_info = self._query_scheduler_status(
-            err=file, ignore_errors=ignore_errors
-        )
-        for (
-            scheduler_id,
-            scheduler_status,
-            aggregate_id,
-            aggregate,
-            group,
-        ) in self._generate_selected_aggregate_groups_with_status(
-            scheduler_info=scheduler_info,
-            selected_aggregates=aggregates,
-            selected_groups=groups,
-            tqdm_kwargs={
-                "desc": "Fetching scheduler status",
-                "file": file,
-            },
-        ):
-            # Iterating over groups/aggregates will update the status cache
-            pass
-        logger.info("Updated job status cache.")
-
-    # TODO: This can be removed in this PR! Need to add parallel behavior first.
-    def _get_group_status(self, group_name, cached_status, ignore_errors=False):
-        """Return status information about a group.
-
-        Status information is fetched for all jobs/aggregates associated with
-        this group and returned as a dict.
-
-        Parameters
-        ----------
-        group_name : str
-            Group name.
-        cached_status : dict
-            Dictionary of cached status information. The keys are uniquely
-            generated ids for each group and job. The values are instances of
-            :class:`~.JobStatus`.
-        ignore_errors : bool
-            Whether to ignore exceptions raised during status check. (Default value = False)
-
-        Returns
-        -------
-        dict
-            A dictionary containing job status for all jobs.
-
-        """
-        group = self._groups[group_name]
-        status_dict = {}
-        errors = {}
-        aggregate_store = self._group_to_aggregate_store[group]
-        for aggregate_id, aggregate in tqdm(
-            aggregate_store.items(),
-            desc=f"Collecting aggregate status info for operation {group.name}",
-            total=len(aggregate_store),
-            leave=False,
-        ):
-            errors.setdefault(aggregate_id, "")
-            scheduler_status = JobStatus.unknown
-            completed = False
-            eligible = False
-            try:
-                job_op_id = group._generate_id(aggregate)
-                scheduler_status = cached_status.get(job_op_id, JobStatus.unknown)
-                completed = group._complete(aggregate)
-                # If the group is not completed, it is sufficient to determine
-                # eligibility while ignoring postconditions (we know at least
-                # one postcondition is not met).
-                eligible = not completed and group._eligible(
-                    aggregate, ignore_conditions=IgnoreConditions.POST
-                )
-            except Exception as error:
-                msg = (
-                    "Error while getting operation status for aggregate "
-                    f"'{aggregate_id}': '{error}'."
-                )
-                logger.debug(msg)
-                if ignore_errors:
-                    errors[aggregate_id] += str(error) + "\n"
-                else:
-                    raise
-            finally:
-                status_dict[aggregate_id] = {
-                    "scheduler_status": scheduler_status,
-                    "eligible": eligible,
-                    "completed": completed,
-                }
-
-        return {
-            "operation_name": group_name,
-            "job_status_details": status_dict,
-            "_operation_error_per_job": errors,
-        }
-
     def _get_job_labels(self, job, ignore_errors=False):
         """Return a dict with information about the labels of a job.
 
@@ -2637,40 +2515,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             )
 
         return status_results_combined, job_labels
-
-    def _fetch_status_in_parallel(
-        self, pool, jobs, groups, ignore_errors, cached_status
-    ):
-        try:
-            serialized_project = cloudpickle.dumps(self)
-            serialized_tasks_labels = [
-                (
-                    cloudpickle.loads,
-                    serialized_project,
-                    job.get_id(),
-                    ignore_errors,
-                    "fetch_labels",
-                )
-                for job in jobs
-            ]
-            serialized_tasks_groups = [
-                (
-                    cloudpickle.loads,
-                    serialized_project,
-                    group,
-                    ignore_errors,
-                    cached_status,
-                    "fetch_status",
-                )
-                for group in groups
-            ]
-        except Exception as error:  # Masking all errors since they must be pickling related.
-            raise self._PickleError(error)
-
-        label_results = pool.starmap(_serializer, serialized_tasks_labels)
-        group_results = pool.starmap(_serializer, serialized_tasks_groups)
-
-        return label_results, group_results
 
     PRINT_STATUS_ALL_VARYING_PARAMETERS = True
     """This constant can be used to signal that the print_status() method is supposed
@@ -3215,7 +3059,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     cloudpickle.loads,
                     serialized_project,
                     self._job_operation_to_tuple(operation),
-                    "run_operations",
                 )
                 for operation in tqdm(
                     operations, desc="Serialize tasks", file=sys.stderr
@@ -3224,7 +3067,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         except Exception as error:  # Masking all errors since they must be pickling related.
             raise self._PickleError(error)
 
-        results = [pool.apply_async(_serializer, task) for task in serialized_tasks]
+        results = [
+            pool.apply_async(_deserialize_and_run_operation, task)
+            for task in serialized_tasks
+        ]
         for result in tqdm(results) if progress else results:
             result.get(timeout=timeout)
 
@@ -5370,20 +5216,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             _show_traceback_and_exit(error)
 
 
-def _serializer(loads, project, *args):
+def _deserialize_and_run_operation(loads, project, operation_data):
     project = loads(project)
-    if args[-1] == "run_operations":
-        operation_data = args[0]
-        project._execute_operation(project._job_operation_from_tuple(operation_data))
-    elif args[-1] == "fetch_labels":
-        job = project.open_job(id=args[0])
-        ignore_errors = args[1]
-        return project._get_job_labels(job, ignore_errors=ignore_errors)
-    elif args[-1] == "fetch_status":
-        group = args[0]
-        ignore_errors = args[1]
-        cached_status = args[2]
-        return project._get_group_status(group, ignore_errors, cached_status)
+    project._execute_operation(project._job_operation_from_tuple(operation_data))
     return None
 
 

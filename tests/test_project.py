@@ -1007,7 +1007,6 @@ class TestExecutionProject(TestProjectBase):
             project.submit(bundle_size=2, num=4)
             assert len(list(MockScheduler.jobs())) == 3
             MockScheduler.reset()
-            project._fetch_scheduler_status(file=StringIO())
             project.submit(bundle_size=0)
             assert len(list(MockScheduler.jobs())) == 1
 
@@ -1034,17 +1033,16 @@ class TestExecutionProject(TestProjectBase):
 
         MockScheduler.step()
         MockScheduler.step()
-        project._fetch_scheduler_status(file=StringIO())
 
-        cached_status = project._get_cached_scheduler_status()
+        scheduler_info = project._query_scheduler_status(err=StringIO())
         for job in project:
             next_op = list(project._next_operations([(job,)]))[0]
-            assert cached_status[next_op.id] == JobStatus.queued
+            assert scheduler_info[next_op.id] == JobStatus.queued
 
         MockScheduler.step()
-        project._fetch_scheduler_status(file=StringIO())
+        scheduler_info = project._query_scheduler_status(err=StringIO())
         for job in project:
-            job_status = project.get_job_status(job)
+            job_status = project.get_job_status(job, cached_status=scheduler_info)
             for op in ("op1", "op2"):
                 assert job_status["operations"][op]["scheduler_status"] in (
                     JobStatus.unknown,

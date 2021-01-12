@@ -2582,11 +2582,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     status["scheduler_status"] = scheduler_status
                     completed = group._complete(aggregate)
                     status["completed"] = completed
-                    eligible_ignore_conditions = (
-                        IgnoreConditions.NONE if completed else IgnoreConditions.POST
-                    )
-                    status["eligible"] = not status["completed"] and group._eligible(
-                        aggregate, ignore_conditions=eligible_ignore_conditions
+                    # If the group is not completed, it is sufficient to determine
+                    # eligibility while ignoring postconditions (we know at least
+                    # one postcondition is not met).
+                    status["eligible"] = not completed and group._eligible(
+                        aggregate, ignore_conditions=IgnoreConditions.POST
                     )
                 except Exception as error:
                     logger.debug(

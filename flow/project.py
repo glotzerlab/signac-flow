@@ -2354,7 +2354,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         groups=None,
         file=None,
         ignore_errors=False,
-        status_callback=None,
     ):
         """Update the status docs.
 
@@ -2371,8 +2370,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             ``sys.stderr`` is used. The default is ``None``.
         ignore_errors : bool
             Whether to ignore exceptions raised during status check. (Default value = False)
-        status_callback : callable
-            A callback with parameters ``aggregate_id, aggregate, group, scheduler_status``.
 
         """
         if aggregates is None:
@@ -2397,8 +2394,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "file": file,
             },
         ):
-            if status_callback is not None:
-                status_callback(aggregate_id, aggregate, group, scheduler_status)
+            # Iterating over groups/aggregates will update the status cache
+            pass
         logger.info("Updated job status cache.")
 
     # TODO: This can be removed in this PR! Need to add parallel behavior first.

@@ -139,6 +139,11 @@ class TestAggregate(AggregateProjectSetup):
         # and then compared. Since sets don't carry duplicate values, we test
         # whether the length of the set obtained from the list is equal to 14 or not.
         assert len(set(list_of_aggregates)) == 14
+        # Ensure that equality implies hash equality.
+        for agg1 in list_of_aggregates:
+            for agg2 in list_of_aggregates:
+                if agg1 == agg2:
+                    assert hash(agg1) == hash(agg2)
 
 
 # Test the _AggregatesStore and _DefaultAggregateStore classes
@@ -182,13 +187,12 @@ class TestAggregateStoring(AggregateProjectSetup):
 
     def test_groups_of_valid_num(self, setUp, project):
         valid_values = [1, 2, 3, 6, 10]
-        # Expected length of aggregates which are made using the
-        # above valid values
+        # Expected length of aggregates which are made using the above values.
         expected_length_of_aggregates = [10, 5, 4, 2, 1]
-        # Expect length of each aggregate which are made using the
-        # above valid values. The zeroth index of the nested list denotes the
-        # length of all the aggregates expect the last one. The first index denotes
-        # to the length of the last aggregate formed.
+        # Expect length of each aggregate which are made using the above
+        # values. The zeroth index of the nested list denotes the length of all
+        # the aggregates expect the last one. The first index denotes the
+        # length of the last aggregate formed.
         expected_length_per_aggregate = [[1, 1], [2, 2], [3, 1], [6, 4], [10, 10]]
         for i, valid_value in enumerate(valid_values):
             aggregate_instance = aggregator.groupsof(valid_value)
@@ -291,7 +295,7 @@ class TestAggregateStoring(AggregateProjectSetup):
         # we need to be sure that the aggregates are hashing and compared correctly.
         # This test ensures this feature.
         def _create_storing(aggregator):
-            return aggregator._create_AggregatesStore(project)
+            return aggregator._create_AggregateStore(project)
 
         list_of_storing = list(map(_create_storing, list_of_aggregates))
         # The above list contains 14 distinct storing objects (because a storing
@@ -303,7 +307,7 @@ class TestAggregateStoring(AggregateProjectSetup):
 
     def test_get_by_id(self, setUp, project, list_of_aggregates):
         def _create_storing(aggregator):
-            return aggregator._create_AggregatesStore(project)
+            return aggregator._create_AggregateStore(project)
 
         # The below set contains the default as well as manu non-default
         # objects which stores aggregates.

@@ -166,18 +166,20 @@ class aggregator:
         except TypeError:
             raise TypeError("The num parameter should be an integer")
 
-        # This method is similar to the `grouper` method which can be found in the link below
+        # This method is similar to the `grouper` method documented here:
         # https://docs.python.org/3/library/itertools.html#itertools.zip_longest
+        # However, this function does not have a fill value.
+        # Source of this implementation: https://stackoverflow.com/a/31185097
         def aggregator_function(jobs):
-            args = [iter(jobs)] * num
-            return itertools.zip_longest(*args)
+            iterable = iter(jobs)
+            return iter(lambda: list(itertools.islice(iterable, num)), [])
 
-        aggregator_obj = cls(aggregator_function, sort_by, sort_ascending, select)
+        aggregator_instance = cls(aggregator_function, sort_by, sort_ascending, select)
 
         if num == 1 and sort_by is None and select is None and sort_ascending:
-            aggregator_obj._is_default_aggregator = True
+            aggregator_instance._is_default_aggregator = True
 
-        return aggregator_obj
+        return aggregator_instance
 
     @classmethod
     def groupby(cls, key, default=None, sort_by=None, sort_ascending=True, select=None):
@@ -276,7 +278,7 @@ class aggregator:
             for key, group in itertools.groupby(
                 sorted(jobs, key=keyfunction), key=keyfunction
             ):
-                yield group
+                yield tuple(group)
 
         return cls(aggregator_function, sort_by, sort_ascending, select)
 
@@ -284,23 +286,20 @@ class aggregator:
         """Test equality with another aggregator."""
         if not isinstance(other, type(self)):
             return NotImplemented
-        return (
-            self._sort_by == other._sort_by
-            and self._sort_ascending == other._sort_ascending
-            and self._is_default_aggregator == other._is_default_aggregator
-            and _get_unique_function_id(self._aggregator_function)
-            == _get_unique_function_id(other._aggregator_function)
-            and _get_unique_function_id(self._select)
-            == _get_unique_function_id(other._select)
-        )
+        # It is not possible to compare aggregators, even with equivalent
+        # aggregator functions. Moreover, the code objects created by
+        # _get_unique_function_id do not account for differences in the bound
+        # parameters. Thus, the only meaningful comparison is whether both
+        # aggregators are the default aggregator (and thus equivalent).
+        return self._is_default_aggregator and other._is_default_aggregator
 
     def __hash__(self):
         """Hash this aggregator."""
         return hash(
             (
-                self._sort_by,
-                self._sort_ascending,
                 self._is_default_aggregator,
+                self._sort_ascending,
+                _get_unique_function_id(self._sort_by),
                 _get_unique_function_id(self._aggregator_function),
                 _get_unique_function_id(self._select),
             )
@@ -326,7 +325,7 @@ class aggregator:
             The aggregate store.
 
         """
-        if not self._is_default_aggregator:
+        if self._is_default_aggregator:
             return _DefaultAggregateStore(project)
         else:
             return _AggregateStore(self, project)

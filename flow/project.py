@@ -2551,8 +2551,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             )
 
         parallel_executor = _get_parallel_executor(status_parallelization)
-
-        status_results = []
         single_operation_groups = {self._groups[name] for name in self.operations}
         # Update the project's status cache
         scheduler_info = self._query_scheduler_status(
@@ -2606,15 +2604,19 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     },
                 )
             )
+            # TODO: Add a total to the progress bar (not currently known by the
+            # generator but could be added by creating a wrapping class with
+            # __len__ and __iter__)
             status_results = parallel_executor(
                 compute_status, aggregate_group_generator, total=None
             )
 
         with self._potentially_buffered():
-            job_labels = [
-                self._get_job_labels(job=job, ignore_errors=ignore_errors)
-                for job in distinct_jobs
-            ]
+            get_job_labels = functools.partial(
+                self._get_job_labels,
+                ignore_errors=ignore_errors,
+            )
+            job_labels = parallel_executor(get_job_labels, distinct_jobs)
 
         status_results_combined = []
         for aggregate_id, aggregate_results in groupby(

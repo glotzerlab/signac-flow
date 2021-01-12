@@ -1127,17 +1127,18 @@ class FlowGroup:
         """
         return set(self).isdisjoint(set(group))
 
-    def _generate_id(self, jobs, operation_name=None, index=0):
+    def _generate_id(self, aggregate, operation_name=None):
         """Generate a unique id which identifies this group and job(s).
+
+        The generated value is used to identify interactions with the
+        scheduler.
 
         Parameters
         ----------
-        jobs : sequence of :class:`signac.contrib.job.Job`
-            Jobs defining the unique id.
+        aggregate : tuple of :class:`signac.contrib.job.Job`
+            The aggregate of signac jobs.
         operation_name : str
             Operation name defining the unique id. (Default value = None)
-        index : int
-            Index for the :class:`~._JobOperation`. (Default value = 0)
 
         Returns
         -------
@@ -1145,7 +1146,7 @@ class FlowGroup:
             The unique id.
 
         """
-        project = jobs[0]._project
+        project = aggregate[0]._project
 
         # The full name is designed to be truly unique for each job-group.
         if operation_name is None:
@@ -1153,12 +1154,11 @@ class FlowGroup:
         else:
             op_string = operation_name
 
-        aggregate_id = get_aggregate_id(jobs)
-        full_name = "{}%{}%{}%{}".format(
+        aggregate_id = get_aggregate_id(aggregate)
+        full_name = "{}%{}%{}".format(
             project.root_directory(),
             aggregate_id,
             op_string,
-            index,
         )
         # The job_op_id is a hash computed from the unique full name.
         job_op_id = md5(full_name.encode("utf-8")).hexdigest()
@@ -1166,23 +1166,20 @@ class FlowGroup:
         # The actual job id is then constructed from a readable part and the
         # job_op_id, ensuring that the job-op is still somewhat identifiable,
         # but guaranteed to be unique. The readable name is based on the
-        # project id, aggregate id, operation name, and the index number. All
-        # names and the id itself are restricted in length to guarantee that
-        # the id does not get too long.
+        # project id, aggregate id, and operation name. All names and the id
+        # itself are restricted in length to guarantee that the id does not get
+        # too long.
         max_len = self.MAX_LEN_ID - len(job_op_id)
         if max_len < len(job_op_id):
             raise ValueError(f"Value for MAX_LEN_ID is too small ({self.MAX_LEN_ID}).")
 
         separator = getattr(project._environment, "JOB_ID_SEPARATOR", "/")
-        readable_name = (
-            "{project}{sep}{aggregate_id}{sep}{op_string}{sep}{index:04d}{sep}".format(
-                sep=separator,
-                project=str(project)[:12],
-                aggregate_id=aggregate_id,
-                op_string=op_string[:12],
-                index=index,
-            )[:max_len]
-        )
+        readable_name = "{project}{sep}{aggregate_id}{sep}{op_string}{sep}".format(
+            sep=separator,
+            project=str(project)[:12],
+            aggregate_id=aggregate_id,
+            op_string=op_string[:12],
+        )[:max_len]
 
         # By appending the unique job_op_id, we ensure that each id is truly unique.
         return readable_name + job_op_id
@@ -1193,7 +1190,6 @@ class FlowGroup:
         default_directives,
         jobs,
         ignore_conditions_on_execution=IgnoreConditions.NONE,
-        index=0,
     ):
         """Create a _JobOperation object from the :class:`~.FlowGroup`.
 
@@ -1215,8 +1211,6 @@ class FlowGroup:
             Specify if preconditions and/or postconditions are to be ignored
             while checking eligibility during execution (after submission). The
             default is :class:`IgnoreConditions.NONE`.
-        index : int
-            Index for the :class:`~._JobOperation`. (Default value = 0)
 
         Returns
         -------
@@ -1279,7 +1273,7 @@ class FlowGroup:
         )
 
         submission_job_operation = _SubmissionJobOperation(
-            self._generate_id(jobs, index=index),
+            self._generate_id(jobs),
             self.name,
             jobs,
             cmd=unevaluated_cmd,
@@ -1297,7 +1291,6 @@ class FlowGroup:
         default_directives,
         jobs,
         ignore_conditions=IgnoreConditions.NONE,
-        index=0,
     ):
         """Create _JobOperation object(s) from the :class:`~.FlowGroup`.
 
@@ -1319,8 +1312,6 @@ class FlowGroup:
             Specify if preconditions and/or postconditions are to be ignored
             when determining eligibility check. The default is
             :class:`IgnoreConditions.NONE`.
-        index : int
-            Index for the :class:`~._JobOperation`. (Default value = 0)
 
         Returns
         -------
@@ -1347,7 +1338,7 @@ class FlowGroup:
                     jobs=jobs,
                 )
                 job_op = _JobOperation(
-                    self._generate_id(jobs, operation_name, index=index),
+                    self._generate_id(jobs, operation_name),
                     operation_name,
                     jobs,
                     cmd=unevaluated_cmd,
@@ -2055,7 +2046,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Parameters
         ----------
-        selected_aggregates : iterable of aggregates
+        selected_aggregates : sequence of tuples of :class:`~signac.contrib.job.Job`
             Aggregates to select.
         selected_groups : set of :class:`~.FlowGroup`
             Groups to select.
@@ -2551,7 +2542,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 else:
                     raise RuntimeError(
                         "Configuration value status_parallelization is invalid. "
-                        "Valid choices are 'thread', 'parallel', or 'none'."
+                        "Valid choices are 'thread', 'process', or 'none'."
                     )
             except RuntimeError as error:
                 if "can't start new thread" not in error.args:
@@ -3538,7 +3529,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Parameters
         ----------
-        aggregates : sequence of aggregates
+        aggregates : sequence of tuples of :class:`~signac.contrib.job.Job`
             The aggregates to consider for submission.
         default_directives : dict
             The default directives to use for the operations. This is to allow
@@ -3583,7 +3574,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     entrypoint=self._entrypoint,
                     default_directives=default_directives,
                     jobs=aggregate,
-                    index=0,
                     ignore_conditions_on_execution=ignore_conditions_on_execution,
                 )
 
@@ -4527,7 +4517,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     jobs=aggregate,
                     default_directives={},
                     ignore_conditions=ignore_conditions,
-                    index=0,
                 ):
                     yield JobOperation(
                         operation.id,

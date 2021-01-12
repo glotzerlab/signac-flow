@@ -62,23 +62,23 @@ class MockScheduler(Scheduler):
             for line in script:
                 _id = str(line).strip()
                 break
-        cid = uuid.uuid4()
-        cls._jobs[cid] = ClusterJob(_id, status=JobStatus.submitted)
+        cluster_id = uuid.uuid4()
+        cls._jobs[cluster_id] = ClusterJob(_id, status=JobStatus.submitted)
         signac_path = os.path.dirname(os.path.dirname(os.path.abspath(signac.__file__)))
         flow_path = os.path.dirname(os.path.dirname(os.path.abspath(flow.__file__)))
         pythonpath = ":".join(
             [os.environ.get("PYTHONPATH", "")] + [signac_path, flow_path]
         )
-        cls._scripts[cid] = f"export PYTHONPATH={pythonpath}\n" + script
+        cls._scripts[cluster_id] = f"export PYTHONPATH={pythonpath}\n" + script
         return JobStatus.submitted
 
     @classmethod
     def step(cls):
         """Mock pushing of jobs through the queue."""
         remove = set()
-        for cid, job in cls._jobs.items():
+        for cluster_id, job in cls._jobs.items():
             if job._status == JobStatus.inactive:
-                remove.add(cid)
+                remove.add(cluster_id)
             else:
                 if job._status in (JobStatus.submitted, JobStatus.held):
                     job._status = JobStatus(job._status + 1)
@@ -86,7 +86,7 @@ class MockScheduler(Scheduler):
                     job._status = JobStatus.active
                     try:
                         with tempfile.NamedTemporaryFile() as tmpfile:
-                            tmpfile.write(cls._scripts[cid].encode("utf-8"))
+                            tmpfile.write(cls._scripts[cluster_id].encode("utf-8"))
                             tmpfile.flush()
                             subprocess.check_call(
                                 ["/bin/bash", tmpfile.name], stderr=subprocess.DEVNULL
@@ -98,8 +98,8 @@ class MockScheduler(Scheduler):
                         job._status = JobStatus.inactive
                 else:
                     raise RuntimeError(f"Unable to process status '{job._status}'.")
-        for cid in remove:
-            del cls._jobs[cid]
+        for cluster_id in remove:
+            del cls._jobs[cluster_id]
 
     @classmethod
     def reset(cls):

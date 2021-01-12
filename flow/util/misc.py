@@ -10,6 +10,8 @@ from contextlib import contextmanager
 from functools import lru_cache, partial
 from itertools import cycle, islice
 
+from tqdm.contrib.concurrent import process_map, thread_map
+
 
 def _positive_int(value):
     """Parse a command line argument as a positive integer.
@@ -303,3 +305,25 @@ class _bidict(MutableMapping):
 
     def __len__(self):
         return len(self._data)
+
+
+def _get_parallel_executor(parallelization="thread"):
+    """Get an executor for the desired parallelization strategy.
+
+    Parameters
+    ----------
+    parallelization : str
+        Parallelization mode. Allowed values are "thread", "process", or
+        "none". (Default value = "thread")
+
+    """
+    if parallelization == "thread":
+        parallel_executor = thread_map
+    elif parallelization == "process":
+        parallel_executor = process_map
+    else:
+
+        def parallel_executor(fn, *iterables, **kwargs):
+            return list(map(fn, *iterables))
+
+    return parallel_executor

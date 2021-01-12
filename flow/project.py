@@ -58,6 +58,7 @@ from .util.misc import (
     TrackGetItemDict,
     _bidict,
     _cached_partial,
+    _get_parallel_executor,
     _positive_int,
     _to_hashable,
     add_cwd_to_environment_pythonpath,
@@ -2527,7 +2528,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Fetch status even if querying the scheduler fails.
         status_parallelization : str
             Parallelization mode for fetching the status. Allowed values are
-            "thread", "process", or "none." (Default value = "thread")
+            "thread", "process", or "none". (Default value = "thread")
 
         Returns
         -------
@@ -2550,6 +2551,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "Configuration value status_parallelization is invalid. "
                 "Valid choices are 'thread', 'process', or 'none'."
             )
+
+        parallel_executor = _get_parallel_executor(status_parallelization)  # noqa: F841
 
         status_results = []
         single_operation_groups = {self._groups[name] for name in self.operations}
@@ -2606,144 +2609,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 }
                 status_results.append(result)
 
-        """
-        # Get project status cache
-        cached_status = self._get_cached_status()
-
-        get_job_labels = functools.partial(
-            self._get_job_labels,
-            ignore_errors=ignore_errors,
-        )
-
-        get_group_status = functools.partial(
-            self._get_group_status,
-            ignore_errors=ignore_errors,
-            cached_status=cached_status,
-        )
-
-        operation_names = list(self.operations)
-
         with self._potentially_buffered():
-            try:
-                if status_parallelization == "thread":
-                    with ThreadPool() as pool:
-                        # First attempt at parallelized status determination.
-                        # This may fail on systems that don't allow threads.
-                        label_results = list(
-                            tqdm(
-                                iterable=pool.imap(get_job_labels, distinct_jobs),
-                                desc="Collecting job label info",
-                                total=len(distinct_jobs),
-                                file=err,
-                            )
-                        )
-                        group_results = list(
-                            tqdm(
-                                iterable=pool.imap(get_group_status, operation_names),
-                                desc="Collecting operation status",
-                                total=len(operation_names),
-                                file=err,
-                            )
-                        )
-                elif status_parallelization == "process":
-                    with Pool() as pool:
-                        try:
-                            (
-                                label_results,
-                                group_results,
-                            ) = self._fetch_status_in_parallel(
-                                pool,
-                                distinct_jobs,
-                                operation_names,
-                                ignore_errors,
-                                cached_status,
-                            )
-                        except self._PickleError as error:
-                            raise RuntimeError(
-                                "Unable to parallelize execution due to a pickling "
-                                f"error: {error}."
-                            )
-                        label_results = list(
-                            tqdm(
-                                iterable=label_results,
-                                desc="Collecting job label info",
-                                total=len(distinct_jobs),
-                                file=err,
-                            )
-                        )
-                        group_results = list(
-                            tqdm(
-                                iterable=group_results,
-                                desc="Collecting operation status",
-                                total=len(operation_names),
-                                file=err,
-                            )
-                        )
-                elif status_parallelization == "none":
-                    label_results = list(
-                        tqdm(
-                            iterable=map(get_job_labels, distinct_jobs),
-                            desc="Collecting job label info",
-                            total=len(distinct_jobs),
-                            file=err,
-                        )
-                    )
-                    group_results = list(
-                        tqdm(
-                            iterable=map(get_group_status, operation_names),
-                            desc="Collecting operation status",
-                            total=len(operation_names),
-                            file=err,
-                        )
-                    )
-                else:
-                    raise RuntimeError(
-                        "Configuration value status_parallelization is invalid. "
-                        "Valid choices are 'thread', 'process', or 'none'."
-                    )
-            except RuntimeError as error:
-                if "can't start new thread" not in error.args:
-                    raise  # unrelated error
-
-                def print_status(iterable, fetch_status, description):
-                    num_itr = len(iterable)
-                    results = []
-                    start_time = time.time()
-                    i = 0
-                    for i, itr in enumerate(iterable):
-                        results.append(fetch_status(itr))
-                        # The status interval 0.2 seconds is used since we expect the
-                        # status for an aggregate to be fetched within that interval
-                        if time.time() - start_time > 0.2:
-                            tqdm.update(
-                                f"{description}: {i+1}/{num_itr}", end="\r", file=err
-                            )
-                            start_time = time.time()
-                    # Always print the completed progressbar.
-                    print(f"{description}: {i+1}/{num_itr}", file=err)
-                    return results
-
-                label_results = print_status(
-                    distinct_jobs, get_job_labels, "Collecting job label info"
-                )
-                group_results = print_status(
-                    operation_names, get_group_status, "Collecting operation status"
-                )
-        """
-
-        with self._potentially_buffered():
-            """
-            for (
-                aggregate_id,
-                aggregate,
-                group,
-            ) in self._generate_selected_aggregate_groups(
-                selected_aggregates=aggregates,
-                selected_groups=single_operation_groups,
-            ):
-                pass
-            """
-
             job_labels = [
                 self._get_job_labels(job=job, ignore_errors=ignore_errors)
                 for job in distinct_jobs
@@ -2766,40 +2632,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     "_error": None,
                 }
             )
-
-        """
-        results = []
-        index = {}
-        for i, job in enumerate(distinct_jobs):
-            results_entry = {}
-            results_entry["job_id"] = job.get_id()
-            results_entry["operations"] = {}
-            results_entry["_operations_error"] = None
-            results_entry["labels"] = []
-            results_entry["_labels_error"] = None
-            results.append(results_entry)
-            index[job.get_id()] = i
-
-        for op_result in group_results:
-            for aggregate_id, aggregate_status in op_result[
-                "job_status_details"
-            ].items():
-                aggregate = self._get_aggregate_from_id(aggregate_id)
-                if aggregate not in aggregates:
-                    continue
-                error = op_result["_operation_error_per_job"].get(aggregate_id, None)
-                for job in aggregate:
-                    results[index[job.get_id()]]["operations"][
-                        op_result["operation_name"]
-                    ] = aggregate_status
-                    results[index[job.get_id()]]["_operations_error"] = error
-
-        for label_result in label_results:
-            results[index[label_result["job_id"]]]["labels"] = label_result["labels"]
-            results[index[label_result["job_id"]]]["_labels_error"] = label_result[
-                "_labels_error"
-            ]
-        """
 
         return status_results_combined, job_labels
 

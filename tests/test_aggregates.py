@@ -8,7 +8,7 @@ from flow.aggregates import aggregator, get_aggregate_id
 
 
 @pytest.fixture
-def list_of_aggregates():
+def list_of_aggregators():
     def helper_default_aggregator_function(jobs):
         return [jobs]
 
@@ -129,25 +129,25 @@ class TestAggregate(AggregateProjectSetup):
         with pytest.raises(ValueError):
             aggregator.groupby(["half", "even"], default=[-1, -1, -1])
 
-    def test_aggregate_hashing(self, list_of_aggregates):
+    def test_aggregate_hashing(self, list_of_aggregators):
         # Since we need to store groups on a per aggregate basis in the project,
         # we need to be sure that the aggregates are hashing and compared correctly.
         # This test ensures this feature.
-        # list_of_aggregates contains 14 distinct storing objects (because an
+        # list_of_aggregators contains 14 distinct store objects (because an
         # aggregator object is differentiated on the basis of the `_is_aggregate` attribute).
         # When this list is converted to set, then these objects are hashed first
         # and then compared. Since sets don't carry duplicate values, we test
         # whether the length of the set obtained from the list is equal to 14 or not.
-        assert len(set(list_of_aggregates)) == 14
+        assert len(set(list_of_aggregators)) == 14
         # Ensure that equality implies hash equality.
-        for agg1 in list_of_aggregates:
-            for agg2 in list_of_aggregates:
+        for agg1 in list_of_aggregators:
+            for agg2 in list_of_aggregators:
                 if agg1 == agg2:
                     assert hash(agg1) == hash(agg2)
 
 
-# Test the _AggregatesStore and _DefaultAggregateStore classes
-class TestAggregateStoring(AggregateProjectSetup):
+# Test the _AggregateStore and _DefaultAggregateStore classes
+class TestAggregateStore(AggregateProjectSetup):
     def test_custom_aggregator_function(self, setUp, project):
         # Testing aggregator function returning aggregates of 1
         def helper_aggregator_function(jobs):
@@ -188,7 +188,7 @@ class TestAggregateStoring(AggregateProjectSetup):
     def test_groups_of_valid_num(self, setUp, project):
         valid_values = [1, 2, 3, 6, 10]
         # Expected length of aggregates which are made using the above values.
-        expected_length_of_aggregates = [10, 5, 4, 2, 1]
+        expected_length_of_aggregators = [10, 5, 4, 2, 1]
         # Expect length of each aggregate which are made using the above
         # values. The zeroth index of the nested list denotes the length of all
         # the aggregates expect the last one. The first index denotes the
@@ -197,7 +197,7 @@ class TestAggregateStoring(AggregateProjectSetup):
         for i, valid_value in enumerate(valid_values):
             aggregate_instance = aggregator.groupsof(valid_value)
             aggregate_store = aggregate_instance._create_AggregateStore(project)
-            expected_len = expected_length_of_aggregates[i]
+            expected_len = expected_length_of_aggregators[i]
             assert len(aggregate_store) == expected_len
 
             # We also check the length of every aggregate in order to ensure
@@ -290,31 +290,38 @@ class TestAggregateStoring(AggregateProjectSetup):
                 selected_jobs.append((job,))
         assert list(aggregate_store.values()) == selected_jobs
 
-    def test_storing_hashing(self, setUp, project, list_of_aggregates):
+    def test_store_hashing(self, setUp, project, list_of_aggregators):
         # Since we need to store groups on a per aggregate basis in the project,
         # we need to be sure that the aggregates are hashing and compared correctly.
         # This test ensures this feature.
-        def _create_storing(aggregator):
-            return aggregator._create_AggregateStore(project)
+        list_of_stores = [
+            aggregator._create_AggregateStore(project)
+            for aggregator in list_of_aggregators
+        ]
+        assert len(list_of_stores) == len(list_of_aggregators)
+        # The above list contains 14 distinct store objects (because a
+        # store object is differentiated on the basis of the
+        # ``_is_default_aggregate`` attribute of the aggregator). When this
+        # list is converted to a set, then these objects are hashed first and
+        # then compared. Since sets don't carry duplicate values, we test
+        # whether the length of the set obtained from the list is equal to 14
+        # or not.
+        assert len(set(list_of_stores)) == 14
 
-        list_of_storing = list(map(_create_storing, list_of_aggregates))
-        # The above list contains 14 distinct storing objects (because a storing
-        # object is differentiated on the basis of the `_is_aggregate` attribute of
-        # the aggregator). When this list is converted to set, then these objects are
-        # hashed first and then compared. Since sets don't carry duplicate values, we test
-        # whether the length of the set obtained from the list is equal to 14 or not.
-        assert len(set(list_of_storing)) == 14
+    def test_aggregates_are_tuples(self, setUp, project, list_of_aggregators):
+        # This test ensures that all aggregators return tuples.
+        for aggregator_instance in list_of_aggregators:
+            aggregate_store = aggregator_instance._create_AggregateStore(project)
+            for aggregate in aggregate_store.values():
+                assert isinstance(aggregate, tuple)
+                assert all(isinstance(job, signac.contrib.job.Job) for job in aggregate)
 
-    def test_get_by_id(self, setUp, project, list_of_aggregates):
-        def _create_storing(aggregator):
-            return aggregator._create_AggregateStore(project)
-
-        # The below set contains the default as well as manu non-default
-        # objects which stores aggregates.
-        list_of_storing = set(map(_create_storing, list_of_aggregates))
-        for stored_aggregate in list_of_storing:
-            for aggregate in stored_aggregate.values():
-                assert aggregate == stored_aggregate[get_aggregate_id(aggregate)]
+    def test_get_by_id(self, setUp, project, list_of_aggregators):
+        # Ensure that all aggregates can be fetched by id.
+        for aggregator_instance in list_of_aggregators:
+            aggregate_store = aggregator_instance._create_AggregateStore(project)
+            for aggregate in aggregate_store.values():
+                assert aggregate == aggregate_store[get_aggregate_id(aggregate)]
 
     def test_get_invalid_id(self, setUp, project):
         jobs = tuple(project)

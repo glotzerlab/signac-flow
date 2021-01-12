@@ -172,7 +172,7 @@ class aggregator:
         # Source of this implementation: https://stackoverflow.com/a/31185097
         def aggregator_function(jobs):
             iterable = iter(jobs)
-            return iter(lambda: list(itertools.islice(iterable, num)), [])
+            return iter(lambda: tuple(itertools.islice(iterable, num)), tuple())
 
         aggregator_instance = cls(aggregator_function, sort_by, sort_ascending, select)
 

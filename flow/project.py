@@ -2026,8 +2026,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         When entered, this context manager yields an empty dictionary. The
         keys in this dictionary are unique generated ids for a given group
         and aggregate, and the value is an instance of :class:`~.JobStatus`.
-        When the context exits, this information is used to update the
-        project document's cached status.
+        When the context exits, this dictionary is used to update the project
+        document's cached status.
 
         Yields
         ------

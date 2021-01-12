@@ -1027,17 +1027,19 @@ class TestExecutionProject(TestProjectBase):
             project.submit()
         assert len(list(MockScheduler.jobs())) == num_jobs_submitted
 
+        cached_status = project._get_cached_scheduler_status()
         for job in project:
             next_op = list(project._next_operations([(job,)]))[0]
-            assert next_op.get_status() == JobStatus.submitted
+            assert cached_status[next_op.id] == JobStatus.submitted
 
         MockScheduler.step()
         MockScheduler.step()
         project._fetch_scheduler_status(file=StringIO())
 
+        cached_status = project._get_cached_scheduler_status()
         for job in project:
             next_op = list(project._next_operations([(job,)]))[0]
-            assert next_op.get_status() == JobStatus.queued
+            assert cached_status[next_op.id] == JobStatus.queued
 
         MockScheduler.step()
         project._fetch_scheduler_status(file=StringIO())

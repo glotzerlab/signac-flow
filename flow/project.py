@@ -2040,8 +2040,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         try:
             yield status_update
         finally:
-            self.document.setdefault("_status", {})
-            self.document["_status"].update(status_update)
+            if status_update:
+                self.document.setdefault("_status", {})
+                self.document["_status"].update(status_update)
 
     def _generate_selected_aggregate_groups(
         self,

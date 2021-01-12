@@ -87,7 +87,7 @@ class aggregator:
         if aggregator_function is None:
 
             def aggregator_function(jobs):
-                return (jobs,) if jobs else ()
+                yield tuple(jobs) if jobs else ()
 
         if not callable(aggregator_function):
             raise TypeError(
@@ -352,7 +352,7 @@ class aggregator:
 
 
 class _BaseAggregateStore(Mapping):
-    """Base class for aggregate stores.
+    """Base abstract class for aggregate stores.
 
     An aggregate store is a mapping from aggregate ids to aggregates, where
     an aggregate is defined as a tuple of instances of
@@ -370,10 +370,6 @@ class _BaseAggregateStore(Mapping):
         This is called at instantiation to generate and store aggregates.
 
         Every aggregate is required to be a tuple of jobs.
-
-        This method converts every aggregate in ``aggregated_jobs``, which
-        may be of any type, returned from an ``aggregator_function`` using
-        the instance of ``_MakeAggregates`` to a tuple of jobs.
         """
         pass
 
@@ -381,14 +377,16 @@ class _BaseAggregateStore(Mapping):
 class _AggregateStore(_BaseAggregateStore):
     """Class containing all aggregates associated with an :class:`aggregator`.
 
-    Iterating over this object yields all aggregates.
+    Iterating over this object yields aggregate ids, which can be used as
+    indices to return the corresponding aggregates.
 
     Parameters
     ----------
     aggregator : :class:`aggregator`
-        aggregator object associated with this class.
+        aggregator object used to generate aggregates for this store.
     project : :class:`flow.FlowProject` or :class:`signac.contrib.project.Project`
-        A signac project used to fetch jobs for creating aggregates.
+        A signac project containing the jobs that will be used to create
+        aggregates.
 
     """
 
@@ -397,7 +395,7 @@ class _AggregateStore(_BaseAggregateStore):
 
         # We need to register the aggregates for this instance using the
         # project provided. After registering, we store the aggregates
-        # mapped with the ids using
+        # mapped with the ids using :func:`get_aggregate_id`.
         self._aggregates_by_id = {}
         super().__init__(project)
 
@@ -455,13 +453,8 @@ class _AggregateStore(_BaseAggregateStore):
         This is called at instantiation to generate and store aggregates.
 
         Every aggregate is required to be a tuple of jobs.
-
-        This method converts every aggregate in ``aggregated_jobs``, which
-        may be of any type, returned from an ``aggregator_function`` using
-        the instance of ``_MakeAggregates`` to a tuple of jobs.
         """
-        aggregated_jobs = self._generate_aggregates()
-        for aggregate in aggregated_jobs:
+        for aggregate in self._generate_aggregates():
             for job in aggregate:
                 if job not in self._project:
                     raise LookupError(
@@ -594,7 +587,12 @@ class _DefaultAggregateStore(_BaseAggregateStore):
 
 
 def get_aggregate_id(aggregate):
-    """Generate hashed id for an aggregate of jobs.
+    """Generate aggregate id for an aggregate of jobs.
+
+    The aggregate id is a unique hash identifying a tuple of jobs. The
+    aggregate id is sensitive to the order of the jobs in the aggregate. The
+    id of an aggregate containing one job is that job's id (the hash of its
+    state point).
 
     Parameters
     ----------
@@ -608,7 +606,8 @@ def get_aggregate_id(aggregate):
 
     """
     if len(aggregate) == 1:
-        return aggregate[0].get_id()  # Return job id as it's already unique
+        # Return job id as it's already unique
+        return aggregate[0].get_id()
 
     id_string = ",".join(job.get_id() for job in aggregate)
     hash_ = md5(id_string.encode("utf-8")).hexdigest()

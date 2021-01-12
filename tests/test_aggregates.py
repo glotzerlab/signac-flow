@@ -4,13 +4,13 @@ from tempfile import TemporaryDirectory
 import pytest
 import signac
 
-from flow.aggregates import aggregator, get_aggregate_id
+from flow.aggregates import _DefaultAggregateStore, aggregator, get_aggregate_id
 
 
 @pytest.fixture
 def list_of_aggregators():
     def helper_default_aggregator_function(jobs):
-        return [jobs]
+        yield tuple(jobs)
 
     def helper_non_default_aggregator_function(jobs):
         for job in jobs:
@@ -312,6 +312,12 @@ class TestAggregateStore(AggregateProjectSetup):
         # This test ensures that all aggregators return tuples.
         for aggregator_instance in list_of_aggregators:
             aggregate_store = aggregator_instance._create_AggregateStore(project)
+            if not isinstance(aggregate_store, _DefaultAggregateStore):
+                for aggregate in aggregate_store._generate_aggregates():
+                    assert isinstance(aggregate, tuple)
+                    assert all(
+                        isinstance(job, signac.contrib.job.Job) for job in aggregate
+                    )
             for aggregate in aggregate_store.values():
                 assert isinstance(aggregate, tuple)
                 assert all(isinstance(job, signac.contrib.job.Job) for job in aggregate)

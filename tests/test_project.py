@@ -1305,14 +1305,12 @@ class TestGroupProject(TestProjectBase):
 
     def test_directives_hierarchy(self):
         project = self.mock_project()
-        cached_status = project._get_cached_status()
         for job in project:
             # Test submit JobOperations
             job_ops = list(
                 project._get_submission_operations(
                     aggregates=[(job,)],
                     default_directives=project._get_default_directives(),
-                    cached_status=cached_status,
                     names=["group2"],
                 )
             )
@@ -1324,7 +1322,6 @@ class TestGroupProject(TestProjectBase):
                 project._get_submission_operations(
                     aggregates=[(job,)],
                     default_directives=project._get_default_directives(),
-                    cached_status=cached_status,
                     names=["op3"],
                 )
             )

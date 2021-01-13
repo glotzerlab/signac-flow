@@ -1117,24 +1117,9 @@ class TestExecutionProject(TestProjectBase):
                 assert evaluated == expected_evaluation
 
 
-class TestUnbufferedExecutionProject(TestExecutionProject):
-    def mock_project(self, project_class=None):
-        project = super().mock_project(
-            project_class=project_class,
-            config_overrides={"flow": {"use_buffered_mode": "off"}},
-        )
-        return project
-
-
 class TestExecutionDynamicProject(TestExecutionProject):
     project_class = _DynamicTestProject
     expected_number_of_steps = 10
-
-
-class TestUnbufferedExecutionDynamicProject(
-    TestUnbufferedExecutionProject, TestExecutionDynamicProject
-):
-    pass
 
 
 class TestProjectMainInterface(TestProjectBase):
@@ -1589,21 +1574,9 @@ class TestGroupExecutionProject(TestProjectBase):
         assert i == self.expected_number_of_steps
 
 
-class TestGroupUnbufferedExecutionProject(
-    TestUnbufferedExecutionProject, TestGroupExecutionProject
-):
-    pass
-
-
 class TestGroupExecutionDynamicProject(TestGroupExecutionProject):
     project_class = _DynamicTestProject
     expected_number_of_steps = 4
-
-
-class TestGroupUnbufferedExecutionDynamicProject(
-    TestGroupUnbufferedExecutionProject, TestGroupExecutionDynamicProject
-):
-    pass
 
 
 class TestGroupProjectMainInterface(TestProjectBase):

@@ -37,6 +37,8 @@ def test_env(env, monkeypatch):
     # Must import the data into the project.
     with signac.TemporaryProject(name=gen.PROJECT_NAME) as p:
         fp = gen.get_masked_flowproject(p)
+        # Set the environment attribute of the FlowProject to current environment
+        fp._environment = env
         # Here we set the appropriate executable for all the operations. This
         # is necessary as otherwise the default executable between submitting
         # and running could look different depending on the environment.
@@ -62,7 +64,6 @@ def test_env(env, monkeypatch):
                     with redirect_stderr(devnull):
                         with redirect_stdout(tmp_out):
                             fp.submit(
-                                env=env,
                                 jobs=[job],
                                 names=bundle,
                                 pretend=True,
@@ -93,7 +94,6 @@ def test_env(env, monkeypatch):
                         with redirect_stderr(devnull):
                             with redirect_stdout(tmp_out):
                                 fp.submit(
-                                    env=env,
                                     jobs=[job],
                                     names=[op],
                                     pretend=True,

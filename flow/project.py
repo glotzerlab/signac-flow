@@ -3722,7 +3722,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         self,
         operations,
         _id=None,
-        env=None,
         parallel=False,
         flags=None,
         force=False,
@@ -3768,14 +3767,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         if _id is None:
             _id = self._store_bundled(operations)
-        if env is None:
-            env = self._environment
-        else:
-            warnings.warn(
-                "The env argument is deprecated as of 0.10 and will be removed in 0.12. "
-                "Instead, set the environment when constructing a FlowProject.",
-                DeprecationWarning,
-            )
 
         print(f"Submitting cluster job '{_id}':", file=sys.stderr)
 
@@ -3789,7 +3780,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 operations=map(_msg, operations),
                 template=template,
                 show_template_help=show_template_help,
-                env=env,
+                env=self._environment,
                 parallel=parallel,
                 force=force,
                 **kwargs,
@@ -3826,14 +3817,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 print(script)
 
             else:
-                return env.submit(_id=_id, script=script, flags=flags, **kwargs)
+                return self._environment.submit(
+                    _id=_id, script=script, flags=flags, **kwargs
+                )
 
     @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
     def submit_operations(
         self,
         operations,
         _id=None,
-        env=None,
         parallel=False,
         flags=None,
         force=False,
@@ -3880,7 +3872,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return self._submit_operations(
             operations,
             _id,
-            env,
             parallel,
             flags,
             force,
@@ -3899,7 +3890,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         parallel=False,
         force=False,
         walltime=None,
-        env=None,
         ignore_conditions=IgnoreConditions.NONE,
         ignore_conditions_on_execution=IgnoreConditions.NONE,
         **kwargs,
@@ -3949,14 +3939,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "The 'names' argument must be a sequence of strings, however "
                 f"a single string was provided: {names}."
             )
-        if env is None:
-            env = self._environment
-        else:
-            warnings.warn(
-                "The env argument is deprecated as of 0.10 and will be removed in 0.12. "
-                "Instead, set the environment when constructing a FlowProject.",
-                DeprecationWarning,
-            )
+
         if walltime is not None:
             try:
                 walltime = datetime.timedelta(hours=walltime)
@@ -3995,7 +3978,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             for bundle in _make_bundles(operations, bundle_size):
                 status = self._submit_operations(
                     operations=bundle,
-                    env=env,
                     parallel=parallel,
                     force=force,
                     walltime=walltime,

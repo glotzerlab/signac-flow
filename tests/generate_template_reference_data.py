@@ -183,6 +183,7 @@ def main(args):
             with job:
                 kwargs = job.statepoint()
                 env = get_nested_attr(flow, kwargs["environment"])
+                fp._environment = env
                 parameters = kwargs["parameters"]
                 if "bundle" in parameters:
                     bundle = parameters.pop("bundle")
@@ -191,7 +192,6 @@ def main(args):
                     with redirect_stdout(tmp_out):
                         try:
                             fp.submit(
-                                env=env,
                                 jobs=[job],
                                 names=bundle,
                                 pretend=True,
@@ -224,7 +224,6 @@ def main(args):
                         with redirect_stdout(tmp_out):
                             try:
                                 fp.submit(
-                                    env=env,
                                     jobs=[job],
                                     names=[op],
                                     pretend=True,

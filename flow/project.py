@@ -363,16 +363,8 @@ class _JobOperation:
         self.directives._keys_set_by_user = user_directives
 
     def __str__(self):
-        assert len(self._jobs) > 0
-        max_len = 3
-        if len(self._jobs) > max_len:
-            shown = self._jobs[: max_len - 2] + ("...",) + self._jobs[-1:]
-        else:
-            shown = self._jobs
-        return (
-            f"{self.name}[#{len(self._jobs)}]"
-            f"({', '.join([str(element) for element in shown])})"
-        )
+        aggregate_id = get_aggregate_id(self._jobs)
+        return f"{self.name}({aggregate_id})"
 
     def __repr__(self):
         return "{type}(name='{name}', jobs='{jobs}', cmd={cmd}, directives={directives})".format(

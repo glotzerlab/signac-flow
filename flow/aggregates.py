@@ -373,6 +373,9 @@ class _BaseAggregateStore(Mapping):
         """
         pass
 
+    def __iter__(self):
+        yield from self.keys()
+
 
 class _AggregateStore(_BaseAggregateStore):
     """Class containing all aggregates associated with an :class:`aggregator`.
@@ -398,9 +401,6 @@ class _AggregateStore(_BaseAggregateStore):
         # mapped with the ids using :func:`get_aggregate_id`.
         self._aggregates_by_id = {}
         super().__init__(project)
-
-    def __iter__(self):
-        yield from self._aggregates_by_id
 
     def __getitem__(self, id):
         """Get the aggregate corresponding to the provided id."""
@@ -518,9 +518,6 @@ class _DefaultAggregateStore(_BaseAggregateStore):
         # class cannot be unpickled unless we pre-emptively compute and store
         # the repr.
         self._project_repr = repr(project)
-
-    def __iter__(self):
-        yield from self.keys()
 
     def __getitem__(self, id):
         """Return an aggregate of one job from its job id.

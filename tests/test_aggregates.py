@@ -67,13 +67,16 @@ class AggregateProjectSetup:
 class TestAggregate(AggregateProjectSetup):
     def test_default_init(self):
         aggregate_instance = aggregator()
-        test_list = (1, 2, 3, 4, 5)
+        # Ensure that all values are converted to tuples
+        test_values = [(1, 2, 3, 4, 5), (), [1, 2, 3, 4, 5], []]
         assert not aggregate_instance._is_default_aggregator
         assert aggregate_instance._sort_by is None
         assert aggregate_instance._sort_ascending
         assert aggregate_instance._select is None
-        assert next(aggregate_instance._aggregator_function(test_list)) == test_list
-        assert next(aggregate_instance._aggregator_function(tuple())) == tuple()
+        for value in test_values:
+            assert list(aggregate_instance._aggregator_function(value)) == [
+                tuple(value)
+            ]
 
     def test_invalid_aggregator_function(self, setUp, project):
         aggregator_functions = ["str", 1, {}]
@@ -312,7 +315,10 @@ class TestAggregateStore(AggregateProjectSetup):
         assert len(set(list_of_stores)) == 14
 
     def test_aggregates_are_tuples(self, setUp, project, list_of_aggregators):
-        # This test ensures that all aggregators return tuples.
+        # This test ensures that all aggregator functions return tuples. All
+        # aggregate stores are expected to return tuples for their values, but
+        # this also tests that the aggregator functions (groupsof, groupby) are
+        # generating tuples internally.
         for aggregator_instance in list_of_aggregators:
             aggregate_store = aggregator_instance._create_AggregateStore(project)
             if not isinstance(aggregate_store, _DefaultAggregateStore):

@@ -2466,7 +2466,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         operation_names = list(self.operations)
 
-        with self._potentially_buffered():
+        with self._buffered():
             try:
                 if status_parallelization == "thread":
                     with ThreadPool() as pool:
@@ -3409,7 +3409,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 break
             try:
                 # Generate _JobOperation instances for selected groups and aggregates.
-                with self._potentially_buffered():
+                with self._buffered():
                     operations = []
                     run_groups = set(self._gather_flow_groups(names))
                     for (
@@ -3656,15 +3656,19 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return aggregates
 
     @contextlib.contextmanager
-    def _potentially_buffered(self):
+    def _buffered(self):
         """Enable the use of buffered mode for certain functions."""
-        if self.config["flow"].as_bool("use_buffered_mode"):
-            logger.debug("Entering buffered mode...")
-            with signac.buffered():
-                yield
-            logger.debug("Exiting buffered mode.")
-        else:
+        if not self.config["flow"].as_bool("use_buffered_mode"):
+            warnings.warn(
+                "The use_buffered_mode config option is deprecated as of 0.12 "
+                "and will be removed in 0.14. Buffered mode is always enabled "
+                "in 0.12 and newer.",
+                DeprecationWarning,
+            )
+        logger.debug("Entering buffered mode.")
+        with signac.buffered():
             yield
+        logger.debug("Exiting buffered mode.")
 
     def _script(
         self, operations, parallel=False, template="script.sh", show_template_help=False
@@ -4008,7 +4012,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             )
 
         # Gather all pending operations.
-        with self._potentially_buffered():
+        with self._buffered():
             default_directives = self._get_default_directives()
             cached_status = self._get_cached_status()
             # The generator must be used *inside* the buffering context manager
@@ -4026,7 +4030,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             operations = list(islice(operation_generator, num))
 
         # Bundle them up and submit.
-        with self._potentially_buffered():
+        with self._buffered():
             for bundle in _make_bundles(operations, bundle_size):
                 status = self._submit_operations(
                     operations=bundle,
@@ -4895,7 +4899,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         aggregates = self._select_jobs_from_args(args)
 
         # Gather all pending operations or generate them based on a direct command...
-        with self._potentially_buffered():
+        with self._buffered():
             names = args.operation_name if args.operation_name else None
             default_directives = self._get_default_directives()
             cached_status = self._get_cached_status()

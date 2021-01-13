@@ -68,9 +68,12 @@ class TestAggregate(AggregateProjectSetup):
     def test_default_init(self):
         aggregate_instance = aggregator()
         test_list = (1, 2, 3, 4, 5)
+        assert not aggregate_instance._is_default_aggregator
         assert aggregate_instance._sort_by is None
-        assert aggregate_instance._aggregator_function(test_list) == (test_list,)
+        assert aggregate_instance._sort_ascending
         assert aggregate_instance._select is None
+        assert next(aggregate_instance._aggregator_function(test_list)) == test_list
+        assert next(aggregate_instance._aggregator_function(tuple())) == tuple()
 
     def test_invalid_aggregator_function(self, setUp, project):
         aggregator_functions = ["str", 1, {}]

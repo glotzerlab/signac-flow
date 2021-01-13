@@ -604,16 +604,16 @@ class BaseFlowOperation:
         self._preconditions = [_FlowCondition(cond) for cond in pre]
         self._postconditions = [_FlowCondition(cond) for cond in post]
 
-    def _eligible(self, jobs, ignore_conditions=IgnoreConditions.NONE):
-        """Determine eligibility of jobs.
+    def _eligible(self, aggregate, ignore_conditions=IgnoreConditions.NONE):
+        """Determine eligibility of an aggregate.
 
-        Jobs are eligible when all preconditions are true and at least one
-        postcondition is false, or corresponding conditions are ignored.
+        An aggregate is eligible when all preconditions are true and at least
+        one postcondition is false, or corresponding conditions are ignored.
 
         Parameters
         ----------
-        jobs : tuple
-            The signac job handles.
+        aggregate : tuple of :class:`~signac.contrib.job.Job`
+            The aggregate of signac jobs.
         ignore_conditions : :class:`~.IgnoreConditions`
             Specify if preconditions and/or postconditions are to be ignored
             when determining eligibility. The default is
@@ -622,7 +622,7 @@ class BaseFlowOperation:
         Returns
         -------
         bool
-            Whether the job is eligible.
+            Whether the aggregate is eligible.
 
         """
         if not isinstance(ignore_conditions, IgnoreConditions):
@@ -634,11 +634,11 @@ class BaseFlowOperation:
         met_preconditions = (
             (len(self._preconditions) == 0)
             or (ignore_conditions & IgnoreConditions.PRE)
-            or all(cond(jobs) for cond in self._preconditions)
+            or all(cond(aggregate) for cond in self._preconditions)
         )
         if met_preconditions and len(self._postconditions) > 0:
             unmet_postconditions = (ignore_conditions & IgnoreConditions.POST) or any(
-                not cond(jobs) for cond in self._postconditions
+                not cond(aggregate) for cond in self._postconditions
             )
         else:
             unmet_postconditions = True
@@ -993,7 +993,7 @@ class FlowGroup:
             )
         )
 
-    def _eligible(self, jobs, ignore_conditions=IgnoreConditions.NONE):
+    def _eligible(self, aggregate, ignore_conditions=IgnoreConditions.NONE):
         """Determine if at least one operation is eligible.
 
         A :class:`~.FlowGroup` is eligible for execution if at least one of
@@ -1001,8 +1001,8 @@ class FlowGroup:
 
         Parameters
         ----------
-        jobs : tuple
-            The signac job handles.
+        aggregate : tuple of :class:`~signac.contrib.job.Job`
+            The aggregate of signac jobs.
         ignore_conditions : :class:`~.IgnoreConditions`
             Specify if preconditions and/or postconditions are to be ignored
             while checking eligibility. The default is
@@ -1014,7 +1014,7 @@ class FlowGroup:
             Whether the group is eligible.
 
         """
-        return any(op._eligible(jobs, ignore_conditions) for op in self)
+        return any(op._eligible(aggregate, ignore_conditions) for op in self)
 
     def _complete(self, jobs):
         """Check if postconditions are met for all operations in the group.
@@ -3456,7 +3456,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             selected_groups=submission_groups,
         ):
             if group._eligible(
-                aggregate, ignore_conditions
+                aggregate=aggregate, ignore_conditions=ignore_conditions
             ) and self._eligible_for_submission(
                 group, aggregate, scheduler_status, scheduler_info
             ):

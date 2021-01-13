@@ -144,12 +144,13 @@ class TestProjectBase:
             config = project.config.copy()
             config = recursive_update(config, config_overrides)
             project = project_class(config=config)
-        for a in range(3):
+        for a in range(2):
             if heterogeneous:
                 # Add jobs with only the `a` key without `b`.
                 project.open_job(dict(a=a)).init()
                 project.open_job(dict(a=dict(a=a))).init()
-            for b in range(3):
+            # Tests assume that there are even and odd values of b
+            for b in range(2):
                 project.open_job(dict(a=a, b=b)).init()
                 project.open_job(dict(a=dict(a=a), b=b)).init()
         project._entrypoint = self.entrypoint

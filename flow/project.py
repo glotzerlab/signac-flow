@@ -1132,7 +1132,9 @@ class FlowGroup:
 
         aggregate_id = get_aggregate_id(aggregate)
         full_name = "{}%{}%{}".format(
-            project.root_directory(),
+            project.root_directory()
+            if not project._mock
+            else project._mock_root_directory(),
             aggregate_id,
             op_string,
         )

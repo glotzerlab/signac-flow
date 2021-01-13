@@ -150,7 +150,8 @@ def get_masked_flowproject(p):
     sys.executable = "/usr/local/bin/python"
     fp = TestProject.get_project(root=p.root_directory())
     fp._entrypoint.setdefault("path", "generate_template_reference_data.py")
-    fp.root_directory = lambda: PROJECT_DIRECTORY
+    fp._mock = True
+    fp._mock_root_directory = lambda: PROJECT_DIRECTORY
     fp.config.project_dir = PROJECT_DIRECTORY
     return fp
 

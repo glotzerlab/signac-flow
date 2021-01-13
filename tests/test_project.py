@@ -1278,7 +1278,6 @@ class TestGroupProject(TestProjectBase):
             job_ops = project._get_submission_operations(
                 aggregates=[(job,)],
                 default_directives={},
-                cached_status={},
             )
             script = project._script(job_ops)
             if job.sp.b % 2 == 0:

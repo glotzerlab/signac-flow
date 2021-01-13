@@ -1130,11 +1130,16 @@ class FlowGroup:
         else:
             op_string = operation_name
 
-        aggregate_id = get_aggregate_id(aggregate)
-        full_name = "{}%{}%{}".format(
+        # Ids are generated based on the project root directory. However, while
+        # testing, we must use a mocked value of the root directory.
+        root_directory = (
             project.root_directory()
             if not project._mock
-            else project._mock_root_directory(),
+            else project._mock_root_directory()
+        )
+        aggregate_id = get_aggregate_id(aggregate)
+        full_name = "{}%{}%{}".format(
+            root_directory,
             aggregate_id,
             op_string,
         )

@@ -1128,7 +1128,7 @@ class TestUnbufferedExecutionProject(TestExecutionProject):
 
 class TestExecutionDynamicProject(TestExecutionProject):
     project_class = _DynamicTestProject
-    expected_number_of_steps = 10
+    expected_number_of_steps = 7
 
 
 class TestUnbufferedExecutionDynamicProject(

@@ -2643,7 +2643,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         file=None,
         err=None,
         ignore_errors=False,
-        no_parallelize=False,
         template=None,
         profile=False,
         eligible_jobs_max_lines=None,
@@ -2697,8 +2696,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         output_format : str
             Status output format, supports:
             'terminal' (default), 'markdown' or 'html'.
-        no_parallelize : bool
-            Disable parallelization. (Default value = False)
 
         Returns
         -------
@@ -2720,19 +2717,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "eligible_jobs_max_lines"
             )
 
-        if no_parallelize:
-            print(
-                "WARNING: "
-                "The no_parallelize argument is deprecated as of 0.10 "
-                "and will be removed in 0.12. "
-                "Instead, set the status_parallelization configuration value to 'none'. "
-                "In order to do this from the CLI, execute "
-                "`signac config set flow.status_parallelization 'none'`\n",
-                file=sys.stderr,
-            )
-            status_parallelization = "none"
-        else:
-            status_parallelization = self.config["flow"]["status_parallelization"]
+        status_parallelization = self.config["flow"]["status_parallelization"]
 
         # initialize jinja2 template environment and necessary filters
         template_environment = self._template_environment()
@@ -4281,14 +4266,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             "--ignore-errors",
             action="store_true",
             help="Ignore errors that might occur when querying the scheduler.",
-        )
-        parser.add_argument(
-            "--no-parallelize",
-            action="store_true",
-            help="Do not parallelize the status determination. "
-            "The '--no-parallelize' argument is deprecated. "
-            "Please use the status_parallelization configuration "
-            "instead (see above).",
         )
         view_group.add_argument(
             "-o",

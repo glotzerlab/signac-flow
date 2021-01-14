@@ -308,6 +308,21 @@ class _bidict(MutableMapping):
         return len(self._data)
 
 
+def _run_cloudpickled_func(func, *args, **kwargs):
+    """A wrapper for cloudpickled functions.
+
+    The set of functions that can be pickled by the built-in pickle module is
+    very limited, which prevents the usage of various useful cases such as
+    locally-defined functions or functions that internally call class methods.
+    This function circumvents that difficulty by allowing the user to pickle
+    the function object a priori and bind it as the first argument to a partial
+    application of this function. All subsequent arguments are transparently
+    passed through.
+    """
+    unpickled_func = cloudpickle.loads(func)
+    return unpickled_func(*args, **kwargs)
+
+
 def _get_parallel_executor(parallelization="thread"):
     """Get an executor for the desired parallelization strategy.
 
@@ -321,31 +336,34 @@ def _get_parallel_executor(parallelization="thread"):
     if parallelization == "thread":
         parallel_executor = thread_map
     elif parallelization == "process":
-        print(
-            "Process parallelism currently does not work. This will execute in serial."
-        )
 
-        def parallel_executor(fn, *iterables, **kwargs):
+        def parallel_executor(func, *iterables, **kwargs):
             pickled_iterables = [repeat(cloudpickle.loads)]
             pickled_iterables.extend(
                 [map(cloudpickle.dumps, iterable) for iterable in iterables]
             )
 
-            def unpickled_fn(loads, *pickled_args):
+            def unpickled_func(loads, *pickled_args):
                 unpickled_args = [loads(arg) for arg in pickled_args]
-                print(unpickled_args)
-                return fn(*unpickled_args)
+                return func(*unpickled_args)
 
-            # return process_map(
-            #     unpickled_fn,
-            #     *pickled_iterables,
-            #     **kwargs,
-            # )
-            return list(map(unpickled_fn, *pickled_iterables))
+            # tqdm process_map doesn't work with infinite generators, it tries
+            # to find a length a priori and repeat has no length.
+            if not 'total' in kwargs:
+                kwargs['total'] = len(iterables)
+
+            return process_map(
+                # Creating a partial here allows us to use the local function
+                # unpickled_func, which also internally normally unpickleable
+                # functions like FlowProject.compute_status.
+                partial(_run_cloudpickled_func, cloudpickle.dumps(unpickled_func)),
+                *pickled_iterables,
+                **kwargs,
+            )
 
     else:
 
-        def parallel_executor(fn, *iterables, **kwargs):
-            return list(map(fn, *iterables))
+        def parallel_executor(func, *iterables, **kwargs):
+            return list(map(func, *iterables))
 
     return parallel_executor

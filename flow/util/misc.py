@@ -309,7 +309,7 @@ class _bidict(MutableMapping):
 
 
 def _run_cloudpickled_func(func, *args, **kwargs):
-    """A wrapper for cloudpickled functions.
+    """Execute a cloudpickled function.
 
     The set of functions that can be pickled by the built-in pickle module is
     very limited, which prevents the usage of various useful cases such as
@@ -349,8 +349,8 @@ def _get_parallel_executor(parallelization="thread"):
 
             # tqdm process_map doesn't work with infinite generators, it tries
             # to find a length a priori and repeat has no length.
-            if not 'total' in kwargs:
-                kwargs['total'] = len(iterables)
+            if "total" not in kwargs:
+                kwargs["total"] = len(iterables)
 
             return process_map(
                 # Creating a partial here allows us to use the local function

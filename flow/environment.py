@@ -87,7 +87,7 @@ def setup(py_modules, **attrs):
     )
 
 
-class ComputeEnvironmentType(type):
+class _ComputeEnvironmentType(type):
     """Metaclass used for :class:`~.ComputeEnvironment`.
 
     This metaclass automatically registers :class:`~.ComputeEnvironment`
@@ -128,7 +128,7 @@ def template_filter(func):
     return classmethod(func)
 
 
-class ComputeEnvironment(metaclass=ComputeEnvironmentType):
+class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
     """Define computational environments.
 
     The ComputeEnvironment class allows us to automatically determine

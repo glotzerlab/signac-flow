@@ -143,12 +143,12 @@ def _store_bundled(self, operations):
         return bid
 
 
-def get_masked_flowproject(p):
+def get_masked_flowproject(p, **kwargs):
     """Mock environment-dependent attributes and functions. Need to mock
     sys.executable before the FlowProject is instantiated, and then modify the
     root_directory and project_dir elements after creation."""
     sys.executable = "/usr/local/bin/python"
-    fp = TestProject.get_project(root=p.root_directory())
+    fp = TestProject.get_project(root=p.root_directory(), **kwargs)
     fp._entrypoint.setdefault("path", "generate_template_reference_data.py")
     fp.root_directory = lambda: PROJECT_DIRECTORY
     fp.config.project_dir = PROJECT_DIRECTORY

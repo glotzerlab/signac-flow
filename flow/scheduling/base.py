@@ -126,8 +126,31 @@ class Scheduler(ABC):
 
 
 def _call_submit(self, submit_cmd, script, pretend):
+    """Call submit command with a temporary script file.
+
+    Parameters
+    ----------
+    submit_cmd : list[str]
+        List of strings composing the submission command and any flags.
+    script : str
+        Script as a string.
+    pretend : bool
+        If True, the script will be printed to screen instead of submitted.
+
+    Returns
+    -------
+    bool
+        True if the submission succeeds (or in pretend mode).
+
+    Raises
+    ------
+    :class:`~.SubmitError`
+        If the submission command fails.
+
+    """
+    submit_cmd_string = " ".join(submit_cmd)
     if pretend:
-        print("# Submit command: {}".format("  ".join(submit_cmd)))
+        print(f"# Submit command: {submit_cmd_string}")
         print(script)
         print()
     else:
@@ -138,7 +161,6 @@ def _call_submit(self, submit_cmd, script, pretend):
             try:
                 subprocess.check_output(submit_cmd, universal_newlines=True)
             except subprocess.CalledProcessError as error:
-                submit_cmd_string = " ".join(submit_cmd)
                 raise SubmitError(
                     f"Error when calling submission command {submit_cmd_string}: {error.output()}"
                 )

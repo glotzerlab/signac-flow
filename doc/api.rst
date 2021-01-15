@@ -194,9 +194,6 @@ Compute Environments
 
 .. autofunction:: flow.environment.setup
 
-.. autoclass:: flow.environment.ComputeEnvironmentType
-    :members:
-
 .. autofunction:: flow.environment.template_filter
 
 .. autoclass:: flow.environment.ComputeEnvironment

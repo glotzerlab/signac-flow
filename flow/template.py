@@ -29,7 +29,7 @@ TEMPLATES = {
 }
 
 
-def init(alias=None, template=None, root=None, out=None):
+def init(alias=None, template=None, root=None):
     """Initialize a templated :class:`~.FlowProject` module.
 
     Parameters
@@ -51,10 +51,6 @@ def init(alias=None, template=None, root=None, out=None):
         Directory where the output file is placed. Uses the current working
         directory if None. (Default value = None)
 
-    out : file-like object
-        The stream where output is printed. Uses :obj:`sys.stderr` if None.
-        (Default value = None)
-
     Returns
     -------
     list
@@ -70,8 +66,6 @@ def init(alias=None, template=None, root=None, out=None):
         )
     if template is None:
         template = "minimal"
-    if out is None:
-        out = sys.stderr
 
     if os.path.splitext(alias)[1]:
         raise RuntimeError("Please provide a name without suffix!")
@@ -123,5 +117,5 @@ def init(alias=None, template=None, root=None, out=None):
                 )
         else:
             files_created.append(fn)
-            print(f"Created file '{fn}'.", file=out)
+            print(f"Created file '{fn}'.", file=sys.stderr)
     return files_created

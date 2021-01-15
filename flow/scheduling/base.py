@@ -140,7 +140,7 @@ def _call_submit(self, submit_cmd, script, pretend):
     Returns
     -------
     bool
-        True if the submission succeeds (or in pretend mode).
+        True if the submission command succeeds (or in pretend mode).
 
     Raises
     ------

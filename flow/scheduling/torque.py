@@ -135,9 +135,13 @@ class TorqueScheduler(Scheduler):
 
         Returns
         -------
-        str
-            The cluster job id if the script was successfully submitted,
-            otherwise None.
+        bool
+            True if the submission command succeeds (or in pretend mode).
+
+        Raises
+        ------
+        :class:`~.SubmitError`
+            If the submission command fails.
 
         """
         if flags is None:

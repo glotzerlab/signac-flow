@@ -132,8 +132,12 @@ class LSFScheduler(Scheduler):
         Returns
         -------
         bool
-            Returns True if the cluster job was successfully submitted,
-            otherwise False.
+            True if the submission command succeeds (or in pretend mode).
+
+        Raises
+        ------
+        :class:`~.SubmitError`
+            If the submission command fails.
 
         """
         if flags is None:

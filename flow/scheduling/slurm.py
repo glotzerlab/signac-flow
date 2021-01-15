@@ -124,9 +124,12 @@ class SlurmScheduler(Scheduler):
         Returns
         -------
         bool
-            Returns True if the cluster job was successfully submitted,
-            otherwise an error is raised. "Pretend" submissions also return
-            True.
+            True if the submission command succeeds (or in pretend mode).
+
+        Raises
+        ------
+        :class:`~.SubmitError`
+            If the submission command fails.
 
         """
         if flags is None:

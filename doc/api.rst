@@ -119,9 +119,6 @@ Operations and Status
 .. autoclass:: flow.project.JobOperation
     :members:
 
-.. autoclass:: flow.render_status.Renderer
-    :members: generate_terminal_output, generate_html_output, render
-
 Labels
 ------
 

@@ -27,6 +27,9 @@ Changed
 - Docstrings are now written in `numpydoc style <https://numpydoc.readthedocs.io/en/latest/format.html>`__ (#392).
 - Default environment for the University of Minnesota Mangi cluster changed from SLURM to Torque (#393).
 - Improved internal caching of scheduler status (#410).
+- ``Scheduler`` is now an abstract base class (#426).
+- ``flow.scheduling.fakescheduler`` has been renamed to ``flow.scheduling.fake_scheduler`` (#426).
+- Arguments to ``submit`` have been changed for all scheduler classes (#426).
 
 Fixed
 +++++
@@ -37,6 +40,7 @@ Removed
 +++++++
 
 - Removed the deprecated method ``flow.util.misc.write_human_readable_statepoints`` (#397).
+- ``flow.render_status.Renderer`` class has been removed from the public API (#426).
 
 Version 0.11
 ============

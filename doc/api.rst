@@ -240,7 +240,7 @@ Schedulers
 .. autoclass:: flow.scheduling.base.Scheduler
     :members:
 
-.. autoclass:: flow.scheduling.fakescheduler.FakeScheduler
+.. autoclass:: flow.scheduling.fake_scheduler.FakeScheduler
     :members:
 
 .. autoclass:: flow.scheduling.lsf.LSFScheduler

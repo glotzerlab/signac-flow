@@ -31,7 +31,7 @@ from .directives import (
 )
 from .errors import NoSchedulerError
 from .scheduling.base import JobStatus
-from .scheduling.fakescheduler import FakeScheduler
+from .scheduling.fake_scheduler import FakeScheduler
 from .scheduling.lsf import LSFScheduler
 from .scheduling.simple_scheduler import SimpleScheduler
 from .scheduling.slurm import SlurmScheduler

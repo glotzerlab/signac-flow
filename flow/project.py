@@ -455,32 +455,11 @@ class JobOperation(_JobOperation):
     """
 
     def __init__(self, id, name, job, cmd, directives=None):
-        self._id = id
-        self.name = name
-        self._jobs = (job,)
-        if not (callable(cmd) or isinstance(cmd, str)):
-            raise ValueError("JobOperation cmd must be a callable or string.")
-        self._cmd = cmd
-
-        if directives is None:
-            directives = job._project._environment._get_default_directives()
-        else:
-            directives = dict(directives)  # explicit copy
-
-        # Keys which were explicitly set by the user, but are not evaluated by the
-        # template engine are cause for concern and might hint at a bug in the template
-        # script or ill-defined directives. We are therefore keeping track of all
-        # keys set by the user and check whether they have been evaluated by the template
-        # script engine later.
-        keys_set_by_user = set(directives)
-
-        # We use a special dictionary that tracks all keys that have been
-        # evaluated by the template engine and compare them to those explicitly
-        # set by the user. See also comment above.
-        self.directives = TrackGetItemDict(
-            {key: value for key, value in directives.items()}
-        )
-        self.directives._keys_set_by_user = keys_set_by_user
+        complete_directives = job._project._environment._get_default_directives()
+        if directives is not None:
+            complete_directives.update(directives)
+        complete_directives.evaluate(job)
+        super().__init__(id, name, (job,), cmd, complete_directives)
 
     @property
     def job(self):
@@ -1367,6 +1346,7 @@ class FlowGroup:
         directives = self._resolve_directives(
             operation_names[0], default_directives, env
         )
+        directives.evaluate(jobs)
         for name in operation_names[1:]:
             # get directives for operation
             directives.update(
@@ -4202,6 +4182,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             help="Execute all operations in a single bundle in parallel.",
         )
 
+    @deprecated(deprecated_in="0.12", removed_in="0.14", current_version=__version__)
     def export_job_statuses(self, collection, statuses):
         """Export the job statuses to a :class:`signac.Collection`."""
         for status in statuses:

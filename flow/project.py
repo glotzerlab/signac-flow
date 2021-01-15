@@ -3691,14 +3691,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return self._script(operations, parallel, template, show_template_help)
 
     def _generate_submit_script(
-        self, _id, operations, template, show_template_help, env, **kwargs
+        self, _id, operations, template, show_template_help, **kwargs
     ):
         """Generate submission script to submit the execution of operations to a scheduler."""
         if template is None:
-            template = env.template
+            template = self._environment.template
         assert _id is not None
 
-        template_environment = self._template_environment(env)
+        template_environment = self._template_environment(self._environment)
         template = template_environment.get_template(template)
         context = self._get_standard_template_context()
         # The flow 'script.sh' file simply extends the base script
@@ -3707,10 +3707,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # with signac-flow unless additional environment information is
         # detected.
 
-        logger.info("Use environment '%s'.", env)
-        logger.info("Set 'base_script=%s'.", env.template)
-        context["base_script"] = env.template
-        context["environment"] = env
+        logger.info("Set 'base_script=%s'.", self._environment.template)
+        logger.info("Use environment '%s'.", self._environment)
+        context["base_script"] = self._environment.template
+        context["environment"] = self._environment
         context["id"] = _id
         context["operations"] = list(operations)
         context.update(kwargs)
@@ -3738,9 +3738,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             The operations to submit.
         _id : str
             The _id to be used for this submission. (Default value = None)
-        env : :class:`~.ComputeEnvironment`
-            The environment to use for submission. Uses the environment defined
-            by the :class:`~.FlowProject` if None (Default value = None).
         parallel : bool
             Execute all bundled operations in parallel. (Default value = False)
         flags : list
@@ -3780,7 +3777,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 operations=map(_msg, operations),
                 template=template,
                 show_template_help=show_template_help,
-                env=self._environment,
                 parallel=parallel,
                 force=force,
                 **kwargs,
@@ -3842,9 +3838,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             The operations to submit.
         _id : str
             The _id to be used for this submission. (Default value = None)
-        env : :class:`~.ComputeEnvironment`
-            The environment to use for submission. Uses the environment defined
-            by the :class:`~.FlowProject` if None (Default value = None).
         parallel : bool
             Execute all bundled operations in parallel. (Default value = False)
         flags : list
@@ -3924,9 +3917,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Specify if preconditions and/or postconditions are to be ignored
             when determining eligibility after submitting. The default is
             :class:`IgnoreConditions.NONE`.
-        env : :class:`~.ComputeEnvironment`
-            The environment to use for submission. Uses the environment defined
-            by the :class:`~.FlowProject` if None (Default value = None).
         \*\*kwargs
             Additional keyword arguments forwarded to :meth:`~.ComputeEnvironment.submit`.
 
@@ -3939,7 +3929,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "The 'names' argument must be a sequence of strings, however "
                 f"a single string was provided: {names}."
             )
-
         if walltime is not None:
             try:
                 walltime = datetime.timedelta(hours=walltime)

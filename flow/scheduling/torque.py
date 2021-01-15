@@ -140,7 +140,7 @@ class TorqueScheduler(Scheduler):
 
         Raises
         ------
-        :class:`~.SubmitError`
+        :class:`~flow.errors.SubmitError`
             If the submission command fails.
 
         """

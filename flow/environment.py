@@ -233,9 +233,9 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
         This method should be used whenever values need to be provided
         that are specific to a user's environment, e.g. account names.
 
-        When a key is not configured and no default value is provided,
-        a :class:`~.errors.SubmitError` will be raised and the user will
-        be prompted to add the missing key to their configuration.
+        When a key is not configured and no default value is provided, a
+        :class:`~flow.errors.SubmitError` will be raised and the user will be
+        prompted to add the missing key to their configuration.
 
         Please note, that the key will be automatically expanded to
         be specific to this environment definition. For example, a
@@ -256,7 +256,7 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
 
         Raises
         ------
-        SubmitError
+        :class:`~flow.errors.SubmitError`
             If the key is not in the user's configuration
             and no default value is provided.
 

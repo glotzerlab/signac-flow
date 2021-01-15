@@ -245,7 +245,7 @@ def get_account_name(environment, required=False):
 
     Raises
     ------
-    :class:`~.SubmitError`
+    :class:`~flow.errors.SubmitError`
         Raised if ``required`` is True and the account name is missing.
 
     """

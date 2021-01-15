@@ -144,7 +144,7 @@ def _call_submit(self, submit_cmd, script, pretend):
 
     Raises
     ------
-    :class:`~.SubmitError`
+    :class:`~flow.errors.SubmitError`
         If the submission command fails.
 
     """

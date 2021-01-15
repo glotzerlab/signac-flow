@@ -102,6 +102,10 @@ class MockScheduler(Scheduler):
             del cls._jobs[cid]
 
     @classmethod
+    def is_present(cls):
+        return True
+
+    @classmethod
     def reset(cls):
         cls._jobs.clear()
 

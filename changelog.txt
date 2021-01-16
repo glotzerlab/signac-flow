@@ -28,6 +28,7 @@ Changed
 - Default environment for the University of Minnesota Mangi cluster changed from SLURM to Torque (#393).
 - Improved internal caching of scheduler status (#410).
 - Deprecated method ``export_job_statuses`` (#402).
+- Refactored status fetching code (#368, #417).
 
 Fixed
 +++++

@@ -2456,7 +2456,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             status_results = parallel_executor(
                 compute_status,
                 aggregate_groups,
-                chunksize=len(aggregate_groups) // cpu_count() + 1,
                 desc="Fetching status",
                 file=err,
             )
@@ -2469,7 +2468,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             job_labels = parallel_executor(
                 compute_labels,
                 distinct_jobs,
-                chunksize=len(distinct_jobs) // cpu_count() + 1,
                 desc="Fetching labels",
                 file=err,
             )

@@ -4,15 +4,17 @@
 """Miscellaneous utility functions."""
 import argparse
 import logging
+import multiprocessing
 import os
 from collections.abc import MutableMapping
 from contextlib import contextmanager
 from functools import lru_cache, partial
-from itertools import cycle, islice, repeat
+from itertools import cycle, islice
 
 import cloudpickle
+from tqdm.auto import tqdm
 from tqdm.contrib import tmap
-from tqdm.contrib.concurrent import process_map, thread_map  # noqa: F401
+from tqdm.contrib.concurrent import thread_map  # noqa: F401
 
 
 def _positive_int(value):
@@ -309,7 +311,7 @@ class _bidict(MutableMapping):
         return len(self._data)
 
 
-def _run_cloudpickled_func(func, *args, **kwargs):
+def _run_cloudpickled_func(func, *args):
     """Execute a cloudpickled function.
 
     The set of functions that can be pickled by the built-in pickle module is
@@ -321,11 +323,19 @@ def _run_cloudpickled_func(func, *args, **kwargs):
     passed through.
     """
     unpickled_func = cloudpickle.loads(func)
-    return unpickled_func(*args, **kwargs)
+    args = list(map(cloudpickle.loads, args))
+    return unpickled_func(*args)
 
 
 def _get_parallel_executor(parallelization="thread"):
     """Get an executor for the desired parallelization strategy.
+
+    This executor shows a progress bar while executing a function over an
+    iterable in parallel. The returned callable has signature ``func,
+    iterable, **kwargs``. The iterable must have a length (generators are not
+    supported). The keyword argument ``chunksize`` is used for chunking the
+    iterable in supported parallelization modes. All other ``**kwargs`` are
+    passed to the tqdm progress bar.
 
     Parameters
     ----------
@@ -333,41 +343,43 @@ def _get_parallel_executor(parallelization="thread"):
         Parallelization mode. Allowed values are "thread", "process", or
         "none". (Default value = "thread")
 
+    Returns
+    -------
+    callable
+        A callable with signature ``func, iterable, **kwargs``.
+
     """
     if parallelization == "thread":
         parallel_executor = thread_map
     elif parallelization == "process":
 
-        def parallel_executor(func, *iterables, **kwargs):
-            pickled_iterables = [repeat(cloudpickle.loads)]
-            pickled_iterables.extend(
-                [map(cloudpickle.dumps, iterable) for iterable in iterables]
-            )
-
-            def unpickled_func(loads, *pickled_args):
-                unpickled_args = [loads(arg) for arg in pickled_args]
-                return func(*unpickled_args)
-
-            # tqdm process_map doesn't work with infinite generators, it tries
-            # to find a length a priori and repeat has no length.
+        def parallel_executor(func, iterable, chunksize=1, **kwargs):
+            # tqdm progress bar requires a total
             if "total" not in kwargs:
-                kwargs["total"] = len(iterables[0])
+                kwargs["total"] = len(iterable)
 
-            return process_map(
-                # Creating a partial here allows us to use the local function
-                # unpickled_func, which also internally normally unpickleable
-                # functions like FlowProject.compute_status.
-                partial(_run_cloudpickled_func, cloudpickle.dumps(unpickled_func)),
-                *pickled_iterables,
-                **kwargs,
-            )
+            with multiprocessing.Pool() as pool:
+                return list(
+                    tqdm(
+                        pool.imap_unordered(
+                            # Creating a partial here allows us to use the
+                            # local function unpickled_func. The top-level
+                            # function called on each process cannot be a local
+                            # function, it must be a module-level function.
+                            partial(_run_cloudpickled_func, cloudpickle.dumps(func)),
+                            map(cloudpickle.dumps, iterable),
+                            chunksize=chunksize,
+                        ),
+                        **kwargs,
+                    )
+                )
 
     else:
 
-        def parallel_executor(func, *iterables, **kwargs):
+        def parallel_executor(func, iterable, **kwargs):
             if "chunksize" in kwargs:
                 # Chunk size only applies to thread/process parallel executors
                 del kwargs["chunksize"]
-            return list(tmap(func, *iterables, **kwargs))
+            return list(tmap(func, iterable, **kwargs))
 
     return parallel_executor

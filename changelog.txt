@@ -42,7 +42,7 @@ Removed
 +++++++
 
 - Removed the deprecated method ``flow.util.misc.write_human_readable_statepoints`` (#397).
-- ``flow.render_status.Renderer`` class has been removed from the public API (#426).
+- ``flow.render_status.Renderer`` class has been removed. ``FlowProject.print_status`` no longer returns the renderer (#426).
 
 Version 0.11
 ============

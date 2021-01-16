@@ -431,32 +431,11 @@ class JobOperation(_JobOperation):
     """
 
     def __init__(self, id, name, job, cmd, directives=None):
-        self._id = id
-        self.name = name
-        self._jobs = (job,)
-        if not (callable(cmd) or isinstance(cmd, str)):
-            raise ValueError("JobOperation cmd must be a callable or string.")
-        self._cmd = cmd
-
-        if directives is None:
-            directives = job._project._environment._get_default_directives()
-        else:
-            directives = dict(directives)  # explicit copy
-
-        # Keys which were explicitly set by the user, but are not evaluated by the
-        # template engine are cause for concern and might hint at a bug in the template
-        # script or ill-defined directives. We are therefore keeping track of all
-        # keys set by the user and check whether they have been evaluated by the template
-        # script engine later.
-        keys_set_by_user = set(directives)
-
-        # We use a special dictionary that tracks all keys that have been
-        # evaluated by the template engine and compare them to those explicitly
-        # set by the user. See also comment above.
-        self.directives = TrackGetItemDict(
-            {key: value for key, value in directives.items()}
-        )
-        self.directives._keys_set_by_user = keys_set_by_user
+        complete_directives = job._project._environment._get_default_directives()
+        if directives is not None:
+            complete_directives.update(directives)
+        complete_directives.evaluate(job)
+        super().__init__(id, name, (job,), cmd, complete_directives)
 
     @property
     def job(self):
@@ -1351,6 +1330,7 @@ class FlowGroup:
         directives = self._resolve_directives(
             operation_names[0], default_directives, env
         )
+        directives.evaluate(jobs)
         for name in operation_names[1:]:
             # get directives for operation
             directives.update(
@@ -2416,12 +2396,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             and ``_labels_error``.
 
         """
-        # The argument status_parallelization is used so that _fetch_status method
-        # gets to know whether the deprecated argument no_parallelization passed
-        # while calling print_status is True or False. This can also be done by
-        # setting self.config['flow']['status_parallelization']='none' if the argument
-        # is True. But the later functionality will last the rest of the session but in order
-        # to do proper deprecation, it is not required for now.
         if status_parallelization not in ("thread", "process", "none"):
             raise RuntimeError(
                 "Configuration value status_parallelization is invalid. "
@@ -2430,6 +2404,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         parallel_executor = _get_parallel_executor(status_parallelization)
         single_operation_groups = {self._groups[name] for name in self.operations}
+
         # Update the project's status cache
         scheduler_info = self._query_scheduler_status(
             err=err, ignore_errors=ignore_errors
@@ -2537,7 +2512,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         file=None,
         err=None,
         ignore_errors=False,
-        no_parallelize=False,
         template=None,
         profile=False,
         eligible_jobs_max_lines=None,
@@ -2591,8 +2565,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         output_format : str
             Status output format, supports:
             'terminal' (default), 'markdown' or 'html'.
-        no_parallelize : bool
-            Disable parallelization. (Default value = False)
 
         Returns
         -------
@@ -2614,19 +2586,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "eligible_jobs_max_lines"
             )
 
-        if no_parallelize:
-            print(
-                "WARNING: "
-                "The no_parallelize argument is deprecated as of 0.10 "
-                "and will be removed in 0.12. "
-                "Instead, set the status_parallelization configuration value to 'none'. "
-                "In order to do this from the CLI, execute "
-                "`signac config set flow.status_parallelization 'none'`\n",
-                file=sys.stderr,
-            )
-            status_parallelization = "none"
-        else:
-            status_parallelization = self.config["flow"]["status_parallelization"]
+        status_parallelization = self.config["flow"]["status_parallelization"]
 
         # initialize jinja2 template environment and necessary filters
         template_environment = self._template_environment()
@@ -3615,14 +3575,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return self._script(operations, parallel, template, show_template_help)
 
     def _generate_submit_script(
-        self, _id, operations, template, show_template_help, env, **kwargs
+        self, _id, operations, template, show_template_help, **kwargs
     ):
         """Generate submission script to submit the execution of operations to a scheduler."""
         if template is None:
-            template = env.template
+            template = self._environment.template
         assert _id is not None
 
-        template_environment = self._template_environment(env)
+        template_environment = self._template_environment(self._environment)
         template = template_environment.get_template(template)
         context = self._get_standard_template_context()
         # The flow 'script.sh' file simply extends the base script
@@ -3631,10 +3591,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # with signac-flow unless additional environment information is
         # detected.
 
-        logger.info("Use environment '%s'.", env)
-        logger.info("Set 'base_script=%s'.", env.template)
-        context["base_script"] = env.template
-        context["environment"] = env
+        logger.info("Set 'base_script=%s'.", self._environment.template)
+        logger.info("Use environment '%s'.", self._environment)
+        context["base_script"] = self._environment.template
+        context["environment"] = self._environment
         context["id"] = _id
         context["operations"] = list(operations)
         context.update(kwargs)
@@ -3646,7 +3606,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         self,
         operations,
         _id=None,
-        env=None,
         parallel=False,
         flags=None,
         force=False,
@@ -3663,9 +3622,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             The operations to submit.
         _id : str
             The _id to be used for this submission. (Default value = None)
-        env : :class:`~.ComputeEnvironment`
-            The environment to use for submission. Uses the environment defined
-            by the :class:`~.FlowProject` if None (Default value = None).
         parallel : bool
             Execute all bundled operations in parallel. (Default value = False)
         flags : list
@@ -3692,14 +3648,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         if _id is None:
             _id = self._store_bundled(operations)
-        if env is None:
-            env = self._environment
-        else:
-            warnings.warn(
-                "The env argument is deprecated as of 0.10 and will be removed in 0.12. "
-                "Instead, set the environment when constructing a FlowProject.",
-                DeprecationWarning,
-            )
 
         print(f"Submitting cluster job '{_id}':", file=sys.stderr)
 
@@ -3713,7 +3661,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 operations=map(_msg, operations),
                 template=template,
                 show_template_help=show_template_help,
-                env=env,
                 parallel=parallel,
                 force=force,
                 **kwargs,
@@ -3750,14 +3697,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 print(script)
 
             else:
-                return env.submit(_id=_id, script=script, flags=flags, **kwargs)
+                return self._environment.submit(
+                    _id=_id, script=script, flags=flags, **kwargs
+                )
 
     @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
     def submit_operations(
         self,
         operations,
         _id=None,
-        env=None,
         parallel=False,
         flags=None,
         force=False,
@@ -3774,9 +3722,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             The operations to submit.
         _id : str
             The _id to be used for this submission. (Default value = None)
-        env : :class:`~.ComputeEnvironment`
-            The environment to use for submission. Uses the environment defined
-            by the :class:`~.FlowProject` if None (Default value = None).
         parallel : bool
             Execute all bundled operations in parallel. (Default value = False)
         flags : list
@@ -3804,7 +3749,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return self._submit_operations(
             operations,
             _id,
-            env,
             parallel,
             flags,
             force,
@@ -3823,7 +3767,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         parallel=False,
         force=False,
         walltime=None,
-        env=None,
         test=False,
         ignore_conditions=IgnoreConditions.NONE,
         ignore_conditions_on_execution=IgnoreConditions.NONE,
@@ -3859,9 +3802,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Specify if preconditions and/or postconditions are to be ignored
             when determining eligibility after submitting. The default is
             :class:`IgnoreConditions.NONE`.
-        env : :class:`~.ComputeEnvironment`
-            The environment to use for submission. Uses the environment defined
-            by the :class:`~.FlowProject` if None (Default value = None).
         test : bool
             If True, the submission will not update the scheduler status
             before determining the operations to submit. The cached status
@@ -3877,14 +3817,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             raise ValueError(
                 "The 'names' argument must be a sequence of strings, however "
                 f"a single string was provided: {names}."
-            )
-        if env is None:
-            env = self._environment
-        else:
-            warnings.warn(
-                "The env argument is deprecated as of 0.10 and will be removed in 0.12. "
-                "Instead, set the environment when constructing a FlowProject.",
-                DeprecationWarning,
             )
         if walltime is not None:
             try:
@@ -3926,7 +3858,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 for bundle in _make_bundles(operations, bundle_size):
                     status = self._submit_operations(
                         operations=bundle,
-                        env=env,
                         parallel=parallel,
                         force=force,
                         walltime=walltime,
@@ -4098,6 +4029,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             help="Execute all operations in a single bundle in parallel.",
         )
 
+    @deprecated(deprecated_in="0.12", removed_in="0.14", current_version=__version__)
     def export_job_statuses(self, collection, statuses):
         """Export the job statuses to a :class:`signac.Collection`."""
         for status in statuses:
@@ -4196,14 +4128,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             "--ignore-errors",
             action="store_true",
             help="Ignore errors that might occur when querying the scheduler.",
-        )
-        parser.add_argument(
-            "--no-parallelize",
-            action="store_true",
-            help="Do not parallelize the status determination. "
-            "The '--no-parallelize' argument is deprecated. "
-            "Please use the status_parallelization configuration "
-            "instead (see above).",
         )
         view_group.add_argument(
             "-o",

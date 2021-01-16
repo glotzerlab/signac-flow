@@ -365,6 +365,9 @@ def _get_parallel_executor(parallelization="thread"):
     else:
 
         def parallel_executor(func, *iterables, **kwargs):
+            if "chunksize" in kwargs:
+                # Chunk size only applies to thread/process parallel executors
+                del kwargs["chunksize"]
             return list(tmap(func, *iterables, **kwargs))
 
     return parallel_executor

@@ -440,6 +440,15 @@ class TestProjectClass(TestProjectBase):
             break
 
     def test_callable_directives(self):
+        """Test that callable directives are properly evaluated.
+
+        _JobOperations and _SubmissionJobOperations should have fully evaluated
+        (no callable) directives when initialized. We additionally test that the
+        directives are evaluated to their proper value specifically in the case
+        of 'np' which is determined by 'nranks' and 'omp_num_threads' if not set
+        directly.
+        """
+
         class A(FlowProject):
             pass
 
@@ -476,6 +485,68 @@ class TestProjectClass(TestProjectBase):
             expected_np = (i + 1) * (i % 3 + 1)
             for next_op in project._next_operations([(job,)]):
                 assert next_op.directives["np"] == expected_np
+
+        # test for proper evaluation of all directives
+        job = next(iter(project))
+        job_operation = next(project._next_operations([(job,)]))
+        assert all(not callable(value) for value in job_operation.directives.values())
+        # Also test for submitting operations
+        submit_job_operation = next(
+            project._get_submission_operations(
+                aggregates=[(job,)],
+                default_directives=project._get_default_directives(),
+            )
+        )
+        assert all(
+            not callable(value) for value in submit_job_operation.directives.values()
+        )
+
+    def test_callable_directives_with_groups(self):
+        """Test the handling of callable directives with multi-operation groups.
+
+        This specifically tests that _SubmissionJobOperations have their
+        directives properly evaluated and are not callable when initialized.
+        We only need to test submission since running in flow breaks a multiple
+        operation group into its constituent singleton groups before creating
+        _JobOperations.
+        """
+
+        class A(FlowProject):
+            pass
+
+        group = A.make_group("group")
+
+        @group
+        @A.operation
+        @directives(
+            nranks=lambda job: job.doc.get("nranks", 1),
+            omp_num_threads=lambda job: job.doc.get("omp_num_threads", 1),
+        )
+        def a(job):
+            return "hello!"
+
+        @group
+        @A.operation
+        @directives(
+            nranks=lambda job: job.doc.get("nranks", 1),
+            omp_num_threads=lambda job: job.doc.get("omp_num_threads", 1),
+        )
+        def b(job):
+            return "world"
+
+        project = self.mock_project(A)
+
+        # test for proper evaluation of all directives.
+        job = next(iter(project))
+        for submit_job_operation in project._get_submission_operations(
+            aggregates=[(job,)],
+            default_directives=project._get_default_directives(),
+        ):
+            if submit_job_operation.name == "group":
+                break
+        assert all(
+            not callable(value) for value in submit_job_operation.directives.values()
+        )
 
     def test_copy_conditions(self):
         class A(FlowProject):

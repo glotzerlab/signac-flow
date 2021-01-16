@@ -13,6 +13,7 @@ from test_project import redirect_stderr, redirect_stdout
 
 import flow
 import flow.environments
+from flow.scheduling.fakescheduler import FakeScheduler
 
 
 def _env_name(env):
@@ -24,6 +25,7 @@ def find_envs():
     """Yields the environments to be tested."""
     for name, env in flow.environment.ComputeEnvironment.registry.items():
         if env.__module__.startswith("flow.environments"):
+            env.scheduler_type = FakeScheduler
             yield env
 
 
@@ -36,7 +38,7 @@ def test_env(env, monkeypatch):
 
     # Must import the data into the project.
     with signac.TemporaryProject(name=gen.PROJECT_NAME) as p:
-        fp = gen.get_masked_flowproject(p)
+        fp = gen.get_masked_flowproject(p, environment=env)
         # Here we set the appropriate executable for all the operations. This
         # is necessary as otherwise the default executable between submitting
         # and running could look different depending on the environment.
@@ -62,7 +64,6 @@ def test_env(env, monkeypatch):
                     with redirect_stderr(devnull):
                         with redirect_stdout(tmp_out):
                             fp.submit(
-                                env=env,
                                 jobs=[job],
                                 names=bundle,
                                 pretend=True,
@@ -93,7 +94,6 @@ def test_env(env, monkeypatch):
                         with redirect_stderr(devnull):
                             with redirect_stdout(tmp_out):
                                 fp.submit(
-                                    env=env,
                                     jobs=[job],
                                     names=[op],
                                     pretend=True,

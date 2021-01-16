@@ -3619,7 +3619,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if not self.config["flow"].as_bool("use_buffered_mode"):
             warnings.warn(
                 "The use_buffered_mode config option is deprecated as of 0.12 "
-                "and will be removed in 0.14. Buffered mode is always enabled "
+                "and will be removed in 0.13. Buffered mode is always enabled "
                 "in 0.12 and newer.",
                 DeprecationWarning,
             )

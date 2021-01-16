@@ -14,7 +14,7 @@ from itertools import cycle, islice
 import cloudpickle
 from tqdm.auto import tqdm
 from tqdm.contrib import tmap
-from tqdm.contrib.concurrent import thread_map  # noqa: F401
+from tqdm.contrib.concurrent import thread_map
 
 
 def _positive_int(value):

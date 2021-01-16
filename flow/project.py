@@ -2021,8 +2021,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             yield status_update
         finally:
             if status_update:
-                self.document.setdefault("_status", {})
-                self.document["_status"].update(status_update)
+                status_update = {
+                    key: int(value) for key, value in status_update.items()
+                }
+                if "_status" in self.document:
+                    self.document["_status"].update(status_update)
+                else:
+                    self.document["_status"] = status_update
 
     def _generate_selected_aggregate_groups(
         self,
@@ -2164,7 +2169,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             ) in self._generate_selected_aggregate_groups(*args, **kwargs):
                 scheduler_id = group._generate_id(aggregate)
                 scheduler_status = scheduler_info.get(scheduler_id, JobStatus.unknown)
-                status_update[scheduler_id] = int(scheduler_status)
+                status_update[scheduler_id] = scheduler_status
                 yield scheduler_id, scheduler_status, aggregate_id, aggregate, group
 
     def _get_aggregate_group_status(self, aggregate, cached_status):

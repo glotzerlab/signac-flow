@@ -3,6 +3,7 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 import argparse
+import contextlib
 import io
 import itertools
 import operator
@@ -144,17 +145,22 @@ def _store_bundled(self, operations):
         return bid
 
 
+@contextlib.contextmanager
 def get_masked_flowproject(p, **kwargs):
     """Mock environment-dependent attributes and functions. Need to mock
     sys.executable before the FlowProject is instantiated, and then modify the
     root_directory and project_dir elements after creation."""
-    sys.executable = "/usr/local/bin/python"
-    fp = TestProject.get_project(root=p.root_directory(), **kwargs)
-    fp._entrypoint.setdefault("path", "generate_template_reference_data.py")
-    fp._mock = True
-    fp._mock_root_directory = lambda: PROJECT_DIRECTORY
-    fp.config.project_dir = PROJECT_DIRECTORY
-    return fp
+    try:
+        old_executable = sys.executable
+        sys.executable = "/usr/local/bin/python"
+        fp = TestProject.get_project(root=p.root_directory(), **kwargs)
+        fp._entrypoint.setdefault("path", "generate_template_reference_data.py")
+        fp._mock = True
+        fp._mock_root_directory = lambda: PROJECT_DIRECTORY
+        fp.config.project_dir = PROJECT_DIRECTORY
+        yield fp
+    finally:
+        sys.executable = old_executable
 
 
 def main(args):
@@ -172,65 +178,34 @@ def main(args):
 
     with signac.TemporaryProject(name=PROJECT_NAME) as p:
         init(p)
-        fp = get_masked_flowproject(p)
-        # Here we set the appropriate executable for all the operations. This
-        # is necessary as otherwise the default executable between submitting
-        # and running could look different depending on the environment.
-        executable = "/usr/local/bin/python"
-        for group in fp.groups.values():
-            for op_key in group.operations:
-                if op_key in group.operation_directives:
-                    group.operation_directives[op_key]["executable"] = executable
-        for job in fp:
-            with job:
-                kwargs = job.statepoint()
-                env = get_nested_attr(flow, kwargs["environment"])
-                env.scheduler_type = FakeScheduler
-                fp._environment = env
-                parameters = kwargs["parameters"]
-                if "bundle" in parameters:
-                    bundle = parameters.pop("bundle")
-                    fn = "script_{}.sh".format("_".join(bundle))
-                    tmp_out = io.TextIOWrapper(io.BytesIO(), sys.stdout.encoding)
-                    with redirect_stdout(tmp_out):
-                        try:
-                            fp.submit(
-                                jobs=[job],
-                                names=bundle,
-                                pretend=True,
-                                force=True,
-                                bundle_size=len(bundle),
-                                **parameters,
-                            )
-                        except jinja2.TemplateError as e:
-                            print("ERROR:", e)  # Shows template error in output script
-
-                    # Filter out non-header lines
-                    tmp_out.seek(0)
-                    with open(fn, "w") as f:
-                        with redirect_stdout(f):
-                            print(tmp_out.read(), end="")
-                else:
-                    for op in {**fp.operations, **fp.groups}:
-                        if "partition" in parameters:
-                            # Don't try to submit GPU operations to CPU partitions
-                            # and vice versa.  We should be able to relax this
-                            # requirement if we make our error checking more
-                            # consistent.
-                            if operator.xor(
-                                "gpu" in parameters["partition"].lower(),
-                                "gpu" in op.lower(),
-                            ):
-                                continue
-                        fn = f"script_{op}.sh"
+        with get_masked_flowproject(p) as fp:
+            # Here we set the appropriate executable for all the operations. This
+            # is necessary as otherwise the default executable between submitting
+            # and running could look different depending on the environment.
+            executable = "/usr/local/bin/python"
+            for group in fp.groups.values():
+                for op_key in group.operations:
+                    if op_key in group.operation_directives:
+                        group.operation_directives[op_key]["executable"] = executable
+            for job in fp:
+                with job:
+                    kwargs = job.statepoint()
+                    env = get_nested_attr(flow, kwargs["environment"])
+                    env.scheduler_type = FakeScheduler
+                    fp._environment = env
+                    parameters = kwargs["parameters"]
+                    if "bundle" in parameters:
+                        bundle = parameters.pop("bundle")
+                        fn = "script_{}.sh".format("_".join(bundle))
                         tmp_out = io.TextIOWrapper(io.BytesIO(), sys.stdout.encoding)
                         with redirect_stdout(tmp_out):
                             try:
                                 fp.submit(
                                     jobs=[job],
-                                    names=[op],
+                                    names=bundle,
                                     pretend=True,
                                     force=True,
+                                    bundle_size=len(bundle),
                                     **parameters,
                                 )
                             except jinja2.TemplateError as e:
@@ -238,14 +213,49 @@ def main(args):
                                     "ERROR:", e
                                 )  # Shows template error in output script
 
-                        # Filter out non-header lines and the job-name line
+                        # Filter out non-header lines
                         tmp_out.seek(0)
                         with open(fn, "w") as f:
                             with redirect_stdout(f):
                                 print(tmp_out.read(), end="")
+                    else:
+                        for op in {**fp.operations, **fp.groups}:
+                            if "partition" in parameters:
+                                # Don't try to submit GPU operations to CPU partitions
+                                # and vice versa.  We should be able to relax this
+                                # requirement if we make our error checking more
+                                # consistent.
+                                if operator.xor(
+                                    "gpu" in parameters["partition"].lower(),
+                                    "gpu" in op.lower(),
+                                ):
+                                    continue
+                            fn = f"script_{op}.sh"
+                            tmp_out = io.TextIOWrapper(
+                                io.BytesIO(), sys.stdout.encoding
+                            )
+                            with redirect_stdout(tmp_out):
+                                try:
+                                    fp.submit(
+                                        jobs=[job],
+                                        names=[op],
+                                        pretend=True,
+                                        force=True,
+                                        **parameters,
+                                    )
+                                except jinja2.TemplateError as e:
+                                    print(
+                                        "ERROR:", e
+                                    )  # Shows template error in output script
 
-        # For compactness, we move the output into an ARCHIVE_DIR then delete the original data.
-        fp.export_to(target=ARCHIVE_DIR)
+                            # Filter out non-header lines and the job-name line
+                            tmp_out.seek(0)
+                            with open(fn, "w") as f:
+                                with redirect_stdout(f):
+                                    print(tmp_out.read(), end="")
+
+            # For compactness, we move the output into an ARCHIVE_DIR then delete the original data.
+            fp.export_to(target=ARCHIVE_DIR)
 
 
 if __name__ == "__main__":

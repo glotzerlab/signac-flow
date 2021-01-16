@@ -188,8 +188,6 @@ class TestProjectStatusPerformance(TestProjectBase):
 
         project = self.mock_project()
 
-        MockScheduler.reset()
-
         time = timeit.timeit(
             lambda: project._fetch_status(
                 _AggregatesCursor(project), project, StringIO(), ignore_errors=False

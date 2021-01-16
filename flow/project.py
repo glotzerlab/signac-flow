@@ -2467,7 +2467,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 ignore_errors=ignore_errors,
             )
             job_labels = parallel_executor(
-                compute_labels, distinct_jobs, desc="Fetching labels", file=err
+                compute_labels,
+                distinct_jobs,
+                chunksize=len(distinct_jobs) // cpu_count() + 1,
+                desc="Fetching labels",
+                file=err,
             )
 
         status_results_combined = []

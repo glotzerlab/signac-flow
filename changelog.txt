@@ -26,6 +26,7 @@ Changed
 - ``CPUEnvironment`` and ``GPUEnvironment`` classes are deprecated (#381).
 - Docstrings are now written in `numpydoc style <https://numpydoc.readthedocs.io/en/latest/format.html>`__ (#392).
 - Default environment for the University of Minnesota Mangi cluster changed from SLURM to Torque (#393).
+- Deprecated method ``export_job_statuses`` (#402).
 - Improved internal caching of scheduler status (#410).
 - ``Scheduler`` is now an abstract base class (#426).
 - ``flow.scheduling.fakescheduler`` has been renamed to ``flow.scheduling.fake_scheduler`` (#426).
@@ -34,6 +35,7 @@ Changed
 Fixed
 +++++
 
+- Ensure that directives are always evaluated before running or submitting (#408, #409).
 - Cache the fully qualified domain name during environment detection to fix a performance issue on macOS (#339, #394).
 
 Removed

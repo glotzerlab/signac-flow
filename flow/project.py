@@ -2471,30 +2471,29 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             return result
 
         with self._potentially_buffered():
-            aggregate_group_generator = (
+            aggregate_groups = list(
                 self._generate_selected_aggregate_groups_with_status(
                     scheduler_info=scheduler_info,
                     selected_aggregates=aggregates,
                     selected_groups=single_operation_groups,
-                    tqdm_kwargs={
-                        "desc": "Fetching scheduler status",
-                        "file": err,
-                    },
                 )
             )
-            # TODO: Add a total to the progress bar (not currently known by the
-            # generator but could be added by creating a wrapping class with
-            # __len__ and __iter__)
             status_results = parallel_executor(
-                compute_status, aggregate_group_generator, total=None
+                compute_status,
+                aggregate_groups,
+                chunksize=len(aggregate_groups) // cpu_count() + 1,
+                desc="Fetching status",
+                file=err,
             )
 
         with self._potentially_buffered():
-            get_job_labels = functools.partial(
+            compute_labels = functools.partial(
                 self._get_job_labels,
                 ignore_errors=ignore_errors,
             )
-            job_labels = parallel_executor(get_job_labels, distinct_jobs)
+            job_labels = parallel_executor(
+                compute_labels, distinct_jobs, desc="Fetching labels", file=err
+            )
 
         status_results_combined = []
         for aggregate_id, aggregate_results in groupby(

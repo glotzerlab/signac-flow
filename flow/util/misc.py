@@ -11,6 +11,7 @@ from functools import lru_cache, partial
 from itertools import cycle, islice, repeat
 
 import cloudpickle
+from tqdm.contrib import tmap
 from tqdm.contrib.concurrent import process_map, thread_map  # noqa: F401
 
 
@@ -350,7 +351,7 @@ def _get_parallel_executor(parallelization="thread"):
             # tqdm process_map doesn't work with infinite generators, it tries
             # to find a length a priori and repeat has no length.
             if "total" not in kwargs:
-                kwargs["total"] = len(iterables)
+                kwargs["total"] = len(iterables[0])
 
             return process_map(
                 # Creating a partial here allows us to use the local function
@@ -364,6 +365,6 @@ def _get_parallel_executor(parallelization="thread"):
     else:
 
         def parallel_executor(func, *iterables, **kwargs):
-            return list(map(func, *iterables))
+            return list(tmap(func, *iterables, **kwargs))
 
     return parallel_executor

@@ -146,14 +146,16 @@ def _store_bundled(self, operations):
 
 
 @contextlib.contextmanager
-def get_masked_flowproject(p, **kwargs):
+def get_masked_flowproject(p, environment=None):
     """Mock environment-dependent attributes and functions. Need to mock
     sys.executable before the FlowProject is instantiated, and then modify the
     root_directory and project_dir elements after creation."""
     try:
         old_executable = sys.executable
         sys.executable = "/usr/local/bin/python"
-        fp = TestProject.get_project(root=p.root_directory(), **kwargs)
+        fp = TestProject.get_project(root=p.root_directory())
+        if environment is not None:
+            fp._environment = environment
         fp._entrypoint.setdefault("path", "generate_template_reference_data.py")
         fp._mock = True
         fp._mock_root_directory = lambda: PROJECT_DIRECTORY

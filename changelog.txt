@@ -39,6 +39,8 @@ Removed
 +++++++
 
 - Removed the deprecated method ``flow.util.misc.write_human_readable_statepoints`` (#397).
+- Removed the deprecated argument ``--no-parallelize`` (#424).
+- Removed the deprecated ``env`` argument from submission methods (#424).
 
 Version 0.11
 ============

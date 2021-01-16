@@ -2421,13 +2421,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             operations, labels, and any errors caught.
 
         """
-        # The argument status_parallelization is used so that _fetch_status method
-        # gets to know whether the deprecated argument no_parallelization passed
-        # while calling print_status is True or False. This can also be done by
-        # setting self.config['flow']['status_parallelization']='none' if the argument
-        # is True. But the later functionality will last the rest of the session but in order
-        # to do proper deprecation, it is not required for now.
-
         # Update the project's status cache
         self._fetch_scheduler_status(aggregates, err, ignore_errors)
         # Get project status cache

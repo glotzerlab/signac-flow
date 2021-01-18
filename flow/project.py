@@ -2024,11 +2024,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 status_update = {
                     key: int(value) for key, value in status_update.items()
                 }
-                with self._buffered():
-                    if "_status" in self.document:
-                        self.document["_status"].update(status_update)
-                    else:
-                        self.document["_status"] = status_update
+                if "_status" in self.document:
+                    self.document["_status"].update(status_update)
+                else:
+                    self.document["_status"] = status_update
 
     def _generate_selected_aggregate_groups(
         self,

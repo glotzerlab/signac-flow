@@ -145,12 +145,13 @@ class TestProjectBase:
             config = project.config.copy()
             config = recursive_update(config, config_overrides)
             project = project_class(config=config)
-        for a in range(3):
+        for a in range(2):
             if heterogeneous:
                 # Add jobs with only the `a` key without `b`.
                 project.open_job(dict(a=a)).init()
                 project.open_job(dict(a=dict(a=a))).init()
-            for b in range(3):
+            # Tests assume that there are even and odd values of b
+            for b in range(2):
                 project.open_job(dict(a=a, b=b)).init()
                 project.open_job(dict(a=dict(a=a), b=b)).init()
         project._entrypoint = self.entrypoint
@@ -1177,24 +1178,9 @@ class TestExecutionProject(TestProjectBase):
                 assert evaluated == expected_evaluation
 
 
-class TestUnbufferedExecutionProject(TestExecutionProject):
-    def mock_project(self, project_class=None):
-        project = super().mock_project(
-            project_class=project_class,
-            config_overrides={"flow": {"use_buffered_mode": "off"}},
-        )
-        return project
-
-
 class TestExecutionDynamicProject(TestExecutionProject):
     project_class = _DynamicTestProject
     expected_number_of_steps = 7
-
-
-class TestUnbufferedExecutionDynamicProject(
-    TestUnbufferedExecutionProject, TestExecutionDynamicProject
-):
-    pass
 
 
 class TestProjectMainInterface(TestProjectBase):
@@ -1632,21 +1618,9 @@ class TestGroupExecutionProject(TestProjectBase):
         assert i == self.expected_number_of_steps
 
 
-class TestGroupUnbufferedExecutionProject(
-    TestUnbufferedExecutionProject, TestGroupExecutionProject
-):
-    pass
-
-
 class TestGroupExecutionDynamicProject(TestGroupExecutionProject):
     project_class = _DynamicTestProject
     expected_number_of_steps = 4
-
-
-class TestGroupUnbufferedExecutionDynamicProject(
-    TestGroupUnbufferedExecutionProject, TestGroupExecutionDynamicProject
-):
-    pass
 
 
 class TestGroupProjectMainInterface(TestProjectBase):

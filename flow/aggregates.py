@@ -407,7 +407,7 @@ class _AggregateStore(_BaseAggregateStore):
         try:
             return self._aggregates_by_id[id]
         except KeyError:
-            raise KeyError(f"Aggregate id {id} is not in this aggregate store.")
+            raise KeyError(f"Aggregate id {id} could not be found.")
 
     def __contains__(self, id):
         """Return whether this instance contains an aggregate (by aggregate id).
@@ -529,7 +529,7 @@ class _DefaultAggregateStore(_BaseAggregateStore):
         try:
             return (self._project.open_job(id=id),)
         except KeyError:
-            raise KeyError(f"Aggregate id {id} is not in this aggregate store.")
+            raise KeyError(f"Aggregate id {id} could not be found.")
 
     def __contains__(self, id):
         """Return whether this instance contains a job (by job id).

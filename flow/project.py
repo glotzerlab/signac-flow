@@ -50,7 +50,7 @@ from .errors import (
     UserOperationError,
 )
 from .labels import _is_label_func, classlabel, label, staticlabel
-from .render_status import Renderer as StatusRenderer
+from .render_status import _render_status
 from .scheduling.base import ClusterJob, JobStatus
 from .util import config as flow_config
 from .util import template_filters
@@ -2690,11 +2690,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Status output format, supports:
             'terminal' (default), 'markdown' or 'html'.
 
-        Returns
-        -------
-        :class:`~.Renderer`
-            A Renderer class object that contains the rendered string.
-
         """
         if file is None:
             file = sys.stdout
@@ -2993,8 +2988,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 (f"[{num_omitted_operations} more operations omitted]", "")
             )
 
-        status_renderer = StatusRenderer()
-
         # We have to make a deep copy of the template environment if we're
         # using a process Pool for parallelism. Somewhere in the process of
         # manually pickling and dispatching tasks to individual processes
@@ -3007,7 +3000,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if status_parallelization == "process"
             else template_environment
         )
-        render_output = status_renderer.render(
+        render_output = _render_status(
             template,
             template_environment_copy,
             context,
@@ -3023,8 +3016,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Show profiling results (if enabled)
         if profiling_results:
             print("\n" + "\n".join(profiling_results), file=file)
-
-        return status_renderer
 
     def _run_operations(
         self, operations=None, pretend=False, np=None, timeout=None, progress=False

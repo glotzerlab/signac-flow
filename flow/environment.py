@@ -31,7 +31,7 @@ from .directives import (
 )
 from .errors import NoSchedulerError
 from .scheduling.base import JobStatus
-from .scheduling.fakescheduler import FakeScheduler
+from .scheduling.fake_scheduler import FakeScheduler
 from .scheduling.lsf import LSFScheduler
 from .scheduling.simple_scheduler import SimpleScheduler
 from .scheduling.slurm import SlurmScheduler
@@ -87,7 +87,7 @@ def setup(py_modules, **attrs):
     )
 
 
-class ComputeEnvironmentType(type):
+class _ComputeEnvironmentType(type):
     """Metaclass used for :class:`~.ComputeEnvironment`.
 
     This metaclass automatically registers :class:`~.ComputeEnvironment`
@@ -128,7 +128,7 @@ def template_filter(func):
     return classmethod(func)
 
 
-class ComputeEnvironment(metaclass=ComputeEnvironmentType):
+class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
     """Define computational environments.
 
     The ComputeEnvironment class allows us to automatically determine
@@ -233,9 +233,9 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
         This method should be used whenever values need to be provided
         that are specific to a user's environment, e.g. account names.
 
-        When a key is not configured and no default value is provided,
-        a :class:`~.errors.SubmitError` will be raised and the user will
-        be prompted to add the missing key to their configuration.
+        When a key is not configured and no default value is provided, a
+        :class:`~flow.errors.SubmitError` will be raised and the user will be
+        prompted to add the missing key to their configuration.
 
         Please note, that the key will be automatically expanded to
         be specific to this environment definition. For example, a
@@ -256,7 +256,7 @@ class ComputeEnvironment(metaclass=ComputeEnvironmentType):
 
         Raises
         ------
-        SubmitError
+        :class:`~flow.errors.SubmitError`
             If the key is not in the user's configuration
             and no default value is provided.
 

@@ -102,6 +102,10 @@ class MockScheduler(Scheduler):
             del cls._jobs[cid]
 
     @classmethod
+    def is_present(cls):
+        return True
+
+    @classmethod
     def reset(cls):
         cls._jobs.clear()
 
@@ -790,8 +794,8 @@ class TestProject(TestProjectBase):
                 assert "exec op2" in script
 
     def test_init(self):
-        with open(os.devnull, "w") as out:
-            for fn in init(root=self._tmp_dir.name, out=out):
+        with redirect_stderr(StringIO()):
+            for fn in init(root=self._tmp_dir.name):
                 fn_ = os.path.join(self._tmp_dir.name, fn)
                 assert os.path.isfile(fn_)
 

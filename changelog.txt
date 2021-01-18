@@ -28,6 +28,7 @@ Changed
 - Default environment for the University of Minnesota Mangi cluster changed from SLURM to Torque (#393).
 - Deprecated method ``export_job_statuses`` (#402).
 - Improved internal caching of scheduler status (#410).
+- The ``use_buffered_mode`` config option is deprecated. Buffering is always internally enabled (#425).
 - ``Scheduler`` is now an abstract base class (#426).
 - ``flow.scheduling.fakescheduler`` has been renamed to ``flow.scheduling.fake_scheduler`` (#426).
 - Arguments to ``submit`` have been changed for all scheduler classes (#426).
@@ -42,6 +43,8 @@ Removed
 +++++++
 
 - Removed the deprecated method ``flow.util.misc.write_human_readable_statepoints`` (#397).
+- Removed the deprecated argument ``--no-parallelize`` (#424).
+- Removed the deprecated ``env`` argument from submission methods (#424).
 - ``flow.render_status.Renderer`` class has been removed. ``FlowProject.print_status`` no longer returns the renderer (#426).
 - Removed deprecated ``status.py`` module (#426).
 

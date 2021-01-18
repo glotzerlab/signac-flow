@@ -102,6 +102,10 @@ class MockScheduler(Scheduler):
             del cls._jobs[cid]
 
     @classmethod
+    def is_present(cls):
+        return True
+
+    @classmethod
     def reset(cls):
         cls._jobs.clear()
 
@@ -144,12 +148,13 @@ class TestProjectBase:
             config = project.config.copy()
             config = recursive_update(config, config_overrides)
             project = project_class(config=config)
-        for a in range(3):
+        for a in range(2):
             if heterogeneous:
                 # Add jobs with only the `a` key without `b`.
                 project.open_job(dict(a=a)).init()
                 project.open_job(dict(a=dict(a=a))).init()
-            for b in range(3):
+            # Tests assume that there are even and odd values of b
+            for b in range(2):
                 project.open_job(dict(a=a, b=b)).init()
                 project.open_job(dict(a=dict(a=a), b=b)).init()
         project._entrypoint = self.entrypoint
@@ -440,6 +445,15 @@ class TestProjectClass(TestProjectBase):
             break
 
     def test_callable_directives(self):
+        """Test that callable directives are properly evaluated.
+
+        _JobOperations and _SubmissionJobOperations should have fully evaluated
+        (no callable) directives when initialized. We additionally test that the
+        directives are evaluated to their proper value specifically in the case
+        of 'np' which is determined by 'nranks' and 'omp_num_threads' if not set
+        directly.
+        """
+
         class A(FlowProject):
             pass
 
@@ -476,6 +490,72 @@ class TestProjectClass(TestProjectBase):
             expected_np = (i + 1) * (i % 3 + 1)
             for next_op in project._next_operations([(job,)]):
                 assert next_op.directives["np"] == expected_np
+
+        # test for proper evaluation of all directives
+        job = next(iter(project))
+        job_operation = next(project._next_operations([(job,)]))
+        assert all(not callable(value) for value in job_operation.directives.values())
+        # Also test for submitting operations
+        cached_status = project._get_cached_status()
+        submit_job_operation = next(
+            project._get_submission_operations(
+                aggregates=[(job,)],
+                default_directives=project._get_default_directives(),
+                cached_status=cached_status,
+            )
+        )
+        assert all(
+            not callable(value) for value in submit_job_operation.directives.values()
+        )
+
+    def test_callable_directives_with_groups(self):
+        """Test the handling of callable directives with multi-operation groups.
+
+        This specifically tests that _SubmissionJobOperations have their
+        directives properly evaluated and are not callable when initialized.
+        We only need to test submission since running in flow breaks a multiple
+        operation group into its constituent singleton groups before creating
+        _JobOperations.
+        """
+
+        class A(FlowProject):
+            pass
+
+        group = A.make_group("group")
+
+        @group
+        @A.operation
+        @directives(
+            nranks=lambda job: job.doc.get("nranks", 1),
+            omp_num_threads=lambda job: job.doc.get("omp_num_threads", 1),
+        )
+        def a(job):
+            return "hello!"
+
+        @group
+        @A.operation
+        @directives(
+            nranks=lambda job: job.doc.get("nranks", 1),
+            omp_num_threads=lambda job: job.doc.get("omp_num_threads", 1),
+        )
+        def b(job):
+            return "world"
+
+        project = self.mock_project(A)
+
+        # test for proper evaluation of all directives.
+        cached_status = project._get_cached_status()
+        job = next(iter(project))
+        for submit_job_operation in project._get_submission_operations(
+            aggregates=[(job,)],
+            default_directives=project._get_default_directives(),
+            cached_status=cached_status,
+        ):
+            if submit_job_operation.name == "group":
+                break
+        assert all(
+            not callable(value) for value in submit_job_operation.directives.values()
+        )
 
     def test_copy_conditions(self):
         class A(FlowProject):
@@ -714,8 +794,8 @@ class TestProject(TestProjectBase):
                 assert "exec op2" in script
 
     def test_init(self):
-        with open(os.devnull, "w") as out:
-            for fn in init(root=self._tmp_dir.name, out=out):
+        with redirect_stderr(StringIO()):
+            for fn in init(root=self._tmp_dir.name):
                 fn_ = os.path.join(self._tmp_dir.name, fn)
                 assert os.path.isfile(fn_)
 
@@ -1117,24 +1197,9 @@ class TestExecutionProject(TestProjectBase):
                 assert evaluated == expected_evaluation
 
 
-class TestUnbufferedExecutionProject(TestExecutionProject):
-    def mock_project(self, project_class=None):
-        project = super().mock_project(
-            project_class=project_class,
-            config_overrides={"flow": {"use_buffered_mode": "off"}},
-        )
-        return project
-
-
 class TestExecutionDynamicProject(TestExecutionProject):
     project_class = _DynamicTestProject
     expected_number_of_steps = 10
-
-
-class TestUnbufferedExecutionDynamicProject(
-    TestUnbufferedExecutionProject, TestExecutionDynamicProject
-):
-    pass
 
 
 class TestProjectMainInterface(TestProjectBase):
@@ -1589,21 +1654,9 @@ class TestGroupExecutionProject(TestProjectBase):
         assert i == self.expected_number_of_steps
 
 
-class TestGroupUnbufferedExecutionProject(
-    TestUnbufferedExecutionProject, TestGroupExecutionProject
-):
-    pass
-
-
 class TestGroupExecutionDynamicProject(TestGroupExecutionProject):
     project_class = _DynamicTestProject
     expected_number_of_steps = 4
-
-
-class TestGroupUnbufferedExecutionDynamicProject(
-    TestGroupUnbufferedExecutionProject, TestGroupExecutionDynamicProject
-):
-    pass
 
 
 class TestGroupProjectMainInterface(TestProjectBase):

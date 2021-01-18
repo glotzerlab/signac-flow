@@ -10,9 +10,8 @@ import getpass
 import json
 import logging
 import subprocess
-import tempfile
 
-from .base import ClusterJob, JobStatus, Scheduler
+from .base import ClusterJob, JobStatus, Scheduler, _call_submit
 
 logger = logging.getLogger(__name__)
 
@@ -97,8 +96,7 @@ class LSFScheduler(Scheduler):
     # The standard command used to submit jobs to the LSF scheduler.
     submit_cmd = ["bsub"]
 
-    def __init__(self, user=None, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, user=None):
         self.user = user
 
     def jobs(self):
@@ -107,7 +105,7 @@ class LSFScheduler(Scheduler):
         yield from _fetch(user=self.user)
 
     def submit(
-        self, script, after=None, hold=False, pretend=False, flags=None, **kwargs
+        self, script, *, after=None, hold=False, pretend=False, flags=None, **kwargs
     ):
         r"""Submit a job script for execution to the scheduler.
 
@@ -134,8 +132,12 @@ class LSFScheduler(Scheduler):
         Returns
         -------
         bool
-            Returns True if the cluster job was successfully submitted,
-            otherwise None.
+            True if the submission command succeeds (or in pretend mode).
+
+        Raises
+        ------
+        :class:`~flow.errors.SubmitError`
+            If the submission command fails.
 
         """
         if flags is None:
@@ -151,16 +153,7 @@ class LSFScheduler(Scheduler):
         if hold:
             submit_cmd += ["-H"]
 
-        if pretend:
-            print("# Submit command: {}".format("  ".join(submit_cmd)))
-            print(script)
-            print()
-        else:
-            with tempfile.NamedTemporaryFile() as tmp_submit_script:
-                tmp_submit_script.write(str(script).encode("utf-8"))
-                tmp_submit_script.flush()
-                subprocess.check_output(submit_cmd + [tmp_submit_script.name])
-                return True
+        return _call_submit(submit_cmd, script, pretend)
 
     @classmethod
     def is_present(cls):

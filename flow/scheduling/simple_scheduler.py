@@ -5,9 +5,8 @@
 import json
 import os
 import subprocess
-import tempfile
 
-from .base import ClusterJob, JobStatus, Scheduler
+from .base import ClusterJob, JobStatus, Scheduler, _call_submit
 
 
 class SimpleScheduler(Scheduler):
@@ -28,6 +27,7 @@ class SimpleScheduler(Scheduler):
 
     def __init__(self):
         self.cmd = os.environ["SIMPLE_SCHEDULER"].split()
+        self.submit_cmd = self.cmd + ["submit"]
 
     def jobs(self):
         """Yield cluster jobs by querying the scheduler."""
@@ -36,7 +36,7 @@ class SimpleScheduler(Scheduler):
         for _id, doc in status.items():
             yield ClusterJob(doc["job_name"], JobStatus(doc["status"]))
 
-    def submit(self, script, pretend=False, **kwargs):
+    def submit(self, script, *, pretend=False, **kwargs):
         r"""Submit a job script for execution to the scheduler.
 
         Parameters
@@ -54,18 +54,13 @@ class SimpleScheduler(Scheduler):
         Returns
         -------
         bool
-            Returns True if the cluster job was successfully submitted,
-            otherwise None.
+            True if the submission command succeeds (or in pretend mode).
+
+        Raises
+        ------
+        :class:`~flow.errors.SubmitError`
+            If the submission command fails.
+
 
         """
-        cmd = self.cmd + ["submit"]
-        if pretend:
-            print("# Submit command: {}".format(" ".join(cmd)))
-            print(script)
-            print()
-        else:
-            with tempfile.NamedTemporaryFile() as tmp_submit_script:
-                tmp_submit_script.write(str(script).encode("utf-8"))
-                tmp_submit_script.flush()
-                subprocess.check_output(cmd + [tmp_submit_script.name])
-                return True
+        return _call_submit(self.submit_cmd, script, pretend)

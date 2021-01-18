@@ -3,8 +3,8 @@
 # This software is licensed under the BSD 3-Clause License.
 """Implementation of the scheduling system for a fake scheduler.
 
-The FakeScheduler class can be used in place of a real scheduler to test
-the cluster job submission workflow.
+The :class:`~.FakeScheduler` class can be used in place of a real scheduler
+to test the cluster job submission workflow.
 """
 import logging
 

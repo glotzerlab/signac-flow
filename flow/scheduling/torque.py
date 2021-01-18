@@ -10,11 +10,9 @@ import getpass
 import io
 import logging
 import subprocess
-import tempfile
 import xml.etree.ElementTree as ET
 
-from ..errors import SubmitError
-from .base import ClusterJob, JobStatus, Scheduler
+from .base import ClusterJob, JobStatus, Scheduler, _call_submit
 
 logger = logging.getLogger(__name__)
 
@@ -100,8 +98,7 @@ class TorqueScheduler(Scheduler):
     # The standard command used to submit jobs to the TORQUE scheduler.
     submit_cmd = ["qsub"]
 
-    def __init__(self, user=None, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, user=None):
         self.user = user
 
     def jobs(self):
@@ -112,7 +109,7 @@ class TorqueScheduler(Scheduler):
             yield TorqueJob(node)
 
     def submit(
-        self, script, after=None, pretend=False, hold=False, flags=None, *args, **kwargs
+        self, script, *, after=None, hold=False, pretend=False, flags=None, **kwargs
     ):
         r"""Submit a job script for execution to the scheduler.
 
@@ -123,26 +120,28 @@ class TorqueScheduler(Scheduler):
         after : str
             Execute the submitted script after a job with this id has
             completed. (Default value = None)
+        hold : bool
+            Whether to hold the job upon submission. (Default value = False)
         pretend : bool
             If True, do not actually submit the script, but only simulate the
             submission.  Can be used to test whether the submission would be
             successful.  Please note: A successful "pretend" submission is not
             guaranteed to succeed. (Default value = False)
-        hold : bool
-            Whether to hold the job upon submission. (Default value = False)
         flags : list
             Additional arguments to pass through to the scheduler submission
             command. (Default value = None)
-        \*args
-            Additional positional arguments (ignored).
         \*\*kwargs
             Additional keyword arguments (ignored).
 
         Returns
         -------
-        str
-            The cluster job id if the script was successfully submitted,
-            otherwise None.
+        bool
+            True if the submission command succeeds (or in pretend mode).
+
+        Raises
+        ------
+        :class:`~flow.errors.SubmitError`
+            If the submission command fails.
 
         """
         if flags is None:
@@ -158,22 +157,7 @@ class TorqueScheduler(Scheduler):
         if hold:
             submit_cmd += ["-h"]
 
-        if pretend:
-            print("# Submit command: {}".format(" ".join(submit_cmd)))
-            print(script)
-            print()
-        else:
-            with tempfile.NamedTemporaryFile() as tmp_submit_script:
-                tmp_submit_script.write(str(script).encode("utf-8"))
-                tmp_submit_script.flush()
-                try:
-                    output = subprocess.check_output(
-                        submit_cmd + [tmp_submit_script.name]
-                    )
-                    jobsid = output.decode("utf-8").strip()
-                except subprocess.CalledProcessError as e:
-                    raise SubmitError(f"qsub error: {e.output()}")
-            return jobsid
+        return _call_submit(submit_cmd, script, pretend)
 
     @classmethod
     def is_present(cls):

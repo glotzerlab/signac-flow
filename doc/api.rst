@@ -119,9 +119,6 @@ Operations and Status
 .. autoclass:: flow.project.JobOperation
     :members:
 
-.. autoclass:: flow.render_status.Renderer
-    :members: generate_terminal_output, generate_html_output, render
-
 Labels
 ------
 
@@ -197,9 +194,6 @@ Compute Environments
 
 .. autofunction:: flow.environment.setup
 
-.. autoclass:: flow.environment.ComputeEnvironmentType
-    :members:
-
 .. autofunction:: flow.environment.template_filter
 
 .. autoclass:: flow.environment.ComputeEnvironment
@@ -243,7 +237,7 @@ Schedulers
 .. autoclass:: flow.scheduling.base.Scheduler
     :members:
 
-.. autoclass:: flow.scheduling.fakescheduler.FakeScheduler
+.. autoclass:: flow.scheduling.fake_scheduler.FakeScheduler
     :members:
 
 .. autoclass:: flow.scheduling.lsf.LSFScheduler

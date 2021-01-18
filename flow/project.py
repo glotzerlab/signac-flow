@@ -50,7 +50,7 @@ from .errors import (
     UserOperationError,
 )
 from .labels import _is_label_func, classlabel, label, staticlabel
-from .render_status import Renderer as StatusRenderer
+from .render_status import _render_status
 from .scheduling.base import ClusterJob, JobStatus
 from .util import config as flow_config
 from .util import template_filters
@@ -455,32 +455,11 @@ class JobOperation(_JobOperation):
     """
 
     def __init__(self, id, name, job, cmd, directives=None):
-        self._id = id
-        self.name = name
-        self._jobs = (job,)
-        if not (callable(cmd) or isinstance(cmd, str)):
-            raise ValueError("JobOperation cmd must be a callable or string.")
-        self._cmd = cmd
-
-        if directives is None:
-            directives = job._project._environment._get_default_directives()
-        else:
-            directives = dict(directives)  # explicit copy
-
-        # Keys which were explicitly set by the user, but are not evaluated by the
-        # template engine are cause for concern and might hint at a bug in the template
-        # script or ill-defined directives. We are therefore keeping track of all
-        # keys set by the user and check whether they have been evaluated by the template
-        # script engine later.
-        keys_set_by_user = set(directives)
-
-        # We use a special dictionary that tracks all keys that have been
-        # evaluated by the template engine and compare them to those explicitly
-        # set by the user. See also comment above.
-        self.directives = TrackGetItemDict(
-            {key: value for key, value in directives.items()}
-        )
-        self.directives._keys_set_by_user = keys_set_by_user
+        complete_directives = job._project._environment._get_default_directives()
+        if directives is not None:
+            complete_directives.update(directives)
+        complete_directives.evaluate(job)
+        super().__init__(id, name, (job,), cmd, complete_directives)
 
     @property
     def job(self):
@@ -1127,17 +1106,18 @@ class FlowGroup:
         """
         return set(self).isdisjoint(set(group))
 
-    def _generate_id(self, jobs, operation_name=None, index=0):
+    def _generate_id(self, aggregate, operation_name=None):
         """Generate a unique id which identifies this group and job(s).
+
+        The generated value is used to identify interactions with the
+        scheduler.
 
         Parameters
         ----------
-        jobs : sequence of :class:`signac.contrib.job.Job`
-            Jobs defining the unique id.
+        aggregate : tuple of :class:`signac.contrib.job.Job`
+            The aggregate of signac jobs.
         operation_name : str
             Operation name defining the unique id. (Default value = None)
-        index : int
-            Index for the :class:`~._JobOperation`. (Default value = 0)
 
         Returns
         -------
@@ -1145,7 +1125,7 @@ class FlowGroup:
             The unique id.
 
         """
-        project = jobs[0]._project
+        project = aggregate[0]._project
 
         # The full name is designed to be truly unique for each job-group.
         if operation_name is None:
@@ -1153,12 +1133,11 @@ class FlowGroup:
         else:
             op_string = operation_name
 
-        aggregate_id = get_aggregate_id(jobs)
-        full_name = "{}%{}%{}%{}".format(
+        aggregate_id = get_aggregate_id(aggregate)
+        full_name = "{}%{}%{}".format(
             project.root_directory(),
             aggregate_id,
             op_string,
-            index,
         )
         # The job_op_id is a hash computed from the unique full name.
         job_op_id = md5(full_name.encode("utf-8")).hexdigest()
@@ -1166,23 +1145,20 @@ class FlowGroup:
         # The actual job id is then constructed from a readable part and the
         # job_op_id, ensuring that the job-op is still somewhat identifiable,
         # but guaranteed to be unique. The readable name is based on the
-        # project id, aggregate id, operation name, and the index number. All
-        # names and the id itself are restricted in length to guarantee that
-        # the id does not get too long.
+        # project id, aggregate id, and operation name. All names and the id
+        # itself are restricted in length to guarantee that the id does not get
+        # too long.
         max_len = self.MAX_LEN_ID - len(job_op_id)
         if max_len < len(job_op_id):
             raise ValueError(f"Value for MAX_LEN_ID is too small ({self.MAX_LEN_ID}).")
 
         separator = getattr(project._environment, "JOB_ID_SEPARATOR", "/")
-        readable_name = (
-            "{project}{sep}{aggregate_id}{sep}{op_string}{sep}{index:04d}{sep}".format(
-                sep=separator,
-                project=str(project)[:12],
-                aggregate_id=aggregate_id,
-                op_string=op_string[:12],
-                index=index,
-            )[:max_len]
-        )
+        readable_name = "{project}{sep}{aggregate_id}{sep}{op_string}{sep}".format(
+            sep=separator,
+            project=str(project)[:12],
+            aggregate_id=aggregate_id,
+            op_string=op_string[:12],
+        )[:max_len]
 
         # By appending the unique job_op_id, we ensure that each id is truly unique.
         return readable_name + job_op_id
@@ -1193,7 +1169,6 @@ class FlowGroup:
         default_directives,
         jobs,
         ignore_conditions_on_execution=IgnoreConditions.NONE,
-        index=0,
     ):
         """Create a _JobOperation object from the :class:`~.FlowGroup`.
 
@@ -1215,8 +1190,6 @@ class FlowGroup:
             Specify if preconditions and/or postconditions are to be ignored
             while checking eligibility during execution (after submission). The
             default is :class:`IgnoreConditions.NONE`.
-        index : int
-            Index for the :class:`~._JobOperation`. (Default value = 0)
 
         Returns
         -------
@@ -1279,7 +1252,7 @@ class FlowGroup:
         )
 
         submission_job_operation = _SubmissionJobOperation(
-            self._generate_id(jobs, index=index),
+            self._generate_id(jobs),
             self.name,
             jobs,
             cmd=unevaluated_cmd,
@@ -1297,7 +1270,6 @@ class FlowGroup:
         default_directives,
         jobs,
         ignore_conditions=IgnoreConditions.NONE,
-        index=0,
     ):
         """Create _JobOperation object(s) from the :class:`~.FlowGroup`.
 
@@ -1319,8 +1291,6 @@ class FlowGroup:
             Specify if preconditions and/or postconditions are to be ignored
             when determining eligibility check. The default is
             :class:`IgnoreConditions.NONE`.
-        index : int
-            Index for the :class:`~._JobOperation`. (Default value = 0)
 
         Returns
         -------
@@ -1347,7 +1317,7 @@ class FlowGroup:
                     jobs=jobs,
                 )
                 job_op = _JobOperation(
-                    self._generate_id(jobs, operation_name, index=index),
+                    self._generate_id(jobs, operation_name),
                     operation_name,
                     jobs,
                     cmd=unevaluated_cmd,
@@ -1376,6 +1346,7 @@ class FlowGroup:
         directives = self._resolve_directives(
             operation_names[0], default_directives, env
         )
+        directives.evaluate(jobs)
         for name in operation_names[1:]:
             # get directives for operation
             directives.update(
@@ -2055,7 +2026,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Parameters
         ----------
-        selected_aggregates : iterable of aggregates
+        selected_aggregates : sequence of tuples of :class:`~signac.contrib.job.Job`
             Aggregates to select.
         selected_groups : set of :class:`~.FlowGroup`
             Groups to select.
@@ -2450,13 +2421,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             operations, labels, and any errors caught.
 
         """
-        # The argument status_parallelization is used so that _fetch_status method
-        # gets to know whether the deprecated argument no_parallelization passed
-        # while calling print_status is True or False. This can also be done by
-        # setting self.config['flow']['status_parallelization']='none' if the argument
-        # is True. But the later functionality will last the rest of the session but in order
-        # to do proper deprecation, it is not required for now.
-
         # Update the project's status cache
         self._fetch_scheduler_status(aggregates, err, ignore_errors)
         # Get project status cache
@@ -2475,7 +2439,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         operation_names = list(self.operations)
 
-        with self._potentially_buffered():
+        with self._buffered():
             try:
                 if status_parallelization == "thread":
                     with ThreadPool() as pool:
@@ -2551,7 +2515,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 else:
                     raise RuntimeError(
                         "Configuration value status_parallelization is invalid. "
-                        "Valid choices are 'thread', 'parallel', or 'none'."
+                        "Valid choices are 'thread', 'process', or 'none'."
                     )
             except RuntimeError as error:
                 if "can't start new thread" not in error.args:
@@ -2672,7 +2636,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         file=None,
         err=None,
         ignore_errors=False,
-        no_parallelize=False,
         template=None,
         profile=False,
         eligible_jobs_max_lines=None,
@@ -2726,13 +2689,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         output_format : str
             Status output format, supports:
             'terminal' (default), 'markdown' or 'html'.
-        no_parallelize : bool
-            Disable parallelization. (Default value = False)
-
-        Returns
-        -------
-        :class:`~.Renderer`
-            A Renderer class object that contains the rendered string.
 
         """
         if file is None:
@@ -2749,19 +2705,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "eligible_jobs_max_lines"
             )
 
-        if no_parallelize:
-            print(
-                "WARNING: "
-                "The no_parallelize argument is deprecated as of 0.10 "
-                "and will be removed in 0.12. "
-                "Instead, set the status_parallelization configuration value to 'none'. "
-                "In order to do this from the CLI, execute "
-                "`signac config set flow.status_parallelization 'none'`\n",
-                file=sys.stderr,
-            )
-            status_parallelization = "none"
-        else:
-            status_parallelization = self.config["flow"]["status_parallelization"]
+        status_parallelization = self.config["flow"]["status_parallelization"]
 
         # initialize jinja2 template environment and necessary filters
         template_environment = self._template_environment()
@@ -3044,8 +2988,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 (f"[{num_omitted_operations} more operations omitted]", "")
             )
 
-        status_renderer = StatusRenderer()
-
         # We have to make a deep copy of the template environment if we're
         # using a process Pool for parallelism. Somewhere in the process of
         # manually pickling and dispatching tasks to individual processes
@@ -3058,7 +3000,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if status_parallelization == "process"
             else template_environment
         )
-        render_output = status_renderer.render(
+        render_output = _render_status(
             template,
             template_environment_copy,
             context,
@@ -3074,8 +3016,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Show profiling results (if enabled)
         if profiling_results:
             print("\n" + "\n".join(profiling_results), file=file)
-
-        return status_renderer
 
     def _run_operations(
         self, operations=None, pretend=False, np=None, timeout=None, progress=False
@@ -3418,7 +3358,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 break
             try:
                 # Generate _JobOperation instances for selected groups and aggregates.
-                with self._potentially_buffered():
+                with self._buffered():
                     operations = []
                     run_groups = set(self._gather_flow_groups(names))
                     for (
@@ -3538,7 +3478,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Parameters
         ----------
-        aggregates : sequence of aggregates
+        aggregates : sequence of tuples of :class:`~signac.contrib.job.Job`
             The aggregates to consider for submission.
         default_directives : dict
             The default directives to use for the operations. This is to allow
@@ -3583,7 +3523,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     entrypoint=self._entrypoint,
                     default_directives=default_directives,
                     jobs=aggregate,
-                    index=0,
                     ignore_conditions_on_execution=ignore_conditions_on_execution,
                 )
 
@@ -3666,15 +3605,19 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return aggregates
 
     @contextlib.contextmanager
-    def _potentially_buffered(self):
+    def _buffered(self):
         """Enable the use of buffered mode for certain functions."""
-        if self.config["flow"].as_bool("use_buffered_mode"):
-            logger.debug("Entering buffered mode...")
-            with signac.buffered():
-                yield
-            logger.debug("Exiting buffered mode.")
-        else:
+        if not self.config["flow"].as_bool("use_buffered_mode"):
+            warnings.warn(
+                "The use_buffered_mode config option is deprecated as of 0.12 "
+                "and will be removed in 0.13. Buffered mode is always enabled "
+                "in 0.12 and newer.",
+                DeprecationWarning,
+            )
+        logger.debug("Entering buffered mode.")
+        with signac.buffered():
             yield
+        logger.debug("Exiting buffered mode.")
 
     def _script(
         self, operations, parallel=False, template="script.sh", show_template_help=False
@@ -3736,14 +3679,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return self._script(operations, parallel, template, show_template_help)
 
     def _generate_submit_script(
-        self, _id, operations, template, show_template_help, env, **kwargs
+        self, _id, operations, template, show_template_help, **kwargs
     ):
         """Generate submission script to submit the execution of operations to a scheduler."""
         if template is None:
-            template = env.template
+            template = self._environment.template
         assert _id is not None
 
-        template_environment = self._template_environment(env)
+        template_environment = self._template_environment(self._environment)
         template = template_environment.get_template(template)
         context = self._get_standard_template_context()
         # The flow 'script.sh' file simply extends the base script
@@ -3752,10 +3695,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # with signac-flow unless additional environment information is
         # detected.
 
-        logger.info("Use environment '%s'.", env)
-        logger.info("Set 'base_script=%s'.", env.template)
-        context["base_script"] = env.template
-        context["environment"] = env
+        logger.info("Set 'base_script=%s'.", self._environment.template)
+        logger.info("Use environment '%s'.", self._environment)
+        context["base_script"] = self._environment.template
+        context["environment"] = self._environment
         context["id"] = _id
         context["operations"] = list(operations)
         context.update(kwargs)
@@ -3767,7 +3710,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         self,
         operations,
         _id=None,
-        env=None,
         parallel=False,
         flags=None,
         force=False,
@@ -3784,9 +3726,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             The operations to submit.
         _id : str
             The _id to be used for this submission. (Default value = None)
-        env : :class:`~.ComputeEnvironment`
-            The environment to use for submission. Uses the environment defined
-            by the :class:`~.FlowProject` if None (Default value = None).
         parallel : bool
             Execute all bundled operations in parallel. (Default value = False)
         flags : list
@@ -3813,14 +3752,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         if _id is None:
             _id = self._store_bundled(operations)
-        if env is None:
-            env = self._environment
-        else:
-            warnings.warn(
-                "The env argument is deprecated as of 0.10 and will be removed in 0.12. "
-                "Instead, set the environment when constructing a FlowProject.",
-                DeprecationWarning,
-            )
 
         print(f"Submitting cluster job '{_id}':", file=sys.stderr)
 
@@ -3834,7 +3765,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 operations=map(_msg, operations),
                 template=template,
                 show_template_help=show_template_help,
-                env=env,
                 parallel=parallel,
                 force=force,
                 **kwargs,
@@ -3871,14 +3801,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 print(script)
 
             else:
-                return env.submit(_id=_id, script=script, flags=flags, **kwargs)
+                return self._environment.submit(
+                    _id=_id, script=script, flags=flags, **kwargs
+                )
 
     @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
     def submit_operations(
         self,
         operations,
         _id=None,
-        env=None,
         parallel=False,
         flags=None,
         force=False,
@@ -3895,9 +3826,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             The operations to submit.
         _id : str
             The _id to be used for this submission. (Default value = None)
-        env : :class:`~.ComputeEnvironment`
-            The environment to use for submission. Uses the environment defined
-            by the :class:`~.FlowProject` if None (Default value = None).
         parallel : bool
             Execute all bundled operations in parallel. (Default value = False)
         flags : list
@@ -3925,7 +3853,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return self._submit_operations(
             operations,
             _id,
-            env,
             parallel,
             flags,
             force,
@@ -3944,7 +3871,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         parallel=False,
         force=False,
         walltime=None,
-        env=None,
         ignore_conditions=IgnoreConditions.NONE,
         ignore_conditions_on_execution=IgnoreConditions.NONE,
         **kwargs,
@@ -3979,9 +3905,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Specify if preconditions and/or postconditions are to be ignored
             when determining eligibility after submitting. The default is
             :class:`IgnoreConditions.NONE`.
-        env : :class:`~.ComputeEnvironment`
-            The environment to use for submission. Uses the environment defined
-            by the :class:`~.FlowProject` if None (Default value = None).
         \*\*kwargs
             Additional keyword arguments forwarded to :meth:`~.ComputeEnvironment.submit`.
 
@@ -3993,14 +3916,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             raise ValueError(
                 "The 'names' argument must be a sequence of strings, however "
                 f"a single string was provided: {names}."
-            )
-        if env is None:
-            env = self._environment
-        else:
-            warnings.warn(
-                "The env argument is deprecated as of 0.10 and will be removed in 0.12. "
-                "Instead, set the environment when constructing a FlowProject.",
-                DeprecationWarning,
             )
         if walltime is not None:
             try:
@@ -4018,7 +3933,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             )
 
         # Gather all pending operations.
-        with self._potentially_buffered():
+        with self._buffered():
             default_directives = self._get_default_directives()
             cached_status = self._get_cached_status()
             # The generator must be used *inside* the buffering context manager
@@ -4036,11 +3951,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             operations = list(islice(operation_generator, num))
 
         # Bundle them up and submit.
-        with self._potentially_buffered():
+        with self._buffered():
             for bundle in _make_bundles(operations, bundle_size):
                 status = self._submit_operations(
                     operations=bundle,
-                    env=env,
                     parallel=parallel,
                     force=force,
                     walltime=walltime,
@@ -4212,6 +4126,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             help="Execute all operations in a single bundle in parallel.",
         )
 
+    @deprecated(deprecated_in="0.12", removed_in="0.14", current_version=__version__)
     def export_job_statuses(self, collection, statuses):
         """Export the job statuses to a :class:`signac.Collection`."""
         for status in statuses:
@@ -4310,14 +4225,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             "--ignore-errors",
             action="store_true",
             help="Ignore errors that might occur when querying the scheduler.",
-        )
-        parser.add_argument(
-            "--no-parallelize",
-            action="store_true",
-            help="Do not parallelize the status determination. "
-            "The '--no-parallelize' argument is deprecated. "
-            "Please use the status_parallelization configuration "
-            "instead (see above).",
         )
         view_group.add_argument(
             "-o",
@@ -4527,7 +4434,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     jobs=aggregate,
                     default_directives={},
                     ignore_conditions=ignore_conditions,
-                    index=0,
                 ):
                     yield JobOperation(
                         operation.id,
@@ -4906,7 +4812,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         aggregates = self._select_jobs_from_args(args)
 
         # Gather all pending operations or generate them based on a direct command...
-        with self._potentially_buffered():
+        with self._buffered():
             names = args.operation_name if args.operation_name else None
             default_directives = self._get_default_directives()
             cached_status = self._get_cached_status()

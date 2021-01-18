@@ -361,7 +361,7 @@ def _get_parallel_executor(parallelization="thread"):
             with multiprocessing.Pool() as pool:
                 return list(
                     tqdm(
-                        pool.imap_unordered(
+                        pool.imap(
                             # Creating a partial here allows us to use the
                             # local function unpickled_func. The top-level
                             # function called on each process cannot be a local

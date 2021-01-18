@@ -2368,7 +2368,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _fetch_status(
         self,
         aggregates,
-        distinct_jobs,
         err,
         ignore_errors,
         status_parallelization="thread",
@@ -2379,10 +2378,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         ----------
         aggregates : sequence of aggregates
             The aggregates for which a user requested to fetch status.
-        distinct_jobs : list of :class:`~signac.contrib.job.Job`
-            Distinct jobs fetched from the ids provided in the ``jobs``
-            argument.  This is used for fetching labels for a job because a
-            label is not associated with an aggregate.
         err : file-like object
             File where status information is printed.
         ignore_errors : bool
@@ -2399,6 +2394,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         job_labels : list
             A list of dictionaries containing keys ``job_id``, ``labels``,
             and ``_labels_error``.
+        individual_jobs : list of :class:`~signac.contrib.job.Job`
+            List of jobs, filtered from aggregates containing one job. This
+            is used internally to generate labels (labels are only supported
+            by individual jobs) and the calling code in
+            :meth:`~.print_status` also needs this information. This is
+            returned from this method so that iteration over all aggregates
+            only has to occur one time.
 
         """
         if status_parallelization not in ("thread", "process", "none"):
@@ -2458,21 +2460,27 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     selected_groups=single_operation_groups,
                 )
             )
+            # aggregate_groups is a list of tuples containing scheduler,
+            # aggregate, and group information. To compute labels, we fetch the
+            # jobs from the aggregates containing only one job.
+            individual_jobs = [
+                aggregate_group[3][0]
+                for aggregate_group in aggregate_groups
+                if len(aggregate_group[3]) == 1
+            ]
             status_results = parallel_executor(
                 compute_status,
                 aggregate_groups,
                 desc="Fetching status",
                 file=err,
             )
-
-        with self._buffered():
             compute_labels = functools.partial(
                 self._get_job_labels,
                 ignore_errors=ignore_errors,
             )
             job_labels = parallel_executor(
                 compute_labels,
-                distinct_jobs,
+                individual_jobs,
                 desc="Fetching labels",
                 file=err,
             )
@@ -2495,7 +2503,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 }
             )
 
-        return status_results_combined, job_labels
+        return status_results_combined, job_labels, individual_jobs
 
     PRINT_STATUS_ALL_VARYING_PARAMETERS = True
     """This constant can be used to signal that the print_status() method is supposed
@@ -2585,8 +2593,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             err = sys.stderr
 
         aggregates = self._convert_jobs_to_aggregates(jobs)
-        # Fetch all the distinct jobs from all the jobs or aggregate passed by the user.
-        distinct_jobs = {job for aggregate in aggregates for job in aggregate}
 
         if eligible_jobs_max_lines is None:
             eligible_jobs_max_lines = flow_config.get_config_value(
@@ -2620,9 +2626,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             ]
 
             with prof(single=False):
-                status_results, job_labels = self._fetch_status(
+                status_results, job_labels, individual_jobs = self._fetch_status(
                     aggregates,
-                    distinct_jobs,
                     err,
                     ignore_errors,
                     status_parallelization,
@@ -2700,8 +2705,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 )
 
         else:
-            status_results, job_labels = self._fetch_status(
-                aggregates, distinct_jobs, err, ignore_errors, status_parallelization
+            status_results, job_labels, individual_jobs = self._fetch_status(
+                aggregates, err, ignore_errors, status_parallelization
             )
             profiling_results = None
 
@@ -2758,12 +2763,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 sorted(
                     {
                         key
-                        for job in distinct_jobs
+                        for job in individual_jobs
                         for key in job.statepoint.keys()
                         if len(
                             {
                                 _to_hashable(job.statepoint().get(key))
-                                for job in distinct_jobs
+                                for job in individual_jobs
                             }
                         )
                         > 1

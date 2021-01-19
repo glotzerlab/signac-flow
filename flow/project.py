@@ -2440,10 +2440,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     aggregate_id,
                     error,
                 )
-                if ignore_errors:
-                    error_text = str(error)
-                else:
+                if not ignore_errors:
                     raise
+                error_text = str(error)
+                status["completed"] = False
+                status["eligible"] = False
             result = {
                 "aggregate_id": aggregate_id,
                 "group_name": group.name,
@@ -2490,6 +2491,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             sorted(status_results, key=lambda result: result["aggregate_id"]),
             key=lambda result: result["aggregate_id"],
         ):
+            # Collect all errors that occurred while evaluating status of
+            # groups for this aggregate
+            error_message = None
+            error_messages = [result["_error"] for result in aggregate_results]
+            if any(error_messages):
+                error_message = f"{len(error_messages)} error(s): " + ", ".join(
+                    error_messages
+                )
             status_results_combined.append(
                 {
                     "aggregate_id": aggregate_id,
@@ -2497,9 +2506,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         result["group_name"]: result["status"]
                         for result in aggregate_results
                     },
-                    # TODO: fix operations error propagation (bdice is not
-                    # sure what that data is supposed to look like)
-                    "_error": None,
+                    "_error": error_message,
                 }
             )
 

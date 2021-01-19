@@ -69,8 +69,8 @@ class aggregator:
     sort_by : str, callable, or None
         Before aggregating, sort the jobs by a given statepoint parameter. If
         the argument is callable, this will be passed as the callable
-        argument to :func:`sorted`. If None, no sorted is performed. (Default
-        value = None)
+        argument to :func:`sorted`. If None, no sorted is performed (Default
+        value = None).
     sort_ascending : bool
         True if the jobs are to be sorted in ascending order. (Default value
         = True)

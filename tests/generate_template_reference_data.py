@@ -27,6 +27,7 @@ ARCHIVE_DIR = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "./template_reference_data.tar.gz")
 )
 PROJECT_DIRECTORY = "/home/user/project/"
+MOCK_EXECUTABLE = "/usr/local/bin/python"
 
 
 def cartesian(**kwargs):
@@ -152,7 +153,7 @@ def get_masked_flowproject(p, environment=None):
     root_directory and project_dir elements after creation."""
     try:
         old_executable = sys.executable
-        sys.executable = "/usr/local/bin/python"
+        sys.executable = MOCK_EXECUTABLE
         fp = TestProject.get_project(root=p.root_directory())
         if environment is not None:
             fp._environment = environment
@@ -184,11 +185,12 @@ def main(args):
             # Here we set the appropriate executable for all the operations. This
             # is necessary as otherwise the default executable between submitting
             # and running could look different depending on the environment.
-            executable = "/usr/local/bin/python"
             for group in fp.groups.values():
                 for op_key in group.operations:
                     if op_key in group.operation_directives:
-                        group.operation_directives[op_key]["executable"] = executable
+                        group.operation_directives[op_key][
+                            "executable"
+                        ] = MOCK_EXECUTABLE
             for job in fp:
                 with job:
                     kwargs = job.statepoint()

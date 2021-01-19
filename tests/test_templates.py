@@ -42,12 +42,13 @@ def test_env(env, monkeypatch):
             # Here we set the appropriate executable for all the operations. This
             # is necessary as otherwise the default executable between submitting
             # and running could look different depending on the environment.
-            executable = "/usr/local/bin/python"
             for group in fp.groups.values():
                 for op_key in group.operations:
                     if op_key in group.operation_directives:
                         monkeypatch.setitem(
-                            group.operation_directives[op_key], "executable", executable
+                            group.operation_directives[op_key],
+                            "executable",
+                            gen.MOCK_EXECUTABLE,
                         )
             fp.import_from(origin=gen.ARCHIVE_DIR)
             jobs = fp.find_jobs(dict(environment=_env_name(env)))

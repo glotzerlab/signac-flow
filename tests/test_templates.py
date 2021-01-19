@@ -31,6 +31,12 @@ def find_envs():
 @pytest.mark.parametrize("env", find_envs())
 def test_env(env, monkeypatch):
     monkeypatch.setattr(flow.FlowProject, "_store_bundled", gen._store_bundled)
+    # We need to set the scheduler manually. The FakeScheduler is used for two
+    # reasons. First, the FakeScheduler prints scripts to screen on submission
+    # and we can capture that output. Second, the FakeScheduler won't try to
+    # call any cluster executable (e.g. squeue) associated with the real
+    # schedulers used on supported clusters. Otherwise submission would fail
+    # when attempting to determine what jobs already exist on the scheduler.
     monkeypatch.setattr(env, "scheduler_type", FakeScheduler)
 
     # Force asserts to show the full file when failures occur.

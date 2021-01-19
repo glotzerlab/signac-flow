@@ -195,6 +195,14 @@ def main(args):
                 with job:
                     kwargs = job.statepoint()
                     env = get_nested_attr(flow, kwargs["environment"])
+                    # We need to set the scheduler manually. The FakeScheduler
+                    # is used for two reasons. First, the FakeScheduler prints
+                    # scripts to screen on submission and we can capture that
+                    # output. Second, the FakeScheduler won't try to call any
+                    # cluster executable (e.g. squeue) associated with the real
+                    # schedulers used on supported clusters. Otherwise
+                    # submission would fail when attempting to determine what
+                    # jobs already exist on the scheduler.
                     env.scheduler_type = FakeScheduler
                     fp._environment = env
                     parameters = kwargs["parameters"]

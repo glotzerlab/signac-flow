@@ -8,7 +8,6 @@ jobs are grouped before being passed as arguments to the operation. The
 default aggregator produces individual jobs.
 """
 import itertools
-from abc import abstractmethod
 from collections.abc import Iterable, Mapping
 from hashlib import md5
 
@@ -361,17 +360,6 @@ class _BaseAggregateStore(Mapping):
 
     def __init__(self, project):
         self._project = project
-        self._register_aggregates()
-
-    @abstractmethod
-    def _register_aggregates(self):
-        """Register aggregates for a given project.
-
-        This is called at instantiation to generate and store aggregates.
-
-        Every aggregate is required to be a tuple of jobs.
-        """
-        pass
 
     def __iter__(self):
         yield from self.keys()
@@ -395,12 +383,13 @@ class _AggregateStore(_BaseAggregateStore):
 
     def __init__(self, aggregator, project):
         self._aggregator = aggregator
+        super().__init__(project)
 
         # We need to register the aggregates for this instance using the
-        # project provided. After registering, we store the aggregates
-        # mapped with the ids using :func:`get_aggregate_id`.
+        # provided project. After registering, we store the aggregates mapped
+        # with the ids using :func:`get_aggregate_id`.
         self._aggregates_by_id = {}
-        super().__init__(project)
+        self._register_aggregates()
 
     def __getitem__(self, id):
         """Get the aggregate corresponding to the provided id."""
@@ -571,14 +560,6 @@ class _DefaultAggregateStore(_BaseAggregateStore):
     def items(self):
         for job in self._project:
             yield (job.get_id(), (job,))
-
-    def _register_aggregates(self):
-        """Register aggregates for a given project.
-
-        A reference to the project is stored on instantiation, and iterated
-        over on-the-fly.
-        """
-        pass
 
 
 def get_aggregate_id(aggregate):

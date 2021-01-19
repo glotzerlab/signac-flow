@@ -4616,7 +4616,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if entry.aggregator not in created_aggregate_stores:
                 created_aggregate_stores[
                     entry.aggregator
-                ] = entry.aggregator._create_AggregatesStore(self)
+                ] = entry.aggregator._create_AggregateStore(self)
             self._group_to_aggregate_store[group] = created_aggregate_stores[
                 entry.aggregator
             ]

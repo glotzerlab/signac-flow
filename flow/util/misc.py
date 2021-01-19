@@ -4,7 +4,6 @@
 """Miscellaneous utility functions."""
 import argparse
 import logging
-import multiprocessing
 import os
 from collections.abc import MutableMapping
 from contextlib import contextmanager
@@ -12,9 +11,8 @@ from functools import lru_cache, partial
 from itertools import cycle, islice
 
 import cloudpickle
-from tqdm.auto import tqdm
 from tqdm.contrib import tmap
-from tqdm.contrib.concurrent import thread_map
+from tqdm.contrib.concurrent import process_map, thread_map
 
 
 def _positive_int(value):
@@ -354,26 +352,22 @@ def _get_parallel_executor(parallelization="thread"):
         parallel_executor = thread_map
     elif parallelization == "process":
 
-        def parallel_executor(func, iterable, chunksize=1, **kwargs):
-            # tqdm progress bar requires a total
+        def parallel_executor(func, iterable, **kwargs):
+            # The tqdm progress bar requires a total. We compute the total in
+            # advance because a map iterable (which has no total) is passed to
+            # process_map.
             if "total" not in kwargs:
                 kwargs["total"] = len(iterable)
 
-            with multiprocessing.Pool() as pool:
-                return list(
-                    tqdm(
-                        pool.imap(
-                            # Creating a partial here allows us to use the
-                            # local function unpickled_func. The top-level
-                            # function called on each process cannot be a local
-                            # function, it must be a module-level function.
-                            partial(_run_cloudpickled_func, cloudpickle.dumps(func)),
-                            map(cloudpickle.dumps, iterable),
-                            chunksize=chunksize,
-                        ),
-                        **kwargs,
-                    )
-                )
+            return process_map(
+                # The top-level function called on each process cannot be a
+                # local function, it must be a module-level function. Creating
+                # a partial here allows us to use the passed function "func"
+                # regardless of whether it is a local function.
+                partial(_run_cloudpickled_func, cloudpickle.dumps(func)),
+                map(cloudpickle.dumps, iterable),
+                **kwargs,
+            )
 
     else:
 

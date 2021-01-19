@@ -10,6 +10,10 @@ from contextlib import contextmanager
 from functools import lru_cache, partial
 from itertools import cycle, islice
 
+import cloudpickle
+from tqdm.contrib import tmap
+from tqdm.contrib.concurrent import process_map, thread_map
+
 
 def _positive_int(value):
     """Parse a command line argument as a positive integer.
@@ -303,3 +307,74 @@ class _bidict(MutableMapping):
 
     def __len__(self):
         return len(self._data)
+
+
+def _run_cloudpickled_func(func, *args):
+    """Execute a cloudpickled function.
+
+    The set of functions that can be pickled by the built-in pickle module is
+    very limited, which prevents the usage of various useful cases such as
+    locally-defined functions or functions that internally call class methods.
+    This function circumvents that difficulty by allowing the user to pickle
+    the function object a priori and bind it as the first argument to a partial
+    application of this function. All subsequent arguments are transparently
+    passed through.
+    """
+    unpickled_func = cloudpickle.loads(func)
+    args = list(map(cloudpickle.loads, args))
+    return unpickled_func(*args)
+
+
+def _get_parallel_executor(parallelization="thread"):
+    """Get an executor for the desired parallelization strategy.
+
+    This executor shows a progress bar while executing a function over an
+    iterable in parallel. The returned callable has signature ``func,
+    iterable, **kwargs``. The iterable must have a length (generators are not
+    supported). The keyword argument ``chunksize`` is used for chunking the
+    iterable in supported parallelization modes
+    (see :meth:`concurrent.futures.Executor.map`). All other ``**kwargs`` are
+    passed to the tqdm progress bar.
+
+    Parameters
+    ----------
+    parallelization : str
+        Parallelization mode. Allowed values are "thread", "process", or
+        "none". (Default value = "thread")
+
+    Returns
+    -------
+    callable
+        A callable with signature ``func, iterable, **kwargs``.
+
+    """
+    if parallelization == "thread":
+        parallel_executor = thread_map
+    elif parallelization == "process":
+
+        def parallel_executor(func, iterable, **kwargs):
+            # The tqdm progress bar requires a total. We compute the total in
+            # advance because a map iterable (which has no total) is passed to
+            # process_map.
+            if "total" not in kwargs:
+                kwargs["total"] = len(iterable)
+
+            return process_map(
+                # The top-level function called on each process cannot be a
+                # local function, it must be a module-level function. Creating
+                # a partial here allows us to use the passed function "func"
+                # regardless of whether it is a local function.
+                partial(_run_cloudpickled_func, cloudpickle.dumps(func)),
+                map(cloudpickle.dumps, iterable),
+                **kwargs,
+            )
+
+    else:
+
+        def parallel_executor(func, iterable, **kwargs):
+            if "chunksize" in kwargs:
+                # Chunk size only applies to thread/process parallel executors
+                del kwargs["chunksize"]
+            return list(tmap(func, iterable, **kwargs))
+
+    return parallel_executor

@@ -62,23 +62,23 @@ class MockScheduler(Scheduler):
             for line in script:
                 _id = str(line).strip()
                 break
-        cid = uuid.uuid4()
-        cls._jobs[cid] = ClusterJob(_id, status=JobStatus.submitted)
+        cluster_id = uuid.uuid4()
+        cls._jobs[cluster_id] = ClusterJob(_id, status=JobStatus.submitted)
         signac_path = os.path.dirname(os.path.dirname(os.path.abspath(signac.__file__)))
         flow_path = os.path.dirname(os.path.dirname(os.path.abspath(flow.__file__)))
         pythonpath = ":".join(
             [os.environ.get("PYTHONPATH", "")] + [signac_path, flow_path]
         )
-        cls._scripts[cid] = f"export PYTHONPATH={pythonpath}\n" + script
+        cls._scripts[cluster_id] = f"export PYTHONPATH={pythonpath}\n" + script
         return JobStatus.submitted
 
     @classmethod
     def step(cls):
         """Mock pushing of jobs through the queue."""
         remove = set()
-        for cid, job in cls._jobs.items():
+        for cluster_id, job in cls._jobs.items():
             if job._status == JobStatus.inactive:
-                remove.add(cid)
+                remove.add(cluster_id)
             else:
                 if job._status in (JobStatus.submitted, JobStatus.held):
                     job._status = JobStatus(job._status + 1)
@@ -86,7 +86,7 @@ class MockScheduler(Scheduler):
                     job._status = JobStatus.active
                     try:
                         with tempfile.NamedTemporaryFile() as tmpfile:
-                            tmpfile.write(cls._scripts[cid].encode("utf-8"))
+                            tmpfile.write(cls._scripts[cluster_id].encode("utf-8"))
                             tmpfile.flush()
                             subprocess.check_call(
                                 ["/bin/bash", tmpfile.name], stderr=subprocess.DEVNULL
@@ -98,8 +98,8 @@ class MockScheduler(Scheduler):
                         job._status = JobStatus.inactive
                 else:
                     raise RuntimeError(f"Unable to process status '{job._status}'.")
-        for cid in remove:
-            del cls._jobs[cid]
+        for cluster_id in remove:
+            del cls._jobs[cluster_id]
 
     @classmethod
     def is_present(cls):
@@ -124,6 +124,7 @@ class TestProjectBase:
 
     @pytest.fixture(autouse=True)
     def setUp(self, request):
+        MockScheduler.reset()
         self._tmp_dir = TemporaryDirectory(prefix="signac-flow_")
         request.addfinalizer(self._tmp_dir.cleanup)
         self.project = self.project_class.init_project(
@@ -192,16 +193,15 @@ class TestProjectStatusPerformance(TestProjectBase):
 
         project = self.mock_project()
 
-        MockScheduler.reset()
-
         time = timeit.timeit(
             lambda: project._fetch_status(
-                _AggregatesCursor(project), project, StringIO(), ignore_errors=False
+                aggregates=_AggregatesCursor(project),
+                err=StringIO(),
+                ignore_errors=False,
             ),
             number=10,
         )
         assert time < 10
-        MockScheduler.reset()
 
 
 class TestProjectClass(TestProjectBase):
@@ -496,12 +496,10 @@ class TestProjectClass(TestProjectBase):
         job_operation = next(project._next_operations([(job,)]))
         assert all(not callable(value) for value in job_operation.directives.values())
         # Also test for submitting operations
-        cached_status = project._get_cached_status()
         submit_job_operation = next(
             project._get_submission_operations(
                 aggregates=[(job,)],
                 default_directives=project._get_default_directives(),
-                cached_status=cached_status,
             )
         )
         assert all(
@@ -544,12 +542,10 @@ class TestProjectClass(TestProjectBase):
         project = self.mock_project(A)
 
         # test for proper evaluation of all directives.
-        cached_status = project._get_cached_status()
         job = next(iter(project))
         for submit_job_operation in project._get_submission_operations(
             aggregates=[(job,)],
             default_directives=project._get_default_directives(),
-            cached_status=cached_status,
         ):
             if submit_job_operation.name == "group":
                 break
@@ -1015,7 +1011,6 @@ class TestExecutionProject(TestProjectBase):
                 assert os.getpid() == job.doc.test
 
     def test_submit_operations(self):
-        MockScheduler.reset()
         project = self.mock_project()
         operations = []
         for job in project:
@@ -1027,7 +1022,6 @@ class TestExecutionProject(TestProjectBase):
         assert len(list(MockScheduler.jobs())) == 1
 
     def test_submit(self):
-        MockScheduler.reset()
         project = self.mock_project()
         assert len(list(MockScheduler.jobs())) == 0
         with redirect_stderr(StringIO()):
@@ -1035,10 +1029,8 @@ class TestExecutionProject(TestProjectBase):
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
         num_jobs_submitted = (2 * len(project)) + len(even_jobs)
         assert len(list(MockScheduler.jobs())) == num_jobs_submitted
-        MockScheduler.reset()
 
     def test_submit_bad_names_argument(self):
-        MockScheduler.reset()
         project = self.mock_project()
         assert len(list(MockScheduler.jobs())) == 0
         with pytest.raises(ValueError):
@@ -1046,7 +1038,6 @@ class TestExecutionProject(TestProjectBase):
         project.submit(names=["foo"])
 
     def test_submit_limited(self):
-        MockScheduler.reset()
         project = self.mock_project()
         assert len(list(MockScheduler.jobs())) == 0
         with redirect_stderr(StringIO()):
@@ -1057,7 +1048,6 @@ class TestExecutionProject(TestProjectBase):
         assert len(list(MockScheduler.jobs())) == 2
 
     def test_resubmit(self):
-        MockScheduler.reset()
         project = self.mock_project()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
         num_jobs_submitted = (2 * len(project)) + len(even_jobs)
@@ -1078,7 +1068,6 @@ class TestExecutionProject(TestProjectBase):
         assert i == self.expected_number_of_steps
 
     def test_bundles(self):
-        MockScheduler.reset()
         project = self.mock_project()
         assert len(list(MockScheduler.jobs())) == 0
         with redirect_stderr(StringIO()):
@@ -1087,12 +1076,10 @@ class TestExecutionProject(TestProjectBase):
             project.submit(bundle_size=2, num=4)
             assert len(list(MockScheduler.jobs())) == 3
             MockScheduler.reset()
-            project._fetch_scheduler_status(file=StringIO())
             project.submit(bundle_size=0)
             assert len(list(MockScheduler.jobs())) == 1
 
     def test_submit_status(self):
-        MockScheduler.reset()
         project = self.mock_project()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
         num_jobs_submitted = (2 * len(project)) + len(even_jobs)
@@ -1107,22 +1094,23 @@ class TestExecutionProject(TestProjectBase):
             project.submit()
         assert len(list(MockScheduler.jobs())) == num_jobs_submitted
 
+        cached_status = project._get_cached_scheduler_status()
         for job in project:
             next_op = list(project._next_operations([(job,)]))[0]
-            assert next_op.get_status() == JobStatus.submitted
+            assert cached_status[next_op.id] == JobStatus.submitted
 
         MockScheduler.step()
         MockScheduler.step()
-        project._fetch_scheduler_status(file=StringIO())
 
+        scheduler_info = project._query_scheduler_status(err=StringIO())
         for job in project:
             next_op = list(project._next_operations([(job,)]))[0]
-            assert next_op.get_status() == JobStatus.queued
+            assert scheduler_info[next_op.id] == JobStatus.queued
 
         MockScheduler.step()
-        project._fetch_scheduler_status(file=StringIO())
+        scheduler_info = project._query_scheduler_status(err=StringIO())
         for job in project:
-            job_status = project.get_job_status(job)
+            job_status = project.get_job_status(job, cached_status=scheduler_info)
             for op in ("op1", "op2"):
                 assert job_status["operations"][op]["scheduler_status"] in (
                     JobStatus.unknown,
@@ -1130,7 +1118,6 @@ class TestExecutionProject(TestProjectBase):
                 )
 
     def test_submit_operations_bad_directive(self):
-        MockScheduler.reset()
         project = self.mock_project()
         operations = []
         for job in project:
@@ -1199,7 +1186,7 @@ class TestExecutionProject(TestProjectBase):
 
 class TestExecutionDynamicProject(TestExecutionProject):
     project_class = _DynamicTestProject
-    expected_number_of_steps = 10
+    expected_number_of_steps = 7
 
 
 class TestProjectMainInterface(TestProjectBase):
@@ -1343,7 +1330,6 @@ class TestGroupProject(TestProjectBase):
             job_ops = project._get_submission_operations(
                 aggregates=[(job,)],
                 default_directives={},
-                cached_status={},
             )
             script = project._script(job_ops)
             if job.sp.b % 2 == 0:
@@ -1370,14 +1356,12 @@ class TestGroupProject(TestProjectBase):
 
     def test_directives_hierarchy(self):
         project = self.mock_project()
-        cached_status = project._get_cached_status()
         for job in project:
             # Test submit JobOperations
             job_ops = list(
                 project._get_submission_operations(
                     aggregates=[(job,)],
                     default_directives=project._get_default_directives(),
-                    cached_status=cached_status,
                     names=["group2"],
                 )
             )
@@ -1389,7 +1373,6 @@ class TestGroupProject(TestProjectBase):
                 project._get_submission_operations(
                     aggregates=[(job,)],
                     default_directives=project._get_default_directives(),
-                    cached_status=cached_status,
                     names=["op3"],
                 )
             )
@@ -1525,7 +1508,6 @@ class TestGroupExecutionProject(TestProjectBase):
                 assert not job.isfile("world.txt")
 
     def test_submit_groups(self):
-        MockScheduler.reset()
         project = self.mock_project()
         operations = [
             project.groups["group1"]._create_submission_job_operation(
@@ -1542,7 +1524,6 @@ class TestGroupExecutionProject(TestProjectBase):
     def test_submit_groups_invalid_char_with_error(self, monkeypatch):
         monkeypatch.setattr(MockScheduler, "_invalid_chars", ["/"])
 
-        MockScheduler.reset()
         project = self.mock_project()
         operations = [
             project.groups["group1"]._create_submission_job_operation(
@@ -1556,13 +1537,11 @@ class TestGroupExecutionProject(TestProjectBase):
             project._submit_operations(_id=cluster_job_id, operations=operations)
         with pytest.raises(RuntimeError):
             assert len(list(MockScheduler.jobs())) == 1
-        MockScheduler.reset()
 
     def test_submit_groups_invalid_char_avoid_error(self, monkeypatch):
         monkeypatch.setattr(MockScheduler, "_invalid_chars", ["/"])
         monkeypatch.setattr(MockEnvironment, "JOB_ID_SEPARATOR", "-", raising=False)
 
-        MockScheduler.reset()
         project = self.mock_project()
         operations = [
             project.groups["group1"]._create_submission_job_operation(
@@ -1575,22 +1554,18 @@ class TestGroupExecutionProject(TestProjectBase):
         with redirect_stderr(StringIO()):
             project.submit_operations(_id=cluster_job_id, operations=operations)
         assert len(list(MockScheduler.jobs())) == 1
-        MockScheduler.reset()
 
     def test_submit(self):
-        MockScheduler.reset()
         project = self.mock_project()
         assert len(list(MockScheduler.jobs())) == 0
         with redirect_stderr(StringIO()):
             project.submit(names=["group1", "group2"])
         num_jobs_submitted = 2 * len(project)
         assert len(list(MockScheduler.jobs())) == num_jobs_submitted
-        MockScheduler.reset()
 
     def test_submit_invalid_char_with_error(self, monkeypatch):
         monkeypatch.setattr(MockScheduler, "_invalid_chars", ["/"])
 
-        MockScheduler.reset()
         project = self.mock_project()
         assert len(list(MockScheduler.jobs())) == 0
         with redirect_stderr(StringIO()):
@@ -1598,23 +1573,19 @@ class TestGroupExecutionProject(TestProjectBase):
         num_jobs_submitted = 2 * len(project)
         with pytest.raises(RuntimeError):
             assert len(list(MockScheduler.jobs())) == num_jobs_submitted
-        MockScheduler.reset()
 
     def test_submit_invalid_char_avoid_error(self, monkeypatch):
         monkeypatch.setattr(MockScheduler, "_invalid_chars", ["/"])
         monkeypatch.setattr(MockEnvironment, "JOB_ID_SEPARATOR", "-", raising=False)
 
-        MockScheduler.reset()
         project = self.mock_project()
         assert len(list(MockScheduler.jobs())) == 0
         with redirect_stderr(StringIO()):
             project.submit(names=["group1", "group2"])
         num_jobs_submitted = 2 * len(project)
         assert len(list(MockScheduler.jobs())) == num_jobs_submitted
-        MockScheduler.reset()
 
     def test_group_resubmit(self):
-        MockScheduler.reset()
         project = self.mock_project()
         num_jobs_submitted = len(project)
         assert len(list(MockScheduler.jobs())) == 0
@@ -1634,7 +1605,6 @@ class TestGroupExecutionProject(TestProjectBase):
         assert i == self.expected_number_of_steps
 
     def test_operation_resubmit(self):
-        MockScheduler.reset()
         project = self.mock_project()
         num_jobs_submitted = len(project)
         assert len(list(MockScheduler.jobs())) == 0

@@ -2627,10 +2627,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
             with prof(single=False):
                 status_results, job_labels, individual_jobs = self._fetch_status(
-                    aggregates,
-                    err,
-                    ignore_errors,
-                    status_parallelization,
+                    aggregates=aggregates,
+                    err=err,
+                    ignore_errors=ignore_errors,
+                    status_parallelization=status_parallelization,
                 )
 
             prof._mergeFileTiming()
@@ -2706,7 +2706,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         else:
             status_results, job_labels, individual_jobs = self._fetch_status(
-                aggregates, err, ignore_errors, status_parallelization
+                aggregates=aggregates,
+                err=err,
+                ignore_errors=ignore_errors,
+                status_parallelization=status_parallelization,
             )
             profiling_results = None
 

@@ -191,7 +191,9 @@ class TestProjectStatusPerformance(TestProjectBase):
 
         time = timeit.timeit(
             lambda: project._fetch_status(
-                _AggregatesCursor(project), project, StringIO(), ignore_errors=False
+                aggregates=_AggregatesCursor(project),
+                err=StringIO(),
+                ignore_errors=False,
             ),
             number=10,
         )

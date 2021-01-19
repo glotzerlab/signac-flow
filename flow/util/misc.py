@@ -334,7 +334,8 @@ def _get_parallel_executor(parallelization="thread"):
     iterable in parallel. The returned callable has signature ``func,
     iterable, **kwargs``. The iterable must have a length (generators are not
     supported). The keyword argument ``chunksize`` is used for chunking the
-    iterable in supported parallelization modes. All other ``**kwargs`` are
+    iterable in supported parallelization modes
+    (see :meth:`concurrent.futures.Executor.map`). All other ``**kwargs`` are
     passed to the tqdm progress bar.
 
     Parameters

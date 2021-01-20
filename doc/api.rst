@@ -176,17 +176,6 @@ The FlowGroup
     :members:
     :special-members: __call__
 
-Aggregation
------------
-
-.. automodule:: flow.aggregates
-
-.. autoclass:: flow.aggregates.aggregator
-    :members:
-    :special-members: __call__
-
-.. autofunction:: flow.aggregates.get_aggregate_id
-
 Compute Environments
 --------------------
 

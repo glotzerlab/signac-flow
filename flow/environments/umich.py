@@ -17,6 +17,14 @@ class GreatLakesEnvironment(DefaultSlurmEnvironment):
 
     @classmethod
     def add_args(cls, parser):
+        """Add arguments to parser.
+
+        Parameters
+        ----------
+        parser : :class:`argparse.ArgumentParser`
+            The argument parser where arguments will be added.
+
+        """
         super().add_args(parser)
         parser.add_argument(
             "--partition",

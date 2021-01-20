@@ -1,7 +1,7 @@
 # Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-"""This module contains the FlowProject module templates.
+"""FlowProject module templates.
 
 These templates can be initialized via the init() function defined
 in this module and the main 'flow' command line interface.
@@ -29,19 +29,43 @@ TEMPLATES = {
 }
 
 
-def init(alias=None, template=None, root=None, out=None):
-    "Initialize a templated FlowProject module."
+def init(alias=None, template=None, root=None):
+    """Initialize a templated :class:`~.FlowProject` module.
+
+    Parameters
+    ----------
+    alias : str
+        Python identifier used as a file name for the template output. Uses
+        ``"project"`` if None.  (Default value = None)
+
+    template : str
+        Name of the template to use. Built-in templates are:
+
+        * ``"minimal"``
+        * ``"example"``
+        * ``"testing"``
+
+        Uses ``"minimal"`` if None. (Default value = None)
+
+    root : str
+        Directory where the output file is placed. Uses the current working
+        directory if None. (Default value = None)
+
+    Returns
+    -------
+    list
+        List of file names created.
+
+    """
     if alias is None:
         alias = "project"
     elif not alias.isidentifier():
         raise ValueError(
-            "The alias '{}' is not a valid Python identifier and therefore "
-            "not be used as a FlowProject alias.".format(alias)
+            f"The alias '{alias}' is not a valid Python identifier and therefore "
+            "cannot be used as a FlowProject alias."
         )
     if template is None:
         template = "minimal"
-    if out is None:
-        out = sys.stderr
 
     if os.path.splitext(alias)[1]:
         raise RuntimeError("Please provide a name without suffix!")
@@ -60,12 +84,12 @@ def init(alias=None, template=None, root=None, out=None):
         trim_blocks=True,
     )
 
-    context = dict()
+    context = {}
     context["alias"] = alias
     context["project_class_name"] = project_class_name
 
     # render all templates
-    codes = dict()
+    codes = {}
 
     for fn, fn_template in TEMPLATES[template]:
         fn_ = fn.format(alias=alias)  # some of the filenames may depend on the alias
@@ -80,18 +104,18 @@ def init(alias=None, template=None, root=None, out=None):
                 fn = os.path.join(root, fn)
             with open(fn, "x") as fw:
                 fw.write(code + "\n")
-        except OSError as e:
-            if e.errno == errno.EEXIST:
+        except OSError as error:
+            if error.errno == errno.EEXIST:
                 logger.error(
-                    "Error while trying to initialize flow project with alias '{alias}', "
-                    "a file named '{fn}' already exists!".format(alias=alias, fn=fn)
+                    f"Error while trying to initialize flow project with alias '{alias}', "
+                    f"a file named '{fn}' already exists!"
                 )
             else:
                 logger.error(
-                    "Error while trying to initialize flow project with alias '{alias}': "
-                    "'{error}'.".format(alias=alias, error=e)
+                    f"Error while trying to initialize flow project with alias '{alias}': "
+                    f"'{error}'."
                 )
         else:
             files_created.append(fn)
-            print(f"Created file '{fn}'.", file=out)
+            print(f"Created file '{fn}'.", file=sys.stderr)
     return files_created

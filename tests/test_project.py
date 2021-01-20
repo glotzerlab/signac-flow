@@ -25,6 +25,7 @@ from deprecation import fail_if_not_removed
 import flow
 from flow import FlowProject, cmd, directives, init, with_job
 from flow.environment import ComputeEnvironment
+from flow.project import _AggregatesCursor
 from flow.scheduling.base import ClusterJob, JobStatus, Scheduler
 from flow.util.misc import (
     add_cwd_to_environment_pythonpath,
@@ -61,23 +62,23 @@ class MockScheduler(Scheduler):
             for line in script:
                 _id = str(line).strip()
                 break
-        cid = uuid.uuid4()
-        cls._jobs[cid] = ClusterJob(_id, status=JobStatus.submitted)
+        cluster_id = uuid.uuid4()
+        cls._jobs[cluster_id] = ClusterJob(_id, status=JobStatus.submitted)
         signac_path = os.path.dirname(os.path.dirname(os.path.abspath(signac.__file__)))
         flow_path = os.path.dirname(os.path.dirname(os.path.abspath(flow.__file__)))
         pythonpath = ":".join(
             [os.environ.get("PYTHONPATH", "")] + [signac_path, flow_path]
         )
-        cls._scripts[cid] = f"export PYTHONPATH={pythonpath}\n" + script
+        cls._scripts[cluster_id] = f"export PYTHONPATH={pythonpath}\n" + script
         return JobStatus.submitted
 
     @classmethod
     def step(cls):
-        "Mock pushing of jobs through the queue."
+        """Mock pushing of jobs through the queue."""
         remove = set()
-        for cid, job in cls._jobs.items():
+        for cluster_id, job in cls._jobs.items():
             if job._status == JobStatus.inactive:
-                remove.add(cid)
+                remove.add(cluster_id)
             else:
                 if job._status in (JobStatus.submitted, JobStatus.held):
                     job._status = JobStatus(job._status + 1)
@@ -85,7 +86,7 @@ class MockScheduler(Scheduler):
                     job._status = JobStatus.active
                     try:
                         with tempfile.NamedTemporaryFile() as tmpfile:
-                            tmpfile.write(cls._scripts[cid].encode("utf-8"))
+                            tmpfile.write(cls._scripts[cluster_id].encode("utf-8"))
                             tmpfile.flush()
                             subprocess.check_call(
                                 ["/bin/bash", tmpfile.name], stderr=subprocess.DEVNULL
@@ -97,8 +98,12 @@ class MockScheduler(Scheduler):
                         job._status = JobStatus.inactive
                 else:
                     raise RuntimeError(f"Unable to process status '{job._status}'.")
-        for cid in remove:
-            del cls._jobs[cid]
+        for cluster_id in remove:
+            del cls._jobs[cluster_id]
+
+    @classmethod
+    def is_present(cls):
+        return True
 
     @classmethod
     def reset(cls):
@@ -119,6 +124,7 @@ class TestProjectBase:
 
     @pytest.fixture(autouse=True)
     def setUp(self, request):
+        MockScheduler.reset()
         self._tmp_dir = TemporaryDirectory(prefix="signac-flow_")
         request.addfinalizer(self._tmp_dir.cleanup)
         self.project = self.project_class.init_project(
@@ -143,12 +149,13 @@ class TestProjectBase:
             config = project.config.copy()
             config = recursive_update(config, config_overrides)
             project = project_class(config=config)
-        for a in range(3):
+        for a in range(2):
             if heterogeneous:
                 # Add jobs with only the `a` key without `b`.
                 project.open_job(dict(a=a)).init()
                 project.open_job(dict(a=dict(a=a))).init()
-            for b in range(3):
+            # Tests assume that there are even and odd values of b
+            for b in range(2):
                 project.open_job(dict(a=a, b=b)).init()
                 project.open_job(dict(a=dict(a=a), b=b)).init()
         project._entrypoint = self.entrypoint
@@ -186,15 +193,15 @@ class TestProjectStatusPerformance(TestProjectBase):
 
         project = self.mock_project()
 
-        MockScheduler.reset()
-
         time = timeit.timeit(
-            lambda: project._fetch_status(project, StringIO(), ignore_errors=False),
+            lambda: project._fetch_status(
+                aggregates=_AggregatesCursor(project),
+                err=StringIO(),
+                ignore_errors=False,
+            ),
             number=10,
         )
-
         assert time < 10
-        MockScheduler.reset()
 
 
 class TestProjectClass(TestProjectBase):
@@ -290,11 +297,11 @@ class TestProjectClass(TestProjectBase):
         assert len(c._label_functions) == 1
 
     def test_conditions_with_inheritance(self):
-        """Tests the inheritance of pre/post conditions.
+        """Tests the inheritance of preconditions/postconditions.
 
-        Class A should only have one pre/post condition, while class C that
-        inherits from A should have three, and class B should just have two
-        explicitly defined. Proper execution is tested in the
+        Class A should only have one precondition/postcondition, while class C
+        that inherits from A should have three, and class B should just have
+        two explicitly defined. Proper execution is tested in the
         TestExecutionProject.
         """
 
@@ -433,7 +440,7 @@ class TestProjectClass(TestProjectBase):
         project = self.mock_project(A)
         for job in project:
             job.doc.np = 3
-            for next_op in project._next_operations((job,)):
+            for next_op in project._next_operations([(job,)]):
                 assert "mpirun -np 3 python" in next_op.cmd
             break
 
@@ -460,38 +467,40 @@ class TestProjectClass(TestProjectBase):
 
         # test setting neither nranks nor omp_num_threads
         for job in project:
-            for next_op in project._next_operations((job,)):
+            for next_op in project._next_operations([(job,)]):
                 assert next_op.directives["np"] == 1
 
         # test only setting nranks
         for i, job in enumerate(project):
             job.doc.nranks = i + 1
-            for next_op in project._next_operations((job,)):
+            for next_op in project._next_operations([(job,)]):
                 assert next_op.directives["np"] == next_op.directives["nranks"]
             del job.doc["nranks"]
 
         # test only setting omp_num_threads
         for i, job in enumerate(project):
             job.doc.omp_num_threads = i + 1
-            for next_op in project._next_operations((job,)):
+            for next_op in project._next_operations([(job,)]):
                 assert next_op.directives["np"] == next_op.directives["omp_num_threads"]
             del job.doc["omp_num_threads"]
-
         # test setting both nranks and omp_num_threads
         for i, job in enumerate(project):
             job.doc.omp_num_threads = i + 1
             job.doc.nranks = i % 3 + 1
             expected_np = (i + 1) * (i % 3 + 1)
-            for next_op in project._next_operations((job,)):
+            for next_op in project._next_operations([(job,)]):
                 assert next_op.directives["np"] == expected_np
 
         # test for proper evaluation of all directives
         job = next(iter(project))
-        job_operation = next(project._next_operations((job,)))
+        job_operation = next(project._next_operations([(job,)]))
         assert all(not callable(value) for value in job_operation.directives.values())
         # Also test for submitting operations
         submit_job_operation = next(
-            project._get_submission_operations([job], project._get_default_directives())
+            project._get_submission_operations(
+                aggregates=[(job,)],
+                default_directives=project._get_default_directives(),
+            )
         )
         assert all(
             not callable(value) for value in submit_job_operation.directives.values()
@@ -535,7 +544,8 @@ class TestProjectClass(TestProjectBase):
         # test for proper evaluation of all directives.
         job = next(iter(project))
         for submit_job_operation in project._get_submission_operations(
-            [job], project._get_default_directives()
+            aggregates=[(job,)],
+            default_directives=project._get_default_directives(),
         ):
             if submit_job_operation.name == "group":
                 break
@@ -596,7 +606,7 @@ class TestProjectClass(TestProjectBase):
             assert job.doc.b
             assert job.doc.c
 
-    def test_pre_post_condition(self):
+    def test_precondition_postcondition(self):
         class A(FlowProject):
             pass
 
@@ -669,7 +679,7 @@ class TestProject(TestProjectBase):
         project = self.mock_project()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
         for job in project:
-            for i, op in enumerate(project._next_operations((job,))):
+            for i, op in enumerate(project._next_operations([(job,)])):
                 assert op._jobs == (job,)
                 if job in even_jobs:
                     assert op.name == ["op1", "op2", "op3"][i]
@@ -683,7 +693,7 @@ class TestProject(TestProjectBase):
             status = project.get_job_status(job)
             assert status["job_id"] == job.get_id()
             assert len(status["operations"]) == len(project.operations)
-            for op in project._next_operations((job,)):
+            for op in project._next_operations([(job,)]):
                 assert op.name in status["operations"]
                 op_status = status["operations"][op.name]
                 assert op_status["eligible"] == project.operations[op.name]._eligible(
@@ -704,6 +714,15 @@ class TestProject(TestProjectBase):
     def test_serial_project_status_homogeneous_schema(self):
         project = self.mock_project(
             config_overrides={"flow": {"status_parallelization": "none"}}
+        )
+        for parameters in (None, True, ["a"], ["b"], ["a", "b"]):
+            with redirect_stdout(StringIO()):
+                with redirect_stderr(StringIO()):
+                    project.print_status(parameters=parameters, detailed=True)
+
+    def test_thread_parallelized_project_status_homogeneous_schema(self):
+        project = self.mock_project(
+            config_overrides={"flow": {"status_parallelization": "thread"}}
         )
         for parameters in (None, True, ["a"], ["b"], ["a", "b"]):
             with redirect_stdout(StringIO()):
@@ -739,7 +758,7 @@ class TestProject(TestProjectBase):
     def test_script(self):
         project = self.mock_project()
         for job in project:
-            script = project._script(project._next_operations((job,)))
+            script = project._script(project._next_operations([(job,)]))
             if job.sp.b % 2 == 0:
                 assert str(job) in script
                 assert 'echo "hello"' in script
@@ -759,7 +778,7 @@ class TestProject(TestProjectBase):
             file.write("THIS IS A CUSTOM SCRIPT!\n")
             file.write("{% endblock %}\n")
         for job in project:
-            script = project._script(project._next_operations((job,)))
+            script = project._script(project._next_operations([(job,)]))
             assert "THIS IS A CUSTOM SCRIPT" in script
             if job.sp.b % 2 == 0:
                 assert str(job) in script
@@ -771,8 +790,8 @@ class TestProject(TestProjectBase):
                 assert "exec op2" in script
 
     def test_init(self):
-        with open(os.devnull, "w") as out:
-            for fn in init(root=self._tmp_dir.name, out=out):
+        with redirect_stderr(StringIO()):
+            for fn in init(root=self._tmp_dir.name):
                 fn_ = os.path.join(self._tmp_dir.name, fn)
                 assert os.path.isfile(fn_)
 
@@ -827,16 +846,16 @@ class TestExecutionProject(TestProjectBase):
 
     def test_pending_operations_order(self):
         # The execution order of local runs is internally assumed to be
-        # 'by-job' by default. A failure of this unit tests means that
-        # a 'by-job' order must be implemented explicitly within the
+        # "by-job" by default. A failure of this unit test means that a
+        # "by-job" order must be implemented explicitly within the
         # FlowProject.run() function.
         project = self.mock_project()
-        ops = list(project._get_pending_operations(self.project.find_jobs()))
+        ops = list(project._get_pending_operations())
         # The length of the list of operations grouped by job is equal
-        # to the length of its set if and only if the operations are grouped
-        # by job already:
+        # to the length of its set if and only if the job-operations are grouped
+        # by job already.
         jobs_order_none = [
-            job._id for job, _ in groupby(ops, key=lambda op: op._jobs[0])
+            job.get_id() for job, _ in groupby(ops, key=lambda op: op._jobs[0])
         ]
         assert len(jobs_order_none) == len(set(jobs_order_none))
 
@@ -992,11 +1011,10 @@ class TestExecutionProject(TestProjectBase):
                 assert os.getpid() == job.doc.test
 
     def test_submit_operations(self):
-        MockScheduler.reset()
         project = self.mock_project()
         operations = []
         for job in project:
-            operations.extend(project._next_operations((job,)))
+            operations.extend(project._next_operations([(job,)]))
         assert len(list(MockScheduler.jobs())) == 0
         cluster_job_id = project._store_bundled(operations)
         with redirect_stderr(StringIO()):
@@ -1004,7 +1022,6 @@ class TestExecutionProject(TestProjectBase):
         assert len(list(MockScheduler.jobs())) == 1
 
     def test_submit(self):
-        MockScheduler.reset()
         project = self.mock_project()
         assert len(list(MockScheduler.jobs())) == 0
         with redirect_stderr(StringIO()):
@@ -1012,10 +1029,8 @@ class TestExecutionProject(TestProjectBase):
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
         num_jobs_submitted = (2 * len(project)) + len(even_jobs)
         assert len(list(MockScheduler.jobs())) == num_jobs_submitted
-        MockScheduler.reset()
 
     def test_submit_bad_names_argument(self):
-        MockScheduler.reset()
         project = self.mock_project()
         assert len(list(MockScheduler.jobs())) == 0
         with pytest.raises(ValueError):
@@ -1023,7 +1038,6 @@ class TestExecutionProject(TestProjectBase):
         project.submit(names=["foo"])
 
     def test_submit_limited(self):
-        MockScheduler.reset()
         project = self.mock_project()
         assert len(list(MockScheduler.jobs())) == 0
         with redirect_stderr(StringIO()):
@@ -1034,7 +1048,6 @@ class TestExecutionProject(TestProjectBase):
         assert len(list(MockScheduler.jobs())) == 2
 
     def test_resubmit(self):
-        MockScheduler.reset()
         project = self.mock_project()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
         num_jobs_submitted = (2 * len(project)) + len(even_jobs)
@@ -1055,7 +1068,6 @@ class TestExecutionProject(TestProjectBase):
         assert i == self.expected_number_of_steps
 
     def test_bundles(self):
-        MockScheduler.reset()
         project = self.mock_project()
         assert len(list(MockScheduler.jobs())) == 0
         with redirect_stderr(StringIO()):
@@ -1064,12 +1076,10 @@ class TestExecutionProject(TestProjectBase):
             project.submit(bundle_size=2, num=4)
             assert len(list(MockScheduler.jobs())) == 3
             MockScheduler.reset()
-            project._fetch_scheduler_status(file=StringIO())
             project.submit(bundle_size=0)
             assert len(list(MockScheduler.jobs())) == 1
 
     def test_submit_status(self):
-        MockScheduler.reset()
         project = self.mock_project()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
         num_jobs_submitted = (2 * len(project)) + len(even_jobs)
@@ -1077,29 +1087,30 @@ class TestExecutionProject(TestProjectBase):
             if job not in even_jobs:
                 continue
             list(project.labels(job))
-            next_op = list(project._next_operations((job,)))[0]
+            next_op = list(project._next_operations([(job,)]))[0]
             assert next_op.name == "op1"
             assert next_op._jobs == (job,)
         with redirect_stderr(StringIO()):
             project.submit()
         assert len(list(MockScheduler.jobs())) == num_jobs_submitted
 
+        cached_status = project._get_cached_scheduler_status()
         for job in project:
-            next_op = list(project._next_operations((job,)))[0]
-            assert next_op.get_status() == JobStatus.submitted
+            next_op = list(project._next_operations([(job,)]))[0]
+            assert cached_status[next_op.id] == JobStatus.submitted
 
         MockScheduler.step()
         MockScheduler.step()
-        project._fetch_scheduler_status(file=StringIO())
 
+        scheduler_info = project._query_scheduler_status(err=StringIO())
         for job in project:
-            next_op = list(project._next_operations((job,)))[0]
-            assert next_op.get_status() == JobStatus.queued
+            next_op = list(project._next_operations([(job,)]))[0]
+            assert scheduler_info[next_op.id] == JobStatus.queued
 
         MockScheduler.step()
-        project._fetch_scheduler_status(file=StringIO())
+        scheduler_info = project._query_scheduler_status(err=StringIO())
         for job in project:
-            job_status = project.get_job_status(job)
+            job_status = project.get_job_status(job, cached_status=scheduler_info)
             for op in ("op1", "op2"):
                 assert job_status["operations"][op]["scheduler_status"] in (
                     JobStatus.unknown,
@@ -1107,11 +1118,10 @@ class TestExecutionProject(TestProjectBase):
                 )
 
     def test_submit_operations_bad_directive(self):
-        MockScheduler.reset()
         project = self.mock_project()
         operations = []
         for job in project:
-            operations.extend(project._next_operations((job,)))
+            operations.extend(project._next_operations([(job,)]))
         assert len(list(MockScheduler.jobs())) == 0
         cluster_job_id = project._store_bundled(operations)
         stderr = StringIO()
@@ -1151,8 +1161,8 @@ class TestExecutionProject(TestProjectBase):
         assert len(project)
         with redirect_stderr(StringIO()):
             for state, expected_evaluation in [
-                (0b0000, 0b1000),  # First pre-condition is not met
-                (0b0001, 0b1000),  # means only the first pre-cond.
+                (0b0000, 0b1000),  # First precondition is not met
+                (0b0001, 0b1000),  # means only the first precondition
                 (0b0010, 0b1000),  # should be evaluated.
                 (0b0011, 0b1000),
                 (0b0100, 0b1000),
@@ -1160,12 +1170,12 @@ class TestExecutionProject(TestProjectBase):
                 (0b0110, 0b1000),
                 (0b0111, 0b1000),
                 (0b1000, 0b1100),  # The first, but not the second
-                (0b1001, 0b1100),  # pre-condition is met, need to evaluate
-                (0b1010, 0b1100),  # both pre-conditions, but not post-conditions.
+                (0b1001, 0b1100),  # precondition is met, need to evaluate
+                (0b1010, 0b1100),  # both preconditions, but not postconditions.
                 (0b1011, 0b1100),
-                (0b1100, 0b1110),  # Both pre-conditions met, evaluate
-                (0b1101, 0b1110),  # first post-condition.
-                (0b1110, 0b1111),  # All pre-conditions and 1st post-condition
+                (0b1100, 0b1110),  # Both preconditions met, evaluate
+                (0b1101, 0b1110),  # first postcondition.
+                (0b1110, 0b1111),  # All preconditions and 1st postcondition
                 # are met, need to evaluate all.
                 (0b1111, 0b1111),  # All conditions met, need to evaluate all.
             ]:
@@ -1174,24 +1184,9 @@ class TestExecutionProject(TestProjectBase):
                 assert evaluated == expected_evaluation
 
 
-class TestUnbufferedExecutionProject(TestExecutionProject):
-    def mock_project(self, project_class=None):
-        project = super().mock_project(
-            project_class=project_class,
-            config_overrides={"flow": {"use_buffered_mode": "off"}},
-        )
-        return project
-
-
 class TestExecutionDynamicProject(TestExecutionProject):
     project_class = _DynamicTestProject
-    expected_number_of_steps = 10
-
-
-class TestUnbufferedExecutionDynamicProject(
-    TestUnbufferedExecutionProject, TestExecutionDynamicProject
-):
-    pass
+    expected_number_of_steps = 7
 
 
 class TestProjectMainInterface(TestProjectBase):
@@ -1254,9 +1249,9 @@ class TestProjectMainInterface(TestProjectBase):
 
     def test_main_next(self):
         assert len(self.project)
-        jobids = set(self.call_subcmd("next op1").decode().split())
+        job_ids = set(self.call_subcmd("next op1").decode().split())
         even_jobs = [job.get_id() for job in self.project if job.sp.b % 2 == 0]
-        assert jobids == set(even_jobs)
+        assert job_ids == set(even_jobs)
 
     def test_main_status(self):
         assert len(self.project)
@@ -1275,7 +1270,7 @@ class TestProjectMainInterface(TestProjectBase):
                             op_lines.append(next(lines))
                         except StopIteration:
                             continue
-                    for op in project._next_operations((job,)):
+                    for op in project._next_operations([(job,)]):
                         assert any(op.name in op_line for op_line in op_lines)
 
     def test_main_script(self):
@@ -1332,7 +1327,10 @@ class TestGroupProject(TestProjectBase):
         project = self.mock_project()
         # For run mode single operation groups
         for job in project:
-            job_ops = project._get_submission_operations((job,), dict())
+            job_ops = project._get_submission_operations(
+                aggregates=[(job,)],
+                default_directives={},
+            )
             script = project._script(job_ops)
             if job.sp.b % 2 == 0:
                 assert str(job) in script
@@ -1360,33 +1358,49 @@ class TestGroupProject(TestProjectBase):
         project = self.mock_project()
         for job in project:
             # Test submit JobOperations
-            job_ops = project._get_submission_operations(
-                (job,), project._get_default_directives(), names=["group2"]
+            job_ops = list(
+                project._get_submission_operations(
+                    aggregates=[(job,)],
+                    default_directives=project._get_default_directives(),
+                    names=["group2"],
+                )
             )
+            assert len(job_ops) == 1
             assert all(
                 [job_op.directives.get("omp_num_threads", 0) == 4 for job_op in job_ops]
             )
-            job_ops = project._get_submission_operations(
-                (job,), project._get_default_directives(), names=["op3"]
+            job_ops = list(
+                project._get_submission_operations(
+                    aggregates=[(job,)],
+                    default_directives=project._get_default_directives(),
+                    names=["op3"],
+                )
             )
+            assert len(job_ops) == 1
             assert all(
                 [job_op.directives.get("omp_num_threads", 0) == 1 for job_op in job_ops]
             )
             # Test run JobOperations
-            job_ops = project.groups["group2"]._create_run_job_operations(
-                project._entrypoint, project._get_default_directives(), (job,)
+            job_ops = list(
+                project.groups["group2"]._create_run_job_operations(
+                    project._entrypoint, project._get_default_directives(), (job,)
+                )
             )
+            assert len(job_ops) == 1
             assert all(
                 [job_op.directives.get("omp_num_threads", 0) == 4 for job_op in job_ops]
             )
-            job_ops = project.groups["op3"]._create_run_job_operations(
-                project._entrypoint, project._get_default_directives(), (job,)
+            job_ops = list(
+                project.groups["op3"]._create_run_job_operations(
+                    project._entrypoint, project._get_default_directives(), (job,)
+                )
             )
+            assert len(job_ops) == 1
             assert all(
                 [job_op.directives.get("omp_num_threads", 0) == 1 for job_op in job_ops]
             )
 
-    def test_submission_aggregation(self):
+    def test_submission_combine_directives(self):
         class A(flow.FlowProject):
             pass
 
@@ -1494,7 +1508,6 @@ class TestGroupExecutionProject(TestProjectBase):
                 assert not job.isfile("world.txt")
 
     def test_submit_groups(self):
-        MockScheduler.reset()
         project = self.mock_project()
         operations = [
             project.groups["group1"]._create_submission_job_operation(
@@ -1511,11 +1524,10 @@ class TestGroupExecutionProject(TestProjectBase):
     def test_submit_groups_invalid_char_with_error(self, monkeypatch):
         monkeypatch.setattr(MockScheduler, "_invalid_chars", ["/"])
 
-        MockScheduler.reset()
         project = self.mock_project()
         operations = [
             project.groups["group1"]._create_submission_job_operation(
-                project._entrypoint, dict(), (job,)
+                project._entrypoint, {}, (job,)
             )
             for job in project
         ]
@@ -1525,17 +1537,15 @@ class TestGroupExecutionProject(TestProjectBase):
             project._submit_operations(_id=cluster_job_id, operations=operations)
         with pytest.raises(RuntimeError):
             assert len(list(MockScheduler.jobs())) == 1
-        MockScheduler.reset()
 
     def test_submit_groups_invalid_char_avoid_error(self, monkeypatch):
         monkeypatch.setattr(MockScheduler, "_invalid_chars", ["/"])
         monkeypatch.setattr(MockEnvironment, "JOB_ID_SEPARATOR", "-", raising=False)
 
-        MockScheduler.reset()
         project = self.mock_project()
         operations = [
             project.groups["group1"]._create_submission_job_operation(
-                project._entrypoint, dict(), (job,)
+                project._entrypoint, {}, (job,)
             )
             for job in project
         ]
@@ -1544,22 +1554,18 @@ class TestGroupExecutionProject(TestProjectBase):
         with redirect_stderr(StringIO()):
             project.submit_operations(_id=cluster_job_id, operations=operations)
         assert len(list(MockScheduler.jobs())) == 1
-        MockScheduler.reset()
 
     def test_submit(self):
-        MockScheduler.reset()
         project = self.mock_project()
         assert len(list(MockScheduler.jobs())) == 0
         with redirect_stderr(StringIO()):
             project.submit(names=["group1", "group2"])
         num_jobs_submitted = 2 * len(project)
         assert len(list(MockScheduler.jobs())) == num_jobs_submitted
-        MockScheduler.reset()
 
     def test_submit_invalid_char_with_error(self, monkeypatch):
         monkeypatch.setattr(MockScheduler, "_invalid_chars", ["/"])
 
-        MockScheduler.reset()
         project = self.mock_project()
         assert len(list(MockScheduler.jobs())) == 0
         with redirect_stderr(StringIO()):
@@ -1567,23 +1573,19 @@ class TestGroupExecutionProject(TestProjectBase):
         num_jobs_submitted = 2 * len(project)
         with pytest.raises(RuntimeError):
             assert len(list(MockScheduler.jobs())) == num_jobs_submitted
-        MockScheduler.reset()
 
     def test_submit_invalid_char_avoid_error(self, monkeypatch):
         monkeypatch.setattr(MockScheduler, "_invalid_chars", ["/"])
         monkeypatch.setattr(MockEnvironment, "JOB_ID_SEPARATOR", "-", raising=False)
 
-        MockScheduler.reset()
         project = self.mock_project()
         assert len(list(MockScheduler.jobs())) == 0
         with redirect_stderr(StringIO()):
             project.submit(names=["group1", "group2"])
         num_jobs_submitted = 2 * len(project)
         assert len(list(MockScheduler.jobs())) == num_jobs_submitted
-        MockScheduler.reset()
 
     def test_group_resubmit(self):
-        MockScheduler.reset()
         project = self.mock_project()
         num_jobs_submitted = len(project)
         assert len(list(MockScheduler.jobs())) == 0
@@ -1603,7 +1605,6 @@ class TestGroupExecutionProject(TestProjectBase):
         assert i == self.expected_number_of_steps
 
     def test_operation_resubmit(self):
-        MockScheduler.reset()
         project = self.mock_project()
         num_jobs_submitted = len(project)
         assert len(list(MockScheduler.jobs())) == 0
@@ -1623,21 +1624,9 @@ class TestGroupExecutionProject(TestProjectBase):
         assert i == self.expected_number_of_steps
 
 
-class TestGroupUnbufferedExecutionProject(
-    TestUnbufferedExecutionProject, TestGroupExecutionProject
-):
-    pass
-
-
 class TestGroupExecutionDynamicProject(TestGroupExecutionProject):
     project_class = _DynamicTestProject
     expected_number_of_steps = 4
-
-
-class TestGroupUnbufferedExecutionDynamicProject(
-    TestGroupUnbufferedExecutionProject, TestGroupExecutionDynamicProject
-):
-    pass
 
 
 class TestGroupProjectMainInterface(TestProjectBase):

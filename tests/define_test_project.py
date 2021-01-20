@@ -79,7 +79,7 @@ group3 = _DynamicTestProject.make_group(name="group3")
 @_DynamicTestProject.operation
 @group3
 @_DynamicTestProject.pre.after(op1)
-@_DynamicTestProject.post.true("dynamic")
+@_DynamicTestProject.post(lambda job: job.sp.get("dynamic", False))
 def op4(job):
     job.sp.dynamic = True  # migration during execution
 

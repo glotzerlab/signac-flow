@@ -1,10 +1,14 @@
 # Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-"""This module implements the run() function, which when called equips
-a regular Python module with a command line interface, which can be used
-to execute functions defined within the same module, that operate on a
-signac data space.
+"""Defines operation decorators and a simple command line interface ``run``.
+
+This module implements the run() function, which when called equips a regular
+Python module with a command line interface. This interface can be used to
+execute functions defined within the same module that operate on a signac data
+space.
+
+See also: :class:`~.FlowProject`.
 """
 import argparse
 import inspect
@@ -15,13 +19,13 @@ from functools import wraps
 from multiprocessing import Pool
 
 from signac import get_project
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 logger = logging.getLogger(__name__)
 
 
 def cmd(func):
-    """Specifies that ``func`` returns a shell command.
+    """Indicate that ``func`` returns a shell command with this decorator.
 
     If this function is an operation function defined by :class:`~.FlowProject`, it will
     be interpreted to return a shell command, instead of executing the function itself.
@@ -33,7 +37,7 @@ def cmd(func):
         @FlowProject.operation
         @flow.cmd
         def hello(job):
-            return "echo {job._id}"
+            return "echo {job.id}"
 
     .. note::
         The final shell command generated for :meth:`~.FlowProject.run` or
@@ -49,7 +53,7 @@ def cmd(func):
 
 
 def with_job(func):
-    """Specifies that ``func(arg)`` will use ``arg`` as a context manager.
+    """Use ``arg`` as a context manager for ``func(arg)`` with this decorator.
 
     If this function is an operation function defined by :class:`~.FlowProject`, it will
     be the same as using ``with job:``.
@@ -126,17 +130,33 @@ class directives:
 
     @classmethod
     def copy_from(cls, func):
-        return cls(**getattr(func, "_flow_directives", dict()))
+        """Copy directives from another operation."""
+        return cls(**getattr(func, "_flow_directives", {}))
 
     def __call__(self, func):
-        directives = getattr(func, "_flow_directives", dict())
+        """Add directives to the function.
+
+        This call operator allows the class to be used as a decorator.
+
+        Parameters
+        ----------
+        func : callable
+            The function to decorate.
+
+        Returns
+        -------
+        callable
+            The decorated function.
+
+        """
+        directives = getattr(func, "_flow_directives", {})
         directives.update(self.kwargs)
         setattr(func, "_flow_directives", directives)
         return func
 
 
 def _get_operations(include_private=False):
-    """Yields the name of all functions that qualify as an operation function.
+    """Yield the name of all functions that qualify as an operation function.
 
     The module is inspected and all functions that have only one argument
     is yielded. Unless the 'include_private' argument is True, all private
@@ -183,7 +203,6 @@ def run(parser=None):
 
         You can control the degree of parallelization with the ``--np`` argument.
 
-
     For more information, see:
 
     .. code-block:: bash
@@ -200,7 +219,7 @@ def run(parser=None):
         help="The operation to execute.",
     )
     parser.add_argument(
-        "jobid",
+        "job_id",
         type=str,
         nargs="*",
         help="The job ids, as registered in the signac project. "
@@ -238,11 +257,11 @@ def run(parser=None):
         except LookupError:
             raise LookupError(f"Multiple matches for id '{_id}'.")
 
-    if len(args.jobid):
+    if len(args.job_id):
         try:
-            jobs = [_open_job_by_id(jid) for jid in args.jobid]
-        except (KeyError, LookupError) as e:
-            print(e, file=sys.stderr)
+            jobs = [_open_job_by_id(job_id) for job_id in args.job_id]
+        except (KeyError, LookupError) as error:
+            print(error, file=sys.stderr)
             sys.exit(1)
     else:
         jobs = project

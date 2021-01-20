@@ -32,8 +32,8 @@ if get_config_value("import_packaged_environments", default=True):
 
 __all__ = [
     "environment",
-    "scheduling",
     "errors",
+    "scheduling",
     "testing",
     "IgnoreConditions",
     "FlowProject",

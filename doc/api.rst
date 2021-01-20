@@ -14,14 +14,13 @@ directly via the ``$ flow`` command.
 For more information, please see ``$ flow --help``.
 
 .. literalinclude:: cli-help.txt
+    :language: none
 
 
 The FlowProject
 ---------------
 
 .. currentmodule:: flow
-
-.. autoclass:: FlowProject
 
 .. rubric:: Attributes
 
@@ -99,10 +98,41 @@ The FlowProject
 .. automethod:: flow.FlowProject.pre.true
 
 .. autoclass:: flow.IgnoreConditions
+    :members:
 
-.. autoclass:: flow.render_status.Renderer
-    :members: generate_terminal_output, generate_html_output, render
+Operations and Status
+---------------------
 
+.. autoclass:: flow.project.BaseFlowOperation
+    :members:
+
+.. autoclass:: flow.project.FlowOperation
+    :show-inheritance:
+    :members:
+    :special-members: __call__
+
+.. autoclass:: flow.project.FlowCmdOperation
+    :show-inheritance:
+    :members:
+    :special-members: __call__
+
+.. autoclass:: flow.project.JobOperation
+    :members:
+
+Labels
+------
+
+.. autoclass:: flow.label
+    :members:
+    :special-members: __call__
+
+.. autoclass:: flow.staticlabel
+    :members:
+    :special-members: __call__
+
+.. autoclass:: flow.classlabel
+    :members:
+    :special-members: __call__
 
 @flow.cmd
 ---------
@@ -118,6 +148,8 @@ The FlowProject
 ----------------
 
 .. autoclass:: directives
+    :members:
+    :special-members: __call__
 
 flow.run()
 ----------
@@ -138,4 +170,79 @@ The FlowGroup
 -------------
 
 .. autoclass:: flow.project.FlowGroup
-   :members: add_operation, complete, eligible, isdisjoint
+    :members:
+
+.. autoclass:: flow.project.FlowGroupEntry
+    :members:
+    :special-members: __call__
+
+Compute Environments
+--------------------
+
+.. automodule:: flow.environment
+
+.. autofunction:: flow.environment.setup
+
+.. autofunction:: flow.environment.template_filter
+
+.. autoclass:: flow.environment.ComputeEnvironment
+    :members:
+
+.. autoclass:: flow.environment.StandardEnvironment
+    :members:
+
+.. autoclass:: flow.environment.NodesEnvironment
+    :members:
+
+.. autoclass:: flow.environment.TestEnvironment
+    :members:
+
+.. autoclass:: flow.environment.SimpleSchedulerEnvironment
+    :members:
+
+.. autoclass:: flow.environment.TorqueEnvironment
+    :members:
+
+.. autoclass:: flow.environment.SlurmEnvironment
+    :members:
+
+.. autoclass:: flow.environment.LSFEnvironment
+    :members:
+
+.. autofunction:: flow.environment.registered_environments
+
+Schedulers
+----------
+
+.. automodule:: flow.scheduling
+
+.. autoclass:: flow.scheduling.base.JobStatus
+    :members:
+    :undoc-members:
+
+.. autoclass:: flow.scheduling.base.ClusterJob
+    :members:
+
+.. autoclass:: flow.scheduling.base.Scheduler
+    :members:
+
+.. autoclass:: flow.scheduling.fake_scheduler.FakeScheduler
+    :members:
+
+.. autoclass:: flow.scheduling.lsf.LSFScheduler
+    :members:
+
+.. autoclass:: flow.scheduling.simple_scheduler.SimpleScheduler
+    :members:
+
+.. autoclass:: flow.scheduling.slurm.SlurmScheduler
+    :members:
+
+.. autoclass:: flow.scheduling.torque.TorqueScheduler
+    :members:
+
+Error Classes
+-------------
+
+.. automodule:: flow.errors
+    :members:

@@ -1,4 +1,13 @@
 #!/usr/bin/env python
+# Copyright (c) 2020 The Regents of the University of Michigan
+# All rights reserved.
+# This software is licensed under the BSD 3-Clause License.
+"""A simple scheduler implementation that works with signac-flow.
+
+The package signac-flow includes the ``simple-scheduler`` script as a simple
+model of a cluster job scheduler. The ``simple-scheduler`` script is designed
+primarily for testing and demonstration.
+"""
 import argparse
 import json
 import logging
@@ -41,6 +50,11 @@ def _get_args(script):
 
 
 def main_submit(args):
+    """Submit jobs.
+
+    Jobs are accepted from a provided filename and copied to a unique name in
+    the scheduler's inbox.
+    """
     # Try to parse args, should raise error if anything is wrong or missing
     with open(args.filename) as script:
         _get_submit_parser().parse_args(list(_get_args(script)))
@@ -152,6 +166,11 @@ def _process_queue(args, db):
 
 
 def main_run(args):
+    """Run the scheduler.
+
+    The scheduler runs multiple threads. A separate thread moves jobs from the
+    inbox to a queue. The main thread processes jobs in the queue.
+    """
     print("Start scheduler...")
     os.makedirs(args.inbox, exist_ok=True)
     os.makedirs(args.queue, exist_ok=True)
@@ -175,6 +194,10 @@ def main_run(args):
 
 
 def main_status(args):
+    """Get job status.
+
+    This returns the status of all jobs from the scheduler's database.
+    """
     with Collection.open(args.db, mode="r") as db:
         if args.json:
             print(json.dumps({doc["_id"]: doc for doc in db}, indent=4))

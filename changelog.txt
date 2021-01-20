@@ -16,13 +16,28 @@ Added
 
 - Code is formatted with ``black`` and ``isort`` pre-commit hooks (#365).
 - Add official support for Python version 3.9 (#365).
+- Documentation has been added for all public classes and methods (#387, #389).
+- Added internal support for aggregates of jobs (#334, #348, #351, #364, #383, #390, #415, #422, #430).
+- Added code coverage to continuous integration (#405).
 
 Changed
 +++++++
 
-- Command line interface for ``exec`` changed parameter name from ``jobid`` to ``job_id`` (#363).
+- Command line interface always uses ``--job-id`` instead of ``--jobid`` (#363, #386).
+- ``CPUEnvironment`` and ``GPUEnvironment`` classes are deprecated (#381).
+- Docstrings are now written in `numpydoc style <https://numpydoc.readthedocs.io/en/latest/format.html>`__ (#392).
 - Default environment for the University of Minnesota Mangi cluster changed from SLURM to Torque (#393).
+- Run commands are evaluted lazily (#70, #396).
 - Deprecated method ``export_job_statuses`` (#402).
+- Improved internal caching of scheduler status (#410).
+- Refactored status fetching code (#368, #417).
+- Optimization: Directives are no longer deep-copied (#420, #421).
+- The ``use_buffered_mode`` config option is deprecated. Buffering is always internally enabled (#425).
+- Evaluate directives when called instead of when defined (#398, #402).
+- Various internal refactorings and optimizations (#371, #373, #374, #375, #376, #377, #378, #379, #380, #400, #410, #416, #423, #426).
+- ``Scheduler`` is now an abstract base class (#426).
+- ``flow.scheduling.fakescheduler`` has been renamed to ``flow.scheduling.fake_scheduler`` (#426).
+- Arguments to ``submit`` have been changed for all scheduler classes (#426).
 
 Fixed
 +++++
@@ -34,6 +49,10 @@ Removed
 +++++++
 
 - Removed the deprecated method ``flow.util.misc.write_human_readable_statepoints`` (#397).
+- Removed the deprecated argument ``--no-parallelize`` (#424).
+- Removed the deprecated ``env`` argument from submission methods (#424).
+- ``flow.render_status.Renderer`` class has been removed. ``FlowProject.print_status`` no longer returns the renderer (#426).
+- Removed deprecated ``status.py`` module (#426).
 
 Version 0.11
 ============

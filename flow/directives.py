@@ -1,3 +1,11 @@
+# Copyright (c) 2020 The Regents of the University of Michigan
+# All rights reserved.
+# This software is licensed under the BSD 3-Clause License.
+"""Directives define how workflows are executed.
+
+Directives affect both execution and submission, such as specifying the number
+of processors required for an operation.
+"""
 import functools
 import operator
 import sys
@@ -9,10 +17,10 @@ from flow.errors import DirectivesError
 class _Directive:
     """The definition of a single directive.
 
-    Logic for validation of values when setting, defaults, and the ability for
-    directives to inspect other directives (such as using nranks and
-    omp_num_threads for finding np). This is only meant to work with the
-    internals of signac-flow.
+    Logic for validation of values when setting, defaults, and the ability
+    for directives to inspect other directives (such as using ``nranks`` and
+    ``omp_num_threads`` for computing ``np``). This is only meant to work
+    with the internals of signac-flow.
 
     The validation of a directive occurs before the call to ``finalize``. It is
     the caller's responsibility to ensure that finalized values are still valid.
@@ -47,6 +55,7 @@ class _Directive:
         multiple ways to be set or are dependent in some way on other
         directives. If ``None`` or not provided, the set value is returned.
         Defaults to ``None``.
+
     """
 
     def __init__(
@@ -64,11 +73,11 @@ class _Directive:
         self._serial = serial
         self._parallel = parallel
 
-        def identity(v):
-            return v
+        def identity(value):
+            return value
 
-        def default_finalize(v, directives):
-            return v
+        def default_finalize(value, directives):
+            return value
 
         self._validator = identity if validator is None else validator
         self._finalize = default_finalize if finalize is None else finalize
@@ -91,6 +100,7 @@ class _Directive:
             Returns a immediately validated value for the given directive, or if
             a callable was passed, a new callable is returned that wraps the
             given callable with a validator.
+
         """
         if callable(value):
 
@@ -99,8 +109,7 @@ class _Directive:
                 return self._validator(value(*jobs))
 
             return validate_callable
-        else:
-            return self._validator(value)
+        return self._validator(value)
 
 
 class _Directives(MutableMapping):
@@ -116,12 +125,14 @@ class _Directives(MutableMapping):
         The sequence of all environment-specified directives. All other
         directives are user-specified and not validated. All environment
         directives must be specified at initialization.
+
     """
 
     def __init__(self, environment_directives):
-        self._directive_definitions = dict()
-        self._defined_directives = dict()
-        self._user_directives = dict()
+        self._directive_definitions = {}
+        self._defined_directives = {}
+        self._user_directives = {}
+        self._evaluated = False
 
         for directive in environment_directives:
             self._add_directive(directive)
@@ -131,32 +142,31 @@ class _Directives(MutableMapping):
             raise TypeError(
                 f"Expected a _Directive object. Received {type(directive)}."
             )
-        elif directive._name in self._directive_definitions:
+        if directive._name in self._directive_definitions:
             raise ValueError(f"Cannot redefine directive name {directive._name}.")
-        else:
-            self._directive_definitions[directive._name] = directive
-            self._defined_directives[directive._name] = directive._default
+        self._directive_definitions[directive._name] = directive
+        self._defined_directives[directive._name] = directive._default
 
     def _set_defined_directive(self, key, value):
         try:
             self._defined_directives[key] = self._directive_definitions[key](value)
-        except (KeyError, ValueError, TypeError) as err:
-            raise DirectivesError(f"Error setting directive {key}") from err
+        except (KeyError, ValueError, TypeError) as error:
+            raise DirectivesError(f"Error setting directive {key}") from error
 
     def __getitem__(self, key):
         if key in self._defined_directives and key in self._directive_definitions:
             value = self._defined_directives[key]
             return self._directive_definitions[key]._finalize(value, self)
-        elif key in self._user_directives:
+        if key in self._user_directives:
             return self._user_directives[key]
-        else:
-            raise KeyError(f"{key} not in directives.")
+        raise KeyError(f"{key} not in directives.")
 
     def __setitem__(self, key, value):
         if key in self._directive_definitions:
             self._set_defined_directive(key, value)
         else:
             self._user_directives[key] = value
+        self._evaluated = False
 
     def __delitem__(self, key):
         if key in self._directive_definitions:
@@ -178,14 +188,43 @@ class _Directives(MutableMapping):
         return f"_Directives({str(self)})"
 
     def update(self, other, aggregate=False, jobs=None, parallel=False):
+        """Update directives with another set of directives.
+
+        This method accounts for serial/parallel behavior and aggregation.
+
+        Parameters
+        ----------
+        other : :class:`~._Directives`
+            The other set of directives.
+        aggregate : bool
+            Whether to combine directives according to serial/parallel rules.
+        jobs : :class:`signac.contrib.job.Job` or tuple of :class:`signac.contrib.job.Job`
+            The jobs used to evaluate directives.
+        parallel : bool
+            Whether to aggregate according to parallel rules.
+
+        """
         if aggregate:
             self._aggregate(other, jobs=jobs, parallel=parallel)
         else:
             super().update(other)
 
     def evaluate(self, jobs):
-        for key, value in self.items():
-            self[key] = _evaluate(value, jobs)
+        """Evaluate directives for the provided jobs.
+
+        This method updates the directives in place, replacing callable
+        directives with their evaluated values.
+
+        Parameters
+        ----------
+        jobs : :class:`signac.contrib.job.Job` or tuple of :class:`signac.contrib.job.Job`
+            The jobs used to evaluate directives.
+
+        """
+        if not self._evaluated:
+            for key, value in self.items():
+                self[key] = _evaluate(value, jobs)
+            self._evaluated = True
 
     def _aggregate(self, other, jobs=None, parallel=False):
         self.evaluate(jobs)
@@ -199,6 +238,11 @@ class _Directives(MutableMapping):
             if other_directive is not None:
                 self._defined_directives[name] = agg_func(directive, other_directive)
 
+    @property
+    def user_keys(self):  # noqa: D401
+        """A generator of user specified keys."""
+        return (key for key in self._user_directives)
+
 
 def _evaluate(value, jobs):
     if callable(value):
@@ -206,47 +250,44 @@ def _evaluate(value, jobs):
             raise RuntimeError(
                 "jobs must be specified when evaluating a callable directive."
             )
-        else:
-            return value(*jobs)
-    else:
-        return value
+        return value(*jobs)
+    return value
 
 
 class _OnlyType:
     def __init__(self, type_, preprocess=None, postprocess=None):
-        def identity(v):
-            return v
+        def identity(value):
+            return value
 
         self.type = type_
         self.preprocess = identity if preprocess is None else preprocess
         self.postprocess = identity if postprocess is None else postprocess
 
-    def __call__(self, v):
-        return self.postprocess(self._validate(self.preprocess(v)))
+    def __call__(self, value):
+        return self.postprocess(self._validate(self.preprocess(value)))
 
-    def _validate(self, v):
-        if isinstance(v, self.type):
-            return v
-        else:
-            try:
-                return self.type(v)
-            except Exception:
-                raise TypeError(
-                    f"Expected an object of type {self.type}. "
-                    f"Received {v} of type {type(v)}."
-                )
-
-
-def _raise_below(value):
-    def is_greater_or_equal(v):
+    def _validate(self, value):
+        if isinstance(value, self.type):
+            return value
         try:
-            if v < value:
+            return self.type(value)
+        except Exception:
+            raise TypeError(
+                f"Expected an object of type {self.type}. "
+                f"Received {value} of type {type(value)}."
+            )
+
+
+def _raise_below(threshold):
+    def is_greater_or_equal(value):
+        try:
+            if value < threshold:
                 raise ValueError
         except (TypeError, ValueError):
             raise ValueError(
-                f"Expected a number greater than or equal to {value}. Received {v}."
+                f"Expected a number greater than or equal to {threshold}. Received {value}."
             )
-        return v
+        return value
 
     return is_greater_or_equal
 
@@ -269,20 +310,22 @@ def _finalize_np(np, directives):
     omp_num_threads = directives.get("omp_num_threads", 1)
     if callable(nranks) or callable(omp_num_threads):
         return np
-    else:
-        return max(np, max(1, nranks) * max(1, omp_num_threads))
+    return max(np, max(1, nranks) * max(1, omp_num_threads))
 
 
 # Helper validators for defining _Directive
-def _no_aggregation(v, o):
-    return v
+def _no_aggregation(value, other):
+    """Return the first argument.
+
+    This is used for directives that ignore aggregation rules.
+    """
+    return value
 
 
 def _is_fraction(value):
     if 0 <= value <= 1:
         return value
-    else:
-        raise ValueError("Value must be between 0 and 1.")
+    raise ValueError("Value must be between 0 and 1.")
 
 
 _natural_number = _OnlyType(int, postprocess=_raise_below(1))
@@ -318,23 +361,6 @@ _OMP_NUM_THREADS = _Directive("omp_num_threads", validator=_nonnegative_int, def
 """The number of OpenMP threads to use for this operation. Defaults to 0.
 
 Expects a nonnegative integer.
-"""
-
-_EXECUTABLE = _Directive(
-    "executable",
-    validator=_OnlyType(str),
-    default=sys.executable,
-    serial=_no_aggregation,
-    parallel=_no_aggregation,
-)
-"""The path to the executable to be used for this operation.
-
-Expects a string pointing to a valid executable file in the
-current file system.
-
-By default this should point to a Python executable (interpreter); however, if
-the :py:class:`FlowProject` path is an empty string, the executable can be a
-path to an executable Python script. Defaults to ``sys.executable``.
 """
 
 _WALLTIME = _Directive(
@@ -373,3 +399,24 @@ CPUs will be used. Defaults to 1.
 
     This can be particularly useful on Stampede2's launcher.
 """
+
+
+def _GET_EXECUTABLE():
+    """Return the path to the executable to be used for an operation.
+
+    The executable directive expects a string pointing to a valid executable
+    file in the current file system.
+
+    When called, by default this should point to a Python executable (interpreter);
+    however, if the :class:`FlowProject` path is an empty string, the executable
+    can be a path to an executable Python script. Defaults to ``sys.executable``.
+    """
+    # Evaluate the excutable directive at call-time instead of definition time.
+    # This is because we mock `sys.executable` while generating template reference data.
+    return _Directive(
+        "executable",
+        validator=_OnlyType(str),
+        default=sys.executable,
+        serial=_no_aggregation,
+        parallel=_no_aggregation,
+    )

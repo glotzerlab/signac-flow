@@ -18,7 +18,7 @@ from test_project import redirect_stdout
 
 import flow
 import flow.environments
-from flow.scheduling.fakescheduler import FakeScheduler
+from flow.scheduling.fake_scheduler import FakeScheduler
 
 # Define a consistent submission name so that we can test that job names are
 # being correctly generated.

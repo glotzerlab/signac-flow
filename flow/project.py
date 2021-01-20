@@ -749,6 +749,9 @@ class FlowOperation(BaseFlowOperation):
 class FlowGroupEntry:
     """A FlowGroupEntry registers operations for inclusion into a :class:`FlowGroup`.
 
+    Application developers should not directly instantiate this class, but
+    use :meth:`~FlowProject.make_group` instead.
+
     Operation functions can be marked for inclusion into a :class:`FlowGroup`
     by decorating the functions with a corresponding :class:`FlowGroupEntry`.
     If the operation requires specific directives, :meth:`~.with_directives`
@@ -766,15 +769,24 @@ class FlowGroupEntry:
         The :meth:`FlowProject.run` options to pass when submitting the group.
         These will be included in all submissions. Submissions use run
         commands to execute.
-    aggregator : :class:`~._aggregator`
-        aggregator object associated with the :class:`FlowGroup`
 
     """
 
-    def __init__(self, name, options="", aggregator=_aggregator.groupsof(1)):
+    # TODO: Enable aggregator argument in documentation.
+    # aggregator : :class:`~._aggregator`
+    #     aggregator object associated with the :class:`FlowGroup`. If None, the
+    #     default aggregator is used (Default value = None).
+
+    def __init__(self, name, options=""):
+        # TODO: Enable aggregator argument.
+        # def __init__(self, name, options="", aggregator=None):
         self.name = name
         self.options = options
-        self.aggregator = aggregator
+        self.aggregator = _aggregator.groupsof(1)
+        # TODO: Enable aggregator argument.
+        # if aggregator is None:
+        #     aggregator = _aggregator.groupsof(1)
+        # self.aggregator = aggregator
 
     def __call__(self, func):
         """Add the function into the group's operations.
@@ -2532,9 +2544,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Parameters
         ----------
-        jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
-            Only print status for the given jobs or aggregates of jobs,
-            or all if the argument is None. (Default value = None)
+        jobs : iterable of :class:`~signac.contrib.job.Job`
+            Only print status for the given jobs, or all if the argument is
+            None. (Default value = None)
         overview : bool
             Display an overview of the project status. (Default value = True)
         overview_max_lines : int
@@ -2578,6 +2590,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             'terminal' (default), 'markdown' or 'html'.
 
         """
+        # TODO: Document aggregates.
+        # jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
+        #     Only print status for the given jobs or aggregates of jobs,
+        #     or all if the argument is None. (Default value = None)
         if file is None:
             file = sys.stdout
         if err is None:
@@ -3107,9 +3123,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Parameters
         ----------
-        jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
-            Only execute operations for the given jobs or aggregates of jobs,
-            or all if the argument is None. (Default value = None)
+        jobs : iterable of :class:`~signac.contrib.job.Job`
+            Only execute operations for the given jobs, or all if the
+            argument is None. (Default value = None)
         names : iterable of :class:`str`
             Only execute operations that match the provided set of names
             (interpreted as regular expressions), or all if the argument is
@@ -3160,6 +3176,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             :class:`IgnoreConditions.NONE`.
 
         """
+        # TODO: Document aggregates.
+        # jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
+        #     Only execute operations for the given jobs or aggregates of jobs,
+        #     or all if the argument is None. (Default value = None)
         aggregates = self._convert_jobs_to_aggregates(jobs)
 
         # Get all matching FlowGroups
@@ -3784,9 +3804,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         ----------
         bundle_size : int
             Specify the number of operations to be bundled into one submission, defaults to 1.
-        jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
-            Only submit operations for the given jobs or aggregates of jobs,
-            or all if the argument is None. (Default value = None)
+        jobs : iterable of :class:`~signac.contrib.job.Job`
+            Only submit operations for the given jobs, or all if the argument
+            is None. (Default value = None)
         names : iterable of :class:`str`
             Only submit operations that match the provided set of names
             (interpreted as regular expressions), or all if the argument is
@@ -3816,6 +3836,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Additional keyword arguments forwarded to :meth:`~.ComputeEnvironment.submit`.
 
         """
+        # TODO: Document aggregates.
+        # jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
+        #     Only submit operations for the given jobs or aggregates of jobs,
+        #     or all if the argument is None. (Default value = None)
         aggregates = self._convert_jobs_to_aggregates(jobs)
 
         # Regular argument checks and expansion
@@ -4404,7 +4428,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Append the name and function to the class registry
         cls._OPERATION_FUNCTIONS.append((name, func))
         cls._GROUPS.append(
-            FlowGroupEntry(name=name, options="", aggregator=func._flow_aggregate)
+            FlowGroupEntry(name=name, options="")
+            # TODO: Enable aggregator argument.
+            # FlowGroupEntry(name=name, options="", aggregator=func._flow_aggregate)
         )
         if hasattr(func, "_flow_groups"):
             func._flow_groups.append(name)
@@ -4495,10 +4521,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             The created group.
 
         """
+        # TODO: Add aggregator argument and pass through to FlowGroupEntry.
         if name in cls._GROUP_NAMES:
             raise ValueError(f"Repeat definition of group with name '{name}'.")
         cls._GROUP_NAMES.add(name)
-        group_entry = FlowGroupEntry(name, options, _aggregator.groupsof(1))
+        group_entry = FlowGroupEntry(name, options)
         cls._GROUPS.append(group_entry)
         return group_entry
 

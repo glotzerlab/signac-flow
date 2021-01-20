@@ -4,7 +4,8 @@ from tempfile import TemporaryDirectory
 import pytest
 import signac
 
-from flow.aggregates import _DefaultAggregateStore, aggregator, get_aggregate_id
+from flow.aggregates import _aggregator as aggregator
+from flow.aggregates import _DefaultAggregateStore, _get_aggregate_id
 
 
 @pytest.fixture
@@ -336,7 +337,7 @@ class TestAggregateStore(AggregateProjectSetup):
         for aggregator_instance in list_of_aggregators:
             aggregate_store = aggregator_instance._create_AggregateStore(project)
             for aggregate in aggregate_store.values():
-                assert aggregate == aggregate_store[get_aggregate_id(aggregate)]
+                assert aggregate == aggregate_store[_get_aggregate_id(aggregate)]
 
     def test_get_invalid_id(self, setUp, project):
         jobs = tuple(project)
@@ -344,18 +345,18 @@ class TestAggregateStore(AggregateProjectSetup):
         default_aggregator = aggregator.groupsof(1)._create_AggregateStore(project)
         # Test for an aggregate of single job for aggregator instance
         with pytest.raises(LookupError):
-            aggregator_instance[get_aggregate_id((jobs[0],))]
+            aggregator_instance[_get_aggregate_id((jobs[0],))]
         # Test for an aggregate of all jobs for default aggregator
         with pytest.raises(LookupError):
-            default_aggregator[get_aggregate_id(jobs)]
+            default_aggregator[_get_aggregate_id(jobs)]
 
     def test_contains(self, setUp, project):
         jobs = tuple(project)
         aggregator_instance = aggregator()._create_AggregateStore(project)
         default_aggregator = aggregator.groupsof(1)._create_AggregateStore(project)
         # Test for an aggregate of all jobs
-        assert get_aggregate_id(jobs) in aggregator_instance
-        assert get_aggregate_id(jobs) not in default_aggregator
+        assert _get_aggregate_id(jobs) in aggregator_instance
+        assert _get_aggregate_id(jobs) not in default_aggregator
         # Test for an aggregate of single job
         assert not jobs[0].get_id() in aggregator_instance
         assert jobs[0].get_id() in default_aggregator

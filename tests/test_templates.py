@@ -13,7 +13,7 @@ from test_project import redirect_stderr, redirect_stdout
 
 import flow
 import flow.environments
-from flow.scheduling.fakescheduler import FakeScheduler
+from flow.scheduling.fake_scheduler import FakeScheduler
 
 
 def _env_name(env):

@@ -1355,8 +1355,8 @@ class _FlowProjectClass(type):
         # are registered with the class.
 
         cls._OPERATION_FUNCTIONS = []
-        cls._OPERATION_PRE_CONDITIONS = defaultdict(list)
-        cls._OPERATION_POST_CONDITIONS = defaultdict(list)
+        cls._OPERATION_PRECONDITIONS = defaultdict(list)
+        cls._OPERATION_POSTCONDITIONS = defaultdict(list)
 
         # All label functions are registered with the label() classmethod,
         # which is intended to be used as decorator function. The
@@ -1364,10 +1364,10 @@ class _FlowProjectClass(type):
         # as value, or None to use the default label name.
         cls._LABEL_FUNCTIONS = {}
 
-        # Give the class a preconditions and post class that are aware of the
-        # class they are in.
-        cls.pre = cls._setup_pre_conditions_class(parent_class=cls)
-        cls.post = cls._setup_post_conditions_class(parent_class=cls)
+        # Give the class a preconditions and postconditions class that are
+        # aware of the class they are in.
+        cls.pre = cls._setup_preconditions_class(parent_class=cls)
+        cls.post = cls._setup_postconditions_class(parent_class=cls)
 
         # All groups are registered with the function returned by the
         # make_group classmethod. In contrast to operations and labels, the
@@ -1381,7 +1381,7 @@ class _FlowProjectClass(type):
         return cls
 
     @staticmethod
-    def _setup_pre_conditions_class(parent_class):
+    def _setup_preconditions_class(parent_class):
         class pre(_condition):
             """Define and evaluate preconditions for operations.
 
@@ -1417,7 +1417,7 @@ class _FlowProjectClass(type):
                     raise ValueError(
                         "Operation functions cannot be used as preconditions."
                     )
-                self._parent_class._OPERATION_PRE_CONDITIONS[func].insert(
+                self._parent_class._OPERATION_PRECONDITIONS[func].insert(
                     0, self.condition
                 )
                 return func
@@ -1426,12 +1426,12 @@ class _FlowProjectClass(type):
             def copy_from(cls, *other_funcs):
                 """Copy preconditions from other operation(s).
 
-                True if and only if all pre conditions of other operation
+                True if and only if all preconditions of other operation
                 function(s) are met.
                 """
                 return cls(
                     _create_all_metacondition(
-                        cls._parent_class._collect_pre_conditions(), *other_funcs
+                        cls._parent_class._collect_preconditions(), *other_funcs
                     )
                 )
 
@@ -1452,14 +1452,14 @@ class _FlowProjectClass(type):
                     raise ValueError("The arguments to pre.after must be operations.")
                 return cls(
                     _create_all_metacondition(
-                        cls._parent_class._collect_post_conditions(), *other_funcs
+                        cls._parent_class._collect_postconditions(), *other_funcs
                     )
                 )
 
         return pre
 
     @staticmethod
-    def _setup_post_conditions_class(parent_class):
+    def _setup_postconditions_class(parent_class):
         class post(_condition):
             """Define and evaluate postconditions for operations.
 
@@ -1496,7 +1496,7 @@ class _FlowProjectClass(type):
                     raise ValueError(
                         "Operation functions cannot be used as postconditions."
                     )
-                self._parent_class._OPERATION_POST_CONDITIONS[func].insert(
+                self._parent_class._OPERATION_POSTCONDITIONS[func].insert(
                     0, self.condition
                 )
                 return func
@@ -1510,7 +1510,7 @@ class _FlowProjectClass(type):
                 """
                 return cls(
                     _create_all_metacondition(
-                        cls._parent_class._collect_post_conditions(), *other_funcs
+                        cls._parent_class._collect_postconditions(), *other_funcs
                     )
                 )
 
@@ -3233,10 +3233,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 )
 
                 # Warn if an operation has no postconditions set.
-                has_post_conditions = (
+                has_postconditions = (
                     len(self.operations[operation.name]._postconditions) > 0
                 )
-                if not has_post_conditions:
+                if not has_postconditions:
                     log(
                         f"Operation '{operation.name}' has no postconditions!",
                         logging.WARNING,
@@ -4456,20 +4456,20 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return ret
 
     @classmethod
-    def _collect_pre_conditions(cls):
+    def _collect_preconditions(cls):
         """Collect all preconditions added with the ``@FlowProject.pre`` decorator."""
-        return cls._collect_conditions("_OPERATION_PRE_CONDITIONS")
+        return cls._collect_conditions("_OPERATION_PRECONDITIONS")
 
     @classmethod
-    def _collect_post_conditions(cls):
+    def _collect_postconditions(cls):
         """Collect all postconditions added with the ``@FlowProject.post`` decorator."""
-        return cls._collect_conditions("_OPERATION_POST_CONDITIONS")
+        return cls._collect_conditions("_OPERATION_POSTCONDITIONS")
 
     def _register_operations(self):
         """Register all operation functions registered with this class and its parent classes."""
         operations = self._collect_operations()
-        pre_conditions = self._collect_pre_conditions()
-        post_conditions = self._collect_post_conditions()
+        preconditions = self._collect_preconditions()
+        postconditions = self._collect_postconditions()
 
         for name, func in operations:
             if name in self._operations:
@@ -4477,8 +4477,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
             # Extract preconditions/postconditions and directives from function:
             params = {
-                "pre": pre_conditions.get(func, None),
-                "post": post_conditions.get(func, None),
+                "pre": preconditions.get(func, None),
+                "post": postconditions.get(func, None),
             }
 
             # Construct FlowOperation:

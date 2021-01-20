@@ -39,7 +39,7 @@ from signac.contrib.filterparse import parse_filter_arg
 from signac.contrib.project import JobsCursor
 from tqdm.auto import tqdm
 
-from .aggregates import _DefaultAggregateStore, aggregator, get_aggregate_id
+from .aggregates import _aggregator, _DefaultAggregateStore, _get_aggregate_id
 from .environment import get_environment
 from .errors import (
     ConfigKeyError,
@@ -363,7 +363,7 @@ class _JobOperation:
         self.directives._keys_set_by_user = user_directives
 
     def __str__(self):
-        aggregate_id = get_aggregate_id(self._jobs)
+        aggregate_id = _get_aggregate_id(self._jobs)
         return f"{self.name}({aggregate_id})"
 
     def __repr__(self):
@@ -749,6 +749,9 @@ class FlowOperation(BaseFlowOperation):
 class FlowGroupEntry:
     """A FlowGroupEntry registers operations for inclusion into a :class:`FlowGroup`.
 
+    Application developers should not directly instantiate this class, but
+    use :meth:`~.FlowProject.make_group` instead.
+
     Operation functions can be marked for inclusion into a :class:`FlowGroup`
     by decorating the functions with a corresponding :class:`FlowGroupEntry`.
     If the operation requires specific directives, :meth:`~.with_directives`
@@ -766,15 +769,24 @@ class FlowGroupEntry:
         The :meth:`FlowProject.run` options to pass when submitting the group.
         These will be included in all submissions. Submissions use run
         commands to execute.
-    aggregator : :class:`~.aggregator`
-        aggregator object associated with the :class:`FlowGroup`
 
     """
 
-    def __init__(self, name, options="", aggregator=aggregator.groupsof(1)):
+    # TODO: Enable aggregator argument in documentation.
+    # aggregator : :class:`~._aggregator`
+    #     aggregator object associated with the :class:`FlowGroup`. If None, the
+    #     default aggregator is used (Default value = None).
+
+    def __init__(self, name, options=""):
+        # TODO: Enable aggregator argument.
+        # def __init__(self, name, options="", aggregator=None):
         self.name = name
         self.options = options
-        self.aggregator = aggregator
+        self.aggregator = _aggregator.groupsof(1)
+        # TODO: Enable aggregator argument.
+        # if aggregator is None:
+        #     aggregator = _aggregator.groupsof(1)
+        # self.aggregator = aggregator
 
     def __call__(self, func):
         """Add the function into the group's operations.
@@ -937,7 +949,7 @@ class FlowGroup:
     def _submit_cmd(self, entrypoint, ignore_conditions, jobs=None):
         entrypoint = self._determine_entrypoint(entrypoint, {}, jobs)
         cmd = f"{entrypoint} run -o {self.name}"
-        cmd = cmd if jobs is None else cmd + f" -j {get_aggregate_id(jobs)}"
+        cmd = cmd if jobs is None else cmd + f" -j {_get_aggregate_id(jobs)}"
         cmd = cmd if self.options is None else cmd + " " + self.options
         if ignore_conditions != IgnoreConditions.NONE:
             return cmd.strip() + " --ignore-conditions=" + str(ignore_conditions)
@@ -947,7 +959,7 @@ class FlowGroup:
         if isinstance(operation, FlowCmdOperation):
             return operation(*jobs).lstrip()
         entrypoint = self._determine_entrypoint(entrypoint, directives, jobs)
-        return f"{entrypoint} exec {operation_name} {get_aggregate_id(jobs)}".lstrip()
+        return f"{entrypoint} exec {operation_name} {_get_aggregate_id(jobs)}".lstrip()
 
     def __iter__(self):
         yield from self.operations.values()
@@ -1110,7 +1122,7 @@ class FlowGroup:
             op_string = operation_name
 
         root_directory = project.root_directory()
-        aggregate_id = get_aggregate_id(aggregate)
+        aggregate_id = _get_aggregate_id(aggregate)
         full_name = f"{root_directory}%{aggregate_id}%{op_string}"
         # The job_op_id is a hash computed from the unique full name.
         job_op_id = md5(full_name.encode("utf-8")).hexdigest()
@@ -2096,7 +2108,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if selected_aggregates is not None:
                 # Use selected aggregates in the aggregate store
                 for aggregate in aggregate_progress_wrapper(selected_aggregates):
-                    aggregate_id = get_aggregate_id(aggregate)
+                    aggregate_id = _get_aggregate_id(aggregate)
                     if aggregate_id in aggregate_store:
                         for group in matching_groups:
                             yield aggregate_id, aggregate, group
@@ -2231,7 +2243,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             A dictionary containing job status for all jobs.
 
         """
-        aggregate_id = get_aggregate_id(aggregate)
+        aggregate_id = _get_aggregate_id(aggregate)
         result = {
             "job_id": aggregate_id,
             "operations": {},
@@ -2532,9 +2544,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Parameters
         ----------
-        jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
-            Only print status for the given jobs or aggregates of jobs,
-            or all if the argument is None. (Default value = None)
+        jobs : iterable of :class:`~signac.contrib.job.Job`
+            Only print status for the given jobs, or all if the argument is
+            None. (Default value = None)
         overview : bool
             Display an overview of the project status. (Default value = True)
         overview_max_lines : int
@@ -2578,6 +2590,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             'terminal' (default), 'markdown' or 'html'.
 
         """
+        # TODO: Document aggregates.
+        # jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
+        #     Only print status for the given jobs or aggregates of jobs,
+        #     or all if the argument is None. (Default value = None)
         if file is None:
             file = sys.stdout
         if err is None:
@@ -3072,7 +3088,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 assert len(operation._jobs) == 1
                 raise UserOperationError(
                     f"An exception was raised during operation {operation.name} "
-                    f"for job or aggregate with id {get_aggregate_id(operation._jobs)}."
+                    f"for job or aggregate with id {_get_aggregate_id(operation._jobs)}."
                 ) from error
 
     def _get_default_directives(self):
@@ -3107,9 +3123,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Parameters
         ----------
-        jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
-            Only execute operations for the given jobs or aggregates of jobs,
-            or all if the argument is None. (Default value = None)
+        jobs : iterable of :class:`~signac.contrib.job.Job`
+            Only execute operations for the given jobs, or all if the
+            argument is None. (Default value = None)
         names : iterable of :class:`str`
             Only execute operations that match the provided set of names
             (interpreted as regular expressions), or all if the argument is
@@ -3160,6 +3176,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             :class:`IgnoreConditions.NONE`.
 
         """
+        # TODO: Document aggregates.
+        # jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
+        #     Only execute operations for the given jobs or aggregates of jobs,
+        #     or all if the argument is None. (Default value = None)
         aggregates = self._convert_jobs_to_aggregates(jobs)
 
         # Get all matching FlowGroups
@@ -3278,7 +3298,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             def key_func_by_job(operation):
                 # In order to group the aggregates in a by-job manner, we need
                 # to first sort the aggregates using their aggregate id.
-                return get_aggregate_id(operation._jobs)
+                return _get_aggregate_id(operation._jobs)
 
             # Optionally re-order operations for execution if order argument is provided:
             if callable(order):
@@ -3501,7 +3521,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     # stores associated with this project. This will raise an
                     # error if not.
                     aggregate_from_id = self._get_aggregate_from_id(
-                        get_aggregate_id(aggregate)
+                        _get_aggregate_id(aggregate)
                     )
                     aggregates.append(aggregate_from_id)
         return aggregates
@@ -3784,9 +3804,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         ----------
         bundle_size : int
             Specify the number of operations to be bundled into one submission, defaults to 1.
-        jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
-            Only submit operations for the given jobs or aggregates of jobs,
-            or all if the argument is None. (Default value = None)
+        jobs : iterable of :class:`~signac.contrib.job.Job`
+            Only submit operations for the given jobs, or all if the argument
+            is None. (Default value = None)
         names : iterable of :class:`str`
             Only submit operations that match the provided set of names
             (interpreted as regular expressions), or all if the argument is
@@ -3816,6 +3836,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Additional keyword arguments forwarded to :meth:`~.ComputeEnvironment.submit`.
 
         """
+        # TODO: Document aggregates.
+        # jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
+        #     Only submit operations for the given jobs or aggregates of jobs,
+        #     or all if the argument is None. (Default value = None)
         aggregates = self._convert_jobs_to_aggregates(jobs)
 
         # Regular argument checks and expansion
@@ -4399,12 +4423,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     f"a default value! ({name})"
                 )
         if not getattr(func, "_flow_aggregate", False):
-            func._flow_aggregate = aggregator.groupsof(1)
+            func._flow_aggregate = _aggregator.groupsof(1)
 
         # Append the name and function to the class registry
         cls._OPERATION_FUNCTIONS.append((name, func))
         cls._GROUPS.append(
-            FlowGroupEntry(name=name, options="", aggregator=func._flow_aggregate)
+            FlowGroupEntry(name=name, options="")
+            # TODO: Enable aggregator argument.
+            # FlowGroupEntry(name=name, options="", aggregator=func._flow_aggregate)
         )
         if hasattr(func, "_flow_groups"):
             func._flow_groups.append(name)
@@ -4495,10 +4521,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             The created group.
 
         """
+        # TODO: Add aggregator argument and pass through to FlowGroupEntry.
         if name in cls._GROUP_NAMES:
             raise ValueError(f"Repeat definition of group with name '{name}'.")
         cls._GROUP_NAMES.add(name)
-        group_entry = FlowGroupEntry(name, options, aggregator.groupsof(1))
+        group_entry = FlowGroupEntry(name, options)
         cls._GROUPS.append(group_entry)
         return group_entry
 
@@ -4683,7 +4710,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """Determine the jobs that are eligible for a specific operation."""
         for operation in self._next_operations():
             if args.name in operation.name:
-                print(get_aggregate_id(operation._jobs))
+                print(_get_aggregate_id(operation._jobs))
 
     def _main_run(self, args):
         """Run all (or select) job operations."""

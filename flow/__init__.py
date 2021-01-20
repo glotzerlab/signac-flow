@@ -9,7 +9,6 @@ configure and implement a workflow to operate on a signac_ data space.
 .. _signac: https://signac.io/
 """
 from . import environment, errors, scheduling, testing
-from .aggregates import get_aggregate_id
 from .environment import get_environment
 from .operations import cmd, directives, run, with_job
 from .project import (
@@ -36,7 +35,6 @@ __all__ = [
     "errors",
     "scheduling",
     "testing",
-    "get_aggregate_id",
     "IgnoreConditions",
     "FlowProject",
     "JobOperation",

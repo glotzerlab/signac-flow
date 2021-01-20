@@ -750,7 +750,7 @@ class FlowGroupEntry:
     """A FlowGroupEntry registers operations for inclusion into a :class:`FlowGroup`.
 
     Application developers should not directly instantiate this class, but
-    use :meth:`~FlowProject.make_group` instead.
+    use :meth:`~.FlowProject.make_group` instead.
 
     Operation functions can be marked for inclusion into a :class:`FlowGroup`
     by decorating the functions with a corresponding :class:`FlowGroupEntry`.

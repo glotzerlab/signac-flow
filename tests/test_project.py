@@ -324,9 +324,9 @@ class TestProjectClass(TestProjectBase):
         def op1(job):
             pass
 
-        assert len(A._collect_pre_conditions()[op1]) == 1
-        assert len(B._collect_pre_conditions()[op1]) == 2
-        assert len(C._collect_pre_conditions()[op1]) == 3
+        assert len(A._collect_preconditions()[op1]) == 1
+        assert len(B._collect_preconditions()[op1]) == 2
+        assert len(C._collect_preconditions()[op1]) == 3
 
         @A.post.true("test_A")
         @C.post.true("test_C")
@@ -338,9 +338,9 @@ class TestProjectClass(TestProjectBase):
         def op2(job):
             pass
 
-        assert len(A._collect_post_conditions()[op2]) == 1
-        assert len(B._collect_post_conditions()[op2]) == 2
-        assert len(C._collect_post_conditions()[op2]) == 3
+        assert len(A._collect_postconditions()[op2]) == 1
+        assert len(B._collect_postconditions()[op2]) == 2
+        assert len(C._collect_postconditions()[op2]) == 3
 
     def test_with_job_decorator(self):
         class A(FlowProject):
@@ -606,7 +606,7 @@ class TestProjectClass(TestProjectBase):
             assert job.doc.b
             assert job.doc.c
 
-    def test_precondition_postcondition(self):
+    def test_preconditions_and_postconditions(self):
         class A(FlowProject):
             pass
 

@@ -2464,12 +2464,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             )
             # aggregate_groups is a list of tuples containing scheduler,
             # aggregate, and group information. To compute labels, we fetch the
-            # jobs from the aggregates containing only one job.
-            individual_jobs = [
+            # unique jobs from the aggregates containing only one job.
+            individual_jobs = {
                 aggregate_group[3][0]
                 for aggregate_group in aggregate_groups
                 if len(aggregate_group[3]) == 1
-            ]
+            }
             status_results = parallel_executor(
                 compute_status,
                 aggregate_groups,
@@ -2492,6 +2492,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             sorted(status_results, key=lambda result: result["aggregate_id"]),
             key=lambda result: result["aggregate_id"],
         ):
+            aggregate_results = list(aggregate_results)
             # Collect all errors that occurred while evaluating status of
             # groups for this aggregate
             error_message = None
@@ -2748,6 +2749,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             for status_entry in status_results
         }
 
+        # Add labels to the status information
+        for job_label_data in job_labels:
+            job_id = job_label_data["job_id"]
+            if job_id in statuses:
+                statuses[job_id]["labels"] = job_label_data["labels"]
+
         # If the dump_json variable is set, just dump all status info
         # formatted in JSON to screen.
         if dump_json:
@@ -2760,9 +2767,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             for status in job_labels:
                 for label in status["labels"]:
                     progress[label] += 1
+            # Sort the label progress by amount complete (descending), then
+            # alphabetically
             progress_sorted = list(
                 islice(
-                    sorted(progress.items(), key=lambda x: (x[1], x[0]), reverse=True),
+                    sorted(progress.items(), key=lambda x: (-x[1], x[0])),
                     overview_max_lines,
                 )
             )

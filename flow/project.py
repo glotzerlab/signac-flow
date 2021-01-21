@@ -2464,12 +2464,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             )
             # aggregate_groups is a list of tuples containing scheduler,
             # aggregate, and group information. To compute labels, we fetch the
-            # jobs from the aggregates containing only one job.
-            individual_jobs = [
+            # unique jobs from the aggregates containing only one job.
+            individual_jobs = {
                 aggregate_group[3][0]
                 for aggregate_group in aggregate_groups
                 if len(aggregate_group[3]) == 1
-            ]
+            }
             status_results = parallel_executor(
                 compute_status,
                 aggregate_groups,

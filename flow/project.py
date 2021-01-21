@@ -2767,9 +2767,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             for status in job_labels:
                 for label in status["labels"]:
                     progress[label] += 1
+            # Sort the progress bars by amount complete, then alphabetically
             progress_sorted = list(
                 islice(
-                    sorted(progress.items(), key=lambda x: (x[1], x[0]), reverse=True),
+                    sorted(progress.items(), key=lambda x: (-x[1], x[0])),
                     overview_max_lines,
                 )
             )

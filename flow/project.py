@@ -2492,6 +2492,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             sorted(status_results, key=lambda result: result["aggregate_id"]),
             key=lambda result: result["aggregate_id"],
         ):
+            aggregate_results = list(aggregate_results)
             # Collect all errors that occurred while evaluating status of
             # groups for this aggregate
             error_message = None

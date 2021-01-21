@@ -2749,6 +2749,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             for status_entry in status_results
         }
 
+        # Add labels to the status information
+        for job_label_data in job_labels:
+            job_id = job_label_data["job_id"]
+            if job_id in statuses:
+                statuses[job_id]["labels"] = job_label_data["labels"]
+
         # If the dump_json variable is set, just dump all status info
         # formatted in JSON to screen.
         if dump_json:

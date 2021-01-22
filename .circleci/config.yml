@@ -7,10 +7,10 @@ version: 2.1
 references:
   restore_keys: &restore_keys
     keys:
-      - python-env-v1-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "setup.py" }}-{{ checksum "requirements-test.txt" }}-{{ checksum "requirements-precommit.txt" }}-{{ checksum ".pre-commit-config.yaml" }}
+      - python-env-v1-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "setup.py" }}-{{ checksum "requirements/requirements-test.txt" }}-{{ checksum "requirements/requirements-precommit.txt" }}-{{ checksum ".pre-commit-config.yaml" }}
 
   save_key: &save_key
-    key: python-env-v1-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "setup.py" }}-{{ checksum "requirements-test.txt" }}-{{ checksum "requirements-precommit.txt" }}-{{ checksum ".pre-commit-config.yaml" }}
+    key: python-env-v1-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "setup.py" }}-{{ checksum "requirements/requirements-test.txt" }}-{{ checksum "requirements/requirements-precommit.txt" }}-{{ checksum ".pre-commit-config.yaml" }}
 
 jobs:
   pre-checks:
@@ -28,7 +28,7 @@ jobs:
       - run:
           name: Install pre-check dependencies
           command: |
-            pip install --progress-bar off --user -U -r requirements-precommit.txt
+            pip install --progress-bar off --user -U -r requirements/requirements-precommit.txt
 
       - run:
           name: Run pre-checks
@@ -59,8 +59,8 @@ jobs:
             python -m virtualenv ./venv
             . venv/bin/activate
             python -m pip install --progress-bar off ${SIGNAC_VERSION}
-            python -m pip install --progress-bar off -r requirements.txt
-            python -m pip install --progress-bar off -r requirements-test.txt
+            python -m pip install --progress-bar off -r requirements/requirements.txt
+            python -m pip install --progress-bar off -r requirements/requirements-test.txt
             python -m pip install --progress-bar off -U codecov
 
       - run:
@@ -115,7 +115,7 @@ jobs:
       - run:
           name: install-dev-requirements
           command: |
-            pip install --user -U -r requirements-test.txt
+            pip install --user -U -r requirements/requirements-test.txt
 
       - run:
           name: check-citation-metadata

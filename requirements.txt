@@ -1,5 +1,0 @@
-signac>=1.0.0
-jinja2>=2.8
-cloudpickle
-deprecation>=2
-tqdm>=4.42.0

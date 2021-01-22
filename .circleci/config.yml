@@ -65,7 +65,7 @@ jobs:
             python -m pip install --progress-bar off -U -r requirements/requirements-test.txt
             # DEPENDENCIES can be "OLDEST", or "NEWEST"
             if [ "${DEPENDENCIES}" == "OLDEST" ]; then
-              $python -m pip install --progress-bar off \
+              python -m pip install --progress-bar off \
                 jinja2==2.8 \
                 cloudpickle==1.1.1 \
                 deprecation==2 \

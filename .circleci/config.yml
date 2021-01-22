@@ -116,6 +116,7 @@ jobs:
     docker:
       - image: circleci/python:3.7
   linux-python-36-oldest:
+    <<: *test-template
     environment:
       DEPENDENCIES: "OLDEST"
       SIGNAC_VERSION: "signac"

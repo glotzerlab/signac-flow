@@ -15,7 +15,7 @@ requirements = [
     # Deprecation management
     "deprecation>=2",
     # Progress bars
-    "tqdm>=4.42.0",
+    "tqdm>=4.43.0",
 ]
 
 description = "Simple workflow management for signac projects."

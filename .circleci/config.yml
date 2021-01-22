@@ -68,7 +68,7 @@ jobs:
                 jinja2==2.10 \
                 cloudpickle==1.1.1 \
                 deprecation==2 \
-                tqdm==4.42.0
+                tqdm==4.43.0
             else
               python -m pip install --progress-bar off -U -r requirements/requirements.txt
             fi

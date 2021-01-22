@@ -217,8 +217,46 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
         )
 
 
+class Bridges2Environment(DefaultSlurmEnvironment):
+    """Environment profile for the Bridges-2 supercomputer.
+
+    https://www.psc.edu/resources/bridges-2/user-guide
+    """
+
+    hostname_pattern = r".*\.bridges2\.psc\.edu$"
+    template = "bridges2.sh"
+    cores_per_node = 128
+    mpi_cmd = "mpirun"
+
+    @classmethod
+    def add_args(cls, parser):
+        """Add arguments to parser.
+
+        Parameters
+        ----------
+        parser : :class:`argparse.ArgumentParser`
+            The argument parser where arguments will be added.
+
+        """
+        super().add_args(parser)
+        parser.add_argument(
+            "--partition",
+            choices=[
+                "RM",
+                "RM-shared",
+                "RM-small",
+                "EM",
+                "GPU",
+                "GPU-shared",
+            ],
+            default="RM-shared",
+            help="Specify the partition to submit to.",
+        )
+
+
 __all__ = [
     "CometEnvironment",
     "Stampede2Environment",
     "BridgesEnvironment",
+    "Bridges2Environment",
 ]

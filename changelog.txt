@@ -38,6 +38,7 @@ Changed
 - ``Scheduler`` is now an abstract base class (#426).
 - ``flow.scheduling.fakescheduler`` has been renamed to ``flow.scheduling.fake_scheduler`` (#426).
 - Arguments to ``submit`` have been changed for all scheduler classes (#426).
+- Python 3.6 is only tested with oldest dependencies (#436).
 
 Fixed
 +++++

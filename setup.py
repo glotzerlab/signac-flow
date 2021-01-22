@@ -9,9 +9,9 @@ requirements = [
     # The core package.
     "signac>=1.0.0",
     # For the templated generation of (submission) scripts.
-    "jinja2>=2.8",
+    "jinja2>=2.10",
     # To enable the parallelized execution of operations across processes.
-    "cloudpickle",
+    "cloudpickle>=1.1.1",
     # Deprecation management
     "deprecation>=2",
     # Progress bars

@@ -65,8 +65,8 @@ jobs:
             # DEPENDENCIES can be "OLDEST", or "NEWEST"
             if [ "${DEPENDENCIES}" == "OLDEST" ]; then
               python -m pip install --progress-bar off \
-                jinja2==2.8 \
-                cloudpickle \
+                jinja2==2.10 \
+                cloudpickle==1.1.1 \
                 deprecation==2 \
                 tqdm==4.42.0
             else

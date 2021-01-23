@@ -13,7 +13,7 @@ requirements = [
     # To enable the parallelized execution of operations across processes.
     "cloudpickle>=1.1.1",
     # Deprecation management
-    "deprecation>=2",
+    "deprecation>=2.0.0",
     # Progress bars
     "tqdm>=4.43.0",
 ]

@@ -61,7 +61,7 @@ jobs:
             . venv/bin/activate
             python -m pip install --progress-bar off -U pip>=20.3
             python -m pip install --progress-bar off -U codecov
-            # DEPENDENCIES can be "OLDEST", or "NEWEST"
+            # DEPENDENCIES can be "OLDEST" or "NEWEST"
             if [ "${DEPENDENCIES}" == "OLDEST" ]; then
               python -m pip install --progress-bar off -r .circleci/ci-oldest-reqs.txt
             else

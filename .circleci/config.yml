@@ -61,11 +61,11 @@ jobs:
             . venv/bin/activate
             python -m pip install --progress-bar off -U pip>=20.3
             python -m pip install --progress-bar off -U codecov
+            python -m pip install --progress-bar off ${SIGNAC_VERSION}
             # DEPENDENCIES can be "OLDEST" or "NEWEST"
             if [ "${DEPENDENCIES}" == "OLDEST" ]; then
               python -m pip install --progress-bar off -r .circleci/ci-oldest-reqs.txt
             else
-              python -m pip install --progress-bar off ${SIGNAC_VERSION}
               python -m pip install --progress-bar off -r requirements/requirements.txt
             fi
             python -m pip install --progress-bar off -r requirements/requirements-test.txt
@@ -81,16 +81,11 @@ jobs:
           path: test-reports
           destination: test-reports
 
-  linux-python-39-signac-10:
+  linux-python-39-signac-15:
     <<: *test-template
     environment:
       DEPENDENCIES: "NEWEST"
-      SIGNAC_VERSION: "signac~=1.0.0"
-  linux-python-39-signac-13:
-    <<: *test-template
-    environment:
-      DEPENDENCIES: "NEWEST"
-      SIGNAC_VERSION: "signac~=1.3.0"
+      SIGNAC_VERSION: "signac~=1.5.0"
   linux-python-39-signac-14:
     <<: *test-template
     environment:
@@ -113,7 +108,7 @@ jobs:
     <<: *test-template
     environment:
       DEPENDENCIES: "OLDEST"
-      SIGNAC_VERSION: "signac"
+      SIGNAC_VERSION: "signac==1.0.0"
     docker:
       - image: circleci/python:3.6
 
@@ -176,10 +171,7 @@ workflows:
       - linux-python-36-oldest:
           requires:
             - pre-checks
-      - linux-python-39-signac-10:
-          requires:
-            - linux-python-39
-      - linux-python-39-signac-13:
+      - linux-python-39-signac-15:
           requires:
             - linux-python-39
       - linux-python-39-signac-14:
@@ -198,8 +190,7 @@ workflows:
             - linux-python-38
             - linux-python-37
             - linux-python-36-oldest
-            - linux-python-39-signac-10
-            - linux-python-39-signac-13
+            - linux-python-39-signac-15
             - linux-python-39-signac-14
   nightly:
     triggers:

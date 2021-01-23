@@ -125,7 +125,7 @@ class Scheduler(ABC):
         raise NotImplementedError()
 
 
-def _call_submit(self, submit_cmd, script, pretend):
+def _call_submit(submit_cmd, script, pretend):
     """Call submit command with a temporary script file.
 
     Parameters

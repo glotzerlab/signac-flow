@@ -38,6 +38,9 @@ Changed
 - ``Scheduler`` is now an abstract base class (#426).
 - ``flow.scheduling.fakescheduler`` has been renamed to ``flow.scheduling.fake_scheduler`` (#426).
 - Arguments to ``submit`` have been changed for all scheduler classes (#426).
+- Python 3.6 is only tested with oldest dependencies (#436).
+- Drop support for `tqdm <https://github.com/tqdm/tqdm>`__ versions older than `4.43.0` (#436).
+- Drop support for `Jinja2 <https://palletsprojects.com/p/jinja/>`__ versions older than `2.10.0` (#436).
 
 Fixed
 +++++

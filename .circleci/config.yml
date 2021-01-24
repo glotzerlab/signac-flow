@@ -7,10 +7,10 @@ version: 2.1
 references:
   restore_keys: &restore_keys
     keys:
-      - python-env-v1-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "setup.py" }}-{{ checksum "requirements-test.txt" }}-{{ checksum "requirements-precommit.txt" }}-{{ checksum ".pre-commit-config.yaml" }}
+      - python-env-v1-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "setup.py" }}-{{ checksum "requirements/requirements-test.txt" }}-{{ checksum "requirements/requirements-precommit.txt" }}-{{ checksum ".circleci/ci-oldest-reqs.txt" }}-{{ checksum ".pre-commit-config.yaml" }}
 
   save_key: &save_key
-    key: python-env-v1-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "setup.py" }}-{{ checksum "requirements-test.txt" }}-{{ checksum "requirements-precommit.txt" }}-{{ checksum ".pre-commit-config.yaml" }}
+    key: python-env-v1-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "setup.py" }}-{{ checksum "requirements/requirements-test.txt" }}-{{ checksum "requirements/requirements-precommit.txt" }}-{{ checksum ".circleci/ci-oldest-reqs.txt" }}-{{ checksum ".pre-commit-config.yaml" }}
 
 jobs:
   pre-checks:
@@ -28,7 +28,7 @@ jobs:
       - run:
           name: Install pre-check dependencies
           command: |
-            pip install --progress-bar off --user -U -r requirements-precommit.txt
+            pip install --progress-bar off --user -U -r requirements/requirements-precommit.txt
 
       - run:
           name: Run pre-checks
@@ -42,6 +42,7 @@ jobs:
 
   linux-python-39: &test-template
     environment:
+      DEPENDENCIES: "NEWEST"
       SIGNAC_VERSION: "signac"
     docker:
       - image: circleci/python:3.9
@@ -54,14 +55,20 @@ jobs:
       - run:
           name: Install dependencies
           command: |
-            pip install -U virtualenv --user
+            python -m pip install --progress-bar off -U virtualenv --user
             mkdir -p ./venv
-            python -m virtualenv ./venv
+            python -m virtualenv ./venv --clear
             . venv/bin/activate
-            python -m pip install --progress-bar off ${SIGNAC_VERSION}
-            python -m pip install --progress-bar off -r requirements.txt
-            python -m pip install --progress-bar off -r requirements-test.txt
+            python -m pip install --progress-bar off -U pip>=20.3
             python -m pip install --progress-bar off -U codecov
+            python -m pip install --progress-bar off ${SIGNAC_VERSION}
+            # DEPENDENCIES can be "OLDEST" or "NEWEST"
+            if [ "${DEPENDENCIES}" == "OLDEST" ]; then
+              python -m pip install --progress-bar off -r .circleci/ci-oldest-reqs.txt
+            else
+              python -m pip install --progress-bar off -r requirements/requirements.txt
+            fi
+            python -m pip install --progress-bar off -r requirements/requirements-test.txt
 
       - run:
           name: Run tests
@@ -74,21 +81,20 @@ jobs:
           path: test-reports
           destination: test-reports
 
-  linux-python-39-signac-10:
+  linux-python-39-signac-15:
     <<: *test-template
     environment:
-      SIGNAC_VERSION: "signac~=1.0.0"
-  linux-python-39-signac-13:
-    <<: *test-template
-    environment:
-      SIGNAC_VERSION: "signac~=1.3.0"
+      DEPENDENCIES: "NEWEST"
+      SIGNAC_VERSION: "signac~=1.5.0"
   linux-python-39-signac-14:
     <<: *test-template
     environment:
+      DEPENDENCIES: "NEWEST"
       SIGNAC_VERSION: "signac~=1.4.0"
   linux-python-39-signac-latest:
     <<: *test-template
     environment:
+      DEPENDENCIES: "NEWEST"
       SIGNAC_VERSION: "git+ssh://git@github.com/glotzerlab/signac.git"
   linux-python-38:
     <<: *test-template
@@ -98,8 +104,11 @@ jobs:
     <<: *test-template
     docker:
       - image: circleci/python:3.7
-  linux-python-36:
+  linux-python-36-oldest:
     <<: *test-template
+    environment:
+      DEPENDENCIES: "OLDEST"
+      SIGNAC_VERSION: "signac==1.0.0"
     docker:
       - image: circleci/python:3.6
 
@@ -115,7 +124,7 @@ jobs:
       - run:
           name: install-dev-requirements
           command: |
-            pip install --user -U -r requirements-test.txt
+            pip install --user -U -r requirements/requirements-test.txt
 
       - run:
           name: check-citation-metadata
@@ -159,13 +168,10 @@ workflows:
       - linux-python-37:
           requires:
             - pre-checks
-      - linux-python-36:
+      - linux-python-36-oldest:
           requires:
             - pre-checks
-      - linux-python-39-signac-10:
-          requires:
-            - linux-python-39
-      - linux-python-39-signac-13:
+      - linux-python-39-signac-15:
           requires:
             - linux-python-39
       - linux-python-39-signac-14:
@@ -183,9 +189,8 @@ workflows:
             - linux-python-39
             - linux-python-38
             - linux-python-37
-            - linux-python-36
-            - linux-python-39-signac-10
-            - linux-python-39-signac-13
+            - linux-python-36-oldest
+            - linux-python-39-signac-15
             - linux-python-39-signac-14
   nightly:
     triggers:

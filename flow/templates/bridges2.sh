@@ -37,7 +37,7 @@
 #SBATCH --ntasks-per-node={{ (96, cpu_tasks)|min }}
 {% elif partition == 'RM-shared' %}
 #SBATCH -N {{ nn|default(1, true) }}
-#SBATCH --ntasks-per-node={{ cpu_tasks }}
+#SBATCH --ntasks={{ cpu_tasks }}
 {% else %}
 {# This should cover RM, RM-512, and possibly RM-small (not documented) #}
 #SBATCH -N {{ nn|check_utilization(cpu_tasks, 128, threshold, 'CPU') }}

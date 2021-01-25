@@ -157,7 +157,7 @@ def _call_submit(submit_cmd, script, pretend):
         with tempfile.NamedTemporaryFile() as tmp_submit_script:
             tmp_submit_script.write(str(script).encode("utf-8"))
             tmp_submit_script.flush()
-            submit_cmd += tmp_submit_script.name
+            submit_cmd.append(tmp_submit_script.name)
             try:
                 subprocess.check_output(submit_cmd, universal_newlines=True)
             except subprocess.CalledProcessError as error:

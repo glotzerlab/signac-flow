@@ -4730,9 +4730,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _main_next(self, args):
         """Determine the jobs that are eligible for a specific operation."""
-        for operation in self._next_operations():
-            if args.name in operation.name:
-                print(_get_aggregate_id(operation._jobs))
+        if args.name not in self.operations:
+            print(f"The requested operation '{args.name}' does not exist.")
+        else:
+            for operation in self._next_operations():
+                if args.name in operation.name:
+                    print(_get_aggregate_id(operation._jobs))
 
     def _main_run(self, args):
         """Run all (or select) job operations."""

@@ -3199,6 +3199,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             )
         if names is None:
             names = list(self.operations)
+        else:
+            absent_ops = (set(self._groups.keys()) ^ set(names)) & set(names)
+            if absent_ops:
+                print(
+                    f"The requested flow operation(s) does not exist: {', '.join(absent_ops)}"
+                )
 
         # Get default directives
         default_directives = self._get_default_directives()
@@ -3845,6 +3851,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Additional keyword arguments forwarded to :meth:`~.ComputeEnvironment.submit`.
 
         """
+        if names is not None:
+            absent_ops = (set(self._groups.keys()) ^ set(names)) & set(names)
+            if absent_ops:
+                print(
+                    f"The requested flow operation(s) does not exist: {', '.join(absent_ops)}"
+                )
+
         # TODO: Document aggregates.
         # jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
         #     Only submit operations for the given jobs or aggregates of jobs,

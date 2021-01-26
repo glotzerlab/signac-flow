@@ -4718,7 +4718,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _main_next(self, args):
         """Determine the jobs that are eligible for a specific operation."""
         for operation in self._next_operations():
-            if args.name in operation.name:
+            if args.name == operation.name:
                 print(_get_aggregate_id(operation._jobs))
 
     def _main_run(self, args):

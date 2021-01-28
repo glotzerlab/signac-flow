@@ -3390,7 +3390,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         names=None,
         ignore_conditions=IgnoreConditions.NONE,
         ignore_conditions_on_execution=IgnoreConditions.NONE,
-        test=False,
     ):
         r"""Grabs eligible :class:`~._JobOperation`\ s from :class:`~.FlowGroup`\ s.
 
@@ -3416,10 +3415,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Specify if preconditions and/or postconditions are to be ignored
             when determining eligibility after submitting. The default is
             :class:`IgnoreConditions.NONE`.
-        test : bool
-            If True, the submission will not update the scheduler status
-            before submission and the cached status will be used. (Default
-            value = False)
 
         Yields
         ------
@@ -3432,8 +3427,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         submission_groups = set(self._gather_flow_groups(names))
 
         # Fetch scheduler status
-        scheduler_info = self._query_scheduler_status() if not test else {}
-
+        scheduler_info = self._query_scheduler_status()
         for (
             scheduler_id,
             scheduler_status,
@@ -3802,7 +3796,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         parallel=False,
         force=False,
         walltime=None,
-        test=False,
         ignore_conditions=IgnoreConditions.NONE,
         ignore_conditions_on_execution=IgnoreConditions.NONE,
         **kwargs,
@@ -3837,10 +3830,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Specify if preconditions and/or postconditions are to be ignored
             when determining eligibility after submitting. The default is
             :class:`IgnoreConditions.NONE`.
-        test : bool
-            If True, the submission will not update the scheduler status
-            before determining the operations to submit. The cached status
-            will still be used. (Default value = False)
         \*\*kwargs
             Additional keyword arguments forwarded to :meth:`~.ComputeEnvironment.submit`.
 
@@ -3871,8 +3860,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "The ignore_conditions argument of FlowProject.run() "
                 "must be a member of class IgnoreConditions."
             )
-        if test:
-            kwargs["pretend"] = True
 
         # Gather all pending operations.
         with self._buffered():
@@ -3885,7 +3872,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 names,
                 ignore_conditions,
                 ignore_conditions_on_execution,
-                test=test,
             )
             # islice takes the first "num" elements from the generator, or all
             # items if num is None.
@@ -3922,11 +3908,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             "--force",
             action="store_true",
             help="Ignore all warnings and checks, just submit.",
-        )
-        parser.add_argument(
-            "--test",
-            action="store_true",
-            help="Do not interact with the scheduler, implies --pretend.",
         )
         parser.add_argument(
             "--ignore-conditions",
@@ -4788,8 +4769,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _main_submit(self, args):
         """Submit jobs to a scheduler."""
-        if args.test:
-            args.pretend = True
         kwargs = vars(args)
 
         # Select jobs:

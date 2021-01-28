@@ -57,6 +57,7 @@ Removed
 - Removed the deprecated ``env`` argument from submission methods (#424).
 - ``flow.render_status.Renderer`` class has been removed. ``FlowProject.print_status`` no longer returns the renderer (#426).
 - Removed deprecated ``status.py`` module (#426).
+- Removed the ``--test`` argument from ``FlowProject.submit`` (#439).
 
 Version 0.11
 ============

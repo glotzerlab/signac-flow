@@ -17,7 +17,7 @@ Added
 - Code is formatted with ``black`` and ``isort`` pre-commit hooks (#365).
 - Add official support for Python version 3.9 (#365).
 - Documentation has been added for all public classes and methods (#387, #389).
-- Added internal support for aggregates of jobs (#334, #348, #351, #364, #383, #390, #415, #422, #430).
+- Added internal support for aggregates of jobs (#334, #348, #351, #364, #383, #390, #415, #422, #430, #443).
 - Added code coverage to continuous integration (#405).
 
 Changed
@@ -47,7 +47,6 @@ Fixed
 
 - Ensure that directives are always evaluated before running or submitting (#408, #409).
 - Cache the fully qualified domain name during environment detection to fix a performance issue on macOS (#339, #394).
-- Ensure that ``next`` command line argument does not display eligible jobs for unequal operations (#443).
 
 Removed
 +++++++

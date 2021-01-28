@@ -1250,8 +1250,12 @@ class TestProjectMainInterface(TestProjectBase):
     def test_main_next(self):
         assert len(self.project)
         job_ids = set(self.call_subcmd("next op1").decode().split())
+        assert len(job_ids) > 0
         even_jobs = [job.get_id() for job in self.project if job.sp.b % 2 == 0]
         assert job_ids == set(even_jobs)
+        # Use only exact operation matches
+        job_ids = set(self.call_subcmd("next op").decode().split())
+        assert len(job_ids) == 0
 
     def test_main_status(self):
         assert len(self.project)

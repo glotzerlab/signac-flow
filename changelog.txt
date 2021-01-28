@@ -47,7 +47,7 @@ Fixed
 
 - Ensure that directives are always evaluated before running or submitting (#408, #409).
 - Cache the fully qualified domain name during environment detection to fix a performance issue on macOS (#339, #394).
-- Ensure that ``next`` command line argument does not display eligible jobs for unequal operations (#443).
+- Ensure that ``next`` CLI command displays eligible jobs for the exact operation name provided (#443).
 
 Removed
 +++++++

@@ -291,17 +291,26 @@ class _AggregatesCursor:
             self._cursor = JobsCursor(project, filter, doc_filter)
 
     def __eq__(self, other):
+        if not (
+            isinstance(other, type(self))
+            and isinstance(other._cursor, type(self._cursor))
+        ):
+            return NotImplemented
         return self._cursor == other._cursor
 
     def __contains__(self, aggregate):
         if self._filter is None and self._doc_filter is None:
-            return any(aggregate in aggregate_store for aggregate_store in self._cursor)
+            return any(
+                get_aggregate_id(aggregate) in aggregate_store
+                for aggregate_store in self._cursor
+            )
         else:
             return aggregate[0] in self._cursor
 
     def __len__(self):
         if self._filter is None and self._doc_filter is None:
-            return sum(len(aggregate_store) for aggregate_store in self._cursor)
+            # Return number of unique aggregates present in the project
+            return sum({len(aggregate_store) for aggregate_store in self._cursor})
         else:
             return len(self._cursor)
 
@@ -310,7 +319,7 @@ class _AggregatesCursor:
             for aggregate_store in self._cursor:
                 yield from aggregate_store
         else:
-            for job in self._jobs_cursor:
+            for job in self._cursor:
                 yield (job,)
 
 

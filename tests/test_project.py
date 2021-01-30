@@ -19,6 +19,7 @@ from tempfile import TemporaryDirectory
 import pytest
 import signac
 from define_dag_test_project import DagTestProject
+from define_test_aggregate_project import _TestAggregateProject
 from define_test_project import _DynamicTestProject, _TestProject
 from deprecation import fail_if_not_removed
 
@@ -159,6 +160,7 @@ class TestProjectBase:
                 project.open_job(dict(a=a, b=b)).init()
                 project.open_job(dict(a=dict(a=a), b=b)).init()
         project._entrypoint = self.entrypoint
+        project._register_groups()
         return project
 
 
@@ -1711,3 +1713,31 @@ class TestGroupProjectMainInterface(TestProjectBase):
 
 class TestGroupDynamicProjectMainInterface(TestProjectMainInterface):
     project_class = _DynamicTestProject
+
+
+class TestProjectUtilities(TestProjectBase):
+    project_class = _TestAggregateProject
+    entrypoint = dict(
+        path=os.path.realpath(
+            os.path.join(os.path.dirname(__file__), "define_test_aggregate_project.py")
+        )
+    )
+
+    def test_AggregatesCursor(self):
+        project = self.mock_project()
+
+        agg_cursor1 = _AggregatesCursor(project=project)
+        assert agg_cursor1._project == project
+        assert agg_cursor1._filter is None
+        assert agg_cursor1._doc_filter is None
+        # Same aggregates for operation agg_op2 and agg_op3.
+        assert len(agg_cursor1) == 12
+        assert [(job,) in agg_cursor1 for job in project]
+
+        agg_cursor2 = _AggregatesCursor(project=project, filter={"a": 1})
+        assert agg_cursor2._project == project
+        assert agg_cursor2._filter == {"a": 1}
+        assert agg_cursor2._doc_filter is None
+        assert len(agg_cursor2) == 2
+
+        assert agg_cursor1 != agg_cursor2

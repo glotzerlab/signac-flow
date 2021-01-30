@@ -4495,7 +4495,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         options : str
             A string to append to submissions. Can be any valid
             :meth:`FlowOperation.run` option. (Default value = "")
-        aggregator_obj :class:`~.aggregator`
+        aggregator_obj : :class:`~.aggregator`
             aggregator object associated with the :class:`FlowGroup`. If None, the
             default aggregator is used (Default value = None).
 

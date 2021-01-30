@@ -453,7 +453,7 @@ class _AggregateStore(_BaseAggregateStore):
                 raise ValueError("Invalid aggregator_function provided by the user.")
             # Store aggregate by id to allow searching by id
             self._aggregates_by_id[
-                _get_aggregate_id(stored_aggregate)
+                get_aggregate_id(stored_aggregate)
             ] = stored_aggregate
 
     def _generate_aggregates(self):
@@ -562,7 +562,7 @@ class _DefaultAggregateStore(_BaseAggregateStore):
             yield (job.get_id(), (job,))
 
 
-def _get_aggregate_id(aggregate):
+def get_aggregate_id(aggregate):
     """Generate aggregate id for an aggregate of jobs.
 
     The aggregate id is a unique hash identifying a tuple of jobs. The

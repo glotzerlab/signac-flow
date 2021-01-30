@@ -9,7 +9,7 @@ configure and implement a workflow to operate on a signac_ data space.
 .. _signac: https://signac.io/
 """
 from . import environment, errors, scheduling, testing
-from .aggregates import aggregator
+from .aggregates import aggregator, get_aggregate_id
 from .environment import get_environment
 from .operations import cmd, directives, run, with_job
 from .project import (
@@ -33,6 +33,7 @@ if get_config_value("import_packaged_environments", default=True):
 
 __all__ = [
     "aggregator",
+    "get_aggregate_id",
     "environment",
     "errors",
     "scheduling",

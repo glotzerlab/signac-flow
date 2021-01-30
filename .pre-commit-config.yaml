@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: 'v3.3.0'
+    rev: 'v3.4.0'
     hooks:
       - id: end-of-file-fixer
         exclude: 'setup.cfg'
@@ -8,14 +8,14 @@ repos:
         exclude: 'setup.cfg'
       - id: debug-statements
   - repo: https://github.com/asottile/pyupgrade
-    rev: 'v2.7.3'
+    rev: 'v2.7.4'
     hooks:
       - id: pyupgrade
         exclude: '(?:mistune/.*)'
         args:
           - --py36-plus
   - repo: https://github.com/pycqa/isort
-    rev: '5.6.4'
+    rev: '5.7.0'
     hooks:
       - id: isort
         exclude: '(?:mistune/.*)'

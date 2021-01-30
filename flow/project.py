@@ -278,36 +278,40 @@ class _AggregatesCursor:
 
     """
 
-    # This class currently only handles aggregates of size 1 (single jobs).
-
     def __init__(self, project, filter=None, doc_filter=None):
         self._project = project
         self._filter = filter
         self._doc_filter = doc_filter
-        self._jobs_cursor = JobsCursor(project, filter, doc_filter)
+        # If no filter or doc_filter is provided by the user, then select every
+        # aggregate present in the flow project. If filter or doc_filter is provided,
+        # then use the jobs returned via JobsCursor instance.
+        if filter is None and doc_filter is None:
+            self._cursor = project._group_to_aggregate_store.inverse.keys()
+        else:
+            self._cursor = JobsCursor(project, filter, doc_filter)
 
     def __eq__(self, other):
-        return self._jobs_cursor == other._jobs_cursor
+        return self._cursor == other._cursor
 
     def __contains__(self, aggregate):
-        if len(aggregate) != 1:
-            # Exit early if this is not an aggregate of 1 job
-            return False
         if self._filter is None and self._doc_filter is None:
-            # Using the Project's __contains__ method is fastest if no
-            # filtering is needed. This is a backport of PR 449 to signac that
-            # optimizes the JobsCursor __contains__ method, and is required for
-            # sufficient performance with earlier versions of signac.
-            return aggregate[0] in self._project
-        # Slow path: requires O(N) iteration over the JobsCursor
-        return aggregate[0] in self._jobs_cursor
+            return any(aggregate in aggregate_store for aggregate_store in self._cursor)
+        else:
+            return aggregate[0] in self._cursor
 
     def __len__(self):
-        return len(self._jobs_cursor)
+        if self._filter is None and self._doc_filter is None:
+            return sum(len(aggregate_store) for aggregate_store in self._cursor)
+        else:
+            return len(self._cursor)
 
     def __iter__(self):
-        for job in self._jobs_cursor:
-            yield (job,)
+        if self._filter is None and self._doc_filter is None:
+            for aggregate_store in self._cursor:
+                yield from aggregate_store
+        else:
+            for job in self._jobs_cursor:
+                yield (job,)
 
 
 class _JobOperation:
@@ -4820,12 +4824,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             # aggregates must be a set to prevent duplicate entries
             aggregates = set()
             for id in args.job_id:
-                # TODO: We need to add support for aggregation id parameter
-                # for the -j flag ('agg-...')
-                try:
-                    aggregates.add((self.open_job(id=id),))
-                except KeyError as error:
-                    raise LookupError(f"Did not find job with id {error}.")
+                if id[0:4] == "agg-":
+                    aggregates.add(self._get_aggregate_from_id(id))
+                else:
+                    try:
+                        aggregates.add((self.open_job(id=id),))
+                    except KeyError as error:
+                        raise LookupError(f"Did not find job with id {error}.")
             return list(aggregates)
         elif args.func == self._main_exec:
             # exec command used with job_id

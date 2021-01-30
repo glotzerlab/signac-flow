@@ -2956,7 +2956,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if timeout is not None and timeout < 0:
             timeout = None
         if operations is None:
-            operations = list(self._get_pending_operations())
+            operations = list(self._next_operations())
         else:
             operations = list(operations)  # ensure list
 
@@ -3119,11 +3119,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         order=None,
         ignore_conditions=IgnoreConditions.NONE,
     ):
-        """Execute all pending operations for the given selection.
+        """Execute all eligible operations for the given selection.
 
-        This function will run in an infinite loop until all pending operations
-        are executed, unless it reaches the maximum number of passes per
-        operation or the maximum number of executions.
+        This function will run in an infinite loop until all eligible
+        operations are executed, unless it reaches the maximum number of
+        passes per operation or the maximum number of executions.
 
         By default there is no limit on the total number of executions, but a
         specific operation will only be executed once per job. This is to avoid
@@ -3271,7 +3271,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if reached_execution_limit.is_set():
                 logger.warning(
                     "Reached the maximum number of operations that can be executed, but "
-                    "there are still operations pending."
+                    "there are still eligible operations."
                 )
                 break
             try:
@@ -3302,7 +3302,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         logger.log(level, msg)
                     del messages[:]  # clear
             if not operations:
-                break  # No more pending operations or execution limits reached.
+                break  # No more eligible operations or execution limits reached.
 
             def key_func_by_job(operation):
                 # In order to group the aggregates in a by-job manner, we need
@@ -3358,24 +3358,25 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             List of groups matching the provided names.
 
         """
-        operations = {}
-        # if no names are selected try all singleton groups
         if names is None:
-            names = self._operations.keys()
-        for name in names:
-            if name in operations:
-                continue
-            groups = [
-                group
-                for group_name, group in self.groups.items()
-                if re.fullmatch(name, group_name)
-            ]
-            if len(groups) > 0:
-                for group in groups:
-                    operations[group.name] = group
-            else:
-                continue
-        operations = list(operations.values())
+            # If no names are selected, use all singleton groups
+            operations = [self._groups[name] for name in self.operations]
+        else:
+            operations = {}
+            for name in names:
+                if name in operations:
+                    continue
+                groups = [
+                    group
+                    for group_name, group in self.groups.items()
+                    if re.fullmatch(name, group_name)
+                ]
+                if len(groups) > 0:
+                    for group in groups:
+                        operations[group.name] = group
+                else:
+                    continue
+            operations = list(operations.values())
         if not FlowProject._verify_group_compatibility(operations):
             raise ValueError(
                 "Cannot specify groups or operations that will be included "
@@ -3450,22 +3451,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     jobs=aggregate,
                     ignore_conditions_on_execution=ignore_conditions_on_execution,
                 )
-
-    def _get_pending_operations(
-        self, jobs=None, operation_names=None, ignore_conditions=IgnoreConditions.NONE
-    ):
-        """Get all pending operations for the given selection."""
-        if jobs is None:
-            jobs = _AggregatesCursor(self)
-        assert not isinstance(operation_names, str)
-        for operation in self._next_operations(jobs, ignore_conditions):
-            # Return operations with names that match the provided list of
-            # regular expressions, or all operations if no names are specified.
-            if operation_names is None or any(
-                re.fullmatch(operation_name, operation.name)
-                for operation_name in operation_names
-            ):
-                yield operation
 
     @classmethod
     def _verify_group_compatibility(cls, groups):
@@ -3861,7 +3846,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "must be a member of class IgnoreConditions."
             )
 
-        # Gather all pending operations.
+        # Gather all eligible operations.
         with self._buffered():
             default_directives = self._get_default_directives()
             # The generator must be used *inside* the buffering context manager
@@ -4039,8 +4024,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             default=1,
             dest="bundle_size",
             help="Bundle multiple operations for execution in a single "
-            "scheduler job. When this option is provided without argument, "
-            " all pending operations are aggregated into one bundle.",
+            "scheduler job. When this option is provided without an argument, "
+            "all eligible operations are combined into one bundle.",
         )
         bundling_group.add_argument(
             "-p",
@@ -4284,7 +4269,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if op._complete((job,)):
                 yield name
 
-    def _next_operations(self, jobs=None, ignore_conditions=IgnoreConditions.NONE):
+    def _next_operations(
+        self, jobs=None, operation_names=None, ignore_conditions=IgnoreConditions.NONE
+    ):
         """Determine the next eligible operations for aggregates.
 
         Parameters
@@ -4292,6 +4279,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         jobs : tuple of :class:`~signac.contrib.job.Job`
             The signac job handles. By default all the aggregates are evaluated
             to get the next operation associated.
+        operation_names : iterable of :class:`str`
+            Only select operations that match the provided set of names
+            (interpreted as regular expressions), or all single operation
+            groups if the argument is None. (Default value = None)
         ignore_conditions : :class:`~.IgnoreConditions`
             Specify if preconditions and/or postconditions are to be ignored
             when determining eligibility. The default is
@@ -4305,11 +4296,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         if jobs is None:
             jobs = _AggregatesCursor(self)
-        single_operation_groups = {self._groups[name] for name in self.operations}
-
+        if operation_names is None:
+            selected_groups = {self._groups[name] for name in self.operations}
+        else:
+            selected_groups = set(self._gather_flow_groups(operation_names))
         for aggregate_id, aggregate, group, in self._generate_selected_aggregate_groups(
             selected_aggregates=jobs,
-            selected_groups=single_operation_groups,
+            selected_groups=selected_groups,
         ):
             yield from group._create_run_job_operations(
                 entrypoint=self._entrypoint,
@@ -4744,7 +4737,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Select jobs:
         aggregates = self._select_jobs_from_args(args)
 
-        # Gather all pending operations or generate them based on a direct command...
+        # Gather all eligible operations or generate them based on a direct command...
         with self._buffered():
             names = args.operation_name if args.operation_name else None
             default_directives = self._get_default_directives()

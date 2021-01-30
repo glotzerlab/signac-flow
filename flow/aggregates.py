@@ -41,7 +41,7 @@ def _get_unique_function_id(func):
         return hash(func)
 
 
-class _aggregator:
+class aggregator:
     """Decorator for operation functions that operate on aggregates.
 
     By default, if the ``aggregator_function`` is ``None``, an aggregate of all

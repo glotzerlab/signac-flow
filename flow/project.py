@@ -39,7 +39,7 @@ from signac.contrib.filterparse import parse_filter_arg
 from signac.contrib.project import JobsCursor
 from tqdm.auto import tqdm
 
-from .aggregates import _aggregator, _DefaultAggregateStore, _get_aggregate_id
+from .aggregates import _DefaultAggregateStore, _get_aggregate_id, aggregator
 from .environment import get_environment
 from .errors import (
     ConfigKeyError,
@@ -773,7 +773,7 @@ class FlowGroupEntry:
     """
 
     # TODO: Enable aggregator argument in documentation.
-    # aggregator : :class:`~._aggregator`
+    # aggregator : :class:`~.aggregator`
     #     aggregator object associated with the :class:`FlowGroup`. If None, the
     #     default aggregator is used (Default value = None).
 
@@ -782,10 +782,10 @@ class FlowGroupEntry:
         # def __init__(self, name, options="", aggregator=None):
         self.name = name
         self.options = options
-        self.aggregator = _aggregator.groupsof(1)
+        self.aggregator = aggregator.groupsof(1)
         # TODO: Enable aggregator argument.
         # if aggregator is None:
-        #     aggregator = _aggregator.groupsof(1)
+        #     aggregator = aggregator.groupsof(1)
         # self.aggregator = aggregator
 
     def __call__(self, func):
@@ -4413,7 +4413,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     f"a default value! ({name})"
                 )
         if not getattr(func, "_flow_aggregate", False):
-            func._flow_aggregate = _aggregator.groupsof(1)
+            func._flow_aggregate = aggregator.groupsof(1)
 
         # Append the name and function to the class registry
         cls._OPERATION_FUNCTIONS.append((name, func))

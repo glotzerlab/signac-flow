@@ -3805,9 +3805,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         ----------
         bundle_size : int
             Specify the number of operations to be bundled into one submission, defaults to 1.
-        jobs : iterable of :class:`~signac.contrib.job.Job`
-            Only submit operations for the given jobs, or all if the argument
-            is None. (Default value = None)
+        jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
+            Only submit operations for the given jobs or aggregates of jobs,
+            or all if the argument is None. (Default value = None)
         names : iterable of :class:`str`
             Only submit operations that match the provided set of names
             (interpreted as regular expressions), or all if the argument is
@@ -3833,10 +3833,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Additional keyword arguments forwarded to :meth:`~.ComputeEnvironment.submit`.
 
         """
-        # TODO: Document aggregates.
-        # jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
-        #     Only submit operations for the given jobs or aggregates of jobs,
-        #     or all if the argument is None. (Default value = None)
         aggregates = self._convert_jobs_to_aggregates(jobs)
 
         # Regular argument checks and expansion

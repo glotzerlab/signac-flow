@@ -317,7 +317,7 @@ class _AggregatesCursor:
     def __iter__(self):
         if self._filter is None and self._doc_filter is None:
             for aggregate_store in self._cursor:
-                yield from aggregate_store
+                yield from aggregate_store.values()
         else:
             for job in self._cursor:
                 yield (job,)
@@ -3098,7 +3098,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             try:
                 self._operations[operation.name](*operation._jobs)
             except Exception as error:
-                assert len(operation._jobs) == 1
                 raise UserOperationError(
                     f"An exception was raised during operation {operation.name} "
                     f"for job or aggregate with id {get_aggregate_id(operation._jobs)}."

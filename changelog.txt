@@ -5,6 +5,21 @@ Changelog
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 The numbers in brackets denote the related GitHub issue and/or pull request.
 
+Version 0.13
+============
+
+[0.13.0] -- 2021-xx-xx
+----------------------
+
+Removed
++++++++
+
+- Removed public API of deprecated class JobOperation (#445).
+- Removed public API of deprecated methods ``eligible`` and ``complete`` of ``BaseFlowOperation`` and ``FlowGroup`` (#445).
+- Removed configuration option ``use_buffered_mode`` (#445).
+- Removed public API of ``script``, ``next_operations`` and ``submit_operations`` of ``FlowProject`` (#445).
+
+
 Version 0.12
 ============
 

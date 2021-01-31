@@ -158,10 +158,47 @@ def _render_status(
         else:
             return string
 
+    def project_length(jobs, kind):
+        """Get the number of unique signac jobs or aggregates present in the FlowProject.
+
+        Parameters
+        ----------
+        jobs : list
+            Status of signac jobs or aggregates of jobs.
+        kind : str
+            Nature of the job passed.
+
+            * 'jobs' (Unique signac jobs of :class:`~signac.contrib.job.Job`)
+            * 'aggregates' (Unique aggregates in :class:`~flow.project.FlowProject`)
+
+        Returns
+        -------
+        int
+            Number of unique jobs or aggregates.
+
+        """
+        if kind == "aggregates":
+            return len(
+                {
+                    job["aggregate_id"]
+                    for job in jobs
+                    if job["aggregate_id"][0:4] == "agg-"
+                }
+            )
+        else:
+            return len(
+                {
+                    job["aggregate_id"]
+                    for job in jobs
+                    if job["aggregate_id"][0:4] != "agg-"
+                }
+            )
+
     template_environment.filters["highlight"] = highlight
     template_environment.filters["draw_progress_bar"] = draw_progress_bar
     template_environment.filters["get_operation_status"] = get_operation_status
     template_environment.filters["job_filter"] = job_filter
+    template_environment.filters["project_length"] = project_length
 
     template = template_environment.get_template(template)
     markdown_output = template.render(**context)

@@ -16,7 +16,8 @@
 {% block overview %}
 {% if overview %}
 {{ 'Overview: \n' }}
-{{ 'Total # of jobs: %s ' | format(jobs | length) }}
+{{ 'Total # of jobs: %s ' | format(jobs | project_length('jobs')) }}
+{{ 'Total # of unique aggregates: %s ' | format(jobs | project_length('aggregates')) }}
 
 {% block progress %}
 | label | ratio |

@@ -5066,8 +5066,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             "job_id",
             type=str,
             nargs="*",
-            help="The job ids, as registered in the signac project. "
-            "Defaults to all jobs.",
+            help="The job ids present or aggregate ids registered in the FlowProject. "
+            "Defaults to all jobs and aggregates.",
         )
         parser_exec.set_defaults(func=self._main_exec)
 

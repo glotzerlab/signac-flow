@@ -2549,9 +2549,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Parameters
         ----------
-        jobs : iterable of :class:`~signac.contrib.job.Job`
-            Only print status for the given jobs, or all if the argument is
-            None. (Default value = None)
+        jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
+            Only print status for the given jobs or aggregates of jobs,
+            or all if the argument is None. (Default value = None)
         overview : bool
             Display an overview of the project status. (Default value = True)
         overview_max_lines : int
@@ -2595,10 +2595,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             'terminal' (default), 'markdown' or 'html'.
 
         """
-        # TODO: Document aggregates.
-        # jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
-        #     Only print status for the given jobs or aggregates of jobs,
-        #     or all if the argument is None. (Default value = None)
         if file is None:
             file = sys.stdout
         if err is None:

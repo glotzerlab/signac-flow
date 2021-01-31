@@ -4195,7 +4195,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         r"""Make a :class:`~.FlowGroup` named ``name`` and return a decorator to make groups.
 
         A :class:`~.FlowGroup` is used to group operations together for
-        running and submitting :class:`~.JobOperation`\ s.
+        running and submitting :class:`~._JobOperation`\ s.
 
         Examples
         --------

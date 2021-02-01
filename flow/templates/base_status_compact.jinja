@@ -2,8 +2,8 @@
 {% block detailed %}
 {% set field_operation = '%s %s %s' %}
 {{ 'Detailed View: \n' }}
-| job id | operation | {{ para_head }}labels |
-| ------ | --------- | {{ ns.dash }}-------- |
+| scheduler job id | operation | {{ para_head }}labels |
+| ---------------- | --------- | {{ ns.dash }}-------- |
 {% for job in jobs %}
 {% if parameters %}
 {% set para_output = ns.field_parameters | format(*job['parameters'].values()) %}

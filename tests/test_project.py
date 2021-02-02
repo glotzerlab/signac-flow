@@ -25,7 +25,7 @@ from deprecation import fail_if_not_removed
 import flow
 from flow import FlowProject, cmd, directives, init, with_job
 from flow.environment import ComputeEnvironment
-from flow.project import _AggregatesCursor
+from flow.project import IgnoreConditions, _AggregatesCursor
 from flow.scheduling.base import ClusterJob, JobStatus, Scheduler
 from flow.util.misc import (
     add_cwd_to_environment_pythonpath,
@@ -1715,3 +1715,25 @@ class TestGroupProjectMainInterface(TestProjectBase):
 
 class TestGroupDynamicProjectMainInterface(TestProjectMainInterface):
     project_class = _DynamicTestProject
+
+
+class TestIgnoreConditions:
+    def test_str(self):
+        expected_results = {
+            IgnoreConditions.PRE: "pre",
+            IgnoreConditions.POST: "post",
+            IgnoreConditions.ALL: "all",
+            IgnoreConditions.NONE: "none",
+        }
+        for key, value in expected_results.items():
+            assert str(key) == value
+
+    def test_invert(self):
+        expected_results = {
+            IgnoreConditions.PRE: IgnoreConditions.POST,
+            IgnoreConditions.POST: IgnoreConditions.PRE,
+            IgnoreConditions.ALL: IgnoreConditions.NONE,
+            IgnoreConditions.NONE: IgnoreConditions.ALL,
+        }
+        for key, value in expected_results.items():
+            assert ~key == value

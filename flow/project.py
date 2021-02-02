@@ -4396,13 +4396,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if name in cls._GROUP_NAMES:
             raise ValueError(f"A group with name '{name}' is already registered.")
 
-        signature = inspect.signature(func)
-        for i, parameter_value in enumerate(signature.parameters.values()):
-            if i > 0 and parameter_value.default is inspect.Parameter.empty:
-                raise ValueError(
-                    "Only the first argument in an operation argument may not have "
-                    f"a default value! ({name})"
-                )
         if not getattr(func, "_flow_aggregate", False):
             func._flow_aggregate = aggregator.groupsof(1)
 

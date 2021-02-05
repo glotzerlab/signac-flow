@@ -572,13 +572,14 @@ class FlowCmdOperation(BaseFlowOperation):
     """An operation that executes a shell command.
 
     When an operation has the ``@cmd`` directive specified, it is instantiated
-    as a FlowCmdOperation. The operation should be a function of
-    :class:`~signac.contrib.job.Job`. The command (cmd) may
-    either be a unary callable that expects an instance of
-    :class:`~signac.contrib.job.Job` as its only positional argument and returns
-    a string containing valid shell commands, or the string of commands itself.
-    In either case, the resulting string may contain any attributes of the job placed
-    in curly braces, which will then be substituted by Python string formatting.
+    as a :class:`~.FlowCmdOperation`. The operation should be a function of
+    :class:`~signac.contrib.job.Job`. The command (cmd) may either be a
+    callable that expects one or more instances of
+    :class:`~signac.contrib.job.Job` as positional arguments and returns a
+    string containing valid shell commands, or the string of commands itself.
+    In either case, the resulting string may contain any attributes of the job
+    placed in curly braces, which will then be substituted by Python string
+    formatting.
 
     .. note::
         This class should not be instantiated directly.
@@ -621,9 +622,11 @@ class FlowCmdOperation(BaseFlowOperation):
         else:
             job = jobs[0] if len(jobs) == 1 else None
 
-        if callable(self._cmd):
-            return self._cmd(job).format(job=job)
-        return self._cmd.format(job=job)
+        cmd = self._cmd(*jobs) if callable(self._cmd) else self._cmd
+        format_arguments = {"jobs": jobs}
+        if len(jobs) == 1:
+            format_arguments["job"] = jobs[0]
+        return cmd.format(**format_arguments)
 
 
 class FlowOperation(BaseFlowOperation):

@@ -21,7 +21,6 @@ import sys
 import threading
 import time
 import traceback
-import warnings
 from collections import Counter, defaultdict
 from copy import deepcopy
 from enum import IntFlag
@@ -571,15 +570,16 @@ class BaseFlowOperation:
 class FlowCmdOperation(BaseFlowOperation):
     """An operation that executes a shell command.
 
-    When an operation has the ``@cmd`` directive specified, it is instantiated
-    as a :class:`~.FlowCmdOperation`. The operation should be a function of
+    When an operation has the ``@cmd`` directive specified, it is
+    instantiated as a :class:`~.FlowCmdOperation`. The operation should be a
+    function of one or more positional arguments that are instances of
     :class:`~signac.contrib.job.Job`. The command (cmd) may either be a
     callable that expects one or more instances of
     :class:`~signac.contrib.job.Job` as positional arguments and returns a
     string containing valid shell commands, or the string of commands itself.
-    In either case, the resulting string may contain any attributes of the job
-    placed in curly braces, which will then be substituted by Python string
-    formatting.
+    In either case, the resulting string may contain any attributes of the
+    job (or jobs) placed in curly braces, which will then be substituted by
+    Python string formatting.
 
     .. note::
         This class should not be instantiated directly.
@@ -587,9 +587,12 @@ class FlowCmdOperation(BaseFlowOperation):
     Parameters
     ----------
     cmd : str or callable
-        The command to execute the operation. Callable values should be a
-        function of ``job``. String values will be formatted with
-        ``cmd.format(job=job)``.
+        The command to execute the operation. Callable values will be
+        provided one or more positional arguments (``*jobs``) that are
+        instances of :class:`~signac.contrib.job.Job`. String values will be
+        formatted with ``cmd.format(jobs=jobs)`` where ``jobs`` is a tuple of
+        :class:`~signac.contrib.job.Job`, or ``cmd.format(jobs=jobs,
+        job=job)`` if only one job is provided.
     pre : sequence of callables
         List of preconditions.
     post : sequence of callables
@@ -604,24 +607,8 @@ class FlowCmdOperation(BaseFlowOperation):
     def __str__(self):
         return f"{type(self).__name__}(cmd='{self._cmd}')"
 
-    def __call__(self, *jobs, **kwargs):
+    def __call__(self, *jobs):
         """Return the command formatted with the supplied job(s)."""
-        job = kwargs.pop("job", None)
-        if kwargs:
-            raise ValueError(f"Invalid keyword arguments: {', '.join(kwargs)}")
-
-        if job is not None:
-            # TODO 0.13: How to remove this keyword argument? How should
-            # FlowCmdOperation act if multiple jobs are provided? Need to
-            # update both documentation and behavior.
-            warnings.warn(
-                "The job keyword argument is deprecated as of 0.11 and will be removed "
-                "in 0.13",
-                DeprecationWarning,
-            )
-        else:
-            job = jobs[0] if len(jobs) == 1 else None
-
         cmd = self._cmd(*jobs) if callable(self._cmd) else self._cmd
         format_arguments = {"jobs": jobs}
         if len(jobs) == 1:

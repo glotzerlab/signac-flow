@@ -17,6 +17,8 @@ cd {{ project.config.project_dir }}
 {% set cmd_suffix = cmd_suffix|default('') ~ (' &' if parallel else '') %}
 {% for operation in operations %}
 
+{% block before_operation %}
+{% endblock %}
 # {{ "%s"|format(operation) }}
 {{ operation.cmd }}{{ cmd_suffix }}
 {% if operation.eligible_operations|length > 0 %}

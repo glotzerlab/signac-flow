@@ -1,5 +1,6 @@
 {% extends "base_script.sh" %}
 {% block header %}
+{% block preamble %}
 #!/bin/bash
 #SBATCH --job-name="{{ id }}"
 {% if partition %}
@@ -15,6 +16,7 @@
 #SBATCH --output={{ job_output }}
 #SBATCH --error={{ job_output }}
 {% endif %}
+{% endblock preamble %}
 {% block tasks %}
 #SBATCH --ntasks={{ operations|calc_tasks('np', parallel, force) }}
 {% endblock %}

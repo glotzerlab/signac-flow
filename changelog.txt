@@ -5,6 +5,18 @@ Changelog
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 The numbers in brackets denote the related GitHub issue and/or pull request.
 
+Version 0.13
+============
+
+[0.13.0] -- 2021-xx-xx
+----------------------
+
+Fixed
++++++
+
+- Support for multi-line ``@flow.cmd`` operations (#451, #453).
+
+
 Version 0.12
 ============
 

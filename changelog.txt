@@ -11,6 +11,11 @@ Version 0.13
 [0.13.0] -- 2021-xx-xx
 ----------------------
 
+Fixed
++++++
+
+- Support for multi-line ``@flow.cmd`` operations (#451, #453).
+
 Removed
 +++++++
 

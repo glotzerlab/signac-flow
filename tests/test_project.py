@@ -1556,7 +1556,7 @@ class TestGroupExecutionProject(TestProjectBase):
         assert len(list(MockScheduler.jobs())) == 0
         cluster_job_id = project._store_bundled(operations)
         with redirect_stderr(StringIO()):
-            project.submit_operations(_id=cluster_job_id, operations=operations)
+            project._submit_operations(_id=cluster_job_id, operations=operations)
         assert len(list(MockScheduler.jobs())) == 1
 
     def test_submit(self):

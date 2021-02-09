@@ -2336,20 +2336,24 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     selected_groups=single_operation_groups,
                 )
             )
-            # aggregate_groups is a list of tuples containing scheduler,
-            # aggregate, and group information. To compute labels, we fetch the
-            # unique jobs from the aggregates containing only one job.
-            individual_jobs = {
-                aggregate_group[3][0]
-                for aggregate_group in aggregate_groups
-                if len(aggregate_group[3]) == 1
-            }
             status_results = parallel_executor(
                 compute_status,
                 aggregate_groups,
                 desc="Fetching status",
                 file=err,
             )
+            # aggregate_groups is a list of tuples containing scheduler,
+            # aggregate, and group information. To compute labels, we fetch the
+            # unique jobs from the aggregates containing only one job.
+            if len(single_operation_groups) > 0:
+                individual_jobs = {
+                    aggregate_group[3][0]
+                    for aggregate_group in aggregate_groups
+                    if len(aggregate_group[3]) == 1
+                }
+            else:
+                # If no operations exist, use all jobs in the project.
+                individual_jobs = set(self)
             compute_labels = functools.partial(
                 self._get_job_labels,
                 ignore_errors=ignore_errors,
@@ -2626,8 +2630,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Add labels to the status information
         for job_label_data in job_labels:
             job_id = job_label_data["job_id"]
-            if job_id in statuses:
-                statuses[job_id]["labels"] = job_label_data["labels"]
+            statuses.setdefault(job_id, {})
+            statuses[job_id]["labels"] = job_label_data["labels"]
 
         # If the dump_json variable is set, just dump all status info
         # formatted in JSON to screen.
@@ -2758,12 +2762,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             }
 
         for job in context["jobs"]:
+            if "groups" not in job:
+                continue
             has_eligible_ops = any([v["eligible"] for v in job["groups"].values()])
             if not has_eligible_ops and not context["all_ops"]:
                 _add_placeholder_operation(job)
 
         op_counter = Counter()
         for job in context["jobs"]:
+            if "groups" not in job:
+                continue
             for group_name, group_status in job["groups"].items():
                 if group_name != "" and group_status["eligible"]:
                     op_counter[group_name] += 1

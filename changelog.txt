@@ -15,6 +15,7 @@ Fixed
 +++++
 
 - Support for multi-line ``@flow.cmd`` operations (#451, #453).
+- FlowProject status shows labels and correct number of jobs for projects with zero operations (#454, #460).
 
 Removed
 +++++++

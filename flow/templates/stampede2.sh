@@ -35,7 +35,6 @@
 {% endif %}
 {% endblock %}
 
-{% block body %}
 {% if ns.use_launcher %}
 {% if parallel %}
 {{("Bundled submission without MPI on Stampede2 is using launcher; the --parallel option is therefore ignored.")|print_warning}}
@@ -55,33 +54,11 @@ export LAUNCHER_JOB_FILE={{ launcher_file }}
 $LAUNCHER_DIR/paramrun
 rm {{ launcher_file }}
 {% else %}
-{% set cmd_suffix = cmd_suffix|default('') ~ (' &' if parallel else '') %}
-{% for operation in operations %}
-
-# {{ "%s"|format(operation) }}
-{{ "_FLOW_STAMPEDE_OFFSET_=%d "|format(operation.directives['nranks']|return_and_increment) }}{{ operation.cmd }}{{ cmd_suffix }}
-{% if operation.eligible_operations|length > 0 %}
-# Eligible to run:
-{% for run_op in operation.eligible_operations %}
-# {{ run_op.cmd }}
-{% endfor %}
-{% endif %}
-{% if operation.operations_with_unmet_preconditions|length > 0 %}
-# Operations with unmet preconditions:
-{% for run_op in operation.operations_with_unmet_preconditions %}
-# {{ run_op.cmd }}
-{% endfor %}
-{% endif %}
-{% if operation.operations_with_met_postconditions|length > 0 %}
-# Operations with all postconditions met:
-{% for run_op in operation.operations_with_met_postconditions %}
-# {{ run_op.cmd }}
-{% endfor %}
-{% endif %}
-{% endfor %}
+{% block pre_operation %}
+{{ "_FLOW_STAMPEDE_OFFSET_=%d "|format(operation.directives['nranks']|return_and_increment) }}
+{% endblock %}
 {# We need to reset the environment's base offset in between script generation for separate bundles. #}
 {# Since Jinja's bytecode optimizes out calls to filters with a constant argument, we are forced to #}
 {# rerun this function on the environment's base offset at the end of each run to return the offset to 0. #}
 {{ "%d"|format(environment.base_offset)|decrement_offset }}
 {% endif %}
-{% endblock %}

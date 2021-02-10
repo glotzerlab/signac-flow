@@ -1492,7 +1492,7 @@ class TestGroupExecutionProject(TestProjectBase):
                 assert all(job.doc.get("test") for job in project)
                 project.run(names=["group2"])
                 assert all(job.isfile("world.txt") for job in even_jobs)
-                assert all(job.doc.get("test3") for job in project)
+                assert all(job.doc.get("test3_true") for job in project)
                 assert all("dynamic" not in job.doc for job in project)
 
     def test_run_parallel(self):

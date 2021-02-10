@@ -24,7 +24,7 @@ from define_test_project import _DynamicTestProject, _TestProject
 from deprecation import fail_if_not_removed
 
 import flow
-from flow import FlowProject, cmd, directives, init, with_job
+from flow import FlowProject, cmd, directives, get_aggregate_id, init, with_job
 from flow.environment import ComputeEnvironment
 from flow.project import _AggregatesCursor
 from flow.scheduling.base import ClusterJob, JobStatus, Scheduler
@@ -1734,9 +1734,10 @@ class TestProjectUtilities(TestProjectBase):
         assert agg_cursor1._project == project
         assert agg_cursor1._filter is None
         assert agg_cursor1._doc_filter is None
-        # Same aggregates for operation agg_op2 and agg_op3.
-        assert len(agg_cursor1) == 12
+        # Count unique aggregates for group_agg, agg_op1, agg_op2, agg_op3
+        assert len(agg_cursor1) == 9
         assert [(job,) in agg_cursor1 for job in project]
+        assert tuple(project) in agg_cursor1
 
         agg_cursor2 = _AggregatesCursor(project=project, filter={"a": 1})
         assert agg_cursor2._project == project
@@ -1745,3 +1746,201 @@ class TestProjectUtilities(TestProjectBase):
         assert len(agg_cursor2) == 2
 
         assert agg_cursor1 != agg_cursor2
+
+
+class TestAggregationProjectMainInterface(TestProjectBase):
+    project_class = _TestAggregateProject
+    entrypoint = dict(
+        path=os.path.realpath(
+            os.path.join(os.path.dirname(__file__), "define_test_aggregate_project.py")
+        )
+    )
+
+    def mock_project(self):
+        project = self.project_class.get_project(root=self._tmp_dir.name)
+        for i in range(1, 31):
+            project.open_job(dict(i=i, even=bool(i % 2 == 0))).init()
+        project._entrypoint = self.entrypoint
+        project._register_groups()
+        return project
+
+    def switch_to_cwd(self):
+        os.chdir(self.cwd)
+
+    @pytest.fixture(autouse=True)
+    def setup_main_interface(self, request):
+        self.project = self.mock_project()
+        self.cwd = os.getcwd()
+        os.chdir(self._tmp_dir.name)
+        request.addfinalizer(self.switch_to_cwd)
+
+    def call_subcmd(self, subcmd):
+        # Determine path to project module and construct command.
+        fn_script = inspect.getsourcefile(type(self.project))
+        _cmd = f"python {fn_script} {subcmd}"
+        try:
+            with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
+                with switch_to_directory(self.project.root_directory()):
+                    return subprocess.check_output(
+                        _cmd.split(), stderr=subprocess.DEVNULL
+                    )
+        except subprocess.CalledProcessError as error:
+            print(error, file=sys.stderr)
+            print(error.output, file=sys.stderr)
+            raise
+
+    def test_main_run(self):
+        project = self.mock_project()
+        assert len(project)
+        for job in project:
+            assert not job.doc.get("sum", False)
+            assert not job.doc.get("sum_other", False)
+            assert not job.doc.get("sum_custom", False)
+            assert not job.doc.get("op2", False)
+            assert not job.doc.get("op3", False)
+
+        even_sum = sum([job.sp.i for job in project if job.sp.i % 2 == 0])
+        odd_sum = sum([job.sp.i for job in project if job.sp.i % 2 != 0])
+
+        self.call_subcmd(
+            "run -o agg_op1 agg_op1_different agg_op1_custom agg_op2 agg_op3 --show-traceback"
+        )
+
+        for job in project:
+            assert job.doc.op2
+            assert job.doc.op3
+            if job.sp.i % 2 == 0:
+                assert (
+                    job.doc.sum == job.doc.sum_other == job.doc.sum_custom == even_sum
+                )
+            else:
+                assert job.doc.sum == job.doc.sum_other == job.doc.sum_custom == odd_sum
+
+    def test_main_run_cmd(self):
+        project = self.mock_project()
+        assert len(project)
+
+        run_output = self.call_subcmd("run -o agg_op4").decode().splitlines()
+
+        assert "1 and 2" in "\n".join(run_output)
+
+    def test_main_submit(self):
+        project = self.mock_project()
+        assert len(project)
+
+        submit_output = (
+            self.call_subcmd(
+                f"submit -o agg_op2 -j {get_aggregate_id(project)} --pretend"
+            )
+            .decode()
+            .splitlines()
+        )
+
+        output_string = "\n".join(submit_output)
+        assert f"agg_op2({get_aggregate_id(project)})" in output_string
+        assert f"run -o agg_op2 -j {get_aggregate_id(project)}" in output_string
+        assert f"exec agg_op2 {get_aggregate_id(project)}" in output_string
+
+    def test_main_script(self):
+        project = self.mock_project()
+        assert len(project)
+
+        script_output = (
+            self.call_subcmd(f"script -o agg_op2 -j {get_aggregate_id(project)}")
+            .decode()
+            .splitlines()
+        )
+
+        output_string = "\n".join(script_output)
+        assert f"agg_op2({get_aggregate_id(project)})" in output_string
+        assert f"run -o agg_op2 -j {get_aggregate_id(project)}" in output_string
+        assert f"exec agg_op2 {get_aggregate_id(project)}" in output_string
+
+
+class TestAggregationGroupProjectMainInterface(TestProjectBase):
+    project_class = _TestAggregateProject
+    entrypoint = dict(
+        path=os.path.realpath(
+            os.path.join(os.path.dirname(__file__), "define_test_aggregate_project.py")
+        )
+    )
+
+    def mock_project(self):
+        project = self.project_class.get_project(root=self._tmp_dir.name)
+        for i in range(1, 31):
+            project.open_job(dict(i=i, even=bool(i % 2 == 0))).init()
+        project._entrypoint = self.entrypoint
+        project._register_groups()
+        return project
+
+    def switch_to_cwd(self):
+        os.chdir(self.cwd)
+
+    @pytest.fixture(autouse=True)
+    def setup_main_interface(self, request):
+        self.project = self.mock_project()
+        self.cwd = os.getcwd()
+        os.chdir(self._tmp_dir.name)
+        request.addfinalizer(self.switch_to_cwd)
+
+    def call_subcmd(self, subcmd):
+        # Determine path to project module and construct command.
+        fn_script = inspect.getsourcefile(type(self.project))
+        _cmd = f"python {fn_script} {subcmd}"
+        try:
+            with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
+                with switch_to_directory(self.project.root_directory()):
+                    return subprocess.check_output(
+                        _cmd.split(), stderr=subprocess.DEVNULL
+                    )
+        except subprocess.CalledProcessError as error:
+            print(error, file=sys.stderr)
+            print(error.output, file=sys.stderr)
+            raise
+
+    def test_main_run(self):
+        project = self.mock_project()
+        assert len(project)
+        for job in project:
+            assert not job.doc.get("op2", False)
+            assert not job.doc.get("op3", False)
+
+        self.call_subcmd(f"run -o group_agg -j {get_aggregate_id(project)}")
+
+        for job in project:
+            assert job.doc.op2
+            assert job.doc.op3
+
+    def test_main_submit(self):
+        project = self.mock_project()
+        assert len(project)
+
+        submit_output = (
+            self.call_subcmd(
+                f"submit -o group_agg -j {get_aggregate_id(project)} --pretend"
+            )
+            .decode()
+            .splitlines()
+        )
+
+        output_string = "\n".join(submit_output)
+        assert f"group_agg({get_aggregate_id(project)})" in output_string
+        assert f"run -o group_agg -j {get_aggregate_id(project)}" in output_string
+        assert f"exec agg_op2 {get_aggregate_id(project)}" in output_string
+        assert f"exec agg_op3 {get_aggregate_id(project)}" in output_string
+
+    def test_main_script(self):
+        project = self.mock_project()
+        assert len(project)
+
+        script_output = (
+            self.call_subcmd(f"script -o group_agg -j {get_aggregate_id(project)}")
+            .decode()
+            .splitlines()
+        )
+
+        output_string = "\n".join(script_output)
+        assert f"group_agg({get_aggregate_id(project)})" in output_string
+        assert f"run -o group_agg -j {get_aggregate_id(project)}" in output_string
+        assert f"exec agg_op2 {get_aggregate_id(project)}" in output_string
+        assert f"exec agg_op3 {get_aggregate_id(project)}" in output_string

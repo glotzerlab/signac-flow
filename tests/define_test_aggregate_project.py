@@ -1,23 +1,65 @@
-from flow import FlowProject, aggregator
+from flow import FlowProject, aggregator, cmd
 
 
 class _TestAggregateProject(FlowProject):
     pass
 
 
-@aggregator.groupsof(1)
+def custom_aggregator(jobs):
+    even = [job for job in jobs if job.sp.i % 2 == 0]
+    odd = [job for job in jobs if job.sp.i % 2 != 0]
+    return [even, odd]
+
+
+group1 = _TestAggregateProject.make_group(name="group_agg", aggregator_obj=aggregator())
+
+
 @_TestAggregateProject.operation
+@aggregator.groupby("even")
 def agg_op1(*jobs):
-    pass
+    total = sum([job.sp.i for job in jobs])
+    for job in jobs:
+        job.document.sum = total
 
 
-@aggregator.groupsof(2)
 @_TestAggregateProject.operation
+@aggregator.groupby(lambda job: job.sp.i % 2)
+def agg_op1_different(*jobs):
+    sum_other = sum([job.sp.i for job in jobs])
+    for job in jobs:
+        job.document.sum_other = sum_other
+
+
+@_TestAggregateProject.operation
+@aggregator(custom_aggregator)
+def agg_op1_custom(*jobs):
+    sum_custom = sum([job.sp.i for job in jobs])
+    for job in jobs:
+        job.document.sum_custom = sum_custom
+
+
+@_TestAggregateProject.operation
+@group1
+@aggregator.groupsof(30)
 def agg_op2(*jobs):
-    pass
+    for job in jobs:
+        job.document.op2 = True
 
 
-@aggregator.groupsof(2)
 @_TestAggregateProject.operation
+@group1
+@aggregator()
 def agg_op3(*jobs):
-    pass
+    for job in jobs:
+        job.document.op3 = True
+
+
+@_TestAggregateProject.operation
+@cmd
+@aggregator(sort_by="i", select=lambda job: job.sp.i <= 2)
+def agg_op4(*jobs):
+    return "echo '{jobs[0].sp.i} and {jobs[1].sp.i}'"
+
+
+if __name__ == "__main__":
+    _TestAggregateProject().main()

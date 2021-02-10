@@ -11,14 +11,7 @@ configure and implement a workflow to operate on a signac_ data space.
 from . import environment, errors, scheduling, testing
 from .environment import get_environment
 from .operations import cmd, directives, run, with_job
-from .project import (
-    FlowProject,
-    IgnoreConditions,
-    JobOperation,
-    classlabel,
-    label,
-    staticlabel,
-)
+from .project import FlowProject, IgnoreConditions, classlabel, label, staticlabel
 from .template import init
 
 # Import packaged environments unless disabled in config:
@@ -37,7 +30,6 @@ __all__ = [
     "testing",
     "IgnoreConditions",
     "FlowProject",
-    "JobOperation",
     "label",
     "classlabel",
     "staticlabel",

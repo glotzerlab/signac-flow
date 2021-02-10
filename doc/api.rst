@@ -116,9 +116,6 @@ Operations and Status
     :members:
     :special-members: __call__
 
-.. autoclass:: flow.project.JobOperation
-    :members:
-
 Labels
 ------
 

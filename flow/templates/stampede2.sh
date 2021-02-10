@@ -63,19 +63,20 @@ rm {{ launcher_file }}
 {% if operation.eligible_operations|length > 0 %}
 # Eligible to run:
 {% for run_op in operation.eligible_operations %}
-# {{ run_op.cmd }}
+{# The split/join handles multi-line cmd operations. #}
+# {{ "\n# ".join(run_op.cmd.strip().split("\n")) }}
 {% endfor %}
 {% endif %}
 {% if operation.operations_with_unmet_preconditions|length > 0 %}
 # Operations with unmet preconditions:
 {% for run_op in operation.operations_with_unmet_preconditions %}
-# {{ run_op.cmd }}
+# {{ "\n# ".join(run_op.cmd.strip().split("\n")) }}
 {% endfor %}
 {% endif %}
 {% if operation.operations_with_met_postconditions|length > 0 %}
 # Operations with all postconditions met:
 {% for run_op in operation.operations_with_met_postconditions %}
-# {{ run_op.cmd }}
+# {{ "\n# ".join(run_op.cmd.strip().split("\n")) }}
 {% endfor %}
 {% endif %}
 {% endfor %}

@@ -2631,6 +2631,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for job_label_data in job_labels:
             job_id = job_label_data["job_id"]
             statuses.setdefault(job_id, {})
+            statuses[job_id].setdefault("aggregate_id", job_id)
             statuses[job_id]["labels"] = job_label_data["labels"]
 
         # If the dump_json variable is set, just dump all status info
@@ -2762,16 +2763,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             }
 
         for job in context["jobs"]:
-            if "groups" not in job:
-                continue
+            job.setdefault("groups", {})
+
+        for job in context["jobs"]:
             has_eligible_ops = any([v["eligible"] for v in job["groups"].values()])
             if not has_eligible_ops and not context["all_ops"]:
                 _add_placeholder_operation(job)
 
         op_counter = Counter()
         for job in context["jobs"]:
-            if "groups" not in job:
-                continue
             for group_name, group_status in job["groups"].items():
                 if group_name != "" and group_status["eligible"]:
                     op_counter[group_name] += 1

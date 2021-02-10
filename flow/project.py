@@ -2630,6 +2630,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Add labels to the status information
         for job_label_data in job_labels:
             job_id = job_label_data["job_id"]
+            # If no status information existed, we need to set default values
             statuses.setdefault(job_id, {})
             statuses[job_id].setdefault("aggregate_id", job_id)
             statuses[job_id]["labels"] = job_label_data["labels"]

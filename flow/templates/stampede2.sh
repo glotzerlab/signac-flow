@@ -54,6 +54,7 @@ export LAUNCHER_JOB_FILE={{ launcher_file }}
 $LAUNCHER_DIR/paramrun
 rm {{ launcher_file }}
 {% else %}
+{# Only the pre_operation block is overridden, all other behavior is inherited from base_script.sh #}
 {% block pre_operation %}
 {{ "_FLOW_STAMPEDE_OFFSET_=%d "|format(operation.directives['nranks']|return_and_increment) }}
 {% endblock %}

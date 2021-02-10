@@ -5,6 +5,8 @@
 {% set np_global = operations|map(attribute='directives.np')|max %}
 {% endif %}
 {% block header %}
+{% block preamble %}
+{% endblock %}
 {% endblock %}
 
 {% block project_header %}

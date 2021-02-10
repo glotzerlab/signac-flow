@@ -16,7 +16,7 @@
 #SBATCH --output={{ job_output }}
 #SBATCH --error={{ job_output }}
 {% endif %}
-{% endblock preamble %}
+{% endblock %}
 {% block tasks %}
 #SBATCH --ntasks={{ operations|calc_tasks('np', parallel, force) }}
 {% endblock %}

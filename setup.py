@@ -30,7 +30,7 @@ except OSError:
 
 setup(
     name="signac-flow",
-    version="0.11.0",
+    version="0.12.0",
     packages=find_packages(),
     include_package_data=True,
     zip_safe=True,

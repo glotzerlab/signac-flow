@@ -5,10 +5,30 @@ Changelog
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 The numbers in brackets denote the related GitHub issue and/or pull request.
 
+Version 0.13
+============
+
+[0.13.0] -- 2021-xx-xx
+----------------------
+
+Fixed
++++++
+
+- Support for multi-line ``@flow.cmd`` operations (#451, #453).
+
+Removed
++++++++
+
+- Removed public API of deprecated class JobOperation (#445).
+- Removed public API of deprecated methods ``eligible`` and ``complete`` of ``BaseFlowOperation`` and ``FlowGroup`` (#445).
+- Removed configuration option ``use_buffered_mode`` (#445).
+- Removed public API of ``script``, ``next_operations`` and ``submit_operations`` of ``FlowProject`` (#445).
+
+
 Version 0.12
 ============
 
-[0.12.0] -- 202x-xx-xx
+[0.12.0] -- 2021-01-30
 ----------------------
 
 Added
@@ -47,6 +67,7 @@ Fixed
 
 - Ensure that directives are always evaluated before running or submitting (#408, #409).
 - Cache the fully qualified domain name during environment detection to fix a performance issue on macOS (#339, #394).
+- Ensure that ``next`` CLI command displays eligible jobs for the exact operation name provided (#443).
 
 Removed
 +++++++

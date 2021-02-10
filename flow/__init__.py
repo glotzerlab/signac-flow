@@ -12,14 +12,7 @@ from . import environment, errors, scheduling, testing
 from .aggregates import aggregator, get_aggregate_id
 from .environment import get_environment
 from .operations import cmd, directives, run, with_job
-from .project import (
-    FlowProject,
-    IgnoreConditions,
-    JobOperation,
-    classlabel,
-    label,
-    staticlabel,
-)
+from .project import FlowProject, IgnoreConditions, classlabel, label, staticlabel
 from .template import init
 
 # Import packaged environments unless disabled in config:
@@ -40,7 +33,6 @@ __all__ = [
     "testing",
     "IgnoreConditions",
     "FlowProject",
-    "JobOperation",
     "label",
     "classlabel",
     "staticlabel",

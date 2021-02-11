@@ -1275,8 +1275,17 @@ class _FlowProjectClass(type):
                     print('hello', job)
                     job.doc.hello = True
 
+                @Project.operation
+                @aggregator()
+                @Project.post(lambda *jobs: all(not job.doc.get('hi_all') for job in jobs))
+                def hi_all(*jobs):
+                    print('hi', jobs)
+                    for job in jobs:
+                        job.doc.hi_all = True
+
             The *hello* operation would only execute if the 'hello' key in the
-            job document does not evaluate to True.
+            job document does not evaluate to True. Similarly, the *hi_all* operation
+            would execute only if the 'hi_all' key is not present in all of the jobs passed.
 
             An optional tag may be associated with the condition. These tags
             are used by :meth:`~.detect_operation_graph` when comparing
@@ -1353,9 +1362,20 @@ class _FlowProjectClass(type):
                     print('bye', job)
                     job.doc.bye = True
 
+                @Project.operation
+                @aggregator()
+                @Project.post(lambda *jobs: all(job.doc.get('bye_all') for job in jobs))
+                def bye_all(*jobs):
+                    print('bye', jobs)
+                    for job in jobs:
+                        job.doc.bye_all = True
+
             The *bye* operation would be considered complete and therefore no
             longer eligible for execution once the 'bye' key in the job
-            document evaluates to True.
+            document evaluates to True. Similarly, the *bye_all* operation
+            would be considered complete and therefore no longer eligible for execution
+            only if the 'bye_all' key is present in all of the jobs passed.
+
 
             An optional tag may be associated with the condition. These tags
             are used by :meth:`~.detect_operation_graph` when comparing

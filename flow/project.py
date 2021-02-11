@@ -175,7 +175,7 @@ class _condition:
 
     @classmethod
     def true(cls, key):
-        """Evaluate if a document key is True for the job(s).
+        """Evaluate if a document key evaluates to True for the job(s).
 
         Returns True if the specified key is present in the job document(s) and
         evaluates to True.
@@ -188,7 +188,7 @@ class _condition:
 
     @classmethod
     def false(cls, key):
-        """Evaluate if a document key is False for the job(s).
+        """Evaluate if a document key evaluates to False for the job(s).
 
         Returns True if the specified key is present in the job document(s) and
         evaluates to False.

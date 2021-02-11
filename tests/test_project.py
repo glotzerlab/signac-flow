@@ -844,13 +844,13 @@ class TestExecutionProject(TestProjectBase):
         )
     )
 
-    def test_pending_operations_order(self):
+    def test_next_operations_order(self):
         # The execution order of local runs is internally assumed to be
         # "by-job" by default. A failure of this unit test means that a
         # "by-job" order must be implemented explicitly within the
         # FlowProject.run() function.
         project = self.mock_project()
-        ops = list(project._get_pending_operations())
+        ops = list(project._next_operations())
         # The length of the list of operations grouped by job is equal
         # to the length of its set if and only if the job-operations are grouped
         # by job already.
@@ -1250,8 +1250,12 @@ class TestProjectMainInterface(TestProjectBase):
     def test_main_next(self):
         assert len(self.project)
         job_ids = set(self.call_subcmd("next op1").decode().split())
+        assert len(job_ids) > 0
         even_jobs = [job.get_id() for job in self.project if job.sp.b % 2 == 0]
         assert job_ids == set(even_jobs)
+        # Use only exact operation matches
+        job_ids = set(self.call_subcmd("next op").decode().split())
+        assert len(job_ids) == 0
 
     def test_main_status(self):
         assert len(self.project)
@@ -1552,7 +1556,7 @@ class TestGroupExecutionProject(TestProjectBase):
         assert len(list(MockScheduler.jobs())) == 0
         cluster_job_id = project._store_bundled(operations)
         with redirect_stderr(StringIO()):
-            project.submit_operations(_id=cluster_job_id, operations=operations)
+            project._submit_operations(_id=cluster_job_id, operations=operations)
         assert len(list(MockScheduler.jobs())) == 1
 
     def test_submit(self):

@@ -1719,36 +1719,7 @@ class TestGroupDynamicProjectMainInterface(TestProjectMainInterface):
     project_class = _DynamicTestProject
 
 
-class TestProjectUtilities(TestProjectBase):
-    project_class = _TestAggregateProject
-    entrypoint = dict(
-        path=os.path.realpath(
-            os.path.join(os.path.dirname(__file__), "define_test_aggregate_project.py")
-        )
-    )
-
-    def test_AggregatesCursor(self):
-        project = self.mock_project()
-
-        agg_cursor1 = _AggregatesCursor(project=project)
-        assert agg_cursor1._project == project
-        assert agg_cursor1._filter is None
-        assert agg_cursor1._doc_filter is None
-        # Count unique aggregates for group_agg, agg_op1, agg_op2, agg_op3
-        assert len(agg_cursor1) == 9
-        assert [(job,) in agg_cursor1 for job in project]
-        assert tuple(project) in agg_cursor1
-
-        agg_cursor2 = _AggregatesCursor(project=project, filter={"a": 1})
-        assert agg_cursor2._project == project
-        assert agg_cursor2._filter == {"a": 1}
-        assert agg_cursor2._doc_filter is None
-        assert len(agg_cursor2) == 2
-
-        assert agg_cursor1 != agg_cursor2
-
-
-class TestAggregationProjectMainInterface(TestProjectBase):
+class TestAggregatesProjectBase(TestProjectBase):
     project_class = _TestAggregateProject
     entrypoint = dict(
         path=os.path.realpath(
@@ -1789,6 +1760,33 @@ class TestAggregationProjectMainInterface(TestProjectBase):
             print(error.output, file=sys.stderr)
             raise
 
+
+class TestProjectUtilities(TestAggregatesProjectBase):
+    def test_AggregatesCursor(self):
+        project = self.mock_project()
+        agg_cursor = _AggregatesCursor(project=project)
+        assert agg_cursor._project == project
+        assert agg_cursor._filter is None
+        assert agg_cursor._doc_filter is None
+        # Count all the unique aggregates in the project.
+        # The count is 3 because of the groups (agg_op2, agg_op3, group_agg),
+        # (agg_op1, agg_op_different, agg_op1_custom) and (agg_op4)
+        assert len(agg_cursor) == 3
+        # Since default aggregate is not present in project, hence aggregate
+        # of single job will not be present in project
+        assert [(job,) not in agg_cursor for job in project]
+        assert tuple(project) in agg_cursor
+
+    def test_filters(self):
+        project = self.mock_project()
+        agg_cursor = _AggregatesCursor(project=project, filter={"even": True})
+        assert agg_cursor._project == project
+        assert agg_cursor._filter == {"even": True}
+        assert agg_cursor._doc_filter is None
+        assert len(agg_cursor) == 15
+
+
+class TestAggregationProjectMainInterface(TestAggregatesProjectBase):
     def test_main_run(self):
         project = self.mock_project()
         assert len(project)
@@ -1857,47 +1855,7 @@ class TestAggregationProjectMainInterface(TestProjectBase):
         assert f"exec agg_op2 {get_aggregate_id(project)}" in output_string
 
 
-class TestAggregationGroupProjectMainInterface(TestProjectBase):
-    project_class = _TestAggregateProject
-    entrypoint = dict(
-        path=os.path.realpath(
-            os.path.join(os.path.dirname(__file__), "define_test_aggregate_project.py")
-        )
-    )
-
-    def mock_project(self):
-        project = self.project_class.get_project(root=self._tmp_dir.name)
-        for i in range(1, 31):
-            project.open_job(dict(i=i, even=bool(i % 2 == 0))).init()
-        project._entrypoint = self.entrypoint
-        project._register_groups()
-        return project
-
-    def switch_to_cwd(self):
-        os.chdir(self.cwd)
-
-    @pytest.fixture(autouse=True)
-    def setup_main_interface(self, request):
-        self.project = self.mock_project()
-        self.cwd = os.getcwd()
-        os.chdir(self._tmp_dir.name)
-        request.addfinalizer(self.switch_to_cwd)
-
-    def call_subcmd(self, subcmd):
-        # Determine path to project module and construct command.
-        fn_script = inspect.getsourcefile(type(self.project))
-        _cmd = f"python {fn_script} {subcmd}"
-        try:
-            with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
-                with switch_to_directory(self.project.root_directory()):
-                    return subprocess.check_output(
-                        _cmd.split(), stderr=subprocess.DEVNULL
-                    )
-        except subprocess.CalledProcessError as error:
-            print(error, file=sys.stderr)
-            print(error.output, file=sys.stderr)
-            raise
-
+class TestAggregationGroupProjectMainInterface(TestAggregatesProjectBase):
     def test_main_run(self):
         project = self.mock_project()
         assert len(project)

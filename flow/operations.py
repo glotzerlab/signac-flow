@@ -97,8 +97,14 @@ def with_job(func):
     """
 
     @wraps(func)
-    def decorated(job):
-        with job:
+    def decorated(*jobs):
+        if len(jobs) != 1:
+            raise NotImplementedError(
+                "signac-flow currently does not support the use of @with_job decorator "
+                "with aggregation. If using aggregates of single job with filters, please use "
+                "`FlowProject.pre` instead."
+            )
+        with jobs[0] as job:
             if getattr(func, "_flow_cmd", False):
                 return 'trap "cd $(pwd)" EXIT && cd {} && {}'.format(job.ws, func(job))
             else:

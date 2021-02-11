@@ -1,4 +1,4 @@
-from flow import FlowProject, aggregator, cmd
+from flow import FlowProject, aggregator, cmd, with_job
 
 
 class _TestAggregateProject(FlowProject):
@@ -59,6 +59,13 @@ def agg_op3(*jobs):
 @aggregator(sort_by="i", select=lambda job: job.sp.i <= 2)
 def agg_op4(*jobs):
     return "echo '{jobs[0].sp.i} and {jobs[1].sp.i}'"
+
+
+@_TestAggregateProject.operation
+@with_job
+@aggregator()
+def agg_op5(*jobs):
+    pass
 
 
 if __name__ == "__main__":

@@ -55,6 +55,8 @@ def cmd(func):
 def with_job(func):
     """Use ``arg`` as a context manager for ``func(arg)`` with this decorator.
 
+    Users cannot use this decorator for functions which uses more than one arguement as a parameter.
+
     If this function is an operation function defined by :class:`~.FlowProject`, it will
     be the same as using ``with job:``.
 

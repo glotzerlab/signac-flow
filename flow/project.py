@@ -4415,7 +4415,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _main_next(self, args):
         """Determine the jobs that are eligible for a specific operation."""
         if args.name not in self.operations:
-            print(f"The requested operation '{args.name}' does not exist.")
+            print(f"The requested flow operation '{args.name}' does not exist.")
         else:
             for operation in self._next_operations():
                 if args.name == operation.name:

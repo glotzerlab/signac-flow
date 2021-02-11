@@ -1010,6 +1010,23 @@ class TestExecutionProject(TestProjectBase):
             else:
                 assert os.getpid() == job.doc.test
 
+    def test_run_invalid_ops(self):
+        class A(FlowProject):
+            pass
+
+        @A.operation
+        def op1(job):
+            pass
+
+        project = self.mock_project(A)
+        output = StringIO()
+        with redirect_stdout(output):
+            project.run(names=["op1", "op2", "op3"])
+        output.seek(0)
+        message = output.read()
+        fail_msg = "The requested flow operation(s) does not exist:"
+        assert f"{fail_msg} op2, op3" in message or f"{fail_msg} op3, op2" in message
+
     def test_submit_operations(self):
         project = self.mock_project()
         operations = []
@@ -1247,6 +1264,16 @@ class TestProjectMainInterface(TestProjectBase):
             else:
                 assert not job.isfile("world.txt")
 
+    def test_main_run_invalid_op(self):
+        assert len(self.project)
+        run_output = " ".join(
+            self.call_subcmd("run -o invalid_op_run").decode("utf-8").split()
+        )
+        assert (
+            "The requested flow operation(s) does not exist: invalid_op_run"
+            in run_output
+        )
+
     def test_main_next(self):
         assert len(self.project)
         job_ids = set(self.call_subcmd("next op1").decode().split())
@@ -1256,6 +1283,16 @@ class TestProjectMainInterface(TestProjectBase):
         # Use only exact operation matches
         job_ids = set(self.call_subcmd("next op").decode().split())
         assert len(job_ids) == 0
+
+    def test_main_next_invalid_op(self):
+        assert len(self.project)
+        next_output = " ".join(
+            self.call_subcmd("next invalid_op_next").decode("utf-8").split()
+        )
+        assert (
+            "The requested flow operation 'invalid_op_next' does not exist."
+            in next_output
+        )
 
     def test_main_status(self):
         assert len(self.project)

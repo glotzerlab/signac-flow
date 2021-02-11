@@ -1020,7 +1020,7 @@ class TestExecutionProject(TestProjectBase):
 
         project = self.mock_project(A)
         output = StringIO()
-        with redirect_stdout(output):
+        with redirect_stderr(output):
             project.run(names=["op1", "op2", "op3"])
         output.seek(0)
         message = output.read()
@@ -1224,7 +1224,7 @@ class TestProjectMainInterface(TestProjectBase):
         os.chdir(self._tmp_dir.name)
         request.addfinalizer(self.switch_to_cwd)
 
-    def call_subcmd(self, subcmd):
+    def call_subcmd(self, subcmd, stderr=subprocess.DEVNULL):
         # Determine path to project module and construct command.
         fn_script = inspect.getsourcefile(type(self.project))
         _cmd = f"python {fn_script} {subcmd}"
@@ -1232,9 +1232,7 @@ class TestProjectMainInterface(TestProjectBase):
         try:
             with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
                 with switch_to_directory(self.project.root_directory()):
-                    return subprocess.check_output(
-                        _cmd.split(), stderr=subprocess.DEVNULL
-                    )
+                    return subprocess.check_output(_cmd.split(), stderr=stderr)
         except subprocess.CalledProcessError as error:
             print(error, file=sys.stderr)
             print(error.output, file=sys.stderr)
@@ -1267,7 +1265,9 @@ class TestProjectMainInterface(TestProjectBase):
     def test_main_run_invalid_op(self):
         assert len(self.project)
         run_output = " ".join(
-            self.call_subcmd("run -o invalid_op_run").decode("utf-8").split()
+            self.call_subcmd("run -o invalid_op_run", subprocess.STDOUT)
+            .decode("utf-8")
+            .split()
         )
         assert (
             "The requested flow operation(s) does not exist: invalid_op_run"
@@ -1287,7 +1287,9 @@ class TestProjectMainInterface(TestProjectBase):
     def test_main_next_invalid_op(self):
         assert len(self.project)
         next_output = " ".join(
-            self.call_subcmd("next invalid_op_next").decode("utf-8").split()
+            self.call_subcmd("next invalid_op_next", subprocess.STDOUT)
+            .decode("utf-8")
+            .split()
         )
         assert (
             "The requested flow operation 'invalid_op_next' does not exist."

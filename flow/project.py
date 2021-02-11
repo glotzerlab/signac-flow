@@ -3050,7 +3050,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             absent_ops = (set(self._groups.keys()) ^ set(names)) & set(names)
             if absent_ops:
                 print(
-                    f"The requested flow operation(s) does not exist: {', '.join(absent_ops)}"
+                    f"The requested flow operation(s) does not exist: {', '.join(absent_ops)}",
+                    file=sys.stderr,
                 )
 
         # Get default directives
@@ -4415,7 +4416,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _main_next(self, args):
         """Determine the jobs that are eligible for a specific operation."""
         if args.name not in self.operations:
-            print(f"The requested flow operation '{args.name}' does not exist.")
+            print(
+                f"The requested flow operation '{args.name}' does not exist.",
+                file=sys.stderr,
+            )
         else:
             for operation in self._next_operations():
                 if args.name == operation.name:

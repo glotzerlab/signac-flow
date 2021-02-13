@@ -35,7 +35,6 @@ import signac
 from deprecation import deprecated
 from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
 from signac.contrib.filterparse import parse_filter_arg
-from signac.contrib.project import JobsCursor
 from tqdm.auto import tqdm
 
 from .aggregates import _aggregator, _get_aggregate_id
@@ -283,7 +282,7 @@ class _AggregatesCursor:
         self._project = project
         self._filter = filter
         self._doc_filter = doc_filter
-        self._jobs_cursor = JobsCursor(project, filter, doc_filter)
+        self._jobs_cursor = project.find_jobs(filter, doc_filter)
 
     def __eq__(self, other):
         return self._jobs_cursor == other._jobs_cursor

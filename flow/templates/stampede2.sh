@@ -56,7 +56,7 @@ rm {{ launcher_file }}
 {% else %}
 {# Only the pre_operation block is overridden, all other behavior is inherited from base_script.sh #}
 {% block pre_operation %}
-{{ "_FLOW_STAMPEDE_OFFSET_=%d "|format(operation.directives['nranks']|return_and_increment) }}
+{{ "export _FLOW_STAMPEDE_OFFSET_=%d "|format(operation.directives['nranks']|return_and_increment) }}
 {% endblock %}
 {# We need to reset the environment's base offset in between script generation for separate bundles. #}
 {# Since Jinja's bytecode optimizes out calls to filters with a constant argument, we are forced to #}

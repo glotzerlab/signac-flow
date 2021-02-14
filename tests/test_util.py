@@ -1,4 +1,7 @@
+import pytest
+
 from flow.util.misc import _bidict
+from flow.util.template_filters import _calc_memory, _parse_memory
 
 
 class TestBidict:
@@ -48,3 +51,31 @@ class TestBidict:
         bd.clear()
         assert bd == {}
         assert bd.inverse == {}
+
+
+class TestTemplateFilters:
+    def test_parse_memory(self):
+        assert _parse_memory("512M") == 0.5
+        assert _parse_memory("0.5G") == 0.5
+        assert _parse_memory("512m") == 0.5
+        assert _parse_memory("0.5g") == 0.5
+
+        with pytest.raises(ValueError):
+            _parse_memory("0.5gb")
+        with pytest.raises(ValueError):
+            _parse_memory("0..5g")
+        with pytest.raises(TypeError):
+            _parse_memory(1)
+
+    def test_calc_memory(self):
+        class MockOp:
+            def __init__(self, memory=4):
+                self.directives = {"memory": memory}
+
+        op1 = MockOp(1)
+        op2 = MockOp(8)
+        op3 = MockOp()
+        assert _calc_memory([], "10g") == 10
+        assert _calc_memory([op3], "10g") == 10
+        assert _calc_memory([op3], None) == 4
+        assert _calc_memory([op1, op2, op3], None) == 8

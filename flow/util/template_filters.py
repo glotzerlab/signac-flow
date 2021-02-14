@@ -112,7 +112,7 @@ def calc_tasks(operations, name, parallel=False, allow_mixed=False):
 def _parse_memory(memory):
     """Parse memory from the memory flag passed by a user.
 
-    A valid memory flag passed to `FlowProject.submit` has a suffix of either
+    A valid memory flag passed to `FlowProject.submit` should have a suffix of either
     "g" for gigabytes, or "m" for megabytes.
 
     Parameters
@@ -138,7 +138,7 @@ def _parse_memory(memory):
             'Invalid memory passed. For gigabytes use suffix "g", '
             'for megabytes use suffix "m".'
         )
-    except (SyntaxError, TypeError):
+    except TypeError:
         raise
 
 
@@ -149,8 +149,9 @@ def _calc_memory(operations, memory=None):
     ----------
     operations : list
         The operations of :class:`~._JobOperation` used to calculate the maximum memory required.
-    memory : float
-        Memory to reserve per node for all the operations.
+    memory : str
+        Memory to reserve per node for all the operations. A valid memory flag passed to
+        `FlowProject.submit` should have a suffix of either "g" for gigabytes, or "m" for megabytes.
 
     Returns
     -------

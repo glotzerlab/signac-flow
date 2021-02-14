@@ -7,8 +7,7 @@
 {% if not no_copy_env %}
 #PBS -V
 {% endif %}
-{% if memory %}
-#PBS -l pmem={{ memory }}
+#PBS -l pmem={{ operations | _calc_memory(memory) }}G
 {% endif %}
 {% block tasks %}
 {% set threshold = 0 if force else 0.9 %}

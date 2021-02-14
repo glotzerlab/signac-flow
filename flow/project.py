@@ -699,11 +699,10 @@ class FlowGroupEntry:
         These will be included in all submissions. Submissions use run
         commands to execute.
     aggregator : :class:`~.aggregator`
-        aggregator object associated with the :class:`FlowGroup`. If no value is passed,
-        the default aggregator is used (Default value = aggregator.groupsof(1)).
+        aggregator object associated with the :class:`FlowGroup`.
     """
 
-    def __init__(self, name, options="", aggregator=aggregator.groupsof(1)):
+    def __init__(self, name, options="", aggregator=None):
         self.name = name
         self.options = options
         self.aggregator = aggregator

@@ -157,7 +157,7 @@ def _calc_memory(operations, memory=None):
     float
         The reserved memory (numeric value) per node in gigabytes.
     """
-    if memory is None:
+    if not memory:
         return max([operation.directives["memory"] for operation in operations])
     else:
         return _parse_memory(memory)

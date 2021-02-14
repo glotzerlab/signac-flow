@@ -109,6 +109,60 @@ def calc_tasks(operations, name, parallel=False, allow_mixed=False):
         )
 
 
+def _parse_memory(memory):
+    """Parse memory from the memory flag passed by a user.
+
+    A valid memory flag passed to `FlowProject.submit` has a suffix of either
+    "g" for gigabytes, or "m" for megabytes.
+
+    Parameters
+    ----------
+    memory : str
+        Required memory to reserve per node.
+
+    Returns
+    -------
+    float
+        The parsed memory (numeric value) in gigabytes.
+    """
+    try:
+        size_type = memory[-1]
+        if size_type.lower() == "m":
+            return float(memory[0:-1]) / 1024
+        elif size_type.lower() == "g":
+            return float(memory[0:-1])
+        else:
+            raise ValueError
+    except ValueError:
+        raise ValueError(
+            'Invalid memory passed. For gigabytes use suffix "g", '
+            'for megabytes use suffix "m".'
+        )
+    except (SyntaxError, TypeError):
+        raise
+
+
+def _calc_memory(operations, memory=None):
+    """Calculate the maximum memory to reserve for submission of operations.
+
+    Parameters
+    ----------
+    operations : list
+        The operations of :class:`~._JobOperation` used to calculate the maximum memory required.
+    memory : float
+        Memory to reserve per node for all the operations.
+
+    Returns
+    -------
+    float
+        The reserved memory (numeric value) per node in gigabytes.
+    """
+    if memory is None:
+        return max([operation.directives["memory"] for operation in operations])
+    else:
+        return _parse_memory(memory)
+
+
 def check_utilization(nn, np, ppn, threshold=0.9, name=None):
     """Check whether the calculated node utilization is below threshold.
 

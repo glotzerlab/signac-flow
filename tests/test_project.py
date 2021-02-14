@@ -160,7 +160,6 @@ class TestProjectBase:
                 project.open_job(dict(a=a, b=b)).init()
                 project.open_job(dict(a=dict(a=a), b=b)).init()
         project._entrypoint = self.entrypoint
-        project._register_groups()
         return project
 
 
@@ -1731,8 +1730,8 @@ class TestAggregatesProjectBase(TestProjectBase):
         project = self.project_class.get_project(root=self._tmp_dir.name)
         for i in range(1, 31):
             project.open_job(dict(i=i, even=bool(i % 2 == 0))).init()
+        project = project.get_project(root=self._tmp_dir.name)
         project._entrypoint = self.entrypoint
-        project._register_groups()
         return project
 
     def switch_to_cwd(self):
@@ -1768,13 +1767,10 @@ class TestProjectUtilities(TestAggregatesProjectBase):
         assert agg_cursor._project == project
         assert agg_cursor._filter is None
         assert agg_cursor._doc_filter is None
-        # Count all the unique aggregates in the project.
-        # The count is 3 because of the groups (agg_op2, agg_op3, group_agg),
-        # (agg_op1, agg_op_different, agg_op1_custom) and (agg_op4)
-        assert len(agg_cursor) == 3
-        # Since default aggregate is not present in project, hence aggregate
-        # of single job will not be present in project
-        assert [(job,) not in agg_cursor for job in project]
+        # Since default aggregate is not present in project, hence no aggregator
+        # will be evaulated as equal and hence all the aggregates present in this project
+        # will be considered unique.
+        assert len(agg_cursor) == 41
         assert tuple(project) in agg_cursor
 
     def test_filters(self):
@@ -1784,6 +1780,17 @@ class TestProjectUtilities(TestAggregatesProjectBase):
         assert agg_cursor._filter == {"even": True}
         assert agg_cursor._doc_filter is None
         assert len(agg_cursor) == 15
+
+    def test_reregister_aggregates(self):
+        project = self.mock_project()
+        agg_cursor = _AggregatesCursor(project=project)
+        assert len(agg_cursor) == 41
+        project.open_job(dict(i=31, even=False)).init()
+        # Default aggregate store doesn't need to be re-registered.
+        assert len(agg_cursor) == 42
+        project.reregister_aggregates()
+        # The operation agg_op2 adds another aggregate in the project.
+        assert len(agg_cursor) == 43
 
 
 class TestAggregationProjectMainInterface(TestAggregatesProjectBase):

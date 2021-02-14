@@ -38,7 +38,7 @@ from signac.contrib.filterparse import parse_filter_arg
 from signac.contrib.project import JobsCursor
 from tqdm.auto import tqdm
 
-from .aggregates import aggregator, get_aggregate_id
+from .aggregates import _AggregateStore, aggregator, get_aggregate_id
 from .environment import get_environment
 from .errors import (
     ConfigKeyError,
@@ -309,7 +309,7 @@ class _AggregatesCursor:
     def __len__(self):
         if self._filter is None and self._doc_filter is None:
             # Return number of unique aggregates present in the project
-            return sum({len(aggregate_store) for aggregate_store in self._cursor})
+            return sum([len(aggregate_store) for aggregate_store in self._cursor])
         else:
             return len(self._cursor)
 
@@ -4288,6 +4288,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             self._groups[operation_name].operation_directives[
                 operation_name
             ] = directives
+
+    def reregister_aggregates(self):
+        """Re-register the aggregates present in this :class:`~.FlowProject`."""
+        for group in self._groups.values():
+            aggregator = self._group_to_aggregate_store[group]
+            if isinstance(aggregator, _AggregateStore):
+                aggregator._register_aggregates()
+                self._group_to_aggregate_store[group] = aggregator
 
     @property
     def operations(self):

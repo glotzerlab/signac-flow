@@ -441,6 +441,8 @@ class _AggregateStore(_BaseAggregateStore):
 
         Every aggregate is required to be a tuple of jobs.
         """
+        if len(self._aggregates_by_id):
+            self._aggregates_by_id = {}
         for aggregate in self._generate_aggregates():
             for job in aggregate:
                 if job not in self._project:

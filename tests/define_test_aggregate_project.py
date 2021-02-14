@@ -15,6 +15,11 @@ group1 = _TestAggregateProject.make_group(name="group_agg", aggregator_obj=aggre
 
 
 @_TestAggregateProject.operation
+def op1(job):
+    pass
+
+
+@_TestAggregateProject.operation
 @aggregator.groupby("even")
 def agg_op1(*jobs):
     total = sum([job.sp.i for job in jobs])

@@ -1,13 +1,13 @@
 {% extends "base_script.sh" %}
 {% block header %}
 #PBS -N {{ id }}
+#PBS -l pmem={{ operations | _calc_memory(memory) }}G
 {% if walltime %}
 #PBS -l walltime={{ walltime|format_timedelta }}
 {% endif %}
 {% if not no_copy_env %}
 #PBS -V
 {% endif %}
-#PBS -l pmem={{ operations | _calc_memory(memory) }}G
 {% block tasks %}
 {% set threshold = 0 if force else 0.9 %}
 {% set cpu_tasks = operations|calc_tasks('np', parallel, force) %}

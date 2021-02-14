@@ -21,6 +21,7 @@ from signac.common import config
 
 from .directives import (
     _GET_EXECUTABLE,
+    _MEMORY,
     _NGPU,
     _NP,
     _NRANKS,
@@ -354,6 +355,7 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
                 _GET_EXECUTABLE(),
                 _WALLTIME,
                 _PROCESSOR_FRACTION,
+                _MEMORY,
             ]
         )
 

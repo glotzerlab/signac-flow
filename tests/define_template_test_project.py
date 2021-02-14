@@ -55,6 +55,12 @@ def mpi_gpu_op(job):
 
 
 @TestProject.operation
+@flow.directives(memory=8)
+def memory_op(job):
+    pass
+
+
+@TestProject.operation
 @flow.cmd
 def multiline_cmd(job):
     return 'echo "First line"\necho "Second line"'

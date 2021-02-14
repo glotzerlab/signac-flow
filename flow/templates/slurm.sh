@@ -5,8 +5,7 @@
 {% if partition %}
 #SBATCH --partition={{ partition }}
 {% endif %}
-{% if memory %}
-#SBATCH --mem={{ memory }}
+#SBATCH --mem={{ operations | calc_memory(memory) }}G
 {% endif %}
 {% if walltime %}
 #SBATCH -t {{ walltime|format_timedelta }}

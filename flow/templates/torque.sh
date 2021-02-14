@@ -8,7 +8,6 @@
 #PBS -V
 {% endif %}
 #PBS -l pmem={{ operations | _calc_memory(memory) }}G
-{% endif %}
 {% block tasks %}
 {% set threshold = 0 if force else 0.9 %}
 {% set cpu_tasks = operations|calc_tasks('np', parallel, force) %}

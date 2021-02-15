@@ -1651,7 +1651,7 @@ class TestGroupProjectMainInterface(TestProjectBase):
         os.chdir(self._tmp_dir.name)
         request.addfinalizer(self.switch_to_cwd)
 
-    def call_subcmd(self, subcmd, stderr=subprocess.DEVNULL):
+    def call_subcmd(self, subcmd):
         # Determine path to project module and construct command.
         fn_script = inspect.getsourcefile(type(self.project))
         _cmd = f"python {fn_script} {subcmd}"
@@ -1659,7 +1659,9 @@ class TestGroupProjectMainInterface(TestProjectBase):
         try:
             with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
                 with switch_to_directory(self.project.root_directory()):
-                    return subprocess.check_output(_cmd.split(), stderr=stderr)
+                    return subprocess.check_output(
+                        _cmd.split(), stderr=subprocess.DEVNULL
+                    )
         except subprocess.CalledProcessError as error:
             print(error, file=sys.stderr)
             print(error.output, file=sys.stderr)
@@ -1709,21 +1711,6 @@ class TestGroupProjectMainInterface(TestProjectBase):
                 .splitlines()
             )
             assert f"run -o group2 -j {job} --num-passes=2" in "\n".join(submit_output)
-
-    def test_main_submit_memory_deprecation(self):
-        project = self.mock_project()
-        assert len(project)
-        submit_output = (
-            self.call_subcmd(
-                "submit -o invalid --memory 4g --pretend", subprocess.STDOUT
-            )
-            .decode()
-            .splitlines()
-        )
-        assert (
-            "memory argument is deprecated as of 0.13 and will be removed in 0.14"
-            in " ".join(submit_output)
-        )
 
 
 class TestGroupDynamicProjectMainInterface(TestProjectMainInterface):

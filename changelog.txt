@@ -68,7 +68,7 @@ Fixed
 - Ensure that directives are always evaluated before running or submitting (#408, #409).
 - Cache the fully qualified domain name during environment detection to fix a performance issue on macOS (#339, #394).
 - Ensure that ``next`` CLI command displays eligible jobs for the exact operation name provided (#443).
-- Users will now know if they passed a non-existing operation/group to ``run``, ``submit``, or ``next`` (#291, #442).
+- Display warning when a non-existing operation/group is passed to ``run``, ``submit``, or ``next`` commands. (#291, #442).
 
 Removed
 +++++++

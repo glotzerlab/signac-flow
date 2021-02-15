@@ -1024,7 +1024,7 @@ class TestExecutionProject(TestProjectBase):
             project.run(names=["op1", "op2", "op3"])
         output.seek(0)
         message = output.read()
-        fail_msg = "The requested flow operation(s) does not exist:"
+        fail_msg = "Unrecognized flow operation(s):"
         assert f"{fail_msg} op2, op3" in message or f"{fail_msg} op3, op2" in message
 
     def test_submit_operations(self):

@@ -3586,9 +3586,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if names is not None:
             absent_ops = (set(self._groups.keys()) ^ set(names)) & set(names)
             if absent_ops:
-                print(
-                    f"Unrecognized flow operation(s): {', '.join(absent_ops)}"
-                )
+                print(f"Unrecognized flow operation(s): {', '.join(absent_ops)}")
 
         # TODO: Document aggregates.
         # jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs

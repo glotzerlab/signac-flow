@@ -1269,10 +1269,7 @@ class TestProjectMainInterface(TestProjectBase):
             .decode("utf-8")
             .split()
         )
-        assert (
-            "Unrecognized flow operation(s): invalid_op_run"
-            in run_output
-        )
+        assert "Unrecognized flow operation(s): invalid_op_run" in run_output
 
     def test_main_next(self):
         assert len(self.project)

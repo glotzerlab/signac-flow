@@ -3587,7 +3587,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             absent_ops = (set(self._groups.keys()) ^ set(names)) & set(names)
             if absent_ops:
                 print(
-                    f"The requested flow operation(s) does not exist: {', '.join(absent_ops)}"
+                    f"Unrecognized flow operation(s): {', '.join(absent_ops)}"
                 )
 
         # TODO: Document aggregates.

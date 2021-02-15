@@ -1270,7 +1270,7 @@ class TestProjectMainInterface(TestProjectBase):
             .split()
         )
         assert (
-            "The requested flow operation(s) does not exist: invalid_op_run"
+            "Unrecognized flow operation(s): invalid_op_run"
             in run_output
         )
 

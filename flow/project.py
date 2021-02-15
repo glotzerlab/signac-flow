@@ -4478,6 +4478,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         aggregates = self._select_jobs_from_args(args)
 
         names = args.operation_name if args.operation_name else None
+
+        if kwargs.get("memory", None):
+            print(
+                "WARNING: "
+                "The memory argument is deprecated as of 0.13 "
+                "and will be removed in 0.14. Use directives to handle the "
+                "reservation of memory per node.",
+                file=sys.stderr,
+            )
         self.submit(jobs=aggregates, names=names, **kwargs)
 
     def _main_exec(self, args):

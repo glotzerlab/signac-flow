@@ -22,6 +22,8 @@ from signac import get_project
 from deprecation import deprecated
 from tqdm.auto import tqdm
 
+from . import __version__
+
 logger = logging.getLogger(__name__)
 
 

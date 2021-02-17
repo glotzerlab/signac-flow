@@ -18,11 +18,11 @@ import sys
 from functools import wraps
 from multiprocessing import Pool
 
-from signac import get_project
 from deprecation import deprecated
+from signac import get_project
 from tqdm.auto import tqdm
 
-from . import __version__
+from .version import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -174,6 +174,7 @@ def _get_operations(include_private=False):
             signature = inspect.getfullargspec(obj)
             if len(signature.args) == 1:
                 yield name
+
 
 @deprecated(deprecated_in="0.12", removed_in="0.14", current_version=__version__)
 def run(parser=None):

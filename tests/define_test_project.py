@@ -63,10 +63,13 @@ def op2(job):
 
 @_TestProject.operation
 @group2.with_directives(dict(omp_num_threads=4))
-@_TestProject.post.true("test3")
+@_TestProject.post.true("test3_true")
+@_TestProject.post.false("test3_false")
+@_TestProject.post.not_(lambda job: job.doc.test3_false)
 @flow.directives(ngpu=1, omp_num_threads=1)
 def op3(job):
-    job.document.test3 = True
+    job.document.test3_true = True
+    job.document.test3_false = False
 
 
 class _DynamicTestProject(_TestProject):

@@ -18,8 +18,11 @@ import sys
 from functools import wraps
 from multiprocessing import Pool
 
+from deprecation import deprecated
 from signac import get_project
 from tqdm.auto import tqdm
+
+from .version import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -173,6 +176,7 @@ def _get_operations(include_private=False):
                 yield name
 
 
+@deprecated(deprecated_in="0.12", removed_in="0.14", current_version=__version__)
 def run(parser=None):
     """Access to the "run" interface of an operations module.
 

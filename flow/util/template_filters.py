@@ -128,14 +128,14 @@ def _parse_memory(memory):
     try:
         size_type = memory[-1]
         if size_type.lower() == "m":
-            return float(memory[0:-1]) / 1024
+            return float(memory[:-1]) / 1024
         elif size_type.lower() == "g":
-            return float(memory[0:-1])
+            return float(memory[:-1])
         else:
             raise ValueError
     except ValueError:
         raise ValueError(
-            'Invalid memory passed. For gigabytes use suffix "g", '
+            'Invalid memory flag. For gigabytes use suffix "g", '
             'for megabytes use suffix "m".'
         )
     except TypeError:

@@ -109,7 +109,7 @@ def calc_tasks(operations, name, parallel=False, allow_mixed=False):
         )
 
 
-def _parse_memory(memory):
+def _parse_memory_flag(memory):
     """Parse memory from the memory flag passed by a user.
 
     A valid memory flag passed to `FlowProject.submit` should have a suffix of either
@@ -132,11 +132,12 @@ def _parse_memory(memory):
         elif size_type.lower() == "g":
             return float(memory[0:-1])
         else:
-            raise ValueError
+            return float(memory)
     except ValueError:
         raise ValueError(
             'Invalid memory passed. For gigabytes use suffix "g", '
-            'for megabytes use suffix "m".'
+            'for megabytes use suffix "m", if a numeric value is passed then '
+            "it will be interpreted as memory in gigabytes."
         )
     except TypeError:
         raise
@@ -161,7 +162,7 @@ def _calc_memory(operations, memory=None):
     if not memory:
         return max([operation.directives["memory"] for operation in operations])
     else:
-        return _parse_memory(memory)
+        return _parse_memory_flag(memory)
 
 
 def check_utilization(nn, np, ppn, threshold=0.9, name=None):

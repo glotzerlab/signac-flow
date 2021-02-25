@@ -1,7 +1,7 @@
 {% extends "base_script.sh" %}
 {% block header %}
 #PBS -N {{ id }}
-#PBS -l pmem={{ operations | _calc_memory(memory) }}G
+#PBS -l pmem={{ operations | calc_memory(memory) }}G
 {% if walltime %}
 #PBS -l walltime={{ walltime|format_timedelta }}
 {% endif %}

@@ -2,7 +2,10 @@
 {% block header %}
 #!/bin/bash
 #SBATCH --job-name="{{ id }}"
+{% set memory_passed = operations | check_memory(memory) %}
+{% if memory_passed %}
 #SBATCH --mem={{ operations | calc_memory(memory) }}G
+{% endif %}
 {% if partition %}
 #SBATCH --partition={{ partition }}
 {% endif %}

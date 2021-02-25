@@ -1,7 +1,7 @@
 import pytest
 
 from flow.util.misc import _bidict
-from flow.util.template_filters import _parse_memory_flag, calc_memory
+from flow.util.template_filters import _parse_memory_flag, calc_memory, check_memory
 
 
 class TestBidict:
@@ -78,5 +78,17 @@ class TestTemplateFilters:
         op3 = MockOp()
         assert calc_memory([], "10g") == 10
         assert calc_memory([op3], "10g") == 10
-        assert calc_memory([op3], None) == 4
         assert calc_memory([op1, op2, op3], None) == 8
+
+    def test_check_memory(self):
+        class MockOp:
+            def __init__(self, memory=None):
+                self.directives = {"memory": memory}
+
+        op1 = MockOp(1)
+        op2 = MockOp(8)
+        op3 = MockOp()
+        assert check_memory([], "10g")
+        assert check_memory([op3], "10g")
+        assert not check_memory([op3], None)
+        assert check_memory([op1, op2, op3], None)

@@ -2,7 +2,10 @@
 {% block header %}
 #!/bin/bash
 #BSUB -J {{ id }}
+{% set memory_passed = operations | check_memory(memory) %}
+{% if memory_passed %}
 #BSUB -M {{ operations | calc_memory(memory) }}G
+{% endif %}
 {% if partition %}
 #BSUB -q {{ partition }}
 {% endif %}

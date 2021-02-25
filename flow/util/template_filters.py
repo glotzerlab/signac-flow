@@ -144,6 +144,27 @@ def _parse_memory_flag(memory):
         raise
 
 
+def check_memory(operations, memory=None):
+    """Check whether memory is defined by the user or not.
+
+    Parameters
+    ----------
+    operations : list
+        The operations of :class:`~._JobOperation` used to calculate the maximum memory required.
+    memory : str
+        Memory to reserve per node for all the operations. A valid memory flag passed to
+        `FlowProject.submit` should have a suffix of either "g" for gigabytes, or "m" for megabytes.
+
+    Returns
+    -------
+    bool
+        Evaluates to True if memory is defined by the user, else False.
+    """
+    return bool(memory) or any(
+        operation.directives["memory"] for operation in operations
+    )
+
+
 def calc_memory(operations, memory=None):
     """Calculate the maximum memory to reserve for submission of operations.
 
@@ -161,7 +182,12 @@ def calc_memory(operations, memory=None):
         The reserved memory (numeric value) per node in gigabytes.
     """
     if not memory:
-        return max([operation.directives["memory"] for operation in operations])
+        return max(
+            [
+                operation.directives["memory"] if operation.directives["memory"] else 4
+                for operation in operations
+            ]
+        )
     else:
         return _parse_memory_flag(memory)
 

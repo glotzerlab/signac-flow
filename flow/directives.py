@@ -255,11 +255,11 @@ def _evaluate(value, jobs):
 
 
 class _OnlyType:
-    def __init__(self, type_, preprocess=None, postprocess=None):
+    def __init__(self, *types, preprocess=None, postprocess=None):
         def identity(value):
             return value
 
-        self.type = type_
+        self.types = types
         self.preprocess = identity if preprocess is None else preprocess
         self.postprocess = identity if postprocess is None else postprocess
 
@@ -267,20 +267,24 @@ class _OnlyType:
         return self.postprocess(self._validate(self.preprocess(value)))
 
     def _validate(self, value):
-        if isinstance(value, self.type):
+        if isinstance(value, self.types):
             return value
-        try:
-            return self.type(value)
-        except Exception:
-            raise TypeError(
-                f"Expected an object of type {self.type}. "
-                f"Received {value} of type {type(value)}."
-            )
+        for type_ in self.types:
+            try:
+                return type_(value)
+            except Exception:
+                pass
+        raise TypeError(
+            f"Expected an object of type {self.types}. "
+            f"Received {value} of type {type(value)}."
+        )
 
 
-def _raise_below(threshold):
+def _raise_below(threshold, allow_none=False):
     def is_greater_or_equal(value):
         try:
+            if allow_none and value is None:
+                return value
             if value < threshold:
                 raise ValueError
         except (TypeError, ValueError):
@@ -331,7 +335,7 @@ def _is_fraction(value):
 _natural_number = _OnlyType(int, postprocess=_raise_below(1))
 _nonnegative_int = _OnlyType(int, postprocess=_raise_below(0))
 _nonnegative_real = _OnlyType(float, postprocess=_raise_below(0))
-_positive_real = _OnlyType(float, postprocess=_raise_below(1e-12))
+_positive_real = _OnlyType(float, type(None), postprocess=_raise_below(1e-12, True))
 
 # Common directives and their instantiation as _Directive
 _NP = _Directive(
@@ -377,7 +381,7 @@ values are supported. For example, a value of 0.5 will request 30 minutes of
 walltime. Defaults to 12 hours.
 """
 
-_MEMORY = _Directive("memory", validator=_positive_real, default=4)
+_MEMORY = _Directive("memory", validator=_positive_real, default=None)
 """The number of gigabytes of memory to request for this operation.
 
 Expects a real number greater than zero.

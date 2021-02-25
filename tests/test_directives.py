@@ -104,7 +104,7 @@ class TestItems:
         assert _OMP_NUM_THREADS._default == 0
         assert _GET_EXECUTABLE()._default == sys.executable
         assert _WALLTIME._default == 12.0
-        assert _MEMORY._default == 4
+        assert _MEMORY._default is None
         assert _PROCESSOR_FRACTION._default == 1.0
 
     def test_invalid_values(self, available_directives_list):
@@ -114,7 +114,7 @@ class TestItems:
             "nranks": [-1, "foo", {}, None],
             "omp_num_threads": [-1, "foo", {}, None],
             "walltime": ["foo", {}, None],
-            "memory": [-1, "foo", {}, None],
+            "memory": [-1, "foo", {}],
             "processor_fraction": [-0.5, 2.5, "foo", {}, None],
         }
 

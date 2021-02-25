@@ -35,6 +35,7 @@
 {% endif %}
 {% endblock %}
 
+{% block body %}
 {% if ns.use_launcher %}
 {% if parallel %}
 {{("Bundled submission without MPI on Stampede2 is using launcher; the --parallel option is therefore ignored.")|print_warning}}
@@ -63,3 +64,4 @@ export _FLOW_STAMPEDE_OFFSET_={{ "%d"|format(operation.directives['nranks']|retu
 {# rerun this function on the environment's base offset at the end of each run to return the offset to 0. #}
 {{ "%d"|format(environment.base_offset)|decrement_offset }}
 {% endif %}
+{% endblock %}

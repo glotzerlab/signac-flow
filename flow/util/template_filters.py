@@ -125,6 +125,7 @@ def _parse_memory_flag(memory):
     float
         The parsed memory (numeric value) in gigabytes.
     """
+    # This method is deprecated as of 0.13 and will be removed in 0.14.
     try:
         size_type = memory[-1]
         if size_type.lower() == "m":

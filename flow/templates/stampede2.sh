@@ -55,10 +55,31 @@ export LAUNCHER_JOB_FILE={{ launcher_file }}
 $LAUNCHER_DIR/paramrun
 rm {{ launcher_file }}
 {% else %}
-{# Only the pre_operation block is overridden, all other behavior is inherited from base_script.sh #}
-{% block pre_operation %}
-export _FLOW_STAMPEDE_OFFSET_={{ "%d"|format(operation.directives['nranks']|return_and_increment) }}
-{% endblock %}
+{% set cmd_suffix = cmd_suffix|default('') ~ (' &' if parallel else '') %}
+{% for operation in operations %}
+
+# {{ "%s"|format(operation) }}
+{{ "_FLOW_STAMPEDE_OFFSET_=%d "|format(operation.directives['nranks']|return_and_increment) }}{{ operation.cmd }}{{ cmd_suffix }}
+{% if operation.eligible_operations|length > 0 %}
+# Eligible to run:
+{% for run_op in operation.eligible_operations %}
+{# The split/join handles multi-line cmd operations. #}
+# {{ "\n# ".join(run_op.cmd.strip().split("\n")) }}
+{% endfor %}
+{% endif %}
+{% if operation.operations_with_unmet_preconditions|length > 0 %}
+# Operations with unmet preconditions:
+{% for run_op in operation.operations_with_unmet_preconditions %}
+# {{ "\n# ".join(run_op.cmd.strip().split("\n")) }}
+{% endfor %}
+{% endif %}
+{% if operation.operations_with_met_postconditions|length > 0 %}
+# Operations with all postconditions met:
+{% for run_op in operation.operations_with_met_postconditions %}
+# {{ "\n# ".join(run_op.cmd.strip().split("\n")) }}
+{% endfor %}
+{% endif %}
+{% endfor %}
 {# We need to reset the environment's base offset in between script generation for separate bundles. #}
 {# Since Jinja's bytecode optimizes out calls to filters with a constant argument, we are forced to #}
 {# rerun this function on the environment's base offset at the end of each run to return the offset to 0. #}

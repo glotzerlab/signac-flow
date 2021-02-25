@@ -1,5 +1,6 @@
 {% extends "base_script.sh" %}
 {% block header %}
+{% block preamble %}
 #!/bin/bash
 #SBATCH --job-name="{{ id }}"
 {% set memory_passed = operations | check_memory(memory) %}
@@ -16,6 +17,7 @@
 #SBATCH --output={{ job_output }}
 #SBATCH --error={{ job_output }}
 {% endif %}
+{% endblock %}
 {% block tasks %}
 #SBATCH --ntasks={{ operations|calc_tasks('np', parallel, force) }}
 {% endblock %}

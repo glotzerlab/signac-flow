@@ -21,7 +21,6 @@ import sys
 import threading
 import time
 import traceback
-import warnings
 from collections import Counter, defaultdict
 from copy import deepcopy
 from enum import IntFlag
@@ -36,10 +35,9 @@ import signac
 from deprecation import deprecated
 from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
 from signac.contrib.filterparse import parse_filter_arg
-from signac.contrib.project import JobsCursor
 from tqdm.auto import tqdm
 
-from .aggregates import _aggregator, _DefaultAggregateStore, _get_aggregate_id
+from .aggregates import _aggregator, _get_aggregate_id
 from .environment import get_environment
 from .errors import (
     ConfigKeyError,
@@ -284,7 +282,7 @@ class _AggregatesCursor:
         self._project = project
         self._filter = filter
         self._doc_filter = doc_filter
-        self._jobs_cursor = JobsCursor(project, filter, doc_filter)
+        self._jobs_cursor = project.find_jobs(filter, doc_filter)
 
     def __eq__(self, other):
         return self._jobs_cursor == other._jobs_cursor
@@ -396,60 +394,6 @@ class _JobOperation:
             # and the user gets the expected result.
             return self._cmd()
         return self._cmd
-
-
-@deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
-class JobOperation(_JobOperation):
-    """Class containing execution information for one group and one job.
-
-    The execution or submission of a :class:`~.FlowGroup` uses a passed-in command
-    which can either be a string or function with no arguments that returns a shell
-    executable command.  The shell executable command won't be used if it is
-    determined that the group can be executed without forking.
-
-    .. note::
-
-        This class is used by the :class:`~.FlowGroup` class for the execution and
-        submission process and should not be instantiated by users themselves.
-
-    Parameters
-    ----------
-    id : str
-        The id of this JobOperation instance. The id should be unique.
-    name : str
-        The name of the JobOperation.
-    job : :class:`~signac.contrib.job.Job`
-        The job associated with this operation.
-    cmd : callable or str
-        The command that executes this operation. Can be a callable that when
-        evaluated returns a string.
-    directives : :class:`flow.directives._Directives`
-        A :class:`flow.directives._Directives` object of additional parameters
-        that provide instructions on how to execute this operation, e.g.,
-        specifically required resources.
-
-    """
-
-    def __init__(self, id, name, job, cmd, directives=None):
-        complete_directives = job._project._environment._get_default_directives()
-        if directives is not None:
-            complete_directives.update(directives)
-        complete_directives.evaluate(job)
-        super().__init__(id, name, (job,), cmd, complete_directives)
-
-    @property
-    def job(self):
-        assert len(self._jobs) == 1
-        return self._jobs[0]
-
-    def __repr__(self):
-        return "{type}(name='{name}', job='{job}', cmd={cmd}, directives={directives})".format(
-            type=type(self).__name__,
-            name=self.name,
-            job=repr(self.job),
-            cmd=repr(self.cmd),
-            directives=self.directives,
-        )
 
 
 class _SubmissionJobOperation(_JobOperation):
@@ -615,47 +559,26 @@ class BaseFlowOperation:
             unmet_postconditions = True
         return met_preconditions and unmet_postconditions
 
-    @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
-    def eligible(self, job, ignore_conditions=IgnoreConditions.NONE):
-        """Determine eligibility of jobs.
-
-        Jobs are eligible when all preconditions are true and at least one
-        postcondition is false, or corresponding conditions are ignored.
-
-        Parameters
-        ----------
-        job : :class:`~signac.contrib.job.Job`
-            The signac job handle.
-        ignore_conditions : :class:`~.IgnoreConditions`
-            Specify if pre and/or postconditions check is to be ignored for
-            eligibility check. The default is :class:`IgnoreConditions.NONE`.
-
-        """
-        return self._eligible((job,), ignore_conditions)
-
     def _complete(self, jobs):
         """Check if all postconditions are met."""
         if len(self._postconditions) > 0:
             return all(cond(jobs) for cond in self._postconditions)
         return False
 
-    @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
-    def complete(self, job):
-        """Check if all postconditions are met."""
-        return self._complete((job,))
-
 
 class FlowCmdOperation(BaseFlowOperation):
     """An operation that executes a shell command.
 
-    When an operation has the ``@cmd`` directive specified, it is instantiated
-    as a FlowCmdOperation. The operation should be a function of
-    :class:`~signac.contrib.job.Job`. The command (cmd) may
-    either be a unary callable that expects an instance of
-    :class:`~signac.contrib.job.Job` as its only positional argument and returns
-    a string containing valid shell commands, or the string of commands itself.
-    In either case, the resulting string may contain any attributes of the job placed
-    in curly braces, which will then be substituted by Python string formatting.
+    When an operation has the ``@cmd`` directive specified, it is
+    instantiated as a :class:`~.FlowCmdOperation`. The operation should be a
+    function of one or more positional arguments that are instances of
+    :class:`~signac.contrib.job.Job`. The command (cmd) may either be a
+    callable that expects one or more instances of
+    :class:`~signac.contrib.job.Job` as positional arguments and returns a
+    string containing valid shell commands, or the string of commands itself.
+    In either case, the resulting string may contain any attributes of the
+    job (or jobs) placed in curly braces, which will then be substituted by
+    Python string formatting.
 
     .. note::
         This class should not be instantiated directly.
@@ -663,9 +586,12 @@ class FlowCmdOperation(BaseFlowOperation):
     Parameters
     ----------
     cmd : str or callable
-        The command to execute the operation. Callable values should be a
-        function of ``job``. String values will be formatted with
-        ``cmd.format(job=job)``.
+        The command to execute the operation. Callable values will be
+        provided one or more positional arguments (``*jobs``) that are
+        instances of :class:`~signac.contrib.job.Job`. String values will be
+        formatted with ``cmd.format(jobs=jobs)`` where ``jobs`` is a tuple of
+        :class:`~signac.contrib.job.Job`, or ``cmd.format(jobs=jobs,
+        job=job)`` if only one job is provided.
     pre : sequence of callables
         List of preconditions.
     post : sequence of callables
@@ -680,24 +606,13 @@ class FlowCmdOperation(BaseFlowOperation):
     def __str__(self):
         return f"{type(self).__name__}(cmd='{self._cmd}')"
 
-    def __call__(self, *jobs, **kwargs):
+    def __call__(self, *jobs):
         """Return the command formatted with the supplied job(s)."""
-        job = kwargs.pop("job", None)
-        if kwargs:
-            raise ValueError(f"Invalid keyword arguments: {', '.join(kwargs)}")
-
-        if job is not None:
-            warnings.warn(
-                "The job keyword argument is deprecated as of 0.11 and will be removed "
-                "in 0.13",
-                DeprecationWarning,
-            )
-        else:
-            job = jobs[0] if len(jobs) == 1 else None
-
-        if callable(self._cmd):
-            return self._cmd(job).format(job=job)
-        return self._cmd.format(job=job)
+        cmd = self._cmd(*jobs) if callable(self._cmd) else self._cmd
+        format_arguments = {"jobs": jobs}
+        if len(jobs) == 1:
+            format_arguments["job"] = jobs[0]
+        return cmd.format(**format_arguments)
 
 
 class FlowOperation(BaseFlowOperation):
@@ -1015,48 +930,6 @@ class FlowGroup:
 
         """
         return all(op._complete(jobs) for op in self)
-
-    @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
-    def eligible(self, job, ignore_conditions=IgnoreConditions.NONE):
-        """Determine if at least one operation is eligible.
-
-        A :class:`~.FlowGroup` is eligible for execution if at least one of
-        its associated operations is eligible.
-
-        Parameters
-        ----------
-        job : :class:`~signac.contrib.job.Job`
-            A :class:`~signac.contrib.job.Job` from the signac workspace.
-        ignore_conditions : :class:`~.IgnoreConditions`
-            Specify if preconditions and/or postconditions are to be ignored
-            while checking eligibility.  The default is
-            :class:`IgnoreConditions.NONE`.
-
-        Returns
-        -------
-        bool
-            Whether the group is eligible.
-
-        """
-        return self._eligible((job,), ignore_conditions)
-
-    @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
-    def complete(self, job):
-        """Check if all :class:`~.BaseFlowOperation` postconditions are met.
-
-        Parameters
-        ----------
-        job : :class:`~signac.contrib.job.Job`
-            A :class:`~signac.contrib.job.Job` from the signac workspace.
-
-        Returns
-        -------
-        bool
-            Whether the group is complete (all contained operations are
-            complete).
-
-        """
-        return self._complete((job,))
 
     def add_operation(self, name, operation, directives=None):
         """Add an operation to the :class:`~.FlowGroup`.
@@ -2981,33 +2854,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         f"error: {error}."
                     )
 
-    @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
-    def run_operations(
-        self, operations=None, pretend=False, np=None, timeout=None, progress=False
-    ):
-        """Execute the next operations as specified by the project's workflow.
-
-        See also: :meth:`~.run`
-
-        Parameters
-        ----------
-        operations : Sequence of instances of :class:`~.JobOperation`
-            The operations to execute (optional). (Default value = None)
-        pretend : bool
-            Do not actually execute the operations, but show the commands that
-            would have been executed. (Default value = False)
-        np : int
-            The number of processors to use for each operation. (Default value = None)
-        timeout : int
-            An optional timeout for each operation in seconds after which
-            execution will be cancelled. Use -1 to indicate no timeout (the
-            default).
-        progress : bool
-            Show a progress bar during execution. (Default value = False)
-
-        """
-        return self._run_operations(operations, pretend, np, timeout, progress)
-
     class _PickleError(Exception):
         """Indicates a pickling error while trying to parallelize the execution of operations."""
 
@@ -3517,13 +3363,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     @contextlib.contextmanager
     def _buffered(self):
         """Enable the use of buffered mode for certain functions."""
-        if not self.config["flow"].as_bool("use_buffered_mode"):
-            warnings.warn(
-                "The use_buffered_mode config option is deprecated as of 0.12 "
-                "and will be removed in 0.13. Buffered mode is always enabled "
-                "in 0.12 and newer.",
-                DeprecationWarning,
-            )
         logger.debug("Entering buffered mode.")
         with signac.buffered():
             yield
@@ -3562,31 +3401,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if show_template_help:
             self._show_template_help_and_exit(template_environment, context)
         return template.render(**context)
-
-    @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
-    def script(
-        self, operations, parallel=False, template="script.sh", show_template_help=False
-    ):
-        """Generate a run script to execute given operations.
-
-        Parameters
-        ----------
-        operations : Sequence of instances of :class:`~.JobOperation`
-            The operations to execute.
-        parallel : bool
-            Execute all operations in parallel (default is False).
-        template : str
-            The name of the template to use to generate the script. (Default value = "script.sh")
-        show_template_help : bool
-            Show help related to the templating system and then exit. (Default value = False)
-
-        Returns
-        -------
-        str
-            Rendered template of run script.
-
-        """
-        return self._script(operations, parallel, template, show_template_help)
 
     def _generate_submit_script(
         self, _id, operations, template, show_template_help, **kwargs
@@ -3714,63 +3528,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 return self._environment.submit(
                     _id=_id, script=script, flags=flags, **kwargs
                 )
-
-    @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
-    def submit_operations(
-        self,
-        operations,
-        _id=None,
-        parallel=False,
-        flags=None,
-        force=False,
-        template="script.sh",
-        pretend=False,
-        show_template_help=False,
-        **kwargs,
-    ):
-        r"""Submit a sequence of operations to the scheduler.
-
-        Parameters
-        ----------
-        operations : A sequence of instances of :class:`~.JobOperation`
-            The operations to submit.
-        _id : str
-            The _id to be used for this submission. (Default value = None)
-        parallel : bool
-            Execute all bundled operations in parallel. (Default value = False)
-        flags : list
-            Additional options to be forwarded to the scheduler. (Default value = None)
-        force : bool
-            Ignore all warnings or checks during submission, just submit. (Default value = False)
-        template : str
-            The name of the template file to be used to generate the submission
-            script. (Default value = "script.sh")
-        pretend : bool
-            Do not actually submit, but only print the submission script to screen. Useful
-            for testing the submission workflow. (Default value = False)
-        show_template_help : bool
-            Show information about available template variables and filters and
-            exit. (Default value = False)
-        \*\*kwargs
-            Additional keyword arguments forwarded to :meth:`~.ComputeEnvironment.submit`.
-
-        Returns
-        -------
-        :class:`~.JobStatus` or None
-            Returns the submission status after successful submission or None.
-
-        """
-        return self._submit_operations(
-            operations,
-            _id,
-            parallel,
-            flags,
-            force,
-            template,
-            pretend,
-            show_template_help,
-            **kwargs,
-        )
 
     def submit(
         self,
@@ -4311,54 +4068,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 ignore_conditions=ignore_conditions,
             )
 
-    @deprecated(deprecated_in="0.11", removed_in="0.13", current_version=__version__)
-    def next_operations(self, *jobs, ignore_conditions=IgnoreConditions.NONE):
-        r"""Determine the next eligible operations for provided job(s).
-
-        Parameters
-        ----------
-        \*jobs : One or more instances of :class:`.Job`.
-            Jobs.
-        ignore_conditions : :class:`~.IgnoreConditions`
-            Specify if preconditions and/or postconditions are to be ignored
-            while checking eligibility. The default is
-            :class:`IgnoreConditions.NONE`.
-
-        Yields
-        ------
-        :class:`~.JobOperation`
-            Eligible job operation.
-
-        """
-        for name in self.operations:
-            group = self._groups[name]
-            aggregate_store = self._group_to_aggregate_store[group]
-
-            # Only yield JobOperation instances from the default aggregates
-            if not isinstance(aggregate_store, _DefaultAggregateStore):
-                continue
-
-            for aggregate in aggregate_store.values():
-                # JobOperation handles a single job and not an aggregate of
-                # jobs. Hence the single job in that aggregate should be
-                # present in the jobs passed by a user.
-                if aggregate[0] not in jobs:
-                    continue
-
-                for operation in group._create_run_job_operations(
-                    entrypoint=self._entrypoint,
-                    jobs=aggregate,
-                    default_directives={},
-                    ignore_conditions=ignore_conditions,
-                ):
-                    yield JobOperation(
-                        operation.id,
-                        operation.name,
-                        operation._jobs[0],
-                        operation._cmd,
-                        operation.directives,
-                    )
-
     @classmethod
     def operation(cls, func, name=None):
         """Add an operation function to the class workflow definition.
@@ -4475,7 +4184,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         r"""Make a :class:`~.FlowGroup` named ``name`` and return a decorator to make groups.
 
         A :class:`~.FlowGroup` is used to group operations together for
-        running and submitting :class:`~.JobOperation`\ s.
+        running and submitting :class:`~._JobOperation`\ s.
 
         Examples
         --------

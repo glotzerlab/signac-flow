@@ -4,7 +4,7 @@
 #BSUB -J {{ id }}
 {% set memory_passed = operations | check_memory(memory) %}
 {% if memory_passed %}
-#BSUB -M {{ operations | calc_memory(memory) }}G
+#BSUB -M {{ operations | calc_memory(memory) }}GB
 {% endif %}
 {% if partition %}
 #BSUB -q {{ partition }}

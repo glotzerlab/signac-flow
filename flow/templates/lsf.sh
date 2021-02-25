@@ -2,7 +2,7 @@
 {% block header %}
 #!/bin/bash
 #BSUB -J {{ id }}
-#BSUB -M {{ operations | _calc_memory(memory) }}G
+#BSUB -M {{ operations | calc_memory(memory) }}G
 {% if partition %}
 #BSUB -q {{ partition }}
 {% endif %}

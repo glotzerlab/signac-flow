@@ -144,7 +144,7 @@ def _parse_memory_flag(memory):
         raise
 
 
-def _calc_memory(operations, memory=None):
+def calc_memory(operations, memory=None):
     """Calculate the maximum memory to reserve for submission of operations.
 
     Parameters

@@ -129,9 +129,9 @@ def _parse_memory_flag(memory):
     try:
         size_type = memory[-1]
         if size_type.lower() == "m":
-            return float(memory[0:-1]) / 1024
+            return float(memory[:-1]) / 1024
         elif size_type.lower() == "g":
-            return float(memory[0:-1])
+            return float(memory[:-1])
         else:
             return float(memory)
     except ValueError:

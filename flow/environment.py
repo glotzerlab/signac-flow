@@ -471,7 +471,8 @@ class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
             "--memory",
             help=(
                 'Specify how much memory to reserve per node, e.g. "4g" for 4 gigabytes '
-                'or "512m" for 512 megabytes. Only relevant for shared queue jobs.'
+                'or "512m" for 512 megabytes. Numeric values will be interpreted as memory '
+                "requested in gigabytes. Only relevant for shared queue jobs."
             ),
         )
         parser.add_argument(

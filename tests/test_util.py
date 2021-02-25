@@ -70,15 +70,20 @@ class TestTemplateFilters:
 
     def test_calc_memory(self):
         class MockOp:
-            def __init__(self, memory=4):
+            def __init__(self, memory=None):
                 self.directives = {"memory": memory}
 
         op1 = MockOp(1)
         op2 = MockOp(8)
         op3 = MockOp()
-        assert calc_memory([], "10g") == 10
-        assert calc_memory([op3], "10g") == 10
-        assert calc_memory([op1, op2, op3], None) == 8
+        # Test when operations run in serial
+        assert calc_memory([], False, "10g") == 10
+        assert calc_memory([op3], False, "10g") == 10
+        assert calc_memory([op1, op2, op3], False, None) == 8
+        # Test when operations run in parallel
+        assert calc_memory([op1, op2], True, "10g") == 20
+        assert calc_memory([op3], True, None) == 0
+        assert calc_memory([op1, op2, op3], True, None) == 9
 
     def test_check_memory(self):
         class MockOp:

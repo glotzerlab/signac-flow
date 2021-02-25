@@ -165,13 +165,17 @@ def check_memory(operations, memory=None):
     )
 
 
-def calc_memory(operations, memory=None):
+def calc_memory(operations, parallel=False, memory=None):
     """Calculate the maximum memory to reserve for submission of operations.
 
     Parameters
     ----------
     operations : list
         The operations of :class:`~._JobOperation` used to calculate the maximum memory required.
+    parallel : bool
+        If True, operations are assumed to be executed in parallel, which means
+        that the total memory requested will be the sum of all memories requested instead of the
+        maximum memory requested. (Default value = False)
     memory : str
         Memory to reserve per node for all the operations. A valid memory flag passed to
         `FlowProject.submit` should have a suffix of either "g" for gigabytes, or "m" for megabytes.
@@ -182,14 +186,17 @@ def calc_memory(operations, memory=None):
         The reserved memory (numeric value) per node in gigabytes.
     """
     if not memory:
-        return max(
-            [
-                operation.directives["memory"] if operation.directives["memory"] else 4
-                for operation in operations
-            ]
-        )
+        list_of_memories = [
+            operation.directives["memory"] if operation.directives["memory"] else 0
+            for operation in operations
+        ]
+        if parallel:
+            return sum(list_of_memories)
+        else:
+            return max(list_of_memories)
     else:
-        return _parse_memory_flag(memory)
+        parsed_memory = _parse_memory_flag(memory)
+        return parsed_memory if not parallel else parsed_memory * len(operations)
 
 
 def check_utilization(nn, np, ppn, threshold=0.9, name=None):

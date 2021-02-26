@@ -28,6 +28,8 @@ pip-log.txt
 .mypy_cache
 nosetests.xml
 .pytest_cache
+benchmarks/*.prof
+benchmarks/*.txt
 
 # Translations
 *.mo

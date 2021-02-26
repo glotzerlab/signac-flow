@@ -62,6 +62,7 @@ Changed
 - Python 3.6 is only tested with oldest dependencies (#436).
 - Drop support for `tqdm <https://github.com/tqdm/tqdm>`__ versions older than `4.48.1` (#436, #440).
 - Drop support for `Jinja2 <https://palletsprojects.com/p/jinja/>`__ versions older than `2.10.0` (#436).
+- Deprecated ``operations.py`` method ``flow.run`` (#221, #463, #467).
 
 Fixed
 +++++
@@ -69,6 +70,7 @@ Fixed
 - Ensure that directives are always evaluated before running or submitting (#408, #409).
 - Cache the fully qualified domain name during environment detection to fix a performance issue on macOS (#339, #394).
 - Ensure that ``next`` CLI command displays eligible jobs for the exact operation name provided (#443).
+- Display warning when a non-existing operation/group is passed to ``run``, ``submit``, or ``next`` commands (#291, #442).
 
 Removed
 +++++++

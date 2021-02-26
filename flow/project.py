@@ -35,7 +35,6 @@ import signac
 from deprecation import deprecated
 from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
 from signac.contrib.filterparse import parse_filter_arg
-from signac.contrib.project import JobsCursor
 from tqdm.auto import tqdm
 
 from .aggregates import _aggregator, _get_aggregate_id
@@ -283,7 +282,7 @@ class _AggregatesCursor:
         self._project = project
         self._filter = filter
         self._doc_filter = doc_filter
-        self._jobs_cursor = JobsCursor(project, filter, doc_filter)
+        self._jobs_cursor = project.find_jobs(filter, doc_filter)
 
     def __eq__(self, other):
         return self._jobs_cursor == other._jobs_cursor
@@ -3055,6 +3054,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             )
         if names is None:
             names = list(self.operations)
+        else:
+            absent_ops = (set(self._groups.keys()) ^ set(names)) & set(names)
+            if absent_ops:
+                print(
+                    f"Unrecognized flow operation(s): {', '.join(absent_ops)}",
+                    file=sys.stderr,
+                )
 
         # Get default directives
         default_directives = self._get_default_directives()
@@ -3586,6 +3592,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Additional keyword arguments forwarded to :meth:`~.ComputeEnvironment.submit`.
 
         """
+        if names is not None:
+            absent_ops = (set(self._groups.keys()) ^ set(names)) & set(names)
+            if absent_ops:
+                print(
+                    f"Unrecognized flow operation(s): {', '.join(absent_ops)}",
+                    file=sys.stderr,
+                )
+
         # TODO: Document aggregates.
         # jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
         #     Only submit operations for the given jobs or aggregates of jobs,
@@ -4410,9 +4424,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _main_next(self, args):
         """Determine the jobs that are eligible for a specific operation."""
-        for operation in self._next_operations():
-            if args.name == operation.name:
-                print(_get_aggregate_id(operation._jobs))
+        if args.name not in self.operations:
+            print(
+                f"The requested flow operation '{args.name}' does not exist.",
+                file=sys.stderr,
+            )
+        else:
+            for operation in self._next_operations():
+                if args.name == operation.name:
+                    print(_get_aggregate_id(operation._jobs))
 
     def _main_run(self, args):
         """Run all (or select) job operations."""

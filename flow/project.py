@@ -2795,14 +2795,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             else template_environment
         )
         render_output = _render_status(
-            template,
-            template_environment_copy,
-            context,
-            detailed,
-            expand,
-            unroll,
-            compact,
-            output_format,
+            template=template,
+            template_environment=template_environment_copy,
+            context=context,
+            detailed=detailed,
+            expand=expand,
+            unroll=unroll,
+            compact=compact,
+            output_format=output_format,
         )
 
         print(render_output, file=file)

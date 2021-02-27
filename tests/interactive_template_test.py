@@ -66,7 +66,7 @@ def cli(num_jobs, bundle, parallel, entrypoint):
     the environment to test, e.g.:
 
         \b
-        $ SIGNAC_FLOW_ENVIRONMENT=BridgesEnvironment ./interactive_template_test.py
+        $ SIGNAC_FLOW_ENVIRONMENT=Bridges2Environment ./interactive_template_test.py
 
     See `./interactive_template_test.py --help` for more information.
     """

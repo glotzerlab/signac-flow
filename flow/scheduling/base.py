@@ -159,7 +159,9 @@ def _call_submit(submit_cmd, script, pretend):
             tmp_submit_script.flush()
             submit_cmd.append(tmp_submit_script.name)
             try:
-                subprocess.check_output(submit_cmd, stderr=subprocess.STDOUT, universal_newlines=True)
+                subprocess.check_output(
+                    submit_cmd, stderr=subprocess.STDOUT, universal_newlines=True
+                )
             except subprocess.CalledProcessError as error:
                 raise SubmitError(
                     f"Error when calling submission command {submit_cmd_string}:\n{error.output}"

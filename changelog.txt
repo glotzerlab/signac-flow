@@ -11,6 +11,11 @@ Version 0.13
 [0.13.0] -- 2021-xx-xx
 ----------------------
 
+Added
++++++
+
+- Add official support for Bridges-2 cluster (#441).
+
 Fixed
 +++++
 

@@ -29,6 +29,7 @@ Removed
 - Removed public API of deprecated methods ``eligible`` and ``complete`` of ``BaseFlowOperation`` and ``FlowGroup`` (#445).
 - Removed configuration option ``use_buffered_mode`` (#445).
 - Removed public API of ``script``, ``next_operations`` and ``submit_operations`` of ``FlowProject`` (#445).
+- Removed support for decommissioned Bridges cluster (#441).
 
 
 Version 0.12

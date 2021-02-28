@@ -178,45 +178,6 @@ class Stampede2Environment(DefaultSlurmEnvironment):
         return prefix
 
 
-class BridgesEnvironment(DefaultSlurmEnvironment):
-    """Environment profile for the Bridges super computer.
-
-    https://portal.xsede.org/psc-bridges
-    """
-
-    hostname_pattern = r".*\.bridges\.psc\.edu$"
-    template = "bridges.sh"
-    cores_per_node = 28
-    mpi_cmd = "mpirun"
-
-    @classmethod
-    def add_args(cls, parser):
-        """Add arguments to parser.
-
-        Parameters
-        ----------
-        parser : :class:`argparse.ArgumentParser`
-            The argument parser where arguments will be added.
-
-        """
-        super().add_args(parser)
-        parser.add_argument(
-            "--partition",
-            choices=[
-                "RM",
-                "RM-shared",
-                "RM-small",
-                "LM",
-                "GPU",
-                "GPU-shared",
-                "GPU-small",
-                "GPU-AI",
-            ],
-            default="RM-shared",
-            help="Specify the partition to submit to.",
-        )
-
-
 class Bridges2Environment(DefaultSlurmEnvironment):
     """Environment profile for the Bridges-2 supercomputer.
 
@@ -257,6 +218,5 @@ class Bridges2Environment(DefaultSlurmEnvironment):
 __all__ = [
     "CometEnvironment",
     "Stampede2Environment",
-    "BridgesEnvironment",
     "Bridges2Environment",
 ]

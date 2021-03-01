@@ -36,6 +36,9 @@
 #SBATCH -N {{ nn|check_utilization(cpu_tasks, 96, threshold, 'CPU') }}
 #SBATCH --ntasks-per-node={{ (96, cpu_tasks)|min }}
 {% elif partition == 'RM-shared' %}
+{% if nn|default(1, true) > 1 or cpu_tasks > 64 %}
+{% raise "Cannot request RM-shared with more than 64 tasks or multiple nodes." %}
+{% endif %}
 #SBATCH -N {{ nn|default(1, true) }}
 #SBATCH --ntasks={{ cpu_tasks }}
 {% else %}

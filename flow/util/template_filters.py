@@ -253,20 +253,26 @@ def get_account_name(environment, required=False):
     try:
         return require_config_value("account", ns=env_name)
     except ConfigKeyError as error:
+        ACCOUNT_MESSAGE = (
+            "Environment '{env}' {requires_or_allows} the specification of an "
+            "account name that will be charged for jobs' compute time.\n"
+            "Set the account name with the command:\n\n"
+            "  $ signac config --global set {key} ACCOUNT_NAME\n"
+        )
         if required:
             raise SubmitError(
-                "Environment '{env}' requires the specification of an account name.\n"
-                "Set the account name for example with:\n\n"
-                "  $ signac config --global set {key} ACCOUNT_NAME\n".format(
-                    env=env_name, key=str(error)
+                ACCOUNT_MESSAGE.format(
+                    requires_or_allows="requires",
+                    env=env_name,
+                    key=str(error),
                 )
             )
         elif env_name not in _GET_ACCOUNT_NAME_MESSAGES_SHOWN:
             print(
-                "Environment '{env}' allows the specification of an account name.\n"
-                "Set the account name for example with:\n\n"
-                "  $ signac config --global set {key} ACCOUNT_NAME\n".format(
-                    env=env_name, key=str(error)
+                ACCOUNT_MESSAGE.format(
+                    requires_or_allows="allows",
+                    env=env_name,
+                    key=str(error),
                 ),
                 file=sys.stderr,
             )

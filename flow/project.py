@@ -3017,7 +3017,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 operation,
                 operation.cmd,
             )
-            subprocess.run(operation.cmd, shell=True, timeout=timeout, check=True)
+            with self._run_with_hooks(operation):
+                subprocess.run(operation.cmd, shell=True, timeout=timeout, check=True)
         else:
             # ... executing operation in interpreter process as function:
             logger.debug(
@@ -3026,7 +3027,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 os.getpid(),
             )
             try:
-                self._operations[operation.name](*operation._jobs)
+                with self._run_with_hooks(operation):
+                    self._operations[operation.name](*operation._jobs)
             except Exception as error:
                 assert len(operation._jobs) == 1
                 raise UserOperationError(
@@ -4286,9 +4288,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 self._operations[name] = FlowCmdOperation(cmd=func, **params)
             else:
                 self._operations[name] = FlowOperation(op_func=func, **params)
-
-            # Update operation hooks
-            self._operation_hooks[name].update(Hooks.from_dict(self.hook[func]))
 
     @classmethod
     def make_group(cls, name, options=""):

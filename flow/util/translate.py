@@ -1,7 +1,7 @@
 # Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-"Helper functions to keep track of abbreviations meant for output on screen."
+"""Helper functions to keep track of abbreviations meant for output on screen."""
 
 
 def abbreviate(x, a):
@@ -12,7 +12,8 @@ def abbreviate(x, a):
         abbreviate.table[a] = x
         return a
 
-abbreviate.table = dict()  # noqa
+
+abbreviate.table = {}  # noqa
 
 
 def shorten(x, max_length=None):

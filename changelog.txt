@@ -1,40 +1,176 @@
-=======
-Changes
-=======
+=========
+Changelog
+=========
 
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 The numbers in brackets denote the related GitHub issue and/or pull request.
 
-next
-====
+Version 0.13
+============
 
-next
-----
+[0.13.0] -- 2021-xx-xx
+----------------------
 
 Added
 +++++
 
-- Add ``FlowGroup``s (one or more operation grouping within an execution environment)(#114)
-- Add official support for University of Michigan Great Lakes cluster (#185).
-- Add official support for Bridges AI cluster (#222).
-- Add IgnoreConditions option for submit(), run() and script() (#38).
-- Add pytest support for Testing Framework (#227, #232).
-- Add markdown and html format support for print_status() (#113, #163).
+- Add official support for Bridges-2 cluster (#441).
 
-Changed
-+++++++
+Fixed
++++++
 
-- The option to provide the env argument to submit and submit_operations has been deprecated (#245).
-- The command line option ``--cmd`` for ``script`` has been deprecated and will trigger a ``DeprecationWarning`` upon use until removed (#243, #218).
+- Support for multi-line ``@flow.cmd`` operations (#451, #453).
+- FlowProject status shows labels and correct number of jobs for projects with zero operations (#454, #460).
 
 Removed
 +++++++
-- Removed ENVIRONMENT global variable in the flow.environment module (#245).
-- Removed vendored ``tqdm`` module and replaced it with a requirement (#247).
+
+- Removed public API of deprecated class JobOperation (#445).
+- Removed public API of deprecated methods ``eligible`` and ``complete`` of ``BaseFlowOperation`` and ``FlowGroup`` (#445).
+- Removed configuration option ``use_buffered_mode`` (#445).
+- Removed public API of ``script``, ``next_operations`` and ``submit_operations`` of ``FlowProject`` (#445).
+- Removed support for decommissioned Bridges cluster (#441).
+
+
+Version 0.12
+============
+
+[0.12.0] -- 2021-01-30
+----------------------
+
+Added
++++++
+
+- Code is formatted with ``black`` and ``isort`` pre-commit hooks (#365).
+- Add official support for Python version 3.9 (#365).
+- Documentation has been added for all public classes and methods (#387, #389).
+- Added internal support for aggregates of jobs (#334, #348, #351, #364, #383, #390, #415, #422, #430).
+- Added code coverage to continuous integration (#405).
 
 Changed
 +++++++
-- Raises ValueError when --job-name passed by the user because that interferes with status checking (#164, #241).
+
+- Command line interface always uses ``--job-id`` instead of ``--jobid`` (#363, #386).
+- ``CPUEnvironment`` and ``GPUEnvironment`` classes are deprecated (#381).
+- Docstrings are now written in `numpydoc style <https://numpydoc.readthedocs.io/en/latest/format.html>`__ (#392).
+- Default environment for the University of Minnesota Mangi cluster changed from SLURM to Torque (#393).
+- Run commands are evaluted lazily (#70, #396).
+- Deprecated method ``export_job_statuses`` (#402).
+- Improved internal caching of scheduler status (#410).
+- Refactored status fetching code (#368, #417).
+- Optimization: Directives are no longer deep-copied (#420, #421).
+- The ``use_buffered_mode`` config option is deprecated. Buffering is always internally enabled (#425).
+- Evaluate directives when called instead of when defined (#398, #402).
+- Various internal refactorings and optimizations (#371, #373, #374, #375, #376, #377, #378, #379, #380, #400, #410, #416, #423, #426).
+- ``Scheduler`` is now an abstract base class (#426).
+- ``flow.scheduling.fakescheduler`` has been renamed to ``flow.scheduling.fake_scheduler`` (#426).
+- Arguments to ``submit`` have been changed for all scheduler classes (#426).
+- Python 3.6 is only tested with oldest dependencies (#436).
+- Drop support for `tqdm <https://github.com/tqdm/tqdm>`__ versions older than `4.48.1` (#436, #440).
+- Drop support for `Jinja2 <https://palletsprojects.com/p/jinja/>`__ versions older than `2.10.0` (#436).
+- Deprecated ``operations.py`` method ``flow.run`` (#221, #463, #467).
+
+Fixed
++++++
+
+- Ensure that directives are always evaluated before running or submitting (#408, #409).
+- Cache the fully qualified domain name during environment detection to fix a performance issue on macOS (#339, #394).
+- Ensure that ``next`` CLI command displays eligible jobs for the exact operation name provided (#443).
+- Display warning when a non-existing operation/group is passed to ``run``, ``submit``, or ``next`` commands (#291, #442).
+
+Removed
++++++++
+
+- Removed the deprecated method ``flow.util.misc.write_human_readable_statepoints`` (#397).
+- Removed the deprecated argument ``--no-parallelize`` (#424).
+- Removed the deprecated ``env`` argument from submission methods (#424).
+- ``flow.render_status.Renderer`` class has been removed. ``FlowProject.print_status`` no longer returns the renderer (#426).
+- Removed deprecated ``status.py`` module (#426).
+- Removed the ``--test`` argument from ``FlowProject.submit`` (#439).
+
+Version 0.11
+============
+
+[0.11.0] -- 2020-10-09
+----------------------
+
+Added
++++++
+
+- Added classes ``_Directives`` and ``_Directive`` that serve as a smart mapping for directives specified by the environment or user (#265, #283).
+- Added support for `pre-commit hooks <https://pre-commit.com/>`__ (#333).
+- Add environment profile for University of Minnesota, Minnesota Supercomputing Institute, Mangi supercomputer (#353).
+
+Changed
++++++++
+
+- Make ``FlowCondition`` class private (#307, #315).
+- Deprecate ``JobOperation`` class, make ``SubmissionJobOperation`` a private class and deprecate the following methods of ``FlowProject``: ``script``, ``run_operations``, ``submit_operations``, ``next_operations``. (#313)
+- Deprecate the following methods: ``FlowGroup.eligible``, ``FlowGroup.complete``, ``BaseFlowOperation.eligible``, ``BaseFlowOperation.complete`` (#337).
+
+Fixed
++++++
+
+- Serial execution on Summit correctly counts total node requirements (#342).
+- Fixed performance regression in job submission in large workspaces (#354).
+
+Removed
++++++++
+
+- Drop support for Python 3.5 (#305). The signac project will follow the `NEP 29 deprecation policy <https://numpy.org/neps/nep-0029-deprecation_policy.html>`_ going forward.
+- Remove the deprecated methods ``always``, ``make_bundles``, and ``JobOperation.get_id`` (#312).
+
+Version 0.10
+============
+
+[0.10.1] -- 2020-08-20
+----------------------
+
+Fixed
++++++
+
+- Fix issue with the submission of bundled operations on cluster environments that do not allow slashes ('/') in cluster scheduler job names (#343).
+
+[0.10.0] -- 2020-06-27
+----------------------
+
+Added
++++++
+
+- Add ``FlowGroup`` (one or more operations can be grouped within an execution environment) (#114).
+- Add official support for University of Michigan Great Lakes cluster (#185).
+- Add official support for Bridges AI cluster (#222).
+- Add ``IgnoreConditions`` option for ``submit()``, ``run()`` and ``script()`` (#38, #209).
+- Add pytest support for testing framework (#227, #232).
+- Add markdown and html format support for ``print_status()`` (#113, #163).
+- Add memory flag option for default Slurm scheduler (#256).
+- Add optional environment variable to specify submission script separator (#262).
+- Add ``status_parallelization`` configuration to specify the parallelization used for fetching status (#264, #271).
+
+Changed
++++++++
+
+- Raises ``ValueError`` when an operation function is passed to ``FlowProject.pre()`` and ``FlowProject.post()``, or a non-operation function passed to ``FlowProject.pre.after()`` (#248, #249).
+- The option to provide the ``env`` argument to ``submit`` and ``submit_operations`` has been deprecated (#245).
+- The command line option ``--cmd`` for ``script`` has been deprecated and will trigger a ``DeprecationWarning`` upon use until removed (#243, #218).
+- Raises ``ValueError`` when ``--job-name`` is passed by the user because that interferes with status checking (#164, #241).
+- Submitting with ``--memory`` no longer assumes a unit of gigabytes on Bridges and Comet clusters (#257).
+- Buffering is enabled by default, improving the performance of status checks (#273).
+- Deprecate the use of ``no_parallelize`` argument while printing status (#264, #271).
+- Submission via the command-line interface now calls the ``FlowProject.submit`` function instead of bypassing it for ``FlowProject.submit_operations`` (#238, #286).
+- Updated Great Lakes GPU request syntax (#299).
+
+Fixed
++++++
+
+- Ensure that label names are used when displaying status (#263).
+- Fix node counting for large resource sets on Summit (#294).
+
+Removed
++++++++
+
+- Removed ``ENVIRONMENT`` global variable in the ``flow.environment`` module (#245).
+- Removed vendored ``tqdm`` module and replaced it with a requirement (#247).
 
 Version 0.9
 ===========
@@ -87,7 +223,7 @@ Added
 - Enable option to always show the full traceback with ``show_traceback = on`` within the ``[flow]`` section of the signac configuration (#61, #144).
 - Add full launcher support for job submission on XSEDE Stampede2 for large parallel single processor jobs (#85, #91).
 
-Fixes
+Fixed
 +++++
 
 - Both the ``nranks`` and ``omp_num_threads`` directives properly support callables (#118).
@@ -129,12 +265,12 @@ Added
 - Add function to automatically print all varying state point parameters in the detailed status view triggered by providing option `-p/--parameters` without arguments (#19, #87).
 - Add clear environment notification when submitting job scripts (#43, #88).
 
-Fixes
+Fixed
 +++++
 
 - Fix issue where the scheduler status of job-operations would not be properly updated for *ineligible* operations (#96).
 
-Fixes (compute environments)
+Fixed (compute environments)
 ++++++++++++++++++++++++++++
 
 - Fix issue with the TORQUE scheduler that occured when there was no job scheduled at all on the system (for any user) (#92, #93).
@@ -154,7 +290,7 @@ Added
 - Add legend explaining the scheduler-related symbols to the detailed status view (#68).
 - Allow the specification of the number of tasks per resource set and additional jsrun arguments for Summit scripts.
 
-Fixes (general)
+Fixed (general)
 +++++++++++++++
 
 - Fixes issue where callable cmd-directives were not evaluated (#47).
@@ -164,7 +300,7 @@ Fixes (general)
 - Fixes issue where using the buffered mode would lead to confusing error messages when condition-functions would raise an AttributeError exception.
 - Fixes issue with erroneous unused-directive-keys-warning.
 
-Fixes (compute environments)
+Fixed (compute environments)
 ++++++++++++++++++++++++++++
 
 - Fixes issues with the Summit environment resource set calculation for parallel operations under specific conditions (#63).
@@ -228,7 +364,7 @@ We recommend to go through the tutorial on signac-docs_ to learn how to best tak
 - Better specification of (optional) dependencies in setup.py and requirements.txt.
 - Overall revision of all cluster submission templates; improved structure and abstraction of logic.
 - The serialization of operations was improved to optimize execution speed for local runs.
-- The evaluation of pre- and post-conditions was optimized for optimally lazy evaluation: cheaper conditions should be placed above more expensive conditions for maximal performance.
+- The evaluation of preconditions and postconditions was optimized for optimally lazy evaluation: cheaper conditions should be placed above more expensive conditions for maximal performance.
 - When gathering operations, signac will automatically use the buffered mode when config value 'flow.use_buffered_mode' is set to True (requires signac >= 0.9.3).
 - Improved documentation for developers and contributors.
 

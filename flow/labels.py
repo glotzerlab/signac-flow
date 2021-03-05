@@ -9,7 +9,7 @@ of a FlowProject class definition.
 """
 
 
-class label(object):
+class label:
     """Decorate a :class:`~.FlowProject` class function as a label function.
 
     For example:
@@ -27,6 +27,21 @@ class label(object):
         self.name = name
 
     def __call__(self, func):
+        """Add the function as a label.
+
+        This call operator allows the class to be used as a decorator.
+
+        Parameters
+        ----------
+        func : callable
+            The function to decorate.
+
+        Returns
+        -------
+        callable
+            The decorated function.
+
+        """
         func._label = True
         if self.name is not None:
             func._label_name = self.name
@@ -40,7 +55,22 @@ class staticlabel(label):
     """
 
     def __call__(self, func):
-        return staticmethod(super(staticlabel, self).__call__(func))
+        """Add the function as a label.
+
+        This call operator allows the class to be used as a decorator.
+
+        Parameters
+        ----------
+        func : callable
+            The function to decorate.
+
+        Returns
+        -------
+        callable
+            The decorated function.
+
+        """
+        return staticmethod(super().__call__(func))
 
 
 class classlabel(label):
@@ -50,8 +80,23 @@ class classlabel(label):
     """
 
     def __call__(self, func):
-        return classmethod(super(classlabel, self).__call__(func))
+        """Add the function as a label.
+
+        This call operator allows the class to be used as a decorator.
+
+        Parameters
+        ----------
+        func : callable
+            The function to decorate.
+
+        Returns
+        -------
+        callable
+            The decorated function.
+
+        """
+        return classmethod(super().__call__(func))
 
 
 def _is_label_func(func):
-    return getattr(getattr(func, '__func__', func), '_label', False)
+    return getattr(getattr(func, "__func__", func), "_label", False)

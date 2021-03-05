@@ -13,7 +13,7 @@
 {% if partition == 'gpu' %}
 #SBATCH --nodes={{ nn|default(1, true) }}
 #SBATCH --ntasks-per-node={{ (gpu_tasks, cpu_tasks)|max }}
-#SBATCH --gres=gpu:{{ gpu_tasks }}
+#SBATCH --gpus={{ gpu_tasks }}
 {% else %}{# standard compute partition #}
 #SBATCH --nodes={{ nn }}
 #SBATCH --ntasks-per-node={{ (36, cpu_tasks)|min }}
@@ -24,8 +24,5 @@
 {% set account = account|default(environment|get_account_name, true) %}
 {% if account %}
 #SBATCH --account={{ account }}
-{% endif %}
-{% if memory %}
-#SBATCH --mem={{ memory }}
 {% endif %}
 {% endblock %}

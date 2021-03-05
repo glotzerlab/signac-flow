@@ -1,105 +1,139 @@
-# Python CircleCI 2.0 configuration file
+# CircleCI configuration file
 #
 # Check https://circleci.com/docs/2.0/language-python/ for more details
 #
-version: 2
+version: 2.1
+
+references:
+  restore_keys: &restore_keys
+    keys:
+      - python-env-v1-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "setup.py" }}-{{ checksum "requirements/requirements-test.txt" }}-{{ checksum "requirements/requirements-precommit.txt" }}-{{ checksum ".circleci/ci-oldest-reqs.txt" }}-{{ checksum ".pre-commit-config.yaml" }}
+
+  save_key: &save_key
+    key: python-env-v1-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "setup.py" }}-{{ checksum "requirements/requirements-test.txt" }}-{{ checksum "requirements/requirements-precommit.txt" }}-{{ checksum ".circleci/ci-oldest-reqs.txt" }}-{{ checksum ".pre-commit-config.yaml" }}
 
 jobs:
-  check-metadata:
+  pre-checks:
     docker:
-      - image: circleci/python:3.8
+      - image: circleci/python:3.9
 
     working_directory: ~/repo
 
     steps:
       - checkout
-      - run:
-          name: install-dev-requirements
-          command: |
-            pip install --user -U -r requirements-test.txt
-      - run:
-          name: check-citation-metadata
-          command: |
-            ./.sync-zenodo-metadata.py --check > /dev/null
 
-  pre-test-checks:
-    docker:
-      - image: circleci/python:3.8
+      - restore_cache:
+          <<: *restore_keys
 
-    working_directory: ~/repo
-
-    steps:
-      - checkout
       - run:
-          name: install-dev-requirements
+          name: Install pre-check dependencies
           command: |
-            pip install --user -U -r requirements-test.txt
-      - run:
-          name: check-code-style
-          command: |
-            python -m flake8 --show-source flow/
+            pip install --progress-bar off --user -U -r requirements/requirements-precommit.txt
 
-  test-3.8: &test-template
+      - run:
+          name: Run pre-checks
+          command: |
+            PRE_COMMIT_HOME=.pre-commit-cache pre-commit run --all-files --show-diff-on-failure
+
+      - save_cache:
+          <<: *save_key
+          paths:
+            - ".pre-commit-cache"
+
+  linux-python-39: &test-template
     environment:
-      SIGNAC_VERSION: master
+      DEPENDENCIES: "NEWEST"
+      SIGNAC_VERSION: "signac"
     docker:
-      - image: circleci/python:3.8
+      - image: circleci/python:3.9
 
     working_directory: ~/repo
 
     steps:
       - checkout
-      - run:
-          name: install dependencies
-          command: |
-            pip install -U virtualenv --user
-            mkdir -p ./venv
-            python -m virtualenv ./venv
-            . venv/bin/activate
-            pip install git+ssh://git@github.com/glotzerlab/signac.git@${SIGNAC_VERSION}
-            pip install -r requirements.txt
-            pip install -r requirements-test.txt
-            pip install -U coverage mock
 
       - run:
-          name: run tests
+          name: Install dependencies
+          command: |
+            python -m pip install --progress-bar off -U virtualenv --user
+            mkdir -p ./venv
+            python -m virtualenv ./venv --clear
+            . venv/bin/activate
+            python -m pip install --progress-bar off -U pip>=20.3
+            python -m pip install --progress-bar off -U codecov
+            python -m pip install --progress-bar off ${SIGNAC_VERSION}
+            # DEPENDENCIES can be "OLDEST" or "NEWEST"
+            if [ "${DEPENDENCIES}" == "OLDEST" ]; then
+              python -m pip install --progress-bar off -r .circleci/ci-oldest-reqs.txt
+            else
+              python -m pip install --progress-bar off -r requirements.txt
+            fi
+            python -m pip install --progress-bar off -r requirements/requirements-test.txt
+
+      - run:
+          name: Run tests
           command: |
             . venv/bin/activate
-            coverage run --source=flow/ -m pytest -v tests/
-            coverage report -i --include="flow*"
+            python -m pytest --cov=flow --cov-config=setup.cfg --cov-report=xml tests/ -v
+            codecov
 
       - store_artifacts:
           path: test-reports
           destination: test-reports
 
-  test-3.8-signac-1.0.0:
+  linux-python-39-signac-15:
     <<: *test-template
     environment:
-      SIGNAC_VERSION: "v1.0.0"
-  test-3.8-signac-1.2.0:
+      DEPENDENCIES: "NEWEST"
+      SIGNAC_VERSION: "signac~=1.5.0"
+  linux-python-39-signac-14:
     <<: *test-template
     environment:
-      SIGNAC_VERSION: "v1.2.0"
-  test-3.8-signac-1.3.0:
+      DEPENDENCIES: "NEWEST"
+      SIGNAC_VERSION: "signac~=1.4.0"
+  linux-python-39-signac-latest:
     <<: *test-template
     environment:
-      SIGNAC_VERSION: "v1.3.0"
-  test-3.7:
+      DEPENDENCIES: "NEWEST"
+      SIGNAC_VERSION: "git+ssh://git@github.com/glotzerlab/signac.git"
+  linux-python-38:
+    <<: *test-template
+    docker:
+      - image: circleci/python:3.8
+  linux-python-37:
     <<: *test-template
     docker:
       - image: circleci/python:3.7
-  test-3.6:
+  linux-python-36-oldest:
     <<: *test-template
+    environment:
+      DEPENDENCIES: "OLDEST"
+      SIGNAC_VERSION: "signac==1.0.0"
     docker:
       - image: circleci/python:3.6
-  test-3.5:
-    <<: *test-template
+
+  check-metadata:
     docker:
-      - image: circleci/python:3.5
+      - image: circleci/python:3.9
+
+    working_directory: ~/repo
+
+    steps:
+      - checkout
+
+      - run:
+          name: install-dev-requirements
+          command: |
+            pip install --user -U -r requirements/requirements-test.txt
+
+      - run:
+          name: check-citation-metadata
+          command: |
+            ./.sync-zenodo-metadata.py --check > /dev/null
 
   test-deploy-pypi:
     docker:
-      - image: circleci/python:3.8
+      - image: circleci/python:3.9
     working_directory: ~/repo
     steps:
       - checkout
@@ -110,7 +144,7 @@ jobs:
 
   deploy-pypi:
     docker:
-      - image: circleci/python:3.8
+      - image: circleci/python:3.9
     working_directory: ~/repo
     steps:
       - checkout
@@ -122,46 +156,52 @@ jobs:
 
 workflows:
   version: 2
-  pre-test-checks-and-tests:
+  test:
     jobs:
+      - pre-checks
+      - linux-python-39:
+          requires:
+            - pre-checks
+      - linux-python-38:
+          requires:
+            - pre-checks
+      - linux-python-37:
+          requires:
+            - pre-checks
+      - linux-python-36-oldest:
+          requires:
+            - pre-checks
+      - linux-python-39-signac-15:
+          requires:
+            - linux-python-39
+      - linux-python-39-signac-14:
+          requires:
+            - linux-python-39
       - check-metadata:
           filters:
             branches:
               only: /release\/.*/
-      - pre-test-checks
-      - test-3.5:
-          requires:
-            - pre-test-checks
-      - test-3.6:
-          requires:
-            - pre-test-checks
-      - test-3.7:
-          requires:
-            - pre-test-checks
-      - test-3.8:
-          requires:
-            - pre-test-checks
-      - test-3.8-signac-1.0.0:
-          requires:
-            - test-3.8
-      - test-3.8-signac-1.2.0:
-          requires:
-            - test-3.8
-      - test-3.8-signac-1.3.0:
-          requires:
-            - test-3.8
       - test-deploy-pypi:
           filters:
             branches:
               only: /release\/.*/
           requires:
-            - test-3.5
-            - test-3.6
-            - test-3.7
-            - test-3.8
-            - test-3.8-signac-1.0.0
-            - test-3.8-signac-1.2.0
-            - test-3.8-signac-1.3.0
+            - linux-python-39
+            - linux-python-38
+            - linux-python-37
+            - linux-python-36-oldest
+            - linux-python-39-signac-15
+            - linux-python-39-signac-14
+  nightly:
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only:
+                - master
+    jobs:
+      - linux-python-39-signac-latest
   deploy:
     jobs:
       - deploy-pypi:

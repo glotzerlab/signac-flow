@@ -35,14 +35,14 @@ for example with `venv <https://docs.python.org/3/library/venv.html>`_:
 
     ~ $ python -m venv ~/envs/signac-flow-dev
     ~ $ source ~/envs/signac-flow-dev/bin/activate
-    (signac-flow-dev) ~ $ pip install -r requirements-dev.txt
+    (signac-flow-dev) ~ $ pip install -r requirements-dev.txt -r requirements-precommit.txt
 
 or alternatively with `conda <https://conda.io/docs/>`_:
 
 .. code-block:: bash
 
-    ~ $ conda create -n signac-flow-dev python --file requirements-dev.txt
-    ~ $ activate signac-flow-dev
+    ~ $ conda create -n signac-flow-dev python --file requirements-dev.txt --file requirements-precommit.txt
+    ~ $ conda activate signac-flow-dev
 
 Then clone your fork and install the package from source with:
 
@@ -54,14 +54,15 @@ Then clone your fork and install the package from source with:
 The ``-e`` option stands for *editable*, which means that the package is directly loaded from the source code repository.
 That means any changes made to the source code are immediately reflected upon reloading the Python interpreter.
 
-Finally, we recommend to setup a `Flake8 <http://flake8.pycqa.org/en/latest/>`_ git commit hook with:
+The `pre-commit tool <https://pre-commit.com/>`__ is used to enforce code style guidelines.
+To install the tool and configure pre-commit hooks, execute:
 
 .. code-block:: bash
 
-    (signac-flow-dev) signac-flow $ flake8 --install-hook git
-    (signac-flow-dev) signac-flow $ git config --bool flake8.strict true
+    (signac-flow-dev) signac $ pip install pre-commit
+    (signac-flow-dev) signac $ pre-commit install
 
-With the *flake8* hook, your code will be checked for syntax and style before you make a commit.
+With the pre-commit hook, your code will be checked for syntax and style before you make a commit.
 The continuous integration pipeline for the package will perform these checks as well, so running these tests before committing / pushing will prevent the pipeline from failing due to style-related issues.
 
 The development workflow
@@ -94,7 +95,7 @@ To run tests, execute:
 
 .. code-block:: bash
 
-    (signac-flow-dev) signac-flow $ python -m unittest discover tests/
+    (signac-flow-dev) signac-flow $ python -m pytest tests/
 
 
 Building documentation

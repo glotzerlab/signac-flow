@@ -10,7 +10,6 @@ dist
 build
 eggs
 parts
-bin
 var
 sdist
 develop-eggs
@@ -26,7 +25,9 @@ pip-log.txt
 .noseids
 .coverage
 .tox
+.mypy_cache
 nosetests.xml
+.pytest_cache
 
 # Translations
 *.mo

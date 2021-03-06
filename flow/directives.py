@@ -254,7 +254,7 @@ def _evaluate(value, jobs):
     return value
 
 
-class _OnlyType:
+class _OnlyTypes:
     def __init__(self, *types, preprocess=None, postprocess=None):
         def identity(value):
             return value
@@ -332,10 +332,10 @@ def _is_fraction(value):
     raise ValueError("Value must be between 0 and 1.")
 
 
-_natural_number = _OnlyType(int, postprocess=_raise_below(1))
-_nonnegative_int = _OnlyType(int, postprocess=_raise_below(0))
-_nonnegative_real = _OnlyType(float, postprocess=_raise_below(0))
-_positive_real = _OnlyType(float, type(None), postprocess=_raise_below(1e-12, True))
+_natural_number = _OnlyTypes(int, postprocess=_raise_below(1))
+_nonnegative_int = _OnlyTypes(int, postprocess=_raise_below(0))
+_nonnegative_real = _OnlyTypes(float, postprocess=_raise_below(0))
+_positive_real = _OnlyTypes(float, type(None), postprocess=_raise_below(1e-12, True))
 
 # Common directives and their instantiation as _Directive
 _NP = _Directive(
@@ -389,7 +389,7 @@ Expects a real number greater than zero.
 
 _PROCESSOR_FRACTION = _Directive(
     "processor_fraction",
-    validator=_OnlyType(float, postprocess=_is_fraction),
+    validator=_OnlyTypes(float, postprocess=_is_fraction),
     default=1.0,
     serial=_no_aggregation,
     parallel=_no_aggregation,
@@ -419,7 +419,7 @@ def _GET_EXECUTABLE():
     # This is because we mock `sys.executable` while generating template reference data.
     return _Directive(
         "executable",
-        validator=_OnlyType(str),
+        validator=_OnlyTypes(str),
         default=sys.executable,
         serial=_no_aggregation,
         parallel=_no_aggregation,

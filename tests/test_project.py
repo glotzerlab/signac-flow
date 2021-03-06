@@ -446,7 +446,7 @@ class TestProjectClass(TestProjectBase):
             break
 
     def test_invalid_memory_directive(self):
-        for value in ["1g", "0", 0]:
+        for value in ["13b", "-1g", "0", 0, -2]:
 
             class A(FlowProject):
                 pass

@@ -87,9 +87,9 @@ def init(project):
                 "bundle": [["mpi_op", "mpi_op"], ["omp_op", "omp_op"]],
             },
         ],
-        "environments.xsede.BridgesEnvironment": [
+        "environments.xsede.Bridges2Environment": [
             {
-                "partition": ["RM", "RM-Shared", "GPU", "GPU-AI"],
+                "partition": ["RM", "RM-shared", "GPU", "GPU-shared"],
                 "walltime": [None, 1],
             },
             {

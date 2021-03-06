@@ -29,7 +29,7 @@ In addition, the package provides specialized submission templates for the follo
    supported_environments/summit
    supported_environments/stampede2
    supported_environments/comet
-   supported_environments/bridges
+   supported_environments/bridges2
    supported_environments/umich
    supported_environments/umn
 

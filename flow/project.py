@@ -2337,20 +2337,24 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     selected_groups=single_operation_groups,
                 )
             )
-            # aggregate_groups is a list of tuples containing scheduler,
-            # aggregate, and group information. To compute labels, we fetch the
-            # unique jobs from the aggregates containing only one job.
-            individual_jobs = {
-                aggregate_group[3][0]
-                for aggregate_group in aggregate_groups
-                if len(aggregate_group[3]) == 1
-            }
             status_results = parallel_executor(
                 compute_status,
                 aggregate_groups,
                 desc="Fetching status",
                 file=err,
             )
+            # aggregate_groups is a list of tuples containing scheduler,
+            # aggregate, and group information. To compute labels, we fetch the
+            # unique jobs from the aggregates containing only one job.
+            if len(single_operation_groups) > 0:
+                individual_jobs = {
+                    aggregate_group[3][0]
+                    for aggregate_group in aggregate_groups
+                    if len(aggregate_group[3]) == 1
+                }
+            else:
+                # If no operations exist, use all jobs in the project.
+                individual_jobs = set(self)
             compute_labels = functools.partial(
                 self._get_job_labels,
                 ignore_errors=ignore_errors,
@@ -2627,8 +2631,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Add labels to the status information
         for job_label_data in job_labels:
             job_id = job_label_data["job_id"]
-            if job_id in statuses:
-                statuses[job_id]["labels"] = job_label_data["labels"]
+            # There is no status information if the project has no operations.
+            # If no status information exists for this job, we need to set
+            # default values.
+            statuses.setdefault(job_id, {})
+            statuses[job_id].setdefault("aggregate_id", job_id)
+            statuses[job_id].setdefault("groups", {})
+            statuses[job_id]["labels"] = job_label_data["labels"]
 
         # If the dump_json variable is set, just dump all status info
         # formatted in JSON to screen.
@@ -2788,14 +2797,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             else template_environment
         )
         render_output = _render_status(
-            template,
-            template_environment_copy,
-            context,
-            detailed,
-            expand,
-            unroll,
-            compact,
-            output_format,
+            template=template,
+            template_environment=template_environment_copy,
+            context=context,
+            detailed=detailed,
+            expand=expand,
+            unroll=unroll,
+            compact=compact,
+            output_format=output_format,
         )
 
         print(render_output, file=file)

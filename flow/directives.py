@@ -332,11 +332,58 @@ def _is_fraction(value):
     raise ValueError("Value must be between 0 and 1.")
 
 
+def _parse_memory(memory):
+    """Parse memory from the memory flag passed by a user.
+
+    A valid memory argument is defined as:
+
+    1. Numeric value with suffix "g" or "G" indicating memory requested in gigabytes.
+    2. Numeric value with suffix "m" or "M" indicating memory requested in megabytes.
+    3. Numeric value with no suffix indicating memory requested in gigabytes.
+
+    Parameters
+    ----------
+    memory : str or int or float
+        Required memory to reserve per node.
+
+    Returns
+    -------
+    float
+        The parsed memory (numeric value) in gigabytes.
+    """
+    try:
+        if memory is None:
+            return None
+        memory = str(memory)
+        size_type = memory[-1]
+        if size_type.lower() == "m":
+            return float(memory[:-1]) / 1024
+        elif size_type.lower() == "g":
+            return float(memory[:-1])
+        else:
+            return float(memory)
+    except ValueError:
+        raise ValueError(
+            'Invalid memory passed. For gigabytes use suffix "g"/"G", '
+            'for megabytes use suffix "m"/"M", if a numeric value is passed then '
+            "it will be interpreted as memory in gigabytes."
+        )
+    except TypeError:
+        raise
+
+
 _natural_number = _OnlyTypes(int, postprocess=_raise_below(1))
 _nonnegative_int = _OnlyTypes(int, postprocess=_raise_below(0))
 _nonnegative_real = _OnlyTypes(float, postprocess=_raise_below(0))
 # 1e-12 is an arbitrarily chosen minimum threshold for what constitutes 0
-_positive_real = _OnlyTypes(float, type(None), postprocess=_raise_below(1e-12, True))
+_positive_real_memory = _OnlyTypes(
+    float,
+    int,
+    str,
+    type(None),
+    postprocess=_raise_below(1e-12, True),
+    preprocess=_parse_memory,
+)
 
 # Common directives and their instantiation as _Directive
 _NP = _Directive(
@@ -382,10 +429,14 @@ values are supported. For example, a value of 0.5 will request 30 minutes of
 walltime. Defaults to 12 hours.
 """
 
-_MEMORY = _Directive("memory", validator=_positive_real, default=None)
-"""The number of gigabytes of memory to request for this operation.
+_MEMORY = _Directive("memory", validator=_positive_real_memory, default=None)
+"""The memory to request for this operation.
 
-Expects a real number greater than zero.
+Expects:
+
+1. Positive numeric value with suffix "g" or "G" indicating memory requested in gigabytes.
+2. Positive numeric value with suffix "m" or "M" indicating memory requested in megabytes.
+3. Positive numeric value with no suffix indicating memory requested in gigabytes.
 """
 
 _PROCESSOR_FRACTION = _Directive(

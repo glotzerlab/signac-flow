@@ -109,41 +109,6 @@ def calc_tasks(operations, name, parallel=False, allow_mixed=False):
         )
 
 
-def _parse_memory_flag(memory):
-    """Parse memory from the memory flag passed by a user.
-
-    A valid memory flag passed to `FlowProject.submit` should have a suffix of either
-    "g" for gigabytes, or "m" for megabytes.
-
-    Parameters
-    ----------
-    memory : str
-        Required memory to reserve per node.
-
-    Returns
-    -------
-    float
-        The parsed memory (numeric value) in gigabytes.
-    """
-    # This method is deprecated as of 0.13 and will be removed in 0.14.
-    try:
-        size_type = memory[-1]
-        if size_type.lower() == "m":
-            return float(memory[:-1]) / 1024
-        elif size_type.lower() == "g":
-            return float(memory[:-1])
-        else:
-            return float(memory)
-    except ValueError:
-        raise ValueError(
-            'Invalid memory passed. For gigabytes use suffix "g", '
-            'for megabytes use suffix "m", if a numeric value is passed then '
-            "it will be interpreted as memory in gigabytes."
-        )
-    except TypeError:
-        raise
-
-
 def check_memory(operations):
     """Check whether memory is defined by the user or not.
 

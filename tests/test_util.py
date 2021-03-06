@@ -1,7 +1,5 @@
-import pytest
-
 from flow.util.misc import _bidict
-from flow.util.template_filters import _parse_memory_flag, calc_memory, check_memory
+from flow.util.template_filters import calc_memory, check_memory
 
 
 class TestBidict:
@@ -54,20 +52,6 @@ class TestBidict:
 
 
 class TestTemplateFilters:
-    def test_parse_memory_flag(self):
-        assert _parse_memory_flag("512M") == 0.5
-        assert _parse_memory_flag("0.5G") == 0.5
-        assert _parse_memory_flag("512m") == 0.5
-        assert _parse_memory_flag("0.5g") == 0.5
-        assert _parse_memory_flag("0.5") == 0.5
-
-        with pytest.raises(ValueError):
-            _parse_memory_flag("0.5gb")
-        with pytest.raises(ValueError):
-            _parse_memory_flag("0..5g")
-        with pytest.raises(TypeError):
-            _parse_memory_flag(1)
-
     def test_calc_memory(self):
         class MockOp:
             def __init__(self, memory=None):
@@ -77,13 +61,12 @@ class TestTemplateFilters:
         op2 = MockOp(8)
         op3 = MockOp()
         # Test when operations run in serial
-        assert calc_memory([], False, "10g") == 10
-        assert calc_memory([op3], False, "10g") == 10
-        assert calc_memory([op1, op2, op3], False, None) == 8
+        assert calc_memory([op1], False) == 1
+        assert calc_memory([op1, op2, op3], False) == 8
         # Test when operations run in parallel
-        assert calc_memory([op1, op2], True, "10g") == 20
-        assert calc_memory([op3], True, None) == 0
-        assert calc_memory([op1, op2, op3], True, None) == 9
+        assert calc_memory([op1, op2], True) == 9
+        assert calc_memory([op3], True) == 0
+        assert calc_memory([op1, op2, op3], True) == 9
 
     def test_check_memory(self):
         class MockOp:
@@ -93,7 +76,7 @@ class TestTemplateFilters:
         op1 = MockOp(1)
         op2 = MockOp(8)
         op3 = MockOp()
-        assert check_memory([], "10g")
-        assert check_memory([op3], "10g")
-        assert not check_memory([op3], None)
-        assert check_memory([op1, op2, op3], None)
+        assert not check_memory([])
+        assert not check_memory([op3])
+        assert check_memory([op1])
+        assert check_memory([op1, op2, op3])

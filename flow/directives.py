@@ -335,6 +335,7 @@ def _is_fraction(value):
 _natural_number = _OnlyTypes(int, postprocess=_raise_below(1))
 _nonnegative_int = _OnlyTypes(int, postprocess=_raise_below(0))
 _nonnegative_real = _OnlyTypes(float, postprocess=_raise_below(0))
+# 1e-12 is an arbitrarily chosen minimum threshold for what constitutes 0
 _positive_real = _OnlyTypes(float, type(None), postprocess=_raise_below(1e-12, True))
 
 # Common directives and their instantiation as _Directive

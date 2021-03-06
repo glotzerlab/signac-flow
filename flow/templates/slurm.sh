@@ -3,9 +3,9 @@
 {% block preamble %}
 #!/bin/bash
 #SBATCH --job-name="{{ id }}"
-{% set memory_passed = operations | check_memory(memory) %}
+{% set memory_passed = operations | check_memory %}
 {% if memory_passed %}
-#SBATCH --mem={{ operations | calc_memory(parallel, memory) }}G
+#SBATCH --mem={{ operations | calc_memory(parallel) }}G
 {% endif %}
 {% if partition %}
 #SBATCH --partition={{ partition }}

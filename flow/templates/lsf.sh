@@ -2,9 +2,9 @@
 {% block header %}
 #!/bin/bash
 #BSUB -J {{ id }}
-{% set memory_passed = operations | check_memory(memory) %}
+{% set memory_passed = operations | check_memory %}
 {% if memory_passed %}
-#BSUB -M {{ operations | calc_memory(parallel, memory) }}GB
+#BSUB -M {{ operations | calc_memory(parallel) }}GB
 {% endif %}
 {% if partition %}
 #BSUB -q {{ partition }}

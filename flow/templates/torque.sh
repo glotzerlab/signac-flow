@@ -1,9 +1,9 @@
 {% extends "base_script.sh" %}
 {% block header %}
 #PBS -N {{ id }}
-{% set memory_passed = operations | check_memory(memory) %}
+{% set memory_passed = operations | check_memory %}
 {% if memory_passed %}
-#PBS -l mem={{ operations | calc_memory(parallel, memory) }}GB
+#PBS -l mem={{ operations | calc_memory(parallel) }}GB
 {% endif %}
 {% if walltime %}
 #PBS -l walltime={{ walltime|format_timedelta }}

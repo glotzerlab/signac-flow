@@ -5,84 +5,75 @@
 
 The FlowProject is a signac Project that allows the user to define a workflow.
 """
-import sys
-import os
-import re
-import ast
-import logging
 import argparse
-import time
-import datetime
-import json
-import inspect
-import functools
+import ast
 import contextlib
-import random
+import datetime
+import functools
 import importlib
-import subprocess
-import traceback
-import warnings
-from deprecation import deprecated
-from collections import defaultdict
-from collections import OrderedDict
-from collections import Counter
-from copy import deepcopy
-from itertools import islice
-from itertools import count
-from itertools import groupby
-from hashlib import sha1
+import inspect
+import json
+import logging
 import multiprocessing
+import os
+import random
+import re
+import subprocess
+import sys
 import threading
-from multiprocessing import Pool
-from multiprocessing import cpu_count
-from multiprocessing import TimeoutError
+import time
+import traceback
+from collections import Counter, defaultdict
+from copy import deepcopy
+from enum import IntFlag
+from hashlib import md5, sha1
+from itertools import count, groupby, islice
+from multiprocessing import Event, Pool, TimeoutError, cpu_count
 from multiprocessing.pool import ThreadPool
-from multiprocessing import Event
+
+import cloudpickle
 import jinja2
-from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
-from tqdm import tqdm
-
 import signac
-from signac.contrib.hashing import calc_id
+from deprecation import deprecated
+from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
 from signac.contrib.filterparse import parse_filter_arg
-from signac.contrib.project import JobsCursor
+from tqdm.auto import tqdm
 
-from enum import IntEnum
-
+from .aggregates import _aggregator, _get_aggregate_id
 from .environment import get_environment
-from .scheduling.base import ClusterJob
-from .scheduling.base import JobStatus
-from .scheduling.status import update_status
-from .errors import SubmitError
-from .errors import ConfigKeyError
-from .errors import NoSchedulerError
-from .errors import UserConditionError
-from .errors import UserOperationError
-from .errors import TemplateError
-from .util.misc import _positive_int
-from .util.misc import roundrobin
-from .util.misc import to_hashable
-from .util import template_filters as tf
-from .util.misc import add_cwd_to_environment_pythonpath
-from .util.misc import switch_to_directory
-from .util.misc import TrackGetItemDict
-from .util.translate import abbreviate
-from .util.translate import shorten
-from .labels import label
-from .labels import staticlabel
-from .labels import classlabel
-from .labels import _is_label_func
+from .errors import (
+    ConfigKeyError,
+    NoSchedulerError,
+    SubmitError,
+    TemplateError,
+    UserConditionError,
+    UserOperationError,
+)
+from .labels import _is_label_func, classlabel, label, staticlabel
+from .render_status import _render_status
+from .scheduling.base import ClusterJob, JobStatus
 from .util import config as flow_config
-from .render_status import Renderer as StatusRenderer
 from .hooks import Hooks
+from .util import template_filters
+from .util.misc import (
+    TrackGetItemDict,
+    _bidict,
+    _cached_partial,
+    _get_parallel_executor,
+    _positive_int,
+    _to_hashable,
+    add_cwd_to_environment_pythonpath,
+    roundrobin,
+    switch_to_directory,
+)
+from .util.translate import abbreviate, shorten
 from .version import __version__
-
 
 logger = logging.getLogger(__name__)
 
 
 # The TEMPLATE_HELP can be shown with the --template-help option available to all
-# command line sub commands that use the templating system.
+# command line subcommands that use the templating system.
 TEMPLATE_HELP = """Execution and submission scripts are generated with the jinja2 template files.
 Standard files are shipped with the package, but maybe replaced or extended with
 custom templates provided within a project.
@@ -91,7 +82,7 @@ variable, for example in the project configuration file. The current template di
 {template_dir}
 
 All template variables can be placed within a template using the standard jinja2
-syntax, e.g., the project root directory can be written like this: {{{{ project._rd }}}}.
+syntax, e.g., the project root directory can be written as: {{{{ project.root_directory() }}}}.
 The available template variables are:
 {template_vars}
 
@@ -101,130 +92,223 @@ For example: {{{{ project.get_id() | capitalize }}}}.
 The available filters are:
 {filters}"""
 
+_FMT_SCHEDULER_STATUS = {
+    JobStatus.unknown: "U",
+    JobStatus.registered: "R",
+    JobStatus.inactive: "I",
+    JobStatus.submitted: "S",
+    JobStatus.held: "H",
+    JobStatus.queued: "Q",
+    JobStatus.active: "A",
+    JobStatus.error: "E",
+    JobStatus.placeholder: " ",
+}
 
-class IgnoreConditions(IntEnum):
-    """Flags that determine which conditions are used to determine job eligibility.
 
-    The options include:
-        * IgnoreConditions.PRE: ignore pre conditions
-        * IgnoreConditions.POST: ignore post conditions
-        * IgnoreConditions.ALL: ignore all conditions
-        * IgnoreConditions.NONE: check all conditions
-    """
+class IgnoreConditions(IntFlag):
+    """Flags that determine which conditions are used to determine job eligibility."""
+
+    # The __invert__ operator must be defined since IntFlag simply performs an
+    # integer bitwise not on the underlying enum value, which is problematic in
+    # two's-complement arithmetic. What we want is to only flip valid bits.
+
+    def __invert__(self):
+        # Compute the largest number of bits used to represent one of the flags
+        # so that we can XOR the appropriate number.
+        max_bits = len(bin(max([elem.value for elem in type(self)]))) - 2
+        return self.__class__((2 ** max_bits - 1) ^ self._value_)
+
+    NONE = 0
+    """Check all conditions."""
+
     PRE = 1
+    """Ignore preconditions."""
+
     POST = 2
+    """Ignore postconditions."""
+
     ALL = PRE | POST
-    NONE = ~ ALL
+    """Ignore all conditions."""
 
     def __str__(self):
-        return {IgnoreConditions.PRE: 'pre', IgnoreConditions.POST: 'post',
-                IgnoreConditions.ALL: 'all', IgnoreConditions.NONE: 'none'}[self]
+        return {
+            IgnoreConditions.PRE: "pre",
+            IgnoreConditions.POST: "post",
+            IgnoreConditions.ALL: "all",
+            IgnoreConditions.NONE: "none",
+        }[self]
 
 
 class _IgnoreConditionsConversion(argparse.Action):
     def __init__(self, option_strings, dest, nargs=None, **kwargs):
         if nargs is not None:
             raise ValueError("nargs not allowed")
-        super(_IgnoreConditionsConversion, self).__init__(option_strings, dest, **kwargs)
+        super().__init__(option_strings, dest, **kwargs)
 
     def __call__(self, parser, namespace, values, option_string=None):
         setattr(namespace, self.dest, getattr(IgnoreConditions, values.upper()))
 
 
-class _condition(object):
-    # This counter should be incremented each time an "always" or "never"
-    # condition is created, and the value should be used as the tag for that
-    # condition to ensure that no pair of "always" and "never" conditions
+class _condition:
+    # This counter should be incremented each time a "never" condition
+    # is created, and the value should be used as the tag for that
+    # condition to ensure that no pair of "never" conditions
     # are found to be equal by the graph detection algorithm.
     current_arbitrary_tag = 0
 
     def __init__(self, condition, tag=None):
         """Add tag to differentiate built-in conditions during graph detection."""
-
         if tag is None:
             try:
                 tag = condition.__code__.co_code
             except AttributeError:
-                logger.warning("Condition {} could not autogenerate tag.".format(condition))
+                logger.warning(f"Condition {condition} could not autogenerate tag.")
         condition._flow_tag = tag
         self.condition = condition
 
     @classmethod
     def isfile(cls, filename):
-        "True if the specified file exists for this job."
-        return cls(lambda job: job.isfile(filename), 'isfile_' + filename)
+        """Determine if the specified file exists for the job(s)."""
+
+        def _isfile(*jobs):
+            return all(job.isfile(filename) for job in jobs)
+
+        return cls(_isfile, "isfile_" + filename)
 
     @classmethod
     def true(cls, key):
-        """True if the specified key is present in the job document and
-        evaluates to True."""
-        return cls(lambda job: job.document.get(key, False), 'true_' + key)
+        """Evaluate if a document key is True for the job(s).
+
+        Returns True if the specified key is present in the job document(s) and
+        evaluates to True.
+        """
+
+        def _document(*jobs):
+            return all(job.document.get(key, False) for job in jobs)
+
+        return cls(_document, "true_" + key)
 
     @classmethod
     def false(cls, key):
-        """True if the specified key is present in the job document and
-        evaluates to False."""
-        return cls(lambda job: not job.document.get(key, False), 'false_' + key)
+        """Evaluate if a document key is False for the job(s).
 
-    @classmethod
-    @deprecated(
-        deprecated_in="0.9", removed_in="0.11", current_version=__version__,
-        details="This condition decorator is obsolete.")
-    def always(cls, func):
-        "Returns True."
-        cls.current_arbitrary_tag += 1
-        return cls(lambda _: True, str(cls.current_arbitrary_tag))(func)
+        Returns True if the specified key is present in the job document(s) and
+        evaluates to False.
+        """
+
+        def _no_document(*jobs):
+            return all(not job.document.get(key, False) for job in jobs)
+
+        return cls(_no_document, "false_" + key)
 
     @classmethod
     def never(cls, func):
-        "Returns False."
+        """Return False."""
         cls.current_arbitrary_tag += 1
         return cls(lambda _: False, str(cls.current_arbitrary_tag))(func)
 
     @classmethod
     def not_(cls, condition):
-        "Returns ``not condition(job)`` for the provided condition function."
-        return cls(lambda job: not condition(job),
-                   'not_'.encode() + condition.__code__.co_code)
+        """Return ``not condition(*jobs)`` for the provided condition function."""
+
+        def _not(*jobs):
+            return not condition(*jobs)
+
+        return cls(_not, b"not_" + condition.__code__.co_code)
 
 
 def _create_all_metacondition(condition_dict, *other_funcs):
-    """Standard function for generating aggregate metaconditions that require
-    *all* provided conditions to be met. The resulting metacondition is
-    constructed with appropriate information for graph detection."""
+    """Generate metacondition requiring all provided conditions to be true.
+
+    This function generates an aggregate metaconditions that requires *all*
+    provided conditions to be met. The resulting metacondition is constructed
+    with appropriate information for graph detection.
+    """
     condition_list = [c for f in other_funcs for c in condition_dict[f]]
 
-    def _flow_metacondition(job):
-        return all(c(job) for c in condition_list)
+    def _flow_metacondition(*jobs):
+        return all(c(*jobs) for c in condition_list)
 
     _flow_metacondition._composed_of = condition_list
     return _flow_metacondition
 
 
 def _make_bundles(operations, size=None):
-    """Utility function for the generation of bundles.
+    """Slice an iterable of operations into equally sized bundles.
 
-    This function splits an iterable of operations into equally
-    sized bundles and a possibly smaller final bundle.
+    This utility function splits an iterable of operations into equally sized
+    bundles. The final bundle may be smaller than the specified size.
+
+    Parameters
+    ----------
+    operations : iterable
+        Iterable of operations.
+    size : int
+        Size of bundles. (Default value = None)
+
+    Yields
+    ------
+    list
+        Bundles of operations with specified size.
+
     """
-    n = None if size == 0 else size
+    if size == 0:
+        size = None
     operations = iter(operations)
     while True:
-        b = list(islice(operations, n))
-        if b:
-            yield b
+        bundle = list(islice(operations, size))
+        if bundle:
+            yield bundle
         else:
             break
 
 
-@deprecated(deprecated_in="0.9", removed_in="0.11", current_version=__version__)
-def make_bundles(operations, size=None):
-    """Utility function for the generation of bundles.
+class _AggregatesCursor:
+    """Utility class to iterate over aggregates stored in a FlowProject.
 
-    This function splits an iterable of operations into equally
-    sized bundles and a possibly smaller final bundle.
+    Parameters
+    ----------
+    project : :class:`~.FlowProject`
+        A FlowProject whose jobs are aggregated.
+    filter : dict
+        A mapping of key-value pairs that all indexed job state points are
+        compared against (Default value = None).
+    doc_filter : dict
+        A mapping of key-value pairs that all indexed job documents are
+        compared against (Default value = None).
+
     """
-    return _make_bundles(operations, size)
+
+    # This class currently only handles aggregates of size 1 (single jobs).
+
+    def __init__(self, project, filter=None, doc_filter=None):
+        self._project = project
+        self._filter = filter
+        self._doc_filter = doc_filter
+        self._jobs_cursor = project.find_jobs(filter, doc_filter)
+
+    def __eq__(self, other):
+        return self._jobs_cursor == other._jobs_cursor
+
+    def __contains__(self, aggregate):
+        if len(aggregate) != 1:
+            # Exit early if this is not an aggregate of 1 job
+            return False
+        if self._filter is None and self._doc_filter is None:
+            # Using the Project's __contains__ method is fastest if no
+            # filtering is needed. This is a backport of PR 449 to signac that
+            # optimizes the JobsCursor __contains__ method, and is required for
+            # sufficient performance with earlier versions of signac.
+            return aggregate[0] in self._project
+        # Slow path: requires O(N) iteration over the JobsCursor
+        return aggregate[0] in self._jobs_cursor
+
+    def __len__(self):
+        return len(self._jobs_cursor)
+
+    def __iter__(self):
+        for job in self._jobs_cursor:
+            yield (job,)
 
 
 class _HooksDecorator(object):
@@ -249,117 +333,76 @@ class _HooksDecorator(object):
         return install_hook
 
 
-class JobOperation(object):
-    """This class represents the information needed to execute one group for one job.
+class _JobOperation:
+    """Class containing execution information for one group and one job.
 
-    The execution or submission of a :py:class:`FlowGroup` uses a passed in command
+    The execution or submission of a :class:`~.FlowGroup` uses a passed-in command
     which can either be a string or function with no arguments that returns a shell
-    executable command.  This won't be used if it is determined that the group can be
-    executed without forking.
+    executable command. The shell executable command won't be used if it is
+    determined that the group can be executed without forking.
 
     .. note::
 
         This class is used by the :class:`~.FlowGroup` class for the execution and
         submission process and should not be instantiated by users themselves.
 
-    :param id:
-        The id of this JobOperation instance. The id should be unique.
-    :type id:
-        str
-    :param name:
-        The name of the JobOperation.
-    :type name:
-        str
-    :param job:
-        The job instance associated with this operation.
-    :type job:
-        :py:class:`signac.Job`.
-    :param cmd:
-        The command that executes this operation. Can be a function that when
+    Parameters
+    ----------
+    id : str
+        The id of this _JobOperation instance. The id should be unique.
+    name : str
+        The name of the _JobOperation.
+    jobs : tuple of :class:`~signac.contrib.job.Job`
+        The jobs associated with this operation.
+    cmd : callable or str
+        The command that executes this operation. Can be a callable that when
         evaluated returns a string.
-    :type cmd:
-        callable or str
-    :param directives:
-        A dictionary of additional parameters that provide instructions on how
-        to execute this operation, e.g., specifically required resources.
-    :type directives:
-        :class:`dict`
+    directives : dict
+        A `dict` object of additional parameters that provide instructions on
+        how to execute this operation, e.g., specifically required resources.
+    user_directives : set
+        Keys in ``directives`` that correspond to user-specified directives
+        that are not part of the environment's standard directives.
     """
 
-    def __init__(self, id, name, job, cmd, directives=None):
+    def __init__(self, id, name, jobs, cmd, directives, user_directives):
         self._id = id
         self.name = name
-        self.job = job
+        self._jobs = jobs
         if not (callable(cmd) or isinstance(cmd, str)):
-            raise ValueError("JobOperation cmd must be a callable or string.")
+            raise ValueError("cmd must be a callable or string.")
         self._cmd = cmd
 
-        if directives is None:
-            directives = dict()  # default argument
-        else:
-            directives = dict(directives)  # explicit copy
+        # We use a special dictionary that tracks all keys that have been
+        # evaluated by the template engine and compare them to those explicitly
+        # set by the user. See also comment below.
+        self.directives = TrackGetItemDict(directives)
 
-        # Keys which were explicitly set by the user, but are not evaluated by the
-        # template engine are cause for concern and might hint at a bug in the template
-        # script or ill-defined directives. We are therefore keeping track of all
-        # keys set by the user and check whether they have been evaluated by the template
-        # script engine later.
-        keys_set_by_user = set(directives)
-
-        nranks = directives.get('nranks', 1)
-        nthreads = directives.get('omp_num_threads', 1)
-
-        if callable(nranks) or callable(nthreads):
-            def np_callable(job):
-                nr = nranks(job) if callable(nranks) else nranks
-                nt = nthreads(job) if callable(nthreads) else nthreads
-                return nr*nt
-
-            directives.setdefault('np', np_callable)
-        else:
-            directives.setdefault('np', nranks*nthreads)
-
-        directives.setdefault('ngpu', 0)
-        directives.setdefault('nranks', 0)
-        directives.setdefault('omp_num_threads', 0)
-        directives.setdefault('processor_fraction', 1)
-
-        # Evaluate strings and callables for job:
-        def evaluate(value):
-            if value and callable(value):
-                return value(job)
-            elif isinstance(value, str):
-                return value.format(job=job)
-            else:
-                return value
-
-        # We use a special dictionary that allows us to track all keys that have been
-        # evaluated by the template engine and compare them to those explicitly set
-        # by the user. See also comment above.
-        self.directives = TrackGetItemDict(
-            {key: evaluate(value) for key, value in directives.items()})
-        self.directives._keys_set_by_user = keys_set_by_user
+        # Keys which were explicitly set by the user, but are not evaluated by
+        # the template engine are cause for concern and might hint at a bug in
+        # the template script or ill-defined directives. We are therefore
+        # keeping track of all keys set by the user and check whether they have
+        # been evaluated by the template script engine later.
+        self.directives._keys_set_by_user = user_directives
 
     def __str__(self):
-        return "{}({})".format(self.name, self.job)
+        aggregate_id = _get_aggregate_id(self._jobs)
+        return f"{self.name}({aggregate_id})"
 
     def __repr__(self):
-        return "{type}(name='{name}', job='{job}', cmd={cmd}, directives={directives})".format(
-                   type=type(self).__name__,
-                   name=self.name,
-                   job=str(self.job),
-                   cmd=repr(self.cmd),
-                   directives=self.directives)
+        return "{type}(name='{name}', jobs='{jobs}', cmd={cmd}, directives={directives})".format(
+            type=type(self).__name__,
+            name=self.name,
+            jobs="(" + ", ".join(map(repr, self._jobs)) + ")",
+            cmd=repr(self.cmd),
+            directives=self.directives,
+        )
 
     def __hash__(self):
-        return int(sha1(self.id.encode('utf-8')).hexdigest(), 16)
+        return hash(self.id)
 
     def __eq__(self, other):
         return self.id == other.id
-
-    @deprecated(deprecated_in="0.9", removed_in="1.0", current_version=__version__)
-    def get_id(self):
-        return self._id
 
     @property
     def id(self):
@@ -375,46 +418,88 @@ class JobOperation(object):
             # error, but not until then. If we don't fork then nothing errors,
             # and the user gets the expected result.
             return self._cmd()
-        else:
-            return self._cmd
-
-    def set_status(self, value):
-        "Store the operation's status."
-        self.job._project.document.setdefault('_status', dict())[self.id] = int(value)
-
-    def get_status(self):
-        "Retrieve the operation's last known status."
-        try:
-            return JobStatus(self.job._project.document['_status'][self.id])
-        except KeyError:
-            return JobStatus.unknown
+        return self._cmd
 
 
-class FlowCondition(object):
-    """A FlowCondition represents a condition as a function of a signac job.
+class _SubmissionJobOperation(_JobOperation):
+    r"""Class containing submission information for one group and one job.
 
-    The __call__() function of a FlowCondition object may return either True
-    or False, representing whether the condition is met or not.
-    This can be used to build a graph of conditions and operations.
+    This class extends :class:`_JobOperation` to include a set of groups
+    that will be executed via the "run" command. These groups are known at
+    submission time.
 
-    :param callback:
+    Parameters
+    ----------
+    \*args
+        Passed to the constructor of :class:`_JobOperation`.
+    eligible_operations : list
+        A list of :class:`_JobOperation` that will be executed when this
+        submitted job is executed.
+    operations_with_unmet_preconditions : list
+        A list of :class:`_JobOperation` that will not be executed in the
+        first pass of :meth:`FlowProject.run` due to unmet preconditions. These
+        operations may be executed in subsequent iterations of the run loop.
+    operations_with_met_postconditions : list
+        A list of :class:`_JobOperation` that will not be executed in the
+        first pass of :meth:`FlowProject.run` because all postconditions are
+        met. These operations may be executed in subsequent iterations of the
+        run loop.
+    \*\*kwargs
+        Passed to the constructor of :class:`_JobOperation`.
+
+    """
+
+    def __init__(
+        self,
+        *args,
+        eligible_operations=None,
+        operations_with_unmet_preconditions=None,
+        operations_with_met_postconditions=None,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+
+        if eligible_operations is None:
+            eligible_operations = []
+        self.eligible_operations = eligible_operations
+
+        if operations_with_unmet_preconditions is None:
+            operations_with_unmet_preconditions = []
+        self.operations_with_unmet_preconditions = operations_with_unmet_preconditions
+
+        if operations_with_met_postconditions is None:
+            operations_with_met_postconditions = []
+        self.operations_with_met_postconditions = operations_with_met_postconditions
+
+
+class _FlowCondition:
+    """A _FlowCondition represents a condition as a function of a signac job.
+
+    The ``__call__()`` method of a _FlowCondition object may return either True
+    or False, representing whether the condition is met or not.  This can be
+    used to build a graph of conditions and operations.
+
+    Parameters
+    ----------
+    callback : callable
         A callable with one positional argument (the job).
-    :type callback:
-        callable
+
     """
 
     def __init__(self, callback):
         self._callback = callback
 
-    def __call__(self, job):
-        if self._callback is None:
-            return True
+    def __call__(self, jobs):
         try:
-            return self._callback(job)
-        except Exception as e:
+            return self._callback(*jobs)
+        except Exception as error:
+            assert len(jobs) == 1
             raise UserConditionError(
-                'An exception was raised while evaluating the condition {name} '
-                'for job {job}.'.format(name=self._callback.__name__, job=job)) from e
+                "An exception was raised while evaluating the condition {name} "
+                "for job {jobs}.".format(
+                    name=self._callback.__name__, jobs=", ".join(map(str, jobs))
+                )
+            ) from error
 
     def __hash__(self):
         return hash(self._callback)
@@ -423,36 +508,31 @@ class FlowCondition(object):
         return self._callback == other._callback
 
 
-class BaseFlowOperation(object):
-    """A BaseFlowOperation represents a data space operation, operating on any job.
+class BaseFlowOperation:
+    """A :class:`~.BaseFlowOperation` represents a data space operation acting on any job.
 
-    Every BaseFlowOperation is associated with a specific command.
+    Every :class:`~.BaseFlowOperation` is associated with a specific command.
 
-    Pre-requirements (pre) and post-conditions (post) can be used to
-    trigger an operation only when certain conditions are met. Conditions are unary
-    callables, which expect an instance of job as their first and only positional
-    argument and return either True or False.
+    Preconditions (pre) and postconditions (post) can be used to trigger an
+    operation only when certain conditions are met. Conditions are unary
+    callables, which expect an instance of job as their first and only
+    positional argument and return either True or False.
 
-    An operation is considered "eligible" for execution when all pre-requirements
-    are met and when at least one of the post-conditions is not met.
-    Requirements are always met when the list of requirements is empty and
-    post-conditions are never met when the list of post-conditions is empty.
+    An operation is considered "eligible" for execution when all preconditions
+    are met and when at least one of the postconditions is not met.
+    Preconditions are always met when the list of preconditions is empty.
+    Postconditions are never met when the list of postconditions is empty.
 
     .. note::
         This class should not be instantiated directly.
 
-    :param cmd:
-        The command to execute operation; should be a function of job.
-    :type cmd:
-        str or callable
-    :param pre:
-        required conditions
-    :type pre:
-        sequence of callables
-    :param post:
-        post-conditions to determine completion
-    :type post:
-        sequence of callables
+    Parameters
+    ----------
+    pre : sequence of callables
+        List of preconditions.
+    post : sequence of callables
+        List of postconditions.
+
     """
 
     def __init__(self, pre=None, post=None):
@@ -461,161 +541,245 @@ class BaseFlowOperation(object):
         if post is None:
             post = []
 
-        self._prereqs = [FlowCondition(cond) for cond in pre]
-        self._postconds = [FlowCondition(cond) for cond in post]
+        self._preconditions = [_FlowCondition(cond) for cond in pre]
+        self._postconditions = [_FlowCondition(cond) for cond in post]
 
-    def __str__(self):
-        return "{type}(cmd='{cmd}')".format(type=type(self).__name__, cmd=self._cmd)
+    def _eligible(self, aggregate, ignore_conditions=IgnoreConditions.NONE):
+        """Determine eligibility of an aggregate.
 
-    def eligible(self, job, ignore_conditions=IgnoreConditions.NONE):
-        """Eligible, when all pre-conditions are true and at least one post-condition is false,
-        or corresponding conditions are ignored.
-        :param job:
-            The signac job handles.
-        :type job:
-            :class:`~signac.contrib.job.Job`
-        :param ignore_conditions:
-            Specify if pre and/or post conditions check is to be ignored for eligibility check.
-            The default is :py:class:`IgnoreConditions.NONE`.
-        :type ignore_conditions:
-            :py:class:`~.IgnoreConditions`
+        An aggregate is eligible when all preconditions are true and at least
+        one postcondition is false, or corresponding conditions are ignored.
+
+        Parameters
+        ----------
+        aggregate : tuple of :class:`~signac.contrib.job.Job`
+            The aggregate of signac jobs.
+        ignore_conditions : :class:`~.IgnoreConditions`
+            Specify if preconditions and/or postconditions are to be ignored
+            when determining eligibility. The default is
+            :class:`IgnoreConditions.NONE`.
+
+        Returns
+        -------
+        bool
+            Whether the aggregate is eligible.
+
         """
-        if type(ignore_conditions) != IgnoreConditions:
+        if not isinstance(ignore_conditions, IgnoreConditions):
             raise ValueError(
                 "The ignore_conditions argument of FlowProject.run() "
-                "must be a member of class IgnoreConditions")
-        # len(self._prereqs) check for speed optimization
-        pre = (not len(self._prereqs)) or (ignore_conditions & IgnoreConditions.PRE) \
-            or all(cond(job) for cond in self._prereqs)
-        if pre and len(self._postconds):
-            post = (ignore_conditions & IgnoreConditions.POST) \
-                or any(not cond(job) for cond in self._postconds)
+                "must be a member of class IgnoreConditions."
+            )
+        # len(self._preconditions) check for speed optimization
+        met_preconditions = (
+            (len(self._preconditions) == 0)
+            or (ignore_conditions & IgnoreConditions.PRE)
+            or all(cond(aggregate) for cond in self._preconditions)
+        )
+        if met_preconditions and len(self._postconditions) > 0:
+            unmet_postconditions = (ignore_conditions & IgnoreConditions.POST) or any(
+                not cond(aggregate) for cond in self._postconditions
+            )
         else:
-            post = True
-        return pre and post
+            unmet_postconditions = True
+        return met_preconditions and unmet_postconditions
 
-    def complete(self, job):
-        "True when all post-conditions are met."
-        if len(self._postconds):
-            return all(cond(job) for cond in self._postconds)
-        else:
-            return False
+    def _complete(self, jobs):
+        """Check if all postconditions are met."""
+        if len(self._postconditions) > 0:
+            return all(cond(jobs) for cond in self._postconditions)
+        return False
 
 
 class FlowCmdOperation(BaseFlowOperation):
-    """A BaseFlowOperation that holds a shell executable command.
+    """An operation that executes a shell command.
 
-    When an operation has the ``@cmd`` directive specified, it is instantiated
-    as a FlowCmdOperation. The operation should be a function of
-    :py:class:`~signac.contrib.job.Job`. The command (cmd) may
-    either be a unary callable that expects an instance of
-    :class:`~signac.contrib.job.Job` as its only positional argument and returns
-    a string containing valid shell commands, or the string of commands itself.
-    In either case, the resulting string may contain any attributes of the job placed
-    in curly braces, which will then be substituted by Python string formatting.
+    When an operation has the ``@cmd`` directive specified, it is
+    instantiated as a :class:`~.FlowCmdOperation`. The operation should be a
+    function of one or more positional arguments that are instances of
+    :class:`~signac.contrib.job.Job`. The command (cmd) may either be a
+    callable that expects one or more instances of
+    :class:`~signac.contrib.job.Job` as positional arguments and returns a
+    string containing valid shell commands, or the string of commands itself.
+    In either case, the resulting string may contain any attributes of the
+    job (or jobs) placed in curly braces, which will then be substituted by
+    Python string formatting.
 
     .. note::
         This class should not be instantiated directly.
+
+    Parameters
+    ----------
+    cmd : str or callable
+        The command to execute the operation. Callable values will be
+        provided one or more positional arguments (``*jobs``) that are
+        instances of :class:`~signac.contrib.job.Job`. String values will be
+        formatted with ``cmd.format(jobs=jobs)`` where ``jobs`` is a tuple of
+        :class:`~signac.contrib.job.Job`, or ``cmd.format(jobs=jobs,
+        job=job)`` if only one job is provided.
+    pre : sequence of callables
+        List of preconditions.
+    post : sequence of callables
+        List of postconditions.
+
     """
 
     def __init__(self, cmd, pre=None, post=None):
-        super(FlowCmdOperation, self).__init__(pre=pre, post=post)
+        super().__init__(pre=pre, post=post)
         self._cmd = cmd
 
     def __str__(self):
-        return "{type}(cmd='{cmd}')".format(type=type(self).__name__, cmd=self._cmd)
+        return f"{type(self).__name__}(cmd='{self._cmd}')"
 
-    def __call__(self, job=None):
-        if callable(self._cmd):
-            return self._cmd(job).format(job=job)
-        else:
-            return self._cmd.format(job=job)
+    def __call__(self, *jobs):
+        """Return the command formatted with the supplied job(s)."""
+        cmd = self._cmd(*jobs) if callable(self._cmd) else self._cmd
+        format_arguments = {"jobs": jobs}
+        if len(jobs) == 1:
+            format_arguments["job"] = jobs[0]
+        return cmd.format(**format_arguments)
 
 
 class FlowOperation(BaseFlowOperation):
-    """FlowOperation holds a Python function that does not return a shell executable string.
+    """An operation that executes a Python function.
 
-    All operations without the ``@cmd`` directive use this class. No command can be specified, and
-    the function is not stored internally (but in an external list) stored by the
-    :class:`FlowProject`.
+    All operations without the ``@cmd`` directive use this class. The
+    callable ``op_func`` should be a function of one or more instances of
+    :class:`~signac.contrib.job.Job`.
 
     .. note::
         This class should not be instantiated directly.
+
+    Parameters
+    ----------
+    op_func : callable
+        A callable function of ``*jobs``.
+    pre : sequence of callables
+        List of preconditions.
+    post : sequence of callables
+        List of postconditions.
+
     """
 
-    def __init__(self, name, pre=None, post=None):
-        super(FlowOperation, self).__init__(pre=pre, post=post)
-        self.name = name
+    def __init__(self, op_func, pre=None, post=None):
+        super().__init__(pre=pre, post=post)
+        self._op_func = op_func
 
     def __str__(self):
-        return "{type}(name='{name}')".format(type=type(self).__name__, name=self.name)
+        """Return string representing operation."""
+        return f"{type(self).__name__}(op_func='{self._op_func}')"
+
+    def __call__(self, *jobs):
+        r"""Call the operation on the provided jobs.
+
+        Parameters
+        ----------
+        \*jobs : One or more instances of :class:`~signac.contrib.job.Job`.
+            The jobs passed to the operation.
+
+        Returns
+        -------
+        object
+            The result of the operation function.
+
+        """
+        return self._op_func(*jobs)
 
 
-class FlowGroupEntry(object):
-    """A FlowGroupEntry registers operations for inclusion into a :py:class:`FlowGroup`.
+class FlowGroupEntry:
+    """A FlowGroupEntry registers operations for inclusion into a :class:`FlowGroup`.
 
-    Has two methods for adding operations: ``self()`` and ``with_directives``.
-    Using ``with_directives`` takes one argument, ``directives``, which are
-    applied to the operation when running through the group. This overrides
-    the default directives specified by ``@flow.directives``. Calling the object
-    directly will then use the default directives.
+    Application developers should not directly instantiate this class, but
+    use :meth:`~.FlowProject.make_group` instead.
 
-    :param name:
-        The name of the :py:class:`FlowGroup` to be created.
-    :type name:
-        str
-    :param options:
-        The :py:meth:`FlowProject.run` options to pass when submitting the group.
+    Operation functions can be marked for inclusion into a :class:`FlowGroup`
+    by decorating the functions with a corresponding :class:`FlowGroupEntry`.
+    If the operation requires specific directives, :meth:`~.with_directives`
+    accepts keyword arguments that are mapped to directives and returns a
+    decorator that can be applied to the operation to mark it for inclusion in
+    the group and indicate that it should be executed using the specified
+    directives. This overrides the default directives specified by
+    :meth:`flow.directives`.
+
+    Parameters
+    ----------
+    name : str
+        The name of the :class:`FlowGroup` to be created.
+    options : str
+        The :meth:`FlowProject.run` options to pass when submitting the group.
         These will be included in all submissions. Submissions use run
         commands to execute.
-    :type options:
-        str
+
     """
+
+    # TODO: Enable aggregator argument in documentation.
+    # aggregator : :class:`~._aggregator`
+    #     aggregator object associated with the :class:`FlowGroup`. If None, the
+    #     default aggregator is used (Default value = None).
+
     def __init__(self, name, options=""):
+        # TODO: Enable aggregator argument.
+        # def __init__(self, name, options="", aggregator=None):
         self.name = name
         self.options = options
+        self.aggregator = _aggregator.groupsof(1)
+        # TODO: Enable aggregator argument.
+        # if aggregator is None:
+        #     aggregator = _aggregator.groupsof(1)
+        # self.aggregator = aggregator
 
     def __call__(self, func):
-        """Decorator that adds the function into the group's operations.
+        """Add the function into the group's operations.
 
-        :param func:
+        This call operator allows the class to be used as a decorator.
+
+        Parameters
+        ----------
+        func : callable
             The function to decorate.
-        :type func:
-            callable
+
+        Returns
+        -------
+        callable
+            The decorated function.
+
         """
-        if hasattr(func, '_flow_groups'):
+        if hasattr(func, "_flow_groups"):
             if self.name in func._flow_groups:
-                raise ValueError("Cannot register existing name {} with group {}"
-                                 "".format(func, self.name))
-            else:
-                func._flow_groups.append(self.name)
+                raise ValueError(
+                    f"Cannot register existing name {func} with group {self.name}"
+                )
+            func._flow_groups.append(self.name)
         else:
             func._flow_groups = [self.name]
         return func
 
     def _set_directives(self, func, directives):
-        if hasattr(func, '_flow_group_operation_directives'):
+        if hasattr(func, "_flow_group_operation_directives"):
             if self.name in func._flow_group_operation_directives:
-                raise ValueError("Cannot set directives because directives already exist for {} "
-                                 "in group {}".format(func, self.name))
-            else:
-                func._flow_group_operation_directives[self.name] = directives
+                raise ValueError(
+                    f"Cannot set directives because directives already exist "
+                    f"for {func} in group {self.name}"
+                )
+            func._flow_group_operation_directives[self.name] = directives
         else:
             func._flow_group_operation_directives = {self.name: directives}
 
     def with_directives(self, directives):
-        """Returns a decorator that sets group specific directives to the operation.
+        """Return a decorator that sets group specific directives to the operation.
 
-        :param directives:
+        Parameters
+        ----------
+        directives : dict
             Directives to use for resource requests and running the operation
             through the group.
-        :type directives:
-            dict
-        :returns:
+
+        Returns
+        -------
+        function
             A decorator which registers the function into the group with
             specified directives.
-        :rtype:
-            function
+
         """
 
         def decorator(func):
@@ -625,14 +789,16 @@ class FlowGroupEntry(object):
         return decorator
 
 
-class FlowGroup(object):
-    """A FlowGroup represents a subset of a workflow for a project.
+class FlowGroup:
+    """A :class:`~.FlowGroup` represents a subset of a workflow for a project.
 
-    Any :py:class:`FlowGroup` is associated with one or more instances of
-    :py:class:`BaseFlowOperation`.
+    A :class:`FlowGroup` is associated with one or more instances of
+    :class:`~.BaseFlowOperation`.
 
-    In the example below, the directives will be {'nranks': 4} for op1 and
-    {'nranks': 2, 'executable': 'python3'} for op2
+    Examples
+    --------
+    In the example below, the directives will be ``{'nranks': 4}`` for op1 and
+    ``{'nranks': 2, 'executable': 'python3'}`` for op2.
 
     .. code-block:: python
 
@@ -650,45 +816,41 @@ class FlowGroup(object):
         def op2(job):
             pass
 
-    :param name:
+    Parameters
+    ----------
+    name : str
         The name of the group to be used when calling from the command line.
-    :type name:
-        str
-    :param operations:
+    operations : dict
         A dictionary of operations where the keys are operation names and
-        each value is a :py:class:`BaseFlowOperation`.
-    :type operations:
-        dict
-    :param operation_directives:
+        each value is a :class:`~.BaseFlowOperation`.
+    operation_directives : dict
         A dictionary of additional parameters that provide instructions on how
         to execute a particular operation, e.g., specifically required
-        resources. Operation names are keys and the dictionaries of directives are
-        values. If an operation does not have directives specified, then the
-        directives of the singleton group containing that operation are used. To
-        prevent this, set the directives to an empty dictionary for that
-        operation.
-    :type operation_directives:
-        dict
-    :param options:
+        resources. Operation names are keys and the dictionaries of directives
+        are values. If an operation does not have directives specified, then
+        the directives of the singleton group containing that operation are
+        used. To prevent this, set the directives to an empty dictionary for
+        that operation.
+    options : str
         A string of options to append to the output of the object's call method.
-        This lets options like ``--num_passes`` to be given to a group.
-    :type options:
-        str
+        This allows options like ``--num_passes`` to be given to a group.
+
     """
 
     MAX_LEN_ID = 100
 
-    def __init__(self, name, operations=None, operation_directives=None,
-                 options=""):
+    def __init__(self, name, operations=None, operation_directives=None, options=""):
         self.name = name
         self.options = options
-        self.operations = dict() if operations is None else operations
+        # Requires Python >=3.6: dict must be ordered to ensure consistent
+        # pretend submission output for templates.
+        self.operations = {} if operations is None else dict(operations)
         if operation_directives is None:
-            self.operation_directives = dict()
+            self.operation_directives = {}
         else:
             self.operation_directives = operation_directives
 
-    def _set_entrypoint_item(self, entrypoint, directives, key, default, job):
+    def _set_entrypoint_item(self, entrypoint, directives, key, default, jobs):
         """Set a value (executable, path) for entrypoint in command.
 
         Order of priority is the operation directives specified and
@@ -696,338 +858,422 @@ class FlowGroup(object):
         """
         entrypoint[key] = directives.get(key, entrypoint.get(key, default))
         if callable(entrypoint[key]):
-            entrypoint[key] = entrypoint[key](job)
+            entrypoint[key] = entrypoint[key](*jobs)
 
-    def _determine_entrypoint(self, entrypoint, directives, job):
-        """Get the entrypoint for creating a JobOperation.
+    def _determine_entrypoint(self, entrypoint, directives, jobs):
+        """Get the entrypoint for creating a _JobOperation.
 
         If path cannot be determined, then raise a RuntimeError since we do not
         know where to point to.
         """
         entrypoint = entrypoint.copy()
-        self._set_entrypoint_item(entrypoint, directives, 'executable', sys.executable, job)
-        self._set_entrypoint_item(entrypoint, directives, 'path', None, job)
-        if entrypoint['path'] is None:
-            raise RuntimeError("Entrypoint path not set.")
-        else:
-            return "{} {}".format(entrypoint['executable'], entrypoint['path']).lstrip()
+        self._set_entrypoint_item(
+            entrypoint, directives, "executable", sys.executable, jobs
+        )
 
-    def _resolve_directives(self, name, defaults):
+        # If a path is not provided, default to the path to the file where the
+        # FlowProject (subclass) is defined.
+        # We are assuming that all the jobs belong to the same project
+        default_path = inspect.getfile(jobs[0]._project.__class__)
+        self._set_entrypoint_item(entrypoint, directives, "path", default_path, jobs)
+        return "{} {}".format(entrypoint["executable"], entrypoint["path"]).lstrip()
+
+    def _resolve_directives(self, name, defaults, env):
+        all_directives = env._get_default_directives()
         if name in self.operation_directives:
-            return deepcopy(self.operation_directives[name])
+            all_directives.update(self.operation_directives[name])
         else:
-            return deepcopy(defaults.get(name, dict()))
+            all_directives.update(defaults.get(name, {}))
+        return all_directives
 
-    def _submit_cmd(self, entrypoint, ignore_conditions, parallel, job=None):
-        entrypoint = self._determine_entrypoint(entrypoint, dict(), job)
-        cmd = "{} run -o {}".format(entrypoint, self.name)
-        cmd = cmd if job is None else cmd + ' -j {}'.format(job)
-        cmd = cmd if not parallel else cmd + " --parallel"
-        cmd = cmd if self.options is None else cmd + ' ' + self.options
+    def _submit_cmd(self, entrypoint, ignore_conditions, jobs=None):
+        entrypoint = self._determine_entrypoint(entrypoint, {}, jobs)
+        cmd = f"{entrypoint} run -o {self.name}"
+        cmd = cmd if jobs is None else cmd + f" -j {_get_aggregate_id(jobs)}"
+        cmd = cmd if self.options is None else cmd + " " + self.options
         if ignore_conditions != IgnoreConditions.NONE:
-            return cmd.strip() + ' --ignore-conditions=' + str(ignore_conditions)
-        else:
-            return cmd.strip()
+            return cmd.strip() + " --ignore-conditions=" + str(ignore_conditions)
+        return cmd.strip()
 
-    def _run_cmd(self, entrypoint, operation_name, operation, directives, job):
+    def _run_cmd(self, entrypoint, operation_name, operation, directives, jobs):
         if isinstance(operation, FlowCmdOperation):
-            return operation(job).lstrip()
-        else:
-            entrypoint = self._determine_entrypoint(entrypoint, directives, job)
-            return '{} exec {} {}'.format(entrypoint, operation_name, job).lstrip()
+            return operation(*jobs).lstrip()
+        entrypoint = self._determine_entrypoint(entrypoint, directives, jobs)
+        return f"{entrypoint} exec {operation_name} {_get_aggregate_id(jobs)}".lstrip()
 
     def __iter__(self):
         yield from self.operations.values()
 
     def __repr__(self):
-        return "{type}(name='{name}', operations='{operations}', " \
-               "operation_directives={directives}, options='{options}')".format(
-                   type=type(self).__name__,
-                   name=self.name,
-                   operations=' '.join(list(self.operations)),
-                   directives=self.operation_directives,
-                   options=self.options)
+        return (
+            "{type}(name='{name}', operations='{operations}', "
+            "operation_directives={directives}, options='{options}')".format(
+                type=type(self).__name__,
+                name=self.name,
+                operations=" ".join(list(self.operations)),
+                directives=self.operation_directives,
+                options=self.options,
+            )
+        )
 
-    def eligible(self, job, ignore_conditions=IgnoreConditions.NONE):
-        """Eligible, when at least one BaseFlowOperation is eligible.
+    def _eligible(self, aggregate, ignore_conditions=IgnoreConditions.NONE):
+        """Determine if at least one operation is eligible.
 
-        :param job:
-            A :class:`signac.Job` from the signac workspace.
-        :type job:
-            :class:`signac.Job`
-        :param ignore_conditions:
-            Specify if pre and/or post conditions check is to be ignored for eligibility check.
-            The default is :py:class:`IgnoreConditions.NONE`.
-        :type ignore_conditions:
-            :py:class:`~.IgnoreConditions`
-        :return:
+        A :class:`~.FlowGroup` is eligible for execution if at least one of
+        its associated operations is eligible.
+
+        Parameters
+        ----------
+        aggregate : tuple of :class:`~signac.contrib.job.Job`
+            The aggregate of signac jobs.
+        ignore_conditions : :class:`~.IgnoreConditions`
+            Specify if preconditions and/or postconditions are to be ignored
+            while checking eligibility. The default is
+            :class:`IgnoreConditions.NONE`.
+
+        Returns
+        -------
+        bool
             Whether the group is eligible.
-        :rtype:
-            bool
+
         """
-        return any(op.eligible(job, ignore_conditions) for op in self)
+        return any(op._eligible(aggregate, ignore_conditions) for op in self)
 
-    def complete(self, job):
-        """True when all BaseFlowOperation post-conditions are met.
+    def _complete(self, jobs):
+        """Check if postconditions are met for all operations in the group.
 
-        :param job:
-            A :class:`signac.Job` from the signac workspace.
-        :type job:
-            :class:`signac.Job`
-        :return:
+        Parameters
+        ----------
+        jobs : tuple
+            The signac job handles.
+
+        Returns
+        -------
+        bool
             Whether the group is complete (all contained operations are
             complete).
-        :rtype:
-            bool
+
         """
-        return all(op.complete(job) for op in self)
+        return all(op._complete(jobs) for op in self)
 
     def add_operation(self, name, operation, directives=None):
-        """Add an operation to the FlowGroup.
+        """Add an operation to the :class:`~.FlowGroup`.
 
-        :param name:
+        Parameters
+        ----------
+        name : str
             The name of the operation.
-        :type name:
-            str
-        :param operation:
-            The workflow operation to add to the FlowGroup.
-        :type operation:
-            :py:class:`BaseFlowOperation`
-        :param directives:
-            The operation specific directives.
-        :type directives:
-            dict
+        operation : :class:`~.BaseFlowOperation`
+            The workflow operation to add to the :class:`~.FlowGroup`.
+        directives : dict
+            The operation specific directives. (Default value = None)
+
         """
         self.operations[name] = operation
         if directives is not None:
             self.operation_directives[name] = directives
 
     def isdisjoint(self, group):
-        """Returns whether two groups are disjoint (do not share any common operations).
+        """Return whether two groups are disjoint.
 
-        :param group:
-            The other FlowGroup to compare to.
-        :type group:
-            :py:class:`flow.FlowGroup`
-        :return:
+        Groups are disjoint if they do not share any common operations.
+
+        Parameters
+        ----------
+        group : :class:`~.FlowGroup`
+            The other :class:`~.FlowGroup` to compare to.
+
+        Returns
+        -------
+        bool
             Returns ``True`` if ``group`` and ``self`` share no operations,
             otherwise returns ``False``.
-        :rtype:
-            bool
+
         """
         return set(self).isdisjoint(set(group))
 
-    def _generate_id(self, job, operation_name=None, index=0):
-        "Return an id, which identifies this group with respect to this job."
-        project = job._project
+    def _generate_id(self, aggregate, operation_name=None):
+        """Generate a unique id which identifies this group and job(s).
+
+        The generated value is used to identify interactions with the
+        scheduler.
+
+        Parameters
+        ----------
+        aggregate : tuple of :class:`signac.contrib.job.Job`
+            The aggregate of signac jobs.
+        operation_name : str
+            Operation name defining the unique id. (Default value = None)
+
+        Returns
+        -------
+        str
+            The unique id.
+
+        """
+        project = aggregate[0]._project
 
         # The full name is designed to be truly unique for each job-group.
         if operation_name is None:
-            op_string = ''.join(sorted(list(self.operations)))
+            op_string = "".join(sorted(list(self.operations)))
         else:
             op_string = operation_name
 
-        full_name = '{}%{}%{}%{}'.format(project.root_directory(),
-                                         job.get_id(),
-                                         op_string,
-                                         index)
+        root_directory = project.root_directory()
+        aggregate_id = _get_aggregate_id(aggregate)
+        full_name = f"{root_directory}%{aggregate_id}%{op_string}"
         # The job_op_id is a hash computed from the unique full name.
-        job_op_id = calc_id(full_name)
+        job_op_id = md5(full_name.encode("utf-8")).hexdigest()
 
-        # The actual job id is then constructed from a readable part and the job_op_id,
-        # ensuring that the job-op is still somewhat identifiable, but guaranteed to
-        # be unique. The readable name is based on the project id, job id, operation name,
-        # and the index number. All names and the id itself are restricted in length
-        # to guarantee that the id does not get too long.
+        # The actual job id is then constructed from a readable part and the
+        # job_op_id, ensuring that the job-op is still somewhat identifiable,
+        # but guaranteed to be unique. The readable name is based on the
+        # project id, aggregate id, and operation name. All names and the id
+        # itself are restricted in length to guarantee that the id does not get
+        # too long.
         max_len = self.MAX_LEN_ID - len(job_op_id)
         if max_len < len(job_op_id):
-            raise ValueError("Value for MAX_LEN_ID is too small ({}).".format(self.MAX_LEN_ID))
+            raise ValueError(f"Value for MAX_LEN_ID is too small ({self.MAX_LEN_ID}).")
 
-        readable_name = '{}/{}/{}/{:04d}/'.format(
-            str(project)[:12], str(job)[:8],
-            op_string[:12], index)[:max_len]
+        separator = getattr(project._environment, "JOB_ID_SEPARATOR", "/")
+        readable_name = "{project}{sep}{aggregate_id}{sep}{op_string}{sep}".format(
+            sep=separator,
+            project=str(project)[:12],
+            aggregate_id=aggregate_id,
+            op_string=op_string[:12],
+        )[:max_len]
 
         # By appending the unique job_op_id, we ensure that each id is truly unique.
         return readable_name + job_op_id
 
-    def _get_status(self, job):
-        """For a given job check the groups submission status."""
-        try:
-            return JobStatus(job._project.document['_status'][self._generate_id(job)])
-        except KeyError:
-            return JobStatus.unknown
+    def _create_submission_job_operation(
+        self,
+        entrypoint,
+        default_directives,
+        jobs,
+        ignore_conditions_on_execution=IgnoreConditions.NONE,
+    ):
+        """Create a _JobOperation object from the :class:`~.FlowGroup`.
 
-    def _create_submission_job_operation(self, entrypoint, default_directives, job,
-                                         ignore_conditions_on_execution=IgnoreConditions.NONE,
-                                         parallel=False, index=0):
-        """Create a JobOperation object from the FlowGroup.
+        Creates a _JobOperation for use in submitting and scripting.
 
-        Creates a JobOperation for use in submitting and scripting.
-
-        :param entrypoint:
+        Parameters
+        ----------
+        entrypoint : dict
             The path and executable, if applicable, to point to for execution.
-        :type entrypoint:
-            dict
-        :param default_directives:
-            The default directives to use for the operations. This is to allow for user specified
-            groups to 'inherit' directives from ``default_directives``. If no defaults are desired,
-            the argument can be set to an empty dictionary. This must be done explicitly, however.
-        :type default_directives:
-            dict
-        :param job:
-            The job that the :class:`~.JobOperation` is based on.
-        :type job:
-            :class:`signac.Job`
-        :param ignore_conditions:
-            Specify if pre and/or post conditions check is to be ignored for
-            checking submission eligibility. The default is `IgnoreConditions.NONE`.
-        :type ignore_conditions:
-            :py:class:`~.IgnoreConditions`
-        :param ignore_conditions_on_execution:
-            Specify if pre and/or post conditions check is to be ignored for eligibility check after
-            submitting.  The default is `IgnoreConditions.NONE`.
-        :type ignore_conditions_on_execution:
-            :py:class:`~.IgnoreConditions`
-        :param parallel:
-            Whether the submission should run its operations in parallel.
-        :type parallel:
-            bool
-        :param index:
-            Index for the :class:`~.JobOperation`.
-        :type index:
-            int
-        :return:
-            Returns a :py:class:`~.JobOperation` for submitting the group. The
-            :py:class:`~.JobOperation` will have directives that have been collected
-            appropriately from its contained operations based on parallel or serial
-            execution.
-        :rtype:
-            :py:class:`JobOperation`
+        default_directives : dict
+            The default directives to use for the operations. This is to allow
+            for user specified groups to 'inherit' directives from
+            ``default_directives``. If no defaults are desired, the argument
+            can be set to an empty dictionary. This must be done explicitly,
+            however.
+        jobs : tuple of :class:`~signac.contrib.job.Job`
+            The jobs that the :class:`~._JobOperation` is based on.
+        ignore_conditions_on_execution : :class:`~.IgnoreConditions`
+            Specify if preconditions and/or postconditions are to be ignored
+            while checking eligibility during execution (after submission). The
+            default is :class:`IgnoreConditions.NONE`.
+
+        Returns
+        -------
+        :class:`~._SubmissionJobOperation`
+            Returns a :class:`~._SubmissionJobOperation` for submitting the
+            group. The :class:`~._JobOperation` will have directives that have
+            been collected appropriately from its contained operations.
+
         """
-        uneval_cmd = functools.partial(self._submit_cmd, entrypoint=entrypoint, job=job,
-                                       ignore_conditions=ignore_conditions_on_execution,
-                                       parallel=parallel)
-        submission_directives = self._get_submission_directives(default_directives, job, parallel)
-        return JobOperation(self._generate_id(job, index=index),
-                            self.name,
-                            job,
-                            cmd=uneval_cmd,
-                            directives=submission_directives)
+        unevaluated_cmd = _cached_partial(
+            self._submit_cmd,
+            entrypoint=entrypoint,
+            jobs=jobs,
+            ignore_conditions=ignore_conditions_on_execution,
+        )
 
-    def _create_run_job_operations(self, entrypoint, default_directives, job,
-                                   ignore_conditions=IgnoreConditions.NONE, index=0):
-        """Create JobOperation object(s) from the FlowGroup.
+        def _get_run_ops(ignore_ops, additional_ignores_flag):
+            """Get all runnable operations.
 
-        Yields a JobOperation for each contained operation given proper conditions are met.
+            Returns operations that match the combination of the conditions
+            required by ``_create_submission_job_operation`` and the ignored
+            flags, and remove operations in the ``ignore_ops`` list.
 
-        :param entrypoint:
+            Parameters
+            ----------
+            ignore_ops : iterable
+                Operations to ignore.
+            additional_ignores_flag : :class:`~.IgnoreConditions`
+                An additional set of ignore flags combined with the ignore
+                flags used for execution.
+
+            Returns
+            -------
+            list of :class:`_JobOperation`
+                Runnable operations.
+
+            """
+            ignore_ops = set(ignore_ops)
+            return [
+                op
+                for op in self._create_run_job_operations(
+                    entrypoint=entrypoint,
+                    default_directives=default_directives,
+                    jobs=jobs,
+                    ignore_conditions=ignore_conditions_on_execution
+                    | additional_ignores_flag,
+                )
+                if op not in ignore_ops
+            ]
+
+        submission_directives = self._get_submission_directives(
+            default_directives, jobs
+        )
+        eligible_operations = _get_run_ops([], IgnoreConditions.NONE)
+        operations_with_unmet_preconditions = _get_run_ops(
+            eligible_operations, IgnoreConditions.PRE
+        )
+        operations_with_met_postconditions = _get_run_ops(
+            eligible_operations, IgnoreConditions.POST
+        )
+
+        submission_job_operation = _SubmissionJobOperation(
+            self._generate_id(jobs),
+            self.name,
+            jobs,
+            cmd=unevaluated_cmd,
+            directives=dict(submission_directives),
+            user_directives=set(submission_directives.user_keys),
+            eligible_operations=eligible_operations,
+            operations_with_unmet_preconditions=operations_with_unmet_preconditions,
+            operations_with_met_postconditions=operations_with_met_postconditions,
+        )
+        return submission_job_operation
+
+    def _create_run_job_operations(
+        self,
+        entrypoint,
+        default_directives,
+        jobs,
+        ignore_conditions=IgnoreConditions.NONE,
+    ):
+        """Create _JobOperation object(s) from the :class:`~.FlowGroup`.
+
+        Yields a _JobOperation for each contained operation given proper
+        conditions are met.
+
+        Parameters
+        ----------
+        entrypoint : dict
             The path and executable, if applicable, to point to for execution.
-        :type entrypoint:
-            dict
-        :param default_directives:
-            The default directives to use for the operations. This is to allow for user specified
-            groups to 'inherent' directives from ``default_directives``. If no defaults are desired,
-            the argument must be explicitly set to an empty dictionary.
-        :type default_directives:
-            dict
-        :param job:
-            The job that the :class:`~.JobOperation` is based on.
-        :type job:
-            :class:`signac.Job`
-        :param index:
-            Index for the :class:`~.JobOperation`.
-        :type index:
-            int
-        :return:
-            Returns an iterator over eligible :py:class:`~.JobOperation`s.
-        :rtype:
-            Iterator[JobOperation]
+        default_directives : dict
+            The default directives to use for the operations. This is to allow
+            for user-specified groups to inherit directives from
+            ``default_directives``. If no defaults are desired, the argument
+            must be explicitly set to an empty dictionary.
+        jobs : tuple of :class:`~signac.contrib.job.Job`
+            The jobs that the :class:`~._JobOperation` is based on.
+        ignore_conditions : :class:`~.IgnoreConditions`
+            Specify if preconditions and/or postconditions are to be ignored
+            when determining eligibility check. The default is
+            :class:`IgnoreConditions.NONE`.
+
+        Returns
+        -------
+        Iterator[_JobOperation]
+            Iterator of eligible instances of :class:`~._JobOperation`.
+
         """
-        for name, op in self.operations.items():
-            if op.eligible(job, ignore_conditions):
-                directives = self._resolve_directives(name, default_directives)
-                uneval_cmd = functools.partial(self._run_cmd, entrypoint=entrypoint,
-                                               operation_name=name, operation=op,
-                                               directives=directives, job=job)
-                # Uses a different id than the groups direct id. Do not use this for submitting
-                # jobs as current implementation prevents checking for resubmission in this case.
-                # The different ids allow for checking whether JobOperations created to run directly
-                # are different.
-                job_op = JobOperation(self._generate_id(job, name, index=index), name, job,
-                                      cmd=uneval_cmd, directives=deepcopy(directives))
+        # Assuming all the jobs belong to the same FlowProject
+        env = jobs[0]._project._environment
+        for operation_name, operation in self.operations.items():
+            if operation._eligible(jobs, ignore_conditions):
+                directives = self._resolve_directives(
+                    operation_name, default_directives, env
+                )
+                directives.evaluate(jobs)
+                # Return an unevaluated command to make evaluation lazy and
+                # reduce side effects in callable FlowCmdOperations.
+                unevaluated_cmd = _cached_partial(
+                    self._run_cmd,
+                    entrypoint=entrypoint,
+                    operation_name=operation_name,
+                    operation=operation,
+                    directives=directives,
+                    jobs=jobs,
+                )
+                job_op = _JobOperation(
+                    self._generate_id(jobs, operation_name),
+                    operation_name,
+                    jobs,
+                    cmd=unevaluated_cmd,
+                    directives=dict(directives),
+                    user_directives=set(directives.user_keys),
+                )
+                # Get the prefix, and if it's non-empty, set the fork directive
+                # to True since we must launch a separate process. Override
+                # the command directly.
+                prefix = jobs[0]._project._environment.get_prefix(job_op)
+                if prefix != "":
+                    job_op.directives["fork"] = True
+                    job_op._cmd = f"{prefix} {job_op.cmd}"
                 yield job_op
 
-    def _get_submission_directives(self, default_directives, job, parallel=False):
+    def _get_submission_directives(self, default_directives, jobs):
         """Get the combined resources for submission.
 
         No checks are done to mitigate inappropriate aggregation of operations.
         This can lead to poor utilization of computing resources.
         """
-        directives = dict(ngpu=0, nranks=0, omp_num_threads=0, np=0)
-
-        def get_directive(directives, key, default, job):
-            d = directives.get(key, default)
-            return d(job) if callable(d) else d
-
-        for name in self.operations:
+        env = jobs[0]._project._environment
+        operation_names = list(self.operations.keys())
+        # The first operation's directives are evaluated, then all other
+        # operations' directives are applied as updates with aggregate=True
+        directives = self._resolve_directives(
+            operation_names[0], default_directives, env
+        )
+        directives.evaluate(jobs)
+        for name in operation_names[1:]:
             # get directives for operation
-            op_dir = self._resolve_directives(name, default_directives)
-            # if operations are callable handle appropriately with job
-            op_dir.update(dict(
-                ngpu=get_directive(op_dir, 'ngpu', 0, job),
-                nranks=get_directive(op_dir, 'nranks', 0, job),
-                omp_num_threads=get_directive(op_dir, 'omp_num_threads', 0, job)))
-
-            # Find the correct number of processors for operation
-            np = op_dir.get('np', max(op_dir['nranks'], 1) * max(op_dir['omp_num_threads'], 1))
-
-            if parallel:
-                # In general parallel means add resources
-                directives['ngpu'] += op_dir['ngpu']
-                directives['nranks'] += op_dir['nranks']
-                directives['omp_num_threads'] += op_dir['omp_num_threads']
-                directives['np'] += np
-            else:
-                # In serial we take the max
-                directives['ngpu'] = max(directives['ngpu'], op_dir['ngpu'])
-                directives['nranks'] = max(directives['nranks'], op_dir['nranks'])
-                directives['omp_num_threads'] = max(directives['omp_num_threads'],
-                                                    op_dir['omp_num_threads'])
-                directives['np'] = max(directives['np'], np)
+            directives.update(
+                self._resolve_directives(name, default_directives, env),
+                aggregate=True,
+                jobs=jobs,
+            )
         return directives
 
 
 class _FlowProjectClass(type):
     """Metaclass for the FlowProject class."""
-    def __new__(metacls, name, bases, namespace, **kwargs):
+
+    def __new__(metacls, name, bases, namespace):
         cls = type.__new__(metacls, name, bases, dict(namespace))
 
-        # All operation functions are registered with the operation() classmethod, which is
-        # intended to be used as a decorator function. _OPERATION_FUNCTIONS is a list of tuples
-        # of the operation name and the operation function. In addition, pre and post conditions
+        # All operation functions are registered with the operation()
+        # classmethod, which is intended to be used as a decorator function.
+        # _OPERATION_FUNCTIONS is a list of tuples of the operation name and
+        # the operation function. In addition, preconditions and postconditions
         # are registered with the class.
 
-        cls._OPERATION_FUNCTIONS = list()
-        cls._OPERATION_PRE_CONDITIONS = defaultdict(list)
-        cls._OPERATION_POST_CONDITIONS = defaultdict(list)
+        cls._OPERATION_FUNCTIONS = []
+        cls._OPERATION_PRECONDITIONS = defaultdict(list)
+        cls._OPERATION_POSTCONDITIONS = defaultdict(list)
 
-        # All label functions are registered with the label() classmethod, which is intended
-        # to be used as decorator function. The _LABEL_FUNCTIONS dict contains the function as
-        # key and the label name as value, or None to use the default label name.
-        cls._LABEL_FUNCTIONS = OrderedDict()
+        # All label functions are registered with the label() classmethod,
+        # which is intended to be used as decorator function. The
+        # _LABEL_FUNCTIONS dict contains the function as key and the label name
+        # as value, or None to use the default label name.
+        cls._LABEL_FUNCTIONS = {}
 
-        # Give the class a pre and post class that are aware of the class they
-        # are in.
-        cls.pre = cls._setup_pre_conditions_class(parent_class=cls)
-        cls.post = cls._setup_post_conditions_class(parent_class=cls)
+        # Give the class a preconditions and postconditions class that are
+        # aware of the class they are in.
+        cls.pre = cls._setup_preconditions_class(parent_class=cls)
+        cls.post = cls._setup_postconditions_class(parent_class=cls)
 
-        # All groups are registered with the function returned by the make_group
-        # classmethod. In contrast to operations and labels, the
+        # All groups are registered with the function returned by the
+        # make_group classmethod. In contrast to operations and labels, the
         # make_group classmethod does not serve as the decorator, the functor
-        # it returns does. The _GROUPS list records the groups created and their
-        # passed parameters for later initialization. The _GROUP_NAMES set stores
-        # whether a group name has already been used.
-        cls._GROUPS = list()
+        # it returns does. The _GROUPS list records the groups created and
+        # their passed parameters for later initialization. The _GROUP_NAMES
+        # set stores whether a group name has already been used.
+        cls._GROUPS = []
         cls._GROUP_NAMES = set()
 
         cls.hook = _HooksDecorator()
@@ -1035,11 +1281,13 @@ class _FlowProjectClass(type):
         return cls
 
     @staticmethod
-    def _setup_pre_conditions_class(parent_class):
-
+    def _setup_preconditions_class(parent_class):
         class pre(_condition):
-            """Specify a function of job that must be true for this operation to
-            be eligible for execution. For example:
+            """Define and evaluate preconditions for operations.
+
+            A precondition is a function accepting one or more jobs as
+            positional arguments (``*jobs``) that must evaluate to True for
+            this operation to be eligible for execution. For example:
 
             .. code-block:: python
 
@@ -1049,8 +1297,8 @@ class _FlowProjectClass(type):
                     print('hello', job)
                     job.doc.hello = True
 
-            The *hello*-operation would only execute if the 'hello' key in the job
-            document does not evaluate to True.
+            The *hello* operation would only execute if the 'hello' key in the
+            job document does not evaluate to True.
 
             An optional tag may be associated with the condition. These tags
             are used by :meth:`~.detect_operation_graph` when comparing
@@ -1060,64 +1308,111 @@ class _FlowProjectClass(type):
 
             _parent_class = parent_class
 
-            def __init__(self, condition, tag=None):
-                super(pre, self).__init__(condition, tag)
-
             def __call__(self, func):
-                self._parent_class._OPERATION_PRE_CONDITIONS[func].insert(0, self.condition)
+                operation_functions = [
+                    operation[1]
+                    for operation in self._parent_class._collect_operations()
+                ]
+                if self.condition in operation_functions:
+                    raise ValueError(
+                        "Operation functions cannot be used as preconditions."
+                    )
+                self._parent_class._OPERATION_PRECONDITIONS[func].insert(
+                    0, self.condition
+                )
                 return func
 
             @classmethod
             def copy_from(cls, *other_funcs):
-                "True if and only if all pre conditions of other operation-function(s) are met."
-                return cls(_create_all_metacondition(cls._parent_class._collect_pre_conditions(),
-                                                     *other_funcs))
+                """Copy preconditions from other operation(s).
+
+                True if and only if all preconditions of other operation
+                function(s) are met.
+                """
+                return cls(
+                    _create_all_metacondition(
+                        cls._parent_class._collect_preconditions(), *other_funcs
+                    )
+                )
 
             @classmethod
             def after(cls, *other_funcs):
-                "True if and only if all post conditions of other operation-function(s) are met."
-                return cls(_create_all_metacondition(cls._parent_class._collect_post_conditions(),
-                                                     *other_funcs))
+                """Precondition to run an operation after other operations.
+
+                True if and only if all postconditions of other operation
+                function(s) are met.
+                """
+                operation_functions = [
+                    operation[1]
+                    for operation in cls._parent_class._collect_operations()
+                ]
+                if not all(
+                    condition in operation_functions for condition in other_funcs
+                ):
+                    raise ValueError("The arguments to pre.after must be operations.")
+                return cls(
+                    _create_all_metacondition(
+                        cls._parent_class._collect_postconditions(), *other_funcs
+                    )
+                )
 
         return pre
 
     @staticmethod
-    def _setup_post_conditions_class(parent_class):
-
+    def _setup_postconditions_class(parent_class):
         class post(_condition):
-            """Specify a function of job that must evaluate to True for this operation
-            to be considered complete. For example:
+            """Define and evaluate postconditions for operations.
+
+            A postcondition is a function accepting one or more jobs as
+            positional arguments (``*jobs``) that must evaluate to True for
+            this operation to be considered complete. For example:
 
             .. code-block:: python
 
                 @Project.operation
                 @Project.post(lambda job: job.doc.get('bye'))
                 def bye(job):
-                    print('bye' job)
+                    print('bye', job)
                     job.doc.bye = True
 
-            The *bye*-operation would be considered complete and therefore no longer
-            eligible for execution once the 'bye' key in the job document evaluates to True.
+            The *bye* operation would be considered complete and therefore no
+            longer eligible for execution once the 'bye' key in the job
+            document evaluates to True.
 
             An optional tag may be associated with the condition. These tags
             are used by :meth:`~.detect_operation_graph` when comparing
             conditions for equality. The tag defaults to the bytecode of the
             function.
             """
+
             _parent_class = parent_class
 
-            def __init__(self, condition, tag=None):
-                super(post, self).__init__(condition, tag)
-
             def __call__(self, func):
-                self._parent_class._OPERATION_POST_CONDITIONS[func].insert(0, self.condition)
+                operation_functions = [
+                    operation[1]
+                    for operation in self._parent_class._collect_operations()
+                ]
+                if self.condition in operation_functions:
+                    raise ValueError(
+                        "Operation functions cannot be used as postconditions."
+                    )
+                self._parent_class._OPERATION_POSTCONDITIONS[func].insert(
+                    0, self.condition
+                )
                 return func
 
             @classmethod
             def copy_from(cls, *other_funcs):
-                "True if and only if all post conditions of other operation-function(s) are met."
-                return cls(_create_all_metacondition(cls._parent_class._collect_post_conditions(),
-                                                     *other_funcs))
+                """Copy postconditions from other operation(s).
+
+                True if and only if all postconditions of other operation
+                function(s) are met.
+                """
+                return cls(
+                    _create_all_metacondition(
+                        cls._parent_class._collect_postconditions(), *other_funcs
+                    )
+                )
 
         return post
 
@@ -1125,10 +1420,12 @@ class _FlowProjectClass(type):
 class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     """A signac project class specialized for workflow management.
 
-    This class provides a command line interface for the definition, execution, and
-    submission of workflows based on condition and operation functions.
+    This class is used to define, execute, and submit workflows based on
+    operations and conditions.
 
-    This is a typical example on how to use this class:
+    Users typically interact with this class through its command line interface.
+
+    This is a typical example of how to use this class:
 
     .. code-block:: python
 
@@ -1138,36 +1435,39 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         FlowProject().main()
 
-    :param config:
+    Parameters
+    ----------
+    config : :class:`signac.contrib.project._ProjectConfig`
         A signac configuration, defaults to the configuration loaded
-        from the environment.
-    :type config:
-        A signac config object.
-    :param entrypoint:
-        A dictionary with two possible keys: executable and path. Path
-        represents the filepath location of the script file (the script file
-        must call ``main``). Executable represents the location of the Python
-        interpreter used for the executable of `FlowOperation` that are Python
-        functions.
-    :type entrypoint:
-        dict
+        from the current directory.
+    environment : :class:`flow.environment.ComputeEnvironment`
+        An environment to use for scheduler submission. If ``None``, the
+        environment is automatically identified. The default is ``None``.
+    entrypoint : dict
+        A dictionary with two possible keys: ``'executable'`` and ``'path'``.
+        The path represents the location of the script file (the
+        script file must call :meth:`FlowProject.main`). The executable
+        represents the location of the Python interpreter used for the
+        execution of :class:`~.BaseFlowOperation` that are Python functions.
+
     """
 
     def __init__(self, config=None, environment=None, entrypoint=None):
-        super(FlowProject, self).__init__(config=config)
+        super().__init__(config=config)
 
         # Associate this class with a compute environment.
         self._environment = environment or get_environment()
 
         # Assign variables that give script location information
-        self._entrypoint = dict() if entrypoint is None else entrypoint
+        self._entrypoint = {} if entrypoint is None else entrypoint
 
         # The standard local template directory is a directory called 'templates' within
         # the project root directory. This directory may be specified with the 'template_dir'
         # configuration variable.
         self._template_dir = os.path.join(
-            self.root_directory(), self._config.get('template_dir', 'templates'))
-        self._template_environment_ = dict()
+            self.root_directory(), self._config.get("template_dir", "templates")
+        )
+        self._template_environment_ = {}
 
         # Setup execution hooks
         self._hooks = Hooks()
@@ -1175,33 +1475,27 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         self._install_config_hooks()
 
         # Register all label functions with this project instance.
-        self._label_functions = OrderedDict()
+        self._label_functions = {}
         self._register_labels()
 
         # Register all operation functions with this project instance.
-        self._operation_functions = dict()
-        self._operations = OrderedDict()
+        self._operations = {}
         self._register_operations()
 
-        # Register all groups with this project instance.
-        self._groups = dict()
+        # Register all groups and aggregates with this project instance.
+        self._groups = {}
+        self._group_to_aggregate_store = _bidict()
         self._register_groups()
 
-        # Enable the use of buffered mode for certain functions
-        try:
-            self._use_buffered_mode = self.config['flow'].as_bool('use_buffered_mode')
-        except KeyError:
-            self._use_buffered_mode = False
-
     def _setup_template_environment(self):
-        """Setup the jinja2 template environment.
+        """Set up the jinja2 template environment.
 
-        The templating system is used to generate templated scripts for the script()
-        and submit_operations() / submit() function and the corresponding command line
-        subcommands.
+        The templating system is used to generate templated scripts for the
+        script() and _submit_operations() / submit() function and the
+        corresponding command line subcommands.
         """
-        if self._config.get('flow') and self._config['flow'].get('environment_modules'):
-            envs = self._config['flow'].as_list('environment_modules')
+        if self._config.get("flow") and self._config["flow"].get("environment_modules"):
+            envs = self._config["flow"].as_list("environment_modules")
         else:
             envs = []
 
@@ -1210,36 +1504,48 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         extra_packages = []
         for env in envs:
             try:
-                extra_packages.append(jinja2.PackageLoader(env, 'templates'))
+                extra_packages.append(jinja2.PackageLoader(env, "templates"))
             except ImportError as error:
-                logger.warning("Unable to load template from package '{}'.".format(error.name))
+                logger.warning(f"Unable to load template from package '{error.name}'.")
 
-        load_envs = ([jinja2.FileSystemLoader(self._template_dir)] +
-                     extra_packages +
-                     [jinja2.PackageLoader('flow', 'templates')])
+        load_envs = (
+            [jinja2.FileSystemLoader(self._template_dir)]
+            + extra_packages
+            + [jinja2.PackageLoader("flow", "templates")]
+        )
 
         template_environment = jinja2.Environment(
             loader=jinja2.ChoiceLoader(load_envs),
             trim_blocks=True,
-            extensions=[TemplateError])
+            extensions=[TemplateError],
+        )
 
         # Setup standard filters that can be used to format context variables.
-        template_environment.filters['format_timedelta'] = tf.format_timedelta
-        template_environment.filters['identical'] = tf.identical
-        template_environment.filters['with_np_offset'] = tf.with_np_offset
-        template_environment.filters['calc_tasks'] = tf.calc_tasks
-        template_environment.filters['calc_num_nodes'] = tf.calc_num_nodes
-        template_environment.filters['check_utilization'] = tf.check_utilization
-        template_environment.filters['homogeneous_openmp_mpi_config'] = \
-            tf.homogeneous_openmp_mpi_config
-        template_environment.filters['get_config_value'] = flow_config.get_config_value
-        template_environment.filters['require_config_value'] = flow_config.require_config_value
-        template_environment.filters['get_account_name'] = tf.get_account_name
-        template_environment.filters['print_warning'] = tf.print_warning
-        if 'max' not in template_environment.filters:    # for jinja2 < 2.10
-            template_environment.filters['max'] = max
-        if 'min' not in template_environment.filters:    # for jinja2 < 2.10
-            template_environment.filters['min'] = min
+        template_environment.filters[
+            "format_timedelta"
+        ] = template_filters.format_timedelta
+        template_environment.filters["identical"] = template_filters.identical
+        template_environment.filters["with_np_offset"] = template_filters.with_np_offset
+        template_environment.filters["calc_tasks"] = template_filters.calc_tasks
+        template_environment.filters["calc_num_nodes"] = template_filters.calc_num_nodes
+        template_environment.filters[
+            "check_utilization"
+        ] = template_filters.check_utilization
+        template_environment.filters[
+            "homogeneous_openmp_mpi_config"
+        ] = template_filters.homogeneous_openmp_mpi_config
+        template_environment.filters["get_config_value"] = flow_config.get_config_value
+        template_environment.filters[
+            "require_config_value"
+        ] = flow_config.require_config_value
+        template_environment.filters[
+            "get_account_name"
+        ] = template_filters.get_account_name
+        template_environment.filters["print_warning"] = template_filters.print_warning
+        if "max" not in template_environment.filters:  # for jinja2 < 2.10
+            template_environment.filters["max"] = max
+        if "min" not in template_environment.filters:  # for jinja2 < 2.10
+            template_environment.filters["min"] = min
 
         return template_environment
 
@@ -1251,26 +1557,32 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
             # Add environment-specific custom filters:
             for name, member in inspect.getmembers(environment):
-                if getattr(member, '_flow_template_filter', False):
+                if getattr(member, "_flow_template_filter", False):
                     template_environment.filters[name] = member
 
             self._template_environment_[environment] = template_environment
         return self._template_environment_[environment]
 
     def _get_standard_template_context(self):
-        "Return the standard templating context for run and submission scripts."
-        context = dict()
-        context['project'] = self
+        """Return the standard templating context for run and submission scripts."""
+        context = {}
+        context["project"] = self
         return context
 
     def _show_template_help_and_exit(self, template_environment, context):
-        "Print all context variables and filters to screen and exit."
+        """Print all context variables and filters to screen and exit."""
         from textwrap import TextWrapper
+
         wrapper = TextWrapper(width=90, break_long_words=False)
-        print(TEMPLATE_HELP.format(
-            template_dir=self._template_dir,
-            template_vars='\n'.join(wrapper.wrap(', '.join(sorted(context)))),
-            filters='\n'.join(wrapper.wrap(', '.join(sorted(template_environment.filters))))))
+        print(
+            TEMPLATE_HELP.format(
+                template_dir=self._template_dir,
+                template_vars="\n".join(wrapper.wrap(", ".join(sorted(context)))),
+                filters="\n".join(
+                    wrapper.wrap(", ".join(sorted(template_environment.filters)))
+                ),
+            )
+        )
         sys.exit(2)
 
     @property
@@ -1302,7 +1614,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @classmethod
     def label(cls, label_name_or_func=None):
-        """Designate a function to be a label function of this class.
+        """Designate a function as a label function for this class.
 
         For example, we can define a label function like this:
 
@@ -1313,8 +1625,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 if job.document.get('foo', False):
                     return 'foo-label-text'
 
-        The ``foo-label-text`` label will now show up in the status view for each job,
-        where the ``foo`` key evaluates true.
+        The ``foo-label-text`` label will now show up in the status view for
+        each job, where the ``foo`` key evaluates true.
 
         If the label functions returns any type other than ``str``, the label
         name will be the name of the function if and only if the return value
@@ -1326,32 +1638,41 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             def foo_label(job):
                 return job.document.get('foo', False)
 
-        Finally, you can specify a different default label name by providing it as the first
-        argument to the ``label()`` decorator.
+        Finally, specify a label name by providing it as the first argument
+        to the ``label()`` decorator.
 
-        :param label_name_or_func:
-            A label name or callable.
-        :type label_name_or_func:
-            str or callable
+        Parameters
+        ----------
+        label_name_or_func : str or callable
+            A label name or callable. (Default value = None)
+
+        Returns
+        -------
+        callable
+            A decorator for the label function.
+
         """
         if callable(label_name_or_func):
+            # This handles the case where no label name is given, as in
+            # @FlowProject.label. label_name_or_func is a function.
             cls._LABEL_FUNCTIONS[label_name_or_func] = None
             return label_name_or_func
 
         def label_func(func):
+            # This handles the case where a label name is given, as in
+            # @FlowProject.label("label_name"). label_name_or_func is a string.
             cls._LABEL_FUNCTIONS[func] = label_name_or_func
             return func
 
         return label_func
 
     def detect_operation_graph(self):
-        """Determine the directed acyclic graph defined by operation pre- and
-        post-conditions.
+        """Determine the directed acyclic graph given by operation conditions.
 
         In general, executing a given operation registered with a FlowProject
-        just involves checking the operation's pre- and post-conditions to
-        determine eligibility. More generally, however, the pre- and
-        post-conditions define a directed acyclic graph that governs the
+        just involves checking the operation's preconditions and postconditions
+        to determine eligibility. More generally, however, the preconditions
+        and postconditions define a directed acyclic graph that governs the
         execution of all operations. Visualizing this graph can be useful for
         finding logic errors in the specified conditions, and having this graph
         computed also enables additional execution modes. For example, using
@@ -1360,18 +1681,18 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         executing all necessary operations can be automated.
 
         The graph is determined by iterating over all pairs of operations and
-        checking for equality of pre- and post-conditions. The algorithm builds
-        an adjacency matrix based on whether the pre-conditions for one
-        operation match the post-conditions for another. The comparison of
-        operations is conservative; by default, conditions must be composed of
-        identical code to be identified as equal (technically, they must be
-        bytecode equivalent, i.e. ``cond1.__code__.co_code ==
+        checking for equality of preconditions and postconditions. The
+        algorithm builds an adjacency matrix based on whether the preconditions
+        for one operation match the postconditions for another. The comparison
+        of operations is conservative; by default, conditions must be composed
+        of identical code to be identified as equal (technically, they must
+        have equivalent bytecode, i.e. ``cond1.__code__.co_code ==
         cond2.__code__.co_code``). Users can specify that conditions should be
         treated as equal by providing tags to the operations.
 
-        Given a FlowProject subclass defined in a module ``project.py``, the
-        output graph could be visualized using Matplotlib and NetworkX with the
-        following code:
+        Given a :class:`~.FlowProject` subclass defined in a module
+        ``project.py``, the output graph could be visualized using Matplotlib
+        and NetworkX with the following code:
 
         .. code-block:: python
 
@@ -1396,11 +1717,19 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
             plt.show()
 
-        Raises a ``RuntimeError`` if a condition does not have a tag. This can
-        occur when using ``functools.partial``, and a manually specified
-        condition tag has not been set.
+        Returns
+        -------
+        list of lists of int
+            The adjacency matrix of operation dependencies. A zero indicates no
+            dependency, and a 1 indicates dependency. This can be converted to
+            a graph using NetworkX.
 
-        :raises: RuntimeError
+        Raises
+        ------
+        :class:`RuntimeError`
+            If a condition does not have a tag. This can occur when using
+            ``functools.partial``, and a manually specified condition tag has
+            not been set.
 
         """
 
@@ -1409,50 +1738,69 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             return [condition._callback for condition in conditions]
 
         def unpack_conditions(condition_functions):
-            """Identify any metaconditions in the list and reduce them to the
-            functions that they are composed of. The callbacks argument is used
-            in recursive calls to the function and appended to directly, but
-            only returned at the end."""
+            """Create a set of callbacks from condition functions.
+
+            Metaconditions in the list of condition functions are reduced into
+            the functions that they are composed of. All condition functions
+            must have a `_flow_tag` attribute defined.
+            """
             callbacks = set()
-            for cf in condition_functions:
-                # condition may not have __name__ attribute in cases where functools is used
-                # for condition creation
-                if hasattr(cf, '__name__') and cf.__name__ == "_flow_metacondition":
-                    callbacks = callbacks.union(unpack_conditions(cf._composed_of))
+            for condition_function in condition_functions:
+                # The condition function may not have a __name__ attribute in
+                # cases where functools is used for condition creation.
+                if (
+                    hasattr(condition_function, "__name__")
+                    and condition_function.__name__ == "_flow_metacondition"
+                ):
+                    callbacks = callbacks.union(
+                        unpack_conditions(condition_function._composed_of)
+                    )
                 else:
-                    if cf._flow_tag is None:
-                        raise RuntimeError("Condition {} was not tagged. To create a graph, ensure "
-                                           "each base condition has a ``__code__`` attribute or "
-                                           "manually specified tag.".format(cf))
-                    callbacks.add(cf._flow_tag)
+                    if condition_function._flow_tag is None:
+                        raise RuntimeError(
+                            f"Condition {condition_function} was not tagged. "
+                            "To create a graph, ensure each base condition "
+                            "has a ``__code__`` attribute or manually "
+                            "specified tag."
+                        )
+                    callbacks.add(condition_function._flow_tag)
 
             return callbacks
 
-        ops = list(self.operations.items())
-        mat = [[0 for _ in range(len(ops))] for _ in range(len(ops))]
+        operations = list(self.operations.values())
+        mat = [[0 for _ in range(len(operations))] for _ in range(len(operations))]
 
-        for i, (name1, op1) in enumerate(ops):
-            for j, (name2, op2) in enumerate(ops[i:]):
-                postconds1 = unpack_conditions(to_callbacks(op1._postconds))
-                postconds2 = unpack_conditions(to_callbacks(op2._postconds))
-                prereqs1 = unpack_conditions(to_callbacks(op1._prereqs))
-                prereqs2 = unpack_conditions(to_callbacks(op2._prereqs))
-                if postconds1.intersection(prereqs2):
-                    mat[i][j+i] = 1
-                elif prereqs1.intersection(postconds2):
-                    mat[j+i][i] = 1
+        for i, operation_i in enumerate(operations):
+            for j, operation_j in enumerate(operations[i:]):
+                postconditions_i = unpack_conditions(
+                    to_callbacks(operation_i._postconditions)
+                )
+                postconditions_j = unpack_conditions(
+                    to_callbacks(operation_j._postconditions)
+                )
+                preconditions_i = unpack_conditions(
+                    to_callbacks(operation_i._preconditions)
+                )
+                preconditions_j = unpack_conditions(
+                    to_callbacks(operation_j._preconditions)
+                )
+                if postconditions_i.intersection(preconditions_j):
+                    mat[i][j + i] = 1
+                elif preconditions_i.intersection(postconditions_j):
+                    mat[j + i][i] = 1
         return mat
 
     def _register_class_labels(self):
-        """This function registers all label functions, which are part of the class definition.
+        """Register all label functions which are part of the class definition.
 
-        To register a class method or function as label function, use the generalized label()
-        function.
+        To register a class method or function as a label function, use the
+        :meth:`~.FlowProject.label()` class method as a decorator.
         """
-        def predicate(m):
-            return inspect.ismethod(m) or inspect.isfunction(m)
 
-        class_label_functions = dict()
+        def predicate(member):
+            return inspect.ismethod(member) or inspect.isfunction(member)
+
+        class_label_functions = {}
         for name, function in inspect.getmembers(type(self), predicate=predicate):
             if _is_label_func(function):
                 class_label_functions[name] = function
@@ -1461,41 +1809,42 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             self._label_functions[class_label_functions[name]] = None
 
     def _register_labels(self):
-        "Register all label functions registered with this class and its parent classes."
+        """Register all label functions registered with this class and its parent classes."""
         self._register_class_labels()
 
         for cls in type(self).__mro__:
-            self._label_functions.update(getattr(cls, '_LABEL_FUNCTIONS', dict()))
+            self._label_functions.update(getattr(cls, "_LABEL_FUNCTIONS", {}))
 
-    ALIASES = dict(
-        unknown='U',
-        registered='R',
-        queued='Q',
-        active='A',
-        inactive='I',
-        requires_attention='!'
-    )
-    "These are default aliases used within the status output."
+    ALIASES = {
+        str(status).replace("JobStatus.", ""): symbol
+        for status, symbol in _FMT_SCHEDULER_STATUS.items()
+        if status != JobStatus.placeholder
+    }
+    """Default aliases used within the status output."""
 
     @classmethod
-    def _alias(cls, x):
-        "Use alias if specified."
+    def _alias(cls, name):
+        """Use alias if specified.
+
+        Parameters
+        ----------
+        name : str
+            Long name to abbreviate.
+
+        Returns
+        -------
+        str
+            Abbreviation if it exists, otherwise the input name.
+
+        """
         try:
-            return abbreviate(x, cls.ALIASES.get(x, x))
+            return abbreviate(name, cls.ALIASES.get(name, name))
         except TypeError:
-            return x
-
-    @classmethod
-    @deprecated(
-        deprecated_in="0.8", removed_in="0.10",
-        current_version=__version__)
-    def update_aliases(cls, aliases):
-        "Update the ALIASES table for this class."
-        cls.ALIASES.update(aliases)
+            return name
 
     def _fn_bundle(self, bundle_id):
-        "Return the canonical name to store bundle information."
-        return os.path.join(self.root_directory(), '.bundles', bundle_id)
+        """Return the canonical name to store bundle information."""
+        return os.path.join(self.root_directory(), ".bundles", bundle_id)
 
     def _store_bundled(self, operations):
         """Store operation-ids as part of a bundle and return bundle id.
@@ -1506,31 +1855,37 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         operation will not be stored, but instead the operation's id is
         directly returned.
 
-        :param operations:
+        Parameters
+        ----------
+        operations : A sequence of instances of :class:`._JobOperation`
             The operations to bundle.
-        :type operations:
-            A sequence of instances of :py:class:`.JobOperation`
-        :return:
+
+        Returns
+        -------
+        str
             The bundle id.
-        :rtype:
-            str
+
         """
         if len(operations) == 1:
             return operations[0].id
-        else:
-            h = '.'.join(op.id for op in operations)
-            bid = '{}/bundle/{}'.format(self, sha1(h.encode('utf-8')).hexdigest())
-            fn_bundle = self._fn_bundle(bid)
-            os.makedirs(os.path.dirname(fn_bundle), exist_ok=True)
-            with open(fn_bundle, 'w') as file:
-                for operation in operations:
-                    file.write(operation.id + '\n')
-            return bid
+        sep = getattr(self._environment, "JOB_ID_SEPARATOR", "/")
+        _id = sha1(".".join(op.id for op in operations).encode("utf-8")).hexdigest()
+        bundle_id = f"{self}{sep}bundle{sep}{_id}"
+        fn_bundle = self._fn_bundle(bundle_id)
+        os.makedirs(os.path.dirname(fn_bundle), exist_ok=True)
+        with open(fn_bundle, "w") as file:
+            for operation in operations:
+                file.write(operation.id + "\n")
+        return bundle_id
 
     def _expand_bundled_jobs(self, scheduler_jobs):
-        "Expand jobs which were submitted as part of a bundle."
+        """Expand jobs which were submitted as part of a bundle."""
+        sep = getattr(self._environment, "JOB_ID_SEPARATOR", "/")
+        bundle_prefix = f"{self}{sep}bundle{sep}"
+        if scheduler_jobs is None:
+            return
         for job in scheduler_jobs:
-            if job.name().startswith('{}/bundle/'.format(self)):
+            if job.name().startswith(bundle_prefix):
                 with open(self._fn_bundle(job.name())) as file:
                     for line in file:
                         yield ClusterJob(line.strip(), job.status())
@@ -1540,267 +1895,655 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def scheduler_jobs(self, scheduler):
         """Fetch jobs from the scheduler.
 
-        This function will fetch all scheduler jobs from the scheduler
-        and also expand bundled jobs automatically.
+        This function will fetch all scheduler jobs from the scheduler and also
+        expand bundled jobs automatically.
 
-        However, this function will not automatically filter scheduler
-        jobs which are not associated with this project.
+        However, this function will not automatically filter scheduler jobs
+        which are not associated with this project.
 
-        :param scheduler:
+        Parameters
+        ----------
+        scheduler : :class:`~.Scheduler`
             The scheduler instance.
-        :type scheduler:
-            :class:`~.flow.manage.Scheduler`
-        :yields:
-            All scheduler jobs fetched from the scheduler instance.
-        """
-        for sjob in self._expand_bundled_jobs(scheduler.jobs()):
-            yield sjob
 
-    def _get_operations_status(self, job, cached_status):
-        "Return a dict with information about job-operations for this job."
+        Yields
+        ------
+        :class:`~.ClusterJob`:
+            All cluster jobs fetched from the scheduler.
+
+        """
+        yield from self._expand_bundled_jobs(scheduler.jobs())
+
+    def _get_cached_scheduler_status(self):
+        """Fetch all status information.
+
+        The project document key ``_status`` is returned as a plain dict, or an
+        empty dict if no status information is present.
+
+        Returns
+        -------
+        dict
+            Dictionary of cached status information. The keys are uniquely
+            generated ids for each group and job. The values are instances of
+            :class:`~.JobStatus`.
+
+        """
+        try:
+            return self.document["_status"]()
+        except KeyError:
+            return {}
+
+    @contextlib.contextmanager
+    def _update_cached_scheduler_status(self):
+        """Context manager used to update cached project status.
+
+        When entered, this context manager yields an empty dictionary. The
+        keys in this dictionary are unique generated ids for a given group
+        and aggregate, and the value is an instance of :class:`~.JobStatus`.
+        When the context exits, this dictionary is used to update the project
+        document's cached status.
+
+        Yields
+        ------
+        dict
+            Empty dictionary where status information should be stored.
+
+        """
+        status_update = {}
+        try:
+            yield status_update
+        finally:
+            if status_update:
+                status_update = {
+                    key: int(value) for key, value in status_update.items()
+                }
+                if "_status" in self.document:
+                    self.document["_status"].update(status_update)
+                else:
+                    self.document["_status"] = status_update
+
+    def _generate_selected_aggregate_groups(
+        self,
+        selected_aggregates=None,
+        selected_groups=None,
+        tqdm_kwargs=None,
+    ):
+        """Yield selected aggregates and groups.
+
+        Parameters
+        ----------
+        selected_aggregates : sequence of tuples of :class:`~signac.contrib.job.Job`
+            Aggregates to select.
+        selected_groups : set of :class:`~.FlowGroup`
+            Groups to select.
+        tqdm_kwargs : dict or None
+            A dict of keyword arguments to the tqdm progress bar used for
+            iterating over aggregates. If None, no progress bar will be
+            shown. (Default value = None)
+
+        Yields
+        ------
+        aggregate_id : str
+            Selected aggregate id.
+        aggregate : tuple of :class:`~signac.contrib.job.Job`
+            Selected aggregate.
+        group : :class:`~.FlowGroup`
+            Selected group.
+
+        """
+
+        def aggregate_progress_wrapper(aggregates):
+            """Show progress bar if keyword arguments are provided."""
+            if tqdm_kwargs is not None:
+                return tqdm(
+                    aggregates,
+                    total=len(aggregates),
+                    **tqdm_kwargs,
+                )
+            else:
+                return aggregates
+
+        if (
+            selected_groups is not None
+            and len(selected_groups) >= 0
+            and len(self._group_to_aggregate_store.inverse) > 1
+        ):
+            # Use only aggregate stores for the selected groups.
+            aggregate_stores_of_selected_groups = {
+                self._group_to_aggregate_store[group] for group in selected_groups
+            }
+            aggregate_stores = {
+                aggregate_store: self._group_to_aggregate_store.inverse[aggregate_store]
+                for aggregate_store in aggregate_stores_of_selected_groups
+            }
+        else:
+            # Use all aggregate stores.
+            aggregate_stores = self._group_to_aggregate_store.inverse
+
+        for (
+            aggregate_store,
+            aggregate_groups,
+        ) in aggregate_stores.items():
+            if selected_groups is not None:
+                # Filter out groups that are not selected. The order of
+                # aggregate_groups must be preserved. Using an intersection of
+                # ordered sets would be preferable but would require a
+                # dependency.
+                matching_groups = [
+                    group for group in aggregate_groups if group in selected_groups
+                ]
+                if len(matching_groups) == 0:
+                    # Skip aggregate store if no groups are selected
+                    continue
+            else:
+                matching_groups = aggregate_groups
+            if selected_aggregates is not None:
+                # Use selected aggregates in the aggregate store
+                for aggregate in aggregate_progress_wrapper(selected_aggregates):
+                    aggregate_id = _get_aggregate_id(aggregate)
+                    if aggregate_id in aggregate_store:
+                        for group in matching_groups:
+                            yield aggregate_id, aggregate, group
+            else:
+                # Use all aggregates in the aggregate store
+                for aggregate_id, aggregate in aggregate_progress_wrapper(
+                    aggregate_store.items()
+                ):
+                    for group in matching_groups:
+                        yield aggregate_id, aggregate, group
+
+    def _generate_selected_aggregate_groups_with_status(
+        self,
+        scheduler_info=None,
+        *args,
+        **kwargs,
+    ):
+        r"""Yield selected aggregates and groups while updating cached status.
+
+        After the iterator is exhausted (or if an exception is raised during
+        iteration), the project's cached status will be updated for all
+        aggregates and groups that have been yielded by this generator.
+
+        Parameters
+        ----------
+        scheduler_info : dict or None
+            A dict of the form returned by :meth:`~._query_scheduler_status`,
+            with keys corresponding to scheduler job names and values that
+            are instances of :class:`~.JobStatus`. If None, all jobs will
+            have unknown status. (Default value = None)
+        \*args :
+            Arguments forwarded to
+            :meth:`~._generate_selected_aggregate_groups`.
+        \*\*kwargs :
+            Keyword arguments forwarded to
+            :meth:`~._generate_selected_aggregate_groups`.
+
+        Yields
+        ------
+        scheduler_id : str
+            Unique identifier for this aggregate and group.
+        scheduler_status : :class:`~.JobStatus`
+            The scheduler status of this aggregate and group.
+        aggregate_id : str
+            Selected aggregate id.
+        aggregate : tuple of :class:`~signac.contrib.job.Job`
+            Selected aggregate.
+        group : :class:`~.FlowGroup`
+            Selected group.
+
+        """
+        if scheduler_info is None:
+            scheduler_info = {}
+        with self._update_cached_scheduler_status() as status_update:
+            for (
+                aggregate_id,
+                aggregate,
+                group,
+            ) in self._generate_selected_aggregate_groups(*args, **kwargs):
+                scheduler_id = group._generate_id(aggregate)
+                scheduler_status = scheduler_info.get(scheduler_id, JobStatus.unknown)
+                status_update[scheduler_id] = scheduler_status
+                yield scheduler_id, scheduler_status, aggregate_id, aggregate, group
+
+    def _get_aggregate_group_status(self, aggregate, cached_status):
+        """Fetch group status for this aggregate.
+
+        Parameters
+        ----------
+        aggregate : tuple of :class:`~signac.contrib.job.Job`
+            Aggregate for which status information is fetched.
+        cached_status : dict
+            Dictionary of cached status information. The keys are uniquely
+            generated ids for each group and job. The values are instances of
+            :class:`~.JobStatus`.
+
+        Yields
+        ------
+        str
+            Operation name.
+        dict
+            Operation status dictionary.
+
+        """
         starting_dict = functools.partial(dict, scheduler_status=JobStatus.unknown)
         status_dict = defaultdict(starting_dict)
-        for group in self._groups.values():
-            completed = group.complete(job)
-            eligible = False if completed else group.eligible(job)
-            scheduler_status = cached_status.get(group._generate_id(job),
-                                                 JobStatus.unknown)
+
+        # TODO: Add support for groups that are not single operations.
+        single_operation_groups = {self._groups[name] for name in self.operations}
+
+        for aggregate_id, aggregate, group, in self._generate_selected_aggregate_groups(
+            selected_aggregates=[aggregate],
+            selected_groups=single_operation_groups,
+        ):
+            completed = group._complete(aggregate)
+            # If the group is not completed, it is sufficient to determine
+            # eligibility while ignoring postconditions (we know at least
+            # one postcondition is not met).
+            eligible = not completed and group._eligible(
+                aggregate, ignore_conditions=IgnoreConditions.POST
+            )
+            scheduler_status = cached_status.get(
+                group._generate_id(aggregate), JobStatus.unknown
+            )
             for operation in group.operations:
-                if scheduler_status >= status_dict[operation]['scheduler_status']:
+                if scheduler_status >= status_dict[operation]["scheduler_status"]:
                     status_dict[operation] = {
-                            'scheduler_status': scheduler_status,
-                            'eligible': eligible,
-                            'completed': completed
-                            }
+                        "scheduler_status": scheduler_status,
+                        "eligible": eligible,
+                        "completed": completed,
+                    }
 
-        for key in sorted(status_dict):
-            yield key, status_dict[key]
+        yield from sorted(status_dict.items())
 
-    def get_job_status(self, job, ignore_errors=False, cached_status=None):
-        "Return a dict with detailed information about the status of a job."
-        result = dict()
-        result['job_id'] = str(job)
+    def _get_aggregate_status(self, aggregate, cached_status, ignore_errors=False):
+        """Return status information about an aggregate.
+
+        Parameters
+        ----------
+        aggregate : tuple of :class:`~signac.contrib.job.Job`
+            Aggregate for which status information is fetched.
+        cached_status : dict
+            Dictionary of cached status information. The keys are uniquely
+            generated ids for each group and job. The values are instances of
+            :class:`~.JobStatus`. (Default value = None)
+        ignore_errors : bool
+            Whether to ignore exceptions raised during status check. (Default value = False)
+
+        Returns
+        -------
+        dict
+            A dictionary containing job status for all jobs.
+
+        """
+        aggregate_id = _get_aggregate_id(aggregate)
+        result = {
+            "job_id": aggregate_id,
+            "operations": {},
+            "_operations_error": None,
+        }
         try:
-            if cached_status is None:
-                try:
-                    cached_status = self.document['_status']._as_dict()
-                except KeyError:
-                    cached_status = dict()
-            result['operations'] = OrderedDict(self._get_operations_status(job, cached_status))
-            result['_operations_error'] = None
+            result["operations"] = dict(
+                self._get_aggregate_group_status(aggregate, cached_status)
+            )
         except Exception as error:
-            msg = "Error while getting operations status for job '{}': '{}'.".format(job, error)
-            logger.debug(msg)
+            logger.debug(
+                "Error while getting operations status for job '%s': '%s'.",
+                aggregate_id,
+                error,
+            )
             if ignore_errors:
-                result['operations'] = dict()
-                result['_operations_error'] = str(error)
-            else:
-                raise
-        try:
-            result['labels'] = sorted(set(self.labels(job)))
-            result['_labels_error'] = None
-        except Exception as error:
-            logger.debug("Error while determining labels for job '{}': '{}'.".format(job, error))
-            if ignore_errors:
-                result['labels'] = list()
-                result['_labels_error'] = str(error)
+                result["_operations_error"] = str(error)
             else:
                 raise
         return result
 
-    def _fetch_scheduler_status(self, jobs=None, file=None, ignore_errors=False):
-        "Update the status docs."
-        if file is None:
-            file = sys.stderr
-        if jobs is None:
-            jobs = list(self)
+    def get_job_status(self, job, ignore_errors=False, cached_status=None):
+        """Return status information about a job.
+
+        Parameters
+        ----------
+        job : :class:`~signac.contrib.job.Job`
+            The signac job.
+        ignore_errors : bool
+            Whether to ignore exceptions raised during status check. (Default value = False)
+        cached_status : dict
+            Dictionary of cached status information. The keys are uniquely
+            generated ids for each group and job. The values are instances of
+            :class:`~.JobStatus`. (Default value = None)
+
+        Returns
+        -------
+        dict
+            A dictionary containing job status for all jobs.
+
+        """
+        if cached_status is None:
+            cached_status = self._get_cached_scheduler_status()
+        result = self._get_aggregate_status(
+            aggregate=(job,),
+            ignore_errors=ignore_errors,
+            cached_status=cached_status,
+        )
+        labels_result = self._get_job_labels(job, ignore_errors=ignore_errors)
+        result["labels"] = labels_result["labels"]
+        result["_labels_error"] = labels_result["_labels_error"]
+        return result
+
+    def _query_scheduler_status(self, err=None, ignore_errors=False):
+        """Query the scheduler for job status.
+
+        Parameters
+        ----------
+        err : file-like object
+            File where status information is printed.
+        ignore_errors : bool
+            Whether to ignore exceptions raised during status check.
+
+        Returns
+        -------
+        dict :
+            A dictionary of scheduler job information. The keys are scheduler
+            job names and the values are instances of :class:`~.JobStatus`.
+            If the scheduler cannot be found or an error occurs with
+            ``ignore_errors=True``, an empty dic is returned.
+
+        """
+        if err is None:
+            err = sys.stderr
         try:
             scheduler = self._environment.get_scheduler()
-
-            self.document.setdefault('_status', dict())
-            scheduler_info = {sjob.name(): sjob.status() for sjob in self.scheduler_jobs(scheduler)}
-            status = dict()
-            print("Query scheduler...", file=file)
-            for job in tqdm(jobs,
-                            desc="Fetching operation status",
-                            total=len(jobs), file=file):
-                for group in self._groups.values():
-                    _id = group._generate_id(job)
-                    status[_id] = int(scheduler_info.get(_id, JobStatus.unknown))
-            self.document._status.update(status)
+            print("Querying scheduler...", file=err)
+            return {
+                scheduler_job.name(): scheduler_job.status()
+                for scheduler_job in self.scheduler_jobs(scheduler)
+            }
         except NoSchedulerError:
             logger.debug("No scheduler available.")
         except RuntimeError as error:
-            logger.warning("Error occurred while querying scheduler: '{}'.".format(error))
+            logger.warning("Error occurred while querying scheduler: '%s'.", error)
             if not ignore_errors:
                 raise
-        else:
-            logger.info("Updated job status cache.")
+        return {}
 
-    def _fetch_status(self, jobs, err, ignore_errors, no_parallelize):
-        # Update the project's status cache
-        self._fetch_scheduler_status(jobs, err, ignore_errors)
+    def _get_job_labels(self, job, ignore_errors=False):
+        """Return a dict with information about the labels of a job.
 
-        # Get status dict for all selected jobs
-        def _print_progress(x):
-            print("Updating status: ", end='', file=err)
-            err.flush()
-            n = max(1, int(len(jobs) / 10))
-            for i, _ in enumerate(x):
-                if (i % n) == 0:
-                    print('.', end='', file=err)
-                    err.flush()
-                yield _
+        Parameters
+        ----------
+        job : :class:`signac.contrib.job.Job`
+            Job handle.
+        ignore_errors : bool
+            Whether to ignore errors raised while fetching labels. (Default value = False)
 
+        Returns
+        -------
+        dict
+            Dictionary with keys ``job_id``, ``labels``, and ``_labels_error``.
+
+        """
+        result = {
+            "job_id": job.get_id(),
+            "labels": [],
+            "_labels_error": None,
+        }
         try:
-            cached_status = self.document['_status']._as_dict()
-        except KeyError:
-            cached_status = dict()
-        _get_job_status = functools.partial(self.get_job_status,
-                                            ignore_errors=ignore_errors,
-                                            cached_status=cached_status)
+            result["labels"] = sorted(set(self.labels(job)))
+        except Exception as error:
+            logger.debug(
+                "Error while determining labels for job '%s': '%s'.", job, error
+            )
+            if ignore_errors:
+                result["_labels_error"] = str(error)
+            else:
+                raise
+        return result
 
-        with self._potentially_buffered():
+    def _fetch_status(
+        self,
+        aggregates,
+        err,
+        ignore_errors,
+        status_parallelization="thread",
+    ):
+        """Fetch status for the provided aggregates / jobs.
+
+        Parameters
+        ----------
+        aggregates : sequence of aggregates
+            The aggregates for which a user requested to fetch status.
+        err : file-like object
+            File where status information is printed.
+        ignore_errors : bool
+            Fetch status even if querying the scheduler fails.
+        status_parallelization : str
+            Parallelization mode for fetching the status. Allowed values are
+            "thread", "process", or "none". (Default value = "thread")
+
+        Returns
+        -------
+        status_results : list
+            A list of dictionaries containing keys ``aggregate_id``,
+            ``groups``, and ``_error``.
+        job_labels : list
+            A list of dictionaries containing keys ``job_id``, ``labels``,
+            and ``_labels_error``.
+        individual_jobs : list of :class:`~signac.contrib.job.Job`
+            List of jobs, filtered from aggregates containing one job. This
+            is used internally to generate labels (labels are only supported
+            by individual jobs) and the calling code in
+            :meth:`~.print_status` also needs this information. This is
+            returned from this method so that iteration over all aggregates
+            only has to occur one time.
+
+        """
+        if status_parallelization not in ("thread", "process", "none"):
+            raise RuntimeError(
+                "Configuration value status_parallelization is invalid. "
+                "Valid choices are 'thread', 'process', or 'none'."
+            )
+
+        parallel_executor = _get_parallel_executor(status_parallelization)
+        single_operation_groups = {self._groups[name] for name in self.operations}
+
+        # Update the project's status cache
+        scheduler_info = self._query_scheduler_status(
+            err=err, ignore_errors=ignore_errors
+        )
+
+        def compute_status(data):
+            scheduler_id, scheduler_status, aggregate_id, aggregate, group = data
+            # Only single-operation groups are supported for status fetching
+            assert len(group.operations) == 1
+
+            status = {}
+            error_text = None
             try:
-                with contextlib.closing(ThreadPool()) as pool:
-                    _map = map if no_parallelize else pool.imap
-                    # First attempt at parallelized status determination.
-                    # This may fail on systems that don't allow threads.
-                    return list(tqdm(
-                        iterable=_map(_get_job_status, jobs),
-                        desc="Collecting job status info", total=len(jobs), file=err))
-            except RuntimeError as error:
-                if "can't start new thread" not in error.args:
-                    raise   # unrelated error
+                status["scheduler_status"] = scheduler_status
+                completed = group._complete(aggregate)
+                status["completed"] = completed
+                # If the group is not completed, it is sufficient to determine
+                # eligibility while ignoring postconditions (we know at least
+                # one postcondition is not met).
+                status["eligible"] = not completed and group._eligible(
+                    aggregate, ignore_conditions=IgnoreConditions.POST
+                )
+            except Exception as error:
+                logger.debug(
+                    "Error while getting operations status for job '%s': '%s'.",
+                    aggregate_id,
+                    error,
+                )
+                if not ignore_errors:
+                    raise
+                error_text = str(error)
+                status["completed"] = False
+                status["eligible"] = False
+            result = {
+                "aggregate_id": aggregate_id,
+                "group_name": group.name,
+                "status": status,
+                "_error": error_text,
+            }
+            return result
 
-                t = time.time()
-                num_jobs = len(jobs)
-                statuses = []
-                for i, job in enumerate(jobs):
-                    statuses.append(_get_job_status(job))
-                    if time.time() - t > 0.2:  # status interval
-                        print(
-                            'Collecting job status info: {}/{}'.format(i+1, num_jobs),
-                            end='\r', file=err)
-                        t = time.time()
-                # Always print the completed progressbar.
-                print('Collecting job status info: {}/{}'.format(i+1, num_jobs), file=err)
-                return statuses
+        with self._buffered():
+            aggregate_groups = list(
+                self._generate_selected_aggregate_groups_with_status(
+                    scheduler_info=scheduler_info,
+                    selected_aggregates=aggregates,
+                    selected_groups=single_operation_groups,
+                )
+            )
+            status_results = parallel_executor(
+                compute_status,
+                aggregate_groups,
+                desc="Fetching status",
+                file=err,
+            )
+            # aggregate_groups is a list of tuples containing scheduler,
+            # aggregate, and group information. To compute labels, we fetch the
+            # unique jobs from the aggregates containing only one job.
+            if len(single_operation_groups) > 0:
+                individual_jobs = {
+                    aggregate_group[3][0]
+                    for aggregate_group in aggregate_groups
+                    if len(aggregate_group[3]) == 1
+                }
+            else:
+                # If no operations exist, use all jobs in the project.
+                individual_jobs = set(self)
+            compute_labels = functools.partial(
+                self._get_job_labels,
+                ignore_errors=ignore_errors,
+            )
+            job_labels = parallel_executor(
+                compute_labels,
+                individual_jobs,
+                desc="Fetching labels",
+                file=err,
+            )
+
+        status_results_combined = []
+        for aggregate_id, aggregate_results in groupby(
+            sorted(status_results, key=lambda result: result["aggregate_id"]),
+            key=lambda result: result["aggregate_id"],
+        ):
+            aggregate_results = list(aggregate_results)
+            # Collect all errors that occurred while evaluating status of
+            # groups for this aggregate
+            error_message = None
+            error_messages = [result["_error"] for result in aggregate_results]
+            if any(error_messages):
+                error_message = f"{len(error_messages)} error(s): " + ", ".join(
+                    error_messages
+                )
+            status_results_combined.append(
+                {
+                    "aggregate_id": aggregate_id,
+                    "groups": {
+                        result["group_name"]: result["status"]
+                        for result in aggregate_results
+                    },
+                    "_error": error_message,
+                }
+            )
+
+        return status_results_combined, job_labels, individual_jobs
 
     PRINT_STATUS_ALL_VARYING_PARAMETERS = True
     """This constant can be used to signal that the print_status() method is supposed
     to automatically show all varying parameters."""
 
-    def print_status(self, jobs=None, overview=True, overview_max_lines=None,
-                     detailed=False, parameters=None,
-                     param_max_width=None,
-                     expand=False, all_ops=False, only_incomplete=False, dump_json=False,
-                     unroll=True, compact=False, pretty=False,
-                     file=None, err=None, ignore_errors=False,
-                     no_parallelize=False, template=None, profile=False,
-                     eligible_jobs_max_lines=None, output_format='terminal'):
+    def print_status(
+        self,
+        jobs=None,
+        overview=True,
+        overview_max_lines=None,
+        detailed=False,
+        parameters=None,
+        param_max_width=None,
+        expand=False,
+        all_ops=False,
+        only_incomplete=False,
+        dump_json=False,
+        unroll=True,
+        compact=False,
+        pretty=False,
+        file=None,
+        err=None,
+        ignore_errors=False,
+        template=None,
+        profile=False,
+        eligible_jobs_max_lines=None,
+        output_format="terminal",
+    ):
         """Print the status of the project.
 
-        :param jobs:
-            Only execute operations for the given jobs, or all if the argument is omitted.
-        :type jobs:
-            Sequence of instances :class:`.Job`.
-        :param overview:
-            Aggregate an overview of the project' status.
-        :type overview:
-            bool
-        :param overview_max_lines:
-            Limit the number of overview lines.
-        :type overview_max_lines:
-            int
-        :param detailed:
-            Print a detailed status of each job.
-        :type detailed:
-            bool
-        :param parameters:
-            Print the value of the specified parameters.
-        :type parameters:
-            list of str
-        :param param_max_width:
-            Limit the number of characters of parameter columns,
-            see also: :py:meth:`~.update_aliases`.
-        :type param_max_width:
-            int
-        :param expand:
-            Present labels and operations in two separate tables.
-        :type expand:
-            bool
-        :param all_ops:
-            Include operations that are not eligible to run.
-        :type all_ops:
-            bool
-        :param only_incomplete:
-            Only show jobs that have eligible operations.
-        :type only_incomplete:
-            bool
-        :param dump_json:
+        Parameters
+        ----------
+        jobs : iterable of :class:`~signac.contrib.job.Job`
+            Only print status for the given jobs, or all if the argument is
+            None. (Default value = None)
+        overview : bool
+            Display an overview of the project status. (Default value = True)
+        overview_max_lines : int
+            Limit the number of overview lines. (Default value = None)
+        detailed : bool
+            Print a detailed status of each job. (Default value = False)
+        parameters : list of str
+            Print the value of the specified parameters. (Default value = None)
+        param_max_width : int
+            Limit the number of characters of parameter columns. (Default value = None)
+        expand : bool
+            Present labels and operations in two separate tables. (Default value = False)
+        all_ops : bool
+            Include operations that are not eligible to run. (Default value = False)
+        only_incomplete : bool
+            Only show jobs that have eligible operations. (Default value = False)
+        dump_json : bool
             Output the data as JSON instead of printing the formatted output.
-        :type dump_json:
-            bool
-        :param unroll:
-            Separate columns for jobs and the corresponding operations.
-        :type unroll:
-            bool
-        :param compact:
-            Print a compact version of the output.
-        :type compact:
-            bool
-        :param pretty:
-            Prettify the output.
-        :type pretty:
-            bool
-        :param file:
+            (Default value = False)
+        unroll : bool
+            Separate columns for jobs and the corresponding operations. (Default value = True)
+        compact : bool
+            Print a compact version of the output. (Default value = False)
+        pretty : bool
+            Prettify the output. (Default value = False)
+        file : str
             Redirect all output to this file, defaults to sys.stdout.
-        :type file:
-            str
-        :param err:
+        err : str
             Redirect all error output to this file, defaults to sys.stderr.
-        :type err:
-            str
-        :param ignore_errors:
-            Print status even if querying the scheduler fails.
-        :type ignore_errors:
-            bool
-        :param no_parallelize:
-            Do not parallelize the status update.
-        :type no_parallelize:
-            bool
-        :param template:
-            User provided Jinja2 template file.
-        :type template:
-            str
-        :param profile:
-            Show profile result.
-        :type profile:
-            bool
-        :param eligible_jobs_max_lines:
-            Limit the number of operations and its eligible job count printed in the overview.
-        :type eligible_jobs_max_lines:
-            int
-        :param output_format:
+        ignore_errors : bool
+            Print status even if querying the scheduler fails. (Default value = False)
+        template : str
+            User provided Jinja2 template file. (Default value = None)
+        profile : bool
+            Show profile result. (Default value = False)
+        eligible_jobs_max_lines : int
+            Limit the number of operations and its eligible job count printed
+            in the overview. (Default value = None)
+        output_format : str
             Status output format, supports:
             'terminal' (default), 'markdown' or 'html'.
-        :type output_format:
-            str
-        :return:
-            A Renderer class object that contains the rendered string.
-        :rtype:
-            :py:class:`~.Renderer`
+
         """
+        # TODO: Document aggregates.
+        # jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
+        #     Only print status for the given jobs or aggregates of jobs,
+        #     or all if the argument is None. (Default value = None)
         if file is None:
             file = sys.stdout
         if err is None:
             err = sys.stderr
-        if jobs is None:
-            jobs = self     # all jobs
+
+        aggregates = self._convert_jobs_to_aggregates(jobs)
 
         if eligible_jobs_max_lines is None:
-            eligible_jobs_max_lines = flow_config.get_config_value('eligible_jobs_max_lines')
+            eligible_jobs_max_lines = flow_config.get_config_value(
+                "eligible_jobs_max_lines"
+            )
+
+        status_parallelization = self.config["flow"]["status_parallelization"]
 
         # initialize jinja2 template environment and necessary filters
         template_environment = self._template_environment()
@@ -1812,9 +2555,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             try:
                 import pprofile
             except ImportError:
-                raise RuntimeWarning(
+                raise ImportError(
                     "Profiling requires the pprofile package. "
-                    "Install with `pip install pprofile`.")
+                    "Install with `pip install pprofile`."
+                )
             prof = pprofile.StatisticalProfile()
 
             fn_filter = [
@@ -1826,257 +2570,336 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             ]
 
             with prof(single=False):
-                tmp = self._fetch_status(jobs, err, ignore_errors, no_parallelize)
+                status_results, job_labels, individual_jobs = self._fetch_status(
+                    aggregates=aggregates,
+                    err=err,
+                    ignore_errors=ignore_errors,
+                    status_parallelization=status_parallelization,
+                )
 
             prof._mergeFileTiming()
 
             # Unrestricted
             total_impact = 0
-            hits = [hit for fn, ft in prof.merged_file_dict.items()
-                    if fn not in fn_filter for hit in ft.iterHits()]
+            hits = [
+                hit
+                for fn, file_timing in prof.merged_file_dict.items()
+                if fn not in fn_filter
+                for hit in file_timing.iterHits()
+            ]
             sorted_hits = reversed(sorted(hits, key=lambda hit: hit[2]))
             total_num_hits = sum([hit[2] for hit in hits])
 
-            profiling_results = ['# Profiling:\n']
+            profiling_results = ["# Profiling:\n"]
 
-            profiling_results.extend([
-                'Rank Impact Code object',
-                '---- ------ -----------'])
+            profiling_results.extend(
+                ["Rank Impact Code object", "---- ------ -----------"]
+            )
             for i, (line, code, hits, duration) in enumerate(sorted_hits):
                 impact = hits / total_num_hits
                 total_impact += impact
+                rank = i + 1
                 profiling_results.append(
-                    "{rank:>4} {impact:>6.0%} {code.co_filename}:"
-                    "{code.co_firstlineno}:{code.co_name}".format(
-                        rank=i+1, impact=impact, code=code))
+                    f"{rank:>4} {impact:>6.0%} {code.co_filename}:"
+                    f"{code.co_firstlineno}:{code.co_name}"
+                )
                 if i > 10 or total_impact > 0.8:
                     break
 
             for module_fn in prof.merged_file_dict:
                 if re.match(profile, module_fn):
-                    ft = prof.merged_file_dict[module_fn]
+                    file_timing = prof.merged_file_dict[module_fn]
                 else:
                     continue
 
-                total_hits = ft.getTotalHitCount()
+                total_hits = file_timing.getTotalHitCount()
                 total_impact = 0
 
-                profiling_results.append(
-                    "\nHits by line for '{}':".format(module_fn))
-                profiling_results.append('-' * len(profiling_results[-1]))
+                profiling_results.append(f"\nHits by line for '{module_fn}':")
+                profiling_results.append("-" * len(profiling_results[-1]))
 
-                hits = list(sorted(ft.iterHits(), key=lambda h: 1/h[2]))
+                hits = list(sorted(file_timing.iterHits(), key=lambda h: 1 / h[2]))
                 for line, code, hits, duration in hits:
                     impact = hits / total_hits
                     total_impact += impact
-                    profiling_results.append(
-                        "{}:{} ({:2.0%}):".format(module_fn, line, impact))
+                    profiling_results.append(f"{module_fn}:{line} ({impact:2.0%}):")
                     try:
                         lines, start = inspect.getsourcelines(code)
                     except OSError:
                         continue
-                    hits_ = [ft.getHitStatsFor(l)[0] for l in range(start, start+len(lines))]
+                    hits_ = [
+                        file_timing.getHitStatsFor(line)[0]
+                        for line in range(start, start + len(lines))
+                    ]
                     profiling_results.extend(
-                        ["{:>5} {:>4}: {}".format(h, lineno, l.rstrip())
-                         for lineno, (l, h) in enumerate(zip(lines, hits_), start)])
-                    profiling_results.append('')
+                        [
+                            f"{h:>5} {lineno:>4}: {l.rstrip()}"
+                            for lineno, (l, h) in enumerate(zip(lines, hits_), start)
+                        ]
+                    )
+                    profiling_results.append("")
                     if total_impact > 0.8:
                         break
 
-            profiling_results.append("Total runtime: {}s".format(int(prof.total_time)))
+            profiling_results.append(f"Total runtime: {int(prof.total_time)}s")
             if prof.total_time < 20:
                 profiling_results.append(
                     "Warning: Profiler ran only for a short time, "
-                    "results may be highly inaccurate.")
+                    "results may be highly inaccurate."
+                )
 
         else:
-            tmp = self._fetch_status(jobs, err, ignore_errors, no_parallelize)
+            status_results, job_labels, individual_jobs = self._fetch_status(
+                aggregates=aggregates,
+                err=err,
+                ignore_errors=ignore_errors,
+                status_parallelization=status_parallelization,
+            )
             profiling_results = None
 
-        operations_errors = {s['_operations_error'] for s in tmp}
-        labels_errors = {s['_labels_error'] for s in tmp}
+        operations_errors = {status_entry["_error"] for status_entry in status_results}
+        labels_errors = {status_entry["_labels_error"] for status_entry in job_labels}
         errors = list(filter(None, operations_errors.union(labels_errors)))
 
         if errors:
             logger.warning(
-                "Some job status updates did not succeed due to errors. "
-                "Number of unique errors: {}. Use --debug to list all errors.".format(len(errors)))
+                "Some job status updates did not succeed due to errors. Number "
+                "of unique errors: %i. Use --debug to list all errors.",
+                len(errors),
+            )
             for i, error in enumerate(errors):
-                logger.debug("Status update error #{}: '{}'".format(i + 1, error))
+                logger.debug("Status update error #%i: '%s'", i + 1, error)
 
         if only_incomplete:
-            # Remove all jobs from the status info, that have not a single
-            # eligible operation.
+            # Remove jobs with no eligible groups from the status info
 
-            def _incomplete(s):
-                return any(op['eligible'] for op in s['operations'].values())
+            def _incomplete(status_entry):
+                return any(
+                    group["eligible"] for group in status_entry["groups"].values()
+                )
 
-            tmp = list(filter(_incomplete, tmp))
+            status_results = list(filter(_incomplete, status_results))
 
-        statuses = OrderedDict([(s['job_id'], s) for s in tmp])
+        statuses = {
+            status_entry["aggregate_id"]: status_entry
+            for status_entry in status_results
+        }
+
+        # Add labels to the status information
+        for job_label_data in job_labels:
+            job_id = job_label_data["job_id"]
+            # There is no status information if the project has no operations.
+            # If no status information exists for this job, we need to set
+            # default values.
+            statuses.setdefault(job_id, {})
+            statuses[job_id].setdefault("aggregate_id", job_id)
+            statuses[job_id].setdefault("groups", {})
+            statuses[job_id]["labels"] = job_label_data["labels"]
 
         # If the dump_json variable is set, just dump all status info
         # formatted in JSON to screen.
         if dump_json:
             print(json.dumps(statuses, indent=4), file=file)
-            return
+            return None
 
         if overview:
             # get overview info:
             progress = defaultdict(int)
-            for status in statuses.values():
-                for label in status['labels']:
+            for status in job_labels:
+                for label in status["labels"]:
                     progress[label] += 1
-            progress_sorted = list(islice(
-                sorted(progress.items(), key=lambda x: (x[1], x[0]), reverse=True),
-                overview_max_lines))
+            # Sort the label progress by amount complete (descending), then
+            # alphabetically
+            progress_sorted = list(
+                islice(
+                    sorted(progress.items(), key=lambda x: (-x[1], x[0])),
+                    overview_max_lines,
+                )
+            )
 
         # Optionally expand parameters argument to all varying parameters.
         if parameters is self.PRINT_STATUS_ALL_VARYING_PARAMETERS:
             parameters = list(
-                sorted({key for job in jobs for key in job.sp.keys() if
-                        len(set([to_hashable(job.sp().get(key)) for job in jobs])) > 1}))
+                sorted(
+                    {
+                        key
+                        for job in individual_jobs
+                        for key in job.statepoint.keys()
+                        if len(
+                            {
+                                _to_hashable(job.statepoint().get(key))
+                                for job in individual_jobs
+                            }
+                        )
+                        > 1
+                    }
+                )
+            )
 
         if parameters:
             # get parameters info
 
             def _add_parameters(status):
-                sp = self.open_job(id=status['job_id']).statepoint()
+                aggregate_id = status["aggregate_id"]
+                if aggregate_id.startswith("agg-"):
+                    # TODO: Fill parameters with empty values (or shared values?)
+                    raise ValueError("Cannot show parameters for aggregates.")
+                statepoint = self.open_job(id=aggregate_id).statepoint()
 
-                def get(k, m):
-                    if m is None:
-                        return
-                    t = k.split('.')
-                    if len(t) > 1:
-                        return get('.'.join(t[1:]), m.get(t[0]))
-                    else:
-                        return m.get(k)
+                def dotted_get(mapping, key):
+                    """Fetch a value from a nested mapping using a dotted key."""
+                    if mapping is None:
+                        return None
+                    tokens = key.split(".")
+                    if len(tokens) > 1:
+                        return dotted_get(mapping.get(tokens[0]), ".".join(tokens[1:]))
+                    return mapping.get(key)
 
-                status['parameters'] = OrderedDict()
-                for i, k in enumerate(parameters):
-                    v = shorten(str(self._alias(get(k, sp))), param_max_width)
-                    status['parameters'][k] = v
+                status["parameters"] = {}
+                for parameter in parameters:
+                    status["parameters"][parameter] = shorten(
+                        str(self._alias(dotted_get(statepoint, parameter))),
+                        param_max_width,
+                    )
 
             for status in statuses.values():
                 _add_parameters(status)
 
-            for i, para in enumerate(parameters):
-                parameters[i] = shorten(self._alias(str(para)), param_max_width)
+            for i, parameter in enumerate(parameters):
+                parameters[i] = shorten(self._alias(str(parameter)), param_max_width)
 
         if detailed:
             # get detailed view info
-            status_legend = ' '.join('[{}]:{}'.format(v, k) for k, v in self.ALIASES.items())
+            status_legend = " ".join(f"[{v}]:{k}" for k, v in self.ALIASES.items())
 
             if compact:
                 num_operations = len(self._operations)
 
             if pretty:
-                OPERATION_STATUS_SYMBOLS = OrderedDict([
-                    ('ineligible', '\u25cb'),   # open circle
-                    ('eligible', '\u25cf'),     # black circle
-                    ('active', '\u25b9'),       # open triangle
-                    ('running', '\u25b8'),      # black triangle
-                    ('completed', '\u2714'),    # check mark
-                ])
-                "Pretty (unicode) symbols denoting the execution status of operations."
+                OPERATION_STATUS_SYMBOLS = {
+                    "ineligible": "\u25cb",  # open circle
+                    "eligible": "\u25cf",  # black circle
+                    "active": "\u25b9",  # open triangle
+                    "running": "\u25b8",  # black triangle
+                    "completed": "\u2714",  # check mark
+                }
+                # Pretty (unicode) symbols denoting the execution status of operations.
             else:
-                OPERATION_STATUS_SYMBOLS = OrderedDict([
-                    ('ineligible', '-'),
-                    ('eligible', '+'),
-                    ('active', '*'),
-                    ('running', '>'),
-                    ('completed', 'X')
-                ])
-                "Symbols denoting the execution status of operations."
-            operation_status_legend = ' '.join('[{}]:{}'.format(v, k)
-                                               for k, v in OPERATION_STATUS_SYMBOLS.items())
+                OPERATION_STATUS_SYMBOLS = {
+                    "ineligible": "-",
+                    "eligible": "+",
+                    "active": "*",
+                    "running": ">",
+                    "completed": "X",
+                }
+                # ASCII symbols denoting the execution status of operations.
+            operation_status_legend = " ".join(
+                f"[{v}]:{k}" for k, v in OPERATION_STATUS_SYMBOLS.items()
+            )
 
-        context['jobs'] = list(statuses.values())
-        context['overview'] = overview
-        context['detailed'] = detailed
-        context['all_ops'] = all_ops
-        context['parameters'] = parameters
-        context['compact'] = compact
-        context['pretty'] = pretty
-        context['unroll'] = unroll
+        context["jobs"] = list(statuses.values())
+        context["overview"] = overview
+        context["detailed"] = detailed
+        context["all_ops"] = all_ops
+        context["parameters"] = parameters
+        context["compact"] = compact
+        context["pretty"] = pretty
+        context["unroll"] = unroll
         if overview:
-            context['progress_sorted'] = progress_sorted
+            context["progress_sorted"] = progress_sorted
         if detailed:
-            context['alias_bool'] = {True: 'Y', False: 'N'}
-            context['scheduler_status_code'] = _FMT_SCHEDULER_STATUS
-            context['status_legend'] = status_legend
+            context["alias_bool"] = {True: "Y", False: "N"}
+            context["scheduler_status_code"] = _FMT_SCHEDULER_STATUS
+            context["status_legend"] = status_legend
             if compact:
-                context['extra_num_operations'] = max(num_operations-1, 0)
+                context["extra_num_operations"] = max(num_operations - 1, 0)
             if not unroll:
-                context['operation_status_legend'] = operation_status_legend
-                context['operation_status_symbols'] = OPERATION_STATUS_SYMBOLS
+                context["operation_status_legend"] = operation_status_legend
+                context["operation_status_symbols"] = OPERATION_STATUS_SYMBOLS
 
-        def _add_dummy_operation(job):
-            job['operations'][''] = {
-                'completed': False,
-                'eligible': False,
-                'scheduler_status': JobStatus.dummy}
+        def _add_placeholder_operation(job):
+            job["groups"][""] = {
+                "completed": False,
+                "eligible": False,
+                "scheduler_status": JobStatus.placeholder,
+            }
 
-        for job in context['jobs']:
-            has_eligible_ops = any([v['eligible'] for v in job['operations'].values()])
-            if not has_eligible_ops and not context['all_ops']:
-                _add_dummy_operation(job)
+        for job in context["jobs"]:
+            has_eligible_ops = any([v["eligible"] for v in job["groups"].values()])
+            if not has_eligible_ops and not context["all_ops"]:
+                _add_placeholder_operation(job)
 
         op_counter = Counter()
-        for job in context['jobs']:
-            for k, v in job['operations'].items():
-                if k != '' and v['eligible']:
-                    op_counter[k] += 1
-        context['op_counter'] = op_counter.most_common(eligible_jobs_max_lines)
-        n = len(op_counter) - len(context['op_counter'])
-        if n > 0:
-            context['op_counter'].append(('[{} more operations omitted]'.format(n), ''))
+        for job in context["jobs"]:
+            for group_name, group_status in job["groups"].items():
+                if group_name != "" and group_status["eligible"]:
+                    op_counter[group_name] += 1
+        context["op_counter"] = op_counter.most_common(eligible_jobs_max_lines)
+        num_omitted_operations = len(op_counter) - len(context["op_counter"])
+        if num_omitted_operations > 0:
+            context["op_counter"].append(
+                (f"[{num_omitted_operations} more operations omitted]", "")
+            )
 
-        status_renderer = StatusRenderer()
-        render_output = status_renderer.render(template, template_environment, context, detailed,
-                                               expand, unroll, compact, output_format)
+        # We have to make a deep copy of the template environment if we're
+        # using a process Pool for parallelism. Somewhere in the process of
+        # manually pickling and dispatching tasks to individual processes
+        # Python's reference counter loses track of the environment and ends up
+        # destructing the template environment. This causes subsequent calls to
+        # print_status to fail (although _fetch_status calls will still
+        # succeed).
+        template_environment_copy = (
+            deepcopy(template_environment)
+            if status_parallelization == "process"
+            else template_environment
+        )
+        render_output = _render_status(
+            template=template,
+            template_environment=template_environment_copy,
+            context=context,
+            detailed=detailed,
+            expand=expand,
+            unroll=unroll,
+            compact=compact,
+            output_format=output_format,
+        )
 
         print(render_output, file=file)
 
         # Show profiling results (if enabled)
         if profiling_results:
-            print('\n' + '\n'.join(profiling_results), file=file)
+            print("\n" + "\n".join(profiling_results), file=file)
 
-        return status_renderer
-
-    def run_operations(self, operations=None, pretend=False, np=None, timeout=None, progress=False):
+    def _run_operations(
+        self, operations=None, pretend=False, np=None, timeout=None, progress=False
+    ):
         """Execute the next operations as specified by the project's workflow.
 
-        See also: :meth:`~.run`
+        See also: :meth:`~.run`.
 
-        :param operations:
-            The operations to execute (optional).
-        :type operations:
-            Sequence of instances of :class:`.JobOperation`
-        :param pretend:
-            Do not actually execute the operations, but show which command would have been used.
-        :type pretend:
-            bool
-        :param np:
-            The number of processors to use for each operation.
-        :type np:
-            int
-        :param timeout:
-            An optional timeout for each operation in seconds after which execution will
-            be cancelled. Use -1 to indicate not timeout (the default).
-        :type timeout:
-            int
-        :param progress:
-            Show a progress bar during execution.
-        :type progress:
-            bool
+        Parameters
+        ----------
+        operations : Sequence of instances of :class:`._JobOperation`
+            The operations to execute (optional). (Default value = None)
+        pretend : bool
+            Do not actually execute the operations, but show the commands that
+            would have been executed. (Default value = False)
+        np : int
+            The number of processors to use for each operation. (Default value = None)
+        timeout : int
+            An optional timeout for each operation in seconds after which
+            execution will be cancelled. Use -1 to indicate no timeout (the
+            default).
+        progress : bool
+            Show a progress bar during execution. (Default value = False)
+
         """
         if timeout is not None and timeout < 0:
             timeout = None
         if operations is None:
-            operations = list(self._get_pending_operations(self))
+            operations = list(self._next_operations())
         else:
-            operations = list(operations)   # ensure list
+            operations = list(operations)  # ensure list
 
         if np is None or np == 1 or pretend:
             if progress:
@@ -2084,64 +2907,70 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             for operation in operations:
                 self._execute_operation(operation, timeout, pretend)
         else:
-            logger.debug("Parallelized execution of {} operation(s).".format(len(operations)))
-            with contextlib.closing(Pool(processes=cpu_count() if np < 0 else np)) as pool:
-                logger.debug("Parallelized execution of {} operation(s).".format(len(operations)))
+            logger.debug("Parallelized execution of %i operation(s).", len(operations))
+            with Pool(processes=cpu_count() if np < 0 else np) as pool:
+                logger.debug(
+                    "Parallelized execution of %i operation(s).", len(operations)
+                )
                 try:
-                    import pickle
-                    self._run_operations_in_parallel(pool, pickle, operations, progress, timeout)
-                    logger.debug("Used cPickle module for serialization.")
-                except Exception as error:
-                    if not isinstance(error, (pickle.PickleError, self._PickleError)) and\
-                            'pickle' not in str(error).lower():
-                        raise    # most likely not a pickle related error...
-
-                    try:
-                        import cloudpickle
-                    except ImportError:  # The cloudpickle package is not available.
-                        logger.error("Unable to parallelize execution due to a pickling error. "
-                                     "\n\n - Try to install the 'cloudpickle' package, e.g., with "
-                                     "'pip install cloudpickle'!\n")
-                        raise error
-                    else:
-                        try:
-                            self._run_operations_in_parallel(
-                                pool, cloudpickle, operations, progress, timeout)
-                        except self._PickleError as error:
-                            raise RuntimeError("Unable to parallelize execution due to a pickling "
-                                               "error: {}.".format(error))
+                    self._run_operations_in_parallel(
+                        pool, operations, progress, timeout
+                    )
+                except self._PickleError as error:
+                    raise RuntimeError(
+                        "Unable to parallelize execution due to a pickling "
+                        f"error: {error}."
+                    )
 
     class _PickleError(Exception):
-        "Indicates a pickling error while trying to parallelize the execution of operations."
-        pass
+        """Indicates a pickling error while trying to parallelize the execution of operations."""
 
     @staticmethod
-    def _dumps_op(op):
-        return (op.id, op.name, op.job._id, op.cmd, op.directives)
+    def _job_operation_to_tuple(operation):
+        return (
+            operation.id,
+            operation.name,
+            [job.get_id() for job in operation._jobs],
+            operation.cmd,
+            operation.directives,
+        )
 
-    def _loads_op(self, blob):
-        id, name, job_id, cmd, directives = blob
-        return JobOperation(id, name, self.open_job(id=job_id), cmd, directives)
+    def _job_operation_from_tuple(self, data):
+        id, name, job_ids, cmd, directives = data
+        jobs = tuple(self.open_job(id=job_id) for job_id in job_ids)
+        return _JobOperation(
+            id, name, jobs, cmd, directives, directives._keys_set_by_user
+        )
 
-    def _run_operations_in_parallel(self, pool, pickle, operations, progress, timeout):
+    def _run_operations_in_parallel(self, pool, operations, progress, timeout):
         """Execute operations in parallel.
 
-        This function executes the given list of operations with the provided process pool.
+        This function executes the given list of operations with the provided
+        process pool.
 
-        Since pickling of the project instance is likely to fail, we manually pickle the
-        project instance and the operations before submitting them to the process pool to
-        enable us to try different pool and pickle module combinations.
+        Since pickling of the project instance is likely to fail, we manually
+        pickle the project instance and the operations before submitting them
+        to the process pool.
         """
-
         try:
-            s_project = pickle.dumps(self)
-            s_tasks = [(pickle.loads, s_project, self._dumps_op(op))
-                       for op in tqdm(operations, desc='Serialize tasks', file=sys.stderr)]
+            serialized_project = cloudpickle.dumps(self)
+            serialized_tasks = [
+                (
+                    cloudpickle.loads,
+                    serialized_project,
+                    self._job_operation_to_tuple(operation),
+                )
+                for operation in tqdm(
+                    operations, desc="Serialize tasks", file=sys.stderr
+                )
+            ]
         except Exception as error:  # Masking all errors since they must be pickling related.
             raise self._PickleError(error)
 
-        results = [pool.apply_async(_execute_serialized_operation, task) for task in s_tasks]
-
+        results = [
+            pool.apply_async(_deserialize_and_run_operation, task)
+            for task in serialized_tasks
+        ]
         for result in tqdm(results) if progress else results:
             result.get(timeout=timeout)
 
@@ -2166,137 +2995,153 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             op_hooks.on_finish(operation)
 
     def _execute_operation(self, operation, timeout=None, pretend=False):
-        prefix = self._environment.get_prefix(operation)
         if pretend:
-            print(prefix + ' ' + operation.cmd if prefix != '' else operation.cmd)
+            print(operation.cmd)
             return None
 
-        logger.info("Execute operation '{}'...".format(operation))
+        logger.info("Execute operation '%s'...", operation)
         # Check if we need to fork for operation execution...
         if (
             # The 'fork' directive was provided and evaluates to True:
-            operation.directives.get('fork', False)
+            operation.directives.get("fork", False)
             # Separate process needed to cancel with timeout:
             or timeout is not None
-            # The operation function is not registered with the class:
-            or operation.name not in self._operation_functions
+            # The operation function is of an instance of FlowCmdOperation:
+            or isinstance(self._operations[operation.name], FlowCmdOperation)
             # The specified executable is not the same as the interpreter instance:
-            or operation.directives.get('executable', sys.executable) != sys.executable
-            or prefix != ''
+            or operation.directives.get("executable", sys.executable) != sys.executable
         ):
             # ... need to fork:
             logger.debug(
-                "Forking to execute operation '{}' with "
-                "cmd '{}'.".format(operation, prefix + ' ' + operation.cmd))
+                "Forking to execute operation '%s' with cmd '%s'.",
+                operation,
+                operation.cmd,
+            )
             with self._run_with_hooks(operation):
-                subprocess.run(prefix + ' ' + operation.cmd,
-                               shell=True, timeout=timeout, check=True)
+                subprocess.run(operation.cmd, shell=True, timeout=timeout, check=True)
         else:
             # ... executing operation in interpreter process as function:
             logger.debug(
-                "Executing operation '{}' with current interpreter "
-                "process ({}).".format(operation, os.getpid()))
+                "Executing operation '%s' with current interpreter process (%s).",
+                operation,
+                os.getpid(),
+            )
             try:
                 with self._run_with_hooks(operation):
-                    self._operation_functions[operation.name](operation.job)
-            except Exception as e:
+                    self._operations[operation.name](*operation._jobs)
+            except Exception as error:
+                assert len(operation._jobs) == 1
                 raise UserOperationError(
-                    'An exception was raised during operation {operation.name} '
-                    'for job {operation.job}.'.format(operation=operation)) from e
+                    f"An exception was raised during operation {operation.name} "
+                    f"for job or aggregate with id {_get_aggregate_id(operation._jobs)}."
+                ) from error
 
     def _get_default_directives(self):
-        return {name: self.groups[name].operation_directives.get(name, dict())
-                for name in self.operations}
+        return {
+            name: self.groups[name].operation_directives.get(name, {})
+            for name in self.operations
+        }
 
-    def run(self, jobs=None, names=None, pretend=False, np=None, timeout=None, num=None,
-            num_passes=1, progress=False, order=None, ignore_conditions=IgnoreConditions.NONE):
-        """Execute all pending operations for the given selection.
+    def run(
+        self,
+        jobs=None,
+        names=None,
+        pretend=False,
+        np=None,
+        timeout=None,
+        num=None,
+        num_passes=1,
+        progress=False,
+        order=None,
+        ignore_conditions=IgnoreConditions.NONE,
+    ):
+        """Execute all eligible operations for the given selection.
 
-        This function will run in an infinite loop until all pending operations
-        are executed, unless it reaches the maximum number of passes per
-        operation or the maximum number of executions.
+        This function will run in an infinite loop until all eligible
+        operations are executed, unless it reaches the maximum number of
+        passes per operation or the maximum number of executions.
 
-        By default there is no limit on the total number of executions, but a specific
-        operation will only be executed once per job. This is to avoid accidental
-        infinite loops when no or faulty post conditions are provided.
+        By default there is no limit on the total number of executions, but a
+        specific operation will only be executed once per job. This is to avoid
+        accidental infinite loops when no or faulty postconditions are
+        provided.
 
-        See also: :meth:`~.run_operations`
+        Parameters
+        ----------
+        jobs : iterable of :class:`~signac.contrib.job.Job`
+            Only execute operations for the given jobs, or all if the
+            argument is None. (Default value = None)
+        names : iterable of :class:`str`
+            Only execute operations that match the provided set of names
+            (interpreted as regular expressions), or all if the argument is
+            None. (Default value = None)
+        pretend : bool
+            Do not actually execute the operations, but show the commands that
+            would have been executed. (Default value = False)
+        np : int
+            Parallelize to the specified number of processors. Use -1 to
+            parallelize to all available processing units. (Default value = None)
+        timeout : int
+            An optional timeout for each operation in seconds after which
+            execution will be cancelled. Use -1 to indicate no timeout (the
+            default).
+        num : int
+            The total number of operations that are executed will not exceed
+            this argument if provided. (Default value = None)
+        num_passes : int or None
+            The total number of executions of one specific job-operation pair
+            will not exceed this argument. The default is 1, there is no limit
+            if this argument is None.
+        progress : bool
+            Show a progress bar during execution. (Default value = False)
+        order : str, callable, or None
+            Specify the order of operations. Possible values are:
 
-        :param jobs:
-            Only execute operations for the given jobs, or all if the argument is omitted.
-        :type jobs:
-            Sequence of instances :class:`.Job`.
-        :param names:
-            Only execute operations that are in the provided set of names, or all, if the
-            argument is omitted.
-        :type names:
-            Sequence of :class:`str`
-        :param pretend:
-            Do not actually execute the operations, but show which command would have been used.
-        :type pretend:
-            bool
-        :param np:
-            Parallelize to the specified number of processors. Use -1 to parallelize to all
-            available processing units.
-        :type np:
-            int
-        :param timeout:
-            An optional timeout for each operation in seconds after which execution will
-            be cancelled. Use -1 to indicate not timeout (the default).
-        :type timeout:
-            int
-        :param num:
-            The total number of operations that are executed will not exceed this argument
-            if provided.
-        :type num:
-            int
-        :param num_passes:
-            The total number of one specific job-operation pair will not exceed this argument.
-            The default is 1, there is no limit if this argument is `None`.
-        :type num_passes:
-            int
-        :param progress:
-            Show a progress bar during execution.
-        :type progress:
-            bool
-        :param order:
-            Specify the order of operations, possible values are:
-                * 'none' or None (no specific order)
-                * 'by-job' (operations are grouped by job)
-                * 'cyclic' (order operations cyclic by job)
-                * 'random' (shuffle the execution order randomly)
-                * callable (a callable returning a comparison key for an
-                            operation used to sort operations)
+            * 'none' or None (no specific order)
+            * 'by-job' (operations are grouped by job)
+            * 'cyclic' (order operations cyclic by job)
+            * 'random' (shuffle the execution order randomly)
+            * callable (a callable returning a comparison key for an
+              operation used to sort operations)
 
-            The default value is `none`, which is equivalent to `by-job` in the current
-            implementation.
+            The default value is ``'none'``, which is equivalent to ``'by-job'``
+            in the current implementation.
 
             .. note::
-                Users are advised to not rely on a specific execution order, as a
-                substitute for defining the workflow in terms of pre- and post-conditions.
-                However, a specific execution order may be more performant in cases where
-                operations need to access and potentially lock shared resources.
-        :type order:
-            str, callable, or NoneType
-        :param ignore_conditions:
-            Specify if pre and/or post conditions check is to be ignored for eligibility check.
-            The default is :py:class:`IgnoreConditions.NONE`.
-        :type ignore_conditions:
-            :py:class:`~.IgnoreConditions`
+
+                Users are advised to not rely on a specific execution order as
+                a substitute for defining the workflow in terms of
+                preconditions and postconditions. However, a specific execution
+                order may be more performant in cases where operations need to
+                access and potentially lock shared resources.
+
+        ignore_conditions : :class:`~.IgnoreConditions`
+            Specify if preconditions and/or postconditions are to be ignored
+            when determining eligibility. The default is
+            :class:`IgnoreConditions.NONE`.
+
         """
-        # If no jobs argument is provided, we run operations for all jobs.
-        if jobs is None:
-            jobs = self
+        # TODO: Document aggregates.
+        # jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
+        #     Only execute operations for the given jobs or aggregates of jobs,
+        #     or all if the argument is None. (Default value = None)
+        aggregates = self._convert_jobs_to_aggregates(jobs)
 
         # Get all matching FlowGroups
         if isinstance(names, str):
             raise ValueError(
                 "The names argument of FlowProject.run() must be a sequence of strings, "
-                "not a string.")
+                "not a string."
+            )
         if names is None:
             names = list(self.operations)
-
-        flow_groups = self._gather_flow_groups(names)
+        else:
+            absent_ops = (set(self._groups.keys()) ^ set(names)) & set(names)
+            if absent_ops:
+                print(
+                    f"Unrecognized flow operation(s): {', '.join(absent_ops)}",
+                    file=sys.stderr,
+                )
 
         # Get default directives
         default_directives = self._get_default_directives()
@@ -2307,12 +3152,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if num and num < 0:
             num = None
 
-        if type(ignore_conditions) != IgnoreConditions:
+        if not isinstance(ignore_conditions, IgnoreConditions):
             raise ValueError(
                 "The ignore_conditions argument of FlowProject.run() "
-                "must be a member of class IgnoreConditions")
+                "must be a member of class IgnoreConditions."
+            )
 
-        messages = list()
+        messages = []
 
         def log(msg, lvl=logging.INFO):
             messages.append((msg, lvl))
@@ -2320,26 +3166,35 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         reached_execution_limit = Event()
 
         def select(operation):
-            if operation.job not in self:
-                log("Job '{}' is no longer part of the project.".format(operation.job))
+            if operation._jobs not in aggregates:
                 return False
+
             if num is not None and select.total_execution_count >= num:
                 reached_execution_limit.set()
                 raise StopIteration  # Reached total number of executions
 
             # Check whether the operation was executed more than the total number of allowed
             # passes *per operation* (default=1).
-            if num_passes is not None and select.num_executions.get(operation, 0) >= num_passes:
-                log("Operation '{}' exceeds max. # of allowed "
-                    "passes ({}).".format(operation, num_passes))
+            if (
+                num_passes is not None
+                and select.num_executions.get(operation, 0) >= num_passes
+            ):
+                log(
+                    f"Operation '{operation}' exceeds max. # of allowed "
+                    f"passes ({num_passes})."
+                )
 
-                # Warn if an operation has no post-conditions set.
-                has_post_conditions = len(self.operations[operation.name]._postconds)
-                if not has_post_conditions:
-                    log("Operation '{}' has no post-conditions!".format(operation.name),
-                        logging.WARNING)
+                # Warn if an operation has no postconditions set.
+                has_postconditions = (
+                    len(self.operations[operation.name]._postconditions) > 0
+                )
+                if not has_postconditions:
+                    log(
+                        f"Operation '{operation.name}' has no postconditions!",
+                        logging.WARNING,
+                    )
 
-                return False    # Reached maximum number of passes for this operation.
+                return False  # Reached maximum number of passes for this operation.
 
             # Increase execution counters for this operation.
             select.num_executions[operation] += 1
@@ -2357,154 +3212,302 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         for i_pass in count(1):
             if reached_execution_limit.is_set():
-                logger.warning("Reached the maximum number of operations that can be executed, but "
-                               "there are still operations pending.")
+                logger.warning(
+                    "Reached the maximum number of operations that can be executed, but "
+                    "there are still eligible operations."
+                )
                 break
             try:
-                # Change groups to available run JobOperations
-                with self._potentially_buffered():
+                # Generate _JobOperation instances for selected groups and aggregates.
+                with self._buffered():
                     operations = []
-                    for flow_group in flow_groups:
-                        for job in jobs:
-                            operations.extend(
-                                flow_group._create_run_job_operations(
-                                    self._entrypoint, default_directives, job, ignore_conditions))
-
+                    run_groups = set(self._gather_flow_groups(names))
+                    for (
+                        aggregate_id,
+                        aggregate,
+                        group,
+                    ) in self._generate_selected_aggregate_groups(
+                        selected_aggregates=aggregates,
+                        selected_groups=run_groups,
+                    ):
+                        operations.extend(
+                            group._create_run_job_operations(
+                                self._entrypoint,
+                                default_directives,
+                                aggregate,
+                                ignore_conditions,
+                            )
+                        )
                     operations = list(filter(select, operations))
             finally:
                 if messages:
                     for msg, level in set(messages):
                         logger.log(level, msg)
-                    del messages[:]     # clear
+                    del messages[:]  # clear
             if not operations:
-                break   # No more pending operations or execution limits reached.
+                break  # No more eligible operations or execution limits reached.
+
+            def key_func_by_job(operation):
+                # In order to group the aggregates in a by-job manner, we need
+                # to first sort the aggregates using their aggregate id.
+                return _get_aggregate_id(operation._jobs)
 
             # Optionally re-order operations for execution if order argument is provided:
             if callable(order):
                 operations = list(sorted(operations, key=order))
-            elif order == 'cyclic':
-                groups = [list(group)
-                          for _, group in groupby(operations, key=lambda op: op.job)]
+            elif order == "cyclic":
+                groups = [
+                    list(group)
+                    for _, group in groupby(
+                        sorted(operations, key=key_func_by_job), key=key_func_by_job
+                    )
+                ]
                 operations = list(roundrobin(*groups))
-            elif order == 'random':
+            elif order == "random":
                 random.shuffle(operations)
-            elif order is None or order in ('none', 'by-job'):
-                pass  # by-job is the default order
+            elif order is None or order in ("none", "by-job"):
+                # by-job is the default order
+                pass
             else:
                 raise ValueError(
                     "Invalid value for the 'order' argument, valid arguments are "
-                    "'none', 'by-job', 'cyclic', 'random', None, or a callable.")
+                    "'none', 'by-job', 'cyclic', 'random', None, or a callable."
+                )
 
             logger.info(
-                "Executing {} operation(s) (Pass # {:02d})...".format(len(operations), i_pass))
-            self.run_operations(operations, pretend=pretend,
-                                np=np, timeout=timeout, progress=progress)
-
-    def _generate_operations(self, cmd, jobs, requires=None):
-        "Generate job-operations for a given 'direct' command."
-        for job in jobs:
-            if requires and set(requires).difference(self.labels(job)):
-                continue
-            cmd_ = cmd.format(job=job)
-            yield JobOperation(name=cmd_.replace(' ', '-'), cmd=cmd_, job=job)
+                "Executing %i operation(s) (Pass #%02d)...",
+                len(operations),
+                i_pass,
+            )
+            self._run_operations(
+                operations, pretend=pretend, np=np, timeout=timeout, progress=progress
+            )
 
     def _gather_flow_groups(self, names=None):
-        """Grabs FlowGroups that match any of a set of names."""
-        operations = OrderedDict()
-        # if no names are selected try all singleton groups
+        r"""Grabs :class:`~.FlowGroup`\ s that match any of a set of names.
+
+        The provided names can be any regular expressions that fully match a group name.
+
+        Parameters
+        ----------
+        names : iterable of :class:`str`
+            Only select operations that match the provided set of names
+            (interpreted as regular expressions), or all if the argument is
+            None. (Default value = None)
+
+        Returns
+        -------
+        list
+            List of groups matching the provided names.
+
+        """
         if names is None:
-            names = self._operations.keys()
-        for name in names:
-            if name in operations:
-                continue
-            groups = [group for gname, group in self.groups.items() if
-                      re.fullmatch(name, gname)]
-            if len(groups) > 0:
-                for group in groups:
-                    operations[group.name] = group
-            else:
-                continue
-        operations = list(operations.values())
-        if not self._verify_group_compatibility(operations):
-            raise ValueError("Cannot specify groups or operations that "
-                             "will be included twice when using the"
-                             " -o/--operation option.")
+            # If no names are selected, use all singleton groups
+            operations = [self._groups[name] for name in self.operations]
+        else:
+            operations = {}
+            for name in names:
+                if name in operations:
+                    continue
+                groups = [
+                    group
+                    for group_name, group in self.groups.items()
+                    if re.fullmatch(name, group_name)
+                ]
+                if len(groups) > 0:
+                    for group in groups:
+                        operations[group.name] = group
+                else:
+                    continue
+            operations = list(operations.values())
+        if not FlowProject._verify_group_compatibility(operations):
+            raise ValueError(
+                "Cannot specify groups or operations that will be included "
+                "twice when using the -o/--operation option."
+            )
         return operations
 
-    def _get_submission_operations(self, jobs, default_directives, names=None, parallel=False,
-                                   ignore_conditions=IgnoreConditions.NONE,
-                                   ignore_conditions_on_execution=IgnoreConditions.NONE):
-        """Grabs JobOperations that are eligible to run from FlowGroups."""
-        for job in jobs:
-            for group in self._gather_flow_groups(names):
-                if group.eligible(job, ignore_conditions) and self._eligible_for_submission(group,
-                                                                                            job):
-                    yield group._create_submission_job_operation(
-                            entrypoint=self._entrypoint, default_directives=default_directives,
-                            job=job, parallel=parallel, index=0,
-                            ignore_conditions_on_execution=ignore_conditions_on_execution)
+    def _get_submission_operations(
+        self,
+        aggregates,
+        default_directives,
+        names=None,
+        ignore_conditions=IgnoreConditions.NONE,
+        ignore_conditions_on_execution=IgnoreConditions.NONE,
+    ):
+        r"""Grabs eligible :class:`~._JobOperation`\ s from :class:`~.FlowGroup`\ s.
 
-    def _get_pending_operations(self, jobs, operation_names=None,
-                                ignore_conditions=IgnoreConditions.NONE):
-        "Get all pending operations for the given selection."
-        assert not isinstance(operation_names, str)
-        for op in self.next_operations(* jobs, ignore_conditions=ignore_conditions):
-            if operation_names is None or any(re.fullmatch(n, op.name) for n in operation_names):
-                yield op
+        Parameters
+        ----------
+        aggregates : sequence of tuples of :class:`~signac.contrib.job.Job`
+            The aggregates to consider for submission.
+        default_directives : dict
+            The default directives to use for the operations. This is to allow
+            for user specified groups to 'inherit' directives from
+            ``default_directives``. If no defaults are desired, the argument
+            can be set to an empty dictionary. This must be done explicitly,
+            however.
+        names : iterable of :class:`str`
+            Only select operations that match the provided set of names
+            (interpreted as regular expressions), or all if the argument is
+            None. (Default value = None)
+        ignore_conditions : :class:`~.IgnoreConditions`
+            Specify if preconditions and/or postconditions are to be ignored
+            when determining eligibility. The default is
+            :class:`IgnoreConditions.NONE`.
+        ignore_conditions_on_execution : :class:`~.IgnoreConditions`
+            Specify if preconditions and/or postconditions are to be ignored
+            when determining eligibility after submitting. The default is
+            :class:`IgnoreConditions.NONE`.
 
-    def _verify_group_compatibility(self, groups):
-        """Verifies that all selected groups can be submitted together."""
+        Yields
+        ------
+        :class:`~._SubmissionJobOperation`
+            Returns a :class:`~._SubmissionJobOperation` for submitting the
+            group. The :class:`~._JobOperation` will have directives that have
+            been collected appropriately from its contained operations.
+
+        """
+        submission_groups = set(self._gather_flow_groups(names))
+
+        # Fetch scheduler status
+        scheduler_info = self._query_scheduler_status()
+        for (
+            scheduler_id,
+            scheduler_status,
+            aggregate_id,
+            aggregate,
+            group,
+        ) in self._generate_selected_aggregate_groups_with_status(
+            scheduler_info=scheduler_info,
+            selected_aggregates=aggregates,
+            selected_groups=submission_groups,
+        ):
+            if group._eligible(
+                aggregate=aggregate, ignore_conditions=ignore_conditions
+            ) and self._eligible_for_submission(
+                group, aggregate, scheduler_status, scheduler_info
+            ):
+                yield group._create_submission_job_operation(
+                    entrypoint=self._entrypoint,
+                    default_directives=default_directives,
+                    jobs=aggregate,
+                    ignore_conditions_on_execution=ignore_conditions_on_execution,
+                )
+
+    @classmethod
+    def _verify_group_compatibility(cls, groups):
+        """Verify that all selected groups can be submitted together."""
         return all(a.isdisjoint(b) for a in groups for b in groups if a != b)
 
-    @contextlib.contextmanager
-    def _potentially_buffered(self):
-        if self._use_buffered_mode:
-            logger.debug("Entering buffered mode...")
-            with signac.buffered():
-                yield
-            logger.debug("Exiting buffered mode.")
-        else:
-            yield
+    def _get_aggregate_from_id(self, id):
+        # Iterate over all the instances of stored aggregates and search for the
+        # aggregate id in those instances.
+        for aggregate_store in self._group_to_aggregate_store.inverse:
+            try:
+                # Assume the id exists and skip the __contains__ check for
+                # performance. If the id doesn't exist in this aggregate_store,
+                # it will raise an exception that can be ignored.
+                return aggregate_store[id]
+            except KeyError:
+                pass
+        # Raise error as didn't find the id in any of the stored objects
+        raise LookupError(f"Did not find aggregate with id {id} in the project")
 
-    def script(self, operations, parallel=False, template='script.sh', show_template_help=False):
+    def _convert_jobs_to_aggregates(self, jobs):
+        """Convert sequences of signac jobs to aggregates.
+
+        The ``jobs`` parameter in public methods like :meth:`~.run`,
+        :meth:`~.submit`, and :meth:`~.print_status` accepts a sequence of
+        signac jobs. This method converts that sequence into a sequence of
+        aggregates (tuples containing single signac jobs).
+        """
+        if jobs is None:
+            return _AggregatesCursor(self)
+        elif isinstance(jobs, _AggregatesCursor):
+            return jobs
+
+        # Handle user-provided jobs/aggregates
+        aggregates = []
+        for aggregate in jobs:
+            if isinstance(aggregate, signac.contrib.job.Job):
+                # aggregate is a single signac job.
+                if aggregate not in self:
+                    raise LookupError(f"Did not find job {aggregate} in the project")
+                aggregates.append((aggregate,))
+            else:
+                try:
+                    aggregate = tuple(aggregate)
+                    assert all(
+                        isinstance(job, signac.contrib.job.Job) for job in aggregate
+                    )
+                except (AssertionError, TypeError) as error:
+                    raise TypeError(
+                        "Invalid jobs argument. Please provide a valid "
+                        "signac job or aggregate of jobs."
+                    ) from error
+                else:
+                    # aggregate is a tuple of signac jobs.
+                    # Ensure that the aggregate exists in one of the aggregate
+                    # stores associated with this project. This will raise an
+                    # error if not.
+                    aggregate_from_id = self._get_aggregate_from_id(
+                        _get_aggregate_id(aggregate)
+                    )
+                    aggregates.append(aggregate_from_id)
+        return aggregates
+
+    @contextlib.contextmanager
+    def _buffered(self):
+        """Enable the use of buffered mode for certain functions."""
+        logger.debug("Entering buffered mode.")
+        with signac.buffered():
+            yield
+        logger.debug("Exiting buffered mode.")
+
+    def _script(
+        self, operations, parallel=False, template="script.sh", show_template_help=False
+    ):
         """Generate a run script to execute given operations.
 
-        :param operations:
+        Parameters
+        ----------
+        operations : Sequence of instances of :class:`._JobOperation`
             The operations to execute.
-        :type operations:
-            Sequence of instances of :class:`.JobOperation`
-        :param parallel:
+        parallel : bool
             Execute all operations in parallel (default is False).
-        :type parallel:
-            bool
-        :param template:
-            The name of the template to use to generate the script.
-        :type template:
-            str
-        :param show_template_help:
-            Show help related to the templating system and then exit.
-        :type show_template_help:
-            bool
+        template : str
+            The name of the template to use to generate the script. (Default value = "script.sh")
+        show_template_help : bool
+            Show help related to the templating system and then exit. (Default value = False)
+
+        Returns
+        -------
+        str
+            Rendered template of run script.
+
         """
         template_environment = self._template_environment()
         template = template_environment.get_template(template)
         context = self._get_standard_template_context()
         # For script generation we do not need the extra logic used for
         # generating cluster job scripts.
-        context['base_script'] = 'base_script.sh'
-        context['operations'] = list(operations)
-        context['parallel'] = parallel
+        context["base_script"] = "base_script.sh"
+        context["operations"] = list(operations)
+        context["parallel"] = parallel
         if show_template_help:
             self._show_template_help_and_exit(template_environment, context)
-        return template.render(** context)
+        return template.render(**context)
 
-    def _generate_submit_script(self, _id, operations, template, show_template_help, env, **kwargs):
+    def _generate_submit_script(
+        self, _id, operations, template, show_template_help, **kwargs
+    ):
         """Generate submission script to submit the execution of operations to a scheduler."""
         if template is None:
-            template = env.template
+            template = self._environment.template
         assert _id is not None
 
-        template_environment = self._template_environment(env)
+        template_environment = self._template_environment(self._environment)
         template = template_environment.get_template(template)
         context = self._get_standard_template_context()
         # The flow 'script.sh' file simply extends the base script
@@ -2513,73 +3516,68 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # with signac-flow unless additional environment information is
         # detected.
 
-        logger.info("Use environment '{}'.".format(env))
-        logger.info("Set 'base_script={}'.".format(env.template))
-        context['base_script'] = env.template
-        context['environment'] = env.__name__
-        context['id'] = _id
-        context['operations'] = list(operations)
+        logger.info("Set 'base_script=%s'.", self._environment.template)
+        logger.info("Use environment '%s'.", self._environment)
+        context["base_script"] = self._environment.template
+        context["environment"] = self._environment
+        context["id"] = _id
+        context["operations"] = list(operations)
         context.update(kwargs)
         if show_template_help:
             self._show_template_help_and_exit(template_environment, context)
-        return template.render(** context)
+        return template.render(**context)
 
-    def submit_operations(self, operations, _id=None, env=None, parallel=False, flags=None,
-                          force=False, template='script.sh', pretend=False,
-                          show_template_help=False, **kwargs):
+    def _submit_operations(
+        self,
+        operations,
+        _id=None,
+        parallel=False,
+        flags=None,
+        force=False,
+        template="script.sh",
+        pretend=False,
+        show_template_help=False,
+        **kwargs,
+    ):
         r"""Submit a sequence of operations to the scheduler.
 
-        :param operations:
+        Parameters
+        ----------
+        operations : A sequence of instances of :class:`~._JobOperation`
             The operations to submit.
-        :type operations:
-            A sequence of instances of :py:class:`.JobOperation`
-        :param _id:
-            The _id to be used for this submission.
-        :type _id:
-            str
-        :param parallel:
-            Execute all bundled operations in parallel.
-        :type parallel:
-            bool
-        :param flags:
-            Additional options to be forwarded to the scheduler.
-        :type flags:
-            list
-        :param force:
-            Ignore all warnings or checks during submission, just submit.
-        :type force:
-            bool
-        :param template:
-            The name of the template file to be used to generate the submission script.
-        :type template:
-            str
-        :param pretend:
+        _id : str
+            The _id to be used for this submission. (Default value = None)
+        parallel : bool
+            Execute all bundled operations in parallel. (Default value = False)
+        flags : list
+            Additional options to be forwarded to the scheduler. (Default value = None)
+        force : bool
+            Ignore all warnings or checks during submission, just submit. (Default value = False)
+        template : str
+            The name of the template file to be used to generate the submission
+            script. (Default value = "script.sh")
+        pretend : bool
             Do not actually submit, but only print the submission script to screen. Useful
-            for testing the submission workflow.
-        :type pretend:
-            bool
-        :param show_template_help:
-            Show information about available template variables and filters and exit.
-        :type show_template_help:
-            bool
-        :param \*\*kwargs:
-            Additional keyword arguments to be forwarded to the scheduler.
-        :return:
+            for testing the submission workflow. (Default value = False)
+        show_template_help : bool
+            Show information about available template variables and filters and
+            exit. (Default value = False)
+        \*\*kwargs
+            Additional keyword arguments forwarded to :meth:`~.ComputeEnvironment.submit`.
+
+        Returns
+        -------
+        :class:`~.JobStatus` or None
             Returns the submission status after successful submission or None.
+
         """
         if _id is None:
             _id = self._store_bundled(operations)
-        if env is None:
-            env = self._environment
-        else:
-            warnings.warn("The env argument is deprecated as of 0.10 and will be removed in 0.12. "
-                          "Instead, set the environment when constructing a FlowProject.",
-                          DeprecationWarning)
 
-        print("Submitting cluster job '{}':".format(_id), file=sys.stderr)
+        print(f"Submitting cluster job '{_id}':", file=sys.stderr)
 
         def _msg(group):
-            print(" - Group: {}".format(group), file=sys.stderr)
+            print(f" - Group: {group}", file=sys.stderr)
             return group
 
         try:
@@ -2588,17 +3586,18 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 operations=map(_msg, operations),
                 template=template,
                 show_template_help=show_template_help,
-                env=env,
                 parallel=parallel,
                 force=force,
-                **kwargs
+                **kwargs,
             )
         except ConfigKeyError as error:
+            key = str(error)
             raise SubmitError(
-                "Unable to submit, because of a configuration error.\n"
-                "The following key is missing: {key}.\n"
-                "You can add the key to the configuration for example with:\n\n"
-                "  $ signac config --global set {key} VALUE\n".format(key=str(error)))
+                f"Unable to submit, because of a configuration error.\n"
+                f"The following key is missing: {key}.\n"
+                f"Add the key to the configuration by executing:\n\n"
+                f"  $ signac config --global set {key} VALUE\n"
+            )
         else:
             # Keys which were explicitly set by the user, but are not evaluated by the
             # template engine are cause for concern and might hint at a bug in the template
@@ -2606,143 +3605,174 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             # have been explicitly set by the user were actually evaluated by the template
             # engine and warn about those that have not been.
             keys_unused = {
-                key for op in operations for key in
-                op.directives._keys_set_by_user.difference(op.directives.keys_used)
-                if key not in ('fork', )  # whitelist
+                key
+                for op in operations
+                for key in op.directives._keys_set_by_user.difference(
+                    op.directives.keys_used
+                )
+                if key not in ("fork", "nranks", "omp_num_threads")  # ignore list
             }
             if keys_unused:
                 logger.warning(
                     "Some of the keys provided as part of the directives were not used by "
-                    "the template script, including: {}".format(
-                        ', '.join(sorted(keys_unused))))
+                    "the template script, including: %s",
+                    ", ".join(sorted(keys_unused)),
+                )
             if pretend:
                 print(script)
 
             else:
-                return env.submit(_id=_id, script=script, flags=flags, **kwargs)
+                return self._environment.submit(
+                    _id=_id, script=script, flags=flags, **kwargs
+                )
 
-    def submit(self, bundle_size=1, jobs=None, names=None, num=None, parallel=False,
-               force=False, walltime=None, env=None, ignore_conditions=IgnoreConditions.NONE,
-               ignore_conditions_on_execution=IgnoreConditions.NONE, **kwargs):
-        """Submit function for the project's main submit interface.
+    def submit(
+        self,
+        bundle_size=1,
+        jobs=None,
+        names=None,
+        num=None,
+        parallel=False,
+        force=False,
+        walltime=None,
+        ignore_conditions=IgnoreConditions.NONE,
+        ignore_conditions_on_execution=IgnoreConditions.NONE,
+        **kwargs,
+    ):
+        r"""Submit function for the project's main submit interface.
 
-        :param bundle_size:
+        Parameters
+        ----------
+        bundle_size : int
             Specify the number of operations to be bundled into one submission, defaults to 1.
-        :type bundle_size:
-            int
-        :param jobs:
-            Only submit operations associated with the provided jobs. Defaults to all jobs.
-        :type jobs:
-            Sequence of instances :class:`.Job`.
-        :param names:
-            Only submit operations with any of the given names, defaults to all names.
-        :type names:
-            Sequence of :class:`str`
-        :param num:
+        jobs : iterable of :class:`~signac.contrib.job.Job`
+            Only submit operations for the given jobs, or all if the argument
+            is None. (Default value = None)
+        names : iterable of :class:`str`
+            Only submit operations that match the provided set of names
+            (interpreted as regular expressions), or all if the argument is
+            None. (Default value = None)
+        num : int
             Limit the total number of submitted operations, defaults to no limit.
-        :type num:
-            int
-        :param parallel:
-            Execute all bundled operations in parallel. With multiple operation
-            groups, this also will run the operations in a group in parallel.
-        :type parallel:
-            bool
-        :param force:
-            Ignore all warnings or checks during submission, just submit.
-        :type force:
-            bool
-        :param walltime:
-            Specify the walltime in hours or as instance of :py:class:`datetime.timedelta`.
-        :param ignore_conditions:
-            Specify if pre and/or post conditions check is to be ignored for eligibility check.
-            The default is :py:class:`IgnoreConditions.NONE`.
-        :type ignore_conditions:
-            :py:class:`~.IgnoreConditions`
-        :param ignore_conditions_on_execution:
-            Specify if pre and/or post conditions check is to be ignored for eligibility check after
-            submitting. The default is :py:class:`IgnoreConditions.NONE`.
-        :type ignore_conditions:
-            :py:class:`~.IgnoreConditions`
+        parallel : bool
+            Execute all bundled operations in parallel. (Default value = False)
+        force : bool
+            Ignore all warnings or checks during submission, just submit. (Default value = False)
+        walltime : :class:`datetime.timedelta`
+            Specify the walltime in hours or as instance of
+            :class:`datetime.timedelta`. (Default value = None)
+        ignore_conditions : :class:`~.IgnoreConditions`
+            Specify if preconditions and/or postconditions are to be ignored
+            when determining eligibility. The default is
+            :class:`IgnoreConditions.NONE`.
+        ignore_conditions_on_execution : :class:`~.IgnoreConditions`
+            Specify if preconditions and/or postconditions are to be ignored
+            when determining eligibility after submitting. The default is
+            :class:`IgnoreConditions.NONE`.
+        \*\*kwargs
+            Additional keyword arguments forwarded to :meth:`~.ComputeEnvironment.submit`.
+
         """
+        if names is not None:
+            absent_ops = (set(self._groups.keys()) ^ set(names)) & set(names)
+            if absent_ops:
+                print(
+                    f"Unrecognized flow operation(s): {', '.join(absent_ops)}",
+                    file=sys.stderr,
+                )
+
+        # TODO: Document aggregates.
+        # jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
+        #     Only submit operations for the given jobs or aggregates of jobs,
+        #     or all if the argument is None. (Default value = None)
+        aggregates = self._convert_jobs_to_aggregates(jobs)
+
         # Regular argument checks and expansion
-        if jobs is None:
-            jobs = self  # select all jobs
         if isinstance(names, str):
             raise ValueError(
-                "The 'names' argument must be a sequence of strings, however you "
-                "provided a single string: {}.".format(names))
-        if env is None:
-            env = self._environment
-        else:
-            warnings.warn("The env argument is deprecated as of 0.10 and will be removed in 0.12. "
-                          "Instead, set the environment when constructing a FlowProject.",
-                          DeprecationWarning)
+                "The 'names' argument must be a sequence of strings, however "
+                f"a single string was provided: {names}."
+            )
         if walltime is not None:
             try:
                 walltime = datetime.timedelta(hours=walltime)
             except TypeError as error:
-                if str(error) != 'unsupported type for timedelta ' \
-                                 'hours component: datetime.timedelta':
+                if (
+                    str(error) != "unsupported type for timedelta "
+                    "hours component: datetime.timedelta"
+                ):
                     raise
-        if type(ignore_conditions) != IgnoreConditions:
+        if not isinstance(ignore_conditions, IgnoreConditions):
             raise ValueError(
                 "The ignore_conditions argument of FlowProject.run() "
-                "must be a member of class IgnoreConditions")
+                "must be a member of class IgnoreConditions."
+            )
 
-        # Gather all pending operations.
-        default_directives = self._get_default_directives()
-        with self._potentially_buffered():
-            operations = self._get_submission_operations(jobs, default_directives, names, parallel,
-                                                         ignore_conditions,
-                                                         ignore_conditions_on_execution)
-        if num is not None:
-            operations = list(islice(operations, num))
+        # Gather all eligible operations.
+        with self._buffered():
+            default_directives = self._get_default_directives()
+            # The generator must be used *inside* the buffering context manager
+            # for performance reasons.
+            operation_generator = self._get_submission_operations(
+                aggregates,
+                default_directives,
+                names,
+                ignore_conditions,
+                ignore_conditions_on_execution,
+            )
+            # islice takes the first "num" elements from the generator, or all
+            # items if num is None.
+            operations = list(islice(operation_generator, num))
 
         # Bundle them up and submit.
-        for bundle in _make_bundles(operations, bundle_size):
-            status = self.submit_operations(
-                operations=bundle, env=env, parallel=parallel,
-                force=force, walltime=walltime, **kwargs)
-
-            if status is not None:  # operations were submitted, store status
-                for op in bundle:
-                    op.set_status(status)
+        with self._buffered():
+            with self._update_cached_scheduler_status() as status_update:
+                for bundle in _make_bundles(operations, bundle_size):
+                    status = self._submit_operations(
+                        operations=bundle,
+                        parallel=parallel,
+                        force=force,
+                        walltime=walltime,
+                        **kwargs,
+                    )
+                    if status is not None:
+                        # Operations were submitted, store status
+                        for operation in bundle:
+                            status_update[operation.id] = status
 
     @classmethod
     def _add_submit_args(cls, parser):
-        "Add arguments to submit sub command to parser."
+        """Add arguments to submit subcommand to parser."""
         parser.add_argument(
-            'flags',
+            "flags", type=str, nargs="*", help="Flags to be forwarded to the scheduler."
+        )
+        parser.add_argument(
+            "--pretend",
+            action="store_true",
+            help="Do not really submit, but print the submission script to screen.",
+        )
+        parser.add_argument(
+            "--force",
+            action="store_true",
+            help="Ignore all warnings and checks, just submit.",
+        )
+        parser.add_argument(
+            "--ignore-conditions",
             type=str,
-            nargs='*',
-            help="Flags to be forwarded to the scheduler.")
-        parser.add_argument(
-            '--pretend',
-            action='store_true',
-            help="Do not really submit, but print the submission script to screen.")
-        parser.add_argument(
-            '--force',
-            action='store_true',
-            help="Ignore all warnings and checks, just submit.")
-        parser.add_argument(
-            '--test',
-            action='store_true',
-            help="Do not interact with the scheduler, implies --pretend.")
-        parser.add_argument(
-            '--ignore-conditions',
-            type=str,
-            choices=['none', 'pre', 'post', 'all'],
+            choices=["none", "pre", "post", "all"],
             default=IgnoreConditions.NONE,
             action=_IgnoreConditionsConversion,
-            help="Specify conditions to ignore for eligibility check.")
+            help="Specify conditions to ignore for eligibility check.",
+        )
         parser.add_argument(
-            '--ignore-conditions-on-execution',
+            "--ignore-conditions-on-execution",
             type=str,
-            choices=['none', 'pre', 'post', 'all'],
+            choices=["none", "pre", "post", "all"],
             default=IgnoreConditions.NONE,
             action=_IgnoreConditionsConversion,
             help="Specify conditions to ignore after submitting. May be useful "
-                 "for conditions that cannot be checked once scheduled.")
+            "for conditions that cannot be checked once scheduled.",
+        )
 
         cls._add_operation_selection_arg_group(parser)
         cls._add_operation_bundling_arg_group(parser)
@@ -2751,232 +3781,252 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     @classmethod
     def _add_script_args(cls, parser):
         cls._add_operation_selection_arg_group(parser)
-        execution_group = parser.add_argument_group('execution')
+        execution_group = parser.add_argument_group("execution")
         execution_group.add_argument(
-            '-p', '--parallel',
-            action='store_true',
-            help="Execute all operations in parallel. This applies to "
-                 "bundled operations and operations within a multi-operation group..")
-        cls._add_direct_cmd_arg_group(parser)
+            "-p",
+            "--parallel",
+            action="store_true",
+            help="Execute all operations in parallel.",
+        )
         cls._add_template_arg_group(parser)
 
     @classmethod
-    def _add_template_arg_group(cls, parser, default='script.sh'):
-        "Add argument group to parser for template handling."
+    def _add_template_arg_group(cls, parser, default="script.sh"):
+        """Add argument group to parser for template handling."""
         template_group = parser.add_argument_group(
-            'templating',
+            "templating",
             "The execution and submission scripts are always generated from a script "
-            "which is by default called '{default}' and located within the default "
+            f"which is by default called '{default}' and located within the default "
             "template directory. The system uses a default template if none is provided. "
             "The default template extends from a base template, which may be different "
             "depending on the local compute environment, e.g., 'slurm.sh' for an environment "
             "with SLURM scheduler. The name of the base template is provided with the "
-            "'base_script' template variable.".format(default=default),
+            "'base_script' template variable.",
         )
         template_group.add_argument(
-            '--template',
+            "--template",
             type=str,
             default=default,
             help="The name of the template file within the template directory. "
-                 "The standard template directory is '${{project_root}}/templates' and "
-                 "can be configured with the 'template_dir' configuration variable. "
-                 "Default: '{}'.".format(default))
+            "The standard template directory is '${{project_root}}/templates' and "
+            "can be configured with the 'template_dir' configuration variable. "
+            f"Default: '{default}'.",
+        )
         template_group.add_argument(
-            '--template-help',
-            dest='show_template_help',
-            action='store_true',
+            "--template-help",
+            dest="show_template_help",
+            action="store_true",
             help="Show information about the template context, including available variables "
-                 "and filter functions; then exit.")
+            "and filter functions; then exit.",
+        )
 
     @classmethod
     def _add_job_selection_args(cls, parser):
         parser.add_argument(
-            '-j', '--job-id',
+            "-j",
+            "--job-id",
             type=str,
-            nargs='+',
-            help="Only select jobs that match the given id(s).")
+            nargs="+",
+            help="Only select jobs that match the given id(s).",
+        )
         parser.add_argument(
-            '-f', '--filter',
+            "-f",
+            "--filter",
             type=str,
-            nargs='+',
-            help="Only select jobs that match the given state point filter.")
+            nargs="+",
+            help="Only select jobs that match the given state point filter.",
+        )
         parser.add_argument(
-            '--doc-filter',
+            "--doc-filter",
             type=str,
-            nargs='+',
-            help="Only select jobs that match the given document filter.")
+            nargs="+",
+            help="Only select jobs that match the given document filter.",
+        )
 
     @classmethod
-    def _add_operation_selection_arg_group(cls, parser, operations=None):
-        "Add argument group to parser for job-operation selection."
+    def _add_operation_selection_arg_group(cls, parser):
+        """Add argument group to parser for job-operation selection."""
         selection_group = parser.add_argument_group(
-            'job-operation selection',
+            "job-operation selection",
             "By default, all eligible operations for all jobs are selected. Use "
-            "the options in this group to reduce this selection.")
+            "the options in this group to reduce this selection.",
+        )
         cls._add_job_selection_args(selection_group)
         selection_group.add_argument(
-            '-o', '--operation',
-            dest='operation_name',
-            nargs='+',
+            "-o",
+            "--operation",
+            dest="operation_name",
+            nargs="+",
             help="Only select operation or groups that match the given "
-            "operation/group name(s).")
+            "operation/group name(s).",
+        )
         selection_group.add_argument(
-            '-n', '--num',
+            "-n",
+            "--num",
             type=int,
             help="Limit the total number of operations/groups to be selected. A group is "
-                 "considered to be one operation even if it consists of multiple operations.")
+            "considered to be one operation even if it consists of multiple operations.",
+        )
 
     @classmethod
     def _add_operation_bundling_arg_group(cls, parser):
         """Add argument group to parser for operation bundling."""
-
         bundling_group = parser.add_argument_group(
-            'bundling',
+            "bundling",
             "Bundle multiple operations for execution, e.g., to submit them "
             "all together to a cluster job, or execute them in parallel within "
-            "an execution script.")
+            "an execution script.",
+        )
         bundling_group.add_argument(
-            '-b', '--bundle',
+            "-b",
+            "--bundle",
             type=int,
-            nargs='?',
+            nargs="?",
             const=0,
             default=1,
-            dest='bundle_size',
+            dest="bundle_size",
             help="Bundle multiple operations for execution in a single "
-            "scheduler job. When this option is provided without argument, "
-            " all pending operations are aggregated into one bundle.")
+            "scheduler job. When this option is provided without an argument, "
+            "all eligible operations are combined into one bundle.",
+        )
         bundling_group.add_argument(
-            '-p', '--parallel',
-            action='store_true',
-            help="Execute all operations or multi-operation groups within "
-                 "a single bundle in parallel. For multi-operation groups "
-                 "operations within a group run in parallel.")
+            "-p",
+            "--parallel",
+            action="store_true",
+            help="Execute all operations in a single bundle in parallel.",
+        )
 
-    @classmethod
-    def _add_direct_cmd_arg_group(cls, parser):
-        direct_cmd_group = parser.add_argument_group("direct cmd")
-        direct_cmd_group.add_argument(
-            '--cmd',
-            type=str,
-            help="Directly specify the command for an operation. "
-                 "For example: --cmd='echo {job._id}'. "
-                 "--cmd option is deprecated as of 0.9 and will be removed in 0.11.")
-        direct_cmd_group.add_argument(
-            '--requires',
-            type=str,
-            nargs='+',
-            help="Manually specify all labels that are required for the direct command "
-                 "to be considered eligible for execution.")
-
-    @deprecated(
-        deprecated_in="0.8", removed_in="0.10",
-        current_version=__version__,
-        details="Use export_job_statuses() instead.")
-    def export_job_stati(self, collection, stati):
-        "Export the job stati to a database collection."
-        self.export_job_statuses(self, collection, stati)
-
+    @deprecated(deprecated_in="0.12", removed_in="0.14", current_version=__version__)
     def export_job_statuses(self, collection, statuses):
-        "Export the job statuses to a database collection."
+        """Export the job statuses to a :class:`signac.Collection`."""
         for status in statuses:
-            job = self.open_job(id=status['job_id'])
-            status['statepoint'] = job.statepoint()
-            collection.update_one({'_id': status['job_id']},
-                                  {'$set': status}, upsert=True)
+            job = self.open_job(id=status["job_id"])
+            status["statepoint"] = job.statepoint()
+            collection.update_one(
+                {"_id": status["job_id"]}, {"$set": status}, upsert=True
+            )
 
     @classmethod
     def _add_print_status_args(cls, parser):
-        "Add arguments to parser for the :meth:`~.print_status` method."
+        """Add arguments to parser for the :meth:`~.print_status` method."""
         cls._add_job_selection_args(parser)
         view_group = parser.add_argument_group(
-            'view',
-            "Specify how to format the status display.")
+            "view", "Specify how to format the status display."
+        )
         view_group.add_argument(
-            '--json',
-            dest='dump_json',
-            action='store_true',
-            help="Do not format the status display, but dump all data formatted in JSON.")
+            "--json",
+            dest="dump_json",
+            action="store_true",
+            help="Do not format the status display, but dump all data formatted in JSON.",
+        )
         view_group.add_argument(
-            '-d', '--detailed',
-            action='store_true',
-            help="Show a detailed view of all jobs and their labels and operations.")
+            "-d",
+            "--detailed",
+            action="store_true",
+            help="Show a detailed view of all jobs and their labels and operations.",
+        )
         view_group.add_argument(
-            '-a', '--all-operations',
-            dest='all_ops',
-            action='store_true',
-            help="Show information about all operations, not just active or eligible ones.")
+            "-a",
+            "--all-operations",
+            dest="all_ops",
+            action="store_true",
+            help="Show information about all operations, not just active or eligible ones.",
+        )
         view_group.add_argument(
-            '--only-incomplete-operations',
-            dest='only_incomplete',
-            action='store_true',
-            help="Only show information for jobs with incomplete operations.")
+            "--only-incomplete-operations",
+            dest="only_incomplete",
+            action="store_true",
+            help="Only show information for jobs with incomplete operations.",
+        )
         view_group.add_argument(
-            '--stack',
-            action='store_false',
-            dest='unroll',
-            help="Show labels and operations in separate rows.")
+            "--stack",
+            action="store_false",
+            dest="unroll",
+            help="Show labels and operations in separate rows.",
+        )
         view_group.add_argument(
-            '-1', '--one-line',
-            dest='compact',
-            action='store_true',
-            help="Show only one line per job.")
+            "-1",
+            "--one-line",
+            dest="compact",
+            action="store_true",
+            help="Show only one line per job.",
+        )
         view_group.add_argument(
-            '-e', '--expand',
-            action='store_true',
-            help="Display job labels and job operations in two separate tables.")
+            "-e",
+            "--expand",
+            action="store_true",
+            help="Display job labels and job operations in two separate tables.",
+        )
+        view_group.add_argument("--pretty", action="store_true")
         view_group.add_argument(
-            '--pretty',
-            action='store_true')
+            "--full",
+            action="store_true",
+            help="Show all available information (implies --detailed --all-operations).",
+        )
         view_group.add_argument(
-            '--full',
-            action='store_true',
-            help="Show all available information (implies --detailed --all-operations).")
+            "--no-overview",
+            action="store_false",
+            dest="overview",
+            help="Do not print an overview.",
+        )
         view_group.add_argument(
-            '--no-overview',
-            action='store_false',
-            dest='overview',
-            help="Do not print an overview.")
-        view_group.add_argument(
-            '-m', '--overview-max-lines',
+            "-m",
+            "--overview-max-lines",
             type=_positive_int,
-            help="Limit the number of lines in the overview.")
+            help="Limit the number of lines in the overview.",
+        )
         view_group.add_argument(
-            '-p', '--parameters',
+            "-p",
+            "--parameters",
             type=str,
-            nargs='*',
+            nargs="*",
             help="Display select parameters of the job's "
-                 "statepoint with the detailed view.")
+            "statepoint with the detailed view.",
+        )
         view_group.add_argument(
-            '--param-max-width',
-            type=int,
-            help="Limit the width of each parameter row.")
+            "--param-max-width", type=int, help="Limit the width of each parameter row."
+        )
         view_group.add_argument(
-            '--eligible-jobs-max-lines',
+            "--eligible-jobs-max-lines",
             type=_positive_int,
-            help="Limit the number of eligible jobs that are shown.")
+            help="Limit the number of eligible jobs that are shown.",
+        )
         parser.add_argument(
-            '--ignore-errors',
-            action='store_true',
-            help="Ignore errors that might occur when querying the scheduler.")
-        parser.add_argument(
-            '--no-parallelize',
-            action='store_true',
-            help="Do not parallelize the status determination.")
+            "--ignore-errors",
+            action="store_true",
+            help="Ignore errors that might occur when querying the scheduler.",
+        )
         view_group.add_argument(
-            '-o', '--output-format',
+            "-o",
+            "--output-format",
             type=str,
-            default='terminal',
-            help="Set status output format: terminal, markdown, or html.")
+            default="terminal",
+            help="Set status output format: terminal, markdown, or html.",
+        )
 
     def labels(self, job):
-        """Yields all labels for the given ``job``.
+        """Yield all labels for the given ``job``.
 
-        See also: :meth:`~.label`
+        See also: :meth:`~.label`.
+
+        Parameters
+        ----------
+        job : :class:`signac.contrib.job.Job`
+            Job handle.
+
+        Yields
+        ------
+        str
+            Label value.
+
         """
         for label_func, label_name in self._label_functions.items():
             if label_name is None:
-                label_name = getattr(label, '_label_name',
-                                     getattr(label, '__name__', type(label).__name__))
+                label_name = getattr(
+                    label_func,
+                    "_label_name",
+                    getattr(label_func, "__name__", type(label_func).__name__),
+                )
             try:
                 label_value = label_func(job)
             except TypeError:
@@ -2986,7 +4036,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     label_func = getattr(self, label.__func__.__name__)
                     label_value = label_func(job)
 
-            label_name = getattr(label_func, '_label_name', label_func.__name__)
             assert label_name is not None
             if isinstance(label_value, str):
                 yield label_value
@@ -2994,31 +4043,30 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 yield label_name
 
     def add_operation(self, name, cmd, pre=None, post=None, hooks=None, **kwargs):
-        """
-        Add an operation to the workflow.
+        r"""Add an operation to the workflow.
 
-        This method will add an instance of :py:class:`~.FlowOperation` to the
-        operations-dict of this project.
+        This method will add an instance of :class:`~.FlowOperation` to the
+        operations of this project.
 
         .. seealso::
 
-            A Python function may be defined as an operation function directly using
-            the :meth:`~.operation` decorator.
+            A Python function may be defined as an operation function directly
+            using the :meth:`~.operation` decorator.
 
-        Any FlowOperation is associated with a specific command, which should be
-        a function of :py:class:`~signac.contrib.job.Job`. The command (cmd) can
-        be stated as function, either by using str-substitution based on a job's
-        attributes, or by providing a unary callable, which expects an instance
-        of job as its first and only positional argument.
+        Any FlowOperation is associated with a specific command, which should
+        be a function of :class:`~signac.contrib.job.Job`. The command (cmd)
+        can be stated as function, either by using str-substitution based on a
+        job's attributes, or by providing a unary callable, which expects an
+        instance of job as its first and only positional argument.
 
-        For example, if we wanted to define a command for a program called 'hello',
-        which expects a job id as its first argument, we could construct the following
-        two equivalent operations:
+        For example, if we wanted to define a command for a program called
+        'hello', which expects a job id as its first argument, we could
+        construct the following two equivalent operations:
 
         .. code-block:: python
 
-            op = FlowOperation('hello', cmd='hello {job._id}')
-            op = FlowOperation('hello', cmd=lambda 'hello {}'.format(job._id))
+            op = FlowOperation('hello', cmd='hello {job.id}')
+            op = FlowOperation('hello', cmd=lambda 'hello {}'.format(job.id))
 
         Here are some more useful examples for str-substitutions:
 
@@ -3027,36 +4075,34 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             # Substitute job state point parameters:
             op = FlowOperation('hello', cmd='cd {job.ws}; hello {job.sp.a}')
 
-        Pre-requirements (pre) and post-conditions (post) can be used to
-        trigger an operation only when certain conditions are met. Conditions are unary
-        callables, which expect an instance of job as their first and only positional
-        argument and return either True or False.
+        Preconditions (pre) and postconditions (post) can be used to trigger an
+        operation only when certain conditions are met. Conditions are unary
+        callables, which expect an instance of job as their first and only
+        positional argument and return either True or False.
 
-        An operation is considered "eligible" for execution when all pre-requirements
-        are met and when at least one of the post-conditions is not met.
-        Requirements are always met when the list of requirements is empty and
-        post-conditions are never met when the list of post-conditions is empty.
+        An operation is considered "eligible" for execution when all
+        preconditions are met and when at least one of the postconditions is
+        not met. Preconditions are always met when the list of preconditions
+        is empty. Postconditions are never met when the list of postconditions
+        is empty.
 
-        Please note, eligibility in this contexts refers only to the workflow pipeline
-        and not to other contributing factors, such as whether the job-operation is currently
-        running or queued.
+        Please note, eligibility in this contexts refers only to the workflow
+        pipeline and not to other contributing factors, such as whether the
+        job-operation is currently running or queued.
 
-        :param name:
+        Parameters
+        ----------
+        name : str
             A unique identifier for this operation, which may be freely chosen.
-        :type name:
-            str
-        :param cmd:
+        cmd : str or callable
             The command to execute operation; should be a function of job.
-        :type cmd:
-            str or callable
-        :param pre:
-            Required conditions.
-        :type pre:
-            sequence of callables
-        :param post:
-            Post-conditions to determine completion.
-        :type pre:
-            sequence of callables
+        pre : sequence of callables
+            List of preconditions. (Default value = None)
+        post : sequence of callables
+            List of postconditions. (Default value = None)
+        \*\*kwargs
+            Keyword arguments passed as directives.
+
         """
         if name in self.operations:
             raise KeyError("An operation with this identifier is already added.")
@@ -3065,105 +4111,75 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         op = self.operations[name] = FlowCmdOperation(cmd=cmd, pre=pre, post=post)
         if name in self._groups:
             raise KeyError("A group with this identifier already exists.")
-        self._groups[name] = FlowGroup(name,
-                                       operations={name: op},
-                                       operation_directives=dict(name=kwargs))
-
-    @deprecated(
-        deprecated_in="0.8", removed_in="0.10",
-        current_version=__version__,
-        details="Use labels() instead.")
-    def classify(self, job):
-        """Generator function which yields labels for job.
-
-        By default, this method yields from the project's labels() method.
-
-        :param job:
-            The signac job handle.
-        :type job:
-            :class:`~signac.contrib.job.Job`
-        :yields:
-            The labels for the provided job.
-        :yield type:
-            str
-        """
-        for _label in self.labels(job):
-            yield _label
+        self._groups[name] = FlowGroup(
+            name, operations={name: op}, operation_directives=dict(name=kwargs)
+        )
 
     def completed_operations(self, job):
         """Determine which operations have been completed for job.
 
-        :param job:
+        Parameters
+        ----------
+        job : :class:`~signac.contrib.job.Job`
             The signac job handle.
-        :type job:
-            :class:`~signac.contrib.job.Job`
-        :return:
-            The name of the operations that are complete.
-        :rtype:
-            str
+
+        Yields
+        ------
+        str
+            The names of the operations that are complete.
+
         """
         for name, op in self._operations.items():
-            if op.complete(job):
+            if op._complete((job,)):
                 yield name
 
-    def _job_operations(self, job, ignore_conditions=IgnoreConditions.NONE):
-        "Yield instances of JobOperation constructed for specific jobs."
-        for name in self.operations:
-            group = self._groups[name]
-            yield from group._create_run_job_operations(entrypoint=self._entrypoint, job=job,
-                                                        default_directives=dict(),
-                                                        ignore_conditions=ignore_conditions,
-                                                        index=0)
+    def _next_operations(
+        self, jobs=None, operation_names=None, ignore_conditions=IgnoreConditions.NONE
+    ):
+        """Determine the next eligible operations for aggregates.
 
-    def next_operations(self, *jobs, ignore_conditions=IgnoreConditions.NONE):
-        """Determine the next eligible operations for jobs.
+        Parameters
+        ----------
+        jobs : tuple of :class:`~signac.contrib.job.Job`
+            The signac job handles. By default all the aggregates are evaluated
+            to get the next operation associated.
+        operation_names : iterable of :class:`str`
+            Only select operations that match the provided set of names
+            (interpreted as regular expressions), or all single operation
+            groups if the argument is None. (Default value = None)
+        ignore_conditions : :class:`~.IgnoreConditions`
+            Specify if preconditions and/or postconditions are to be ignored
+            when determining eligibility. The default is
+            :class:`IgnoreConditions.NONE`.
 
-        :param jobs:
-            The signac job handles.
-        :type job:
-            :class:`~signac.contrib.job.Job`
-        :param ignore_conditions:
-            Specify if pre and/or post conditions check is to be ignored for eligibility check.
-            The default is :py:class:`IgnoreConditions.NONE`.
-        :type ignore_conditions:
-            :py:class:`~.IgnoreConditions`
-        :yield:
-            All instances of :class:`~.JobOperation` jobs are eligible for.
+        Yields
+        ------
+        :class:`~._JobOperation`
+            All eligible operations for the provided jobs.
+
         """
-        for job in jobs:
-            for op in self._job_operations(job, ignore_conditions):
-                yield op
-
-    @deprecated(
-        deprecated_in="0.8", removed_in="0.10",
-        current_version=__version__,
-        details="Use next_operations() instead.")
-    def next_operation(self, job):
-        """Determine the next operation for this job.
-
-        :param job:
-            The signac job handle.
-        :type job:
-            :class:`~signac.contrib.job.Job`
-        :param default_directives:
-            The default directives to use for the operations. This is to allow for user specified
-            groups to 'inherit' directives from ``default_directives``. If no defaults are desired,
-            the argument can be set to an empty dictionary. This must be done explicitly, however.
-        :type default_directives:
-            :py:class:`dict`
-        :return:
-            An instance of JobOperation to execute next or `None`, if no operation is eligible.
-        :rtype:
-            `:py:class:`~.JobOperation` or `NoneType`
-        """
-        for op in self.next_operations(job):
-            return op
+        if jobs is None:
+            jobs = _AggregatesCursor(self)
+        if operation_names is None:
+            selected_groups = {self._groups[name] for name in self.operations}
+        else:
+            selected_groups = set(self._gather_flow_groups(operation_names))
+        for aggregate_id, aggregate, group, in self._generate_selected_aggregate_groups(
+            selected_aggregates=jobs,
+            selected_groups=selected_groups,
+        ):
+            yield from group._create_run_job_operations(
+                entrypoint=self._entrypoint,
+                default_directives={},
+                jobs=aggregate,
+                ignore_conditions=ignore_conditions,
+            )
 
     @classmethod
     def operation(cls, func, name=None):
-        """Add the function `func` as operation function to the class workflow definition.
+        """Add an operation function to the class workflow definition.
 
-        This function is designed to be used as a decorator function, for example:
+        This function is designed to be used as a decorator, for example:
 
         .. code-block:: python
 
@@ -3172,6 +4188,20 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 print('Hello', job)
 
         See also: :meth:`~.flow.FlowProject.add_operation`.
+
+        Parameters
+        ----------
+        func : callable
+            The function to add to the workflow.
+        name : str
+            The operation name. Uses the name of the function if None.
+             (Default value = None)
+
+        Returns
+        -------
+        callable
+            The operation function.
+
         """
         if isinstance(func, str):
             return lambda op: cls.operation(op, name=func)
@@ -3180,22 +4210,28 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             name = func.__name__
 
         if (name, func) in cls._OPERATION_FUNCTIONS:
-            raise ValueError(
-                "An operation with name '{}' is already registered.".format(name))
+            raise ValueError(f"An operation with name '{name}' is already registered.")
         if name in cls._GROUP_NAMES:
-            raise ValueError("A group with name '{}' is already registered.".format(name))
+            raise ValueError(f"A group with name '{name}' is already registered.")
 
         signature = inspect.signature(func)
-        for i, (k, v) in enumerate(signature.parameters.items()):
-            if i and v.default is inspect.Parameter.empty:
+        for i, parameter_value in enumerate(signature.parameters.values()):
+            if i > 0 and parameter_value.default is inspect.Parameter.empty:
                 raise ValueError(
                     "Only the first argument in an operation argument may not have "
-                    "a default value! ({})".format(name))
+                    f"a default value! ({name})"
+                )
+        if not getattr(func, "_flow_aggregate", False):
+            func._flow_aggregate = _aggregator.groupsof(1)
 
         # Append the name and function to the class registry
         cls._OPERATION_FUNCTIONS.append((name, func))
-        cls._GROUPS.append(FlowGroupEntry(name=name, options=""))
-        if hasattr(func, '_flow_groups'):
+        cls._GROUPS.append(
+            FlowGroupEntry(name=name, options="")
+            # TODO: Enable aggregator argument.
+            # FlowGroupEntry(name=name, options="", aggregator=func._flow_aggregate)
+        )
+        if hasattr(func, "_flow_groups"):
             func._flow_groups.append(name)
         else:
             func._flow_groups = [name]
@@ -3203,63 +4239,66 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @classmethod
     def _collect_operations(cls):
-        "Collect all operations that were add via decorator."
+        """Collect all operations added with the ``@FlowProject.operation`` decorator."""
         operations = []
         for parent_class in cls.__mro__:
-            operations.extend(getattr(parent_class, '_OPERATION_FUNCTIONS', []))
+            operations.extend(getattr(parent_class, "_OPERATION_FUNCTIONS", []))
         return operations
 
     @classmethod
     def _collect_conditions(cls, attr):
-        "Collect conditions from attr using the mro hierarchy."
+        """Collect conditions from attr using the mro hierarchy."""
         ret = defaultdict(list)
         for parent_class in cls.__mro__:
-            for func, conds in getattr(parent_class, attr, dict()).items():
+            for func, conds in getattr(parent_class, attr, {}).items():
                 ret[func].extend(conds)
         return ret
 
     @classmethod
-    def _collect_pre_conditions(cls):
-        "Collect all pre-conditions that were added via decorator."
-        return cls._collect_conditions('_OPERATION_PRE_CONDITIONS')
+    def _collect_preconditions(cls):
+        """Collect all preconditions added with the ``@FlowProject.pre`` decorator."""
+        return cls._collect_conditions("_OPERATION_PRECONDITIONS")
 
     @classmethod
-    def _collect_post_conditions(cls):
-        "Collect all post-conditions that were added via decorator."
-        return cls._collect_conditions('_OPERATION_POST_CONDITIONS')
+    def _collect_postconditions(cls):
+        """Collect all postconditions added with the ``@FlowProject.post`` decorator."""
+        return cls._collect_conditions("_OPERATION_POSTCONDITIONS")
 
     def _register_operations(self):
-        "Register all operation functions registered with this class and its parent classes."
+        """Register all operation functions registered with this class and its parent classes."""
         operations = self._collect_operations()
-        pre_conditions = self._collect_pre_conditions()
-        post_conditions = self._collect_post_conditions()
+        preconditions = self._collect_preconditions()
+        postconditions = self._collect_postconditions()
 
         for name, func in operations:
             if name in self._operations:
-                raise ValueError(
-                    "Repeat definition of operation with name '{}'.".format(name))
+                raise ValueError(f"Repeat definition of operation with name '{name}'.")
 
-            # Extract pre/post conditions and directives from function:
+            # Extract preconditions/postconditions and directives from function:
             params = {
-                'pre': pre_conditions.get(func, None),
-                'post': post_conditions.get(func, None)}
+                "pre": preconditions.get(func, None),
+                "post": postconditions.get(func, None),
+            }
 
             # Update operation hooks
             self._operation_hooks[name].update(Hooks.from_dict(self.hook[func]))
 
             # Construct FlowOperation:
-            if getattr(func, '_flow_cmd', False):
+            if getattr(func, "_flow_cmd", False):
                 self._operations[name] = FlowCmdOperation(cmd=func, **params)
             else:
-                self._operations[name] = FlowOperation(name=name, **params)
-                self._operation_functions[name] = func
-
-            # Update operation hooks
-            self._operation_hooks[name].update(Hooks.from_dict(self.hook[func]))
+                self._operations[name] = FlowOperation(op_func=func, **params)
 
     @classmethod
     def make_group(cls, name, options=""):
-        """Make a FlowGroup named ``name`` and return a decorator to make groups.
+        r"""Make a :class:`~.FlowGroup` named ``name`` and return a decorator to make groups.
+
+        A :class:`~.FlowGroup` is used to group operations together for
+        running and submitting :class:`~._JobOperation`\ s.
+
+        Examples
+        --------
+        The code below creates a group and adds an operation to that group.
 
         .. code-block:: python
 
@@ -3270,154 +4309,238 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             def foo(job):
                 return "hello world"
 
-        FlowGroups group operations together for running and submitting
-        JobOperations.
-
-        :param name:
+        Parameters
+        ----------
+        name : str
             The name of the :class:`~.FlowGroup`.
-        :type name:
-            str
-        :param options:
-            A string to append to submissions can be any valid :meth:`FlowOperation.run` option.
-        :type options:
-            str
-        """
-        if name in cls._GROUP_NAMES:
-            raise ValueError("Repeat definition of group with name '{}'.".format(name))
-        else:
-            cls._GROUP_NAMES.add(name)
+        options : str
+            A string to append to submissions. Can be any valid
+            :meth:`FlowOperation.run` option. (Default value = "")
 
+        Returns
+        -------
+        :class:`~.FlowGroupEntry`
+            The created group.
+
+        """
+        # TODO: Add aggregator argument and pass through to FlowGroupEntry.
+        if name in cls._GROUP_NAMES:
+            raise ValueError(f"Repeat definition of group with name '{name}'.")
+        cls._GROUP_NAMES.add(name)
         group_entry = FlowGroupEntry(name, options)
         cls._GROUPS.append(group_entry)
         return group_entry
 
     def _register_groups(self):
-        "Register all groups and add the correct operations to each."
+        """Register all groups.
+
+        Operations are assigned to each group.
+
+        Aggregators are created for each group and tracked in a bidirectional mapping.
+
+        """
         group_entries = []
         # Gather all groups from class and parent classes.
         for cls in type(self).__mro__:
-            group_entries.extend(getattr(cls, '_GROUPS', []))
+            group_entries.extend(getattr(cls, "_GROUPS", []))
 
-        # Initialize all groups without operations
+        # Initialize all groups without operations. Also store the aggregators
+        # associated with each group. The aggregate stores are cached so that
+        # equivalent aggregators only generate once.
+        created_aggregate_stores = {}
         for entry in group_entries:
-            self._groups[entry.name] = FlowGroup(entry.name, options=entry.options)
+            group = FlowGroup(entry.name, options=entry.options)
+            self._groups[entry.name] = group
+            if entry.aggregator not in created_aggregate_stores:
+                created_aggregate_stores[
+                    entry.aggregator
+                ] = entry.aggregator._create_AggregateStore(self)
+            self._group_to_aggregate_store[group] = created_aggregate_stores[
+                entry.aggregator
+            ]
 
         # Add operations and directives to group
-        for (op_name, op) in self._operations.items():
-            if isinstance(op, FlowCmdOperation):
-                func = op._cmd
+        for operation_name, operation in self._operations.items():
+            if isinstance(operation, FlowCmdOperation):
+                func = operation._cmd
             else:
-                func = self._operation_functions[op_name]
+                func = operation._op_func
 
-            if hasattr(func, '_flow_groups'):
-                operation_directives = getattr(func, '_flow_group_operation_directives', dict())
+            if hasattr(func, "_flow_groups"):
+                op_directives = getattr(func, "_flow_group_operation_directives", {})
                 for group_name in func._flow_groups:
+                    directives = op_directives.get(group_name)
                     self._groups[group_name].add_operation(
-                        op_name, op, operation_directives.get(group_name, None))
+                        operation_name, operation, directives
+                    )
 
             # For singleton groups add directives
-            self._groups[op_name].operation_directives[op_name] = getattr(func,
-                                                                          '_flow_directives',
-                                                                          dict())
+            directives = getattr(func, "_flow_directives", {})
+            self._groups[operation_name].operation_directives[
+                operation_name
+            ] = directives
 
     @property
     def operations(self):
-        "The dictionary of operations that have been added to the workflow."
+        """Get the dictionary of operations that have been added to the workflow."""
         return self._operations
 
     @property
     def groups(self):
+        """Get the dictionary of groups that have been added to the workflow."""
         return self._groups
 
-    def _eligible_for_submission(self, flow_group, job):
-        """Determine if a flow_group is eligible for submission with a given job.
+    def _eligible_for_submission(
+        self, flow_group, jobs, scheduler_status, cached_status
+    ):
+        """Check group eligibility for submission with an aggregate.
 
-        By default, an operation is eligible for submission when it
-        is not considered active, that means already queued or running.
+        By default, a group is eligible for submission when it is not
+        considered active, that means already queued or running.
+
+        Parameters
+        ----------
+        flow_group : :class:`~.FlowGroup`
+            The FlowGroup used to determine eligibility.
+        aggregate : tuple of :class:`~signac.contrib.job.Job`
+            The aggregate of signac jobs.
+        scheduler_status : :class:`~.JobStatus`
+            The status of the provided group and aggregate (this should be
+            known by the calling code and is re-used instead of fetching from
+            the ``cached_status`` for efficiency).
+        cached_status : dict
+            Dictionary of status information. The keys are uniquely
+            generated ids for each group and aggregate. The values are instances of
+            :class:`~.JobStatus`.
+
+        Returns
+        -------
+        bool
+            Whether the group is eligible for submission with the provided aggregate.
+
         """
-        if flow_group is None or job is None:
+
+        def _group_is_submitted(flow_group):
+            """Check if group has been submitted for the provided jobs."""
+            group_id = flow_group._generate_id(jobs)
+            job_status = JobStatus(cached_status.get(group_id, JobStatus.unknown))
+            return job_status >= JobStatus.submitted
+
+        if scheduler_status >= JobStatus.submitted:
             return False
-        if flow_group._get_status(job) >= JobStatus.submitted:
-            return False
-        group_ops = set(flow_group)
+
+        # Check if any other groups containing an operation from this group
+        # have been submitted. Submitting both groups might cause conflicts.
         for other_group in self._groups.values():
-            if group_ops & set(other_group):
-                if other_group._get_status(job) >= JobStatus.submitted:
-                    return False
+            if not flow_group.isdisjoint(other_group) and _group_is_submitted(
+                other_group
+            ):
+                return False
         return True
 
-    @deprecated(
-        deprecated_in="0.8", removed_in="0.10",
-        current_version=__version__)
-    def eligible_for_submission(self, job_operation):
-        return self._eligible_for_submission(self, job_operation)
-
     def _main_status(self, args):
-        "Print status overview."
-        jobs = self._select_jobs_from_args(args)
+        """Print status overview."""
+        aggregates = self._select_jobs_from_args(args)
         if args.compact and not args.unroll:
-            logger.warn("The -1/--one-line argument is incompatible with "
-                        "'--stack' and will be ignored.")
+            logger.warning(
+                "The -1/--one-line argument is incompatible with "
+                "'--stack' and will be ignored."
+            )
         show_traceback = args.debug or args.show_traceback
-        args = {key: val for key, val in vars(args).items()
-                if key not in ['func', 'verbose', 'debug', 'show_traceback',
-                               'job_id', 'filter', 'doc_filter']}
-        if args.pop('full'):
-            args['detailed'] = args['all_ops'] = True
+        args = {
+            key: val
+            for key, val in vars(args).items()
+            if key
+            not in [
+                "func",
+                "verbose",
+                "debug",
+                "show_traceback",
+                "job_id",
+                "filter",
+                "doc_filter",
+            ]
+        }
+        if args.pop("full"):
+            args["detailed"] = args["all_ops"] = True
 
         start = time.time()
         try:
-            self.print_status(jobs=jobs, **args)
-        except NoSchedulerError:
-            self.print_status(jobs=jobs, **args)
+            self.print_status(jobs=aggregates, **args)
         except Exception as error:
             if show_traceback:
                 logger.error(
-                    "Error during status update: {}\nUse '--ignore-errors' to "
-                    "complete the update anyways.".format(str(error)))
+                    f"Error during status update: {str(error)}\nUse '--ignore-errors' to "
+                    "complete the update anyways."
+                )
             else:
                 logger.error(
-                    "Error during status update: {}\nUse '--ignore-errors' to "
+                    f"Error during status update: {str(error)}\nUse '--ignore-errors' to "
                     "complete the update anyways or '--show-traceback' to show "
-                    "the full traceback.".format(str(error)))
+                    "the full traceback."
+                )
                 error = error.__cause__  # Always show the user traceback cause.
             traceback.print_exception(type(error), error, error.__traceback__)
         else:
+            if aggregates is None:
+                length_jobs = sum(
+                    len(aggregate_store)
+                    for aggregate_store in self._group_to_aggregate_store.inverse
+                )
+            else:
+                length_jobs = len(aggregates)
             # Use small offset to account for overhead with few jobs
-            delta_t = (time.time() - start - 0.5) / max(len(jobs), 1)
-            config_key = 'status_performance_warn_threshold'
+            delta_t = (time.time() - start - 0.5) / max(length_jobs, 1)
+            config_key = "status_performance_warn_threshold"
             warn_threshold = flow_config.get_config_value(config_key)
-            if not args['profile'] and delta_t > warn_threshold >= 0:
+            if not args["profile"] and delta_t > warn_threshold >= 0:
                 print(
                     "WARNING: "
-                    "The status compilation took more than {}s per job. Consider "
-                    "using `--profile` to determine bottlenecks within your project "
-                    "workflow definition.\n"
-                    "Execute `signac config set flow.{} VALUE` to specify the "
-                    "warning threshold in seconds. Use -1 to completely suppress this "
-                    "warning."
-                    .format(warn_threshold, config_key), file=sys.stderr)
+                    f"The status compilation took more than {warn_threshold}s per job. "
+                    "Consider using `--profile` to determine bottlenecks "
+                    "within the project workflow definition.\n"
+                    f"Execute `signac config set flow.{config_key} VALUE` to specify "
+                    "the warning threshold in seconds.\n"
+                    "To speed up the compilation, try executing "
+                    "`signac config set flow.status_parallelization 'process'` to set "
+                    "the status_parallelization config value to process."
+                    "Use -1 to completely suppress this warning.\n",
+                    file=sys.stderr,
+                )
 
     def _main_next(self, args):
-        "Determine the jobs that are eligible for a specific operation."
-        for job in self:
-            if args.name in {op.name for op in self.next_operations(job)}:
-                print(job)
+        """Determine the jobs that are eligible for a specific operation."""
+        if args.name not in self.operations:
+            print(
+                f"The requested flow operation '{args.name}' does not exist.",
+                file=sys.stderr,
+            )
+        else:
+            for operation in self._next_operations():
+                if args.name == operation.name:
+                    print(_get_aggregate_id(operation._jobs))
 
     def _main_run(self, args):
-        "Run all (or select) job operations."
+        """Run all (or select) job operations."""
         # Select jobs:
-        jobs = self._select_jobs_from_args(args)
+        aggregates = self._select_jobs_from_args(args)
 
         # Setup partial run function, because we need to call this either
         # inside some context managers or not based on whether we need
         # to switch to the project root directory or not.
-        run = functools.partial(self.run,
-                                jobs=jobs, names=args.operation_name, pretend=args.pretend,
-                                np=args.parallel, timeout=args.timeout, num=args.num,
-                                num_passes=args.num_passes, progress=args.progress,
-                                order=args.order,
-                                ignore_conditions=args.ignore_conditions)
+        run = functools.partial(
+            self.run,
+            jobs=aggregates,
+            names=args.operation_name,
+            pretend=args.pretend,
+            np=args.parallel,
+            timeout=args.timeout,
+            num=args.num,
+            num_passes=args.num_passes,
+            progress=args.progress,
+            order=args.order,
+            ignore_conditions=args.ignore_conditions,
+        )
 
         if args.switch_to_project_root:
             with add_cwd_to_environment_pythonpath():
@@ -3427,112 +4550,114 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             run()
 
     def _main_script(self, args):
-        "Generate a script for the execution of operations."
-        if args.requires and not args.cmd:
-            raise ValueError(
-                "The --requires option can only be used in combination with --cmd.")
-        if args.cmd and args.operation_name:
-            raise ValueError(
-                "Cannot use the -o/--operation-name and the --cmd options in combination!")
-        # Select jobs:
-        jobs = self._select_jobs_from_args(args)
+        """Generate a script for the execution of operations."""
+        print(
+            "WARNING: "
+            "The script argument is deprecated as of 0.12 "
+            "and will be removed in 0.14. "
+            'Use "submit --pretend" instead.',
+            file=sys.stderr,
+        )
 
-        # Gather all pending operations or generate them based on a direct command...
-        with self._potentially_buffered():
-            if args.cmd:
-                warnings.warn("The --cmd option for script is deprecated as of "
-                              "0.9 and will be removed in 0.11.",
-                              DeprecationWarning)
-                operations = self._generate_operations(args.cmd, jobs, args.requires)
-            else:
-                names = args.operation_name if args.operation_name else None
-                default_directives = self._get_default_directives()
-                operations = self._get_submission_operations(jobs, default_directives, names,
-                                                             args.parallel, args.ignore_conditions,
-                                                             args.ignore_conditions_on_execution)
+        # Select jobs:
+        aggregates = self._select_jobs_from_args(args)
+
+        # Gather all eligible operations or generate them based on a direct command...
+        with self._buffered():
+            names = args.operation_name if args.operation_name else None
+            default_directives = self._get_default_directives()
+            operations = self._get_submission_operations(
+                aggregates=aggregates,
+                default_directives=default_directives,
+                names=names,
+                ignore_conditions=args.ignore_conditions,
+                ignore_conditions_on_execution=args.ignore_conditions_on_execution,
+            )
             operations = list(islice(operations, args.num))
 
         # Generate the script and print to screen.
-        print(self.script(
-            operations=operations, parallel=args.parallel,
-            template=args.template, show_template_help=args.show_template_help))
+        print(
+            self._script(
+                operations=operations,
+                parallel=args.parallel,
+                template=args.template,
+                show_template_help=args.show_template_help,
+            )
+        )
 
     def _main_submit(self, args):
-        if args.test:
-            args.pretend = True
+        """Submit jobs to a scheduler."""
         kwargs = vars(args)
 
         # Select jobs:
-        jobs = self._select_jobs_from_args(args)
+        aggregates = self._select_jobs_from_args(args)
 
-        # Fetch the scheduler status.
-        if not args.test:
-            self._fetch_scheduler_status(jobs)
-
-        # Gather all pending operations ...
-        with self._potentially_buffered():
-            names = args.operation_name if args.operation_name else None
-            default_directives = self._get_default_directives()
-            operations = self._get_submission_operations(jobs, default_directives, names,
-                                                         args.parallel, args.ignore_conditions,
-                                                         args.ignore_conditions_on_execution)
-        operations = list(islice(operations, args.num))
-        # Bundle operations up, generate the script, and submit to scheduler.
-        for bundle in make_bundles(operations, args.bundle_size):
-            status = self.submit_operations(operations=bundle, **kwargs)
-            if status is not None:
-                for operations in bundle:
-                    operations.set_status(status)
+        names = args.operation_name if args.operation_name else None
+        self.submit(jobs=aggregates, names=names, **kwargs)
 
     def _main_exec(self, args):
-        if len(args.jobid):
-            jobs = [self.open_job(id=jid) for jid in args.jobid]
-        else:
-            jobs = self
+        aggregates = self._select_jobs_from_args(args)
         try:
-            try:
-                operation_function = self._operation_functions[args.operation]
-            except KeyError:
-                operation = self._operations[args.operation]
+            operation = self._operations[args.operation]
+
+            if isinstance(operation, FlowCmdOperation):
 
                 def operation_function(job):
                     cmd = operation(job).format(job=job)
                     subprocess.run(cmd, shell=True, check=True)
 
-        except KeyError:
-            raise KeyError("Unknown operation '{}'.".format(args.operation))
+            else:
+                operation_function = operation
 
-        if getattr(operation_function, '_flow_aggregate', False):
-            operation_function(jobs)
-        else:
-            for job in jobs:
-                operation_function(job)
+        except KeyError:
+            raise KeyError(f"Unknown operation '{args.operation}'.")
+
+        for aggregate_id, aggregate, group in self._generate_selected_aggregate_groups(
+            selected_aggregates=aggregates,
+            selected_groups={self._groups[args.operation]},
+        ):
+            operation_function(*aggregate)
 
     def _select_jobs_from_args(self, args):
-        "Select jobs with the given command line arguments ('-j/-f/--doc-filter')."
-        if args.job_id and (args.filter or args.doc_filter):
+        """Select jobs with the given command line arguments ('-j/-f/--doc-filter/--job-id')."""
+        if (
+            not args.func == self._main_exec
+            and args.job_id
+            and (args.filter or args.doc_filter)
+        ):
             raise ValueError(
-                "Cannot provide both -j/--job-id and -f/--filter or --doc-filter in combination.")
+                "Cannot provide both -j/--job-id and -f/--filter or --doc-filter in combination."
+            )
 
         if args.job_id:
-            try:
-                return [self.open_job(id=job_id) for job_id in args.job_id]
-            except KeyError as error:
-                raise LookupError("Did not find job with id {}.".format(error))
+            # aggregates must be a set to prevent duplicate entries
+            aggregates = set()
+            for id in args.job_id:
+                # TODO: We need to add support for aggregation id parameter
+                # for the -j flag ('agg-...')
+                try:
+                    aggregates.add((self.open_job(id=id),))
+                except KeyError as error:
+                    raise LookupError(f"Did not find job with id {error}.")
+            return list(aggregates)
+        elif args.func == self._main_exec:
+            # exec command used with job_id
+            return _AggregatesCursor(self)
         else:
+            # filter or doc filter provided
             filter_ = parse_filter_arg(args.filter)
             doc_filter = parse_filter_arg(args.doc_filter)
-            return JobsCursor(self, filter_, doc_filter)
+            return _AggregatesCursor(self, filter_, doc_filter)
 
     def main(self, parser=None):
         """Call this function to use the main command line interface.
 
         In most cases one would want to call this function as part of the
-        class definition, e.g.:
+        class definition:
 
         .. code-block:: python
 
-             my_project.py
+            # my_project.py
             from flow import FlowProject
 
             class MyProject(FlowProject):
@@ -3541,14 +4666,25 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if __name__ == '__main__':
                 MyProject().main()
 
-        You can then execute this script on the command line:
+        The project can then be executed on the command line:
 
         .. code-block:: bash
 
             $ python my_project.py --help
+
+        Parameters
+        ----------
+        parser : :class:`argparse.ArgumentParser`
+            The argument parser used to implement the command line interface.
+            If None, a new parser is constructed. (Default value = None)
+
         """
-        # Find file that main is called in
-        self._entrypoint.setdefault('path', os.path.realpath(inspect.stack()[-1].filename))
+        # Find file that main is called in. When running through the command
+        # line interface, we know exactly what the entrypoint path should be:
+        # it's the file where main is called, which we can pull off the stack.
+        self._entrypoint.setdefault(
+            "path", os.path.realpath(inspect.stack()[-1].filename)
+        )
 
         if parser is None:
             parser = argparse.ArgumentParser()
@@ -3558,169 +4694,197 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # The argparse module does not automatically merge options shared between the main
         # parser and the subparsers. We therefore assign different destinations for each
         # option and then merge them manually below.
-        for prefix, _parser in (('main_', parser), ('', base_parser)):
+        for prefix, _parser in (("main_", parser), ("", base_parser)):
             _parser.add_argument(
-                '-v', '--verbose',
-                dest=prefix + 'verbose',
-                action='count',
+                "-v",
+                "--verbose",
+                dest=prefix + "verbose",
+                action="count",
                 default=0,
-                help="Increase output verbosity.")
+                help="Increase output verbosity.",
+            )
             _parser.add_argument(
-                '--show-traceback',
-                dest=prefix + 'show_traceback',
-                action='store_true',
-                help="Show the full traceback on error.")
+                "--show-traceback",
+                dest=prefix + "show_traceback",
+                action="store_true",
+                help="Show the full traceback on error.",
+            )
             _parser.add_argument(
-                '--debug',
-                dest=prefix + 'debug',
-                action='store_true',
-                help="This option implies `-vv --show-traceback`.")
+                "--debug",
+                dest=prefix + "debug",
+                action="store_true",
+                help="This option implies `-vv --show-traceback`.",
+            )
 
         subparsers = parser.add_subparsers()
 
         parser_status = subparsers.add_parser(
-            'status',
-            parents=[base_parser])
+            "status",
+            parents=[base_parser],
+            description="Parallelization of the status command can be "
+            "controlled by setting the flow.status_parallelization config "
+            "value to 'thread' (default), 'none', or 'process'. To do this, "
+            "execute `signac config set flow.status_parallelization VALUE`.",
+        )
         self._add_print_status_args(parser_status)
         parser_status.add_argument(
-            '--profile',
+            "--profile",
             const=inspect.getsourcefile(inspect.getmodule(self)),
-            nargs='?',
+            nargs="?",
             help="Collect statistics to determine code paths that are responsible "
-                 "for the majority of runtime required for status determination. "
-                 "Optionally provide a filename pattern to select for what files "
-                 "to show result for. Defaults to the main module. "
-                 "(requires pprofile)")
+            "for the majority of runtime required for status determination. "
+            "Optionally provide a filename pattern to select for what files "
+            "to show result for. Defaults to the main module. "
+            "(requires pprofile)",
+        )
         parser_status.set_defaults(func=self._main_status)
 
         parser_next = subparsers.add_parser(
-            'next',
+            "next",
             parents=[base_parser],
-            description="Determine jobs that are eligible for a specific operation.")
-        parser_next.add_argument(
-            'name',
-            type=str,
-            help="The name of the operation.")
+            description="Determine jobs that are eligible for a specific operation.",
+        )
+        parser_next.add_argument("name", type=str, help="The name of the operation.")
         parser_next.set_defaults(func=self._main_next)
 
         parser_run = subparsers.add_parser(
-            'run',
+            "run",
             parents=[base_parser],
         )
-        self._add_operation_selection_arg_group(parser_run, list(sorted(self._operations)))
+        self._add_operation_selection_arg_group(parser_run)
 
-        execution_group = parser_run.add_argument_group('execution')
+        execution_group = parser_run.add_argument_group("execution")
         execution_group.add_argument(
-            '--pretend',
-            action='store_true',
-            help="Do not actually execute commands, just show them.")
+            "--pretend",
+            action="store_true",
+            help="Do not actually execute commands, just show them.",
+        )
         execution_group.add_argument(
-            '--progress',
-            action='store_true',
-            help="Display a progress bar during execution.")
+            "--progress",
+            action="store_true",
+            help="Display a progress bar during execution.",
+        )
         execution_group.add_argument(
-            '--num-passes',
+            "--num-passes",
             type=int,
             default=1,
             help="Specify how many times a particular job-operation may be executed within one "
-                 "session (default=1). This is to prevent accidental infinite loops, "
-                 "where operations are executed indefinitely, because post conditions "
-                 "were not properly set. Use -1 to allow for an infinite number of passes.")
+            "session (default=1). This is to prevent accidental infinite loops, "
+            "where operations are executed indefinitely, because postconditions "
+            "were not properly set. Use -1 to allow for an infinite number of passes.",
+        )
         execution_group.add_argument(
-            '-t', '--timeout',
+            "-t",
+            "--timeout",
             type=int,
-            help="A timeout in seconds after which the execution of one operation is canceled.")
+            help="A timeout in seconds after which the execution of one operation is canceled.",
+        )
         execution_group.add_argument(
-            '--switch-to-project-root',
-            action='store_true',
+            "--switch-to-project-root",
+            action="store_true",
             help="Temporarily add the current working directory to the python search path and "
-                 "switch to the root directory prior to execution.")
+            "switch to the root directory prior to execution.",
+        )
         execution_group.add_argument(
-            '-p', '--parallel',
+            "-p",
+            "--parallel",
             type=int,
-            nargs='?',
-            const='-1',
+            nargs="?",
+            const="-1",
             help="Specify the number of cores to parallelize to. Defaults to all available "
-                 "processing units if argument is omitted.")
+            "processing units.",
+        )
         execution_group.add_argument(
-            '--order',
+            "--order",
             type=str,
-            choices=['none', 'by-job', 'cyclic', 'random'],
+            choices=["none", "by-job", "cyclic", "random"],
             default=None,
-            help="Specify the execution order of operations for each execution pass.")
+            help="Specify the execution order of operations for each execution pass.",
+        )
         execution_group.add_argument(
-            '--ignore-conditions',
+            "--ignore-conditions",
             type=str,
-            choices=['none', 'pre', 'post', 'all'],
+            choices=["none", "pre", "post", "all"],
             default=IgnoreConditions.NONE,
             action=_IgnoreConditionsConversion,
-            help="Specify conditions to ignore for eligibility check.")
+            help="Specify conditions to ignore for eligibility check.",
+        )
         parser_run.set_defaults(func=self._main_run)
 
         parser_script = subparsers.add_parser(
-            'script',
+            "script",
             parents=[base_parser],
         )
         parser_script.add_argument(
-            '--ignore-conditions',
+            "--ignore-conditions",
             type=str,
-            choices=['none', 'pre', 'post', 'all'],
+            choices=["none", "pre", "post", "all"],
             default=IgnoreConditions.NONE,
             action=_IgnoreConditionsConversion,
-            help="Specify conditions to ignore for eligibility check.")
+            help="Specify conditions to ignore for eligibility check.",
+        )
         parser_script.add_argument(
-            '--ignore-conditions-on-execution',
+            "--ignore-conditions-on-execution",
             type=str,
-            choices=['none', 'pre', 'post', 'all'],
+            choices=["none", "pre", "post", "all"],
             default=IgnoreConditions.NONE,
             action=_IgnoreConditionsConversion,
             help="Specify conditions to ignore after submitting. May be useful "
-                 "for conditions that cannot be checked once scheduled.")
+            "for conditions that cannot be checked once scheduled.",
+        )
         self._add_script_args(parser_script)
         parser_script.set_defaults(func=self._main_script)
 
         parser_submit = subparsers.add_parser(
-            'submit',
+            "submit",
             parents=[base_parser],
+            conflict_handler="resolve",
         )
         self._add_submit_args(parser_submit)
         env_group = parser_submit.add_argument_group(
-            '{} options'.format(self._environment.__name__))
+            f"{self._environment.__name__} options"
+        )
         self._environment.add_args(env_group)
         parser_submit.set_defaults(func=self._main_submit)
-        print('Using environment configuration:', self._environment.__name__, file=sys.stderr)
+        print(
+            "Using environment configuration:",
+            self._environment.__name__,
+            file=sys.stderr,
+        )
 
         parser_exec = subparsers.add_parser(
-            'exec',
+            "exec",
             parents=[base_parser],
         )
         parser_exec.add_argument(
-            'operation',
+            "operation",
             type=str,
             choices=list(sorted(self._operations)),
-            help="The operation to execute.")
+            help="The operation to execute.",
+        )
         parser_exec.add_argument(
-            'jobid',
+            "job_id",
             type=str,
-            nargs='*',
+            nargs="*",
             help="The job ids, as registered in the signac project. "
-                 "Omit to default to all statepoints.")
+            "Defaults to all jobs.",
+        )
         parser_exec.set_defaults(func=self._main_exec)
 
         args = parser.parse_args()
-        if not hasattr(args, 'func'):
+        if not hasattr(args, "func"):
             parser.print_usage()
             sys.exit(2)
 
         # Manually 'merge' the various global options defined for both the main parser
         # and the parent parser that are shared by all subparsers:
-        for dest in ('verbose', 'show_traceback', 'debug'):
-            setattr(args, dest, getattr(args, 'main_' + dest) or getattr(args, dest))
-            delattr(args, 'main_' + dest)
+        for dest in ("verbose", "show_traceback", "debug"):
+            setattr(args, dest, getattr(args, "main_" + dest) or getattr(args, dest))
+            delattr(args, "main_" + dest)
 
         # Read the config file and set the internal flag.
         # Do not overwrite with False if not present in config file
-        if flow_config.get_config_value('show_traceback'):
+        if flow_config.get_config_value("show_traceback"):
             args.show_traceback = True
 
         if args.debug:  # Implies '-vv' and '--show-traceback'
@@ -3732,7 +4896,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             args.detailed = args.all_ops = True
 
         # Empty parameters argument on the command line means: show all varying parameters.
-        if hasattr(args, 'parameters'):
+        if hasattr(args, "parameters"):
             if args.parameters is not None and len(args.parameters) == 0:
                 args.parameters = self.PRINT_STATUS_ALL_VARYING_PARAMETERS
 
@@ -3755,86 +4919,82 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 # Always show the user traceback cause.
                 error = error.__cause__
                 traceback.print_exception(type(error), error, error.__traceback__)
-                print("Execute with '--show-traceback' or '--debug' to show the "
-                      "full traceback.", file=sys.stderr)
+                print(
+                    "Execute with '--show-traceback' or '--debug' to show the "
+                    "full traceback.",
+                    file=sys.stderr,
+                )
             else:
-                print("Execute with '--show-traceback' or '--debug' to get more "
-                      "information.", file=sys.stderr)
+                print(
+                    "Execute with '--show-traceback' or '--debug' to get more "
+                    "information.",
+                    file=sys.stderr,
+                )
             sys.exit(1)
 
         try:
             args.func(args)
         except NoSchedulerError as error:
-            print("ERROR: {}".format(error),
-                  "Consider to use the 'script' command to generate an execution script instead.",
-                  file=sys.stderr)
+            print(
+                f"ERROR: {error}",
+                "Consider to use the 'script' command to generate an execution script instead.",
+                file=sys.stderr,
+            )
             _show_traceback_and_exit(error)
         except SubmitError as error:
             print("Submission error:", error, file=sys.stderr)
             _show_traceback_and_exit(error)
         except (TimeoutError, subprocess.TimeoutExpired) as error:
-            print("Error: Failed to complete execution due to "
-                  "timeout ({}s).".format(args.timeout), file=sys.stderr)
+            print(
+                "Error: Failed to complete execution due to "
+                f"timeout ({args.timeout}s).",
+                file=sys.stderr,
+            )
             _show_traceback_and_exit(error)
         except Jinja2TemplateNotFound as error:
-            print("Did not find template script '{}'.".format(error), file=sys.stderr)
+            print(f"Did not find template script '{error}'.", file=sys.stderr)
             _show_traceback_and_exit(error)
         except AssertionError as error:
             if not args.show_traceback:
-                print("ERROR: Encountered internal error during program execution.",
-                      file=sys.stderr)
+                print(
+                    "ERROR: Encountered internal error during program execution.",
+                    file=sys.stderr,
+                )
             _show_traceback_and_exit(error)
         except (UserOperationError, UserConditionError) as error:
             if str(error):
-                print("ERROR: {}\n".format(error), file=sys.stderr)
+                print(f"ERROR: {error}\n", file=sys.stderr)
             else:
-                print("ERROR: Encountered error during program execution.\n",
-                      file=sys.stderr)
+                print(
+                    "ERROR: Encountered error during program execution.\n",
+                    file=sys.stderr,
+                )
             _show_traceback_and_exit(error)
         except Exception as error:
             if str(error):
-                print("ERROR: Encountered error during program execution: "
-                      "'{}'\n".format(error), file=sys.stderr)
+                print(
+                    "ERROR: Encountered error during program execution: "
+                    f"'{error}'\n",
+                    file=sys.stderr,
+                )
             else:
-                print("ERROR: Encountered error during program execution.\n",
-                      file=sys.stderr)
+                print(
+                    "ERROR: Encountered error during program execution.\n",
+                    file=sys.stderr,
+                )
             _show_traceback_and_exit(error)
 
 
-def _execute_serialized_operation(loads, project, operation):
-    """Invoke the _execute_operation() method on a serialized project instance."""
+def _deserialize_and_run_operation(loads, project, operation_data):
     project = loads(project)
-    project._execute_operation(project._loads_op(operation))
-
-
-# Status-related helper functions
-
-
-_FMT_SCHEDULER_STATUS = {
-    JobStatus.unknown: 'U',
-    JobStatus.registered: 'R',
-    JobStatus.inactive: 'I',
-    JobStatus.submitted: 'S',
-    JobStatus.held: 'H',
-    JobStatus.queued: 'Q',
-    JobStatus.active: 'A',
-    JobStatus.error: 'E',
-    JobStatus.dummy: ' ',
-}
-
-
-def _update_status(args):
-    "Wrapper-function, that is probably obsolete."
-    return update_status(* args)
-
-
-def _update_job_status(job, scheduler_jobs):
-    "Update the status entry for job."
-    update_status(job, scheduler_jobs)
+    project._execute_operation(project._job_operation_from_tuple(operation_data))
+    return None
 
 
 __all__ = [
-    'FlowProject',
-    'FlowOperation',
-    'label', 'staticlabel', 'classlabel',
+    "FlowProject",
+    "FlowOperation",
+    "label",
+    "staticlabel",
+    "classlabel",
 ]

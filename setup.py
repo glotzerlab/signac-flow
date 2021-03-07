@@ -2,71 +2,69 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 import os
-from setuptools import setup, find_packages
 
+from setuptools import find_packages, setup
 
 requirements = [
     # The core package.
-    'signac>=1.0.0',
+    "signac>=1.0.0",
     # For the templated generation of (submission) scripts.
-    'jinja2>=2.8',
+    "jinja2>=2.10",
     # To enable the parallelized execution of operations across processes.
-    'cloudpickle',
+    "cloudpickle>=1.1.1",
     # Deprecation management
-    'deprecation>=2',
+    "deprecation>=2.0.0",
     # Progress bars
-    'tqdm>=4.35.0',
+    "tqdm>=4.48.1",
 ]
 
 description = "Simple workflow management for signac projects."
 
 try:
     this_path = os.path.dirname(os.path.abspath(__file__))
-    fn_readme = os.path.join(this_path, 'README.md')
+    fn_readme = os.path.join(this_path, "README.md")
     with open(fn_readme) as fh:
         long_description = fh.read()
-except (IOError, OSError):
+except OSError:
     long_description = description
 
 setup(
-    name='signac-flow',
-    version='0.9.0',
+    name="signac-flow",
+    version="0.12.0",
     packages=find_packages(),
     include_package_data=True,
     zip_safe=True,
-    maintainer='signac Developers',
-    maintainer_email='signac-support@umich.edu',
-    author='Carl Simon Adorf et al.',
-    author_email='csadorf@umich.edu',
+    maintainer="signac Developers",
+    maintainer_email="signac-support@umich.edu",
+    author="Carl Simon Adorf et al.",
+    author_email="csadorf@umich.edu",
     description=description,
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://signac.io",
     download_url="https://pypi.org/project/signac-flow/",
-    keywords='workflow management signac framework database',
-
+    keywords="workflow management signac framework database",
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: BSD License",
         "Topic :: Scientific/Engineering :: Physics",
-        "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
     ],
     entry_points={
-        'console_scripts': [
-            'flow = flow.__main__:main',
-            'flow-track-operations = flow.hooks.track_operations.__main__:main',
+        "console_scripts": [
+            "flow = flow.__main__:main",
+            "flow-track-operations = flow.hooks.track_operations.__main__:main",
         ],
     },
-
     scripts=[
-        'bin/simple-scheduler',
+        "bin/simple-scheduler",
     ],
-
     install_requires=requirements,
-
-    python_requires='>=3.5, <4',
+    # Supported versions are determined according to NEP 29.
+    # https://numpy.org/neps/nep-0029-deprecation_policy.html
+    python_requires=">=3.6, <4",
 )

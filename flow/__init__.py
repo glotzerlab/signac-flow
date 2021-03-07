@@ -8,50 +8,38 @@ configure and implement a workflow to operate on a signac_ data space.
 
 .. _signac: https://signac.io/
 """
-from . import environment
-from . import scheduling
-from . import hooks
-from . import errors
-from . import testing
-from .project import IgnoreConditions
-from .project import FlowProject
-from .project import JobOperation
-from .project import label
-from .project import classlabel
-from .project import staticlabel
-from .operations import cmd
-from .operations import directives
-from .operations import run
+from . import environment, errors, scheduling, testing, hooks
 from .environment import get_environment
+from .operations import cmd, directives, run, with_job
+from .project import FlowProject, IgnoreConditions, classlabel, label, staticlabel
 from .template import init
-from .util.misc import redirect_log
-from .operations import with_job
-from .version import __version__
 
 # Import packaged environments unless disabled in config:
 from .util.config import get_config_value
-if get_config_value('import_packaged_environments', default=True):
+from .util.misc import redirect_log
+from .version import __version__
+
+if get_config_value("import_packaged_environments", default=True):
     from . import environments  # noqa: F401
 
 
 __all__ = [
-    'environment',
-    'scheduling',
     'hooks',
-    'errors',
-    'testing',
-    'IgnoreConditions',
-    'FlowProject',
-    'JobOperation',
-    'label',
-    'classlabel',
-    'staticlabel',
-    'cmd',
-    'directives',
-    'run',
-    'get_environment',
-    'init',
-    'redirect_log',
-    'with_job',
-    '__version__',
-    ]
+    "environment",
+    "errors",
+    "scheduling",
+    "testing",
+    "IgnoreConditions",
+    "FlowProject",
+    "label",
+    "classlabel",
+    "staticlabel",
+    "cmd",
+    "directives",
+    "run",
+    "get_environment",
+    "init",
+    "redirect_log",
+    "with_job",
+    "__version__",
+]

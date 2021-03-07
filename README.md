@@ -8,6 +8,8 @@
 [![License](https://img.shields.io/github/license/glotzerlab/signac-flow.svg)](https://github.com/glotzerlab/signac-flow/blob/master/LICENSE.txt)
 [![conda-forge-downloads](https://img.shields.io/conda/dn/conda-forge/signac-flow.svg)](https://anaconda.org/conda-forge/signac-flow)
 [![Gitter](https://img.shields.io/gitter/room/signac/Lobby.svg?style=flat)](https://gitter.im/signac/Lobby)
+[![Twitter](https://img.shields.io/twitter/follow/signacdata?style=social)](https://twitter.com/signacdata)
+[![GitHub Stars](https://img.shields.io/github/stars/glotzerlab/signac-flow?style=social)](https://github.com/glotzerlab/signac-flow/)
 
 The [**signac** framework](https://signac.io) helps users manage and scale file-based workflows, facilitating data reuse, sharing, and reproducibility.
 
@@ -30,7 +32,7 @@ That includes the definition of data pipelines, execution of data space operatio
 ## Installation
 
 The recommended installation method for **signac-flow** is through **conda** or **pip**.
-The software is tested for Python versions 3.5+ and is built for all major platforms.
+The software is tested for Python versions 3.6+ and is built for all major platforms.
 
 To install **signac-flow** *via* the [conda-forge](https://conda-forge.github.io/) channel, execute:
 

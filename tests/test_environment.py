@@ -2,16 +2,14 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 import pytest
-
-from flow import get_environment
-from flow.environment import ComputeEnvironment
-from flow.environment import TestEnvironment
-from flow.errors import ConfigKeyError
 from test_project import StringIO, redirect_stdout
 
+from flow import get_environment
+from flow.environment import ComputeEnvironment, TestEnvironment
+from flow.errors import ConfigKeyError
 
-class TestProject():
 
+class TestProject:
     def test_get_TestEnvironment(self):
         env = get_environment()
         assert issubclass(env, ComputeEnvironment)
@@ -24,10 +22,10 @@ class TestProject():
 
         with redirect_stdout(StringIO()):
             with pytest.raises(ConfigKeyError):
-                a = env.get_config_value('a')
+                a = env.get_config_value("a")
 
-        a = env.get_config_value('a', None)
+        a = env.get_config_value("a", None)
         assert a is None
 
-        a = env.get_config_value('a', 42)
+        a = env.get_config_value("a", 42)
         assert a == 42

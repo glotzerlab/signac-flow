@@ -5,46 +5,55 @@
 
 This module implements the Scheduler and ClusterJob classes for LSF.
 """
+import errno
 import getpass
-import subprocess
-import tempfile
 import json
 import logging
-import errno
+import subprocess
 
-from .base import Scheduler
-from .base import ClusterJob, JobStatus
-
+from .base import ClusterJob, JobStatus, Scheduler, _call_submit
 
 logger = logging.getLogger(__name__)
 
 
 def _parse_status(s):
-    if s in ['PEND', 'WAIT']:
+    if s in ["PEND", "WAIT"]:
         return JobStatus.queued
-    elif s == 'RUN':
+    elif s == "RUN":
         return JobStatus.active
-    elif s in ['SSUSP', 'USUSP', 'PSUSP']:
+    elif s in ["SSUSP", "USUSP", "PSUSP"]:
         return JobStatus.held
-    elif s == 'DONE':
+    elif s == "DONE":
         return JobStatus.inactive
-    elif s == 'EXIT':
+    elif s == "EXIT":
         return JobStatus.error
     return JobStatus.registered
 
 
 def _fetch(user=None):
-    "Fetch the cluster job status information from the LSF scheduler."
+    """Fetch the cluster job status information from the LSF scheduler.
 
+    Parameters
+    ----------
+    user : str
+        Limit the status information to cluster jobs submitted by user.
+        (Default value = None)
+
+    Yields
+    ------
+    :class:`~.LSFJob`
+        LSF cluster job.
+
+    """
     if user is None:
         user = getpass.getuser()
 
-    cmd = ['bjobs', '-json', '-u', user]
+    cmd = ["bjobs", "-json", "-u", user]
     try:
-        result = json.loads(subprocess.check_output(cmd).decode('utf-8'))
+        result = json.loads(subprocess.check_output(cmd).decode("utf-8"))
     except subprocess.CalledProcessError:
         raise
-    except IOError as error:
+    except OSError as error:
         if error.errno != errno.ENOENT:
             raise
         else:
@@ -52,69 +61,84 @@ def _fetch(user=None):
     except json.decoder.JSONDecodeError:
         raise RuntimeError("Could not parse LSF JSON output.")
 
-    for record in result['RECORDS']:
+    for record in result["RECORDS"]:
         yield LSFJob(record)
 
 
 class LSFJob(ClusterJob):
-    "An LSFJob is a ClusterJob managed by an LSF scheduler."
+    """An LSFJob is a ClusterJob managed by an LSF scheduler."""
 
     def __init__(self, record):
         self.record = record
-        self._job_id = record['JOBID']
-        self._status = _parse_status(record['STAT'])
+        self._job_id = record["JOBID"]
+        self._status = _parse_status(record["STAT"])
 
     def name(self):
-        return self.record['JOB_NAME']
+        """Return the name of the cluster job."""
+        return self.record["JOB_NAME"]
 
 
 class LSFScheduler(Scheduler):
-    """Implementation of the abstract Scheduler class for LSF schedulers.
+    r"""Implementation of the abstract Scheduler class for LSF schedulers.
 
-    This class allows us to submit cluster jobs to a LSF scheduler and query
-    their current status.
+    This class can submit cluster jobs to a LSF scheduler and query their
+    current status.
 
-    :param user:
+    Parameters
+    ----------
+    user : str
         Limit the status information to cluster jobs submitted by user.
-    :type user:
-        str
-    """
-    # The standard command used to submit jobs to the LSF scheduler.
-    submit_cmd = ['bsub']
+    \*\*kwargs
+        Forwarded to the parent constructor.
 
-    def __init__(self, user=None, **kwargs):
-        super(LSFScheduler, self).__init__(**kwargs)
+    """
+
+    # The standard command used to submit jobs to the LSF scheduler.
+    submit_cmd = ["bsub"]
+
+    def __init__(self, user=None):
         self.user = user
 
     def jobs(self):
-        "Yield cluster jobs by querying the scheduler."
+        """Yield cluster jobs by querying the scheduler."""
         self._prevent_dos()
-        for job in _fetch(user=self.user):
-            yield job
+        yield from _fetch(user=self.user)
 
-    def submit(self, script, after=None, hold=False, pretend=False, flags=None, **kwargs):
-        """Submit a job script for execution to the scheduler.
+    def submit(
+        self, script, *, after=None, hold=False, pretend=False, flags=None, **kwargs
+    ):
+        r"""Submit a job script for execution to the scheduler.
 
-        :param script:
+        Parameters
+        ----------
+        script : str
             The job script submitted for execution.
-        :type script:
-            str
-        :param after:
-            Execute the submitted script after a job with this id has completed.
-        :type after:
-            str
-        :param pretend:
-            If True, do not actually submit the script, but only simulate the submission.
-            Can be used to test whether the submission would be successful.
-            Please note: A successful "pretend" submission is not guaranteed to succeed.
-        :type pretend:
-            bool
-        :param flags:
-            Additional arguments to pass through to the scheduler submission command.
-        :type flags:
-            list
-        :returns:
-            Returns True if the cluster job was successfully submitted, otherwise None.
+        after : str
+            Execute the submitted script after a job with this id has
+            completed. (Default value = None)
+        hold : bool
+            Whether to hold the job upon submission. (Default value = False)
+        pretend : bool
+            If True, do not actually submit the script, but only simulate the
+            submission. Can be used to test whether the submission would be
+            successful. Please note: A successful "pretend" submission is not
+            guaranteed to succeed. (Default value = False)
+        flags : list
+            Additional arguments to pass through to the scheduler submission
+            command. (Default value = None)
+        \*\*kwargs
+            Additional keyword arguments (ignored).
+
+        Returns
+        -------
+        bool
+            True if the submission command succeeds (or in pretend mode).
+
+        Raises
+        ------
+        :class:`~flow.errors.SubmitError`
+            If the submission command fails.
+
         """
         if flags is None:
             flags = []
@@ -124,29 +148,19 @@ class LSFScheduler(Scheduler):
         submit_cmd = self.submit_cmd + flags
 
         if after is not None:
-            submit_cmd.extend(
-                ['-w', '"done({})"'.format(after.split('.')[0])])
+            submit_cmd.extend(["-w", '"done({})"'.format(after.split(".")[0])])
 
         if hold:
-            submit_cmd += ['-H']
+            submit_cmd += ["-H"]
 
-        if pretend:
-            print("# Submit command: {}".format('  '.join(submit_cmd)))
-            print(script)
-            print()
-        else:
-            with tempfile.NamedTemporaryFile() as tmp_submit_script:
-                tmp_submit_script.write(str(script).encode('utf-8'))
-                tmp_submit_script.flush()
-                subprocess.check_output(submit_cmd + [tmp_submit_script.name])
-                return True
+        return _call_submit(submit_cmd, script, pretend)
 
     @classmethod
     def is_present(cls):
-        "Return True if it appears that an LSF scheduler is available within the environment."
+        """Return True if an LSF scheduler is detected."""
         try:
-            subprocess.check_output(['bjobs', '-V'], stderr=subprocess.STDOUT)
-        except (IOError, OSError):
+            subprocess.check_output(["bjobs", "-V"], stderr=subprocess.STDOUT)
+        except OSError:
             return False
         else:
             return True

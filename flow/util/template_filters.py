@@ -109,22 +109,6 @@ def calc_tasks(operations, name, parallel=False, allow_mixed=False):
         )
 
 
-def check_memory(operations):
-    """Check whether memory is defined by the user or not.
-
-    Parameters
-    ----------
-    operations : list
-        The operations of :class:`~._JobOperation` used to calculate the maximum memory required.
-
-    Returns
-    -------
-    bool
-        Evaluates to True if memory is defined by the user, else False.
-    """
-    return any(operation.directives["memory"] for operation in operations)
-
-
 def calc_memory(operations, parallel=False):
     """Calculate the maximum memory to reserve for submission of operations.
 
@@ -135,7 +119,7 @@ def calc_memory(operations, parallel=False):
     parallel : bool
         If True, operations are assumed to be executed in parallel, which means
         that the total memory requested will be the sum of all memories requested instead of the
-        maximum memory requested. (Default value = False)
+        maximum memory requested (Default value = False).
 
     Returns
     -------

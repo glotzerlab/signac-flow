@@ -55,7 +55,8 @@ def mpi_gpu_op(job):
 
 
 @TestProject.operation
-@flow.directives(memory=8)
+@flow.directives(memory="512m")
+@group1
 def memory_op(job):
     pass
 

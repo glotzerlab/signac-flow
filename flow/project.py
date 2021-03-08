@@ -1497,7 +1497,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         template_environment.filters["calc_tasks"] = template_filters.calc_tasks
         template_environment.filters["calc_num_nodes"] = template_filters.calc_num_nodes
         template_environment.filters["calc_memory"] = template_filters.calc_memory
-        template_environment.filters["check_memory"] = template_filters.check_memory
         template_environment.filters[
             "check_utilization"
         ] = template_filters.check_utilization

@@ -372,6 +372,38 @@ def _parse_memory(memory):
         raise
 
 
+def _memory_serial(value, other):
+    """Return the memory requirements for running operations in serial.
+
+    Takes two memory inputs for the directive and returns the
+    appropriate value for these operations when running in serial.
+    """
+    if value is None and other is None:
+        return None
+    elif other is None:
+        return value
+    elif value is None:
+        return other
+    else:
+        return max(value, other)
+
+
+def _memory_parallel(value, other):
+    """Return the memory requirements for running operations in parallel.
+
+    A callable that takes two memory inputs for the directive and returns the
+    appropriate value for these operations when running in parallel.
+    """
+    if value is None and other is None:
+        return None
+    elif other is None:
+        return value
+    elif value is None:
+        return other
+    else:
+        return operator.add(value, other)
+
+
 _natural_number = _OnlyTypes(int, postprocess=_raise_below(1))
 _nonnegative_int = _OnlyTypes(int, postprocess=_raise_below(0))
 _nonnegative_real = _OnlyTypes(float, postprocess=_raise_below(0))
@@ -429,7 +461,13 @@ values are supported. For example, a value of 0.5 will request 30 minutes of
 walltime. Defaults to 12 hours.
 """
 
-_MEMORY = _Directive("memory", validator=_positive_real_memory, default=None)
+_MEMORY = _Directive(
+    "memory",
+    validator=_positive_real_memory,
+    default=None,
+    serial=_memory_serial,
+    parallel=_memory_parallel,
+)
 """The memory to request for this operation.
 
 Expects:

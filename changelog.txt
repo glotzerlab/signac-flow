@@ -15,7 +15,7 @@ Added
 +++++
 
 - Add official support for Bridges-2 cluster (#441).
-- Add support for memory requests via ``directives`` (#466).
+- Add support for memory requests via ``directives`` (#258, #466).
 
 Fixed
 +++++

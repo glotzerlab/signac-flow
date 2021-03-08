@@ -275,16 +275,16 @@ class _OnlyTypes:
             except Exception:
                 pass
         raise TypeError(
-            f"Expected an object of type {self.types}. "
-            f"Received {value} of type {type(value)}."
+            f"Expected an object convertible to one of the following types: {self.types}. "
+            f"Received object {value} of type {type(value)}."
         )
 
 
 def _raise_below(threshold, allow_none=False):
     def is_greater_or_equal(value):
+        if allow_none and value is None:
+            return value
         try:
-            if allow_none and value is None:
-                return value
             if value < threshold:
                 raise ValueError
         except (TypeError, ValueError):
@@ -343,13 +343,13 @@ def _parse_memory(memory):
 
     Parameters
     ----------
-    memory : str or int or float
+    memory : str or float
         Required memory to reserve per node.
 
     Returns
     -------
     float
-        The parsed memory (numeric value) in gigabytes.
+        The parsed memory value in gigabytes.
     """
     try:
         if memory is None:
@@ -365,11 +365,9 @@ def _parse_memory(memory):
     except ValueError:
         raise ValueError(
             'Invalid memory passed. For gigabytes use suffix "g"/"G", '
-            'for megabytes use suffix "m"/"M", if a numeric value is passed then '
+            'for megabytes use suffix "m"/"M". If a numeric value is passed then '
             "it will be interpreted as memory in gigabytes."
         )
-    except TypeError:
-        raise
 
 
 def _memory_serial(value, other):
@@ -470,11 +468,43 @@ _MEMORY = _Directive(
 )
 """The memory to request for this operation.
 
-Expects:
+The memory to validate should be either a float, int, or string.
+A valid memory argument is defined as:
 
-1. Positive numeric value with suffix "g" or "G" indicating memory requested in gigabytes.
-2. Positive numeric value with suffix "m" or "M" indicating memory requested in megabytes.
-3. Positive numeric value with no suffix indicating memory requested in gigabytes.
+- Positive numeric value with suffix "g" or "G" indicating memory requested in gigabytes.
+For example:
+
+.. code-block:: python
+
+    @Project.operation
+    @directives(memory="4g")
+    def op(job):
+        pass
+
+- Positive numeric value with suffix "m" or "M" indicating memory requested in megabytes.
+For example:
+
+.. code-block:: python
+
+    @Project.operation
+    @directives(memory="512m")
+    def op(job):
+        pass
+
+- Positive numeric value with no suffix indicating memory requested in gigabytes.
+For example:
+
+.. code-block:: python
+
+    @Project.operation
+    @directives(memory="4")
+    def op1(job):
+        pass
+
+    @Project.operation
+    @directives(memory=4)
+    def op2(job):
+        pass
 """
 
 _PROCESSOR_FRACTION = _Directive(

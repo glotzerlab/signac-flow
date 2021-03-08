@@ -1,5 +1,16 @@
+import pytest
+
 from flow.util.misc import _bidict
-from flow.util.template_filters import calc_memory, check_memory
+from flow.util.template_filters import calc_memory
+
+
+@pytest.fixture()
+def mock_operations():
+    class MockOp:
+        def __init__(self, memory=None):
+            self.directives = {"memory": memory}
+
+    return [MockOp(1), MockOp(8), MockOp()]
 
 
 class TestBidict:
@@ -52,14 +63,10 @@ class TestBidict:
 
 
 class TestTemplateFilters:
-    def test_calc_memory(self):
-        class MockOp:
-            def __init__(self, memory=None):
-                self.directives = {"memory": memory}
-
-        op1 = MockOp(1)
-        op2 = MockOp(8)
-        op3 = MockOp()
+    def test_calc_memory(self, mock_operations):
+        op1 = mock_operations[0]
+        op2 = mock_operations[1]
+        op3 = mock_operations[2]
         # Test when operations run in serial
         assert calc_memory([op1], False) == 1
         assert calc_memory([op1, op2, op3], False) == 8
@@ -67,16 +74,3 @@ class TestTemplateFilters:
         assert calc_memory([op1, op2], True) == 9
         assert calc_memory([op3], True) == 0
         assert calc_memory([op1, op2, op3], True) == 9
-
-    def test_check_memory(self):
-        class MockOp:
-            def __init__(self, memory=None):
-                self.directives = {"memory": memory}
-
-        op1 = MockOp(1)
-        op2 = MockOp(8)
-        op3 = MockOp()
-        assert not check_memory([])
-        assert not check_memory([op3])
-        assert check_memory([op1])
-        assert check_memory([op1, op2, op3])

@@ -4506,9 +4506,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Select jobs:
         aggregates = self._select_jobs_from_args(args)
-
         names = args.operation_name if args.operation_name else None
-
         self.submit(jobs=aggregates, names=names, **kwargs)
 
     def _main_exec(self, args):

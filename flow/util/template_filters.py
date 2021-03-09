@@ -118,7 +118,7 @@ def calc_memory(operations, parallel=False):
         The operations of :class:`~._JobOperation` used to calculate the maximum memory required.
     parallel : bool
         If True, operations are assumed to be executed in parallel, which means
-        that the total memory requested will be the sum of all memories requested instead of the
+        that the total memory requested will be the sum of all memory requested instead of the
         maximum memory requested (Default value = False).
 
     Returns

@@ -127,9 +127,7 @@ def calc_memory(operations, parallel=False):
         The reserved memory (numeric value) in gigabytes.
     """
     func = sum if parallel else max
-    return func(
-        operation.directives["memory"] or 0 for operation in operations
-    )
+    return func(operation.directives["memory"] or 0 for operation in operations)
 
 
 def check_utilization(nn, np, ppn, threshold=0.9, name=None):

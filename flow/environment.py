@@ -435,9 +435,6 @@ class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
         """
         super().add_args(parser)
         parser.add_argument(
-            "-w", "--walltime", type=float, help="The wallclock time in hours."
-        )
-        parser.add_argument(
             "--hold", action="store_true", help="Submit jobs, but put them on hold."
         )
         parser.add_argument(

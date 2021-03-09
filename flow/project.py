@@ -1496,6 +1496,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         template_environment.filters["with_np_offset"] = template_filters.with_np_offset
         template_environment.filters["calc_tasks"] = template_filters.calc_tasks
         template_environment.filters["calc_num_nodes"] = template_filters.calc_num_nodes
+        template_environment.filters["calc_walltime"] = template_filters.calc_walltime
         template_environment.filters["calc_memory"] = template_filters.calc_memory
         template_environment.filters[
             "check_utilization"
@@ -3579,8 +3580,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         force : bool
             Ignore all warnings or checks during submission, just submit. (Default value = False)
         walltime : :class:`datetime.timedelta`
-            Specify the walltime in hours or as instance of
-            :class:`datetime.timedelta`. (Default value = None)
+            Specify the walltime in hours or as an instance of
+            :class:`datetime.timedelta`. If specified, this value will
+            override the walltime calculated from operation directives.
+            (Default value = None)
         ignore_conditions : :class:`~.IgnoreConditions`
             Specify if preconditions and/or postconditions are to be ignored
             when determining eligibility. The default is

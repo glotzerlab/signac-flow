@@ -6,6 +6,7 @@
 Directives affect both execution and submission, such as specifying the number
 of processors required for an operation.
 """
+import datetime
 import functools
 import operator
 import sys
@@ -332,6 +333,32 @@ def _is_fraction(value):
     raise ValueError("Value must be between 0 and 1.")
 
 
+def _parse_walltime(walltime):
+    """Parse walltime from the walltime flag passed by a user.
+
+    A valid walltime argument is defined as:
+
+    1. Numeric value indicating walltime requested in hours.
+    2. :class:`datetime.timedelta` value.
+    3. None to indicate no specific walltime request.
+
+    Parameters
+    ----------
+    memory : float or :class:`datetime.timedelta`
+        Walltime to request.
+
+    Returns
+    -------
+    :class:`datetime.timedelta` or None
+        The parsed walltime value.
+    """
+    if walltime is None:
+        return None
+    if not isinstance(walltime, datetime.timedelta):
+        walltime = datetime.timedelta(hours=walltime)
+    return walltime
+
+
 def _parse_memory(memory):
     """Parse memory from the memory flag passed by a user.
 
@@ -340,15 +367,16 @@ def _parse_memory(memory):
     1. Numeric value with suffix "g" or "G" indicating memory requested in gigabytes.
     2. Numeric value with suffix "m" or "M" indicating memory requested in megabytes.
     3. Numeric value with no suffix indicating memory requested in gigabytes.
+    4. None to indicate no specific memory request.
 
     Parameters
     ----------
-    memory : str or float
-        Required memory to reserve per node.
+    memory : str or float or None
+        Requested memory.
 
     Returns
     -------
-    float
+    float or None
         The parsed memory value in gigabytes.
     """
     try:
@@ -370,11 +398,11 @@ def _parse_memory(memory):
         )
 
 
-def _memory_serial(value, other):
-    """Return the memory requirements for running operations in serial.
+def _max_not_none(value, other):
+    """Return the max of two values, with special handling of None.
 
-    Takes two memory inputs for the directive and returns the
-    appropriate value for these operations when running in serial.
+    This is used for memory directives in serial and walltime directives in
+    parallel.
     """
     if value is None and other is None:
         return None
@@ -386,11 +414,11 @@ def _memory_serial(value, other):
         return max(value, other)
 
 
-def _memory_parallel(value, other):
-    """Return the memory requirements for running operations in parallel.
+def _sum_not_none(value, other):
+    """Return the sum of two values, with special handling of None.
 
-    A callable that takes two memory inputs for the directive and returns the
-    appropriate value for these operations when running in parallel.
+    This is used for memory directives in parallel and walltime directives in
+    serial.
     """
     if value is None and other is None:
         return None
@@ -404,16 +432,23 @@ def _memory_parallel(value, other):
 
 _natural_number = _OnlyTypes(int, postprocess=_raise_below(1))
 _nonnegative_int = _OnlyTypes(int, postprocess=_raise_below(0))
-_nonnegative_real = _OnlyTypes(float, postprocess=_raise_below(0))
-# 1e-12 is an arbitrarily chosen minimum threshold for what constitutes 0
+_positive_real_walltime = _OnlyTypes(
+    float,
+    datetime.timedelta,
+    type(None),
+    preprocess=_parse_walltime,
+    postprocess=_raise_below(datetime.timedelta(seconds=1), True),
+    # 1 second is an arbitrarily chosen minimum threshold
+)
 _positive_real_memory = _OnlyTypes(
     float,
-    int,
     str,
     type(None),
-    postprocess=_raise_below(1e-12, True),
     preprocess=_parse_memory,
+    postprocess=_raise_below(1e-12, True),
+    # 1e-12 is an arbitrarily chosen minimum threshold for what constitutes 0
 )
+
 
 # Common directives and their instantiation as _Directive
 _NP = _Directive(
@@ -447,24 +482,36 @@ Expects a nonnegative integer.
 
 _WALLTIME = _Directive(
     "walltime",
-    validator=_nonnegative_real,
-    default=12.0,
-    serial=operator.add,
-    parallel=max,
+    validator=_positive_real_walltime,
+    default=None,
+    serial=_sum_not_none,
+    parallel=_max_not_none,
 )
 """The number of hours to request for executing this job.
 
 This directive expects a float representing the walltime in hours. Fractional
 values are supported. For example, a value of 0.5 will request 30 minutes of
-walltime. Defaults to 12 hours.
+walltime. If no operations specify a walltime, the submission will request a
+default value of 12 hours.
+
+For example:
+
+.. code-block:: python
+
+    @Project.operation
+    @directives(walltime=24)
+    def op(job):
+        # This operation takes 1 day to run
+        pass
+
 """
 
 _MEMORY = _Directive(
     "memory",
     validator=_positive_real_memory,
     default=None,
-    serial=_memory_serial,
-    parallel=_memory_parallel,
+    serial=_max_not_none,
+    parallel=_sum_not_none,
 )
 """The memory to request for this operation.
 

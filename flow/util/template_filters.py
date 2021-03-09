@@ -2,6 +2,7 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 """Provide jinja2 template environment filter functions."""
+import datetime
 import sys
 from math import ceil
 
@@ -15,18 +16,19 @@ def identical(iterable):
 
 
 def format_timedelta(delta, style="HH:MM:SS"):
-    """Format a time delta for interpretation by schedulers."""
-    if isinstance(delta, int) or isinstance(delta, float):
-        import datetime
+    """Format a time delta for interpretation by schedulers.
 
+    Some schedulers require days to be converted to hours.
+    """
+    if not isinstance(delta, datetime.timedelta):
         delta = datetime.timedelta(hours=delta)
-    hours, r = divmod(delta.seconds, 3600)
-    minutes, seconds = divmod(r, 60)
-    hours += delta.days * 24
+
+    total_hours, remainder = divmod(int(delta.total_seconds()), 3600)
+    minutes, seconds = divmod(remainder, 60)
     if style == "HH:MM:SS":
-        return f"{hours:0>2}:{minutes:0>2}:{seconds:0>2}"
+        return f"{total_hours:0>2}:{minutes:0>2}:{seconds:0>2}"
     elif style == "HH:MM":
-        return f"{hours:0>2}:{minutes:0>2}"
+        return f"{total_hours:0>2}:{minutes:0>2}"
     else:
         raise ValueError("Unsupported style in format_timedelta.")
 
@@ -115,11 +117,13 @@ def calc_memory(operations, parallel=False):
     Parameters
     ----------
     operations : list
-        The operations of :class:`~._JobOperation` used to calculate the maximum memory required.
+        The operations of :class:`~._JobOperation` used to calculate the
+        maximum memory required.
     parallel : bool
-        If True, operations are assumed to be executed in parallel, which means
-        that the total memory requested will be the sum of all memory requested instead of the
-        maximum memory requested (Default value = False).
+        If True, operations are assumed to be executed in parallel, which
+        means that the total memory requested will be the sum of all memory
+        requested instead of the maximum memory requested (Default value =
+        False).
 
     Returns
     -------
@@ -128,6 +132,29 @@ def calc_memory(operations, parallel=False):
     """
     func = sum if parallel else max
     return func(operation.directives["memory"] or 0 for operation in operations)
+
+
+def calc_walltime(operations, parallel=False):
+    """Calculate the total walltime to reserve for submission of operations.
+
+    Parameters
+    ----------
+    operations : list
+        The operations of :class:`~._JobOperation` used to calculate the
+        total walltime required.
+    parallel : bool
+        If True, operations are assumed to be executed in parallel, which
+        means that the total walltime requested will be the maximum requested
+        walltime instead of the sum of requested walltimes (Default value =
+        False).
+
+    Returns
+    -------
+    :class:`datetime.timedelta`
+        The total walltime.
+    """
+    func = max if parallel else sum
+    return func(operation.directives["walltime"] or 0 for operation in operations)
 
 
 def check_utilization(nn, np, ppn, threshold=0.9, name=None):

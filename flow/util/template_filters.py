@@ -124,7 +124,7 @@ def calc_memory(operations, parallel=False):
     Returns
     -------
     float
-        The reserved memory (numeric value) per node in gigabytes.
+        The reserved memory (numeric value) in gigabytes.
     """
     list_of_memories = [
         operation.directives["memory"] if operation.directives["memory"] else 0

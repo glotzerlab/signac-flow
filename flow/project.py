@@ -3613,7 +3613,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "The 'names' argument must be a sequence of strings, however "
                 f"a single string was provided: {names}."
             )
-        if walltime is not None:
+        if walltime is not None and not isinstance(walltime, datetime.timedelta):
             try:
                 walltime = datetime.timedelta(hours=walltime)
             except TypeError as error:

@@ -15,6 +15,7 @@ Added
 +++++
 
 - Add official support for Bridges-2 cluster (#441).
+- Add support for memory requests via ``directives`` (#258, #466).
 
 Fixed
 +++++
@@ -30,7 +31,7 @@ Removed
 - Removed configuration option ``use_buffered_mode`` (#445).
 - Removed public API of ``script``, ``next_operations`` and ``submit_operations`` of ``FlowProject`` (#445).
 - Removed support for decommissioned Bridges cluster (#441).
-
+- Removed support for ``memory`` command line argument in ``submit`` (#466).
 
 Version 0.12
 ============

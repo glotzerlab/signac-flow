@@ -254,12 +254,12 @@ def _evaluate(value, jobs):
     return value
 
 
-class _OnlyType:
-    def __init__(self, type_, preprocess=None, postprocess=None):
+class _OnlyTypes:
+    def __init__(self, *types, preprocess=None, postprocess=None):
         def identity(value):
             return value
 
-        self.type = type_
+        self.types = types
         self.preprocess = identity if preprocess is None else preprocess
         self.postprocess = identity if postprocess is None else postprocess
 
@@ -267,19 +267,23 @@ class _OnlyType:
         return self.postprocess(self._validate(self.preprocess(value)))
 
     def _validate(self, value):
-        if isinstance(value, self.type):
+        if isinstance(value, self.types):
             return value
-        try:
-            return self.type(value)
-        except Exception:
-            raise TypeError(
-                f"Expected an object of type {self.type}. "
-                f"Received {value} of type {type(value)}."
-            )
+        for type_ in self.types:
+            try:
+                return type_(value)
+            except Exception:
+                pass
+        raise TypeError(
+            f"Expected an object convertible to one of the following types: {self.types}. "
+            f"Received object {value} of type {type(value)}."
+        )
 
 
-def _raise_below(threshold):
+def _raise_below(threshold, allow_none=False):
     def is_greater_or_equal(value):
+        if allow_none and value is None:
+            return value
         try:
             if value < threshold:
                 raise ValueError
@@ -328,10 +332,88 @@ def _is_fraction(value):
     raise ValueError("Value must be between 0 and 1.")
 
 
-_natural_number = _OnlyType(int, postprocess=_raise_below(1))
-_nonnegative_int = _OnlyType(int, postprocess=_raise_below(0))
-_nonnegative_real = _OnlyType(float, postprocess=_raise_below(0))
-_positive_real = _OnlyType(float, postprocess=_raise_below(1e-12))
+def _parse_memory(memory):
+    """Parse memory from the memory flag passed by a user.
+
+    A valid memory argument is defined as:
+
+    1. Numeric value with suffix "g" or "G" indicating memory requested in gigabytes.
+    2. Numeric value with suffix "m" or "M" indicating memory requested in megabytes.
+    3. Numeric value with no suffix indicating memory requested in gigabytes.
+
+    Parameters
+    ----------
+    memory : str or float
+        Required memory to reserve per node.
+
+    Returns
+    -------
+    float
+        The parsed memory value in gigabytes.
+    """
+    try:
+        if memory is None:
+            return None
+        memory = str(memory)
+        size_type = memory[-1]
+        if size_type.lower() == "m":
+            return float(memory[:-1]) / 1024
+        elif size_type.lower() == "g":
+            return float(memory[:-1])
+        else:
+            return float(memory)
+    except ValueError:
+        raise ValueError(
+            'Invalid memory passed. For gigabytes use suffix "g"/"G", '
+            'for megabytes use suffix "m"/"M". If a numeric value is passed then '
+            "it will be interpreted as memory in gigabytes."
+        )
+
+
+def _memory_serial(value, other):
+    """Return the memory requirements for running operations in serial.
+
+    Takes two memory inputs for the directive and returns the
+    appropriate value for these operations when running in serial.
+    """
+    if value is None and other is None:
+        return None
+    elif other is None:
+        return value
+    elif value is None:
+        return other
+    else:
+        return max(value, other)
+
+
+def _memory_parallel(value, other):
+    """Return the memory requirements for running operations in parallel.
+
+    A callable that takes two memory inputs for the directive and returns the
+    appropriate value for these operations when running in parallel.
+    """
+    if value is None and other is None:
+        return None
+    elif other is None:
+        return value
+    elif value is None:
+        return other
+    else:
+        return operator.add(value, other)
+
+
+_natural_number = _OnlyTypes(int, postprocess=_raise_below(1))
+_nonnegative_int = _OnlyTypes(int, postprocess=_raise_below(0))
+_nonnegative_real = _OnlyTypes(float, postprocess=_raise_below(0))
+# 1e-12 is an arbitrarily chosen minimum threshold for what constitutes 0
+_positive_real_memory = _OnlyTypes(
+    float,
+    int,
+    str,
+    type(None),
+    postprocess=_raise_below(1e-12, True),
+    preprocess=_parse_memory,
+)
 
 # Common directives and their instantiation as _Directive
 _NP = _Directive(
@@ -377,15 +459,57 @@ values are supported. For example, a value of 0.5 will request 30 minutes of
 walltime. Defaults to 12 hours.
 """
 
-_MEMORY = _Directive("memory", validator=_positive_real, default=4)
-"""The number of gigabytes of memory to request for this operation.
+_MEMORY = _Directive(
+    "memory",
+    validator=_positive_real_memory,
+    default=None,
+    serial=_memory_serial,
+    parallel=_memory_parallel,
+)
+"""The memory to request for this operation.
 
-Expects a real number greater than zero.
+The memory to validate should be either a float, int, or string.
+A valid memory argument is defined as:
+
+- Positive numeric value with suffix "g" or "G" indicating memory requested in gigabytes.
+For example:
+
+.. code-block:: python
+
+    @Project.operation
+    @directives(memory="4g")
+    def op(job):
+        pass
+
+- Positive numeric value with suffix "m" or "M" indicating memory requested in megabytes.
+For example:
+
+.. code-block:: python
+
+    @Project.operation
+    @directives(memory="512m")
+    def op(job):
+        pass
+
+- Positive numeric value with no suffix indicating memory requested in gigabytes.
+For example:
+
+.. code-block:: python
+
+    @Project.operation
+    @directives(memory="4")
+    def op1(job):
+        pass
+
+    @Project.operation
+    @directives(memory=4)
+    def op2(job):
+        pass
 """
 
 _PROCESSOR_FRACTION = _Directive(
     "processor_fraction",
-    validator=_OnlyType(float, postprocess=_is_fraction),
+    validator=_OnlyTypes(float, postprocess=_is_fraction),
     default=1.0,
     serial=_no_aggregation,
     parallel=_no_aggregation,
@@ -415,7 +539,7 @@ def _GET_EXECUTABLE():
     # This is because we mock `sys.executable` while generating template reference data.
     return _Directive(
         "executable",
-        validator=_OnlyType(str),
+        validator=_OnlyTypes(str),
         default=sys.executable,
         serial=_no_aggregation,
         parallel=_no_aggregation,

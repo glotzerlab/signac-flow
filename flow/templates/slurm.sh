@@ -3,11 +3,12 @@
 {% block preamble %}
 #!/bin/bash
 #SBATCH --job-name="{{ id }}"
+{% set memory_requested = operations | calc_memory(parallel)  %}
+{% if memory_requested %}
+#SBATCH --mem={{ memory_requested }}G
+{% endif %}
 {% if partition %}
 #SBATCH --partition={{ partition }}
-{% endif %}
-{% if memory %}
-#SBATCH --mem={{ memory }}
 {% endif %}
 {% if walltime %}
 #SBATCH -t {{ walltime|format_timedelta }}

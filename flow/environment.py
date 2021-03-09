@@ -21,6 +21,7 @@ from signac.common import config
 
 from .directives import (
     _GET_EXECUTABLE,
+    _MEMORY,
     _NGPU,
     _NP,
     _NRANKS,
@@ -354,6 +355,7 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
                 _GET_EXECUTABLE(),
                 _WALLTIME,
                 _PROCESSOR_FRACTION,
+                _MEMORY,
             ]
         )
 
@@ -465,13 +467,6 @@ class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
 
         """
         super().add_args(parser)
-        parser.add_argument(
-            "--memory",
-            help=(
-                'Specify how much memory to reserve per node, e.g. "4g" for 4 gigabytes '
-                'or "512m" for 512 megabytes. Only relevant for shared queue jobs.'
-            ),
-        )
         parser.add_argument(
             "-w",
             "--walltime",

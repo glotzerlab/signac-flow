@@ -109,6 +109,27 @@ def calc_tasks(operations, name, parallel=False, allow_mixed=False):
         )
 
 
+def calc_memory(operations, parallel=False):
+    """Calculate the maximum memory to reserve for submission of operations.
+
+    Parameters
+    ----------
+    operations : list
+        The operations of :class:`~._JobOperation` used to calculate the maximum memory required.
+    parallel : bool
+        If True, operations are assumed to be executed in parallel, which means
+        that the total memory requested will be the sum of all memory requested instead of the
+        maximum memory requested (Default value = False).
+
+    Returns
+    -------
+    float
+        The reserved memory (numeric value) in gigabytes.
+    """
+    func = sum if parallel else max
+    return func(operation.directives["memory"] or 0 for operation in operations)
+
+
 def check_utilization(nn, np, ppn, threshold=0.9, name=None):
     """Check whether the calculated node utilization is below threshold.
 

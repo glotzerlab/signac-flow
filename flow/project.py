@@ -1496,6 +1496,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         template_environment.filters["with_np_offset"] = template_filters.with_np_offset
         template_environment.filters["calc_tasks"] = template_filters.calc_tasks
         template_environment.filters["calc_num_nodes"] = template_filters.calc_num_nodes
+        template_environment.filters["calc_memory"] = template_filters.calc_memory
         template_environment.filters[
             "check_utilization"
         ] = template_filters.check_utilization
@@ -4505,7 +4506,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Select jobs:
         aggregates = self._select_jobs_from_args(args)
-
         names = args.operation_name if args.operation_name else None
         self.submit(jobs=aggregates, names=names, **kwargs)
 

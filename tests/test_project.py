@@ -25,6 +25,7 @@ from deprecation import fail_if_not_removed
 import flow
 from flow import FlowProject, cmd, directives, init, with_job
 from flow.environment import ComputeEnvironment
+from flow.errors import DirectivesError
 from flow.project import IgnoreConditions, _AggregatesCursor
 from flow.scheduling.base import ClusterJob, JobStatus, Scheduler
 from flow.util.misc import (
@@ -443,6 +444,42 @@ class TestProjectClass(TestProjectBase):
             for next_op in project._next_operations([(job,)]):
                 assert "mpirun -np 3 python" in next_op.cmd
             break
+
+    def test_invalid_memory_directive(self):
+        for value in ["13b", "-1g", "0", 0, -2]:
+
+            class A(FlowProject):
+                pass
+
+            @A.operation
+            @directives(memory=value)
+            def op1(job):
+                pass
+
+            project = self.mock_project(A)
+            for job in project:
+                with pytest.raises(DirectivesError):
+                    for next_op in project._next_operations([(job,)]):
+                        pass
+
+    def test_memory_directive(self):
+        for value in ["0.5g", "0.5G", "512m", "512M", "0.5", 0.5, None]:
+
+            class A(FlowProject):
+                pass
+
+            @A.operation
+            @directives(memory=value)
+            def op1(job):
+                pass
+
+            project = self.mock_project(A)
+            for job in project:
+                for op in project._next_operations([(job,)]):
+                    if value is None:
+                        assert op.directives["memory"] is None
+                    else:
+                        assert op.directives["memory"] == 0.5
 
     def test_callable_directives(self):
         """Test that callable directives are properly evaluated.

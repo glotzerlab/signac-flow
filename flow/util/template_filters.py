@@ -126,14 +126,10 @@ def calc_memory(operations, parallel=False):
     float
         The reserved memory (numeric value) in gigabytes.
     """
-    list_of_memories = [
-        operation.directives["memory"] if operation.directives["memory"] else 0
-        for operation in operations
-    ]
-    if parallel:
-        return sum(list_of_memories)
-    else:
-        return max(list_of_memories)
+    func = sum if parallel else max
+    return func(
+        operation.directives["memory"] or 0 for operation in operations
+    )
 
 
 def check_utilization(nn, np, ppn, threshold=0.9, name=None):

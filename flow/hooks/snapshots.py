@@ -1,15 +1,15 @@
 # Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-import os
 import gzip
-import tarfile
-import logging
-import tempfile
-import shutil
 import hashlib
 import json
+import logging
+import os
 import re
+import shutil
+import tarfile
+import tempfile
 from contextlib import contextmanager
 from tempfile import NamedTemporaryFile
 
@@ -21,28 +21,32 @@ except ImportError:
     from .util import collect_metadata
 
 
-DEFAULT_SNAPSHOTS_DIRECTORY = '.signac/snapshots'
+DEFAULT_SNAPSHOTS_DIRECTORY = ".signac/snapshots"
 
-logger = logging.getLogger('snapshot')
+logger = logging.getLogger("snapshot")
 
 
 @contextmanager
 def _archive_project(project, workspace, ignore):
-    logger.info("Archiving project '{}'...".format(project))
+    logger.info(f"Archiving project '{project}'...")
 
     wd = os.path.relpath(project.workspace(), project.root_directory())
 
     def filter(info):
-        if not workspace and info.isdir() and os.path.relpath(info.name, 'project').startswith(wd):
+        if (
+            not workspace
+            and info.isdir()
+            and os.path.relpath(info.name, "project").startswith(wd)
+        ):
             return
         if ignore is not None and re.match(ignore, info.name):
             return
         return info
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        fn_snapshot = os.path.join(tmpdir, 'project.tar')
-        with tarfile.open(fn_snapshot, 'w') as tarball:
-            tarball.add(project.root_directory(), 'project', filter=filter)
+        fn_snapshot = os.path.join(tmpdir, "project.tar")
+        with tarfile.open(fn_snapshot, "w") as tarball:
+            tarball.add(project.root_directory(), "project", filter=filter)
         yield fn_snapshot, tarball
 
 
@@ -59,8 +63,13 @@ class Snapshot:
         Specify the name of the directory where the snapshots will be stored.
     """
 
-    def __init__(self, workspace=False, ignore=None, compress=False,
-                 directory=DEFAULT_SNAPSHOTS_DIRECTORY):
+    def __init__(
+        self,
+        workspace=False,
+        ignore=None,
+        compress=False,
+        directory=DEFAULT_SNAPSHOTS_DIRECTORY,
+    ):
         self.compress = compress
         self.workspace = workspace
         self.ignore = ignore
@@ -70,37 +79,41 @@ class Snapshot:
     def archive_project(self, operation):
         project = operation.job._project
         metadata = collect_metadata(operation)
-        with NamedTemporaryFile(mode='w') as metadatafile:
+        with NamedTemporaryFile(mode="w") as metadatafile:
             json.dump(collect_metadata(operation), metadatafile)
             metadatafile.flush()
             os.makedirs(project.fn(self._directory), exist_ok=True)
             with _archive_project(
-                    project=project, workspace=self.workspace,
-                    ignore=self.ignore) as (fn_tmp, tarball):
+                project=project, workspace=self.workspace, ignore=self.ignore
+            ) as (fn_tmp, tarball):
 
                 # Determine snapshot id
-                with open(fn_tmp, 'rb') as archive_file:
+                with open(fn_tmp, "rb") as archive_file:
                     m = hashlib.sha256()
                     m.update(archive_file.read())
 
                 snapshot_id = m.hexdigest()
-                logger.info("Project snapshot id: {}".format(snapshot_id))
+                logger.info(f"Project snapshot id: {snapshot_id}")
 
-                fn_snapshot = project.fn(os.path.join(self._directory, '{}.tar{}'.format(
-                    snapshot_id, '.gz' if self.compress else '')))
+                fn_snapshot = project.fn(
+                    os.path.join(
+                        self._directory,
+                        "{}.tar{}".format(snapshot_id, ".gz" if self.compress else ""),
+                    )
+                )
 
                 if os.path.isfile(fn_snapshot):
-                    logger.debug("Snapshot file '{}' already exists.".format(fn_snapshot))
+                    logger.debug(f"Snapshot file '{fn_snapshot}' already exists.")
                 else:
                     if self.compress:
-                        with open(fn_tmp, 'rb') as archive_file:
-                            with gzip.open(fn_snapshot, 'wb') as zipfile:
+                        with open(fn_tmp, "rb") as archive_file:
+                            with gzip.open(fn_snapshot, "wb") as zipfile:
                                 zipfile.write(archive_file.read())
                     else:
                         shutil.move(fn_tmp, fn_snapshot)
-                    logger.info("Created snapshot file '{}'.".format(fn_snapshot))
+                    logger.info(f"Created snapshot file '{fn_snapshot}'.")
 
-        with Collection.open(os.path.join(self._directory, 'metadata.txt')) as c:
+        with Collection.open(os.path.join(self._directory, "metadata.txt")) as c:
             c[snapshot_id] = metadata
 
     def install_hooks(self, project):

@@ -49,11 +49,11 @@ from .errors import (
     UserConditionError,
     UserOperationError,
 )
+from .hooks import Hooks
 from .labels import _is_label_func, classlabel, label, staticlabel
 from .render_status import _render_status
 from .scheduling.base import ClusterJob, JobStatus
 from .util import config as flow_config
-from .hooks import Hooks
 from .util import template_filters
 from .util.misc import (
     TrackGetItemDict,
@@ -311,8 +311,7 @@ class _AggregatesCursor:
             yield (job,)
 
 
-class _HooksDecorator(object):
-
+class _HooksDecorator:
     def __init__(self):
         self._operation_hooks = defaultdict(lambda: defaultdict(list))
 
@@ -320,9 +319,7 @@ class _HooksDecorator(object):
         return self._operation_hooks[func]
 
     def __getattr__(self, name):
-
-        class install_hook(object):
-
+        class install_hook:
             def __init__(install_self, hook_func):
                 install_self.hook_func = hook_func
 
@@ -1592,25 +1589,30 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _install_config_hooks(self):
         try:
-            hooks_config = self._config['flow'].as_list('hooks')
+            hooks_config = self._config["flow"].as_list("hooks")
         except KeyError:
             return  # no hooks configured
         for entry in hooks_config:
             try:
-                m = re.match(r'^(?P<path>[\w.]+?)(\((?P<constructor>.*)\))?$', entry)
+                m = re.match(r"^(?P<path>[\w.]+?)(\((?P<constructor>.*)\))?$", entry)
                 if m:
-                    name_module, name_installer = m.groupdict()['path'].rsplit('.', 1)
-                    nodes = [c.rpartition('=') for c in m.groupdict('')['constructor'].split(',')]
+                    name_module, name_installer = m.groupdict()["path"].rsplit(".", 1)
+                    nodes = [
+                        c.rpartition("=")
+                        for c in m.groupdict("")["constructor"].split(",")
+                    ]
                     kwargs = {k: ast.literal_eval(v) for k, _, v in nodes if k}
                     hook = getattr(importlib.import_module(name_module), name_installer)
                     if inspect.isclass(hook):
-                        hook(** kwargs)(self)
+                        hook(**kwargs)(self)
                     else:
                         hook(self)
                 else:
-                    raise ValueError("The hook configuration entry '{}' is invalid.".format(entry))
+                    raise ValueError(
+                        f"The hook configuration entry '{entry}' is invalid."
+                    )
             except (ImportError, AttributeError, ValueError, TypeError) as error:
-                raise RuntimeError("Unable to install '{}': {}".format(entry, error))
+                raise RuntimeError(f"Unable to install '{entry}': {error}")
 
     @classmethod
     def label(cls, label_name_or_func=None):

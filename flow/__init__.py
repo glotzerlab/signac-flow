@@ -8,7 +8,7 @@ configure and implement a workflow to operate on a signac_ data space.
 
 .. _signac: https://signac.io/
 """
-from . import environment, errors, scheduling, testing, hooks
+from . import environment, errors, hooks, scheduling, testing
 from .environment import get_environment
 from .operations import cmd, directives, run, with_job
 from .project import FlowProject, IgnoreConditions, classlabel, label, staticlabel
@@ -24,7 +24,7 @@ if get_config_value("import_packaged_environments", default=True):
 
 
 __all__ = [
-    'hooks',
+    "hooks",
     "environment",
     "errors",
     "scheduling",

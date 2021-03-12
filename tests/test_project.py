@@ -9,15 +9,15 @@ import subprocess
 import sys
 import tempfile
 import uuid
+
+# TODO: Kept this while resolving merge conflicts
+from collections import defaultdict
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from distutils.version import StrictVersion
 from functools import partial
 from io import StringIO
 from itertools import groupby
 from tempfile import TemporaryDirectory
-
-# TODO: Kept this while resolving merge conflicts
-from collections import defaultdict
 
 import pytest
 import signac
@@ -1758,7 +1758,6 @@ class TestGroupDynamicProjectMainInterface(TestProjectMainInterface):
 
 
 class ProjectHooksTest(TestProjectBase):
-
     def test_run_hooks(self):
 
         ran = defaultdict(set)
@@ -1768,10 +1767,10 @@ class ProjectHooksTest(TestProjectBase):
             pass
 
         @FooProject.operation
-        @FooProject.hook.on_start(lambda op: ran['start'].add(op.job))
-        @FooProject.hook.on_finish(lambda op: ran['finish'].add(op.job))
-        @FooProject.hook.on_success(lambda op: ran['success'].add(op.job))
-        @FooProject.hook.on_fail(lambda op, error: ran['fail'].add(op.job))
+        @FooProject.hook.on_start(lambda op: ran["start"].add(op.job))
+        @FooProject.hook.on_finish(lambda op: ran["finish"].add(op.job))
+        @FooProject.hook.on_success(lambda op: ran["success"].add(op.job))
+        @FooProject.hook.on_fail(lambda op, error: ran["fail"].add(op.job))
         def foo(job):
             if raise_exception:
                 raise RuntimeError
@@ -1781,20 +1780,20 @@ class ProjectHooksTest(TestProjectBase):
         with redirect_stderr(output):
             FooProject(config=project.config).run()
             for job in project:
-                assert job in ran['start']
-                assert job in ran['start']
-                assert job in ran['finish']
-                assert job in ran['success']
-                assert job not in ran['fail']
+                assert job in ran["start"]
+                assert job in ran["start"]
+                assert job in ran["finish"]
+                assert job in ran["success"]
+                assert job not in ran["fail"]
             ran.clear()
             raise_exception = True
             for job in project:
                 with pytest.raises(RuntimeError):
                     FooProject(config=project.config).run(jobs=[job])
-                assert job in ran['start']
-                assert job in ran['finish']
-                assert job not in ran['success']
-                assert job in ran['fail']
+                assert job in ran["start"]
+                assert job in ran["finish"]
+                assert job not in ran["success"]
+                assert job in ran["fail"]
 
 
 class TestIgnoreConditions:

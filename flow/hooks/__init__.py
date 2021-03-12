@@ -5,6 +5,7 @@ import logging
 
 from .log_operations import LogOperations
 from .track_operations import TrackOperations
+
 try:
     from .git_workspace_tracking import Git
 except ImportError:
@@ -18,37 +19,38 @@ logger = logging.getLogger(__name__)
 
 
 __all__ = [
-    'Hooks',
-    'LogOperations',
-    'TrackOperations',
-    'SnapshotProject',
-    'TrackWorkspaceWithGit',
+    "Hooks",
+    "LogOperations",
+    "TrackOperations",
+    "SnapshotProject",
+    "TrackWorkspaceWithGit",
 ]
 
 
 class _HooksList(list):
-
     def __call__(self, *args, **kwargs):
         "Call all hook functions as part of this list."
         for hook in self:
-            logger.debug("Executing hook function '{}'.".format(hook))
+            logger.debug(f"Executing hook function '{hook}'.")
             try:
                 hook(*args, **kwargs)
             except Exception as error:
-                logger.debug("Error occurred during execution of "
-                             "hook '{}': {}.".format(hook, error))
+                logger.debug(
+                    "Error occurred during execution of "
+                    "hook '{}': {}.".format(hook, error)
+                )
                 raise
 
 
-class Hooks(object):
+class Hooks:
     "Define execution hooks that are executed on certain conditions."
 
     _keys = [
-        'on_start',
-        'on_finish',
-        'on_success',
-        'on_fail',
-        ]
+        "on_start",
+        "on_finish",
+        "on_success",
+        "on_fail",
+    ]
 
     def __init__(self, **kwargs):
         for key in self._keys:
@@ -56,9 +58,9 @@ class Hooks(object):
 
     def __setattr__(self, name, value):
         if name in self._keys:
-            super(Hooks, self).__setattr__(name, _HooksList(value))
+            super().__setattr__(name, _HooksList(value))
         else:
-            super(Hooks, self).__setattr__(name, value)
+            super().__setattr__(name, value)
 
     @classmethod
     def from_dict(cls, mapping):
@@ -76,7 +78,8 @@ class Hooks(object):
     def __str__(self):
         return "{}({})".format(
             type(self).__name__,
-            ', '.join(['{}={}'.format(key, getattr(self, key)) for key in self._keys]))
+            ", ".join(["{}={}".format(key, getattr(self, key)) for key in self._keys]),
+        )
 
     def __bool__(self):
         return any(getattr(self, key, None) for key in self._keys)

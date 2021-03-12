@@ -9,8 +9,6 @@ import subprocess
 import sys
 import tempfile
 import uuid
-
-# TODO: Kept this while resolving merge conflicts
 from collections import defaultdict
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from distutils.version import StrictVersion

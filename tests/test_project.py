@@ -1456,7 +1456,7 @@ class TestDirectivesProject(TestProjectBase):
             .decode("utf-8")
             .split()
         )
-        assert "SBATCH -t " not in output
+        assert "-t 12:00:00" in output
 
     def test_main_submit_walltime_deprecated(self):
         assert len(self.project)

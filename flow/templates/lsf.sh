@@ -12,6 +12,8 @@
 {% set walltime = walltime | default(operations | calc_walltime(parallel) , True) %}
 {% if walltime %}
 #BSUB -W {{ walltime|format_timedelta(style='HH:MM') }}
+{% else %}
+#BSUB -W 12:00
 {% endif %}
 {% if job_output %}
 #BSUB -eo {{ job_output }}

@@ -13,6 +13,8 @@
 {% set walltime = walltime | default(operations | calc_walltime(parallel) , True) %}
 {% if walltime %}
 #SBATCH -t {{ walltime|format_timedelta }}
+{% else %}
+#SBATCH -t 12:00:00
 {% endif %}
 {% if job_output %}
 #SBATCH --output={{ job_output }}

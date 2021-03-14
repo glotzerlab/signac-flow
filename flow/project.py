@@ -3631,7 +3631,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     "hours component: datetime.timedelta"
                 ):
                     raise
-        print(walltime)
+
         if not isinstance(ignore_conditions, IgnoreConditions):
             raise ValueError(
                 "The ignore_conditions argument of FlowProject.run() "

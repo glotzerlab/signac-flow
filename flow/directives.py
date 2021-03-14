@@ -491,7 +491,7 @@ _WALLTIME = _Directive(
 
 This directive expects a float representing the walltime in hours. Fractional
 values are supported. For example, a value of 0.5 will request 30 minutes of
-walltime. If no operations specify a walltime, the submission will request a
+walltime. If walltime is not requested, the submission will request a
 default value of 12 hours.
 
 For example:

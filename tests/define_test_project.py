@@ -1,4 +1,3 @@
-import datetime
 import os
 
 import flow
@@ -11,7 +10,6 @@ class _TestProject(FlowProject):
 
 group1 = _TestProject.make_group(name="group1")
 group2 = _TestProject.make_group(name="group2", options="--num-passes=2")
-group3 = _TestProject.make_group(name="walltimegroup")
 
 
 @_TestProject.label
@@ -49,27 +47,6 @@ def b_is_even(job):
 @flow.directives(np=1)
 def op1(job):
     return 'echo "hello" > {job.ws}/world.txt'
-
-
-@_TestProject.operation
-@flow.directives(walltime=1.0)
-@group3
-def op_walltime(job):
-    pass
-
-
-@_TestProject.operation
-@flow.directives(walltime=None)
-@group3
-def op_walltime_2(job):
-    pass
-
-
-@_TestProject.operation
-@flow.directives(walltime=datetime.timedelta(hours=2))
-@group3
-def op_walltime_3(job):
-    pass
 
 
 def _need_to_fork(job):

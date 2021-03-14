@@ -20,6 +20,7 @@ from tempfile import TemporaryDirectory
 import pytest
 import signac
 from define_dag_test_project import DagTestProject
+from define_directives_test_project import _DirectivesTestProject
 from define_test_project import _DynamicTestProject, _TestProject
 from deprecation import fail_if_not_removed
 
@@ -1352,6 +1353,96 @@ class TestProjectMainInterface(TestProjectBase):
         )
         assert "Unrecognized flow operation(s): invalid_op_run" in run_output
 
+    def test_main_next(self):
+        assert len(self.project)
+        job_ids = set(self.call_subcmd("next op1").decode().split())
+        assert len(job_ids) > 0
+        even_jobs = [job.get_id() for job in self.project if job.sp.b % 2 == 0]
+        assert job_ids == set(even_jobs)
+        # Use only exact operation matches
+        job_ids = set(self.call_subcmd("next op").decode().split())
+        assert len(job_ids) == 0
+
+    def test_main_next_invalid_op(self):
+        assert len(self.project)
+        next_output = " ".join(
+            self.call_subcmd("next invalid_op_next", subprocess.STDOUT)
+            .decode("utf-8")
+            .split()
+        )
+        assert (
+            "The requested flow operation 'invalid_op_next' does not exist."
+            in next_output
+        )
+
+    def test_main_status(self):
+        assert len(self.project)
+        status_output = (
+            self.call_subcmd("--debug status --detailed").decode("utf-8").splitlines()
+        )
+        lines = iter(status_output)
+        project = self.mock_project()
+        num_ops = len(project.operations)
+        for line in lines:
+            for job in project:
+                if job.get_id() in line:
+                    op_lines = [line]
+                    for i in range(num_ops - 1):
+                        try:
+                            op_lines.append(next(lines))
+                        except StopIteration:
+                            continue
+                    for op in project._next_operations([(job,)]):
+                        assert any(op.name in op_line for op_line in op_lines)
+
+    def test_main_script(self):
+        assert len(self.project)
+        even_jobs = [job for job in self.project if job.sp.b % 2 == 0]
+        for job in self.project:
+            script_output = self.call_subcmd(f"script -j {job}").decode().splitlines()
+            assert job.get_id() in "\n".join(script_output)
+            if job in even_jobs:
+                assert "run -o op1" in "\n".join(script_output)
+            else:
+                assert "run -o op1" not in "\n".join(script_output)
+
+
+class TestDynamicProjectMainInterface(TestProjectMainInterface):
+    project_class = _DynamicTestProject
+
+
+class TestDirectivesProject(TestProjectBase):
+    project_class = _DirectivesTestProject
+    entrypoint = dict(
+        path=os.path.realpath(
+            os.path.join(os.path.dirname(__file__), "define_directives_test_project.py")
+        )
+    )
+
+    def switch_to_cwd(self):
+        os.chdir(self.cwd)
+
+    @pytest.fixture(autouse=True)
+    def setup_main_interface(self, request):
+        self.project = self.mock_project()
+        self.cwd = os.getcwd()
+        os.chdir(self._tmp_dir.name)
+        request.addfinalizer(self.switch_to_cwd)
+
+    def call_subcmd(self, subcmd, stderr=subprocess.DEVNULL):
+        # Determine path to project module and construct command.
+        fn_script = inspect.getsourcefile(type(self.project))
+        _cmd = f"python {fn_script} {subcmd}"
+
+        try:
+            with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
+                with switch_to_directory(self.project.root_directory()):
+                    return subprocess.check_output(_cmd.split(), stderr=stderr)
+        except subprocess.CalledProcessError as error:
+            print(error, file=sys.stderr)
+            print(error.output, file=sys.stderr)
+            raise
+
     def test_main_submit_walltime(self):
         assert len(self.project)
         output = " ".join(
@@ -1412,63 +1503,6 @@ class TestProjectMainInterface(TestProjectBase):
             .split()
         )
         assert "-t 02:00:00" in output
-
-    def test_main_next(self):
-        assert len(self.project)
-        job_ids = set(self.call_subcmd("next op1").decode().split())
-        assert len(job_ids) > 0
-        even_jobs = [job.get_id() for job in self.project if job.sp.b % 2 == 0]
-        assert job_ids == set(even_jobs)
-        # Use only exact operation matches
-        job_ids = set(self.call_subcmd("next op").decode().split())
-        assert len(job_ids) == 0
-
-    def test_main_next_invalid_op(self):
-        assert len(self.project)
-        next_output = " ".join(
-            self.call_subcmd("next invalid_op_next", subprocess.STDOUT)
-            .decode("utf-8")
-            .split()
-        )
-        assert (
-            "The requested flow operation 'invalid_op_next' does not exist."
-            in next_output
-        )
-
-    def test_main_status(self):
-        assert len(self.project)
-        status_output = (
-            self.call_subcmd("--debug status --detailed").decode("utf-8").splitlines()
-        )
-        lines = iter(status_output)
-        project = self.mock_project()
-        num_ops = len(project.operations)
-        for line in lines:
-            for job in project:
-                if job.get_id() in line:
-                    op_lines = [line]
-                    for i in range(num_ops - 1):
-                        try:
-                            op_lines.append(next(lines))
-                        except StopIteration:
-                            continue
-                    for op in project._next_operations([(job,)]):
-                        assert any(op.name in op_line for op_line in op_lines)
-
-    def test_main_script(self):
-        assert len(self.project)
-        even_jobs = [job for job in self.project if job.sp.b % 2 == 0]
-        for job in self.project:
-            script_output = self.call_subcmd(f"script -j {job}").decode().splitlines()
-            assert job.get_id() in "\n".join(script_output)
-            if job in even_jobs:
-                assert "run -o op1" in "\n".join(script_output)
-            else:
-                assert "run -o op1" not in "\n".join(script_output)
-
-
-class TestDynamicProjectMainInterface(TestProjectMainInterface):
-    project_class = _DynamicTestProject
 
 
 class TestProjectDagDetection(TestProjectBase):

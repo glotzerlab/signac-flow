@@ -4,6 +4,7 @@
 """Provide jinja2 template environment filter functions."""
 import datetime
 import sys
+from functools import partial
 from math import ceil
 
 from ..errors import ConfigKeyError, SubmitError
@@ -153,8 +154,11 @@ def calc_walltime(operations, parallel=False):
     :class:`datetime.timedelta`
         The total walltime.
     """
-    func = max if parallel else sum
-    return func(operation.directives["walltime"] or 0 for operation in operations)
+    func = max if parallel else partial(sum, start=datetime.timedelta())
+    return func(
+        operation.directives["walltime"] or datetime.timedelta()
+        for operation in operations
+    )
 
 
 def check_utilization(nn, np, ppn, threshold=0.9, name=None):

@@ -62,6 +62,13 @@ def memory_op(job):
 
 
 @TestProject.operation
+@flow.directives(walltime=1)
+@group1
+def walltime_op(job):
+    pass
+
+
+@TestProject.operation
 @flow.cmd
 def multiline_cmd(job):
     return 'echo "First line"\necho "Second line"'

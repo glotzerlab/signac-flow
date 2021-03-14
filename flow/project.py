@@ -3616,6 +3616,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "The 'names' argument must be a sequence of strings, however "
                 f"a single string was provided: {names}."
             )
+
+        if walltime:
+            print(
+                "DeprecationWarning: The walltime argument is deprecated as of 0.13 and "
+                "will be removed in 0.14. Use the walltime directive instead."
+            )
         if walltime is not None and not isinstance(walltime, datetime.timedelta):
             try:
                 walltime = datetime.timedelta(hours=walltime)
@@ -3625,6 +3631,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     "hours component: datetime.timedelta"
                 ):
                     raise
+        print(walltime)
         if not isinstance(ignore_conditions, IgnoreConditions):
             raise ValueError(
                 "The ignore_conditions argument of FlowProject.run() "

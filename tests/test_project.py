@@ -2,6 +2,7 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 import collections.abc
+import datetime
 import inspect
 import logging
 import os
@@ -480,6 +481,49 @@ class TestProjectClass(TestProjectBase):
                         assert op.directives["memory"] is None
                     else:
                         assert op.directives["memory"] == 0.5
+
+    def test_walltime_directive(self):
+        for value in [
+            None,
+            datetime.timedelta(seconds=3600),
+            datetime.timedelta(minutes=60),
+            datetime.timedelta(hours=1),
+            1,
+            1.0,
+        ]:
+
+            class A(FlowProject):
+                pass
+
+            @A.operation
+            @directives(walltime=value)
+            def op1(job):
+                pass
+
+            project = self.mock_project(A)
+            for job in project:
+                for op in project._next_operations([(job,)]):
+                    if value is None:
+                        assert op.directives["walltime"] is None
+                    else:
+                        assert str(op.directives["walltime"]) == "1:00:00"
+
+    def test_invalid_walltime_directive(self):
+        for value in [0, -1, "1.0", datetime.timedelta(0), {}]:
+
+            class A(FlowProject):
+                pass
+
+            @A.operation
+            @directives(walltime=value)
+            def op1(job):
+                pass
+
+            project = self.mock_project(A)
+            for job in project:
+                with pytest.raises(DirectivesError):
+                    for _ in project._next_operations([(job,)]):
+                        pass
 
     def test_callable_directives(self):
         """Test that callable directives are properly evaluated.
@@ -1307,6 +1351,67 @@ class TestProjectMainInterface(TestProjectBase):
             .split()
         )
         assert "Unrecognized flow operation(s): invalid_op_run" in run_output
+
+    def test_main_submit_walltime(self):
+        assert len(self.project)
+        output = " ".join(
+            self.call_subcmd("submit -o op_walltime --pretend", subprocess.STDOUT)
+            .decode("utf-8")
+            .split()
+        )
+        assert "SBATCH -t 01:00:00" in output
+        output = " ".join(
+            self.call_subcmd("submit -o op_walltime_2 --pretend", subprocess.STDOUT)
+            .decode("utf-8")
+            .split()
+        )
+        assert "SBATCH -t " not in output
+
+    def test_main_submit_walltime_deprecated(self):
+        assert len(self.project)
+        output = " ".join(
+            self.call_subcmd("submit -o op_walltime -w 12 --pretend", subprocess.STDOUT)
+            .decode("utf-8")
+            .split()
+        )
+        assert "The walltime argument is deprecated as of 0.13" in output
+        assert "-t 12:00:00" in output
+
+    def test_main_submit_walltime_with_groups(self):
+        assert len(self.project)
+        output = " ".join(
+            self.call_subcmd("submit -o walltimegroup --pretend", subprocess.STDOUT)
+            .decode("utf-8")
+            .split()
+        )
+        assert "-t 03:00:00" in output
+
+    def test_main_submit_walltime_serial(self):
+        assert len(self.project)
+        job_id = list(self.project)[0].get_id()
+        output = " ".join(
+            self.call_subcmd(
+                f"submit -o op_walltime op_walltime_2 op_walltime_3 -j {job_id} -b 3 --pretend",
+                subprocess.STDOUT,
+            )
+            .decode("utf-8")
+            .split()
+        )
+        assert "-t 03:00:00" in output
+
+    def test_main_submit_walltime_parallel(self):
+        assert len(self.project)
+        job_id = list(self.project)[0].get_id()
+        output = " ".join(
+            self.call_subcmd(
+                "submit -o op_walltime op_walltime_2 op_walltime_3 "
+                f"-j {job_id} -b 3 --parallel --pretend",
+                subprocess.STDOUT,
+            )
+            .decode("utf-8")
+            .split()
+        )
+        assert "-t 02:00:00" in output
 
     def test_main_next(self):
         assert len(self.project)

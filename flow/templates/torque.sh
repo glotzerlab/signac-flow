@@ -5,7 +5,7 @@
 {% if memory_requested %}
 #PBS -l mem={{ memory_requested }}GB
 {% endif %}
-{% set walltime = walltime | default(operations | calc_walltime(parallel)) %}
+{% set walltime = walltime | default(operations | calc_walltime(parallel) , True) %}
 {% if walltime %}
 #PBS -l walltime={{ walltime|format_timedelta }}
 {% endif %}

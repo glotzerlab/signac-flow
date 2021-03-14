@@ -435,6 +435,9 @@ class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
         """
         super().add_args(parser)
         parser.add_argument(
+            "-w", "--walltime", type=float, help="The wallclock time in hours."
+        )
+        parser.add_argument(
             "--hold", action="store_true", help="Submit jobs, but put them on hold."
         )
         parser.add_argument(
@@ -468,7 +471,6 @@ class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
             "-w",
             "--walltime",
             type=float,
-            default=12,
             help="The wallclock time in hours.",
         )
         parser.add_argument(
@@ -500,7 +502,6 @@ class DefaultLSFEnvironment(NodesEnvironment, LSFEnvironment):
             "-w",
             "--walltime",
             type=float,
-            default=12,
             help="The wallclock time in hours.",
         )
         parser.add_argument(

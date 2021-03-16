@@ -21,6 +21,7 @@ import sys
 import threading
 import time
 import traceback
+import warnings
 from collections import Counter, defaultdict
 from copy import deepcopy
 from enum import IntFlag
@@ -3618,9 +3619,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             )
 
         if walltime:
-            print(
-                "DeprecationWarning: The walltime argument is deprecated as of 0.13 and "
-                "will be removed in 0.14. Use the walltime directive instead."
+            warnings.warn(
+                "The walltime argument is deprecated as of 0.13 and "
+                "will be removed in 0.14. Use the walltime directive instead.",
+                DeprecationWarning,
             )
         if walltime is not None and not isinstance(walltime, datetime.timedelta):
             try:

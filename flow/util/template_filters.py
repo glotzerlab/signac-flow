@@ -154,7 +154,13 @@ def calc_walltime(operations, parallel=False):
     :class:`datetime.timedelta`
         The total walltime.
     """
-    func = max if parallel else partial(sum, start=datetime.timedelta())
+    # Replace the sum function with partial(sum, start=datetime.timedelta())
+    # when dropping Python 3.7 support.
+    func = (
+        max
+        if parallel
+        else partial(lambda start, iterable: sum(iterable, start), datetime.timedelta())
+    )
     return func(
         operation.directives["walltime"] or datetime.timedelta()
         for operation in operations

@@ -5,6 +5,18 @@ Changelog
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 The numbers in brackets denote the related GitHub issue and/or pull request.
 
+Version 0.14
+============
+
+[0.14.0] -- 2021-xx-xx
+----------------------
+
+Removed
++++++++
+
+- Removed deprecated ``--walltime`` argument (#478).
+- Removed deprecated ``flow.run`` interface (#478).
+
 Version 0.13
 ============
 

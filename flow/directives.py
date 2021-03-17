@@ -345,7 +345,7 @@ def _parse_walltime(walltime):
     Parameters
     ----------
     walltime : float or :class:`datetime.timedelta` or None
-        Walltime to request.
+        Requested walltime.
 
     Returns
     -------

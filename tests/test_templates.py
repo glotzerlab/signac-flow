@@ -115,4 +115,4 @@ def test_env(env, monkeypatch):
 
                         with open(job.fn(f"script_{op}.sh")) as file:
                             reference.extend([msg] + file.read().splitlines())
-            assert "\n".join(reference) == "\n".join(generated)
+            assert "\n".join(generated) == "\n".join(reference)

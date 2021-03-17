@@ -2,6 +2,7 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 import collections.abc
+import datetime
 import inspect
 import logging
 import os
@@ -19,6 +20,7 @@ from tempfile import TemporaryDirectory
 import pytest
 import signac
 from define_dag_test_project import DagTestProject
+from define_directives_test_project import _DirectivesTestProject
 from define_test_project import _DynamicTestProject, _TestProject
 from deprecation import fail_if_not_removed
 
@@ -131,6 +133,10 @@ class TestProjectBase:
         self.project = self.project_class.init_project(
             name="FlowTestProject", root=self._tmp_dir.name
         )
+        self.cwd = os.getcwd()
+
+    def switch_to_cwd(self):
+        os.chdir(self.cwd)
 
     def mock_project(
         self, project_class=None, heterogeneous=False, config_overrides=None
@@ -161,6 +167,20 @@ class TestProjectBase:
                 project.open_job(dict(a=dict(a=a), b=b)).init()
         project._entrypoint = self.entrypoint
         return project
+
+    def call_subcmd(self, subcmd, stderr=subprocess.DEVNULL):
+        # Determine path to project module and construct command.
+        fn_script = inspect.getsourcefile(type(self.project))
+        _cmd = f"python {fn_script} {subcmd}"
+
+        try:
+            with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
+                with switch_to_directory(self.project.root_directory()):
+                    return subprocess.check_output(_cmd.split(), stderr=stderr)
+        except subprocess.CalledProcessError as error:
+            print(error, file=sys.stderr)
+            print(error.output, file=sys.stderr)
+            raise
 
 
 # Tests for single operation groups
@@ -480,6 +500,49 @@ class TestProjectClass(TestProjectBase):
                         assert op.directives["memory"] is None
                     else:
                         assert op.directives["memory"] == 0.5
+
+    def test_walltime_directive(self):
+        for value in [
+            None,
+            datetime.timedelta(seconds=3600),
+            datetime.timedelta(minutes=60),
+            datetime.timedelta(hours=1),
+            1,
+            1.0,
+        ]:
+
+            class A(FlowProject):
+                pass
+
+            @A.operation
+            @directives(walltime=value)
+            def op1(job):
+                pass
+
+            project = self.mock_project(A)
+            for job in project:
+                for op in project._next_operations([(job,)]):
+                    if value is None:
+                        assert op.directives["walltime"] is None
+                    else:
+                        assert str(op.directives["walltime"]) == "1:00:00"
+
+    def test_invalid_walltime_directive(self):
+        for value in [0, -1, "1.0", datetime.timedelta(0), {}]:
+
+            class A(FlowProject):
+                pass
+
+            @A.operation
+            @directives(walltime=value)
+            def op1(job):
+                pass
+
+            project = self.mock_project(A)
+            for job in project:
+                with pytest.raises(DirectivesError):
+                    for _ in project._next_operations([(job,)]):
+                        pass
 
     def test_callable_directives(self):
         """Test that callable directives are properly evaluated.
@@ -1251,29 +1314,11 @@ class TestProjectMainInterface(TestProjectBase):
         )
     )
 
-    def switch_to_cwd(self):
-        os.chdir(self.cwd)
-
     @pytest.fixture(autouse=True)
     def setup_main_interface(self, request):
         self.project = self.mock_project()
-        self.cwd = os.getcwd()
         os.chdir(self._tmp_dir.name)
         request.addfinalizer(self.switch_to_cwd)
-
-    def call_subcmd(self, subcmd, stderr=subprocess.DEVNULL):
-        # Determine path to project module and construct command.
-        fn_script = inspect.getsourcefile(type(self.project))
-        _cmd = f"python {fn_script} {subcmd}"
-
-        try:
-            with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
-                with switch_to_directory(self.project.root_directory()):
-                    return subprocess.check_output(_cmd.split(), stderr=stderr)
-        except subprocess.CalledProcessError as error:
-            print(error, file=sys.stderr)
-            print(error.output, file=sys.stderr)
-            raise
 
     def test_main_help(self):
         # This unit test mainly checks if the test setup works properly.
@@ -1301,30 +1346,26 @@ class TestProjectMainInterface(TestProjectBase):
 
     def test_main_run_invalid_op(self):
         assert len(self.project)
-        run_output = " ".join(
-            self.call_subcmd("run -o invalid_op_run", subprocess.STDOUT)
-            .decode("utf-8")
-            .split()
-        )
+        run_output = self.call_subcmd(
+            "run -o invalid_op_run", subprocess.STDOUT
+        ).decode("utf-8")
         assert "Unrecognized flow operation(s): invalid_op_run" in run_output
 
     def test_main_next(self):
         assert len(self.project)
-        job_ids = set(self.call_subcmd("next op1").decode().split())
+        job_ids = set(self.call_subcmd("next op1").decode("utf-8").split())
         assert len(job_ids) > 0
         even_jobs = [job.get_id() for job in self.project if job.sp.b % 2 == 0]
         assert job_ids == set(even_jobs)
         # Use only exact operation matches
-        job_ids = set(self.call_subcmd("next op").decode().split())
+        job_ids = set(self.call_subcmd("next op").decode("utf-8").split())
         assert len(job_ids) == 0
 
     def test_main_next_invalid_op(self):
         assert len(self.project)
-        next_output = " ".join(
-            self.call_subcmd("next invalid_op_next", subprocess.STDOUT)
-            .decode("utf-8")
-            .split()
-        )
+        next_output = self.call_subcmd(
+            "next invalid_op_next", subprocess.STDOUT
+        ).decode("utf-8")
         assert (
             "The requested flow operation 'invalid_op_next' does not exist."
             in next_output
@@ -1354,16 +1395,81 @@ class TestProjectMainInterface(TestProjectBase):
         assert len(self.project)
         even_jobs = [job for job in self.project if job.sp.b % 2 == 0]
         for job in self.project:
-            script_output = self.call_subcmd(f"script -j {job}").decode().splitlines()
-            assert job.get_id() in "\n".join(script_output)
+            script_output = self.call_subcmd(f"script -j {job}").decode("utf-8")
+            assert job.get_id() in script_output
             if job in even_jobs:
-                assert "run -o op1" in "\n".join(script_output)
+                assert "run -o op1" in script_output
             else:
-                assert "run -o op1" not in "\n".join(script_output)
+                assert "run -o op1" not in script_output
 
 
 class TestDynamicProjectMainInterface(TestProjectMainInterface):
     project_class = _DynamicTestProject
+
+
+class TestDirectivesProjectMainInterface(TestProjectBase):
+    project_class = _DirectivesTestProject
+    entrypoint = dict(
+        path=os.path.realpath(
+            os.path.join(os.path.dirname(__file__), "define_directives_test_project.py")
+        )
+    )
+
+    @pytest.fixture(autouse=True)
+    def setup_main_interface(self, request):
+        self.project = self.mock_project()
+        os.chdir(self._tmp_dir.name)
+        request.addfinalizer(self.switch_to_cwd)
+
+    def test_main_submit_walltime_with_directive(self):
+        assert len(self.project)
+        output = self.call_subcmd(
+            "submit -o op_walltime --pretend --template slurm.sh",
+            subprocess.STDOUT,
+        ).decode("utf-8")
+        assert "#SBATCH -t 01:00:00" in output
+
+    def test_main_submit_walltime_with_cli(self):
+        assert len(self.project)
+        output = self.call_subcmd(
+            "submit -o op_walltime --pretend --template slurm.sh --walltime 15",
+            subprocess.STDOUT,
+        ).decode("utf-8")
+        assert "#SBATCH -t 15:00:00" in output
+
+    def test_main_submit_walltime_no_directive(self):
+        assert len(self.project)
+        output = self.call_subcmd(
+            "submit -o op_walltime_2 --pretend --template slurm.sh", subprocess.STDOUT
+        ).decode("utf-8")
+        assert "#SBATCH -t" not in output
+
+    def test_main_submit_walltime_with_groups(self):
+        assert len(self.project)
+        output = self.call_subcmd(
+            "submit -o walltimegroup --pretend --template slurm.sh", subprocess.STDOUT
+        ).decode("utf-8")
+        assert "#SBATCH -t 03:00:00" in output
+
+    def test_main_submit_walltime_serial(self):
+        assert len(self.project)
+        job_id = next(iter(self.project)).get_id()
+        output = self.call_subcmd(
+            "submit -o op_walltime op_walltime_2 op_walltime_3 "
+            f"-j {job_id} -b 3 --pretend --template slurm.sh",
+            subprocess.STDOUT,
+        ).decode("utf-8")
+        assert "#SBATCH -t 03:00:00" in output
+
+    def test_main_submit_walltime_parallel(self):
+        assert len(self.project)
+        job_id = next(iter(self.project)).get_id()
+        output = self.call_subcmd(
+            "submit -o op_walltime op_walltime_2 op_walltime_3 "
+            f"-j {job_id} -b 3 --parallel --pretend --template slurm.sh",
+            subprocess.STDOUT,
+        ).decode("utf-8")
+        assert "-t 02:00:00" in output
 
 
 class TestProjectDagDetection(TestProjectBase):
@@ -1715,31 +1821,11 @@ class TestGroupProjectMainInterface(TestProjectBase):
         )
     )
 
-    def switch_to_cwd(self):
-        os.chdir(self.cwd)
-
     @pytest.fixture(autouse=True)
     def setup_main_interface(self, request):
         self.project = self.mock_project()
-        self.cwd = os.getcwd()
         os.chdir(self._tmp_dir.name)
         request.addfinalizer(self.switch_to_cwd)
-
-    def call_subcmd(self, subcmd):
-        # Determine path to project module and construct command.
-        fn_script = inspect.getsourcefile(type(self.project))
-        _cmd = f"python {fn_script} {subcmd}"
-
-        try:
-            with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
-                with switch_to_directory(self.project.root_directory()):
-                    return subprocess.check_output(
-                        _cmd.split(), stderr=subprocess.DEVNULL
-                    )
-        except subprocess.CalledProcessError as error:
-            print(error, file=sys.stderr)
-            print(error.output, file=sys.stderr)
-            raise
 
     def test_main_run(self):
         assert len(self.project)
@@ -1757,34 +1843,29 @@ class TestGroupProjectMainInterface(TestProjectBase):
     def test_main_script(self):
         assert len(self.project)
         for job in self.project:
-            script_output = (
-                self.call_subcmd(f"script -j {job} -o group1").decode().splitlines()
+            script_output = self.call_subcmd(f"script -j {job} -o group1").decode(
+                "utf-8"
             )
-            assert job.get_id() in "\n".join(script_output)
-            assert "-o group1" in "\n".join(script_output)
-            script_output = (
-                self.call_subcmd(f"script -j {job} -o group2").decode().splitlines()
+            assert job.get_id() in script_output
+            assert "-o group1" in script_output
+            script_output = self.call_subcmd(f"script -j {job} -o group2").decode(
+                "utf-8"
             )
-            assert "--num-passes=2" in "\n".join(script_output)
+            assert "--num-passes=2" in script_output
 
     def test_main_submit(self):
         project = self.mock_project()
         assert len(project)
         # Assert that correct output for group submission is given
         for job in project:
-            submit_output = (
-                self.call_subcmd(f"submit -j {job} -o group1 --pretend")
-                .decode()
-                .splitlines()
-            )
-            output_string = "\n".join(submit_output)
-            assert f"run -o group1 -j {job}" in output_string
-            submit_output = (
-                self.call_subcmd(f"submit -j {job} -o group2 --pretend")
-                .decode()
-                .splitlines()
-            )
-            assert f"run -o group2 -j {job} --num-passes=2" in "\n".join(submit_output)
+            submit_output = self.call_subcmd(
+                f"submit -j {job} -o group1 --pretend"
+            ).decode("utf-8")
+            assert f"run -o group1 -j {job}" in submit_output
+            submit_output = self.call_subcmd(
+                f"submit -j {job} -o group2 --pretend"
+            ).decode("utf-8")
+            assert f"run -o group2 -j {job} --num-passes=2" in submit_output
 
 
 class TestGroupDynamicProjectMainInterface(TestProjectMainInterface):

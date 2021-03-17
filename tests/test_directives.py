@@ -1,6 +1,7 @@
 # Copyright (c) 2020 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
+import datetime
 import sys
 from tempfile import TemporaryDirectory
 
@@ -103,7 +104,7 @@ class TestItems:
         assert _NRANKS._default == 0
         assert _OMP_NUM_THREADS._default == 0
         assert _GET_EXECUTABLE()._default == sys.executable
-        assert _WALLTIME._default == 12.0
+        assert _WALLTIME._default is None
         assert _MEMORY._default is None
         assert _PROCESSOR_FRACTION._default == 1.0
 
@@ -113,7 +114,7 @@ class TestItems:
             "ngpu": [-1, "foo", {}, None],
             "nranks": [-1, "foo", {}, None],
             "omp_num_threads": [-1, "foo", {}, None],
-            "walltime": ["foo", {}, None],
+            "walltime": [-1, "foo", {}],
             "memory": [-1, "foo", {}],
             "processor_fraction": [-0.5, 2.5, "foo", {}, None],
         }
@@ -139,7 +140,13 @@ class TestItems:
         assert _OMP_NUM_THREADS._serial(4, 2) == 4
         assert _GET_EXECUTABLE()._serial("Path1", "Path2") == "Path1"
         assert _WALLTIME._serial(4, 2) == 6
+        assert _WALLTIME._serial(4, None) == 4
+        assert _WALLTIME._serial(None, 4) == 4
+        assert _WALLTIME._serial(None, None) is None
         assert _MEMORY._serial(4, 2) == 4
+        assert _MEMORY._serial(4, None) == 4
+        assert _MEMORY._serial(None, 4) == 4
+        assert _MEMORY._serial(None, None) is None
         assert _PROCESSOR_FRACTION._serial(0.4, 0.2) == 0.4
 
     def test_parallel(self):
@@ -149,7 +156,13 @@ class TestItems:
         assert _OMP_NUM_THREADS._parallel(4, 2) == 6
         assert _GET_EXECUTABLE()._parallel("Path1", "Path2") == "Path1"
         assert _WALLTIME._parallel(4, 2) == 4
+        assert _WALLTIME._parallel(4, None) == 4
+        assert _WALLTIME._parallel(None, 4) == 4
+        assert _WALLTIME._parallel(None, None) is None
         assert _MEMORY._parallel(4, 2) == 6
+        assert _MEMORY._parallel(4, None) == 4
+        assert _MEMORY._parallel(None, 4) == 4
+        assert _MEMORY._parallel(None, None) is None
         assert _PROCESSOR_FRACTION._parallel(0.4, 0.2) == 0.4
 
     def test_finalize(self):
@@ -240,7 +253,7 @@ class TestDirectives:
             "nranks": 0,
             "omp_num_threads": 10,
             "executable": "PathFinder",
-            "walltime": 20.0,
+            "walltime": datetime.timedelta(hours=20.0),
             "memory": 16,
             "processor_fraction": 0.5,
         }
@@ -261,7 +274,7 @@ class TestDirectives:
             "nranks": 5,
             "omp_num_threads": 20,
             "executable": "Non Default Path",
-            "walltime": 84.0,
+            "walltime": datetime.timedelta(hours=84.0),
             "memory": 32,
             "processor_fraction": 0.5,
         }
@@ -284,7 +297,7 @@ class TestDirectives:
             "nranks": 5,
             "omp_num_threads": 30,
             "executable": "Non Default Path",
-            "walltime": 64.0,
+            "walltime": datetime.timedelta(hours=64.0),
             "memory": 48,
             "processor_fraction": 0.5,
         }

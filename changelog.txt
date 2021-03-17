@@ -16,6 +16,7 @@ Added
 
 - Add official support for Bridges-2 cluster (#441).
 - Add support for memory requests via ``directives`` (#258, #466).
+- Add support for walltime requests via ``directives``, deprecated ``--walltime`` argument to ``submit`` (#240, #476).
 
 Fixed
 +++++

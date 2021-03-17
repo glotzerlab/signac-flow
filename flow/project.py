@@ -21,6 +21,7 @@ import sys
 import threading
 import time
 import traceback
+import warnings
 from collections import Counter, defaultdict
 from copy import deepcopy
 from enum import IntFlag
@@ -1496,6 +1497,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         template_environment.filters["with_np_offset"] = template_filters.with_np_offset
         template_environment.filters["calc_tasks"] = template_filters.calc_tasks
         template_environment.filters["calc_num_nodes"] = template_filters.calc_num_nodes
+        template_environment.filters["calc_walltime"] = template_filters.calc_walltime
         template_environment.filters["calc_memory"] = template_filters.calc_memory
         template_environment.filters[
             "check_utilization"
@@ -3579,8 +3581,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         force : bool
             Ignore all warnings or checks during submission, just submit. (Default value = False)
         walltime : :class:`datetime.timedelta`
-            Specify the walltime in hours or as instance of
-            :class:`datetime.timedelta`. (Default value = None)
+            Specify the walltime in hours or as an instance of
+            :class:`datetime.timedelta`. If specified, this value will
+            override the walltime calculated from operation directives.
+            (Default value = None)
         ignore_conditions : :class:`~.IgnoreConditions`
             Specify if preconditions and/or postconditions are to be ignored
             when determining eligibility. The default is
@@ -3613,15 +3617,23 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "The 'names' argument must be a sequence of strings, however "
                 f"a single string was provided: {names}."
             )
+
         if walltime is not None:
-            try:
-                walltime = datetime.timedelta(hours=walltime)
-            except TypeError as error:
-                if (
-                    str(error) != "unsupported type for timedelta "
-                    "hours component: datetime.timedelta"
-                ):
-                    raise
+            warnings.warn(
+                "The walltime argument is deprecated as of 0.13 and "
+                "will be removed in 0.14. Use the walltime directive instead.",
+                UserWarning,
+            )
+            if not isinstance(walltime, datetime.timedelta):
+                try:
+                    walltime = datetime.timedelta(hours=walltime)
+                except TypeError as error:
+                    if (
+                        str(error) != "unsupported type for timedelta "
+                        "hours component: datetime.timedelta"
+                    ):
+                        raise
+
         if not isinstance(ignore_conditions, IgnoreConditions):
             raise ValueError(
                 "The ignore_conditions argument of FlowProject.run() "

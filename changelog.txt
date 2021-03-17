@@ -16,6 +16,9 @@ Removed
 
 - Removed deprecated ``--walltime`` argument (#478).
 - Removed deprecated ``flow.run`` interface (#478).
+- Removed deprecated ``FlowProject.export_job_statuses`` (#478).
+- Removed deprecated ``script`` feature, use ``submit --pretend`` instead (#478).
+- Removed deprecated ``CPUEnvironment``, ``GPUEnvironment`` classes (#478).
 
 Version 0.13
 ============

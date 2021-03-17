@@ -3618,21 +3618,21 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 f"a single string was provided: {names}."
             )
 
-        if walltime:
+        if walltime is not None:
             warnings.warn(
                 "The walltime argument is deprecated as of 0.13 and "
                 "will be removed in 0.14. Use the walltime directive instead.",
-                DeprecationWarning,
+                UserWarning,
             )
-        if walltime is not None and not isinstance(walltime, datetime.timedelta):
-            try:
-                walltime = datetime.timedelta(hours=walltime)
-            except TypeError as error:
-                if (
-                    str(error) != "unsupported type for timedelta "
-                    "hours component: datetime.timedelta"
-                ):
-                    raise
+            if not isinstance(walltime, datetime.timedelta):
+                try:
+                    walltime = datetime.timedelta(hours=walltime)
+                except TypeError as error:
+                    if (
+                        str(error) != "unsupported type for timedelta "
+                        "hours component: datetime.timedelta"
+                    ):
+                        raise
 
         if not isinstance(ignore_conditions, IgnoreConditions):
             raise ValueError(

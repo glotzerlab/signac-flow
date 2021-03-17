@@ -225,7 +225,12 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
             The argument parser where arguments will be added.
 
         """
-        return
+        parser.add_argument(
+            "-w",
+            "--walltime",
+            type=float,
+            help="The wallclock time in hours. Deprecated in 0.13 and will be removed in 0.14.",
+        )
 
     @classmethod
     def get_config_value(cls, key, default=flow_config._GET_CONFIG_VALUE_NONE):
@@ -435,9 +440,6 @@ class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
         """
         super().add_args(parser)
         parser.add_argument(
-            "-w", "--walltime", type=float, help="The wallclock time in hours."
-        )
-        parser.add_argument(
             "--hold", action="store_true", help="Submit jobs, but put them on hold."
         )
         parser.add_argument(
@@ -468,12 +470,6 @@ class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
         """
         super().add_args(parser)
         parser.add_argument(
-            "-w",
-            "--walltime",
-            type=float,
-            help="The wallclock time in hours.",
-        )
-        parser.add_argument(
             "--hold", action="store_true", help="Submit jobs, but put them on hold."
         )
         parser.add_argument(
@@ -498,12 +494,6 @@ class DefaultLSFEnvironment(NodesEnvironment, LSFEnvironment):
 
         """
         super().add_args(parser)
-        parser.add_argument(
-            "-w",
-            "--walltime",
-            type=float,
-            help="The wallclock time in hours.",
-        )
         parser.add_argument(
             "--hold", action="store_true", help="Submit jobs, but put them on hold."
         )

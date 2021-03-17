@@ -344,7 +344,7 @@ def _parse_walltime(walltime):
 
     Parameters
     ----------
-    memory : float or :class:`datetime.timedelta`
+    walltime : float or :class:`datetime.timedelta`
         Walltime to request.
 
     Returns
@@ -491,8 +491,9 @@ _WALLTIME = _Directive(
 
 This directive expects a float representing the walltime in hours. Fractional
 values are supported. For example, a value of 0.5 will request 30 minutes of
-walltime. If walltime is not requested, the submission will request a
-default value of 12 hours.
+walltime. If no walltimes are requested, the submission will not specify a
+walltime in the output script. Some schedulers have a default value that will
+be used.
 
 For example:
 

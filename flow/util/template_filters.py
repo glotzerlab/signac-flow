@@ -118,8 +118,8 @@ def calc_memory(operations, parallel=False):
     Parameters
     ----------
     operations : list
-        The operations of :class:`~._JobOperation` used to calculate the
-        maximum memory required.
+        A list of :class:`~._JobOperation` used to calculate the maximum
+        memory required.
     parallel : bool
         If True, operations are assumed to be executed in parallel, which
         means that the total memory requested will be the sum of all memory
@@ -141,8 +141,8 @@ def calc_walltime(operations, parallel=False):
     Parameters
     ----------
     operations : list
-        The operations of :class:`~._JobOperation` used to calculate the
-        total walltime required.
+        A list of :class:`~._JobOperation` used to calculate the total
+        walltime required.
     parallel : bool
         If True, operations are assumed to be executed in parallel, which
         means that the total walltime requested will be the maximum requested

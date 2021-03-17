@@ -9,7 +9,7 @@
 {% if partition %}
 #BSUB -q {{ partition }}
 {% endif %}
-{% set walltime = walltime | default(operations | calc_walltime(parallel), True) %}
+{% set walltime = operations | calc_walltime(parallel) %}
 {% if walltime %}
 #BSUB -W {{ walltime|format_timedelta(style='HH:MM') }}
 {% endif %}

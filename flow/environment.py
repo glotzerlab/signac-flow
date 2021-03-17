@@ -225,12 +225,7 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
             The argument parser where arguments will be added.
 
         """
-        parser.add_argument(
-            "-w",
-            "--walltime",
-            type=float,
-            help="The wallclock time in hours. Deprecated in 0.13 and will be removed in 0.14.",
-        )
+        pass
 
     @classmethod
     def get_config_value(cls, key, default=flow_config._GET_CONFIG_VALUE_NONE):

@@ -334,7 +334,7 @@ def _is_fraction(value):
 
 
 def _parse_walltime(walltime):
-    """Parse walltime from the walltime flag passed by a user.
+    """Parse walltime from a walltime directive passed by a user.
 
     A valid walltime argument is defined as:
 
@@ -360,7 +360,7 @@ def _parse_walltime(walltime):
 
 
 def _parse_memory(memory):
-    """Parse memory from the memory flag passed by a user.
+    """Parse memory value from a memory directive passed by a user.
 
     A valid memory argument is defined as:
 

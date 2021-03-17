@@ -7,7 +7,6 @@ The FlowProject is a signac Project that allows the user to define a workflow.
 """
 import argparse
 import contextlib
-import datetime
 import functools
 import inspect
 import json
@@ -21,7 +20,6 @@ import sys
 import threading
 import time
 import traceback
-import warnings
 from collections import Counter, defaultdict
 from copy import deepcopy
 from enum import IntFlag
@@ -3556,7 +3554,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         num=None,
         parallel=False,
         force=False,
-        walltime=None,
         ignore_conditions=IgnoreConditions.NONE,
         ignore_conditions_on_execution=IgnoreConditions.NONE,
         **kwargs,
@@ -3580,11 +3577,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Execute all bundled operations in parallel. (Default value = False)
         force : bool
             Ignore all warnings or checks during submission, just submit. (Default value = False)
-        walltime : :class:`datetime.timedelta`
-            Specify the walltime in hours or as an instance of
-            :class:`datetime.timedelta`. If specified, this value will
-            override the walltime calculated from operation directives.
-            (Default value = None)
         ignore_conditions : :class:`~.IgnoreConditions`
             Specify if preconditions and/or postconditions are to be ignored
             when determining eligibility. The default is
@@ -3618,22 +3610,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 f"a single string was provided: {names}."
             )
 
-        if walltime is not None:
-            warnings.warn(
-                "The walltime argument is deprecated as of 0.13 and "
-                "will be removed in 0.14. Use the walltime directive instead.",
-                UserWarning,
-            )
-            if not isinstance(walltime, datetime.timedelta):
-                try:
-                    walltime = datetime.timedelta(hours=walltime)
-                except TypeError as error:
-                    if (
-                        str(error) != "unsupported type for timedelta "
-                        "hours component: datetime.timedelta"
-                    ):
-                        raise
-
         if not isinstance(ignore_conditions, IgnoreConditions):
             raise ValueError(
                 "The ignore_conditions argument of FlowProject.run() "
@@ -3664,7 +3640,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         operations=bundle,
                         parallel=parallel,
                         force=force,
-                        walltime=walltime,
                         **kwargs,
                     )
                     if status is not None:

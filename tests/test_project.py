@@ -1429,14 +1429,6 @@ class TestDirectivesProjectMainInterface(TestProjectBase):
         ).decode("utf-8")
         assert "#SBATCH -t 01:00:00" in output
 
-    def test_main_submit_walltime_with_cli(self):
-        assert len(self.project)
-        output = self.call_subcmd(
-            "submit -o op_walltime --pretend --template slurm.sh --walltime 15",
-            subprocess.STDOUT,
-        ).decode("utf-8")
-        assert "#SBATCH -t 15:00:00" in output
-
     def test_main_submit_walltime_no_directive(self):
         assert len(self.project)
         output = self.call_subcmd(

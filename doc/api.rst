@@ -29,13 +29,11 @@ The FlowProject
     FlowProject.ALIASES
     FlowProject.add_operation
     FlowProject.completed_operations
-    FlowProject.export_job_statuses
     FlowProject.get_job_status
     FlowProject.label
     FlowProject.labels
     FlowProject.main
     FlowProject.make_group
-    FlowProject.next_operations
     FlowProject.operation
     FlowProject.operations
     FlowProject.post
@@ -54,11 +52,8 @@ The FlowProject
     FlowProject.pre.not_
     FlowProject.pre.true
     FlowProject.run
-    FlowProject.run_operations
     FlowProject.scheduler_jobs
-    FlowProject.script
     FlowProject.submit
-    FlowProject.submit_operations
 
 
 .. autoclass:: FlowProject

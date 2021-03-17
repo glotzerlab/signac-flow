@@ -113,12 +113,12 @@ def calc_tasks(operations, name, parallel=False, allow_mixed=False):
 
 
 def calc_memory(operations, parallel=False):
-    """Calculate the maximum memory to reserve for submission of operations.
+    r"""Calculate the maximum memory to reserve for submission of operations.
 
     Parameters
     ----------
     operations : list
-        A list of :class:`~._JobOperation` used to calculate the maximum
+        A list of :class:`~._JobOperation`\ s used to calculate the maximum
         memory required.
     parallel : bool
         If True, operations are assumed to be executed in parallel, which
@@ -136,12 +136,12 @@ def calc_memory(operations, parallel=False):
 
 
 def calc_walltime(operations, parallel=False):
-    """Calculate the total walltime to reserve for submission of operations.
+    r"""Calculate the total walltime to reserve for submission of operations.
 
     Parameters
     ----------
     operations : list
-        A list of :class:`~._JobOperation` used to calculate the total
+        A list of :class:`~._JobOperation`\ s used to calculate the total
         walltime required.
     parallel : bool
         If True, operations are assumed to be executed in parallel, which

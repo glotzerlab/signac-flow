@@ -16,7 +16,6 @@ import re
 import socket
 from functools import lru_cache
 
-from deprecation import deprecated
 from signac.common import config
 
 from .directives import (
@@ -38,7 +37,6 @@ from .scheduling.simple_scheduler import SimpleScheduler
 from .scheduling.slurm import SlurmScheduler
 from .scheduling.torque import TorqueScheduler
 from .util import config as flow_config
-from .version import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -225,12 +223,7 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
             The argument parser where arguments will be added.
 
         """
-        parser.add_argument(
-            "-w",
-            "--walltime",
-            type=float,
-            help="The wallclock time in hours. Deprecated in 0.13 and will be removed in 0.14.",
-        )
+        pass
 
     @classmethod
     def get_config_value(cls, key, default=flow_config._GET_CONFIG_VALUE_NONE):
@@ -503,20 +496,6 @@ class DefaultLSFEnvironment(NodesEnvironment, LSFEnvironment):
             help="Schedule this job to be executed after "
             "completion of a cluster job with this id.",
         )
-
-
-@deprecated(deprecated_in="0.12", removed_in="0.14", current_version=__version__)
-class CPUEnvironment(ComputeEnvironment):
-    """An environment with CPUs."""
-
-    pass
-
-
-@deprecated(deprecated_in="0.12", removed_in="0.14", current_version=__version__)
-class GPUEnvironment(ComputeEnvironment):
-    """An environment with GPUs."""
-
-    pass
 
 
 def _import_configured_environments():

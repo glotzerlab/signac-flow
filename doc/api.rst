@@ -148,11 +148,6 @@ Labels
     :members:
     :special-members: __call__
 
-flow.run()
-----------
-
-.. autofunction:: run
-
 flow.init()
 -----------
 

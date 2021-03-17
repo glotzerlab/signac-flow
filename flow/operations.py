@@ -103,8 +103,7 @@ def with_job(func):
         if len(jobs) != 1:
             raise NotImplementedError(
                 "signac-flow currently does not support the use of @with_job decorator "
-                "with aggregation. If using aggregates of single job with filters, please use "
-                "`FlowProject.pre` instead."
+                "with aggregation."
             )
         with jobs[0] as job:
             if getattr(func, "_flow_cmd", False):

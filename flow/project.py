@@ -31,7 +31,6 @@ from multiprocessing.pool import ThreadPool
 import cloudpickle
 import jinja2
 import signac
-from deprecation import deprecated
 from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
 from signac.contrib.filterparse import parse_filter_arg
 from tqdm.auto import tqdm
@@ -63,7 +62,6 @@ from .util.misc import (
     switch_to_directory,
 )
 from .util.translate import abbreviate, shorten
-from .version import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -3802,16 +3800,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             action="store_true",
             help="Execute all operations in a single bundle in parallel.",
         )
-
-    @deprecated(deprecated_in="0.12", removed_in="0.14", current_version=__version__)
-    def export_job_statuses(self, collection, statuses):
-        """Export the job statuses to a :class:`signac.Collection`."""
-        for status in statuses:
-            job = self.open_job(id=status["job_id"])
-            status["statepoint"] = job.statepoint()
-            collection.update_one(
-                {"_id": status["job_id"]}, {"$set": status}, upsert=True
-            )
 
     @classmethod
     def _add_print_status_args(cls, parser):

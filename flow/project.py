@@ -3383,40 +3383,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             yield
         logger.debug("Exiting buffered mode.")
 
-    def _script(
-        self, operations, parallel=False, template="script.sh", show_template_help=False
-    ):
-        """Generate a run script to execute given operations.
-
-        Parameters
-        ----------
-        operations : Sequence of instances of :class:`._JobOperation`
-            The operations to execute.
-        parallel : bool
-            Execute all operations in parallel (default is False).
-        template : str
-            The name of the template to use to generate the script. (Default value = "script.sh")
-        show_template_help : bool
-            Show help related to the templating system and then exit. (Default value = False)
-
-        Returns
-        -------
-        str
-            Rendered template of run script.
-
-        """
-        template_environment = self._template_environment()
-        template = template_environment.get_template(template)
-        context = self._get_standard_template_context()
-        # For script generation we do not need the extra logic used for
-        # generating cluster job scripts.
-        context["base_script"] = "base_script.sh"
-        context["operations"] = list(operations)
-        context["parallel"] = parallel
-        if show_template_help:
-            self._show_template_help_and_exit(template_environment, context)
-        return template.render(**context)
-
     def _generate_submit_script(
         self, _id, operations, template, show_template_help, **kwargs
     ):
@@ -4439,42 +4405,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         else:
             run()
 
-    def _main_script(self, args):
-        """Generate a script for the execution of operations."""
-        print(
-            "WARNING: "
-            "The script argument is deprecated as of 0.12 "
-            "and will be removed in 0.14. "
-            'Use "submit --pretend" instead.',
-            file=sys.stderr,
-        )
-
-        # Select jobs:
-        aggregates = self._select_jobs_from_args(args)
-
-        # Gather all eligible operations or generate them based on a direct command...
-        with self._buffered():
-            names = args.operation_name if args.operation_name else None
-            default_directives = self._get_default_directives()
-            operations = self._get_submission_operations(
-                aggregates=aggregates,
-                default_directives=default_directives,
-                names=names,
-                ignore_conditions=args.ignore_conditions,
-                ignore_conditions_on_execution=args.ignore_conditions_on_execution,
-            )
-            operations = list(islice(operations, args.num))
-
-        # Generate the script and print to screen.
-        print(
-            self._script(
-                operations=operations,
-                parallel=args.parallel,
-                template=args.template,
-                show_template_help=args.show_template_help,
-            )
-        )
-
     def _main_submit(self, args):
         """Submit jobs to a scheduler."""
         kwargs = vars(args)
@@ -4700,30 +4630,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         )
         parser_run.set_defaults(func=self._main_run)
 
-        parser_script = subparsers.add_parser(
-            "script",
-            parents=[base_parser],
-        )
-        parser_script.add_argument(
-            "--ignore-conditions",
-            type=str,
-            choices=["none", "pre", "post", "all"],
-            default=IgnoreConditions.NONE,
-            action=_IgnoreConditionsConversion,
-            help="Specify conditions to ignore for eligibility check.",
-        )
-        parser_script.add_argument(
-            "--ignore-conditions-on-execution",
-            type=str,
-            choices=["none", "pre", "post", "all"],
-            default=IgnoreConditions.NONE,
-            action=_IgnoreConditionsConversion,
-            help="Specify conditions to ignore after submitting. May be useful "
-            "for conditions that cannot be checked once scheduled.",
-        )
-        self._add_script_args(parser_script)
-        parser_script.set_defaults(func=self._main_script)
-
         parser_submit = subparsers.add_parser(
             "submit",
             parents=[base_parser],
@@ -4814,13 +4720,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         try:
             args.func(args)
-        except NoSchedulerError as error:
-            print(
-                f"ERROR: {error}",
-                "Consider to use the 'script' command to generate an execution script instead.",
-                file=sys.stderr,
-            )
-            _show_traceback_and_exit(error)
         except SubmitError as error:
             print("Submission error:", error, file=sys.stderr)
             _show_traceback_and_exit(error)

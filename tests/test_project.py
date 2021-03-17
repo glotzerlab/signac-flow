@@ -855,40 +855,6 @@ class TestProject(TestProjectBase):
                 with redirect_stderr(StringIO()):
                     project.print_status(parameters=parameters, detailed=True)
 
-    def test_script(self):
-        project = self.mock_project()
-        for job in project:
-            script = project._script(project._next_operations([(job,)]))
-            if job.sp.b % 2 == 0:
-                assert str(job) in script
-                assert 'echo "hello"' in script
-                assert "exec op2" in script
-            else:
-                assert str(job) in script
-                assert 'echo "hello"' not in script
-                assert "exec op2" in script
-
-    def test_script_with_custom_script(self):
-        project = self.mock_project()
-        template_dir = project._template_dir
-        os.mkdir(template_dir)
-        with open(os.path.join(template_dir, "script.sh"), "w") as file:
-            file.write("{% extends base_script %}\n")
-            file.write("{% block header %}\n")
-            file.write("THIS IS A CUSTOM SCRIPT!\n")
-            file.write("{% endblock %}\n")
-        for job in project:
-            script = project._script(project._next_operations([(job,)]))
-            assert "THIS IS A CUSTOM SCRIPT" in script
-            if job.sp.b % 2 == 0:
-                assert str(job) in script
-                assert 'echo "hello"' in script
-                assert "exec op2" in script
-            else:
-                assert str(job) in script
-                assert 'echo "hello"' not in script
-                assert "exec op2" in script
-
     def test_init(self):
         with redirect_stderr(StringIO()):
             for fn in init(root=self._tmp_dir.name):
@@ -1391,17 +1357,6 @@ class TestProjectMainInterface(TestProjectBase):
                     for op in project._next_operations([(job,)]):
                         assert any(op.name in op_line for op_line in op_lines)
 
-    def test_main_script(self):
-        assert len(self.project)
-        even_jobs = [job for job in self.project if job.sp.b % 2 == 0]
-        for job in self.project:
-            script_output = self.call_subcmd(f"script -j {job}").decode("utf-8")
-            assert job.get_id() in script_output
-            if job in even_jobs:
-                assert "run -o op1" in script_output
-            else:
-                assert "run -o op1" not in script_output
-
 
 class TestDynamicProjectMainInterface(TestProjectMainInterface):
     project_class = _DynamicTestProject
@@ -1497,37 +1452,6 @@ class TestGroupProject(TestProjectBase):
 
     def test_instance(self):
         assert isinstance(self.project, FlowProject)
-
-    def test_script(self):
-        project = self.mock_project()
-        # For run mode single operation groups
-        for job in project:
-            job_ops = project._get_submission_operations(
-                aggregates=[(job,)],
-                default_directives={},
-            )
-            script = project._script(job_ops)
-            if job.sp.b % 2 == 0:
-                assert str(job) in script
-                assert f"run -o op1 -j {job}" in script
-                assert f"run -o op2 -j {job}" in script
-            else:
-                assert str(job) in script
-                assert f"run -o op1 -j {job}" not in script
-                assert f"run -o op2 -j {job}" in script
-
-        # For multiple operation groups and options
-        for job in project:
-            job_op1 = project.groups["group1"]._create_submission_job_operation(
-                project._entrypoint, project._get_default_directives(), (job,)
-            )
-            script1 = project._script([job_op1])
-            assert f"run -o group1 -j {job}" in script1
-            job_op2 = project.groups["group2"]._create_submission_job_operation(
-                project._entrypoint, project._get_default_directives(), (job,)
-            )
-            script2 = project._script([job_op2])
-            assert "--num-passes=2" in script2
 
     def test_directives_hierarchy(self):
         project = self.mock_project()
@@ -1831,19 +1755,6 @@ class TestGroupProjectMainInterface(TestProjectBase):
                 assert job.isfile("world.txt")
             else:
                 assert not job.isfile("world.txt")
-
-    def test_main_script(self):
-        assert len(self.project)
-        for job in self.project:
-            script_output = self.call_subcmd(f"script -j {job} -o group1").decode(
-                "utf-8"
-            )
-            assert job.get_id() in script_output
-            assert "-o group1" in script_output
-            script_output = self.call_subcmd(f"script -j {job} -o group2").decode(
-                "utf-8"
-            )
-            assert "--num-passes=2" in script_output
 
     def test_main_submit(self):
         project = self.mock_project()

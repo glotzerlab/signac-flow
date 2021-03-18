@@ -6,6 +6,7 @@
 Directives affect both execution and submission, such as specifying the number
 of processors required for an operation.
 """
+import datetime
 import functools
 import operator
 import sys
@@ -254,12 +255,12 @@ def _evaluate(value, jobs):
     return value
 
 
-class _OnlyType:
-    def __init__(self, type_, preprocess=None, postprocess=None):
+class _OnlyTypes:
+    def __init__(self, *types, preprocess=None, postprocess=None):
         def identity(value):
             return value
 
-        self.type = type_
+        self.types = types
         self.preprocess = identity if preprocess is None else preprocess
         self.postprocess = identity if postprocess is None else postprocess
 
@@ -267,19 +268,23 @@ class _OnlyType:
         return self.postprocess(self._validate(self.preprocess(value)))
 
     def _validate(self, value):
-        if isinstance(value, self.type):
+        if isinstance(value, self.types):
             return value
-        try:
-            return self.type(value)
-        except Exception:
-            raise TypeError(
-                f"Expected an object of type {self.type}. "
-                f"Received {value} of type {type(value)}."
-            )
+        for type_ in self.types:
+            try:
+                return type_(value)
+            except Exception:
+                pass
+        raise TypeError(
+            f"Expected an object convertible to one of the following types: {self.types}. "
+            f"Received object {value} of type {type(value)}."
+        )
 
 
-def _raise_below(threshold):
+def _raise_below(threshold, allow_none=False):
     def is_greater_or_equal(value):
+        if allow_none and value is None:
+            return value
         try:
             if value < threshold:
                 raise ValueError
@@ -328,10 +333,122 @@ def _is_fraction(value):
     raise ValueError("Value must be between 0 and 1.")
 
 
-_natural_number = _OnlyType(int, postprocess=_raise_below(1))
-_nonnegative_int = _OnlyType(int, postprocess=_raise_below(0))
-_nonnegative_real = _OnlyType(float, postprocess=_raise_below(0))
-_positive_real = _OnlyType(float, postprocess=_raise_below(1e-12))
+def _parse_walltime(walltime):
+    """Parse walltime from a walltime directive passed by a user.
+
+    A valid walltime argument is defined as:
+
+    1. Numeric value indicating walltime requested in hours.
+    2. :class:`datetime.timedelta` value.
+    3. None to indicate no specific walltime request.
+
+    Parameters
+    ----------
+    walltime : float or :class:`datetime.timedelta` or None
+        Requested walltime.
+
+    Returns
+    -------
+    :class:`datetime.timedelta` or None
+        The parsed walltime value.
+    """
+    if walltime is None:
+        return None
+    if not isinstance(walltime, datetime.timedelta):
+        walltime = datetime.timedelta(hours=walltime)
+    return walltime
+
+
+def _parse_memory(memory):
+    """Parse memory value from a memory directive passed by a user.
+
+    A valid memory argument is defined as:
+
+    1. Numeric value with suffix "g" or "G" indicating memory requested in gigabytes.
+    2. Numeric value with suffix "m" or "M" indicating memory requested in megabytes.
+    3. Numeric value with no suffix indicating memory requested in gigabytes.
+    4. None to indicate no specific memory request.
+
+    Parameters
+    ----------
+    memory : str or float or None
+        Requested memory.
+
+    Returns
+    -------
+    float or None
+        The parsed memory value in gigabytes.
+    """
+    try:
+        if memory is None:
+            return None
+        memory = str(memory)
+        size_type = memory[-1]
+        if size_type.lower() == "m":
+            return float(memory[:-1]) / 1024
+        elif size_type.lower() == "g":
+            return float(memory[:-1])
+        else:
+            return float(memory)
+    except ValueError:
+        raise ValueError(
+            'Invalid memory passed. For gigabytes use suffix "g"/"G", '
+            'for megabytes use suffix "m"/"M". If a numeric value is passed then '
+            "it will be interpreted as memory in gigabytes."
+        )
+
+
+def _max_not_none(value, other):
+    """Return the max of two values, with special handling of None.
+
+    This is used for memory directives in serial and walltime directives in
+    parallel.
+    """
+    if value is None and other is None:
+        return None
+    elif other is None:
+        return value
+    elif value is None:
+        return other
+    else:
+        return max(value, other)
+
+
+def _sum_not_none(value, other):
+    """Return the sum of two values, with special handling of None.
+
+    This is used for memory directives in parallel and walltime directives in
+    serial.
+    """
+    if value is None and other is None:
+        return None
+    elif other is None:
+        return value
+    elif value is None:
+        return other
+    else:
+        return operator.add(value, other)
+
+
+_natural_number = _OnlyTypes(int, postprocess=_raise_below(1))
+_nonnegative_int = _OnlyTypes(int, postprocess=_raise_below(0))
+_positive_real_walltime = _OnlyTypes(
+    float,
+    datetime.timedelta,
+    type(None),
+    preprocess=_parse_walltime,
+    postprocess=_raise_below(datetime.timedelta(seconds=1), True),
+    # 1 second is an arbitrarily chosen minimum threshold
+)
+_positive_real_memory = _OnlyTypes(
+    float,
+    str,
+    type(None),
+    preprocess=_parse_memory,
+    postprocess=_raise_below(1e-12, True),
+    # 1e-12 is an arbitrarily chosen minimum threshold for what constitutes 0
+)
+
 
 # Common directives and their instantiation as _Directive
 _NP = _Directive(
@@ -365,27 +482,82 @@ Expects a nonnegative integer.
 
 _WALLTIME = _Directive(
     "walltime",
-    validator=_nonnegative_real,
-    default=12.0,
-    serial=operator.add,
-    parallel=max,
+    validator=_positive_real_walltime,
+    default=None,
+    serial=_sum_not_none,
+    parallel=_max_not_none,
 )
 """The number of hours to request for executing this job.
 
 This directive expects a float representing the walltime in hours. Fractional
 values are supported. For example, a value of 0.5 will request 30 minutes of
-walltime. Defaults to 12 hours.
+walltime. If no walltimes are requested, the submission will not specify a
+walltime in the output script. Some schedulers have a default value that will
+be used.
+
+For example:
+
+.. code-block:: python
+
+    @Project.operation
+    @directives(walltime=24)
+    def op(job):
+        # This operation takes 1 day to run
+        pass
+
 """
 
-_MEMORY = _Directive("memory", validator=_positive_real, default=4)
-"""The number of gigabytes of memory to request for this operation.
+_MEMORY = _Directive(
+    "memory",
+    validator=_positive_real_memory,
+    default=None,
+    serial=_max_not_none,
+    parallel=_sum_not_none,
+)
+"""The memory to request for this operation.
 
-Expects a real number greater than zero.
+The memory to validate should be either a float, int, or string.
+A valid memory argument is defined as:
+
+- Positive numeric value with suffix "g" or "G" indicating memory requested in gigabytes.
+For example:
+
+.. code-block:: python
+
+    @Project.operation
+    @directives(memory="4g")
+    def op(job):
+        pass
+
+- Positive numeric value with suffix "m" or "M" indicating memory requested in megabytes.
+For example:
+
+.. code-block:: python
+
+    @Project.operation
+    @directives(memory="512m")
+    def op(job):
+        pass
+
+- Positive numeric value with no suffix indicating memory requested in gigabytes.
+For example:
+
+.. code-block:: python
+
+    @Project.operation
+    @directives(memory="4")
+    def op1(job):
+        pass
+
+    @Project.operation
+    @directives(memory=4)
+    def op2(job):
+        pass
 """
 
 _PROCESSOR_FRACTION = _Directive(
     "processor_fraction",
-    validator=_OnlyType(float, postprocess=_is_fraction),
+    validator=_OnlyTypes(float, postprocess=_is_fraction),
     default=1.0,
     serial=_no_aggregation,
     parallel=_no_aggregation,
@@ -415,7 +587,7 @@ def _GET_EXECUTABLE():
     # This is because we mock `sys.executable` while generating template reference data.
     return _Directive(
         "executable",
-        validator=_OnlyType(str),
+        validator=_OnlyTypes(str),
         default=sys.executable,
         serial=_no_aggregation,
         parallel=_no_aggregation,

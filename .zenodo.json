@@ -102,6 +102,10 @@
         {
             "affiliation": "Jodhpur Institute of Engineering and Technology",
             "name": "Shantanu Dave"
+        },
+        {
+            "affiliation": "",
+            "name": "Ange-Desire Gnabro"
         }
     ],
     "creators": [
@@ -156,5 +160,5 @@
     },
     "title": "signac-flow",
     "upload_type": "software",
-    "version": "0.12.0"
+    "version": "0.13.0"
 }

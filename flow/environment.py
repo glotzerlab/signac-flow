@@ -16,11 +16,11 @@ import re
 import socket
 from functools import lru_cache
 
-from deprecation import deprecated
 from signac.common import config
 
 from .directives import (
     _GET_EXECUTABLE,
+    _MEMORY,
     _NGPU,
     _NP,
     _NRANKS,
@@ -37,7 +37,6 @@ from .scheduling.simple_scheduler import SimpleScheduler
 from .scheduling.slurm import SlurmScheduler
 from .scheduling.torque import TorqueScheduler
 from .util import config as flow_config
-from .version import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -224,7 +223,7 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
             The argument parser where arguments will be added.
 
         """
-        return
+        pass
 
     @classmethod
     def get_config_value(cls, key, default=flow_config._GET_CONFIG_VALUE_NONE):
@@ -354,6 +353,7 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
                 _GET_EXECUTABLE(),
                 _WALLTIME,
                 _PROCESSOR_FRACTION,
+                _MEMORY,
             ]
         )
 
@@ -433,9 +433,6 @@ class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
         """
         super().add_args(parser)
         parser.add_argument(
-            "-w", "--walltime", type=float, help="The wallclock time in hours."
-        )
-        parser.add_argument(
             "--hold", action="store_true", help="Submit jobs, but put them on hold."
         )
         parser.add_argument(
@@ -466,20 +463,6 @@ class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
         """
         super().add_args(parser)
         parser.add_argument(
-            "--memory",
-            help=(
-                'Specify how much memory to reserve per node, e.g. "4g" for 4 gigabytes '
-                'or "512m" for 512 megabytes. Only relevant for shared queue jobs.'
-            ),
-        )
-        parser.add_argument(
-            "-w",
-            "--walltime",
-            type=float,
-            default=12,
-            help="The wallclock time in hours.",
-        )
-        parser.add_argument(
             "--hold", action="store_true", help="Submit jobs, but put them on hold."
         )
         parser.add_argument(
@@ -505,13 +488,6 @@ class DefaultLSFEnvironment(NodesEnvironment, LSFEnvironment):
         """
         super().add_args(parser)
         parser.add_argument(
-            "-w",
-            "--walltime",
-            type=float,
-            default=12,
-            help="The wallclock time in hours.",
-        )
-        parser.add_argument(
             "--hold", action="store_true", help="Submit jobs, but put them on hold."
         )
         parser.add_argument(
@@ -520,20 +496,6 @@ class DefaultLSFEnvironment(NodesEnvironment, LSFEnvironment):
             help="Schedule this job to be executed after "
             "completion of a cluster job with this id.",
         )
-
-
-@deprecated(deprecated_in="0.12", removed_in="0.14", current_version=__version__)
-class CPUEnvironment(ComputeEnvironment):
-    """An environment with CPUs."""
-
-    pass
-
-
-@deprecated(deprecated_in="0.12", removed_in="0.14", current_version=__version__)
-class GPUEnvironment(ComputeEnvironment):
-    """An environment with GPUs."""
-
-    pass
 
 
 def _import_configured_environments():

@@ -5,32 +5,49 @@ Changelog
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 The numbers in brackets denote the related GitHub issue and/or pull request.
 
+Version 0.14
+============
+
+[0.14.0] -- 2021-xx-xx
+----------------------
+
+Removed
++++++++
+
+- Removed deprecated ``--walltime`` argument (#478).
+- Removed deprecated ``flow.run`` interface (#478).
+- Removed deprecated ``FlowProject.export_job_statuses`` (#478).
+- Removed deprecated ``script`` feature, use ``submit --pretend`` instead (#478).
+- Removed deprecated ``CPUEnvironment``, ``GPUEnvironment`` classes (#478).
+
 Version 0.13
 ============
 
-[0.13.0] -- 2021-xx-xx
+[0.13.0] -- 2021-03-16
 ----------------------
 
 Added
 +++++
 
 - Add official support for Bridges-2 cluster (#441).
+- Add support for memory requests via ``directives`` (#258, #466).
+- Add support for walltime requests via ``directives``, deprecated ``--walltime`` argument to ``submit`` (#240, #476).
 
 Fixed
 +++++
 
 - Support for multi-line ``@flow.cmd`` operations (#451, #453).
-- FlowProject status shows labels and correct number of jobs for projects with zero operations (#454, #460).
+- ``FlowProject`` status shows labels and correct number of jobs for projects with zero operations (#454, #460).
 
 Removed
 +++++++
 
-- Removed public API of deprecated class JobOperation (#445).
+- Removed public API of deprecated class ``JobOperation`` (#445).
 - Removed public API of deprecated methods ``eligible`` and ``complete`` of ``BaseFlowOperation`` and ``FlowGroup`` (#445).
 - Removed configuration option ``use_buffered_mode`` (#445).
 - Removed public API of ``script``, ``next_operations`` and ``submit_operations`` of ``FlowProject`` (#445).
 - Removed support for decommissioned Bridges cluster (#441).
-
+- Removed support for ``memory`` command line argument in ``submit`` (#466).
 
 Version 0.12
 ============

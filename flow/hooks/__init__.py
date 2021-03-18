@@ -45,7 +45,7 @@ class _HooksList(list):
 class Hooks:
     "Define execution hooks that are executed on certain conditions."
 
-    _keys = [
+    _hook_triggers = [
         "on_start",
         "on_finish",
         "on_success",
@@ -53,11 +53,11 @@ class Hooks:
     ]
 
     def __init__(self, **kwargs):
-        for key in self._keys:
-            setattr(self, key, _HooksList(kwargs.get(key, [])))
+        for hook_trigger in self._hook_triggers:
+            setattr(self, hook_trigger, _HooksList(kwargs.get(hook_trigger, [])))
 
     def __setattr__(self, name, value):
-        if name in self._keys:
+        if name in self._hook_triggers:
             super().__setattr__(name, _HooksList(value))
         else:
             super().__setattr__(name, value)
@@ -66,20 +66,20 @@ class Hooks:
     def from_dict(cls, mapping):
         "Instantiate the hook class from a dictionary."
         hook = cls()
-        for key in mapping:
-            getattr(hook, key)[:] = list(mapping[key])
+        for trigger_type in mapping:
+            getattr(hook, trigger_type)[:] = list(mapping[trigger_type])
         return hook
 
     def update(self, other):
         "Update this instance with hooks from another instance."
-        for key in self._keys:
-            getattr(self, key).extend(getattr(other, key))
+        for hook_trigger in self._hook_triggers:
+            getattr(self, hook_trigger).extend(getattr(other, hook_trigger))
 
     def __str__(self):
         return "{}({})".format(
             type(self).__name__,
-            ", ".join(["{}={}".format(key, getattr(self, key)) for key in self._keys]),
+            ", ".join(["{}={}".format(hook_trigger, getattr(self, hook_trigger)) for hook_trigger in self._hook_triggers]),
         )
 
     def __bool__(self):
-        return any(getattr(self, key, None) for key in self._keys)
+        return any(getattr(self, hook_trigger, None) for hook_trigger in self._hook_triggers)

@@ -78,8 +78,15 @@ class Hooks:
     def __str__(self):
         return "{}({})".format(
             type(self).__name__,
-            ", ".join(["{}={}".format(hook_trigger, getattr(self, hook_trigger)) for hook_trigger in self._hook_triggers]),
+            ", ".join(
+                [
+                    "{}={}".format(hook_trigger, getattr(self, hook_trigger))
+                    for hook_trigger in self._hook_triggers
+                ]
+            ),
         )
 
     def __bool__(self):
-        return any(getattr(self, hook_trigger, None) for hook_trigger in self._hook_triggers)
+        return any(
+            getattr(self, hook_trigger, None) for hook_trigger in self._hook_triggers
+        )

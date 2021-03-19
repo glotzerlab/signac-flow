@@ -8,8 +8,8 @@
 {% block detailed %}
 {{ super () }}
 {{ 'Operations: \n' }}
-| scheduler job id | operation | eligible | cluster_status |
-| ---------------- | --------- | -------- | -------------- |
+| job id | operation | eligible | cluster_status |
+| ------ | --------- | -------- | -------------- |
 {% for job in jobs %}
 {% for key, value in job['groups'].items() if value | job_filter(scheduler_status_code, all_ops) %}
 {% if loop.first %}

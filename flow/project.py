@@ -171,7 +171,7 @@ class _condition:
 
     @classmethod
     def true(cls, key):
-        """Evaluate if a document key evaluates to True for the job(s).
+        """Evaluate if a document key is True for the job(s).
 
         Returns True if the specified key is present in the job document(s) and
         evaluates to True.
@@ -184,7 +184,7 @@ class _condition:
 
     @classmethod
     def false(cls, key):
-        """Evaluate if a document key evaluates to False for the job(s).
+        """Evaluate if a document key is False for the job(s).
 
         Returns True if the specified key is present in the job document(s) and
         evaluates to False.
@@ -278,7 +278,7 @@ class _AggregatesCursor:
         self._filter = filter
         self._doc_filter = doc_filter
         # If no filter or doc_filter is provided by the user, then select every
-        # aggregate present in the flow project. If filter or doc_filter is provided,
+        # aggregate present in the FlowProject. If filter or doc_filter are provided,
         # then use the jobs returned via JobsCursor instance.
         if filter is None and doc_filter is None:
             self._cursor = project._group_to_aggregate_store.inverse.keys()
@@ -295,9 +295,9 @@ class _AggregatesCursor:
 
     def __contains__(self, aggregate):
         if self._filter is None and self._doc_filter is None:
+            aggregate_id = get_aggregate_id(aggregate)
             return any(
-                get_aggregate_id(aggregate) in aggregate_store
-                for aggregate_store in self._cursor
+                aggregate_id in aggregate_store for aggregate_store in self._cursor
             )
         else:
             return aggregate[0] in self._cursor
@@ -305,7 +305,7 @@ class _AggregatesCursor:
     def __len__(self):
         if self._filter is None and self._doc_filter is None:
             # Return number of unique aggregates present in the project
-            return sum([len(aggregate_store) for aggregate_store in self._cursor])
+            return sum(len(aggregate_store) for aggregate_store in self._cursor)
         else:
             return len(self._cursor)
 
@@ -695,7 +695,7 @@ class FlowGroupEntry:
         These will be included in all submissions. Submissions use run
         commands to execute.
     aggregator : :class:`~.aggregator`
-        aggregator object associated with the :class:`FlowGroup`.
+        aggregator object associated with the :class:`FlowGroup` (Default value = None).
     """
 
     def __init__(self, name, options="", aggregator=None):
@@ -1272,7 +1272,7 @@ class _FlowProjectClass(type):
 
                 @Project.operation
                 @aggregator()
-                @Project.post(lambda *jobs: all(not job.doc.get('hi_all') for job in jobs))
+                @Project.pre(lambda *jobs: all("hi_all" not in job.doc for job in jobs))
                 def hi_all(*jobs):
                     print('hi', jobs)
                     for job in jobs:
@@ -1359,7 +1359,7 @@ class _FlowProjectClass(type):
 
                 @Project.operation
                 @aggregator()
-                @Project.post(lambda *jobs: all(job.doc.get('bye_all') for job in jobs))
+                @Project.post(lambda *jobs: all("bye_all" in job.doc for job in jobs))
                 def bye_all(*jobs):
                     print('bye', jobs)
                     for job in jobs:
@@ -4176,8 +4176,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             A string to append to submissions. Can be any valid
             :meth:`FlowOperation.run` option. (Default value = "")
         aggregator_obj : :class:`~.aggregator`
-            aggregator object associated with the :class:`FlowGroup`. If None, the
-            default aggregator is used (Default value = None).
+            An instance of :class:`~flow.aggregator` to associate with the :class:`FlowGroup`.
+            If None, no aggregation takes place (Default value = None).
 
         Returns
         -------
@@ -4476,12 +4476,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if args.job_id:
             # aggregates must be a set to prevent duplicate entries
             aggregates = set()
-            for id in args.job_id:
-                if id[0:4] == "agg-":
-                    aggregates.add(self._get_aggregate_from_id(id))
+            for job_id in args.job_id:
+                if job_id.startswith("agg-"):
+                    aggregates.add(self._get_aggregate_from_id(job_id))
                 else:
                     try:
-                        aggregates.add((self.open_job(id=id),))
+                        aggregates.add((self.open_job(id=job_id),))
                     except KeyError as error:
                         raise LookupError(f"Did not find job with id {error}.")
             return list(aggregates)
@@ -4687,7 +4687,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             "job_id",
             type=str,
             nargs="*",
-            help="The job ids present or aggregate ids registered in the FlowProject. "
+            help="The job ids or aggregate ids in the FlowProject. "
             "Defaults to all jobs and aggregates.",
         )
         parser_exec.set_defaults(func=self._main_exec)

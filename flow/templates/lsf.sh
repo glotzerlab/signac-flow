@@ -2,9 +2,14 @@
 {% block header %}
 #!/bin/bash
 #BSUB -J {{ id }}
+{% set memory_requested = operations | calc_memory(parallel) %}
+{% if memory_requested %}
+#BSUB -M {{ memory_requested }}GB
+{% endif %}
 {% if partition %}
 #BSUB -q {{ partition }}
 {% endif %}
+{% set walltime = operations | calc_walltime(parallel) %}
 {% if walltime %}
 #BSUB -W {{ walltime|format_timedelta(style='HH:MM') }}
 {% endif %}

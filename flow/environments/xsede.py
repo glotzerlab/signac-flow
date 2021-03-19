@@ -178,15 +178,15 @@ class Stampede2Environment(DefaultSlurmEnvironment):
         return prefix
 
 
-class BridgesEnvironment(DefaultSlurmEnvironment):
-    """Environment profile for the Bridges super computer.
+class Bridges2Environment(DefaultSlurmEnvironment):
+    """Environment profile for the Bridges-2 supercomputer.
 
-    https://portal.xsede.org/psc-bridges
+    https://www.psc.edu/resources/bridges-2/user-guide
     """
 
-    hostname_pattern = r".*\.bridges\.psc\.edu$"
-    template = "bridges.sh"
-    cores_per_node = 28
+    hostname_pattern = r".*\.bridges2\.psc\.edu$"
+    template = "bridges2.sh"
+    cores_per_node = 128
     mpi_cmd = "mpirun"
 
     @classmethod
@@ -206,11 +206,9 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
                 "RM",
                 "RM-shared",
                 "RM-small",
-                "LM",
+                "EM",
                 "GPU",
                 "GPU-shared",
-                "GPU-small",
-                "GPU-AI",
             ],
             default="RM-shared",
             help="Specify the partition to submit to.",
@@ -220,5 +218,5 @@ class BridgesEnvironment(DefaultSlurmEnvironment):
 __all__ = [
     "CometEnvironment",
     "Stampede2Environment",
-    "BridgesEnvironment",
+    "Bridges2Environment",
 ]

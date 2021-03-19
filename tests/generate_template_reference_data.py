@@ -68,7 +68,6 @@ def init(project):
         "environments.xsede.CometEnvironment": [
             {
                 "partition": ["compute", "shared", "gpu"],
-                "walltime": [None, 1],
             },
             {
                 "partition": ["compute"],
@@ -79,7 +78,6 @@ def init(project):
         "environments.xsede.Stampede2Environment": [
             {
                 "partition": ["skx-normal"],
-                "walltime": [None, 1],
             },
             {
                 "partition": ["skx-normal"],
@@ -87,10 +85,9 @@ def init(project):
                 "bundle": [["mpi_op", "mpi_op"], ["omp_op", "omp_op"]],
             },
         ],
-        "environments.xsede.BridgesEnvironment": [
+        "environments.xsede.Bridges2Environment": [
             {
-                "partition": ["RM", "RM-Shared", "GPU", "GPU-AI"],
-                "walltime": [None, 1],
+                "partition": ["RM", "RM-shared", "GPU", "GPU-shared"],
             },
             {
                 "partition": ["RM"],
@@ -101,7 +98,6 @@ def init(project):
         "environments.umich.GreatLakesEnvironment": [
             {
                 "partition": ["standard", "gpu"],
-                "walltime": [None, 1],
             },
             {
                 "parallel": [False, True],
@@ -109,18 +105,14 @@ def init(project):
             },
         ],
         "environments.incite.SummitEnvironment": [
-            {
-                "walltime": [None, 1],
-            },
+            {},
             {
                 "parallel": [False, True],
                 "bundle": [["mpi_op", "omp_op"]],
             },
         ],
         "environments.umn.MangiEnvironment": [
-            {
-                "walltime": [None, 1],
-            },
+            {},
             {
                 "parallel": [False, True],
                 "bundle": [["mpi_op", "omp_op"]],

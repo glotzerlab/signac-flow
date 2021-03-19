@@ -11,7 +11,7 @@ configure and implement a workflow to operate on a signac_ data space.
 from . import environment, errors, scheduling, testing
 from .aggregates import aggregator, get_aggregate_id
 from .environment import get_environment
-from .operations import cmd, directives, run, with_job
+from .operations import cmd, directives, with_job
 from .project import FlowProject, IgnoreConditions, classlabel, label, staticlabel
 from .template import init
 
@@ -38,7 +38,6 @@ __all__ = [
     "staticlabel",
     "cmd",
     "directives",
-    "run",
     "get_environment",
     "init",
     "redirect_log",

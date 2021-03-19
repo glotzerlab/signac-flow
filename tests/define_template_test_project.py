@@ -6,6 +6,8 @@ class TestProject(flow.FlowProject):
     np = 3
     omp_num_threads = 4
     nranks = 5
+    walltime = 1
+    memory = "512m"
 
 
 group1 = TestProject.make_group(name="group1")
@@ -51,6 +53,20 @@ def gpu_op(job):
 @TestProject.operation
 @flow.directives(ngpu=TestProject.ngpu, nranks=TestProject.nranks)
 def mpi_gpu_op(job):
+    pass
+
+
+@TestProject.operation
+@flow.directives(memory=TestProject.memory)
+@group1
+def memory_op(job):
+    pass
+
+
+@TestProject.operation
+@flow.directives(walltime=TestProject.walltime)
+@group1
+def walltime_op(job):
     pass
 
 

@@ -10,19 +10,9 @@ space.
 
 See also: :class:`~.FlowProject`.
 """
-import argparse
 import inspect
 import logging
-import subprocess
-import sys
 from functools import wraps
-from multiprocessing import Pool
-
-from deprecation import deprecated
-from signac import get_project
-from tqdm.auto import tqdm
-
-from .version import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -184,126 +174,4 @@ def _get_operations(include_private=False):
                 yield name
 
 
-@deprecated(deprecated_in="0.12", removed_in="0.14", current_version=__version__)
-def run(parser=None):
-    """Access to the "run" interface of an operations module.
-
-    Executing this function within a module will start a command line interface,
-    that can be used to execute operations defined within the same module.
-    All **top-level unary functions** will be interpreted as executable operation functions.
-
-    For example, if we have a module as such:
-
-    .. code-block:: python
-
-        # operations.py
-
-        def hello(job):
-            print('hello', job)
-
-        if __name__ == '__main__':
-            import flow
-            flow.run()
-
-    Then we can execute the ``hello`` operation for all jobs from the command like like this:
-
-    .. code-block:: bash
-
-        $ python operations.py hello
-
-    .. note::
-
-        You can control the degree of parallelization with the ``--np`` argument.
-
-    For more information, see:
-
-    .. code-block:: bash
-
-        $ python operations.py --help
-    """
-    if parser is None:
-        parser = argparse.ArgumentParser()
-
-    parser.add_argument(
-        "operation",
-        type=str,
-        choices=list(_get_operations()),
-        help="The operation to execute.",
-    )
-    parser.add_argument(
-        "job_id",
-        type=str,
-        nargs="*",
-        help="The job ids, as registered in the signac project. "
-        "Omit to default to all statepoints.",
-    )
-    parser.add_argument(
-        "--np",
-        type=int,
-        default=1,
-        help="Specify the number of cores to parallelize to (default=1) or 0 "
-        "to parallelize on as many cores as there are available.",
-    )
-    parser.add_argument(
-        "-t",
-        "--timeout",
-        type=int,
-        help="A timeout in seconds after which the parallel execution "
-        "of operations is canceled.",
-    )
-    parser.add_argument(
-        "--progress",
-        action="store_true",
-        help="Display a progress bar during execution.",
-    )
-    args = parser.parse_args()
-
-    project = get_project()
-
-    def _open_job_by_id(_id):
-        try:
-            return project.open_job(id=_id)
-        except KeyError:
-            msg = f"Did not find job corresponding to id '{_id}'."
-            raise KeyError(msg)
-        except LookupError:
-            raise LookupError(f"Multiple matches for id '{_id}'.")
-
-    if len(args.job_id):
-        try:
-            jobs = [_open_job_by_id(job_id) for job_id in args.job_id]
-        except (KeyError, LookupError) as error:
-            print(error, file=sys.stderr)
-            sys.exit(1)
-    else:
-        jobs = project
-
-    module = inspect.getmodule(inspect.currentframe().f_back)
-    try:
-        operation_func = getattr(module, args.operation)
-    except AttributeError:
-        raise KeyError(f"Unknown operation '{args.operation}'.")
-
-    if getattr(operation_func, "_flow_cmd", False):
-
-        def operation(job):
-            cmd = operation_func(job).format(job=job)
-            subprocess.run(cmd, shell=True, timeout=args.timeout, check=True)
-
-    else:
-        operation = operation_func
-
-    # Serial execution
-    if args.np == 1 or len(jobs) < 2:
-        if args.timeout is not None:
-            logger.warning("A timeout has no effect in serial execution!")
-        for job in tqdm(jobs) if args.progress else jobs:
-            operation(job)
-    else:
-        with Pool(args.np) as pool:
-            result = pool.imap_unordered(operation, jobs)
-            for _ in tqdm(jobs) if args.progress else jobs:
-                result.next(args.timeout)
-
-
-__all__ = ["cmd", "directives", "run"]
+__all__ = ["cmd", "directives", "with_job"]

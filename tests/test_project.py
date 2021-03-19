@@ -1914,21 +1914,6 @@ class TestAggregationProjectMainInterface(TestAggregatesProjectBase):
         assert f"run -o agg_op2 -j {get_aggregate_id(project)}" in output_string
         assert f"exec agg_op2 {get_aggregate_id(project)}" in output_string
 
-    def test_main_script(self):
-        project = self.mock_project()
-        assert len(project)
-
-        script_output = (
-            self.call_subcmd(f"script -o agg_op2 -j {get_aggregate_id(project)}")
-            .decode()
-            .splitlines()
-        )
-
-        output_string = "\n".join(script_output)
-        assert f"agg_op2({get_aggregate_id(project)})" in output_string
-        assert f"run -o agg_op2 -j {get_aggregate_id(project)}" in output_string
-        assert f"exec agg_op2 {get_aggregate_id(project)}" in output_string
-
 
 class TestAggregationGroupProjectMainInterface(TestAggregatesProjectBase):
     def test_main_run(self):
@@ -1957,22 +1942,6 @@ class TestAggregationGroupProjectMainInterface(TestAggregatesProjectBase):
         )
 
         output_string = "\n".join(submit_output)
-        assert f"group_agg({get_aggregate_id(project)})" in output_string
-        assert f"run -o group_agg -j {get_aggregate_id(project)}" in output_string
-        assert f"exec agg_op2 {get_aggregate_id(project)}" in output_string
-        assert f"exec agg_op3 {get_aggregate_id(project)}" in output_string
-
-    def test_main_script(self):
-        project = self.mock_project()
-        assert len(project)
-
-        script_output = (
-            self.call_subcmd(f"script -o group_agg -j {get_aggregate_id(project)}")
-            .decode()
-            .splitlines()
-        )
-
-        output_string = "\n".join(script_output)
         assert f"group_agg({get_aggregate_id(project)})" in output_string
         assert f"run -o group_agg -j {get_aggregate_id(project)}" in output_string
         assert f"exec agg_op2 {get_aggregate_id(project)}" in output_string

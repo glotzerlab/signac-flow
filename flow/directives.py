@@ -454,7 +454,7 @@ _positive_real_memory = _OnlyTypes(
 _NP = _Directive(
     "np", validator=_natural_number, default=_NP_DEFAULT, finalize=_finalize_np
 )
-"""The number of tasks to launch for a given operation i.e., the number of CPU
+_NP.__doc__ = """The number of tasks to launch for a given operation i.e., the number of CPU
 cores to be requested for a given operation.
 
 Expects a natural number (i.e. an integer >= 1). This directive introspects into
@@ -463,19 +463,19 @@ greater than the current set value. Defaults to 1.
 """
 
 _NGPU = _Directive("ngpu", validator=_nonnegative_int, default=0)
-"""The number of GPUs to use for this operation.
+_NGPU.__doc__ = """The number of GPUs to use for this operation.
 
 Expects a nonnegative integer. Defaults to 0.
 """
 
 _NRANKS = _Directive("nranks", validator=_nonnegative_int, default=0)
-"""The number of MPI ranks to use for this operation. Defaults to 0.
+_NRANKS.__doc__ = """The number of MPI ranks to use for this operation. Defaults to 0.
 
 Expects a nonnegative integer.
 """
 
 _OMP_NUM_THREADS = _Directive("omp_num_threads", validator=_nonnegative_int, default=0)
-"""The number of OpenMP threads to use for this operation. Defaults to 0.
+_OMP_NUM_THREADS.__doc__ = """The number of OpenMP threads to use for this operation. Defaults to 0.
 
 Expects a nonnegative integer.
 """
@@ -487,7 +487,7 @@ _WALLTIME = _Directive(
     serial=_sum_not_none,
     parallel=_max_not_none,
 )
-"""The number of hours to request for executing this job.
+_WALLTIME.__doc__ = """The number of hours to request for executing this job.
 
 This directive expects a float representing the walltime in hours. Fractional
 values are supported. For example, a value of 0.5 will request 30 minutes of
@@ -514,7 +514,7 @@ _MEMORY = _Directive(
     serial=_max_not_none,
     parallel=_sum_not_none,
 )
-"""The memory to request for this operation.
+_MEMORY.__doc__ = """The memory to request for this operation.
 
 The memory to validate should be either a float, int, or string.
 A valid memory argument is defined as:
@@ -562,7 +562,7 @@ _PROCESSOR_FRACTION = _Directive(
     serial=_no_aggregation,
     parallel=_no_aggregation,
 )
-"""Fraction of a resource to use on a single operation.
+_PROCESSOR_FRACTION.__doc__ = """Fraction of a resource to use on a single operation.
 
 If set to 0.5 for a bundled job with 20 operations (all with 'np' set to 1), 10
 CPUs will be used. Defaults to 1.
@@ -583,7 +583,7 @@ def _GET_EXECUTABLE():
     however, if the :class:`FlowProject` path is an empty string, the executable
     can be a path to an executable Python script. Defaults to ``sys.executable``.
     """
-    # Evaluate the excutable directive at call-time instead of definition time.
+    # Evaluate the executable directive at call-time instead of definition time.
     # This is because we mock `sys.executable` while generating template reference data.
     return _Directive(
         "executable",
@@ -592,3 +592,6 @@ def _GET_EXECUTABLE():
         serial=_no_aggregation,
         parallel=_no_aggregation,
     )
+
+
+_GET_EXECUTABLE._name = "executable"

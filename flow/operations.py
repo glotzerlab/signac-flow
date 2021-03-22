@@ -14,6 +14,8 @@ import inspect
 import logging
 from functools import wraps
 
+from .environment import DEFAULT_DIRECTIVES
+
 logger = logging.getLogger(__name__)
 
 
@@ -146,6 +148,11 @@ class directives:
         directives.update(self.kwargs)
         setattr(func, "_flow_directives", directives)
         return func
+
+
+directives.__doc__ += "\n\n" + "\n\n".join(
+    f"**{directive._name}**\n\n{directive.__doc__}" for directive in DEFAULT_DIRECTIVES
+)
 
 
 def _get_operations(include_private=False):

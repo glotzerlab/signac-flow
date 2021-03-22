@@ -127,6 +127,18 @@ def template_filter(func):
     return classmethod(func)
 
 
+DEFAULT_DIRECTIVES = [
+    _NP,
+    _NGPU,
+    _NRANKS,
+    _OMP_NUM_THREADS,
+    _GET_EXECUTABLE,
+    _WALLTIME,
+    _PROCESSOR_FRACTION,
+    _MEMORY,
+]
+
+
 class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
     """Define computational environments.
 
@@ -346,14 +358,8 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
     def _get_default_directives(cls):
         return _Directives(
             [
-                _NP,
-                _NGPU,
-                _NRANKS,
-                _OMP_NUM_THREADS,
-                _GET_EXECUTABLE(),
-                _WALLTIME,
-                _PROCESSOR_FRACTION,
-                _MEMORY,
+                directive() if callable(directive) else directive
+                for directive in DEFAULT_DIRECTIVES
             ]
         )
 

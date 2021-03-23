@@ -128,7 +128,7 @@ def calc_memory(operations, parallel=False):
 
     Returns
     -------
-    float
+    int
         The reserved memory (numeric value) in gigabytes.
     """
     func = sum if parallel else max

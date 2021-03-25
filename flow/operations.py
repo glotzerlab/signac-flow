@@ -13,8 +13,9 @@ See also: :class:`~.FlowProject`.
 import inspect
 import logging
 from functools import wraps
+from textwrap import indent
 
-from .environment import DEFAULT_DIRECTIVES
+from .environment import ComputeEnvironment
 
 logger = logging.getLogger(__name__)
 
@@ -110,14 +111,6 @@ class directives:
     such as the number of processes required for execution of parallelized operations.
     For more information, read about :ref:`signac-docs:directives`.
 
-    In addition, you can use the ``@directives(fork=True)`` directive to enforce that a
-    particular operation is always executed within a subprocess and not within the
-    Python interpreter's process even if there are no other reasons that would prevent that.
-
-    .. note::
-
-        Setting ``fork=False`` will not prevent forking if there are other reasons for forking,
-        such as a timeout.
     """
 
     def __init__(self, **kwargs):
@@ -150,8 +143,22 @@ class directives:
         return func
 
 
-directives.__doc__ += "\n\n" + "\n\n".join(
-    f"**{directive._name}**\n\n{directive.__doc__}" for directive in DEFAULT_DIRECTIVES
+def _document_directive(directive):
+    name = directive._name
+    name = name.replace("_", r"\_")
+    doc = directive.__doc__
+    return f"**{name}**\n\n{doc}"
+
+
+_directives_to_document = (
+    ComputeEnvironment._get_default_directives()._directive_definitions.values()
+)
+directives.__doc__ += indent(
+    "\n**Supported Directives:**\n\n"
+    + "\n\n".join(
+        _document_directive(directive) for directive in _directives_to_document
+    ),
+    "    ",
 )
 
 

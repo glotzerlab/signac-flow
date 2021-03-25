@@ -430,6 +430,7 @@ def _sum_not_none(value, other):
         return operator.add(value, other)
 
 
+_bool = _OnlyTypes(bool)
 _natural_number = _OnlyTypes(int, postprocess=_raise_below(1))
 _nonnegative_int = _OnlyTypes(int, postprocess=_raise_below(0))
 _positive_real_walltime = _OnlyTypes(
@@ -451,6 +452,18 @@ _positive_real_memory = _OnlyTypes(
 
 
 # Common directives and their instantiation as _Directive
+_FORK = _Directive("fork", validator=_bool, default=False)
+_FORK.__doc__ = """The fork directive can be set to True to enforce that a
+particular operation is always executed within a subprocess and not within the
+Python interpreter's process even if there are no other reasons that would prevent that.
+
+.. note::
+
+    Setting ``fork=False`` will not prevent forking if there are other reasons for forking,
+    such as a timeout.
+"""
+
+
 _NP = _Directive(
     "np", validator=_natural_number, default=_NP_DEFAULT, finalize=_finalize_np
 )
@@ -520,6 +533,7 @@ The memory to validate should be either a float, int, or string.
 A valid memory argument is defined as:
 
 - Positive numeric value with suffix "g" or "G" indicating memory requested in gigabytes.
+
 For example:
 
 .. code-block:: python
@@ -530,6 +544,7 @@ For example:
         pass
 
 - Positive numeric value with suffix "m" or "M" indicating memory requested in megabytes.
+
 For example:
 
 .. code-block:: python
@@ -540,6 +555,7 @@ For example:
         pass
 
 - Positive numeric value with no suffix indicating memory requested in gigabytes.
+
 For example:
 
 .. code-block:: python
@@ -574,24 +590,22 @@ CPUs will be used. Defaults to 1.
 
 
 def _GET_EXECUTABLE():
-    """Return the path to the executable to be used for an operation.
-
-    The executable directive expects a string pointing to a valid executable
-    file in the current file system.
-
-    When called, by default this should point to a Python executable (interpreter);
-    however, if the :class:`FlowProject` path is an empty string, the executable
-    can be a path to an executable Python script. Defaults to ``sys.executable``.
-    """
     # Evaluate the executable directive at call-time instead of definition time.
     # This is because we mock `sys.executable` while generating template reference data.
-    return _Directive(
+    _EXECUTABLE = _Directive(
         "executable",
         validator=_OnlyTypes(str),
         default=sys.executable,
         serial=_no_aggregation,
         parallel=_no_aggregation,
     )
+    _EXECUTABLE.__doc__ = """Return the path to the executable to be used for an operation.
 
+The executable directive expects a string pointing to a valid executable
+file in the current file system.
 
-_GET_EXECUTABLE._name = "executable"
+When called, by default this should point to a Python executable (interpreter);
+however, if the :class:`FlowProject` path is an empty string, the executable
+can be a path to an executable Python script. Defaults to ``sys.executable``.
+"""
+    return _EXECUTABLE

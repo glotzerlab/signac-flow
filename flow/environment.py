@@ -19,6 +19,7 @@ from functools import lru_cache
 from signac.common import config
 
 from .directives import (
+    _FORK,
     _GET_EXECUTABLE,
     _MEMORY,
     _NGPU,
@@ -125,18 +126,6 @@ def template_filter(func):
     """
     setattr(func, "_flow_template_filter", True)
     return classmethod(func)
-
-
-DEFAULT_DIRECTIVES = [
-    _NP,
-    _NGPU,
-    _NRANKS,
-    _OMP_NUM_THREADS,
-    _GET_EXECUTABLE,
-    _WALLTIME,
-    _PROCESSOR_FRACTION,
-    _MEMORY,
-]
 
 
 class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
@@ -358,8 +347,15 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
     def _get_default_directives(cls):
         return _Directives(
             [
-                directive() if callable(directive) else directive
-                for directive in DEFAULT_DIRECTIVES
+                _FORK,
+                _NP,
+                _NGPU,
+                _NRANKS,
+                _OMP_NUM_THREADS,
+                _GET_EXECUTABLE(),
+                _WALLTIME,
+                _PROCESSOR_FRACTION,
+                _MEMORY,
             ]
         )
 

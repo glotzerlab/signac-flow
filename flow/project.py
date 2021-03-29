@@ -3927,7 +3927,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         .. code-block:: python
 
             op = FlowOperation('hello', cmd='hello {job.id}')
-            op = FlowOperation('hello', cmd=lambda 'hello {}'.format(job.id))
+            op = FlowOperation('hello', cmd=lambda job: 'hello {}'.format(job.id))
 
         Here are some more useful examples for str-substitutions:
 

@@ -325,7 +325,7 @@ def _run_cloudpickled_func(func, *args):
     return unpickled_func(*args)
 
 
-def _get_parallel_executor(parallelization="thread"):
+def _get_parallel_executor(parallelization="process"):
     """Get an executor for the desired parallelization strategy.
 
     This executor shows a progress bar while executing a function over an
@@ -340,7 +340,7 @@ def _get_parallel_executor(parallelization="thread"):
     ----------
     parallelization : str
         Parallelization mode. Allowed values are "thread", "process", or
-        "none". (Default value = "thread")
+        "none". (Default value = "process")
 
     Returns
     -------

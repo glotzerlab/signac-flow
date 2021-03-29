@@ -35,6 +35,7 @@ from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
 from signac.contrib.filterparse import parse_filter_arg
 from tqdm.auto import tqdm
 
+from . import operations as _operations
 from .aggregates import _aggregator, _get_aggregate_id
 from .environment import get_environment
 from .errors import (
@@ -3903,11 +3904,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             elif bool(label_value) is True:
                 yield label_name
 
-    def add_operation(self, name, cmd, pre=None, post=None, **kwargs):
+    @classmethod
+    def add_operation(cls, name, cmd, pre=None, post=None, **kwargs):
         r"""Add an operation to the workflow.
 
         This method will add an instance of :class:`~.FlowOperation` to the
-        operations of this project.
+        operations of this project class.
 
         .. seealso::
 
@@ -3965,14 +3967,30 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Keyword arguments passed as directives.
 
         """
-        if name in self.operations:
-            raise KeyError("An operation with this identifier is already added.")
-        op = self.operations[name] = FlowCmdOperation(cmd=cmd, pre=pre, post=post)
-        if name in self._groups:
-            raise KeyError("A group with this identifier already exists.")
-        self._groups[name] = FlowGroup(
-            name, operations={name: op}, operation_directives=dict(name=kwargs)
-        )
+        if (
+            name in map(lambda x: x[0], cls._OPERATION_FUNCTIONS)
+            or name in cls._GROUP_NAMES
+        ):
+            raise KeyError(
+                "An operation or group with this identifier is already added."
+            )
+        if isinstance(cmd, str):
+
+            @_operations.cmd
+            def op_func(job):
+                return cmd.format(job=job)
+
+        else:
+            op_func = cmd
+        if kwargs:
+            _operations.directives(**kwargs)(op_func)
+        cls.operation(op_func, name)
+        if pre:
+            for condition in pre:
+                cls.pre(condition)(op_func)
+        if post:
+            for condition in post:
+                cls.post(condition)(op_func)
 
     def completed_operations(self, job):
         """Determine which operations have been completed for job.

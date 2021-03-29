@@ -11,6 +11,11 @@ Version 0.14
 [0.14.0] -- 2021-xx-xx
 ----------------------
 
+Fixed
++++++
+
+- Changed default value of ``status_parallelization`` to process, to avoid bugs in user code caused by thread parallelism (#486).
+
 Removed
 +++++++
 

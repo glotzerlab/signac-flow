@@ -11,6 +11,11 @@ Version 0.14
 [0.14.0] -- 2021-xx-xx
 ----------------------
 
+Changed
++++++++
+
+- ``FlowProject.add_operation`` is now a classmethod (#487)
+
 Removed
 +++++++
 

@@ -4098,8 +4098,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if name is None:
             name = func.__name__
 
-        if (name, func) in cls._OPERATION_FUNCTIONS:
-            raise ValueError(f"An operation with name '{name}' is already registered.")
+        for registered_name, registered_func in cls._OPERATION_FUNCTIONS:
+            if name == registered_name:
+                raise ValueError(
+                    f"An operation with name '{name}' is already registered."
+                )
+            if func is registered_func:
+                raise ValueError(
+                    "An operation with this function is already registered."
+                )
         if name in cls._GROUP_NAMES:
             raise ValueError(f"A group with name '{name}' is already registered.")
 

@@ -290,6 +290,43 @@ class TestProjectClass(TestProjectBase):
         with pytest.raises(ValueError):
             B.get_project(root=self._tmp_dir.name)
 
+    def test_add_operation(self):
+        """Test the function of FlowProject.add_opeation classmethod."""
+
+        class A(FlowProject):
+            pass
+
+        class B(A):
+            pass
+
+        class C(FlowProject):
+            pass
+
+        def foo(job):
+            pass
+
+        A.add_opeation("foo", foo)
+
+        def bar(job):
+            pass
+
+        A.add_operation("bar", bar)
+
+        def baz(job):
+            pass
+
+        B.add_operation("baz", baz)
+        C.add_operation("baz", baz)
+
+        with suspend_logging():
+            a = A.get_project(root=self._tmp_dir.name)
+            b = B.get_project(root=self._tmp_dir.name)
+            c = C.get_project(root=self._tmp_dir.name)
+
+        assert len(a.operations) == 2
+        assert len(b.operations) == 3
+        assert len(c.operations) == 1
+
     def test_label_definition(self):
         class A(FlowProject):
             pass

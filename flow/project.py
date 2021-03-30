@@ -24,7 +24,7 @@ from collections import Counter, defaultdict
 from copy import deepcopy
 from enum import IntFlag
 from hashlib import md5, sha1
-from itertools import count, groupby, islice
+from itertools import chain, count, groupby, islice
 from multiprocessing import Event, Pool, TimeoutError, cpu_count
 from multiprocessing.pool import ThreadPool
 
@@ -4088,6 +4088,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         if isinstance(func, str):
             return lambda op: cls.operation(op, name=func)
+
+        if func in chain(
+            *cls._OPERATION_PRECONDITIONS.values(),
+            *cls._OPERATION_POSTCONDITIONS.values(),
+        ):
+            raise ValueError("An condition function cannot be used as an operation")
 
         if name is None:
             name = func.__name__

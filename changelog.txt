@@ -11,6 +11,11 @@ Version 0.14
 [0.14.0] -- 2021-xx-xx
 ----------------------
 
+Added
++++++
+
+- Submission summary now appears in ``FlowProject`` status output, showing the number of queued, running, unknown statuses. (#472, #488).
+
 Removed
 +++++++
 

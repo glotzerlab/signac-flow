@@ -11,9 +11,11 @@ Version 0.14
 [0.14.0] -- 2021-xx-xx
 ----------------------
 
-Changed
-+++++++
+Added
++++++
 
+- Documentation for all directives (#480).
+- Defined validators for the ``fork`` directive (#480).
 
 Removed
 +++++++

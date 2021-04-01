@@ -391,10 +391,10 @@ class SimpleSchedulerEnvironment(ComputeEnvironment):
     template = "simple_scheduler.sh"
 
 
-class PbsEnvironment(ComputeEnvironment):
+class PBSEnvironment(ComputeEnvironment):
     """An environment with PBS scheduler."""
 
-    scheduler_type = PbsScheduler
+    scheduler_type = PBSScheduler
     template = "pbs.sh"
 
 

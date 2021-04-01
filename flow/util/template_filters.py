@@ -113,9 +113,18 @@ def calc_tasks(operations, name, parallel=False, allow_mixed=False):
 
 
 def format_memory(memory):
-    """Format a float as either (int)G or (int)M
+    """Format memory request as a string with an appropriate suffix.
+    
+    Parameters
+    -----------
+    memory : float
+        Value of memory to format in gigabytes.
+
     Returns
-    -------"""
+    -------
+    str
+        String value with suffix "G" or "M".
+    """
     if memory.is_integer():
         return f"{int(memory)}G"
 

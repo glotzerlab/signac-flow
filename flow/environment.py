@@ -36,7 +36,7 @@ from .scheduling.fake_scheduler import FakeScheduler
 from .scheduling.lsf import LSFScheduler
 from .scheduling.simple_scheduler import SimpleScheduler
 from .scheduling.slurm import SlurmScheduler
-from .scheduling.torque import TorqueScheduler
+from .scheduling.pbs import PbsScheduler
 from .util import config as flow_config
 
 logger = logging.getLogger(__name__)
@@ -391,11 +391,11 @@ class SimpleSchedulerEnvironment(ComputeEnvironment):
     template = "simple_scheduler.sh"
 
 
-class TorqueEnvironment(ComputeEnvironment):
-    """An environment with TORQUE scheduler."""
+class PbsEnvironment(ComputeEnvironment):
+    """An environment with PBS scheduler."""
 
-    scheduler_type = TorqueScheduler
-    template = "torque.sh"
+    scheduler_type = PbsScheduler
+    template = "pbs.sh"
 
 
 class SlurmEnvironment(ComputeEnvironment):
@@ -420,8 +420,8 @@ class NodesEnvironment(ComputeEnvironment):
     """
 
 
-class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
-    """Default environment for clusters with a TORQUE scheduler."""
+class DefaultPbsEnvironment(NodesEnvironment, PbsEnvironment):
+    """Default environment for clusters with a PBS scheduler."""
 
     @classmethod
     def add_args(cls, parser):

@@ -112,6 +112,18 @@ def calc_tasks(operations, name, parallel=False, allow_mixed=False):
         )
 
 
+def format_memory(memory):
+    """Format a float as either (int)G or (int)M
+    Returns
+    -------"""
+    if memory.is_integer():
+        return f"{int(memory)}G"
+
+    else:
+        mem_in_mb = ceil(memory * 1024)
+        return f"{mem_in_mb}M"
+
+
 def calc_memory(operations, parallel=False):
     r"""Calculate the maximum memory to reserve for submission of operations.
 
@@ -128,11 +140,11 @@ def calc_memory(operations, parallel=False):
 
     Returns
     -------
-    int
+    float
         The reserved memory (numeric value) in gigabytes.
     """
     func = sum if parallel else max
-    return int(func(operation.directives["memory"] or 0 for operation in operations))
+    return func(operation.directives["memory"] or 0 for operation in operations)
 
 
 def calc_walltime(operations, parallel=False):

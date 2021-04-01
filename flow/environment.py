@@ -34,7 +34,7 @@ from .errors import NoSchedulerError
 from .scheduling.base import JobStatus
 from .scheduling.fake_scheduler import FakeScheduler
 from .scheduling.lsf import LSFScheduler
-from .scheduling.pbs import PbsScheduler
+from .scheduling.pbs import PBSScheduler
 from .scheduling.simple_scheduler import SimpleScheduler
 from .scheduling.slurm import SlurmScheduler
 from .util import config as flow_config

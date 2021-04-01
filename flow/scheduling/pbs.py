@@ -80,7 +80,7 @@ class PbsJob(ClusterJob):
         return JobStatus.registered
 
 
-class PbsScheduler(Scheduler):
+class PBSScheduler(Scheduler):
     r"""Implementation of the abstract Scheduler class for PBS schedulers.
 
     This class can submit cluster jobs to a PBS scheduler and query their

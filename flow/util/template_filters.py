@@ -114,9 +114,9 @@ def calc_tasks(operations, name, parallel=False, allow_mixed=False):
 
 def format_memory(memory):
     """Format memory request as a string with an appropriate suffix.
-    
+
     Parameters
-    -----------
+    ----------
     memory : float
         Value of memory to format in gigabytes.
 

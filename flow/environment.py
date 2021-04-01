@@ -19,6 +19,7 @@ from functools import lru_cache
 from signac.common import config
 
 from .directives import (
+    _FORK,
     _GET_EXECUTABLE,
     _MEMORY,
     _NGPU,
@@ -346,6 +347,7 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
     def _get_default_directives(cls):
         return _Directives(
             [
+                _FORK,
                 _NP,
                 _NGPU,
                 _NRANKS,

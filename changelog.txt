@@ -14,7 +14,14 @@ Version 0.14
 Added
 +++++
 
+- Documentation for all directives (#480).
+- Defined validators for the ``fork`` directive (#480).
 - Submission summary now appears in ``FlowProject`` status output, showing the number of queued, running, unknown statuses. (#472, #488).
+
+Fixed
++++++
+
+- Changed default value of ``status_parallelization`` to none, to avoid bugs in user code caused by thread parallelism and overhead in process parallelism (#486).
 
 Removed
 +++++++

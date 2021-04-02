@@ -36,7 +36,6 @@ from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
 from signac.contrib.filterparse import parse_filter_arg
 from tqdm.auto import tqdm
 
-from . import __version__
 from .aggregates import _aggregator, _get_aggregate_id
 from .environment import get_environment
 from .errors import (
@@ -64,6 +63,7 @@ from .util.misc import (
     switch_to_directory,
 )
 from .util.translate import abbreviate, shorten
+from .version import __version__
 
 logger = logging.getLogger(__name__)
 

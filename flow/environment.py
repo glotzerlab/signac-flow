@@ -16,8 +16,10 @@ import re
 import socket
 from functools import lru_cache
 
+from deprecation import deprecated
 from signac.common import config
 
+from . import __version__
 from .directives import (
     _FORK,
     _GET_EXECUTABLE,
@@ -448,6 +450,16 @@ class DefaultPBSEnvironment(NodesEnvironment, PBSEnvironment):
             action="store_true",
             help="Do not copy current environment variables into compute node environment.",
         )
+
+
+@deprecated(
+    deprecated_in="0.14",
+    removed_in="0.16",
+    current_version=__version__,
+    details="DefaultTorqueEnvironment has been renamed to DefaultPBSEnvironment",
+)
+class DefaultTorqueEnvironment(DefaultPBSEnvironment):  # noqa: D101
+    pass
 
 
 class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):

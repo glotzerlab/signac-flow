@@ -19,7 +19,6 @@ from functools import lru_cache
 from deprecation import deprecated
 from signac.common import config
 
-from . import __version__
 from .directives import (
     _FORK,
     _GET_EXECUTABLE,
@@ -40,6 +39,7 @@ from .scheduling.pbs import PBSScheduler
 from .scheduling.simple_scheduler import SimpleScheduler
 from .scheduling.slurm import SlurmScheduler
 from .util import config as flow_config
+from .version import __version__
 
 logger = logging.getLogger(__name__)
 

@@ -31,10 +31,12 @@ from multiprocessing.pool import ThreadPool
 import cloudpickle
 import jinja2
 import signac
+from deprecation import deprecated
 from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
 from signac.contrib.filterparse import parse_filter_arg
 from tqdm.auto import tqdm
 
+from . import __version__
 from .aggregates import _aggregator, _get_aggregate_id
 from .environment import get_environment
 from .errors import (
@@ -3903,8 +3905,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             elif bool(label_value) is True:
                 yield label_name
 
-    def add_operation(*args, **kwargs):  # noqa: D401
-        """Method has been removed."""
+    @deprecated(
+        deprecated_in="0.14",
+        removed_in="0.16",
+        current_version=__version__,
+        details="Method has been removed.",
+    )
+    def add_operation(*args, **kwargs):  # noqa: D102
         raise AttributeError(
             "The add_operation() method was removed in version 0.14. "
             "Please see https://docs.signac.io/en/latest/flow-project.html#defining-a-workflow "
@@ -3983,8 +3990,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             @FlowProject.operation
             def hello(job):
                 print('Hello', job)
-
-        See also: :meth:`~.flow.FlowProject.add_operation`.
 
         Parameters
         ----------

@@ -27,7 +27,6 @@ The FlowProject
 .. autosummary::
 
     FlowProject.ALIASES
-    FlowProject.add_operation
     FlowProject.completed_operations
     FlowProject.get_job_status
     FlowProject.label

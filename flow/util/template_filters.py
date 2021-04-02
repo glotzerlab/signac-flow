@@ -118,16 +118,16 @@ def format_memory(memory):
     Parameters
     ----------
     memory : float
-        Value of memory to format in gigabytes.
+        Amount of memory in gigabytes.
 
     Returns
     -------
     str
         String value with suffix "G" or "M".
     """
+    memory = float(memory)
     if memory.is_integer():
         return f"{int(memory)}G"
-
     else:
         mem_in_mb = ceil(memory * 1024)
         return f"{mem_in_mb}M"

@@ -14,11 +14,11 @@ Version 0.14
 Changed
 +++++++
 
-- ``FlowProject.add_operation`` is now a classmethod (#487)
 
 Removed
 +++++++
 
+- Removed ``FlowProject.add_operation`` (#487).
 - Removed deprecated ``--walltime`` argument (#478).
 - Removed deprecated ``flow.run`` interface (#478).
 - Removed deprecated ``FlowProject.export_job_statuses`` (#478).

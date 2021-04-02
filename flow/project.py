@@ -2781,9 +2781,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     ] += 1
 
         def _op_submission_summary(counter):
+            """Generate string of statuses and counts, sorted by status."""
             return ", ".join(
                 f"[{_FMT_SCHEDULER_STATUS[status]}]: {count}"
-                for status, count in counter.most_common()
+                for status, count in sorted(counter.items())
             )
 
         op_counter_status = [

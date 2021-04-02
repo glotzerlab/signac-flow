@@ -420,7 +420,7 @@ class NodesEnvironment(ComputeEnvironment):
     """
 
 
-class DefaultPbsEnvironment(NodesEnvironment, PBSEnvironment):
+class DefaultPBSEnvironment(NodesEnvironment, PBSEnvironment):
     """Default environment for clusters with a PBS scheduler."""
 
     @classmethod

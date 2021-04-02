@@ -28,8 +28,8 @@ def _fetch(user=None):
 
     Yields
     ------
-    :class:`~.PbsJob`
-        Pbs cluster job.
+    :class:`~.PBSJob`
+        PBS cluster job.
 
     """
     if user is None:
@@ -57,7 +57,7 @@ def _fetch(user=None):
             raise error
 
 
-class PbsJob(ClusterJob):
+class PBSJob(ClusterJob):
     """Implementation of the abstract ClusterJob class for PBS schedulers."""
 
     def __init__(self, node):
@@ -106,7 +106,7 @@ class PBSScheduler(Scheduler):
         self._prevent_dos()
         nodes = _fetch(user=self.user)
         for node in nodes.findall("Job"):
-            yield PbsJob(node)
+            yield PBSJob(node)
 
     def submit(
         self, script, *, after=None, hold=False, pretend=False, flags=None, **kwargs

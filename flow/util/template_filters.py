@@ -112,6 +112,27 @@ def calc_tasks(operations, name, parallel=False, allow_mixed=False):
         )
 
 
+def format_memory(memory):
+    """Format memory request as a string with an appropriate suffix.
+
+    Parameters
+    ----------
+    memory : float
+        Amount of memory in gigabytes.
+
+    Returns
+    -------
+    str
+        String value with suffix "G" or "M".
+    """
+    memory = float(memory)
+    if memory.is_integer():
+        return f"{int(memory)}G"
+    else:
+        mem_in_mb = ceil(memory * 1024)
+        return f"{mem_in_mb}M"
+
+
 def calc_memory(operations, parallel=False):
     r"""Calculate the maximum memory to reserve for submission of operations.
 

@@ -364,10 +364,12 @@ def _parse_memory(memory):
 
     A valid memory argument is defined as:
 
-    1. Numeric value with suffix "g" or "G" indicating memory requested in gigabytes.
-    2. Numeric value with suffix "m" or "M" indicating memory requested in megabytes.
+    1. Numeric value with suffix "G" or "GB" indicating memory requested in gigabytes.
+    2. Numeric value with suffix "M" or "MB" indicating memory requested in megabytes.
     3. Numeric value with no suffix indicating memory requested in gigabytes.
     4. None to indicate no specific memory request.
+
+    Memory arguments passed as strings are case insensitive.
 
     Parameters
     ----------
@@ -382,18 +384,19 @@ def _parse_memory(memory):
     try:
         if memory is None:
             return None
-        memory = str(memory)
+        # Convert to uppercase, remove "B" suffix if provided
+        memory = str(memory).upper().rstrip("B")
         size_type = memory[-1]
-        if size_type.lower() == "m":
+        if size_type == "M":
             return float(memory[:-1]) / 1024
-        elif size_type.lower() == "g":
+        elif size_type == "G":
             return float(memory[:-1])
         else:
             return float(memory)
     except ValueError:
         raise ValueError(
-            'Invalid memory passed. For gigabytes use suffix "g"/"G", '
-            'for megabytes use suffix "m"/"M". If a numeric value is passed then '
+            'Invalid memory passed. For gigabytes use suffix "G" or "GB", '
+            'for megabytes use suffix "M" or "MB". If a numeric value is passed then '
             "it will be interpreted as memory in gigabytes."
         )
 

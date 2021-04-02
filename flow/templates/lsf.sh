@@ -4,7 +4,7 @@
 #BSUB -J {{ id }}
 {% set memory_requested = operations | calc_memory(parallel) %}
 {% if memory_requested %}
-#BSUB -M {{ memory_requested }}GB
+#BSUB -M {{ memory_requested|format_memory }}B
 {% endif %}
 {% if partition %}
 #BSUB -q {{ partition }}

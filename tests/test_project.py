@@ -1893,26 +1893,21 @@ class TestAggregationProjectMainInterface(TestAggregatesProjectBase):
         project = self.mock_project()
         assert len(project)
 
-        run_output = self.call_subcmd("run -o agg_op4").decode().splitlines()
+        run_output = self.call_subcmd("run -o agg_op4").decode("utf-8")
 
-        assert "1 and 2" in "\n".join(run_output)
+        assert "1 and 2" in run_output
 
     def test_main_submit(self):
         project = self.mock_project()
         assert len(project)
 
-        submit_output = (
-            self.call_subcmd(
-                f"submit -o agg_op2 -j {get_aggregate_id(project)} --pretend"
-            )
-            .decode()
-            .splitlines()
-        )
+        submit_output = self.call_subcmd(
+            f"submit -o agg_op2 -j {get_aggregate_id(project)} --pretend"
+        ).decode("utf-8")
 
-        output_string = "\n".join(submit_output)
-        assert f"agg_op2({get_aggregate_id(project)})" in output_string
-        assert f"run -o agg_op2 -j {get_aggregate_id(project)}" in output_string
-        assert f"exec agg_op2 {get_aggregate_id(project)}" in output_string
+        assert f"agg_op2({get_aggregate_id(project)})" in submit_output
+        assert f"run -o agg_op2 -j {get_aggregate_id(project)}" in submit_output
+        assert f"exec agg_op2 {get_aggregate_id(project)}" in submit_output
 
 
 class TestAggregationGroupProjectMainInterface(TestAggregatesProjectBase):
@@ -1933,19 +1928,14 @@ class TestAggregationGroupProjectMainInterface(TestAggregatesProjectBase):
         project = self.mock_project()
         assert len(project)
 
-        submit_output = (
-            self.call_subcmd(
-                f"submit -o group_agg -j {get_aggregate_id(project)} --pretend"
-            )
-            .decode()
-            .splitlines()
-        )
+        submit_output = self.call_subcmd(
+            f"submit -o group_agg -j {get_aggregate_id(project)} --pretend"
+        ).decode("utf-8")
 
-        output_string = "\n".join(submit_output)
-        assert f"group_agg({get_aggregate_id(project)})" in output_string
-        assert f"run -o group_agg -j {get_aggregate_id(project)}" in output_string
-        assert f"exec agg_op2 {get_aggregate_id(project)}" in output_string
-        assert f"exec agg_op3 {get_aggregate_id(project)}" in output_string
+        assert f"group_agg({get_aggregate_id(project)})" in submit_output
+        assert f"run -o group_agg -j {get_aggregate_id(project)}" in submit_output
+        assert f"exec agg_op2 {get_aggregate_id(project)}" in submit_output
+        assert f"exec agg_op3 {get_aggregate_id(project)}" in submit_output
 
 
 class TestIgnoreConditions:

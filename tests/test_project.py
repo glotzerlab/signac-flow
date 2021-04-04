@@ -466,7 +466,7 @@ class TestProjectClass(TestProjectBase):
             break
 
     def test_invalid_memory_directive(self):
-        for value in ["13b", "-1g", "0", 0, -2]:
+        for value in ["13qb", "-1g", "0", 0, -2]:
 
             class A(FlowProject):
                 pass
@@ -483,7 +483,19 @@ class TestProjectClass(TestProjectBase):
                         pass
 
     def test_memory_directive(self):
-        for value in ["0.5g", "0.5G", "512m", "512M", "0.5", 0.5, None]:
+        for value in [
+            "0.5g",
+            "0.5G",
+            "0.5gb",
+            "0.5GB",
+            "512m",
+            "512M",
+            "512mb",
+            "512MB",
+            "0.5",
+            0.5,
+            None,
+        ]:
 
             class A(FlowProject):
                 pass

@@ -26,6 +26,7 @@ Fixed
 +++++
 
 - Changed default value of ``status_parallelization`` to none, to avoid bugs in user code caused by thread parallelism and overhead in process parallelism (#486).
+- Memory directives are converted to an integer number of gigabytes or megabytes in submission scripts (#482, #484).
 
 Removed
 +++++++

@@ -1489,6 +1489,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         template_environment.filters[
             "format_timedelta"
         ] = template_filters.format_timedelta
+        template_environment.filters["format_memory"] = template_filters.format_memory
         template_environment.filters["identical"] = template_filters.identical
         template_environment.filters["with_np_offset"] = template_filters.with_np_offset
         template_environment.filters["calc_tasks"] = template_filters.calc_tasks

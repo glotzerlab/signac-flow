@@ -98,8 +98,7 @@ def with_job(func):
     def decorated(*jobs):
         if len(jobs) != 1:
             raise NotImplementedError(
-                "signac-flow currently does not support the use of @with_job decorator "
-                "with aggregation."
+                "The @with_job decorator cannot be used with aggregation."
             )
         with jobs[0] as job:
             if getattr(func, "_flow_cmd", False):

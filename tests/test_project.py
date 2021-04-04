@@ -1804,30 +1804,11 @@ class TestAggregatesProjectBase(TestProjectBase):
         project._entrypoint = self.entrypoint
         return project
 
-    def switch_to_cwd(self):
-        os.chdir(self.cwd)
-
     @pytest.fixture(autouse=True)
     def setup_main_interface(self, request):
         self.project = self.mock_project()
-        self.cwd = os.getcwd()
         os.chdir(self._tmp_dir.name)
         request.addfinalizer(self.switch_to_cwd)
-
-    def call_subcmd(self, subcmd):
-        # Determine path to project module and construct command.
-        fn_script = inspect.getsourcefile(type(self.project))
-        _cmd = f"python {fn_script} {subcmd}"
-        try:
-            with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
-                with switch_to_directory(self.project.root_directory()):
-                    return subprocess.check_output(
-                        _cmd.split(), stderr=subprocess.DEVNULL
-                    )
-        except subprocess.CalledProcessError as error:
-            print(error, file=sys.stderr)
-            print(error.output, file=sys.stderr)
-            raise
 
 
 class TestProjectUtilities(TestAggregatesProjectBase):

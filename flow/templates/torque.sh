@@ -3,7 +3,7 @@
 #PBS -N {{ id }}
 {% set memory_requested = operations | calc_memory(parallel) %}
 {% if memory_requested %}
-#PBS -l mem={{ memory_requested }}GB
+#PBS -l mem={{ memory_requested|format_memory }}B
 {% endif %}
 {% set walltime = operations | calc_walltime(parallel) %}
 {% if walltime %}

@@ -1792,7 +1792,7 @@ class TestAggregatesProjectBase(TestProjectBase):
     project_class = _AggregateTestProject
     entrypoint = dict(
         path=os.path.realpath(
-            os.path.join(os.path.dirname(__file__), "define_test_aggregate_project.py")
+            os.path.join(os.path.dirname(__file__), "define_aggregate_test_project.py")
         )
     )
 

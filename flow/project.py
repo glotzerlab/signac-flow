@@ -1512,6 +1512,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         template_environment.filters[
             "format_timedelta"
         ] = template_filters.format_timedelta
+        template_environment.filters["format_memory"] = template_filters.format_memory
         template_environment.filters["identical"] = template_filters.identical
         template_environment.filters["with_np_offset"] = template_filters.with_np_offset
         template_environment.filters["calc_tasks"] = template_filters.calc_tasks
@@ -2266,7 +2267,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         aggregates,
         err,
         ignore_errors,
-        status_parallelization="thread",
+        status_parallelization="none",
     ):
         """Fetch status for the provided aggregates / jobs.
 
@@ -2280,7 +2281,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Fetch status even if querying the scheduler fails.
         status_parallelization : str
             Parallelization mode for fetching the status. Allowed values are
-            "thread", "process", or "none". (Default value = "thread")
+            "thread", "process", or "none". (Default value = "none")
 
         Returns
         -------

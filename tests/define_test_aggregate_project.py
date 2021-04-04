@@ -66,6 +66,7 @@ def agg_op4(*jobs):
     return "echo '{jobs[0].sp.i} and {jobs[1].sp.i}'"
 
 
+# This operation should raise an exception and only exists to test that.
 @_TestAggregateProject.operation
 @with_job
 @aggregator()

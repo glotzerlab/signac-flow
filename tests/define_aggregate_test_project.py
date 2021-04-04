@@ -5,7 +5,7 @@ class _AggregateTestProject(FlowProject):
     pass
 
 
-def custom_aggregator(jobs):
+def statepoint_i_even_odd_aggregator(jobs):
     even = [job for job in jobs if job.sp.i % 2 == 0]
     odd = [job for job in jobs if job.sp.i % 2 != 0]
     return [even, odd]
@@ -36,7 +36,7 @@ def agg_op1_different(*jobs):
 
 
 @_AggregateTestProject.operation
-@aggregator(custom_aggregator)
+@aggregator(statepoint_i_even_odd_aggregator)
 def agg_op1_custom(*jobs):
     sum_custom = sum([job.sp.i for job in jobs])
     for job in jobs:

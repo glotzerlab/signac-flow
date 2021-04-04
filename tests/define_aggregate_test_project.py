@@ -1,7 +1,7 @@
 from flow import FlowProject, aggregator, cmd, with_job
 
 
-class _TestAggregateProject(FlowProject):
+class _AggregateTestProject(FlowProject):
     pass
 
 
@@ -11,15 +11,15 @@ def custom_aggregator(jobs):
     return [even, odd]
 
 
-group1 = _TestAggregateProject.make_group(name="group_agg", aggregator_obj=aggregator())
+group1 = _AggregateTestProject.make_group(name="group_agg", aggregator_obj=aggregator())
 
 
-@_TestAggregateProject.operation
+@_AggregateTestProject.operation
 def op1(job):
     pass
 
 
-@_TestAggregateProject.operation
+@_AggregateTestProject.operation
 @aggregator.groupby("even")
 def agg_op1(*jobs):
     total = sum([job.sp.i for job in jobs])
@@ -27,7 +27,7 @@ def agg_op1(*jobs):
         job.document.sum = total
 
 
-@_TestAggregateProject.operation
+@_AggregateTestProject.operation
 @aggregator.groupby(lambda job: job.sp.i % 2)
 def agg_op1_different(*jobs):
     sum_other = sum([job.sp.i for job in jobs])
@@ -35,7 +35,7 @@ def agg_op1_different(*jobs):
         job.document.sum_other = sum_other
 
 
-@_TestAggregateProject.operation
+@_AggregateTestProject.operation
 @aggregator(custom_aggregator)
 def agg_op1_custom(*jobs):
     sum_custom = sum([job.sp.i for job in jobs])
@@ -43,7 +43,7 @@ def agg_op1_custom(*jobs):
         job.document.sum_custom = sum_custom
 
 
-@_TestAggregateProject.operation
+@_AggregateTestProject.operation
 @group1
 @aggregator.groupsof(30)
 def agg_op2(*jobs):
@@ -51,7 +51,7 @@ def agg_op2(*jobs):
         job.document.op2 = True
 
 
-@_TestAggregateProject.operation
+@_AggregateTestProject.operation
 @group1
 @aggregator()
 def agg_op3(*jobs):
@@ -59,7 +59,7 @@ def agg_op3(*jobs):
         job.document.op3 = True
 
 
-@_TestAggregateProject.operation
+@_AggregateTestProject.operation
 @cmd
 @aggregator(sort_by="i", select=lambda job: job.sp.i <= 2)
 def agg_op4(*jobs):
@@ -67,7 +67,7 @@ def agg_op4(*jobs):
 
 
 # This operation should raise an exception and only exists to test that.
-@_TestAggregateProject.operation
+@_AggregateTestProject.operation
 @with_job
 @aggregator()
 def agg_op5(*jobs):
@@ -75,4 +75,4 @@ def agg_op5(*jobs):
 
 
 if __name__ == "__main__":
-    _TestAggregateProject().main()
+    _AggregateTestProject().main()

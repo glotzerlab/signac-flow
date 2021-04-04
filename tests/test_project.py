@@ -19,9 +19,9 @@ from tempfile import TemporaryDirectory
 
 import pytest
 import signac
+from define_aggregate_test_project import _AggregateTestProject
 from define_dag_test_project import DagTestProject
 from define_directives_test_project import _DirectivesTestProject
-from define_test_aggregate_project import _TestAggregateProject
 from define_test_project import _DynamicTestProject, _TestProject
 from deprecation import fail_if_not_removed
 
@@ -1789,7 +1789,7 @@ class TestGroupDynamicProjectMainInterface(TestProjectMainInterface):
 
 
 class TestAggregatesProjectBase(TestProjectBase):
-    project_class = _TestAggregateProject
+    project_class = _AggregateTestProject
     entrypoint = dict(
         path=os.path.realpath(
             os.path.join(os.path.dirname(__file__), "define_test_aggregate_project.py")

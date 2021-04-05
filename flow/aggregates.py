@@ -388,7 +388,6 @@ class _AggregateStore(_BaseAggregateStore):
         # We need to register the aggregates for this instance using the
         # provided project. After registering, we store the aggregates mapped
         # with the ids using :func:`get_aggregate_id`.
-        self._aggregates_by_id = {}
         self._register_aggregates()
 
     def __getitem__(self, id):
@@ -441,7 +440,7 @@ class _AggregateStore(_BaseAggregateStore):
 
         Every aggregate is required to be a tuple of jobs.
         """
-        # Clear the internal mapping from id to aggregate
+        # Initialize the internal mapping from id to aggregate
         self._aggregates_by_id = {}
         for aggregate in self._generate_aggregates():
             for job in aggregate:

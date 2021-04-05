@@ -15,9 +15,10 @@
 
 {% block overview %}
 {% if overview %}
-{{ 'Overview: \n' }}
-{{ 'Total # of jobs: %s ' | format(jobs | project_length('jobs')) }}
-{{ 'Total # of unique aggregates: %s ' | format(jobs | project_length('aggregates')) }}
+Overview:
+
+Total # of jobs: {{ jobs | project_length('jobs') }}
+Total # of unique aggregates: {{ jobs | project_length('aggregates') }}
 
 {% block progress %}
 | label | ratio |
@@ -39,7 +40,8 @@
 
 {% block detailed %}
 {% if detailed %}
-{{ 'Detailed View: \n' }}
+Detailed View:
+
 | job id | operation | {{ para_head }}labels |
 | ------ | --------- | {{ ns.dash }}-------- |
 {% for job in jobs %}

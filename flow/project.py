@@ -3006,8 +3006,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         Parameters
         ----------
         jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
-            Only execute operations for the given jobs or aggregates of jobs,
-            or all if the argument is None. (Default value = None)
+            If not ``None``, only execute operations for the given jobs or
+            aggregates of jobs (Default value = None).
         names : iterable of :class:`str`
             Only execute operations that match the provided set of names
             (interpreted as regular expressions), or all if the argument is

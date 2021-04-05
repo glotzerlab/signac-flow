@@ -24,7 +24,7 @@ def op1(job):
 @_AggregateTestProject.operation
 @aggregator.groupby("even")
 def agg_op1(*jobs):
-    total = sum([job.sp.i for job in jobs])
+    total = sum(job.sp.i for job in jobs)
     for job in jobs:
         job.document.sum = total
 
@@ -32,7 +32,7 @@ def agg_op1(*jobs):
 @_AggregateTestProject.operation
 @aggregator.groupby(lambda job: job.sp.i % 2)
 def agg_op1_different(*jobs):
-    sum_other = sum([job.sp.i for job in jobs])
+    sum_other = sum(job.sp.i for job in jobs)
     for job in jobs:
         job.document.sum_other = sum_other
 
@@ -40,7 +40,7 @@ def agg_op1_different(*jobs):
 @_AggregateTestProject.operation
 @aggregator(statepoint_i_even_odd_aggregator)
 def agg_op1_custom(*jobs):
-    sum_custom = sum([job.sp.i for job in jobs])
+    sum_custom = sum(job.sp.i for job in jobs)
     for job in jobs:
         job.document.sum_custom = sum_custom
 

@@ -164,7 +164,7 @@ def _render_status(
         Parameters
         ----------
         jobs : list
-            Status of signac jobs or aggregates of jobs.
+            List of signac jobs or aggregates of jobs.
         kind : {{"jobs", "aggregates"}}
             Whether to interpret the ``jobs`` argument as individual jobs or aggregates of jobs.
 
@@ -178,21 +178,9 @@ def _render_status(
 
         """
         if kind == "aggregates":
-            return len(
-                {
-                    job["aggregate_id"]
-                    for job in jobs
-                    if job["aggregate_id"][0:4] == "agg-"
-                }
-            )
+            return sum(1 for job in jobs if job["aggregate_id"].startswith("agg-"))
         else:
-            return len(
-                {
-                    job["aggregate_id"]
-                    for job in jobs
-                    if job["aggregate_id"][0:4] != "agg-"
-                }
-            )
+            return sum(1 for job in jobs if not job["aggregate_id"].startswith("agg-"))
 
     template_environment.filters["highlight"] = highlight
     template_environment.filters["draw_progress_bar"] = draw_progress_bar

@@ -694,14 +694,14 @@ class FlowGroupEntry:
         The :meth:`FlowProject.run` options to pass when submitting the group.
         These will be included in all submissions. Submissions use run
         commands to execute.
-    aggregator : :class:`~.aggregator`
+    group_aggregator : :class:`~.aggregator`
         aggregator object associated with the :class:`FlowGroup` (Default value = None).
     """
 
-    def __init__(self, name, options="", aggregator=None):
+    def __init__(self, name, options="", group_aggregator=None):
         self.name = name
         self.options = options
-        self.aggregator = aggregator
+        self.group_aggregator = group_aggregator
 
     def __call__(self, func):
         """Add the function into the group's operations.
@@ -4093,7 +4093,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # in `_register_groups` and hence the aggregator parameter is passed as None.
         # This is because we do not restrict the decorator placement in terms of
         # `FlowGroupEntry`, `aggregator`, or `operation`.
-        cls._GROUPS.append(FlowGroupEntry(name=name, options="", aggregator=None))
+        cls._GROUPS.append(FlowGroupEntry(name=name, options="", group_aggregator=None))
         if hasattr(func, "_flow_groups"):
             func._flow_groups.append(name)
         else:
@@ -4150,7 +4150,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 self._operations[name] = FlowOperation(op_func=func, **params)
 
     @classmethod
-    def make_group(cls, name, options="", aggregator_obj=None):
+    def make_group(cls, name, options="", group_aggregator=None):
         r"""Make a :class:`~.FlowGroup` named ``name`` and return a decorator to make groups.
 
         A :class:`~.FlowGroup` is used to group operations together for
@@ -4176,7 +4176,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         options : str
             A string to append to submissions. Can be any valid
             :meth:`FlowOperation.run` option. (Default value = "")
-        aggregator_obj : :class:`~.aggregator`
+        group_aggregator : :class:`~.aggregator`
             An instance of :class:`~flow.aggregator` to associate with the :class:`FlowGroup`.
             If None, no aggregation takes place (Default value = None).
 
@@ -4189,9 +4189,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if name in cls._GROUP_NAMES:
             raise ValueError(f"Repeat definition of group with name '{name}'.")
         cls._GROUP_NAMES.add(name)
-        if aggregator_obj is None:
-            aggregator_obj = aggregator.groupsof(1)
-        group_entry = FlowGroupEntry(name, options, aggregator_obj)
+        if group_aggregator is None:
+            group_aggregator = aggregator.groupsof(1)
+        group_entry = FlowGroupEntry(
+            name=name, options=options, group_aggregator=group_aggregator
+        )
         cls._GROUPS.append(group_entry)
         return group_entry
 
@@ -4218,19 +4220,19 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             # Since we store aggregator parameter for operations as None,
             # we fetch the aggregators associated with operations using
             # the registered operations.
-            if entry.aggregator is None:
+            if entry.group_aggregator is None:
                 operation = self._operations[entry.name]
                 if isinstance(operation, FlowCmdOperation):
-                    entry.aggregator = operation._cmd._flow_aggregate
+                    entry.group_aggregator = operation._cmd._flow_aggregate
                 else:
-                    entry.aggregator = operation._op_func._flow_aggregate
+                    entry.group_aggregator = operation._op_func._flow_aggregate
 
-            if entry.aggregator not in created_aggregate_stores:
+            if entry.group_aggregator not in created_aggregate_stores:
                 created_aggregate_stores[
-                    entry.aggregator
-                ] = entry.aggregator._create_AggregateStore(self)
+                    entry.group_aggregator
+                ] = entry.group_aggregator._create_AggregateStore(self)
             self._group_to_aggregate_store[group] = created_aggregate_stores[
-                entry.aggregator
+                entry.group_aggregator
             ]
 
         # Add operations and directives to group

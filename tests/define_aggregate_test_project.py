@@ -11,7 +11,9 @@ def statepoint_i_even_odd_aggregator(jobs):
     return [even, odd]
 
 
-group1 = _AggregateTestProject.make_group(name="group_agg", aggregator_obj=aggregator())
+group1 = _AggregateTestProject.make_group(
+    name="group_agg", group_aggregator=aggregator()
+)
 
 
 @_AggregateTestProject.operation

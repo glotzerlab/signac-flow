@@ -1818,11 +1818,16 @@ class TestProjectUtilities(TestAggregatesProjectBase):
         assert agg_cursor._project == project
         assert agg_cursor._filter is None
         assert agg_cursor._doc_filter is None
-        # Since default aggregate is not present in project, hence no aggregator
-        # will be evaulated as equal and hence all the aggregates present in this project
-        # will be considered unique.
+        # All operations will return aggregates, even if the aggregates are not
+        # unique to that operation, because every operation/group in this
+        # project has a custom aggregator defined. Only the default aggregator
+        # can de-duplicate the returned results in the cursor, thus it is
+        # expected that the length of the cursor is larger than the number of
+        # unique ids present in the cursor.
         assert len(agg_cursor) == 41
+        assert len({get_aggregate_id(agg) for agg in agg_cursor}) == 34
         assert tuple(project) in agg_cursor
+        assert all((job,) in agg_cursor for job in project)
 
     def test_filters(self):
         project = self.mock_project()

@@ -18,7 +18,10 @@
 Overview:
 
 Total # of jobs: {{ jobs | project_length('jobs') }}
+{% set num_unique_aggregates = jobs | project_length('aggregates') %}
+{% if num_unique_aggregates > 0 %}
 Total # of unique aggregates: {{ jobs | project_length('aggregates') }}
+{% endif %}
 
 {% block progress %}
 | label | ratio |

@@ -165,8 +165,8 @@ def _render_status(
         ----------
         jobs : list
             Status of signac jobs or aggregates of jobs.
-        kind : str
-            Nature of the job passed.
+        kind : {{"jobs", "aggregates"}}
+            Whether to interpret the ``jobs`` argument as individual jobs or aggregates of jobs.
 
             * 'jobs' (Unique signac jobs of :class:`~signac.contrib.job.Job`)
             * 'aggregates' (Unique aggregates in :class:`~flow.project.FlowProject`)

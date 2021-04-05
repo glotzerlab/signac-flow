@@ -6,8 +6,8 @@ class _AggregateTestProject(FlowProject):
 
 
 def statepoint_i_even_odd_aggregator(jobs):
-    even = [job for job in jobs if job.sp.i % 2 == 0]
-    odd = [job for job in jobs if job.sp.i % 2 != 0]
+    even = tuple(job for job in jobs if job.sp.i % 2 == 0)
+    odd = tuple(job for job in jobs if job.sp.i % 2 != 0)
     return [even, odd]
 
 

@@ -2711,7 +2711,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         if detailed:
             # get detailed view info
-            status_legend = " ".join(f"[{v}]:{k}" for k, v in self.ALIASES.items())
 
             if compact:
                 num_operations = len(self._operations)
@@ -2738,6 +2737,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 f"[{v}]:{k}" for k, v in OPERATION_STATUS_SYMBOLS.items()
             )
 
+        status_legend = " ".join(f"[{v}]:{k}" for k, v in self.ALIASES.items())
         context["jobs"] = list(statuses.values())
         context["overview"] = overview
         context["detailed"] = detailed
@@ -2746,12 +2746,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         context["compact"] = compact
         context["pretty"] = pretty
         context["unroll"] = unroll
+        context["status_legend"] = status_legend
         if overview:
             context["progress_sorted"] = progress_sorted
         if detailed:
             context["alias_bool"] = {True: "Y", False: "N"}
             context["scheduler_status_code"] = _FMT_SCHEDULER_STATUS
-            context["status_legend"] = status_legend
             if compact:
                 context["extra_num_operations"] = max(num_operations - 1, 0)
             if not unroll:
@@ -2771,11 +2771,34 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 _add_placeholder_operation(job)
 
         op_counter = Counter()
+        op_submission_status_counter = defaultdict(Counter)
         for job in context["jobs"]:
             for group_name, group_status in job["groups"].items():
-                if group_name != "" and group_status["eligible"]:
-                    op_counter[group_name] += 1
-        context["op_counter"] = op_counter.most_common(eligible_jobs_max_lines)
+                if group_name != "":
+                    if group_status["eligible"]:
+                        op_counter[group_name] += 1
+                    op_submission_status_counter[group_name][
+                        group_status["scheduler_status"]
+                    ] += 1
+
+        def _op_submission_summary(counter):
+            """Generate string of statuses and counts, sorted by status."""
+            return ", ".join(
+                f"[{_FMT_SCHEDULER_STATUS[status]}]: {count}"
+                for status, count in sorted(counter.items())
+            )
+
+        op_counter_status = [
+            [
+                group_name,
+                group_count,
+                _op_submission_summary(op_submission_status_counter[group_name]),
+            ]
+            for group_name, group_count in op_counter.most_common(
+                eligible_jobs_max_lines
+            )
+        ]
+        context["op_counter"] = op_counter_status
         num_omitted_operations = len(op_counter) - len(context["op_counter"])
         if num_omitted_operations > 0:
             context["op_counter"].append(

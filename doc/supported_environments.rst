@@ -18,9 +18,9 @@ The package currently ships with scheduler support for:
 
 .. toctree::
 
-   supported_environments/slurm
-   supported_environments/torque
    supported_environments/lsf
+   supported_environments/pbs
+   supported_environments/slurm
 
 Any supercomputing system utilizing these schedulers is supported out of the box.
 In addition, the package provides specialized submission templates for the following environments:

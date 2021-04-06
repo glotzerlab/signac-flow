@@ -186,7 +186,7 @@ Compute Environments
 .. autoclass:: flow.environment.SimpleSchedulerEnvironment
     :members:
 
-.. autoclass:: flow.environment.TorqueEnvironment
+.. autoclass:: flow.environment.PBSEnvironment
     :members:
 
 .. autoclass:: flow.environment.SlurmEnvironment
@@ -218,13 +218,13 @@ Schedulers
 .. autoclass:: flow.scheduling.lsf.LSFScheduler
     :members:
 
+.. autoclass:: flow.scheduling.pbs.PBSScheduler
+    :members:
+
 .. autoclass:: flow.scheduling.simple_scheduler.SimpleScheduler
     :members:
 
 .. autoclass:: flow.scheduling.slurm.SlurmScheduler
-    :members:
-
-.. autoclass:: flow.scheduling.torque.TorqueScheduler
     :members:
 
 Error Classes

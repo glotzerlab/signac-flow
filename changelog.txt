@@ -18,6 +18,11 @@ Added
 - Defined validators for the ``fork`` directive (#480).
 - Submission summary now appears in ``FlowProject`` status output, showing the number of queued, running, unknown statuses. (#472, #488).
 
+Changed
++++++++
+
+- Renamed TorqueEnvironment and related classes to PBSEnvironment (#491).
+
 Fixed
 +++++
 
@@ -83,7 +88,7 @@ Changed
 - Command line interface always uses ``--job-id`` instead of ``--jobid`` (#363, #386).
 - ``CPUEnvironment`` and ``GPUEnvironment`` classes are deprecated (#381).
 - Docstrings are now written in `numpydoc style <https://numpydoc.readthedocs.io/en/latest/format.html>`__ (#392).
-- Default environment for the University of Minnesota Mangi cluster changed from SLURM to Torque (#393).
+- Default environment for the University of Minnesota Mangi cluster changed from Torque to SLURM (#393).
 - Run commands are evaluted lazily (#70, #396).
 - Deprecated method ``export_job_statuses`` (#402).
 - Improved internal caching of scheduler status (#410).

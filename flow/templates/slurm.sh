@@ -5,7 +5,7 @@
 #SBATCH --job-name="{{ id }}"
 {% set memory_requested = operations | calc_memory(parallel)  %}
 {% if memory_requested %}
-#SBATCH --mem={{ memory_requested }}G
+#SBATCH --mem={{ memory_requested|format_memory }}
 {% endif %}
 {% if partition %}
 #SBATCH --partition={{ partition }}

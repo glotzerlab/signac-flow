@@ -16,9 +16,11 @@ import re
 import socket
 from functools import lru_cache
 
+from deprecation import deprecated
 from signac.common import config
 
 from .directives import (
+    _FORK,
     _GET_EXECUTABLE,
     _MEMORY,
     _NGPU,
@@ -33,10 +35,11 @@ from .errors import NoSchedulerError
 from .scheduling.base import JobStatus
 from .scheduling.fake_scheduler import FakeScheduler
 from .scheduling.lsf import LSFScheduler
+from .scheduling.pbs import PBSScheduler
 from .scheduling.simple_scheduler import SimpleScheduler
 from .scheduling.slurm import SlurmScheduler
-from .scheduling.torque import TorqueScheduler
 from .util import config as flow_config
+from .version import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -346,6 +349,7 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
     def _get_default_directives(cls):
         return _Directives(
             [
+                _FORK,
                 _NP,
                 _NGPU,
                 _NRANKS,
@@ -389,11 +393,11 @@ class SimpleSchedulerEnvironment(ComputeEnvironment):
     template = "simple_scheduler.sh"
 
 
-class TorqueEnvironment(ComputeEnvironment):
-    """An environment with TORQUE scheduler."""
+class PBSEnvironment(ComputeEnvironment):
+    """An environment with PBS scheduler."""
 
-    scheduler_type = TorqueScheduler
-    template = "torque.sh"
+    scheduler_type = PBSScheduler
+    template = "pbs.sh"
 
 
 class SlurmEnvironment(ComputeEnvironment):
@@ -418,8 +422,8 @@ class NodesEnvironment(ComputeEnvironment):
     """
 
 
-class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
-    """Default environment for clusters with a TORQUE scheduler."""
+class DefaultPBSEnvironment(NodesEnvironment, PBSEnvironment):
+    """Default environment for clusters with a PBS scheduler."""
 
     @classmethod
     def add_args(cls, parser):
@@ -446,6 +450,16 @@ class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
             action="store_true",
             help="Do not copy current environment variables into compute node environment.",
         )
+
+
+@deprecated(
+    deprecated_in="0.14",
+    removed_in="0.16",
+    current_version=__version__,
+    details="DefaultTorqueEnvironment has been renamed to DefaultPBSEnvironment",
+)
+class DefaultTorqueEnvironment(DefaultPBSEnvironment):  # noqa: D101
+    pass
 
 
 class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):

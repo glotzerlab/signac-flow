@@ -392,6 +392,7 @@ class SimpleSchedulerEnvironment(ComputeEnvironment):
     scheduler_type = SimpleScheduler
     template = "simple_scheduler.sh"
 
+
 @deprecated(
     deprecated_in="0.16",
     removed_in="0.17",
@@ -400,7 +401,9 @@ class SimpleSchedulerEnvironment(ComputeEnvironment):
 )
 class PBSEnvironment(ComputeEnvironment):
     """An environment with PBS scheduler."""
+
     pass
+
 
 @deprecated(
     deprecated_in="0.16",
@@ -413,13 +416,16 @@ class SlurmEnvironment(ComputeEnvironment):
 
     pass
 
+
 @deprecated(
     deprecated_in="0.16",
     removed_in="0.17",
     current_version=__version__,
     details="LSFEnvironment has been deprecated, instead use DefaultLSFEnvironment",
+)
 class LSFEnvironment(ComputeEnvironment):
     """An environment with LSF scheduler."""
+
     pass
 
 
@@ -435,6 +441,8 @@ class NodesEnvironment(ComputeEnvironment):
     Each compute node is assumed to have a specific number of compute units,
     e.g., CPUs.
     """
+
+    pass
 
 
 class DefaultPBSEnvironment(ComputeEnvironment):

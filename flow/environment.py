@@ -392,28 +392,43 @@ class SimpleSchedulerEnvironment(ComputeEnvironment):
     scheduler_type = SimpleScheduler
     template = "simple_scheduler.sh"
 
-
+@deprecated(
+    deprecated_in="0.16",
+    removed_in="0.17",
+    current_version=__version__,
+    details="PBSEnvironment has been deprecated, instead use DefaultPBSEnvironment",
+)
 class PBSEnvironment(ComputeEnvironment):
     """An environment with PBS scheduler."""
+    pass
 
-    scheduler_type = PBSScheduler
-    template = "pbs.sh"
-
-
+@deprecated(
+    deprecated_in="0.16",
+    removed_in="0.17",
+    current_version=__version__,
+    details="SlurmEnvironment has been deprecated, instead use DefaultSlurmEnvironment",
+)
 class SlurmEnvironment(ComputeEnvironment):
     """An environment with SLURM scheduler."""
 
-    scheduler_type = SlurmScheduler
-    template = "slurm.sh"
+    pass
 
-
+@deprecated(
+    deprecated_in="0.16",
+    removed_in="0.17",
+    current_version=__version__,
+    details="LSFEnvironment has been deprecated, instead use DefaultLSFEnvironment",
 class LSFEnvironment(ComputeEnvironment):
     """An environment with LSF scheduler."""
-
-    scheduler_type = LSFScheduler
-    template = "lsf.sh"
+    pass
 
 
+@deprecated(
+    deprecated_in="0.16",
+    removed_in="0.17",
+    current_version=__version__,
+    details="SlurmEnvironment has been deprecated.",
+)
 class NodesEnvironment(ComputeEnvironment):
     """A compute environment consisting of multiple compute nodes.
 
@@ -422,8 +437,11 @@ class NodesEnvironment(ComputeEnvironment):
     """
 
 
-class DefaultPBSEnvironment(NodesEnvironment, PBSEnvironment):
+class DefaultPBSEnvironment(ComputeEnvironment):
     """Default environment for clusters with a PBS scheduler."""
+
+    scheduler_type = PBSScheduler
+    template = "pbs.sh"
 
     @classmethod
     def add_args(cls, parser):
@@ -462,8 +480,11 @@ class DefaultTorqueEnvironment(DefaultPBSEnvironment):  # noqa: D101
     pass
 
 
-class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
+class DefaultSlurmEnvironment(ComputeEnvironment):
     """Default environment for clusters with a SLURM scheduler."""
+
+    scheduler_type = SlurmScheduler
+    template = "slurm.sh"
 
     @classmethod
     def add_args(cls, parser):
@@ -487,8 +508,11 @@ class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
         )
 
 
-class DefaultLSFEnvironment(NodesEnvironment, LSFEnvironment):
+class DefaultLSFEnvironment(ComputeEnvironment):
     """Default environment for clusters with a LSF scheduler."""
+
+    scheduler_type = LSFScheduler
+    template = "lsf.sh"
 
     @classmethod
     def add_args(cls, parser):

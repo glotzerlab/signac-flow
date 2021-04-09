@@ -27,10 +27,10 @@
     {%- endif %}
 {% endblock tasks %}
 {% block header %}
-{{ super () -}}
-{% set account = account|default(environment|get_account_name, true) %}
-{% if account %}
+    {{- super() -}}
+    {%- set account = account|default(environment|get_account_name, true) %}
+    {%- if account %}
 #SBATCH -A {{ account }}
-{% endif %}
+    {%- endif %}
 
 {% endblock header %}

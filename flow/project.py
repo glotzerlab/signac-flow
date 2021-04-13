@@ -4093,7 +4093,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             *cls._OPERATION_PRECONDITIONS.values(),
             *cls._OPERATION_POSTCONDITIONS.values(),
         ):
-            raise ValueError("An condition function cannot be used as an operation")
+            raise ValueError("A condition function cannot be used as an operation.")
 
         if name is None:
             name = func.__name__

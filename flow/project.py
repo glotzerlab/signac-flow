@@ -24,7 +24,7 @@ from collections import Counter, defaultdict
 from copy import deepcopy
 from enum import IntFlag
 from hashlib import md5, sha1
-from itertools import count, groupby, islice
+from itertools import chain, count, groupby, islice
 from multiprocessing import Event, Pool, TimeoutError, cpu_count
 from multiprocessing.pool import ThreadPool
 
@@ -4032,11 +4032,24 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if isinstance(func, str):
             return lambda op: cls.operation(op, name=func)
 
+        if func in chain(
+            *cls._OPERATION_PRECONDITIONS.values(),
+            *cls._OPERATION_POSTCONDITIONS.values(),
+        ):
+            raise ValueError("A condition function cannot be used as an operation.")
+
         if name is None:
             name = func.__name__
 
-        if (name, func) in cls._OPERATION_FUNCTIONS:
-            raise ValueError(f"An operation with name '{name}' is already registered.")
+        for registered_name, registered_func in cls._OPERATION_FUNCTIONS:
+            if name == registered_name:
+                raise ValueError(
+                    f"An operation with name '{name}' is already registered."
+                )
+            if func is registered_func:
+                raise ValueError(
+                    "An operation with this function is already registered."
+                )
         if name in cls._GROUP_NAMES:
             raise ValueError(f"A group with name '{name}' is already registered.")
 

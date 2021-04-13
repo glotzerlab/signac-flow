@@ -26,13 +26,14 @@ from collections import Counter, defaultdict
 from copy import deepcopy
 from enum import IntFlag
 from hashlib import md5, sha1
-from itertools import count, groupby, islice
+from itertools import chain, count, groupby, islice
 from multiprocessing import Event, Pool, TimeoutError, cpu_count
 from multiprocessing.pool import ThreadPool
 
 import cloudpickle
 import jinja2
 import signac
+from deprecation import deprecated
 from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
 from signac.contrib.filterparse import parse_filter_arg
 from tqdm.auto import tqdm
@@ -65,6 +66,7 @@ from .util.misc import (
     switch_to_directory,
 )
 from .util.translate import abbreviate, shorten
+from .version import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -4010,77 +4012,18 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             elif bool(label_value) is True:
                 yield label_name
 
-    def add_operation(self, name, cmd, pre=None, post=None, hooks=None, **kwargs):
-        r"""Add an operation to the workflow.
-
-        This method will add an instance of :class:`~.FlowOperation` to the
-        operations of this project.
-
-        .. seealso::
-
-            A Python function may be defined as an operation function directly
-            using the :meth:`~.operation` decorator.
-
-        Any FlowOperation is associated with a specific command, which should
-        be a function of :class:`~signac.contrib.job.Job`. The command (cmd)
-        can be stated as function, either by using str-substitution based on a
-        job's attributes, or by providing a unary callable, which expects an
-        instance of job as its first and only positional argument.
-
-        For example, if we wanted to define a command for a program called
-        'hello', which expects a job id as its first argument, we could
-        construct the following two equivalent operations:
-
-        .. code-block:: python
-
-            op = FlowOperation('hello', cmd='hello {job.id}')
-            op = FlowOperation('hello', cmd=lambda 'hello {}'.format(job.id))
-
-        Here are some more useful examples for str-substitutions:
-
-        .. code-block:: python
-
-            # Substitute job state point parameters:
-            op = FlowOperation('hello', cmd='cd {job.ws}; hello {job.sp.a}')
-
-        Preconditions (pre) and postconditions (post) can be used to trigger an
-        operation only when certain conditions are met. Conditions are unary
-        callables, which expect an instance of job as their first and only
-        positional argument and return either True or False.
-
-        An operation is considered "eligible" for execution when all
-        preconditions are met and when at least one of the postconditions is
-        not met. Preconditions are always met when the list of preconditions
-        is empty. Postconditions are never met when the list of postconditions
-        is empty.
-
-        Please note, eligibility in this contexts refers only to the workflow
-        pipeline and not to other contributing factors, such as whether the
-        job-operation is currently running or queued.
-
-        Parameters
-        ----------
-        name : str
-            A unique identifier for this operation, which may be freely chosen.
-        cmd : str or callable
-            The command to execute operation; should be a function of job.
-        pre : sequence of callables
-            List of preconditions. (Default value = None)
-        post : sequence of callables
-            List of postconditions. (Default value = None)
-        \*\*kwargs
-            Keyword arguments passed as directives.
-
-        """
-        if name in self.operations:
-            raise KeyError("An operation with this identifier is already added.")
-        if hooks:
-            self._operation_hooks[name].update(Hooks.from_dict(hooks))
-        op = self.operations[name] = FlowCmdOperation(cmd=cmd, pre=pre, post=post)
-        if name in self._groups:
-            raise KeyError("A group with this identifier already exists.")
-        self._groups[name] = FlowGroup(
-            name, operations={name: op}, operation_directives=dict(name=kwargs)
+    @deprecated(
+        deprecated_in="0.14",
+        removed_in="0.16",
+        current_version=__version__,
+        details="Method has been removed.",
+    )
+    def add_operation(*args, **kwargs):  # noqa: D102
+        raise AttributeError(
+            "The add_operation() method was removed in version 0.14. "
+            "Please see https://docs.signac.io/en/latest/flow-project.html#defining-a-workflow "
+            "for instructions on how to define operations using the current API. This message "
+            "will be removed in version 0.16."
         )
 
     def completed_operations(self, job):
@@ -4155,8 +4098,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             def hello(job):
                 print('Hello', job)
 
-        See also: :meth:`~.flow.FlowProject.add_operation`.
-
         Parameters
         ----------
         func : callable
@@ -4174,11 +4115,24 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if isinstance(func, str):
             return lambda op: cls.operation(op, name=func)
 
+        if func in chain(
+            *cls._OPERATION_PRECONDITIONS.values(),
+            *cls._OPERATION_POSTCONDITIONS.values(),
+        ):
+            raise ValueError("A condition function cannot be used as an operation.")
+
         if name is None:
             name = func.__name__
 
-        if (name, func) in cls._OPERATION_FUNCTIONS:
-            raise ValueError(f"An operation with name '{name}' is already registered.")
+        for registered_name, registered_func in cls._OPERATION_FUNCTIONS:
+            if name == registered_name:
+                raise ValueError(
+                    f"An operation with name '{name}' is already registered."
+                )
+            if func is registered_func:
+                raise ValueError(
+                    "An operation with this function is already registered."
+                )
         if name in cls._GROUP_NAMES:
             raise ValueError(f"A group with name '{name}' is already registered.")
 

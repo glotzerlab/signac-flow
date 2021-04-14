@@ -172,4 +172,34 @@ class SummitEnvironment(DefaultLSFEnvironment):
         return mpi_prefix
 
 
-__all__ = ["SummitEnvironment"]
+class AndesEnvironment(DefaultLSFEnvironment):
+    """Environment profile for the Andes supercomputer...."""
+
+    hostname_pattern = r".*\.andes\.olcf\.ornl\.gov"
+    template = "andes.sh"
+    mpi_cmd = "mpirun"
+    cores_per_node = 32
+
+    @classmethod
+    def add_args(cls, parser):
+        """Add arguments to parser.
+
+        Parameters
+        ----------
+        parser : :class:`argparse.ArgumentParser`
+            The argument parser where arguments will be added.
+
+        """
+        super().add_args(parser)
+        parser.add_argument(
+            "--partition",
+            choices=[
+                "batch",
+                "gpu"
+            ],
+            default="batch",
+            help="Specify the partition to submit to.",
+        )
+
+
+__all__ = ["SummitEnvironment", "AndesEnvironment"]

@@ -177,7 +177,7 @@ class AndesEnvironment(DefaultLSFEnvironment):
 
     hostname_pattern = r".*\.andes\.olcf\.ornl\.gov"
     template = "andes.sh"
-    mpi_cmd = "mpirun"
+    mpi_cmd = "srun"
     cores_per_node = 32
 
     @classmethod

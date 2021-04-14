@@ -154,6 +154,8 @@ class SlurmScheduler(Scheduler):
         """Return True if a SLURM scheduler is detected."""
         try:
             subprocess.check_output(["sbatch", "--version"], stderr=subprocess.STDOUT)
+        except subprocess.CalledProcessError:
+            return True
         except OSError:
             return False
         else:

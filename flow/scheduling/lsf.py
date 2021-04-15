@@ -160,6 +160,8 @@ class LSFScheduler(Scheduler):
         """Return True if an LSF scheduler is detected."""
         try:
             subprocess.check_output(["bjobs", "-V"], stderr=subprocess.STDOUT)
+        except subprocess.CalledProcessError:
+            return True
         except OSError:
             return False
         else:

@@ -394,8 +394,8 @@ class SimpleSchedulerEnvironment(ComputeEnvironment):
 
 
 @deprecated(
-    deprecated_in="0.16",
-    removed_in="0.17",
+    deprecated_in="0.14",
+    removed_in="0.15",
     current_version=__version__,
     details="PBSEnvironment has been deprecated, instead use DefaultPBSEnvironment",
 )
@@ -406,8 +406,8 @@ class PBSEnvironment(ComputeEnvironment):
 
 
 @deprecated(
-    deprecated_in="0.16",
-    removed_in="0.17",
+    deprecated_in="0.14",
+    removed_in="0.15",
     current_version=__version__,
     details="SlurmEnvironment has been deprecated, instead use DefaultSlurmEnvironment",
 )
@@ -418,8 +418,8 @@ class SlurmEnvironment(ComputeEnvironment):
 
 
 @deprecated(
-    deprecated_in="0.16",
-    removed_in="0.17",
+    deprecated_in="0.14",
+    removed_in="0.15",
     current_version=__version__,
     details="LSFEnvironment has been deprecated, instead use DefaultLSFEnvironment",
 )
@@ -430,10 +430,10 @@ class LSFEnvironment(ComputeEnvironment):
 
 
 @deprecated(
-    deprecated_in="0.16",
-    removed_in="0.17",
+    deprecated_in="0.14",
+    removed_in="0.15",
     current_version=__version__,
-    details="SlurmEnvironment has been deprecated.",
+    details="NodesEnvironment has been deprecated.",
 )
 class NodesEnvironment(ComputeEnvironment):
     """A compute environment consisting of multiple compute nodes.

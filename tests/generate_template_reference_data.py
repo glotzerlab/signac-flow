@@ -111,6 +111,13 @@ def init(project):
                 "bundle": [["mpi_op", "omp_op"]],
             },
         ],
+        "environments.incite.AndesEnvironment": [
+            {},
+            {
+                "parallel": [False, True],
+                "bundle": [["mpi_op", "omp_op"]],
+            },
+        ],
         "environments.umn.MangiEnvironment": [
             {},
             {

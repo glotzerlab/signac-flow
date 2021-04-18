@@ -2634,10 +2634,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             # There is no status information if the project has no operations.
             # If no status information exists for this job, we need to set
             # default values.
-            statuses.setdefault(job_id, {})
-            statuses[job_id].setdefault("aggregate_id", job_id)
-            statuses[job_id].setdefault("groups", {})
-            statuses[job_id]["labels"] = job_label_data["labels"]
+            if job_id in statuses:
+                # Don't create label entries for job ids that were removed by
+                # --only-incomplete-operations.
+                statuses[job_id].setdefault("groups", {})
+                statuses[job_id]["labels"] = job_label_data["labels"]
 
         # If the dump_json variable is set, just dump all status info
         # formatted in JSON to screen.

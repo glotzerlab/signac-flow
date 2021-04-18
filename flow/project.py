@@ -2617,15 +2617,17 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # eligible groups.
         total_num_jobs = len(status_results)
 
+        def _has_any_eligible_group(status_entry):
+            return any(group["eligible"] for group in status_entry["groups"].values())
+
         if only_incomplete:
             # Remove jobs with no eligible groups from the status info.
-
-            def _incomplete(status_entry):
-                return any(
-                    group["eligible"] for group in status_entry["groups"].values()
-                )
-
-            status_results = list(filter(_incomplete, status_results))
+            status_results = list(filter(_has_any_eligible_group, status_results))
+            total_num_eligible_jobs = len(status_results)
+        else:
+            total_num_eligible_jobs = sum(
+                1 for _ in filter(_has_any_eligible_group, status_results)
+            )
 
         statuses = {
             status_entry["aggregate_id"]: status_entry
@@ -2747,6 +2749,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         status_legend = " ".join(f"[{v}]:{k}" for k, v in self.ALIASES.items())
         context["jobs"] = list(statuses.values())
         context["total_num_jobs"] = total_num_jobs
+        context["total_num_eligible_jobs"] = total_num_eligible_jobs
         context["total_num_job_labels"] = len(job_labels)
         context["overview"] = overview
         context["detailed"] = detailed

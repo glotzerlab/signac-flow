@@ -2742,6 +2742,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         status_legend = " ".join(f"[{v}]:{k}" for k, v in self.ALIASES.items())
         context["jobs"] = list(statuses.values())
+        context["total_num_job_labels"] = len(job_labels)
         context["overview"] = overview
         context["detailed"] = detailed
         context["all_ops"] = all_ops

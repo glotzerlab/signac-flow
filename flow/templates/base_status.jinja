@@ -15,8 +15,7 @@
 
 {% block overview %}
 {% if overview %}
-{{ 'Overview: \n' }}
-{{ 'Total # of jobs: %s ' | format(jobs | length) }}
+Overview: {{ total_num_jobs }} jobs
 
 {% block progress %}
 | label | ratio |

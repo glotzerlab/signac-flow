@@ -2613,8 +2613,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             for i, error in enumerate(errors):
                 logger.debug("Status update error #%i: '%s'", i + 1, error)
 
+        # Get the total number of statuses before removing those with no
+        # eligible groups.
+        total_num_jobs = len(status_results)
+
         if only_incomplete:
-            # Remove jobs with no eligible groups from the status info
+            # Remove jobs with no eligible groups from the status info.
 
             def _incomplete(status_entry):
                 return any(
@@ -2628,7 +2632,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             for status_entry in status_results
         }
 
-        # Add labels to the status information
+        # Add labels to the status information.
         for job_label_data in job_labels:
             job_id = job_label_data["job_id"]
             # There is no status information if the project has no operations.
@@ -2653,7 +2657,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 for label in status["labels"]:
                     progress[label] += 1
             # Sort the label progress by amount complete (descending), then
-            # alphabetically
+            # alphabetically.
             progress_sorted = list(
                 islice(
                     sorted(progress.items(), key=lambda x: (-x[1], x[0])),
@@ -2742,6 +2746,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         status_legend = " ".join(f"[{v}]:{k}" for k, v in self.ALIASES.items())
         context["jobs"] = list(statuses.values())
+        context["total_num_jobs"] = total_num_jobs
         context["total_num_job_labels"] = len(job_labels)
         context["overview"] = overview
         context["detailed"] = detailed

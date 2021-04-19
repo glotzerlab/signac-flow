@@ -2445,9 +2445,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Parameters
         ----------
-        jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
-            Only print status for the given jobs or aggregates of jobs,
-            or all if the argument is None. (Default value = None)
+        jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates
+            If ``None``, print status for all jobs/aggregates. If not
+            ``None``, only print status for the given jobs or aggregates
+            (Default value = None).
         overview : bool
             Display an overview of the project status. (Default value = True)
         overview_max_lines : int
@@ -3005,9 +3006,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Parameters
         ----------
-        jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
+        jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates
+            If ``None``, execute operations for all eligible jobs/aggregates.
             If not ``None``, only execute operations for the given jobs or
-            aggregates of jobs (Default value = None).
+            aggregates (Default value = None).
         names : iterable of :class:`str`
             Only execute operations that match the provided set of names
             (interpreted as regular expressions), or all if the argument is
@@ -3543,9 +3545,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         ----------
         bundle_size : int
             Specify the number of operations to be bundled into one submission, defaults to 1.
-        jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates of jobs
-            Only submit operations for the given jobs or aggregates of jobs,
-            or all if the argument is None. (Default value = None)
+        jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates
+            If ``None``, submit operations for all eligible jobs/aggregates.
+            If not ``None``, only submit operations for the given jobs or
+            aggregates (Default value = None).
         names : iterable of :class:`str`
             Only submit operations that match the provided set of names
             (interpreted as regular expressions), or all if the argument is

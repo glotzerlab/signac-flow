@@ -32,10 +32,10 @@ Total # of unique aggregates: {{ jobs | project_length('aggregates') }}
 {% endblock%}
 
 {% block operation_summary %}
-| operation | number of eligible jobs |
-| --------- | ----------------------- |
-{% for op, n_jobs in op_counter %}
-| {{ op }} | {{ n_jobs }} |
+| operation | number of eligible jobs | submission status |
+| --------- | ----------------------- | ----------------- |
+{% for op, n_jobs, op_submission_status in op_counter %}
+| {{ op }} | {{ n_jobs }} | {{ op_submission_status }} |
 {% endfor %}
 {% endblock %}
 {% endif %}
@@ -59,6 +59,6 @@ Detailed View:
 {% endif %}
 {% endfor %}
 {% endfor %}
-{{ status_legend }}
 {% endif %}
 {% endblock %}
+{{ status_legend }}

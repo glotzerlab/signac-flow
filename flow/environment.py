@@ -16,6 +16,7 @@ import re
 import socket
 from functools import lru_cache
 
+from deprecation import deprecated
 from signac.common import config
 
 from .directives import (
@@ -34,10 +35,11 @@ from .errors import NoSchedulerError
 from .scheduling.base import JobStatus
 from .scheduling.fake_scheduler import FakeScheduler
 from .scheduling.lsf import LSFScheduler
+from .scheduling.pbs import PBSScheduler
 from .scheduling.simple_scheduler import SimpleScheduler
 from .scheduling.slurm import SlurmScheduler
-from .scheduling.torque import TorqueScheduler
 from .util import config as flow_config
+from .version import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -391,27 +393,48 @@ class SimpleSchedulerEnvironment(ComputeEnvironment):
     template = "simple_scheduler.sh"
 
 
-class TorqueEnvironment(ComputeEnvironment):
-    """An environment with TORQUE scheduler."""
+@deprecated(
+    deprecated_in="0.14",
+    removed_in="0.15",
+    current_version=__version__,
+    details="PBSEnvironment has been deprecated, instead use DefaultPBSEnvironment",
+)
+class PBSEnvironment(ComputeEnvironment):
+    """An environment with PBS scheduler."""
 
-    scheduler_type = TorqueScheduler
-    template = "torque.sh"
+    pass
 
 
+@deprecated(
+    deprecated_in="0.14",
+    removed_in="0.15",
+    current_version=__version__,
+    details="SlurmEnvironment has been deprecated, instead use DefaultSlurmEnvironment",
+)
 class SlurmEnvironment(ComputeEnvironment):
     """An environment with SLURM scheduler."""
 
-    scheduler_type = SlurmScheduler
-    template = "slurm.sh"
+    pass
 
 
+@deprecated(
+    deprecated_in="0.14",
+    removed_in="0.15",
+    current_version=__version__,
+    details="LSFEnvironment has been deprecated, instead use DefaultLSFEnvironment",
+)
 class LSFEnvironment(ComputeEnvironment):
     """An environment with LSF scheduler."""
 
-    scheduler_type = LSFScheduler
-    template = "lsf.sh"
+    pass
 
 
+@deprecated(
+    deprecated_in="0.14",
+    removed_in="0.15",
+    current_version=__version__,
+    details="NodesEnvironment has been deprecated.",
+)
 class NodesEnvironment(ComputeEnvironment):
     """A compute environment consisting of multiple compute nodes.
 
@@ -419,9 +442,14 @@ class NodesEnvironment(ComputeEnvironment):
     e.g., CPUs.
     """
 
+    pass
 
-class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
-    """Default environment for clusters with a TORQUE scheduler."""
+
+class DefaultPBSEnvironment(ComputeEnvironment):
+    """Default environment for clusters with a PBS scheduler."""
+
+    scheduler_type = PBSScheduler
+    template = "pbs.sh"
 
     @classmethod
     def add_args(cls, parser):
@@ -450,8 +478,21 @@ class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
         )
 
 
-class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
+@deprecated(
+    deprecated_in="0.14",
+    removed_in="0.16",
+    current_version=__version__,
+    details="DefaultTorqueEnvironment has been renamed to DefaultPBSEnvironment",
+)
+class DefaultTorqueEnvironment(DefaultPBSEnvironment):  # noqa: D101
+    pass
+
+
+class DefaultSlurmEnvironment(ComputeEnvironment):
     """Default environment for clusters with a SLURM scheduler."""
+
+    scheduler_type = SlurmScheduler
+    template = "slurm.sh"
 
     @classmethod
     def add_args(cls, parser):
@@ -475,8 +516,11 @@ class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
         )
 
 
-class DefaultLSFEnvironment(NodesEnvironment, LSFEnvironment):
+class DefaultLSFEnvironment(ComputeEnvironment):
     """Default environment for clusters with a LSF scheduler."""
+
+    scheduler_type = LSFScheduler
+    template = "lsf.sh"
 
     @classmethod
     def add_args(cls, parser):

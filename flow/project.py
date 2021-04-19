@@ -4259,8 +4259,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 operation_name
             ] = directives
 
-    def reregister_aggregates(self):
+    def _reregister_aggregates(self):
         """Re-register the aggregates present in this :class:`~.FlowProject`."""
+        # TODO: This method could be consolidated with the code in _register_groups.
+        # For now, we will not put it into the public API.
         for group in self._groups.values():
             aggregator = self._group_to_aggregate_store[group]
             if isinstance(aggregator, _AggregateStore):

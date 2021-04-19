@@ -1887,7 +1887,7 @@ class TestProjectUtilities(TestAggregatesProjectBase):
         project.open_job(dict(i=31, even=False)).init()
         # Default aggregate store doesn't need to be re-registered.
         assert len(agg_cursor) == 42
-        project.reregister_aggregates()
+        project._reregister_aggregates()
         # The operation agg_op2 adds another aggregate in the project.
         assert len(agg_cursor) == 43
 

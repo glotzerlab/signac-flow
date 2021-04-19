@@ -4071,11 +4071,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Append the name and function to the class registry
         cls._OPERATION_FUNCTIONS.append((name, func))
-        # We register aggregators associated with operation functions
-        # in `_register_groups` and hence the aggregator parameter is passed as None.
-        # This is because we do not restrict the decorator placement in terms of
-        # `FlowGroupEntry`, `aggregator`, or `operation`.
-        cls._GROUPS.append(FlowGroupEntry(name=name, options="", group_aggregator=None))
+        # We register aggregators associated with operation functions in
+        # `_register_groups` and we do not set the aggregator explicitly.
+        # We delay setting the aggregator because we do not restrict the
+        # decorator placement in terms of `@FlowGroupEntry`, `@aggregator`, or
+        # `@operation`.
+        cls._GROUPS.append(FlowGroupEntry(name=name, options=""))
         if hasattr(func, "_flow_groups"):
             func._flow_groups.append(name)
         else:
@@ -4171,8 +4172,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if name in cls._GROUP_NAMES:
             raise ValueError(f"Repeat definition of group with name '{name}'.")
         cls._GROUP_NAMES.add(name)
-        if group_aggregator is None:
-            group_aggregator = aggregator.groupsof(1)
         group_entry = FlowGroupEntry(
             name=name, options=options, group_aggregator=group_aggregator
         )
@@ -4199,20 +4198,24 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for entry in group_entries:
             group = FlowGroup(entry.name, options=entry.options)
             self._groups[entry.name] = group
-            # Since we store aggregator parameter for operations as None,
-            # we fetch the aggregators associated with operations using
-            # the registered operations.
+            # Handle unset aggregators
             if entry.group_aggregator is None:
-                operation = self._operations[entry.name]
-                if isinstance(operation, FlowCmdOperation):
-                    entry.group_aggregator = operation._cmd._flow_aggregate
+                # use the operation's aggregator for singleton groups
+                # corresponding to single operations
+                if entry.name in self._operations:
+                    operation = self._operations[entry.name]
+                    if isinstance(operation, FlowCmdOperation):
+                        entry.group_aggregator = operation._cmd._flow_aggregate
+                    else:
+                        entry.group_aggregator = operation._op_func._flow_aggregate
+                # The default group aggregator just iterates over jobs
                 else:
-                    entry.group_aggregator = operation._op_func._flow_aggregate
-
+                    entry.group_aggregator = aggregator.groupsof()
             if entry.group_aggregator not in created_aggregate_stores:
                 created_aggregate_stores[
                     entry.group_aggregator
                 ] = entry.group_aggregator._create_AggregateStore(self)
+            # Associate the group with its aggregate store
             self._group_to_aggregate_store[group] = created_aggregate_stores[
                 entry.group_aggregator
             ]

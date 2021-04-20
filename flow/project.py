@@ -1906,10 +1906,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 disk_status = {}
             disk_status.update(status_update)
 
-            # Filter out JobStatus.unknown == 1 before writing to disk, to save
+            # Filter out JobStatus.unknown before writing to disk, to save
             # space and reduce the write time.
             disk_status = {
-                key: value for key, value in disk_status.items() if value != 1
+                key: value
+                for key, value in disk_status.items()
+                if value != int(JobStatus.unknown)
             }
 
             self.document["_status"] = disk_status

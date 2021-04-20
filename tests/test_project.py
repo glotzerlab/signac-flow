@@ -708,21 +708,6 @@ class TestProjectClass(TestProjectBase):
             not callable(value) for value in submit_job_operation.directives.values()
         )
 
-    def test_operation_with_directies(self):
-        class A(FlowProject):
-            pass
-
-        @A.operation.with_directives({"executable": "python3", "nranks": 4})
-        def test_context(job):
-            return "exit 1"
-
-        project = self.mock_project(A)
-        for job in project:
-            for next_op in project._next_operations([(job,)]):
-                assert next_op.directives["executable"] == "python3"
-                assert next_op.directives["nranks"] == 4
-            break
-
     def test_copy_conditions(self):
         class A(FlowProject):
             pass

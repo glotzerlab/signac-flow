@@ -193,10 +193,7 @@ class AndesEnvironment(DefaultLSFEnvironment):
         super().add_args(parser)
         parser.add_argument(
             "--partition",
-            choices=[
-                "batch",
-                "gpu"
-            ],
+            choices=["batch", "gpu"],
             default="batch",
             help="Specify the partition to submit to.",
         )

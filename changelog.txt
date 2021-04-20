@@ -17,6 +17,7 @@ Added
 - Documentation for all directives (#480).
 - Defined validators for the ``fork`` directive (#480).
 - Submission summary now appears in ``FlowProject`` status output, showing the number of queued, running, unknown statuses. (#472, #488).
+- Decorator for setting directives while registering operation function ``FlowProject.operation.with_directives`` (#502).
 
 Changed
 +++++++

@@ -1241,6 +1241,9 @@ class _FlowProjectClass(type):
         cls.pre = cls._setup_preconditions_class(parent_class=cls)
         cls.post = cls._setup_postconditions_class(parent_class=cls)
 
+        # Give the class an operation register object
+        cls.operation = cls._setup_operation_register_object(parent_class=cls)
+
         # All groups are registered with the function returned by the
         # make_group classmethod. In contrast to operations and labels, the
         # make_group classmethod does not serve as the decorator, the functor
@@ -1387,6 +1390,131 @@ class _FlowProjectClass(type):
                 )
 
         return post
+
+    @staticmethod
+    def _setup_operation_register_object(parent_class):
+        class operation:
+            """Add operation functions to the class workflow definition.
+
+            This object is designed to be used as a decorator, for example:
+
+            .. code-block:: python
+
+                @FlowProject.operation
+                def hello(job):
+                    print('Hello', job)
+
+            Directives can also be specified by using :meth:`FlowProject.operation.with_directives`.
+
+            .. code-block:: python
+
+                @FlowProject.operation.with_directives({'nranks': 4})
+                def mpi_hello(job):
+                    print("hello")
+
+            Parameters
+            ----------
+            func : callable
+                The function to add to the workflow.
+            name : str
+                The operation name. Uses the name of the function if None.
+                (Default value = None)
+
+            Returns
+            -------
+            callable
+                The operation function.
+            """
+
+            _parent_class = parent_class
+
+            def __init__(self, func, name=None):
+                """We somewhat abuse the __init__ function to act as a decorator.
+
+                We return the original function here, and only use classmethods
+                of this class.
+                """
+                if isinstance(func, str):
+                    return lambda op: self(op, name=func)
+
+                if func in chain(
+                    *self._parent_class._OPERATION_PRECONDITIONS.values(),
+                    *self._parent_class._OPERATION_POSTCONDITIONS.values(),
+                ):
+                    raise ValueError(
+                        "A condition function cannot be used as an operation."
+                    )
+
+                if name is None:
+                    name = func.__name__
+
+                for (
+                    registered_name,
+                    registered_func,
+                ) in self._parent_class._OPERATION_FUNCTIONS:
+                    if name == registered_name:
+                        raise ValueError(
+                            f"An operation with name '{name}' is already registered."
+                        )
+                    if func is registered_func:
+                        raise ValueError(
+                            "An operation with this function is already registered."
+                        )
+                if name in self._parent_class._GROUP_NAMES:
+                    raise ValueError(
+                        f"A group with name '{name}' is already registered."
+                    )
+
+                signature = inspect.signature(func)
+                for i, parameter_value in enumerate(signature.parameters.values()):
+                    if i > 0 and parameter_value.default is inspect.Parameter.empty:
+                        raise ValueError(
+                            "Only the first argument in an operation argument may not have "
+                            f"a default value! ({name})"
+                        )
+                if not getattr(func, "_flow_aggregate", False):
+                    func._flow_aggregate = _aggregator.groupsof(1)
+
+                # Append the name and function to the class registry
+                self._parent_class._OPERATION_FUNCTIONS.append((name, func))
+                self._parent_class._GROUPS.append(
+                    FlowGroupEntry(name=name, options="")
+                    # TODO: Enable aggregator argument.
+                    # FlowGroupEntry(name=name, options="", aggregator=func._flow_aggregate)
+                )
+                if hasattr(func, "_flow_groups"):
+                    func._flow_groups.append(name)
+                else:
+                    func._flow_groups = [name]
+                return func
+
+            @classmethod
+            def with_directives(cls, directives, name=None):
+                """Return a decorator that also sets directives for the operation.
+
+                Parameters
+                ----------
+                directives : dict
+                    Directives to use for resource requests and running the operation through the
+                    group.
+                name : str
+                    The operation name. Uses the name of the function if None.
+                    (Default value = None)
+
+                Returns
+                -------
+                function
+                    A decorator which registers the function with the correct name and directives as
+                    an operation of the :class:`~.FlowProject` subclass.
+                """
+
+                def add_operation_with_directives(function):
+                    function._flow_directives = directives
+                    return cls(function, name)
+
+                return add_operation_with_directives
+
+        return operation
 
 
 class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
@@ -4002,79 +4130,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 jobs=aggregate,
                 ignore_conditions=ignore_conditions,
             )
-
-    @classmethod
-    def operation(cls, func, name=None):
-        """Add an operation function to the class workflow definition.
-
-        This function is designed to be used as a decorator, for example:
-
-        .. code-block:: python
-
-            @FlowProject.operation
-            def hello(job):
-                print('Hello', job)
-
-        Parameters
-        ----------
-        func : callable
-            The function to add to the workflow.
-        name : str
-            The operation name. Uses the name of the function if None.
-             (Default value = None)
-
-        Returns
-        -------
-        callable
-            The operation function.
-
-        """
-        if isinstance(func, str):
-            return lambda op: cls.operation(op, name=func)
-
-        if func in chain(
-            *cls._OPERATION_PRECONDITIONS.values(),
-            *cls._OPERATION_POSTCONDITIONS.values(),
-        ):
-            raise ValueError("A condition function cannot be used as an operation.")
-
-        if name is None:
-            name = func.__name__
-
-        for registered_name, registered_func in cls._OPERATION_FUNCTIONS:
-            if name == registered_name:
-                raise ValueError(
-                    f"An operation with name '{name}' is already registered."
-                )
-            if func is registered_func:
-                raise ValueError(
-                    "An operation with this function is already registered."
-                )
-        if name in cls._GROUP_NAMES:
-            raise ValueError(f"A group with name '{name}' is already registered.")
-
-        signature = inspect.signature(func)
-        for i, parameter_value in enumerate(signature.parameters.values()):
-            if i > 0 and parameter_value.default is inspect.Parameter.empty:
-                raise ValueError(
-                    "Only the first argument in an operation argument may not have "
-                    f"a default value! ({name})"
-                )
-        if not getattr(func, "_flow_aggregate", False):
-            func._flow_aggregate = _aggregator.groupsof(1)
-
-        # Append the name and function to the class registry
-        cls._OPERATION_FUNCTIONS.append((name, func))
-        cls._GROUPS.append(
-            FlowGroupEntry(name=name, options="")
-            # TODO: Enable aggregator argument.
-            # FlowGroupEntry(name=name, options="", aggregator=func._flow_aggregate)
-        )
-        if hasattr(func, "_flow_groups"):
-            func._flow_groups.append(name)
-        else:
-            func._flow_groups = [name]
-        return func
 
     @classmethod
     def _collect_operations(cls):

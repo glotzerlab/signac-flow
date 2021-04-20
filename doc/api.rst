@@ -34,6 +34,7 @@ The FlowProject
     FlowProject.main
     FlowProject.make_group
     FlowProject.operation
+    FlowProject.operation.with_directives
     FlowProject.operations
     FlowProject.post
     FlowProject.post.copy_from
@@ -58,8 +59,11 @@ The FlowProject
 .. autoclass:: FlowProject
     :show-inheritance:
     :members:
-    :exclude-members: pre,post
+    :exclude-members: pre,post,operation
 
+.. automethod:: flow.FlowProject.operation(func, name=None)
+
+.. automethod:: flow.FlowProject.operation.with_directives(directives, name=None)
 
 .. automethod:: flow.FlowProject.post
 

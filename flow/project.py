@@ -1392,7 +1392,7 @@ class _FlowProjectClass(type):
 
     @staticmethod
     def _setup_operation_object(parent_class):
-        class operation:
+        class OperationRegister:
             """Add operation functions to the class workflow definition.
 
             This object is designed to be used as a decorator, for example:
@@ -1508,7 +1508,7 @@ class _FlowProjectClass(type):
 
                 return add_operation_with_directives
 
-        return operation()
+        return OperationRegister()
 
 
 class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):

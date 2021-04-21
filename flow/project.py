@@ -1482,8 +1482,7 @@ class _FlowProjectClass(type):
                     func._flow_groups = [name]
                 return func
 
-            @classmethod
-            def with_directives(cls, directives, name=None):
+            def with_directives(self, directives, name=None):
                 """Return a decorator that also sets directives for the operation.
 
                 Parameters
@@ -1504,7 +1503,7 @@ class _FlowProjectClass(type):
 
                 def add_operation_with_directives(function):
                     function._flow_directives = directives
-                    return cls(function, name)
+                    return self(function, name)
 
                 return add_operation_with_directives
 

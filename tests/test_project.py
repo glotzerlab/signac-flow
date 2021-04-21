@@ -708,7 +708,7 @@ class TestProjectClass(TestProjectBase):
             not callable(value) for value in submit_job_operation.directives.values()
         )
 
-    def test_operation_with_directies(self):
+    def test_operation_with_directives(self):
         class A(FlowProject):
             pass
 

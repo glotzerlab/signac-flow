@@ -1241,7 +1241,7 @@ class _FlowProjectClass(type):
         cls.post = cls._setup_postconditions_class(parent_class=cls)
 
         # Give the class an operation register object
-        cls.operation = cls._setup_operation_register_object(parent_class=cls)
+        cls.operation = cls._setup_operation_object(parent_class=cls)
 
         # All groups are registered with the function returned by the
         # make_group classmethod. In contrast to operations and labels, the
@@ -1391,7 +1391,7 @@ class _FlowProjectClass(type):
         return post
 
     @staticmethod
-    def _setup_operation_register_object(parent_class):
+    def _setup_operation_object(parent_class):
         class operation:
             """Add operation functions to the class workflow definition.
 
@@ -1427,12 +1427,7 @@ class _FlowProjectClass(type):
 
             _parent_class = parent_class
 
-            def __init__(self, func, name=None):
-                """We somewhat abuse the __init__ function to act as a decorator.
-
-                We return the original function here, and only use classmethods
-                of this class.
-                """
+            def __call__(self, func, name=None):
                 if isinstance(func, str):
                     return lambda op: self(op, name=func)
 
@@ -1513,7 +1508,7 @@ class _FlowProjectClass(type):
 
                 return add_operation_with_directives
 
-        return operation
+        return operation()
 
 
 class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):

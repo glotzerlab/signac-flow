@@ -42,27 +42,26 @@
         {% endif %}
     {% set launcher_file = 'launcher_' ~ id|replace('/', '_') %}
     {% set cmd_suffix = cmd_suffix|default('') %}
-    cat << EOF > {{ launcher_file }}
+cat << EOF > {{ launcher_file }}
     {% for operation in (operations|with_np_offset) %}
-        {{ operation.cmd }}{{ cmd_suffix }}
+{{ operation.cmd }}{{ cmd_suffix }}
     {% endfor %}
 EOF
+export LAUNCHER_PLUGIN_DIR=$LAUNCHER_DIR/plugins
+export LAUNCHER_RMI=SLURM
+export LAUNCHER_JOB_FILE={{ launcher_file }}
 
-                export LAUNCHER_PLUGIN_DIR=$LAUNCHER_DIR/plugins
-                export LAUNCHER_RMI=SLURM
-                export LAUNCHER_JOB_FILE={{ launcher_file }}
-
-                $LAUNCHER_DIR/paramrun
-                rm {{ launcher_file }}
-            {% else %}
-                {# Only the pre_operation block is overridden, all other behavior is inherited from base_script.sh #}
-                {{ super () -}}
-                {# We need to reset the environment's base offset in between script generation for separate bundles. #}
-                {# Since Jinja's bytecode optimizes out calls to filters with a constant argument, we are forced to #}
-                {# rerun this function on the environment's base offset at the end of each run to return the offset to 0. #}
-                {{ "%d"|format(environment.base_offset)|decrement_offset }}
-            {% endif %}
-        {% endblock %}
+$LAUNCHER_DIR/paramrun
+rm {{ launcher_file }}
+        {% else %}
+	    {# Only the pre_operation block is overridden, all other behavior is inherited from base_script.sh #}
+	    {{ super () -}}
+	    {# We need to reset the environment's base offset in between script generation for separate bundles. #}
+	    {# Since Jinja's bytecode optimizes out calls to filters with a constant argument, we are forced to #}
+	    {# rerun this function on the environment's base offset at the end of each run to return the offset to 0. #}
+	    {{ "%d"|format(environment.base_offset)|decrement_offset }}
+	{% endif %}
+{% endblock %}
 
     {# This override needs to happen outside the body block above, otherwise jinja2 doesn't seem to #}
     {# respect block scope and the operations variable is left undefined. #}

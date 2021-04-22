@@ -173,9 +173,12 @@ class SummitEnvironment(DefaultLSFEnvironment):
 
 
 class AndesEnvironment(DefaultLSFEnvironment):
-    """Environment profile for the Andes supercomputer...."""
+    """Environment profile for the Andes supercomputer.
 
-    hostname_pattern = r".*\.andes\.olcf\.ornl\.gov"
+    https://www.olcf.ornl.gov/olcf-resources/compute-systems/andes/
+    """
+
+    hostname_pattern = r"andes-.*\.olcf\.ornl\.gov"
     template = "andes.sh"
     mpi_cmd = "srun"
     cores_per_node = 32

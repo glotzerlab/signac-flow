@@ -215,8 +215,69 @@ class Bridges2Environment(DefaultSlurmEnvironment):
         )
 
 
+class ExpanseEnvironment(DefaultSlurmEnvironment):
+    """Environment profile for the Expanse supercomputer.
+
+    https://www.sdsc.edu/support/user_guides/expanse.html
+    """
+
+    hostname_pattern = r".*\.expanse\.sdsc\.edu$"
+    template = "expanse.sh"
+    cores_per_node = 128
+    gpus_per_node = 4
+
+    @classmethod
+    def _get_mpi_prefix(cls, operation):
+        if operation.directives["nranks"] == 0:
+            return ""
+        # We must specify the pmi2 option as the SLURM configuration of Expanse uses the
+        # special pmi2 preprocessing. See `man srun` on an Expanse login node.
+        base_prefix = "srun --mpi=pmi2"
+        rank_option = f"-n {operation.directives['nranks']} "
+        # We have to handle the case with and without OpenMP differently due to the
+        # --cpus-per-task option.
+        if operation.directives["omp_num_threads"] == 0:
+            return base_prefix + rank_option
+        cpus_per_task = f"--cpus-per-task={operation.directives['omp_num_threads']} "
+        return base_prefix + cpus_per_task + rank_option
+
+    @classmethod
+    def _get_omp_prefix(cls, operation):
+        # The current user states to run OpenMP jobs with mpirun even when not using MPI
+        base_prefix = super()._get_omp_prefix(operation)
+        if operation.directives["nranks"] == 0:
+            return base_prefix + f"mpirun -np {operation.directives['num_omp_threads']}"
+        return base_prefix
+
+    @classmethod
+    def add_args(cls, parser):
+        """Add arguments to parser.
+
+        Parameters
+        ----------
+        parser : :class:`argparse.ArgumentParser`
+            The argument parser where arguments will be added.
+
+        """
+        super().add_args(parser)
+        parser.add_argument(
+            "--partition",
+            choices=[
+                "compute",
+                "shared",
+                "large-shared",
+                "gpu",
+                "gpu-shared",
+                "debug",
+            ],
+            default="compute",
+            help="Specify the partition to submit to.",
+        )
+
+
 __all__ = [
     "CometEnvironment",
     "Stampede2Environment",
     "Bridges2Environment",
+    "ExpanseEnvironment",
 ]

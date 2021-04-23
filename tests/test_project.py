@@ -1267,6 +1267,12 @@ class TestExecutionProject(TestProjectBase):
             next_op = list(project._next_operations([(job,)]))[0]
             assert next_op.name == "op1"
             assert next_op._jobs == (job,)
+
+        cached_status = project._get_cached_scheduler_status()
+        for job in project:
+            for next_op in project._next_operations([(job,)]):
+                assert next_op.id not in cached_status
+
         with redirect_stderr(StringIO()):
             project.submit()
         assert len(list(MockScheduler.jobs())) == num_jobs_submitted

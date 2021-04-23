@@ -24,6 +24,7 @@ Changed
 
 - Renamed TorqueEnvironment and related classes to PBSEnvironment (#491).
 - LSF and SLURM schedulers will appear to be present if the respective commands ``bjobs -V`` or ``sbatch --version`` exit with a non-zero error code (#498).
+- Only known JobStatus values will be written to the project document, to save space and writing time (#503).
 
 Fixed
 +++++

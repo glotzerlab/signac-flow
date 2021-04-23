@@ -2017,14 +2017,25 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         try:
             yield status_update
         finally:
-            if status_update:
-                status_update = {
-                    key: int(value) for key, value in status_update.items()
-                }
-                if "_status" in self.document:
-                    self.document["_status"].update(status_update)
-                else:
-                    self.document["_status"] = status_update
+            if not status_update:
+                return
+
+            status_update = {key: int(value) for key, value in status_update.items()}
+            if "_status" in self.document:
+                disk_status = self.document["_status"]()
+            else:
+                disk_status = {}
+            disk_status.update(status_update)
+
+            # Filter out JobStatus.unknown before writing to disk, to save
+            # space and reduce the write time.
+            disk_status = {
+                key: value
+                for key, value in disk_status.items()
+                if value != int(JobStatus.unknown)
+            }
+
+            self.document["_status"] = disk_status
 
     def _generate_selected_aggregate_groups(
         self,

@@ -54,13 +54,13 @@ export LAUNCHER_JOB_FILE={{ launcher_file }}
 $LAUNCHER_DIR/paramrun
 rm {{ launcher_file }}
     {% else %}
-	    {#- Only the pre_operation block is overridden, all other behavior is inherited from base_script.sh #}
-	    {{- super () -}}
-	    {#- We need to reset the environment's base offset in between script generation for separate bundles. #}
-	    {#- Since Jinja's bytecode optimizes out calls to filters with a constant argument, we are forced to #}
-	    {#- rerun this function on the environment's base offset at the end of each run to return the offset to 0. #}
-	    {{- "%d"|format(environment.base_offset)|decrement_offset }}
-	{% endif %}
+        {#- Only the pre_operation block is overridden, all other behavior is inherited from base_script.sh #}
+        {{- super () -}}
+        {#- We need to reset the environment's base offset in between script generation for separate bundles. #}
+        {#- Since Jinja's bytecode optimizes out calls to filters with a constant argument, we are forced to #}
+        {#- rerun this function on the environment's base offset at the end of each run to return the offset to 0. #}
+        {{- "%d"|format(environment.base_offset)|decrement_offset }}
+    {% endif %}
 {% endblock body %}
 
 {# This override needs to happen outside the body block above, otherwise jinja2 doesn't seem to #}

@@ -333,6 +333,30 @@ class TestProjectClass(TestProjectBase):
         with pytest.raises(ValueError):
             B.get_project(root=self._tmp_dir.name)
 
+    def test_invalid_operation_function_signature(self):
+        """Test that all arguments other than job or *jobs must have a default."""
+
+        class A(FlowProject):
+            pass
+
+        @A.operation
+        def op1(job, default_arg=None, default_arg2=3):
+            pass
+
+        @A.operation
+        def op2(*jobs):
+            pass
+
+        @A.operation
+        def op3(*jobs, default_arg=None):
+            pass
+
+        with pytest.raises(ValueError):
+
+            @A.operation
+            def op4(job, non_default_argument):
+                pass
+
     def test_label_definition(self):
         class A(FlowProject):
             pass
@@ -1568,6 +1592,30 @@ class TestGroupProject(TestProjectBase):
             assert all(
                 [job_op.directives.get("omp_num_threads", 0) == 1 for job_op in job_ops]
             )
+
+    def test_unique_group_operation_names(self):
+        """Test that manually created groups and operations cannot share the same name."""
+
+        class A(FlowProject):
+            pass
+
+        A.make_group("foo")
+
+        with pytest.raises(ValueError):
+
+            @A.operation
+            def foo(job):
+                pass
+
+        class B(FlowProject):
+            pass
+
+        @B.operation
+        def bar(job):
+            pass
+
+        with pytest.raises(ValueError):
+            B.make_group("bar")
 
     def test_submission_combine_directives(self):
         class A(flow.FlowProject):

@@ -82,6 +82,7 @@ def init(alias=None, template=None, root=None):
             ]
         ),
         trim_blocks=True,
+        lstrip_blocks=True,
     )
 
     context = {}

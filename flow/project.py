@@ -2625,31 +2625,38 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             for i, error in enumerate(errors):
                 logger.debug("Status update error #%i: '%s'", i + 1, error)
 
+        # Get the total number of statuses before removing those with no
+        # eligible groups.
+        total_num_jobs = len(status_results)
+
+        def _has_any_eligible_group(status_entry):
+            return any(group["eligible"] for group in status_entry["groups"].values())
+
         if only_incomplete:
-            # Remove jobs with no eligible groups from the status info
-
-            def _incomplete(status_entry):
-                return any(
-                    group["eligible"] for group in status_entry["groups"].values()
-                )
-
-            status_results = list(filter(_incomplete, status_results))
+            # Remove jobs with no eligible groups from the status info.
+            status_results = list(filter(_has_any_eligible_group, status_results))
+            total_num_eligible_jobs = len(status_results)
+        else:
+            total_num_eligible_jobs = sum(
+                1 for _ in filter(_has_any_eligible_group, status_results)
+            )
 
         statuses = {
             status_entry["aggregate_id"]: status_entry
             for status_entry in status_results
         }
 
-        # Add labels to the status information
+        # Add labels to the status information.
         for job_label_data in job_labels:
             job_id = job_label_data["job_id"]
             # There is no status information if the project has no operations.
             # If no status information exists for this job, we need to set
             # default values.
-            statuses.setdefault(job_id, {})
-            statuses[job_id].setdefault("aggregate_id", job_id)
-            statuses[job_id].setdefault("groups", {})
-            statuses[job_id]["labels"] = job_label_data["labels"]
+            if job_id in statuses:
+                # Don't create label entries for job ids that were removed by
+                # --only-incomplete-operations.
+                statuses[job_id].setdefault("groups", {})
+                statuses[job_id]["labels"] = job_label_data["labels"]
 
         # If the dump_json variable is set, just dump all status info
         # formatted in JSON to screen.
@@ -2664,7 +2671,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 for label in status["labels"]:
                     progress[label] += 1
             # Sort the label progress by amount complete (descending), then
-            # alphabetically
+            # alphabetically.
             progress_sorted = list(
                 islice(
                     sorted(progress.items(), key=lambda x: (-x[1], x[0])),
@@ -2753,6 +2760,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         status_legend = " ".join(f"[{v}]:{k}" for k, v in self.ALIASES.items())
         context["jobs"] = list(statuses.values())
+        context["total_num_jobs"] = total_num_jobs
+        context["total_num_eligible_jobs"] = total_num_eligible_jobs
+        context["total_num_job_labels"] = len(job_labels)
         context["overview"] = overview
         context["detailed"] = detailed
         context["all_ops"] = all_ops

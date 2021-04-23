@@ -4210,6 +4210,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # TODO: Add aggregator argument and pass through to FlowGroupEntry.
         if name in cls._GROUP_NAMES:
             raise ValueError(f"Repeat definition of group with name '{name}'.")
+        if any(
+            name == operation_name for operation_name, _ in cls._OPERATION_FUNCTIONS
+        ):
+            raise ValueError(
+                f"Cannot create user group with name of existing operation {name}"
+            )
         cls._GROUP_NAMES.add(name)
         group_entry = FlowGroupEntry(name, options)
         cls._GROUPS.append(group_entry)

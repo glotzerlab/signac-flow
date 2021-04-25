@@ -268,11 +268,54 @@ class TestProjectClass(TestProjectBase):
         with pytest.raises(ValueError):
 
             @A.operation
-            @A.operation
+            @A.operation("foo")
             def op1(job):
                 pass
 
         return
+
+    def test_repeat_operation_name(self):
+        class A(FlowProject):
+            pass
+
+        @A.operation
+        def op1(job):
+            pass
+
+        with pytest.raises(ValueError):
+
+            @A.operation("op1")
+            def op2(job):
+                pass
+
+    def test_condition_as_operation(self):
+        class A(FlowProject):
+            pass
+
+        def precondition(job):
+            pass
+
+        @A.pre(precondition)
+        @A.operation
+        def op1(job):
+            pass
+
+        with pytest.raises(ValueError):
+            precondition = A.operation(precondition)
+
+    def test_operation_as_condition(self):
+        class A(FlowProject):
+            pass
+
+        @A.operation
+        def attempted_precondition(job):
+            pass
+
+        with pytest.raises(ValueError):
+
+            @A.pre(attempted_precondition)
+            def op1(job):
+                pass
 
     def test_repeat_operation_definition_with_inheritance(self):
         class A(FlowProject):
@@ -1188,6 +1231,12 @@ class TestExecutionProject(TestProjectBase):
             next_op = list(project._next_operations([(job,)]))[0]
             assert next_op.name == "op1"
             assert next_op._jobs == (job,)
+
+        cached_status = project._get_cached_scheduler_status()
+        for job in project:
+            for next_op in project._next_operations([(job,)]):
+                assert next_op.id not in cached_status
+
         with redirect_stderr(StringIO()):
             project.submit()
         assert len(list(MockScheduler.jobs())) == num_jobs_submitted

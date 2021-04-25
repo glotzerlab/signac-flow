@@ -1,9 +1,9 @@
 # Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-"""Implementation of the scheduling system for TORQUE schedulers.
+"""Implementation of the scheduling system for PBS schedulers.
 
-This module implements the Scheduler and ClusterJob classes for TORQUE.
+This module implements the Scheduler and ClusterJob classes for PBS.
 """
 import errno
 import getpass
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def _fetch(user=None):
-    """Fetch the cluster job status information from the TORQUE scheduler.
+    """Fetch the cluster job status information from the PBS scheduler.
 
     Parameters
     ----------
@@ -28,8 +28,8 @@ def _fetch(user=None):
 
     Yields
     ------
-    :class:`~.TorqueJob`
-        Torque cluster job.
+    :class:`~.PBSJob`
+        PBS cluster job.
 
     """
     if user is None:
@@ -52,13 +52,13 @@ def _fetch(user=None):
             raise
     except OSError as error:
         if error.errno == errno.ENOENT:
-            raise RuntimeError("Torque not available.")
+            raise RuntimeError("PBS not available.")
         else:
             raise error
 
 
-class TorqueJob(ClusterJob):
-    """Implementation of the abstract ClusterJob class for TORQUE schedulers."""
+class PBSJob(ClusterJob):
+    """Implementation of the abstract ClusterJob class for PBS schedulers."""
 
     def __init__(self, node):
         self.node = node
@@ -80,10 +80,10 @@ class TorqueJob(ClusterJob):
         return JobStatus.registered
 
 
-class TorqueScheduler(Scheduler):
-    r"""Implementation of the abstract Scheduler class for TORQUE schedulers.
+class PBSScheduler(Scheduler):
+    r"""Implementation of the abstract Scheduler class for PBS schedulers.
 
-    This class can submit cluster jobs to a TORQUE scheduler and query their
+    This class can submit cluster jobs to a PBS scheduler and query their
     current status.
 
     Parameters
@@ -95,7 +95,7 @@ class TorqueScheduler(Scheduler):
 
     """
 
-    # The standard command used to submit jobs to the TORQUE scheduler.
+    # The standard command used to submit jobs to the PBS scheduler.
     submit_cmd = ["qsub"]
 
     def __init__(self, user=None):
@@ -106,7 +106,7 @@ class TorqueScheduler(Scheduler):
         self._prevent_dos()
         nodes = _fetch(user=self.user)
         for node in nodes.findall("Job"):
-            yield TorqueJob(node)
+            yield PBSJob(node)
 
     def submit(
         self, script, *, after=None, hold=False, pretend=False, flags=None, **kwargs
@@ -161,7 +161,7 @@ class TorqueScheduler(Scheduler):
 
     @classmethod
     def is_present(cls):
-        """Return True if a TORQUE scheduler is detected."""
+        """Return True if a PBS scheduler is detected."""
         try:
             subprocess.check_output(["qsub", "--version"], stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError:

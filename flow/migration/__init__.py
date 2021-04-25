@@ -71,7 +71,7 @@ def _collect_migrations(project):
         raise RuntimeError(
             "The signac-flow schema version used by this project is {}, but flow {} "
             "only supports up to schema version {}. Try updating flow.".format(
-                get_config_schema_version, __version__, SCHEMA_VERSION
+                get_config_schema_version(), __version__, SCHEMA_VERSION
             )
         )
 

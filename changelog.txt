@@ -18,6 +18,7 @@ Added
 - Defined validators for the ``fork`` directive (#480).
 - Submission summary now appears in ``FlowProject`` status output, showing the number of queued, running, unknown statuses. (#472, #488).
 - Status overview now shows the number of jobs with incomplete operations and totals for the label overviews (#501).
+- Add schema version to ensure compatibility and enable migrations in future package versions (#504).
 
 Changed
 +++++++

@@ -25,7 +25,8 @@ class _GetConfigValueNoneType:
 _GET_CONFIG_VALUE_NONE = _GetConfigValueNoneType()
 
 
-def require_config_value(key, ns=None, default=_GET_CONFIG_VALUE_NONE):
+def require_config_value(key, ns=None, default=_GET_CONFIG_VALUE_NONE,
+                         config=None):
     """Request a value from the user's configuration, failing if not available.
 
     Parameters
@@ -37,6 +38,10 @@ def require_config_value(key, ns=None, default=_GET_CONFIG_VALUE_NONE):
     default
         A default value in case the key cannot be found
         within the user's configuration.
+    config
+        The config to pull from. If ``None``, uses
+        :func:`~signac.common.config.load_config` to acquire one
+        (Default value = None).
 
     Returns
     -------
@@ -63,7 +68,7 @@ def require_config_value(key, ns=None, default=_GET_CONFIG_VALUE_NONE):
             return default
 
 
-def get_config_value(key, ns=None, default=None):
+def get_config_value(key, ns=None, default=None, config=None):
     """Request a value from the user's configuration.
 
     Parameters
@@ -75,6 +80,8 @@ def get_config_value(key, ns=None, default=None):
     default
         A default value returned if the key cannot be found within the user
         configuration.
+    config
+        The config to pull from (Default value = None).
 
     Returns
     -------
@@ -82,4 +89,4 @@ def get_config_value(key, ns=None, default=None):
         The value if found, None if not found.
 
     """
-    return require_config_value(key=key, ns=ns, default=default)
+    return require_config_value(key=key, ns=ns, default=default, config=config)

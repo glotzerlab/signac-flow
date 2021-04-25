@@ -2484,7 +2484,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "eligible_jobs_max_lines"
             )
 
-        status_parallelization = self.config["flow"]["status_parallelization"]
+        status_parallelization = flow_config.get_config_value(
+            "status_parallelization", config=self.config)
 
         # initialize jinja2 template environment and necessary filters
         template_environment = self._template_environment()
@@ -4349,7 +4350,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             # Use small offset to account for overhead with few jobs
             delta_t = (time.time() - start - 0.5) / max(length_jobs, 1)
             config_key = "status_performance_warn_threshold"
-            warn_threshold = flow_config.get_config_value(config_key)
+            warn_threshold = flow_config.get_config_value(
+                config_key, config=self.config)
             if not args["profile"] and delta_t > warn_threshold >= 0:
                 print(
                     "WARNING: "

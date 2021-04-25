@@ -16,6 +16,10 @@ requirements = [
     "deprecation>=2.0.0",
     # Progress bars
     "tqdm>=4.48.1",
+    # Platform-independent file locking
+    'filelock~=3.0',
+    # Used for version parsing and comparison
+    'packaging>=15.0',
 ]
 
 description = "Simple workflow management for signac projects."

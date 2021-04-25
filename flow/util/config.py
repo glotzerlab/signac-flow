@@ -2,19 +2,19 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 """Contains logic for working with flow related information stored in the signac config."""
-from signac.common import config
+import signac.common.config
 
 from ..errors import ConfigKeyError
 
 # Monkeypatch the signac config spec to include flow-specific fields.
-config.cfg += """
+signac.common.config.cfg += """
 [flow]
 import_packaged_environments = boolean()
 status_performance_warn_threshold = float(default=0.2)
 show_traceback = boolean()
 eligible_jobs_max_lines = integer(default=10)
 status_parallelization = string(default='none')
-schema_version = integer(default=1)
+schema_version = string(default='1')
 """
 
 
@@ -25,8 +25,7 @@ class _GetConfigValueNoneType:
 _GET_CONFIG_VALUE_NONE = _GetConfigValueNoneType()
 
 
-def require_config_value(key, ns=None, default=_GET_CONFIG_VALUE_NONE,
-                         config=None):
+def require_config_value(key, ns=None, default=_GET_CONFIG_VALUE_NONE, config=None):
     """Request a value from the user's configuration, failing if not available.
 
     Parameters
@@ -57,9 +56,9 @@ def require_config_value(key, ns=None, default=_GET_CONFIG_VALUE_NONE,
     """
     try:
         if ns is None:
-            return config.load_config()["flow"][key]
+            return signac.common.config.load_config()["flow"][key]
         else:
-            return config.load_config()["flow"][ns][key]
+            return signac.common.config.load_config()["flow"][ns][key]
     except KeyError:
         if default is _GET_CONFIG_VALUE_NONE:
             k = str(key) if ns is None else f"{ns}.{key}"

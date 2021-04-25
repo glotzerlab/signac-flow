@@ -32,6 +32,7 @@ import cloudpickle
 import jinja2
 import signac
 from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
+from packaging import version
 from signac.contrib.filterparse import parse_filter_arg
 from tqdm.auto import tqdm
 
@@ -39,6 +40,7 @@ from .aggregates import _aggregator, _get_aggregate_id
 from .environment import get_environment
 from .errors import (
     ConfigKeyError,
+    IncompatibleSchemaVersion,
     NoSchedulerError,
     SubmitError,
     TemplateError,
@@ -62,6 +64,7 @@ from .util.misc import (
     switch_to_directory,
 )
 from .util.translate import abbreviate, shorten
+from .version import SCHEMA_VERSION, __version__
 
 logger = logging.getLogger(__name__)
 
@@ -1425,6 +1428,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def __init__(self, config=None, environment=None, entrypoint=None):
         super().__init__(config=config)
 
+        self._check_flow_schema_compatibility()
+
         # Associate this class with a compute environment.
         self._environment = environment or get_environment()
 
@@ -1451,6 +1456,39 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         self._groups = {}
         self._group_to_aggregate_store = _bidict()
         self._register_groups()
+
+    def _check_flow_schema_compatibility(self):
+        """Check whether this project's data schema is compatible with this version.
+
+        Raises
+        ------
+        :class:`~flow.errors.IncompatibleSchemaVersion`
+            If the schema version is incompatible.
+
+        """
+        schema_version = version.parse(SCHEMA_VERSION)
+        config_schema_version = version.parse(
+            flow_config.get_config_value("schema_version", config=self.config)
+        )
+        if config_schema_version > schema_version:
+            # Project config schema version is newer and therefore not supported.
+            raise IncompatibleSchemaVersion(
+                "The signac-flow schema version used by this project is '{}', but flow {} "
+                "only supports up to schema version '{}'. Try updating flow.".format(
+                    config_schema_version, __version__, schema_version
+                )
+            )
+        elif config_schema_version < schema_version:
+            raise IncompatibleSchemaVersion(
+                "The flow schema version used by this project is '{}', but flow {} "
+                "requires schema version '{}'. Please use '$ flow migrate' to "
+                "irreversibly migrate this project's schema to the supported "
+                "version.".format(config_schema_version, __version__, schema_version)
+            )
+        else:  # identical and therefore compatible
+            logger.debug(
+                f"The project's schema version {config_schema_version} is supported."
+            )
 
     def _setup_template_environment(self):
         """Set up the jinja2 template environment.
@@ -2485,7 +2523,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             )
 
         status_parallelization = flow_config.get_config_value(
-            "status_parallelization", config=self.config)
+            "status_parallelization", config=self.config
+        )
 
         # initialize jinja2 template environment and necessary filters
         template_environment = self._template_environment()
@@ -4351,7 +4390,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             delta_t = (time.time() - start - 0.5) / max(length_jobs, 1)
             config_key = "status_performance_warn_threshold"
             warn_threshold = flow_config.get_config_value(
-                config_key, config=self.config)
+                config_key, config=self.config
+            )
             if not args["profile"] and delta_t > warn_threshold >= 0:
                 print(
                     "WARNING: "

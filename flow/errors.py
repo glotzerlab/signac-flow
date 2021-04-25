@@ -61,3 +61,9 @@ class TemplateError(Jinja2Extension):
     def err(self, msg, caller):
         """Raise a template error."""
         raise jinja2.TemplateError(msg)
+
+
+class IncompatibleSchemaVersion(RuntimeError):
+    """The FlowProject's schema version is incompatible with this version of flow."""
+
+    pass

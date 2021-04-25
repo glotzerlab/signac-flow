@@ -3,3 +3,5 @@ coverage==5.5
 pytest-cov==2.11.1
 pytest==6.2.2
 ruamel.yaml==0.17.2
+filelock~=3.0
+packaging>=15.0

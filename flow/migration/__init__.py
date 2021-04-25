@@ -9,12 +9,12 @@ from contextlib import contextmanager
 
 from filelock import FileLock
 from packaging import version
-
 from signac.common.config import get_config
-from ...version import SCHEMA_VERSION, __version__
-from .v0_to_v1 import migrate_v0_to_v1
 
 from flow.util.config import get_config_value
+
+from ..version import SCHEMA_VERSION, __version__
+from .v0_to_v1 import migrate_v0_to_v1
 
 FN_MIGRATION_LOCKFILE = ".FLOW_PROJECT_MIGRATION_LOCK"
 
@@ -26,7 +26,7 @@ MIGRATIONS = {
 
 def _reload_project_config(project):
     project_reloaded = project.get_project(
-        root=project.root_directory(), search=False, _ignore_schema_version=True
+        root=project.root_directory(), search=False, _ignore_flow_schema_version=True
     )
     project._config = project_reloaded._config
 
@@ -39,7 +39,7 @@ def _update_project_config(project, **kwargs):
             break
     else:
         raise RuntimeError("Unable to determine project configuration file.")
-    config['flow'].update(kwargs)
+    config.setdefault("flow", {}).update(kwargs)
     config.write()
     _reload_project_config(project)
 
@@ -64,7 +64,7 @@ def _collect_migrations(project):
         # TODO: The means of getting schema versions will have to change for
         # flow versions in schema versions > 1 that no longer rely on signac's
         # configuration file and schema.
-        return version.parse(get_config_value("schema_version"))
+        return version.parse(get_config_value("schema_version", config=project.config))
 
     if get_config_schema_version() > schema_version:
         # Project config schema version is newer and therefore not supported.

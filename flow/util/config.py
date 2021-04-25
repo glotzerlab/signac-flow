@@ -54,11 +54,13 @@ def require_config_value(key, ns=None, default=_GET_CONFIG_VALUE_NONE, config=No
         and no default value is provided.
 
     """
+    config = config or signac.common.config.load_config()
+
     try:
         if ns is None:
-            return signac.common.config.load_config()["flow"][key]
+            return config["flow"][key]
         else:
-            return signac.common.config.load_config()["flow"][ns][key]
+            return config["flow"][ns][key]
     except KeyError:
         if default is _GET_CONFIG_VALUE_NONE:
             k = str(key) if ns is None else f"{ns}.{key}"

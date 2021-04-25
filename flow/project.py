@@ -1425,10 +1425,19 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     """
 
-    def __init__(self, config=None, environment=None, entrypoint=None):
+    def __init__(
+        self,
+        config=None,
+        environment=None,
+        entrypoint=None,
+        _ignore_flow_schema_version=False,
+    ):
         super().__init__(config=config)
 
-        self._check_flow_schema_compatibility()
+        # This internal constructor parameter exists solely for the purpose of
+        # allowing reloads of the project during migration.
+        if not _ignore_flow_schema_version:
+            self._check_flow_schema_compatibility()
 
         # Associate this class with a compute environment.
         self._environment = environment or get_environment()

@@ -4,6 +4,7 @@
 import collections.abc
 import datetime
 import inspect
+import io
 import logging
 import os
 import subprocess
@@ -17,6 +18,7 @@ from io import StringIO
 from itertools import groupby
 from tempfile import TemporaryDirectory
 
+import packaging.version
 import pytest
 import signac
 from define_dag_test_project import DagTestProject
@@ -27,9 +29,10 @@ from deprecation import fail_if_not_removed
 import flow
 from flow import FlowProject, cmd, directives, init, with_job
 from flow.environment import ComputeEnvironment
-from flow.errors import DirectivesError
+from flow.errors import DirectivesError, IncompatibleSchemaVersion
 from flow.project import IgnoreConditions, _AggregatesCursor
 from flow.scheduling.base import ClusterJob, JobStatus, Scheduler
+from flow.util.config import get_config_value
 from flow.util.misc import (
     add_cwd_to_environment_pythonpath,
     add_path_to_environment_pythonpath,
@@ -1807,3 +1810,50 @@ class TestIgnoreConditions:
         }
         for key, value in expected_results.items():
             assert ~key == value
+
+
+class TestProjectSchema(TestProjectBase):
+    project_class = _TestProject
+
+    def test_project_schema_versions(self):
+        impossibly_high_schema_version = "9999"
+        assert packaging.version.parse(
+            get_config_value("schema_version", config=self.project._config)
+        ) < packaging.version.parse(impossibly_high_schema_version)
+        config = signac.common.config.get_config(self.project.fn("signac.rc"))
+        flow_config = config.setdefault("flow", {})
+        flow_config["schema_version"] = impossibly_high_schema_version
+        config.write()
+        with pytest.raises(IncompatibleSchemaVersion):
+            self.project_class.init_project(
+                name=str(self.project), root=self.project.root_directory()
+            )
+
+    def test_project_schema_version_migration(self):
+        from flow.migration import apply_migrations
+
+        apply_migrations(self.project)
+        self.project._config["flow"]["schema_version"] = "0"
+        assert self.project._config["flow"]["schema_version"] == "0"
+        err = io.StringIO()
+        with redirect_stderr(err):
+            for origin, destination in apply_migrations(self.project):
+                assert self.project._config["schema_version"] == destination
+                project = signac.get_project(root=self.project.root_directory())
+                assert project._config["schema_version"] == destination
+        assert self.project._config["schema_version"] == "1"
+        assert "OK" in err.getvalue()
+        assert "0 to 1" in err.getvalue()
+
+    def test_no_migration(self):
+        # This unit test should fail as long as there are no schema migrations
+        # implemented within the signac.contrib.migration package.
+        #
+        # Once migrations are implemented:
+        #
+        # 1. Ensure to enable the 'migrate' sub-command within the __main__ module.
+        # 2. Either update or remove this unit test.
+        from signac.contrib.migration import _collect_migrations
+
+        migrations = list(_collect_migrations(self.project))
+        assert len(migrations) == 0

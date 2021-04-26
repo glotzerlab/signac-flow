@@ -8,29 +8,29 @@ repos:
         exclude: 'setup.cfg'
       - id: debug-statements
   - repo: https://github.com/asottile/pyupgrade
-    rev: 'v2.10.1'
+    rev: 'v2.13.0'
     hooks:
       - id: pyupgrade
         exclude: '(?:mistune/.*)'
         args:
           - --py36-plus
   - repo: https://github.com/pycqa/isort
-    rev: '5.7.0'
+    rev: '5.8.0'
     hooks:
       - id: isort
         exclude: '(?:mistune/.*)'
   - repo: https://github.com/psf/black
-    rev: '20.8b1'
+    rev: '21.4b0'
     hooks:
       - id: black
         exclude: '(?:mistune/.*)'
-  - repo: https://gitlab.com/pycqa/flake8
-    rev: '3.9.0'
+  - repo: https://github.com/PyCQA/flake8
+    rev: '3.9.1'
     hooks:
       - id: flake8
         exclude: '(?:mistune/.*)'
   - repo: https://github.com/pycqa/pydocstyle
-    rev: '5.1.1'
+    rev: '6.0.0'
     hooks:
       - id: pydocstyle
         files: ^((?!doc|tests|mistune).)*$

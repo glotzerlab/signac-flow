@@ -112,8 +112,11 @@ def init(project):
             },
         ],
         "environments.incite.AndesEnvironment": [
-            {},
             {
+                "partition": ["batch", "gpu"],
+            },
+            {
+                "partition": ["batch"],
                 "parallel": [False, True],
                 "bundle": [["mpi_op", "omp_op"]],
             },

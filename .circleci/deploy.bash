@@ -16,13 +16,13 @@ index-servers=
     testpypi
 
 [pypi]
-username: ${PYPI_USERNAME}
-password: ${PYPI_PASSWORD}
+username: __token__
+password: ${PYPI_API_TOKEN}
 
 [testpypi]
 repository: https://test.pypi.org/legacy/
-username: ${PYPI_USERNAME}
-password: ${PYPI_PASSWORD}
+username: __token__
+password: ${TEST_PYPI_API_TOKEN}
 EOF
 
 # Create wheels and source distribution

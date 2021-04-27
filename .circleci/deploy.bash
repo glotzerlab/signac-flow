@@ -6,8 +6,8 @@ set -u
 python -m pip install --progress-bar off --user -U -r requirements/requirements-test.txt
 python -m pip install --progress-bar off --user -U twine wheel setuptools
 
-# PYPI_USERNAME - (Required) Username for the publisher's account on PyPI
-# PYPI_PASSWORD - (Required, Secret) Password for the publisher's account on PyPI
+# PYPI_API_TOKEN - (Required, Secret) Token for the publisher's account on PyPI
+# TEST_PYPI_API_TOKEN - (Required, Secret) Token for the publisher's account on TestPyPI
 
 cat << EOF > ~/.pypirc
 [distutils]

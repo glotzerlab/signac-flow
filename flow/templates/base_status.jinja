@@ -15,14 +15,13 @@
 
 {% block overview %}
 {% if overview %}
-{{ 'Overview: \n' }}
-{{ 'Total # of jobs: %s ' | format(jobs | length) }}
+Overview: {{ total_num_jobs }} jobs, {{ total_num_eligible_jobs }} jobs with eligible operations.
 
 {% block progress %}
 | label | ratio |
 | ----- | ----- |
 {% for label in progress_sorted %}
-| {{ label[0] }} | {{ label[1]|draw_progress_bar(jobs | length, '\\') }} |
+| {{ label[0] }} | {{ label[1]|draw_progress_bar(total_num_job_labels, '\\') }} |
 {% endfor %}
 {% endblock%}
 

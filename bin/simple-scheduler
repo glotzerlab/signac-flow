@@ -176,7 +176,7 @@ def main_run(args):
     os.makedirs(args.queue, exist_ok=True)
     with _lock_database(args) as db:
         print("Execute this to enable environment detection for this scheduler:")
-        print('export SIMPLE_SCHEDULER="{} --data={}"'.format(sys.argv[0], args.data))
+        print(f'export SIMPLE_SCHEDULER="{sys.argv[0]} --data={args.data}"')
         stop = threading.Event()
         process_inbox_thread = threading.Thread(
             target=_process_inbox_loop,

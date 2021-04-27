@@ -109,7 +109,7 @@ def main():
             raise
         sys.exit(1)
     except Exception as error:
-        sys.stderr.write("{}\n".format(str(error)))
+        sys.stderr.write(f"{str(error)}\n")
         if args.debug:
             raise
         sys.exit(1)

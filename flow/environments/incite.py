@@ -7,7 +7,11 @@ http://www.doeleadershipcomputing.org/
 """
 from math import gcd
 
-from ..environment import DefaultLSFEnvironment, template_filter
+from ..environment import (
+    DefaultLSFEnvironment,
+    DefaultSlurmEnvironment,
+    template_filter,
+)
 
 
 class SummitEnvironment(DefaultLSFEnvironment):
@@ -172,7 +176,7 @@ class SummitEnvironment(DefaultLSFEnvironment):
         return mpi_prefix
 
 
-class AndesEnvironment(DefaultLSFEnvironment):
+class AndesEnvironment(DefaultSlurmEnvironment):
     """Environment profile for the Andes supercomputer.
 
     https://www.olcf.ornl.gov/olcf-resources/compute-systems/andes/

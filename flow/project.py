@@ -4787,9 +4787,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Set verbosity level according to the `-v` argument.
         #
-        # We cannot use `logging.basicConfig`, because of issues in combination with the
-        # installation of individual filehanders for operation logging as implemented in
-        # the hooks.log_operation module.
+        # We cannot use `logging.basicConfig`, because of issues in combination
+        # with the installation of individual file handlers for operation
+        # logging as implemented in the hooks.log_operation module.
         logger = logging.getLogger()
         logger.setLevel(logging.DEBUG)
         ch = logging.StreamHandler()

@@ -56,14 +56,6 @@ class Hooks:
         else:
             super().__setattr__(name, value)
 
-    @classmethod
-    def from_dict(cls, mapping):
-        """Instantiate the hook class from a dictionary."""
-        hook = cls()
-        for trigger_type in mapping:
-            getattr(hook, trigger_type)[:] = list(mapping[trigger_type])
-        return hook
-
     def update(self, other):
         """Update this instance with hooks from another instance."""
         for hook_trigger in self._hook_triggers:

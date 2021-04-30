@@ -3027,20 +3027,23 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Determine operation hooks
         op_hooks = self._operation_hooks.get(operation.name, Hooks())
 
-        self.hooks.on_start(operation)
-        op_hooks.on_start(operation)
+        name = operation.name
+        jobs = operation._jobs
+
+        self.hooks.on_start(name, *jobs)
+        op_hooks.on_start(name, *jobs)
         try:
             yield
         except Exception as error:
-            self.hooks.on_fail(operation, error)
-            op_hooks.on_fail(operation, error)
+            self.hooks.on_fail(name, error, *jobs)
+            op_hooks.on_fail(name, error, *jobs)
             raise error
         else:
-            self.hooks.on_success(operation)
-            op_hooks.on_success(operation)
+            self.hooks.on_success(name, *jobs)
+            op_hooks.on_success(name, *jobs)
         finally:
-            self.hooks.on_finish(operation)
-            op_hooks.on_finish(operation)
+            self.hooks.on_finish(name, *jobs)
+            op_hooks.on_finish(name, *jobs)
 
     def _execute_operation(self, operation, timeout=None, pretend=False):
         if pretend:
@@ -4224,7 +4227,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             }
 
             # Update operation hooks
-            self._operation_hooks[name].update(Hooks.from_dict(self.hook[func]))
+            self._operation_hooks[name].update(Hooks(**self.hook[func]))
 
             # Construct FlowOperation:
             if getattr(func, "_flow_cmd", False):

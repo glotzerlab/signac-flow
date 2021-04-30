@@ -1837,7 +1837,10 @@ class TestGroupDynamicProjectMainInterface(TestProjectMainInterface):
     project_class = _DynamicTestProject
 
 
-class ProjectHooksTest(TestProjectBase):
+class TestProjectHooks(TestProjectBase):
+    # TODO: Refactor this class to look more like the other test classes
+    # (override mock_project?)
+
     def test_run_hooks(self):
 
         ran = defaultdict(set)
@@ -1847,10 +1850,12 @@ class ProjectHooksTest(TestProjectBase):
             pass
 
         @FooProject.operation
-        @FooProject.hook.on_start(lambda op: ran["start"].add(op.job))
-        @FooProject.hook.on_finish(lambda op: ran["finish"].add(op.job))
-        @FooProject.hook.on_success(lambda op: ran["success"].add(op.job))
-        @FooProject.hook.on_fail(lambda op, error: ran["fail"].add(op.job))
+        @FooProject.hook.on_start(lambda operation_name, job: ran["start"].add(job))
+        @FooProject.hook.on_finish(lambda operation_name, job: ran["finish"].add(job))
+        @FooProject.hook.on_success(lambda operation_name, job: ran["success"].add(job))
+        @FooProject.hook.on_fail(
+            lambda operation_name, error, job: ran["fail"].add(job)
+        )
         def foo(job):
             if raise_exception:
                 raise RuntimeError
@@ -1867,9 +1872,10 @@ class ProjectHooksTest(TestProjectBase):
                 assert job not in ran["fail"]
             ran.clear()
             raise_exception = True
-            for job in project:
+            foo_project = FooProject(config=project.config)
+            for job in foo_project:
                 with pytest.raises(RuntimeError):
-                    FooProject(config=project.config).run(jobs=[job])
+                    foo_project.run(jobs=[job])
                 assert job in ran["start"]
                 assert job in ran["finish"]
                 assert job not in ran["success"]

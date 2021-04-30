@@ -24,9 +24,9 @@ if get_config_value("import_packaged_environments", default=True):
 
 
 __all__ = [
-    "hooks",
     "environment",
     "errors",
+    "hooks",
     "scheduling",
     "testing",
     "IgnoreConditions",

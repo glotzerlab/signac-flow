@@ -34,7 +34,7 @@ def _git_ignore(root, entries):
 
 def _git_ignored(root):
     fn_ignore = os.path.join(root, ".gitignore")
-    with open(fn_ignore, mode="r") as file:
+    with open(fn_ignore) as file:
         return file.readlines()
 
 

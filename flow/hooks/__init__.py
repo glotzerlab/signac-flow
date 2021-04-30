@@ -80,7 +80,7 @@ class Hooks:
             type(self).__name__,
             ", ".join(
                 [
-                    "{}={}".format(hook_trigger, getattr(self, hook_trigger))
+                    f"{hook_trigger}={getattr(self, hook_trigger)}"
                     for hook_trigger in self._hook_triggers
                 ]
             ),

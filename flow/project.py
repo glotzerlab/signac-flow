@@ -318,7 +318,7 @@ class _HooksDecorator:
         return self._operation_hooks[func]
 
     def __getattr__(self, name):
-        class install_hook:
+        class _InstallHook:
             def __init__(install_self, hook_func):
                 install_self.hook_func = hook_func
 
@@ -326,7 +326,7 @@ class _HooksDecorator:
                 self._operation_hooks[func][name].append(install_self.hook_func)
                 return func
 
-        return install_hook
+        return _InstallHook
 
 
 class _JobOperation:

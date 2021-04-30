@@ -5,6 +5,17 @@ Changelog
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 The numbers in brackets denote the related GitHub issue and/or pull request.
 
+Version 0.15
+============
+
+[0.15.0] -- 2021-xx-xx
+----------------------
+
+Added
++++++
+
+- Feature to install execution hooks for the automated execution of functions with operations (#28, #189, #508).
+
 Version 0.14
 ============
 
@@ -227,7 +238,6 @@ Added
 - Add "fork" directive to enforce the execution of operations within a subprocess (#159).
 - Operation graph detection based on function comparison (#178).
 - Exceptions raised during operations always show tracebacks of user code (#169, #171).
-- Feature to install execution hooks for the automated execution of functions with operations (#28, #189).
 
 Changed
 +++++++

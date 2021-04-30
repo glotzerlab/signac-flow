@@ -4756,16 +4756,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 args.parameters = self.PRINT_STATUS_ALL_VARYING_PARAMETERS
 
         # Set verbosity level according to the `-v` argument.
-        #
-        # We cannot use `logging.basicConfig`, because of issues in combination
-        # with the installation of individual file handlers for operation
-        # logging as implemented in the hooks.log_operation module.
-        logger = logging.getLogger()
-        logger.setLevel(logging.DEBUG)
-        ch = logging.StreamHandler()
-        ch.setFormatter(logging.Formatter(logging.BASIC_FORMAT))
-        ch.setLevel(level=max(0, logging.WARNING - 10 * args.verbose))
-        logger.addHandler(ch)
+        logging.basicConfig(level=max(0, logging.WARNING - 10 * args.verbose))
 
         def _show_traceback_and_exit(error):
             if args.show_traceback:

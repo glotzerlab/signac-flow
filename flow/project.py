@@ -6,10 +6,8 @@
 The FlowProject is a signac Project that allows the user to define a workflow.
 """
 import argparse
-import ast
 import contextlib
 import functools
-import importlib
 import inspect
 import json
 import logging
@@ -1468,7 +1466,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Setup execution hooks
         self._hooks = Hooks()
         self._operation_hooks = defaultdict(Hooks)
-        self._install_config_hooks()
 
         # Register all label functions with this project instance.
         self._label_functions = {}
@@ -1588,33 +1585,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def hooks(self):
         """Return a reference to the instance of :class:`.hooks.Hooks` of this project."""
         return self._hooks
-
-    def _install_config_hooks(self):
-        try:
-            hooks_config = self._config["flow"].as_list("hooks")
-        except KeyError:
-            return  # no hooks configured
-        for entry in hooks_config:
-            try:
-                m = re.match(r"^(?P<path>[\w.]+?)(\((?P<constructor>.*)\))?$", entry)
-                if m:
-                    name_module, name_installer = m.groupdict()["path"].rsplit(".", 1)
-                    nodes = [
-                        c.rpartition("=")
-                        for c in m.groupdict("")["constructor"].split(",")
-                    ]
-                    kwargs = {k: ast.literal_eval(v) for k, _, v in nodes if k}
-                    hook = getattr(importlib.import_module(name_module), name_installer)
-                    if inspect.isclass(hook):
-                        hook(**kwargs)(self)
-                    else:
-                        hook(self)
-                else:
-                    raise ValueError(
-                        f"The hook configuration entry '{entry}' is invalid."
-                    )
-            except (ImportError, AttributeError, ValueError, TypeError) as error:
-                raise RuntimeError(f"Unable to install '{entry}': {error}")
 
     @classmethod
     def label(cls, label_name_or_func=None):

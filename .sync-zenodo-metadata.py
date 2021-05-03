@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """Synchronize authors and contributor metadata.
 
 This script synchronizes the metadata provided in the CITATION.cff and

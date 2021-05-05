@@ -1,18 +1,19 @@
 {% extends "base_status.jinja" %}
 {% block detailed %}
-{{ 'Detailed View: \n' }}
+Detailed View:
+
 | job id | {{ para_head }}labels |
 | ------ | {{ ns.dash }}-------- |
 {% set field_operation = '%s %s %s' %}
-{% for job in jobs %}
-{% if parameters %}
-{% set para_output = ns.field_parameters | format(*job['parameters'].values()) %}
-{% endif %}
+    {% for job in jobs %}
+        {% if parameters %}
+            {% set para_output = ns.field_parameters | format(*job['parameters'].values()) %}
+        {% endif %}
 | {{job['aggregate_id']}} | {{ para_output }}{{ job['labels'] | join(', ') }} |
-{% for key, value in job['groups'].items() if value | job_filter(scheduler_status_code, all_ops) %}
+        {% for key, value in job['groups'].items() if value | job_filter(scheduler_status_code, all_ops) %}
 | {{ field_operation | highlight(value['eligible'], pretty) | format(value | get_operation_status(operation_status_symbols), key, '['+scheduler_status_code[value['scheduler_status']]+']') }} |
-{% endfor %}
-{% endfor %}
+        {% endfor %}
+    {% endfor %}
 {{ operation_status_legend }}
 {{ status_legend }}
-{% endblock %}
+{% endblock detailed %}

@@ -158,19 +158,11 @@ workflows:
   version: 2
   test:
     jobs:
-      - pre-checks
-      - linux-python-39:
-          requires:
-            - pre-checks
-      - linux-python-38:
-          requires:
-            - pre-checks
-      - linux-python-37:
-          requires:
-            - pre-checks
-      - linux-python-36-oldest:
-          requires:
-            - pre-checks
+#     - pre-checks
+      - linux-python-39
+      - linux-python-38
+      - linux-python-37
+      - linux-python-36-oldest
       - linux-python-39-signac-15:
           requires:
             - linux-python-39

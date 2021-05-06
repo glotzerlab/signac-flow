@@ -8,7 +8,7 @@ The numbers in brackets denote the related GitHub issue and/or pull request.
 Version 0.14
 ============
 
-[0.14.0] -- 2021-xx-xx
+[0.14.0] -- 2021-04-27
 ----------------------
 
 Added
@@ -18,14 +18,15 @@ Added
 - Defined validators for the ``fork`` directive (#480).
 - Submission summary now appears in ``FlowProject`` status output, showing the number of queued, running, unknown statuses. (#472, #488).
 - Decorator for setting directives while registering operation function ``FlowProject.operation.with_directives`` (#502).
-- Status overview now shows the number of jobs with incomplete operations and totals for the label overviews (#501).
+- Status overview now shows the number of jobs with incomplete operations and totals for the label overviews (#481, #501).
 
 Changed
 +++++++
 
-- Renamed TorqueEnvironment and related classes to PBSEnvironment (#491).
+- Renamed TorqueEnvironment and related classes to PBSEnvironment (#388, #491).
 - LSF and SLURM schedulers will appear to be present if the respective commands ``bjobs -V`` or ``sbatch --version`` exit with a non-zero error code (#498).
 - Only known JobStatus values will be written to the project document, to save space and writing time (#503).
+- Jinja templates are indented for easier reading (#495).
 
 Fixed
 +++++
@@ -33,12 +34,12 @@ Fixed
 - Strictly enforce that operation functions cannot be used as condition functions (and vice-versa) and prevent the registration of two operations with the same name (#496).
 - Changed default value of ``status_parallelization`` to none, to avoid bugs in user code caused by thread parallelism and overhead in process parallelism (#486).
 - Memory directives are converted to an integer number of gigabytes or megabytes in submission scripts (#482, #484).
-- Fixed behavior of ``--only-incomplete-operations`` (#501).
+- Fixed behavior of ``--only-incomplete-operations`` (#481, #501).
 
 Removed
 +++++++
 
-- Removed ``FlowProject.add_operation`` (#487).
+- Removed ``FlowProject.add_operation`` (#479, #487).
 - Removed deprecated ``--walltime`` argument (#478).
 - Removed deprecated ``flow.run`` interface (#478).
 - Removed deprecated ``FlowProject.export_job_statuses`` (#478).

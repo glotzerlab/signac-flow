@@ -780,7 +780,6 @@ class FlowGroup:
 
         @group.with_directives(nranks=4)
         @FlowProject.operation.with_directives({"nranks": 2, "executable": "python3"})
-        @directives()
         def op1(job):
             pass
 

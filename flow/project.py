@@ -778,7 +778,7 @@ class FlowGroup:
 
         group = FlowProject.make_group(name='example_group')
 
-        @group.with_directives(nranks=4)
+        @group.with_directives({"nranks": 4})
         @FlowProject.operation.with_directives({"nranks": 2, "executable": "python3"})
         def op1(job):
             pass

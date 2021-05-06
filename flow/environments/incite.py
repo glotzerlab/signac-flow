@@ -20,7 +20,7 @@ class SummitEnvironment(DefaultLSFEnvironment):
             "ngpu": 3,  # 3 GPUs
             "np": 3,  # 3 CPU cores
             "rs_tasks": 3,  # 3 tasks per resource set
-            "extra_jsrun_args": '--smpiargs="-gpu"'  # extra jsrun arguments
+            "extra_jsrun_args": '--smpiargs="-gpu"',  # extra jsrun arguments
         })
         def my_operation(job):
             ...

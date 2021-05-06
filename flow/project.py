@@ -1407,7 +1407,7 @@ class _FlowProjectClass(type):
 
             .. code-block:: python
 
-                @FlowProject.operation.with_directives({'nranks': 4})
+                @FlowProject.operation.with_directives({"nranks": 4})
                 def mpi_hello(job):
                     print("hello")
 

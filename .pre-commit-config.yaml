@@ -8,7 +8,7 @@ repos:
         exclude: 'setup.cfg'
       - id: debug-statements
   - repo: https://github.com/asottile/pyupgrade
-    rev: 'v2.13.0'
+    rev: 'v2.14.0'
     hooks:
       - id: pyupgrade
         exclude: '(?:mistune/.*)'
@@ -20,7 +20,7 @@ repos:
       - id: isort
         exclude: '(?:mistune/.*)'
   - repo: https://github.com/psf/black
-    rev: '21.4b1'
+    rev: '21.4b2'
     hooks:
       - id: black
         exclude: '(?:mistune/.*)'

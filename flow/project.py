@@ -1510,6 +1510,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         template_environment = jinja2.Environment(
             loader=jinja2.ChoiceLoader(load_envs),
             trim_blocks=True,
+            lstrip_blocks=True,
             extensions=[TemplateError],
         )
 

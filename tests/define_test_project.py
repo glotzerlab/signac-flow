@@ -35,16 +35,19 @@ def b_is_even(job):
         return False
 
 
-@_TestProject.operation
+@_TestProject.operation.with_directives(
+    {
+        # Explicitly set a "bad" directive that is unused by the template.
+        # The submit interface should warn about unused directives.
+        "bad_directive": 0,
+        # But not this one:
+        "np": 1,
+    }
+)
 @flow.cmd
 @_TestProject.pre(b_is_even)
 @group1
 @_TestProject.post.isfile("world.txt")
-# Explicitly set a "bad" directive that is unused by the template.
-# The submit interface should warn about unused directives.
-@flow.directives(bad_directive=0)
-# But not this one:
-@flow.directives(np=1)
 def op1(job):
     return 'echo "hello" > {job.ws}/world.txt'
 
@@ -53,20 +56,19 @@ def _need_to_fork(job):
     return job.doc.get("fork")
 
 
-@_TestProject.operation
-@flow.directives(fork=_need_to_fork)
+@_TestProject.operation.with_directives({"fork": _need_to_fork})
 @group1
 @_TestProject.post.true("test")
 def op2(job):
     job.document.test = os.getpid()
 
 
-@_TestProject.operation
+@_TestProject.operation.with_directives({"ngpu": 1, "omp_num_threads": 1})
 @group2.with_directives(dict(omp_num_threads=4))
 @_TestProject.post.true("test3_true")
 @_TestProject.post.false("test3_false")
 @_TestProject.post.not_(lambda job: job.doc.test3_false)
-@flow.directives(ngpu=1, omp_num_threads=1)
+@flow.directives()
 def op3(job):
     job.document.test3_true = True
     job.document.test3_false = False

@@ -1926,16 +1926,6 @@ class TestAggregationProjectMainInterface(TestAggregatesProjectBase):
             else:
                 assert job.doc.sum == job.doc.sum_other == job.doc.sum_custom == odd_sum
 
-    def test_invalid_with_job(self):
-        project = self.mock_project()
-        assert len(project)
-
-        with pytest.raises(Exception) as runinfo:
-            project.run(names=["agg_op5"])
-            assert (
-                "use of @with_job decorator with aggregation" in runinfo.value.message
-            )
-
     def test_main_run_cmd(self):
         project = self.mock_project()
         assert len(project)

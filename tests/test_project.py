@@ -1889,13 +1889,16 @@ class TestProjectUtilities(TestAggregatesProjectBase):
     def test_reregister_aggregates(self):
         project = self.mock_project()
         agg_cursor = _AggregatesCursor(project=project)
-        assert len(agg_cursor) == 41
-        project.open_job(dict(i=31, even=False)).init()
+        NUM_BEFORE_REREGISTRATION = 40
+        assert len(agg_cursor) == NUM_BEFORE_REREGISTRATION
+        new_job = project.open_job(dict(i=31, even=False))
+        assert new_job not in project
+        new_job.init()
         # Default aggregate store doesn't need to be re-registered.
-        assert len(agg_cursor) == 42
+        assert len(agg_cursor) == NUM_BEFORE_REREGISTRATION + 1
         project._reregister_aggregates()
         # The operation agg_op2 adds another aggregate in the project.
-        assert len(agg_cursor) == 43
+        assert len(agg_cursor) == NUM_BEFORE_REREGISTRATION + 2
 
 
 class TestAggregationProjectMainInterface(TestAggregatesProjectBase):

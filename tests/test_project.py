@@ -1873,7 +1873,7 @@ class TestProjectUtilities(TestAggregatesProjectBase):
         # can de-duplicate the returned results in the cursor, thus it is
         # expected that the length of the cursor is larger than the number of
         # unique ids present in the cursor.
-        assert len(agg_cursor) == 41
+        assert len(agg_cursor) == 40
         assert len({get_aggregate_id(agg) for agg in agg_cursor}) == 34
         assert tuple(project) in agg_cursor
         assert all((job,) in agg_cursor for job in project)

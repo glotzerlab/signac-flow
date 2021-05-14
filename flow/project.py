@@ -705,6 +705,11 @@ class FlowGroupEntry:
     def __init__(self, name, options="", group_aggregator=None):
         self.name = name
         self.options = options
+        # We register aggregators associated with operation functions in
+        # `_register_groups` and we do not set the aggregator explicitly.
+        # We delay setting the aggregator because we do not restrict the
+        # decorator placement in terms of `@FlowGroupEntry`, `@aggregator`, or
+        # `@operation`.
         self.group_aggregator = group_aggregator
 
     def __call__(self, func):

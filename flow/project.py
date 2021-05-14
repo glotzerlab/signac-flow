@@ -3402,7 +3402,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             except KeyError:
                 pass
         # Raise error as didn't find the id in any of the stored objects
-        raise LookupError(f"Did not find aggregate with id '{id}'.")
+        raise LookupError(f"Did not find aggregate with id {repr(id)}.")
 
     def _convert_jobs_to_aggregates(self, jobs):
         """Convert sequences of signac jobs to aggregates.

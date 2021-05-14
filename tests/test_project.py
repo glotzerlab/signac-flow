@@ -1395,7 +1395,7 @@ class TestProjectMainInterface(TestProjectBase):
                 f"run -o group1 -j {INVALID_JOB_ID}", stderr=subprocess.STDOUT
             )
         assert (
-            f"LookupError: Did not find job with id '{INVALID_JOB_ID}'."
+            f"LookupError: Did not find job with id {repr(INVALID_JOB_ID)}."
             in err.value.output.decode("utf-8")
         )
 
@@ -1407,7 +1407,7 @@ class TestProjectMainInterface(TestProjectBase):
                 f"run -o group1 -j {INVALID_AGGREGATE_ID}", stderr=subprocess.STDOUT
             )
         assert (
-            f"LookupError: Did not find aggregate with id '{INVALID_AGGREGATE_ID}'."
+            f"LookupError: Did not find aggregate with id {repr(INVALID_AGGREGATE_ID)}."
             in err.value.output.decode("utf-8")
         )
 

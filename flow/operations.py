@@ -93,13 +93,11 @@ def with_job(func):
         def hello_cmd(job):
             return 'trap "cd `pwd`" EXIT && cd {} && echo "hello {job}"'.format(job.ws)
     """
+    if getattr(func, "_flow_aggregate", False):
+        raise RuntimeError("The @with_job decorator cannot be used with aggregation.")
 
     @wraps(func)
     def decorated(*jobs):
-        if len(jobs) != 1:
-            raise NotImplementedError(
-                "The @with_job decorator cannot be used with aggregation."
-            )
         with jobs[0] as job:
             if getattr(func, "_flow_cmd", False):
                 return f'trap "cd $(pwd)" EXIT && cd {job.ws} && {func(job)}'

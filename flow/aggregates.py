@@ -340,14 +340,17 @@ class aggregator:
             The function to decorate.
 
         """
-        if callable(func):
-            setattr(func, "_flow_aggregate", self)
-            return func
-        else:
+        if not callable(func):
             raise TypeError(
                 "Invalid argument passed while calling the aggregate "
                 f"instance. Expected a callable, got {type(func)}."
             )
+        if getattr(func, "_flow_with_job", False):
+            raise RuntimeError(
+                "The @with_job decorator cannot be used with aggregation."
+            )
+        setattr(func, "_flow_aggregate", self)
+        return func
 
 
 class _BaseAggregateStore(Mapping):

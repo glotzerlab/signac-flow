@@ -1396,7 +1396,7 @@ class TestProjectMainInterface(TestProjectBase):
             )
         assert (
             f"LookupError: Did not find job with id {repr(INVALID_JOB_ID)}."
-            in err.value.output.decode("utf-8")
+            in err.value.output.decode("utf-8").splitlines()
         )
 
     def test_main_run_invalid_aggregate(self):
@@ -1408,7 +1408,7 @@ class TestProjectMainInterface(TestProjectBase):
             )
         assert (
             f"LookupError: Did not find aggregate with id {repr(INVALID_AGGREGATE_ID)}."
-            in err.value.output.decode("utf-8")
+            in err.value.output.decode("utf-8").splitlines()
         )
 
     def test_main_next(self):

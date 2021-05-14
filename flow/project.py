@@ -1380,7 +1380,6 @@ class _FlowProjectClass(type):
             would be considered complete and therefore no longer eligible for execution
             only if the 'bye_all' key is present in all of the jobs passed.
 
-
             An optional tag may be associated with the condition. These tags
             are used by :meth:`~.detect_operation_graph` when comparing
             conditions for equality. The tag defaults to the bytecode of the
@@ -4231,7 +4230,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             self._groups[entry.name] = group
             # Handle unset aggregators
             if entry.group_aggregator is None:
-                # use the operation's aggregator for singleton groups
+                # Use the operation's aggregator for singleton groups
                 # corresponding to single operations
                 if entry.name in self._operations:
                     operation = self._operations[entry.name]

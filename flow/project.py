@@ -4235,7 +4235,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             name == operation_name for operation_name, _ in cls._OPERATION_FUNCTIONS
         ):
             raise ValueError(
-                f"Cannot create user group with name of existing operation {name}"
+                f"Cannot create a group with the same name as the existing operation {name}"
             )
         cls._GROUP_NAMES.add(name)
         group_entry = FlowGroupEntry(name, options)

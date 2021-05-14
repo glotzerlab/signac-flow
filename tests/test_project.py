@@ -753,7 +753,7 @@ class TestProjectClass(TestProjectBase):
         class A(FlowProject):
             pass
 
-        # add deprecation warning context manager in v0.15
+        # TODO: Add deprecation warning context manager in v0.15
         @A.operation
         @directives(executable=lambda job: f"mpirun -np {job.doc.np} python")
         def test_context(job):

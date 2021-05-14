@@ -1157,28 +1157,6 @@ class TestExecutionProject(TestProjectBase):
         fail_msg = "Unrecognized flow operation(s):"
         assert f"{fail_msg} op2, op3" in message or f"{fail_msg} op3, op2" in message
 
-    def test_main_run_invalid_job(self):
-        INVALID_JOB_ID = "0" * 32
-        with pytest.raises(subprocess.CalledProcessError) as err:
-            self.call_subcmd(
-                f"run -o group1 -j {INVALID_JOB_ID}", stderr=subprocess.STDOUT
-            )
-        assert (
-            f"LookupError: Did not find job with id '{INVALID_JOB_ID}'."
-            in err.value.output.decode("utf-8")
-        )
-
-    def test_main_run_invalid_aggregate(self):
-        INVALID_AGGREGATE_ID = "agg-" + "0" * 32
-        with pytest.raises(subprocess.CalledProcessError) as err:
-            self.call_subcmd(
-                f"run -o group1 -j {INVALID_AGGREGATE_ID}", stderr=subprocess.STDOUT
-            )
-        assert (
-            f"LookupError: Did not find aggregate with id '{INVALID_AGGREGATE_ID}'."
-            in err.value.output.decode("utf-8")
-        )
-
     def test_submit_operations(self):
         project = self.mock_project()
         operations = []
@@ -1408,6 +1386,30 @@ class TestProjectMainInterface(TestProjectBase):
             "run -o invalid_op_run", subprocess.STDOUT
         ).decode("utf-8")
         assert "Unrecognized flow operation(s): invalid_op_run" in run_output
+
+    def test_main_run_invalid_job(self):
+        assert len(self.project)
+        INVALID_JOB_ID = "0" * 32
+        with pytest.raises(subprocess.CalledProcessError) as err:
+            self.call_subcmd(
+                f"run -o group1 -j {INVALID_JOB_ID}", stderr=subprocess.STDOUT
+            )
+        assert (
+            f"LookupError: Did not find job with id '{INVALID_JOB_ID}'."
+            in err.value.output.decode("utf-8")
+        )
+
+    def test_main_run_invalid_aggregate(self):
+        assert len(self.project)
+        INVALID_AGGREGATE_ID = "agg-" + "0" * 32
+        with pytest.raises(subprocess.CalledProcessError) as err:
+            self.call_subcmd(
+                f"run -o group1 -j {INVALID_AGGREGATE_ID}", stderr=subprocess.STDOUT
+            )
+        assert (
+            f"LookupError: Did not find aggregate with id '{INVALID_AGGREGATE_ID}'."
+            in err.value.output.decode("utf-8")
+        )
 
     def test_main_next(self):
         assert len(self.project)

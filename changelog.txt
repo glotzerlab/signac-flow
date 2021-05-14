@@ -17,12 +17,13 @@ Added
 - Documentation for all directives (#480).
 - Defined validators for the ``fork`` directive (#480).
 - Submission summary now appears in ``FlowProject`` status output, showing the number of queued, running, unknown statuses. (#472, #488).
-- Decorator for setting directives while registering operation function ``FlowProject.operation.with_directives`` (#502).
+- Decorator for setting directives while registering operation function ``FlowProject.operation.with_directives`` (#309, #502).
 - Status overview now shows the number of jobs with incomplete operations and totals for the label overviews (#481, #501).
 
 Changed
 +++++++
 
+- ``flow.directives`` is deprecated in favor of ``flow.FlowProject.operation.with_directives`` (#309, #502).
 - Renamed TorqueEnvironment and related classes to PBSEnvironment (#388, #491).
 - LSF and SLURM schedulers will appear to be present if the respective commands ``bjobs -V`` or ``sbatch --version`` exit with a non-zero error code (#498).
 - Only known JobStatus values will be written to the project document, to save space and writing time (#503).

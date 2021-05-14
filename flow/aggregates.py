@@ -67,16 +67,16 @@ class aggregator:
         default behavior is creating a single aggregate of all jobs.
     sort_by : str, callable, or None
         Before aggregating, sort the jobs by a given statepoint parameter. If
-        the argument is callable, this will be passed as the callable
-        argument to :func:`sorted`. If None, no sorted is performed (Default
-        value = None).
+        the argument is a string, jobs are sorted by that state point key. If
+        the argument is callable, this will be passed as the ``key`` argument to
+        :func:`sorted`. If None, no sorting is performed (Default value = None).
     sort_ascending : bool
-        True if the jobs are to be sorted in ascending order. (Default value
-        = True)
+        True if the jobs are to be sorted in ascending order (Default value =
+        True).
     select : callable or None
         Condition for filtering individual jobs. This is passed as the
-        callable argument to :func:`filter`. If None, no filtering is
-        performed. (Default value = None)
+        ``function`` argument to :func:`filter`. If None, no filtering is
+        performed (Default value = None).
 
     """
 
@@ -138,17 +138,20 @@ class aggregator:
         Parameters
         ----------
         num : int
-            The default size of aggregates excluding the final aggregate.
-        sort_by : str or None
-            Before aggregating, sort the jobs by a given statepoint parameter.
-            The default behavior is no sorting.
+            The default size of aggregates. The final aggregate contains the
+            remaining jobs and may have fewer than ``num`` jobs.
+        sort_by : str, callable, or None
+            Before aggregating, sort the jobs by a given statepoint parameter. If
+            the argument is a string, jobs are sorted by that state point key. If
+            the argument is callable, this will be passed as the ``key`` argument to
+            :func:`sorted`. If None, no sorting is performed (Default value = None).
         sort_ascending : bool
-            States if the jobs are to be sorted in ascending order.
-            The default value is True.
+            True if the jobs are to be sorted in ascending order (Default value
+            = True).
         select : callable or None
             Condition for filtering individual jobs. This is passed as the
-            callable argument to :func:`filter`. The default behavior is no
-            filtering.
+            ``function`` argument to :func:`filter`. If None, no filtering is
+            performed (Default value = None).
 
         Returns
         -------
@@ -187,12 +190,12 @@ class aggregator:
         Examples
         --------
         The code block below provides an example of how to aggregate jobs
-        having a common state point parameter ``'sp'`` whose value, if not
-        found, is replaced by a default value of -1.
+        by a state point parameter ``"sp"``. If the state point does not
+        contain the key ``"sp"``, a default value of -1 is used.
 
         .. code-block:: python
 
-            @aggregator.groupby(key='sp', default=-1)
+            @aggregator.groupby(key="sp", default=-1)
             @FlowProject.operation
             def foo(*jobs):
                 print(len(jobs))
@@ -209,18 +212,20 @@ class aggregator:
             Default value used for grouping if the key is missing or invalid.
             If ``key`` is an iterable, the default value must be a sequence
             of equal length. If ``key`` is a callable, this argument is
-            ignored. If None, the provided keys must exist for all jobs.
-            (Default value = None)
-        sort_by : str or None
-            State point parameter used to sort the jobs before grouping.
-            The default value is None, which does no sorting.
+            ignored. If None, the provided keys must exist for all jobs
+            (Default value = None).
+        sort_by : str, callable, or None
+            Before aggregating, sort the jobs by a given statepoint parameter. If
+            the argument is a string, jobs are sorted by that state point key. If
+            the argument is callable, this will be passed as the ``key`` argument to
+            :func:`sorted`. If None, no sorting is performed (Default value = None).
         sort_ascending : bool
-            Whether jobs are to be sorted in ascending order. (Default value
-            = True)
+            True if the jobs are to be sorted in ascending order (Default value
+            = True).
         select : callable or None
             Condition for filtering individual jobs. This is passed as the
-            callable argument to :func:`filter`. The default behavior is no
-            filtering.
+            ``function`` argument to :func:`filter`. If None, no filtering is
+            performed (Default value = None).
 
         Returns
         -------

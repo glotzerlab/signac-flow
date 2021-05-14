@@ -1394,10 +1394,8 @@ class TestProjectMainInterface(TestProjectBase):
             self.call_subcmd(
                 f"run -o group1 -j {INVALID_JOB_ID}", stderr=subprocess.STDOUT
             )
-        assert (
-            f"LookupError: Did not find job with id {repr(INVALID_JOB_ID)}."
-            in err.value.output.decode("utf-8").splitlines()
-        )
+        run_output = err.value.output.decode("utf-8")
+        assert f"Did not find job with id {repr(INVALID_JOB_ID)}." in run_output
 
     def test_main_run_invalid_aggregate(self):
         assert len(self.project)
@@ -1406,9 +1404,10 @@ class TestProjectMainInterface(TestProjectBase):
             self.call_subcmd(
                 f"run -o group1 -j {INVALID_AGGREGATE_ID}", stderr=subprocess.STDOUT
             )
+        run_output = err.value.output.decode("utf-8")
         assert (
-            f"LookupError: Did not find aggregate with id {repr(INVALID_AGGREGATE_ID)}."
-            in err.value.output.decode("utf-8").splitlines()
+            f"Did not find aggregate with id {repr(INVALID_AGGREGATE_ID)}."
+            in run_output
         )
 
     def test_main_next(self):

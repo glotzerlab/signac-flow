@@ -1826,6 +1826,18 @@ class TestGroupProjectMainInterface(TestProjectBase):
             else:
                 assert not job.isfile("world.txt")
 
+    def test_main_run_select_invalid(self):
+        assert len(self.project)
+        INVALID_JOB_ID = "0" * 32
+        with pytest.raises(subprocess.CalledProcessError) as err:
+            self.call_subcmd(
+                f"run -o group1 -j {INVALID_JOB_ID}", stderr=subprocess.STDOUT
+            )
+        assert (
+            f"LookupError: Did not find job with id '{INVALID_JOB_ID}'."
+            in err.value.output.decode("utf-8")
+        )
+
     def test_main_submit(self):
         project = self.mock_project()
         assert len(project)

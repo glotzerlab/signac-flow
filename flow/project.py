@@ -288,6 +288,8 @@ class _AggregatesCursor:
             self._cursor = project.find_jobs(filter, doc_filter)
 
     def __eq__(self, other):
+        # Cursors cannot compare equal if one is over aggregates and the other
+        # is over jobs.
         if not (
             isinstance(other, type(self))
             and isinstance(other._cursor, type(self._cursor))

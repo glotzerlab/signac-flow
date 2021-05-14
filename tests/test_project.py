@@ -26,7 +26,15 @@ from define_test_project import _DynamicTestProject, _TestProject
 from deprecation import fail_if_not_removed
 
 import flow
-from flow import FlowProject, cmd, directives, get_aggregate_id, init, with_job
+from flow import (
+    FlowProject,
+    aggregator,
+    cmd,
+    directives,
+    get_aggregate_id,
+    init,
+    with_job,
+)
 from flow.environment import ComputeEnvironment
 from flow.errors import DirectivesError
 from flow.project import IgnoreConditions, _AggregatesCursor
@@ -1860,7 +1868,7 @@ class TestAggregatesProjectBase(TestProjectBase):
         request.addfinalizer(self.switch_to_cwd)
 
 
-class TestProjectUtilities(TestAggregatesProjectBase):
+class TestAggregatesProjectUtilities(TestAggregatesProjectBase):
     def test_AggregatesCursor(self):
         project = self.mock_project()
         agg_cursor = _AggregatesCursor(project=project)
@@ -1899,6 +1907,30 @@ class TestProjectUtilities(TestAggregatesProjectBase):
         project._reregister_aggregates()
         # The operation agg_op2 adds another aggregate in the project.
         assert len(agg_cursor) == NUM_BEFORE_REREGISTRATION + 2
+
+    def test_aggregator_with_job(self):
+        class A(FlowProject):
+            pass
+
+        with pytest.raises(RuntimeError):
+
+            @A.operation
+            @aggregator()
+            @with_job
+            def test_invalid_decorators(job):
+                pass
+
+    def test_with_job_aggregator(self):
+        class A(FlowProject):
+            pass
+
+        with pytest.raises(RuntimeError):
+
+            @A.operation
+            @with_job
+            @aggregator()
+            def test_invalid_decorators(job):
+                pass
 
 
 class TestAggregationProjectMainInterface(TestAggregatesProjectBase):

@@ -1895,7 +1895,7 @@ class TestAggregatesProjectUtilities(TestAggregatesProjectBase):
     def test_AggregatesCursor(self):
         project = self.mock_project()
         agg_cursor = _AggregatesCursor(project=project)
-        assert agg_cursor._project == project
+        assert agg_cursor._project is project
         assert agg_cursor._filter is None
         assert agg_cursor._doc_filter is None
         # All operations will return aggregates, even if the aggregates are not

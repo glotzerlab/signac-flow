@@ -41,7 +41,7 @@ def _get_unique_function_id(func):
         return hash(func)
 
 
-class _aggregator:
+class aggregator:
     """Decorator for operation functions that operate on aggregates.
 
     By default, if the ``aggregator_function`` is ``None``, an aggregate of all
@@ -67,16 +67,16 @@ class _aggregator:
         default behavior is creating a single aggregate of all jobs.
     sort_by : str, callable, or None
         Before aggregating, sort the jobs by a given statepoint parameter. If
-        the argument is callable, this will be passed as the callable
-        argument to :func:`sorted`. If None, no sorted is performed (Default
-        value = None).
+        the argument is a string, jobs are sorted by that state point key. If
+        the argument is callable, this will be passed as the ``key`` argument to
+        :func:`sorted`. If None, no sorting is performed (Default value = None).
     sort_ascending : bool
-        True if the jobs are to be sorted in ascending order. (Default value
-        = True)
+        True if the jobs are to be sorted in ascending order (Default value =
+        True).
     select : callable or None
         Condition for filtering individual jobs. This is passed as the
-        callable argument to :func:`filter`. If None, no filtering is
-        performed. (Default value = None)
+        ``function`` argument to :func:`filter`. If None, no filtering is
+        performed (Default value = None).
 
     """
 
@@ -138,17 +138,20 @@ class _aggregator:
         Parameters
         ----------
         num : int
-            The default size of aggregates excluding the final aggregate.
-        sort_by : str or None
-            Before aggregating, sort the jobs by a given statepoint parameter.
-            The default behavior is no sorting.
+            The default size of aggregates. The final aggregate contains the
+            remaining jobs and may have fewer than ``num`` jobs.
+        sort_by : str, callable, or None
+            Before aggregating, sort the jobs by a given statepoint parameter. If
+            the argument is a string, jobs are sorted by that state point key. If
+            the argument is callable, this will be passed as the ``key`` argument to
+            :func:`sorted`. If None, no sorting is performed (Default value = None).
         sort_ascending : bool
-            States if the jobs are to be sorted in ascending order.
-            The default value is True.
+            True if the jobs are to be sorted in ascending order (Default value
+            = True).
         select : callable or None
             Condition for filtering individual jobs. This is passed as the
-            callable argument to :func:`filter`. The default behavior is no
-            filtering.
+            ``function`` argument to :func:`filter`. If None, no filtering is
+            performed (Default value = None).
 
         Returns
         -------
@@ -187,12 +190,12 @@ class _aggregator:
         Examples
         --------
         The code block below provides an example of how to aggregate jobs
-        having a common state point parameter ``'sp'`` whose value, if not
-        found, is replaced by a default value of -1.
+        by a state point parameter ``"sp"``. If the state point does not
+        contain the key ``"sp"``, a default value of -1 is used.
 
         .. code-block:: python
 
-            @aggregator.groupby(key='sp', default=-1)
+            @aggregator.groupby(key="sp", default=-1)
             @FlowProject.operation
             def foo(*jobs):
                 print(len(jobs))
@@ -209,18 +212,20 @@ class _aggregator:
             Default value used for grouping if the key is missing or invalid.
             If ``key`` is an iterable, the default value must be a sequence
             of equal length. If ``key`` is a callable, this argument is
-            ignored. If None, the provided keys must exist for all jobs.
-            (Default value = None)
-        sort_by : str or None
-            State point parameter used to sort the jobs before grouping.
-            The default value is None, which does no sorting.
+            ignored. If None, the provided keys must exist for all jobs
+            (Default value = None).
+        sort_by : str, callable, or None
+            Before aggregating, sort the jobs by a given statepoint parameter. If
+            the argument is a string, jobs are sorted by that state point key. If
+            the argument is callable, this will be passed as the ``key`` argument to
+            :func:`sorted`. If None, no sorting is performed (Default value = None).
         sort_ascending : bool
-            Whether jobs are to be sorted in ascending order. (Default value
-            = True)
+            True if the jobs are to be sorted in ascending order (Default value
+            = True).
         select : callable or None
             Condition for filtering individual jobs. This is passed as the
-            callable argument to :func:`filter`. The default behavior is no
-            filtering.
+            ``function`` argument to :func:`filter`. If None, no filtering is
+            performed (Default value = None).
 
         Returns
         -------
@@ -340,14 +345,17 @@ class _aggregator:
             The function to decorate.
 
         """
-        if callable(func):
-            setattr(func, "_flow_aggregate", self)
-            return func
-        else:
+        if not callable(func):
             raise TypeError(
                 "Invalid argument passed while calling the aggregate "
                 f"instance. Expected a callable, got {type(func)}."
             )
+        if getattr(func, "_flow_with_job", False):
+            raise RuntimeError(
+                "The @with_job decorator cannot be used with aggregation."
+            )
+        setattr(func, "_flow_aggregate", self)
+        return func
 
 
 class _BaseAggregateStore(Mapping):
@@ -388,7 +396,6 @@ class _AggregateStore(_BaseAggregateStore):
         # We need to register the aggregates for this instance using the
         # provided project. After registering, we store the aggregates mapped
         # with the ids using :func:`get_aggregate_id`.
-        self._aggregates_by_id = {}
         self._register_aggregates()
 
     def __getitem__(self, id):
@@ -441,6 +448,8 @@ class _AggregateStore(_BaseAggregateStore):
 
         Every aggregate is required to be a tuple of jobs.
         """
+        # Initialize the internal mapping from id to aggregate
+        self._aggregates_by_id = {}
         for aggregate in self._generate_aggregates():
             for job in aggregate:
                 if job not in self._project:
@@ -453,7 +462,7 @@ class _AggregateStore(_BaseAggregateStore):
                 raise ValueError("Invalid aggregator_function provided by the user.")
             # Store aggregate by id to allow searching by id
             self._aggregates_by_id[
-                _get_aggregate_id(stored_aggregate)
+                get_aggregate_id(stored_aggregate)
             ] = stored_aggregate
 
     def _generate_aggregates(self):
@@ -562,7 +571,7 @@ class _DefaultAggregateStore(_BaseAggregateStore):
             yield (job.get_id(), (job,))
 
 
-def _get_aggregate_id(aggregate):
+def get_aggregate_id(aggregate):
     """Generate aggregate id for an aggregate of jobs.
 
     The aggregate id is a unique hash identifying a tuple of jobs. The

@@ -54,6 +54,8 @@ def cmd(func):
 def with_job(func):
     """Use ``arg`` as a context manager for ``func(arg)`` with this decorator.
 
+    This decorator can only be used for operations that accept a single job as a parameter.
+
     If this function is an operation function defined by :class:`~.FlowProject`, it will
     be the same as using ``with job:``.
 
@@ -94,10 +96,12 @@ def with_job(func):
         def hello_cmd(job):
             return 'trap "cd `pwd`" EXIT && cd {} && echo "hello {job}"'.format(job.ws)
     """
+    if getattr(func, "_flow_aggregate", False):
+        raise RuntimeError("The @with_job decorator cannot be used with aggregation.")
 
     @wraps(func)
-    def decorated(job):
-        with job:
+    def decorated(*jobs):
+        with jobs[0] as job:
             if getattr(func, "_flow_cmd", False):
                 return f'trap "cd $(pwd)" EXIT && cd {job.ws} && {func(job)}'
             else:

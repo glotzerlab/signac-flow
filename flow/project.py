@@ -1926,25 +1926,29 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         try:
             yield status_update
         finally:
-            if not status_update:
-                return
+            # This "finally" block cannot include "return", "break", or
+            # "continue", or else saved exceptions raised in the context
+            # manager will be lost and not be seen by the user.
+            # https://docs.python.org/3/reference/compound_stmts.html#the-try-statement
+            if status_update:
+                status_update = {
+                    key: int(value) for key, value in status_update.items()
+                }
+                if "_status" in self.document:
+                    disk_status = self.document["_status"]()
+                else:
+                    disk_status = {}
+                disk_status.update(status_update)
 
-            status_update = {key: int(value) for key, value in status_update.items()}
-            if "_status" in self.document:
-                disk_status = self.document["_status"]()
-            else:
-                disk_status = {}
-            disk_status.update(status_update)
+                # Filter out JobStatus.unknown before writing to disk, to save
+                # space and reduce the write time.
+                disk_status = {
+                    key: value
+                    for key, value in disk_status.items()
+                    if value != int(JobStatus.unknown)
+                }
 
-            # Filter out JobStatus.unknown before writing to disk, to save
-            # space and reduce the write time.
-            disk_status = {
-                key: value
-                for key, value in disk_status.items()
-                if value != int(JobStatus.unknown)
-            }
-
-            self.document["_status"] = disk_status
+                self.document["_status"] = disk_status
 
     def _generate_selected_aggregate_groups(
         self,

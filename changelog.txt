@@ -5,6 +5,27 @@ Changelog
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 The numbers in brackets denote the related GitHub issue and/or pull request.
 
+Version 0.15
+============
+
+[0.15.0] -- 2021-xx-xx
+----------------------
+
+Added
++++++
+
+- Add official support for Andes cluster (#500).
+
+Changed
++++++++
+
+- Jinja templates are indented for easier reading (#461, #495).
+
+Fixed
++++++
+
+- Errors raised during submission were not being shown to users (#517, #518).
+
 Version 0.14
 ============
 
@@ -27,7 +48,6 @@ Changed
 - Renamed TorqueEnvironment and related classes to PBSEnvironment (#388, #491).
 - LSF and SLURM schedulers will appear to be present if the respective commands ``bjobs -V`` or ``sbatch --version`` exit with a non-zero error code (#498).
 - Only known JobStatus values will be written to the project document, to save space and writing time (#503).
-- Jinja templates are indented for easier reading (#495).
 
 Fixed
 +++++

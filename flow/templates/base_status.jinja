@@ -15,7 +15,7 @@
 
 {% block overview %}
     {% if overview %}
-Overview: {{ total_num_jobs }} jobs, {{ total_num_eligible_jobs }} jobs with eligible operations.
+Overview: {{ total_num_jobs_or_aggregates }} jobs/aggregates, {{ total_num_eligible_jobs_or_aggregates }} jobs/aggregates with eligible operations.
 
         {% block progress %}
 | label | ratio |

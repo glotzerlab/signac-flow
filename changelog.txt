@@ -16,6 +16,11 @@ Changed
 
 - Jinja templates are indented for easier reading (#461, #495).
 
+Fixed
++++++
+
+- Errors raised during submission were not being shown to users (#517, #518).
+
 Version 0.14
 ============
 

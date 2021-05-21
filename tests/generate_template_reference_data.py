@@ -118,6 +118,15 @@ def init(project):
                 "bundle": [["mpi_op", "omp_op"]],
             },
         ],
+        "environments.xsede.ExpanseEnvironment": [
+            {
+                "partition": ["compute", "shared", "gpu", "gpu-shared", "large-shared"],
+            }
+            {
+                "parallel": [],
+                "bundle": [[]]
+            }
+        ]
     }
 
     for environment, parameter_combinations in environments.items():

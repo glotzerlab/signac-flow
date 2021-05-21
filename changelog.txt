@@ -11,10 +11,20 @@ Version 0.15
 [0.15.0] -- 2021-xx-xx
 ----------------------
 
+Added
++++++
+
+- Add official support for Andes cluster (#500).
+
 Changed
 +++++++
 
 - Jinja templates are indented for easier reading (#461, #495).
+
+Fixed
++++++
+
+- Errors raised during submission were not being shown to users (#517, #518).
 
 Version 0.14
 ============

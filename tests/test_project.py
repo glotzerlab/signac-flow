@@ -36,7 +36,7 @@ from flow import (
     with_job,
 )
 from flow.environment import ComputeEnvironment
-from flow.errors import DirectivesError
+from flow.errors import DirectivesError, SubmitError
 from flow.project import IgnoreConditions, _AggregatesCursor
 from flow.scheduling.base import ClusterJob, JobStatus, Scheduler
 from flow.util.misc import (
@@ -124,6 +124,18 @@ class MockScheduler(Scheduler):
 
 class MockEnvironment(ComputeEnvironment):
     scheduler_type = MockScheduler
+
+    @classmethod
+    def is_present(cls):
+        return True
+
+
+class MockSchedulerSubmitError(Scheduler):
+    def jobs(self):
+        pass
+
+    def submit(self, script, **kwargs):
+        raise SubmitError("This class always fails to submit.")
 
     @classmethod
     def is_present(cls):
@@ -1193,6 +1205,13 @@ class TestExecutionProject(TestProjectBase):
         with redirect_stderr(StringIO()):
             project.submit(num=1)
         assert len(list(MockScheduler.jobs())) == 2
+
+    def test_submit_error(self, monkeypatch):
+        """Ensure that SubmitErrors are raised to the user."""
+        monkeypatch.setattr(MockEnvironment, "scheduler_type", MockSchedulerSubmitError)
+        project = self.mock_project()
+        with pytest.raises(SubmitError):
+            project.submit(num=1)
 
     def test_resubmit(self):
         project = self.mock_project()

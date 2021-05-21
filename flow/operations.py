@@ -15,7 +15,10 @@ import logging
 from functools import wraps
 from textwrap import indent
 
+from deprecation import deprecated
+
 from .environment import ComputeEnvironment
+from .version import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +111,12 @@ def with_job(func):
     return decorated
 
 
+@deprecated(
+    deprecated_in="0.15",
+    removed_in="1.0",
+    current_version=__version__,
+    details="Use FlowProject.operation.with_directives",
+)
 class directives:
     """Decorator for operation functions to provide additional execution directives.
 

@@ -19,12 +19,13 @@ class SummitEnvironment(DefaultLSFEnvironment):
 
     Example::
 
-        @Project.operation
-        @directives(nranks=3) # 3 MPI ranks per operation
-        @directives(ngpu=3) # 3 GPUs
-        @directives(np=3) # 3 CPU cores
-        @directives(rs_tasks=3) # 3 tasks per resource set
-        @directives(extra_jsrun_args='--smpiargs="-gpu"') # extra jsrun arguments
+        @Project.operation.with_directives({
+            "nranks": 3,  # 3 MPI ranks per operation
+            "ngpu": 3,  # 3 GPUs
+            "np": 3,  # 3 CPU cores
+            "rs_tasks": 3,  # 3 tasks per resource set
+            "extra_jsrun_args": '--smpiargs="-gpu"',  # extra jsrun arguments
+        })
         def my_operation(job):
             ...
 

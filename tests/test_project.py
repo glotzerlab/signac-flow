@@ -518,8 +518,9 @@ class TestProjectClass(TestProjectBase):
         class A(FlowProject):
             pass
 
-        @A.operation
-        @directives(executable=lambda job: f"mpirun -np {job.doc.np} python")
+        @A.operation.with_directives(
+            {"executable": lambda job: f"mpirun -np {job.doc.np} python"}
+        )
         def test_context(job):
             return "exit 1"
 
@@ -536,8 +537,7 @@ class TestProjectClass(TestProjectBase):
             class A(FlowProject):
                 pass
 
-            @A.operation
-            @directives(memory=value)
+            @A.operation.with_directives({"memory": value})
             def op1(job):
                 pass
 
@@ -565,8 +565,7 @@ class TestProjectClass(TestProjectBase):
             class A(FlowProject):
                 pass
 
-            @A.operation
-            @directives(memory=value)
+            @A.operation.with_directives({"memory": value})
             def op1(job):
                 pass
 
@@ -591,8 +590,7 @@ class TestProjectClass(TestProjectBase):
             class A(FlowProject):
                 pass
 
-            @A.operation
-            @directives(walltime=value)
+            @A.operation.with_directives({"walltime": value})
             def op1(job):
                 pass
 
@@ -610,8 +608,7 @@ class TestProjectClass(TestProjectBase):
             class A(FlowProject):
                 pass
 
-            @A.operation
-            @directives(walltime=value)
+            @A.operation.with_directives({"walltime": value})
             def op1(job):
                 pass
 
@@ -634,9 +631,12 @@ class TestProjectClass(TestProjectBase):
         class A(FlowProject):
             pass
 
-        @A.operation
-        @directives(nranks=lambda job: job.doc.get("nranks", 1))
-        @directives(omp_num_threads=lambda job: job.doc.get("omp_num_threads", 1))
+        @A.operation.with_directives(
+            {
+                "nranks": lambda job: job.doc.get("nranks", 1),
+                "omp_num_threads": lambda job: job.doc.get("omp_num_threads", 1),
+            }
+        )
         def a(job):
             return "hello!"
 
@@ -699,19 +699,21 @@ class TestProjectClass(TestProjectBase):
         group = A.make_group("group")
 
         @group
-        @A.operation
-        @directives(
-            nranks=lambda job: job.doc.get("nranks", 1),
-            omp_num_threads=lambda job: job.doc.get("omp_num_threads", 1),
+        @A.operation.with_directives(
+            {
+                "nranks": lambda job: job.doc.get("nranks", 1),
+                "omp_num_threads": lambda job: job.doc.get("omp_num_threads", 1),
+            }
         )
         def a(job):
             return "hello!"
 
         @group
-        @A.operation
-        @directives(
-            nranks=lambda job: job.doc.get("nranks", 1),
-            omp_num_threads=lambda job: job.doc.get("omp_num_threads", 1),
+        @A.operation.with_directives(
+            {
+                "nranks": lambda job: job.doc.get("nranks", 1),
+                "omp_num_threads": lambda job: job.doc.get("omp_num_threads", 1),
+            }
         )
         def b(job):
             return "world"
@@ -729,6 +731,38 @@ class TestProjectClass(TestProjectBase):
         assert all(
             not callable(value) for value in submit_job_operation.directives.values()
         )
+
+    def test_operation_with_directives(self):
+        class A(FlowProject):
+            pass
+
+        @A.operation.with_directives({"executable": "python3", "nranks": 4})
+        def test_context(job):
+            return "exit 1"
+
+        project = self.mock_project(A)
+        for job in project:
+            for next_op in project._next_operations([(job,)]):
+                assert next_op.directives["executable"] == "python3"
+                assert next_op.directives["nranks"] == 4
+            break
+
+    def test_old_directives_decorator(self):
+        class A(FlowProject):
+            pass
+
+        # TODO: Add deprecation warning context manager in v0.15
+        @A.operation
+        @directives(executable=lambda job: f"mpirun -np {job.doc.np} python")
+        def test_context(job):
+            return "exit 1"
+
+        project = self.mock_project(A)
+        for job in project:
+            job.doc.np = 3
+            for next_op in project._next_operations([(job,)]):
+                assert "mpirun -np 3 python" in next_op.cmd
+            break
 
     def test_copy_conditions(self):
         class A(FlowProject):
@@ -1611,6 +1645,30 @@ class TestGroupProject(TestProjectBase):
             assert all(
                 [job_op.directives.get("omp_num_threads", 0) == 1 for job_op in job_ops]
             )
+
+    def test_unique_group_operation_names(self):
+        """Test that manually created groups and operations cannot share the same name."""
+
+        class A(FlowProject):
+            pass
+
+        A.make_group("foo")
+
+        with pytest.raises(ValueError):
+
+            @A.operation
+            def foo(job):
+                pass
+
+        class B(FlowProject):
+            pass
+
+        @B.operation
+        def bar(job):
+            pass
+
+        with pytest.raises(ValueError):
+            B.make_group("bar")
 
     def test_submission_combine_directives(self):
         class A(flow.FlowProject):

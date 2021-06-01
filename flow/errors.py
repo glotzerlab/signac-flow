@@ -64,6 +64,6 @@ class TemplateError(Jinja2Extension):
 
 
 class IncompatibleSchemaVersion(RuntimeError):
-    """The FlowProject's schema version is incompatible with this version of flow."""
+    """The FlowProject's configuration schema version is incompatible with this version of signac-flow."""  # noqa: E501
 
     pass

@@ -26,16 +26,16 @@ def migrate_v1_to_v2(project):
     #    that long term so that would at best be a short term solution (say for
     #    one or two flow releases) and then after that we tell users who
     #    haven't migrated to just `pip install configobj`. Then, this function
-    #    can rely on the fact that in signac schema version one the config
-    #    information is stored in signac.rc using the known schema and operate
-    #    accordingly to pull it.
+    #    can rely on the fact that in signac schema v1 the config information
+    #    is stored in signac.rc using the known schema and operate accordingly
+    #    to pull it.
     # 2. User updates signac and attempts to migrate before migrating flow
     #    schema. In this case, `signac migrate` should error and tell the user
     #    to update flow and run `flow migrate` first. This can be accomplished
     #    by having the v1->v2 migration in signac check for the presence of the
     #    "flow" key in the config and error if it is present.  We will
     #    introduce the flow v1->v2 migration before signac's to ensure that
-    #    this be possible.
+    #    this is possible.
     # 3. Users update signac and create a new project, but still use an old
     #    version of flow that has errors trying to access signac config
     #    information. This case should fail fast, and we'll just have to inform

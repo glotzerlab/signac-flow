@@ -1,7 +1,7 @@
 # Copyright (c) 2021 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-"""Handle migrations of signac schema versions."""
+"""Handle migrations of signac-flow schema versions."""
 
 import os
 import sys
@@ -69,8 +69,9 @@ def _collect_migrations(project):
     if get_config_schema_version() > schema_version:
         # Project config schema version is newer and therefore not supported.
         raise RuntimeError(
-            "The signac-flow schema version used by this project is {}, but flow {} "
-            "only supports up to schema version {}. Try updating flow.".format(
+            "The signac-flow configuration schema version used by this project is {}, "
+            "but signac-flow {} only supports up to schema version {}. Try updating "
+            "signac-flow.".format(
                 get_config_schema_version(), __version__, SCHEMA_VERSION
             )
         )
@@ -82,8 +83,9 @@ def _collect_migrations(project):
                 break
         else:
             raise RuntimeError(
-                "The signac-flow schema version used by this project is {}, but flow {} "
-                "uses schema version {} and does not know how to migrate.".format(
+                "The signac-flow configuration schema version used by this project is "
+                "{}, but signac-flow {} uses schema version {} and does not know how "
+                "to migrate.".format(
                     get_config_schema_version(), __version__, schema_version
                 )
             )

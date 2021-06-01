@@ -7,7 +7,11 @@ http://www.doeleadershipcomputing.org/
 """
 from math import gcd
 
-from ..environment import DefaultLSFEnvironment, template_filter
+from ..environment import (
+    DefaultLSFEnvironment,
+    DefaultSlurmEnvironment,
+    template_filter,
+)
 
 
 class SummitEnvironment(DefaultLSFEnvironment):
@@ -15,12 +19,13 @@ class SummitEnvironment(DefaultLSFEnvironment):
 
     Example::
 
-        @Project.operation
-        @directives(nranks=3) # 3 MPI ranks per operation
-        @directives(ngpu=3) # 3 GPUs
-        @directives(np=3) # 3 CPU cores
-        @directives(rs_tasks=3) # 3 tasks per resource set
-        @directives(extra_jsrun_args='--smpiargs="-gpu"') # extra jsrun arguments
+        @Project.operation.with_directives({
+            "nranks": 3,  # 3 MPI ranks per operation
+            "ngpu": 3,  # 3 GPUs
+            "np": 3,  # 3 CPU cores
+            "rs_tasks": 3,  # 3 tasks per resource set
+            "extra_jsrun_args": '--smpiargs="-gpu"',  # extra jsrun arguments
+        })
         def my_operation(job):
             ...
 
@@ -172,4 +177,34 @@ class SummitEnvironment(DefaultLSFEnvironment):
         return mpi_prefix
 
 
-__all__ = ["SummitEnvironment"]
+class AndesEnvironment(DefaultSlurmEnvironment):
+    """Environment profile for the Andes supercomputer.
+
+    https://www.olcf.ornl.gov/olcf-resources/compute-systems/andes/
+    """
+
+    hostname_pattern = r"andes-.*\.olcf\.ornl\.gov"
+    template = "andes.sh"
+    mpi_cmd = "srun"
+    cores_per_node = 32
+
+    @classmethod
+    def add_args(cls, parser):
+        """Add arguments to parser.
+
+        Parameters
+        ----------
+        parser : :class:`argparse.ArgumentParser`
+            The argument parser where arguments will be added.
+
+        """
+        super().add_args(parser)
+        parser.add_argument(
+            "--partition",
+            choices=["batch", "gpu"],
+            default="batch",
+            help="Specify the partition to submit to.",
+        )
+
+
+__all__ = ["SummitEnvironment", "AndesEnvironment"]

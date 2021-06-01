@@ -3,7 +3,7 @@
 # This software is licensed under the BSD 3-Clause License.
 """Define the signac-flow version."""
 
-__version__ = "0.13.0"
+__version__ = "0.14.0"
 
 SCHEMA_VERSION = "1"
 

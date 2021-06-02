@@ -28,6 +28,7 @@ Fixed
 +++++
 
 - Errors raised during submission were not being shown to users (#517, #518).
+- Fixed dependency flag for SLURM submissions (#530)
 
 Version 0.14
 ============

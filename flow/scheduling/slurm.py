@@ -140,9 +140,7 @@ class SlurmScheduler(Scheduler):
         submit_cmd = self.submit_cmd + flags
 
         if after is not None:
-            submit_cmd.extend(
-                ["-W", '-d afterany:{}'.format(after.split(".")[0])]
-            )
+            submit_cmd.extend(["-W", "-d afterany:{}".format(after.split(".")[0])])
 
         if hold:
             submit_cmd += ["--hold"]

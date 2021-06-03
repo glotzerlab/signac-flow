@@ -111,7 +111,7 @@ class IgnoreConditions(IntFlag):
     def __invert__(self):
         # Compute the largest number of bits used to represent one of the flags
         # so that we can XOR the appropriate number.
-        max_bits = len(bin(max([elem.value for elem in type(self)]))) - 2
+        max_bits = len(bin(max(elem.value for elem in type(self)))) - 2
         return self.__class__((2 ** max_bits - 1) ^ self._value_)
 
     NONE = 0
@@ -2687,7 +2687,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 for hit in file_timing.iterHits()
             ]
             sorted_hits = reversed(sorted(hits, key=lambda hit: hit[2]))
-            total_num_hits = sum([hit[2] for hit in hits])
+            total_num_hits = sum(hit[2] for hit in hits)
 
             profiling_results = ["# Profiling:\n"]
 

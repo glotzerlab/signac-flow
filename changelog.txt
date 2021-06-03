@@ -23,6 +23,7 @@ Changed
 
 - Jinja templates are indented for easier reading (#461, #495).
 - ``flow.directives`` is deprecated in favor of ``flow.FlowProject.operation.with_directives`` (#309, #502).
+- All environments require a scheduler in order to submit, even in pretend mode (#533).
 
 Fixed
 +++++

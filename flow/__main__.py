@@ -70,8 +70,8 @@ def main_template_create(args):
 
     # grab and render custom template
     jinja_env = jinja2.Environment(loader=jinja2.PackageLoader("flow"))
-    custom_template_template = jinja_env.get_template("custom.sh")
-    new_template = custom_template_template.render(extend_template=extend_template)
+    custom_template = jinja_env.get_template("custom.sh")
+    new_template = custom_template.render(extend_template=extend_template)
 
     try:
         with open(project.fn(os.path.join("templates", "script.sh")), "x") as fh:
@@ -79,7 +79,7 @@ def main_template_create(args):
     except OSError as error:
         if error.errno == errno.EEXIST:
             logger.error(
-                "Error while trying to create custom template. Delete "
+                "The file 'templates/script.sh' already exists. Delete "
                 "'templates/script.sh' first and rerun command."
             )
         else:

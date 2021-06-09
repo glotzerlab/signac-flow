@@ -9,12 +9,15 @@ initialize FlowProject class definitions directly from the command line.
 Execute `flow --help` for more information.
 """
 import argparse
+import errno
 import logging
+import os
 import sys
 
+import jinja2
 from signac import get_project, init_project
 
-from . import __version__, template
+from . import __version__, environment, template
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +47,43 @@ def main_init(args):
         raise RuntimeError(
             f"Error occurred while trying to initialize a flow project: {error}"
         )
+
+
+def main_template(args):
+    """Print out general information about template subcommand."""
+    print("flow template does nothing. Use of the available subcommands [create,].")
+
+
+def main_template_create(args):
+    """Create custom template based on a specified or detected environment."""
+    if args.name is None:
+        env = environment.get_environment()
+        if env is environment.StandardEnvironment:
+            extend_template = "base_script.sh"
+        else:
+            extend_template = env.template
+    else:
+        extend_template = args.name
+
+    project = get_project()
+    os.makedirs(project.fn("templates"), exist_ok=True)
+
+    # grab and render custom template
+    jinja_env = jinja2.Environment(loader=jinja2.PackageLoader("flow"))
+    custom_template_template = jinja_env.get_template("custom.sh")
+    new_template = custom_template_template.render(extend_template=extend_template)
+
+    try:
+        with open(project.fn(os.path.join("templates", "script.sh")), "x") as fh:
+            fh.write(new_template)
+    except OSError as error:
+        if error.errno == errno.EEXIST:
+            logger.error(
+                "Error while trying to create custom template. Delete "
+                "'templates/script.sh' first and rerun command."
+            )
+        else:
+            logger.error(f"Error while trying to create custom template: '{error}'.")
 
 
 def main():
@@ -89,6 +129,30 @@ def main():
         default="minimal",
         help="Specify a template to use. Default value: 'minimal'.",
     )
+
+    # the flow template command
+    parser_template = subparsers.add_parser(
+        "template", help="Create and manage custom user templates."
+    )
+    template_subparsers = parser_template.add_subparsers()
+    parser_template.set_defaults(func=main_template)
+
+    # flow template create command
+    parser_template_create = template_subparsers.add_parser(
+        "create",
+        help="Create a new custom template based on the detected or selected environment",
+    )
+    parser_template_create.add_argument(
+        "name",
+        nargs="?",
+        type=str,
+        default=None,
+        help="Optional specify a template to use as the base template to "
+        "extend. If not specified, the currently detected environment's template is "
+        "used. ",
+    )
+
+    parser_template_create.set_defaults(func=main_template_create)
 
     if "--version" in sys.argv:
         print("signac-flow", __version__)

@@ -348,17 +348,17 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
     @classmethod
     def _get_default_directives(cls):
         return _Directives(
-            [
+            (
+                _GET_EXECUTABLE(),
                 _FORK,
-                _NP,
+                _MEMORY,
                 _NGPU,
+                _NP,
                 _NRANKS,
                 _OMP_NUM_THREADS,
-                _GET_EXECUTABLE(),
-                _WALLTIME,
                 _PROCESSOR_FRACTION,
-                _MEMORY,
-            ]
+                _WALLTIME,
+            )
         )
 
 

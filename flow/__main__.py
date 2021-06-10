@@ -54,7 +54,7 @@ def main_template_create(args):
     if args.extends is None:
         extend_template = environment.get_environment().template
     else:
-        extend_template = args.extends
+        extend_template = args.extends[0]
 
     project = get_project()
     template_directory = project.fn(project._config.get("template_dir", "templates"))
@@ -62,25 +62,26 @@ def main_template_create(args):
 
     # grab and render custom template
     jinja_env = jinja2.Environment(loader=jinja2.PackageLoader("flow"))
-    custom_template = jinja_env.get_template("custom.sh")
+    custom_template = jinja_env.get_template("custom_script_template.sh")
     new_template = custom_template.render(extend_template=extend_template)
 
+    script_name = args.name[0]
+    script_path = os.path.join(template_directory, script_name)
     try:
-        with open(project.fn(os.path.join(template_directory, args.name)), "x") as fh:
+        with open(script_path, "x") as fh:
             fh.write(new_template)
     except OSError as error:
         if error.errno == errno.EEXIST:
             logger.error(
-                f"Error while trying to create custom template. Delete "
-                f"'{template_directory}{os.path.sep}{args.name}' first and rerun "
-                f"command."
+                f"Error while trying to create custom template. Delete '{script_path}' "
+                f"first and rerun command."
             )
         else:
             logger.error(f"Error while trying to create custom template: '{error}'.")
     else:
         print(
-            f"Created user script template at {template_directory}{os.path.sep}"
-            f"{args.name} extending the template {extend_template}."
+            f"Created user script template at '{script_path}' extending the template "
+            "{extend_template}."
         )
 
 

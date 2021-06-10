@@ -56,17 +56,14 @@ def main_template(args):
 
 def main_template_create(args):
     """Create custom template based on a specified or detected environment."""
-    if args.name is None:
-        env = environment.get_environment()
-        if env is environment.StandardEnvironment:
-            extend_template = "base_script.sh"
-        else:
-            extend_template = env.template
+    if args.extends is None:
+        extend_template = environment.get_environment().template
     else:
-        extend_template = args.name
+        extend_template = args.extends
 
     project = get_project()
-    os.makedirs(project.fn("templates"), exist_ok=True)
+    template_directory = project.fn(project._config.get("template_dir", "templates"))
+    os.makedirs(template_directory, exist_ok=True)
 
     # grab and render custom template
     jinja_env = jinja2.Environment(loader=jinja2.PackageLoader("flow"))
@@ -74,16 +71,22 @@ def main_template_create(args):
     new_template = custom_template.render(extend_template=extend_template)
 
     try:
-        with open(project.fn(os.path.join("templates", "script.sh")), "x") as fh:
+        with open(project.fn(os.path.join(template_directory, args.name)), "x") as fh:
             fh.write(new_template)
     except OSError as error:
         if error.errno == errno.EEXIST:
             logger.error(
-                "The file 'templates/script.sh' already exists. Delete "
-                "'templates/script.sh' first and rerun command."
+                f"Error while trying to create custom template. Delete "
+                f"'{template_directory}{os.path.sep}{args.name}' first and rerun "
+                f"command."
             )
         else:
             logger.error(f"Error while trying to create custom template: '{error}'.")
+    else:
+        print(
+            f"Created user script template at {template_directory}{os.path.sep}"
+            f"{args.name} extending the template {extend_template}."
+        )
 
 
 def main():
@@ -143,13 +146,25 @@ def main():
         help="Create a new custom template based on the detected or selected environment",
     )
     parser_template_create.add_argument(
-        "name",
-        nargs="?",
+        "--extends",
+        "-e",
+        nargs=1,
         type=str,
         default=None,
         help="Optional specify a template to use as the base template to "
         "extend. If not specified, the currently detected environment's template is "
-        "used. ",
+        "used which on a system without a scheduler is 'base_script.sh'.",
+    )
+
+    parser_template_create.add_argument(
+        "--name",
+        "-n",
+        nargs=1,
+        type=str,
+        default="script.sh",
+        help="Optional specify a name to use as the the name of the custom user "
+        "template. Defaults to 'script.sh' which will be used by default in flow "
+        "submissions for the current project.",
     )
 
     parser_template_create.set_defaults(func=main_template_create)

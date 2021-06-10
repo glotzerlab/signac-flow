@@ -74,7 +74,7 @@ class TestCLI:
         assert str(signac.get_project()) == "my_project"
         assert os.path.exists("my_project.py")
 
-    def test_init_flowproject_again(self):
+    def test_init_flowproject_fail_if_exists(self):
         self.call("python -m flow init".split())
         assert str(signac.get_project()) == "project"
         assert os.path.exists("project.py")

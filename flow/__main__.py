@@ -12,6 +12,7 @@ import argparse
 import errno
 import logging
 import os
+import string
 import sys
 
 import jinja2
@@ -63,7 +64,9 @@ def main_template_create(args):
     # grab and render custom template
     jinja_env = jinja2.Environment(loader=jinja2.PackageLoader("flow"))
     custom_template = jinja_env.get_template("custom_script_template.sh")
-    new_template = custom_template.render(extend_template=extend_template)
+    new_template = custom_template.render(extend_template=extend_template).strip(
+        string.whitespace
+    )
 
     script_name = args.name[0]
     script_path = os.path.join(template_directory, script_name)

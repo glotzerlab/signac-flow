@@ -113,7 +113,7 @@ def init(alias=None, template=None, root=None):
                 error_message += f"a file named '{fn}' already exists!"
             else:
                 error_message += f"'{error}'."
-            raise RuntimeError(error_message)
+            raise OSError(error_message)
         else:
             files_created.append(fn)
             print(f"Created file '{fn}'.", file=sys.stderr)

@@ -76,9 +76,10 @@ def main():
         type=str,
         nargs="?",
         default="project",
-        help="Name of the flow project module to initialize. "
-        "This name will also be used to initialize a signac project in case that "
-        "no project was initialized prior to calling 'init'.",
+        help="Name of the FlowProject module to initialize. "
+        "This name will also be used to initialize a signac project if "
+        "no signac project was initialized prior to calling 'init'. "
+        "Default value: 'project'.",
     )
     parser_init.add_argument(
         "-t",
@@ -86,7 +87,7 @@ def main():
         type=str,
         choices=tuple(sorted(template.TEMPLATES)),
         default="minimal",
-        help="Specify a specific to template to use.",
+        help="Specify a template to use. Default value: 'minimal'.",
     )
 
     if "--version" in sys.argv:

@@ -37,7 +37,7 @@ from flow import (
 )
 from flow.environment import ComputeEnvironment
 from flow.errors import DirectivesError, SubmitError
-from flow.project import IgnoreConditions, _AggregatesCursor
+from flow.project import IgnoreConditions, _AggregateStoresCursor, _JobAggregateCursor
 from flow.scheduling.base import ClusterJob, JobStatus, Scheduler
 from flow.util.misc import (
     add_cwd_to_environment_pythonpath,
@@ -237,7 +237,7 @@ class TestProjectStatusPerformance(TestProjectBase):
 
         time = timeit.timeit(
             lambda: project._fetch_status(
-                aggregates=_AggregatesCursor(project),
+                aggregates=_AggregateStoresCursor(project),
                 err=StringIO(),
                 ignore_errors=False,
             ),
@@ -1971,10 +1971,7 @@ class TestAggregatesProjectBase(TestProjectBase):
 class TestAggregatesProjectUtilities(TestAggregatesProjectBase):
     def test_AggregatesCursor(self):
         project = self.mock_project()
-        agg_cursor = _AggregatesCursor(project=project)
-        assert agg_cursor._project is project
-        assert agg_cursor._filter is None
-        assert agg_cursor._doc_filter is None
+        agg_cursor = _AggregateStoresCursor(project=project)
         # All operations will return aggregates, even if the aggregates are not
         # unique to that operation, because every operation/group in this
         # project has a custom aggregator defined. Only the default aggregator
@@ -1988,15 +1985,13 @@ class TestAggregatesProjectUtilities(TestAggregatesProjectBase):
 
     def test_filters(self):
         project = self.mock_project()
-        agg_cursor = _AggregatesCursor(project=project, filter={"even": True})
+        agg_cursor = _JobAggregateCursor(project=project, filter={"even": True})
         assert agg_cursor._project == project
-        assert agg_cursor._filter == {"even": True}
-        assert agg_cursor._doc_filter is None
         assert len(agg_cursor) == 15
 
     def test_reregister_aggregates(self):
         project = self.mock_project()
-        agg_cursor = _AggregatesCursor(project=project)
+        agg_cursor = _AggregateStoresCursor(project=project)
         NUM_BEFORE_REREGISTRATION = 40
         assert len(agg_cursor) == NUM_BEFORE_REREGISTRATION
         new_job = project.open_job(dict(i=31, even=False))
@@ -2091,6 +2086,20 @@ class TestAggregationGroupProjectMainInterface(TestAggregatesProjectBase):
             assert not job.doc.get("op3", False)
 
         self.call_subcmd(f"run -o group_agg -j {get_aggregate_id(project)}")
+
+        for job in project:
+            assert job.doc.op2
+            assert job.doc.op3
+
+    def test_main_run_abbreviated(self):
+        project = self.mock_project()
+        assert len(project)
+        for job in project:
+            assert not job.doc.get("op2", False)
+            assert not job.doc.get("op3", False)
+
+        # Use an abbreviated aggregate id
+        self.call_subcmd(f"run -o group_agg -j {get_aggregate_id(project)[:-5]}")
 
         for job in project:
             assert job.doc.op2

@@ -2316,7 +2316,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         Returns
         -------
         dict
-            A dictionary containing job status for all jobs.
+            A dictionary containing status for the requested job.
 
         """
         if cached_status is None:

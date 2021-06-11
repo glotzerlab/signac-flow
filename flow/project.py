@@ -4525,13 +4525,17 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     raise LookupError(error)
             return list(aggregates)
         elif args.func == self._main_exec:
-            # exec command used with job_id
+            # exec command does not support filters, so we must exit early.
             return _AggregateStoresCursor(self)
-        else:
-            # filter or doc filter provided
+        elif args.filter or args.doc_filter:
+            # filter or doc_filter provided. Filters can only be used to select
+            # single jobs and not aggregates of multiple jobs.
             filter_ = parse_filter_arg(args.filter)
             doc_filter = parse_filter_arg(args.doc_filter)
             return _JobAggregateCursor(self, filter_, doc_filter)
+        else:
+            # Use all aggregates
+            return _AggregateStoresCursor(self)
 
     def main(self, parser=None):
         """Call this function to use the main command line interface.

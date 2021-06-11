@@ -3609,7 +3609,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         flags=None,
         force=False,
         template="script.sh",
-        pretend=False,
         show_template_help=False,
         **kwargs,
     ):
@@ -3630,9 +3629,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         template : str
             The name of the template file to be used to generate the submission
             script. (Default value = "script.sh")
-        pretend : bool
-            Do not actually submit, but only print the submission script to screen. Useful
-            for testing the submission workflow. (Default value = False)
         show_template_help : bool
             Show information about available template variables and filters and
             exit. (Default value = False)
@@ -3692,13 +3688,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     "the template script, including: %s",
                     ", ".join(sorted(keys_unused)),
                 )
-            if pretend:
-                print(script)
-
-            else:
-                return self._environment.submit(
-                    _id=_id, script=script, flags=flags, **kwargs
-                )
+            return self._environment.submit(
+                _id=_id, script=script, flags=flags, **kwargs
+            )
 
     def submit(
         self,

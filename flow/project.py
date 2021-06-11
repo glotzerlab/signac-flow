@@ -3837,18 +3837,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         cls._add_template_arg_group(parser)
 
     @classmethod
-    def _add_script_args(cls, parser):
-        cls._add_operation_selection_arg_group(parser)
-        execution_group = parser.add_argument_group("execution")
-        execution_group.add_argument(
-            "-p",
-            "--parallel",
-            action="store_true",
-            help="Execute all operations in parallel.",
-        )
-        cls._add_template_arg_group(parser)
-
-    @classmethod
     def _add_template_arg_group(cls, parser, default="script.sh"):
         """Add argument group to parser for template handling."""
         template_group = parser.add_argument_group(

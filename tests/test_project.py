@@ -1609,12 +1609,6 @@ class TestProjectSubmitOptions(TestProjectBase):
         )
     )
 
-    @pytest.fixture(autouse=True)
-    def setup_main_interface(self, request):
-        self.project = self.mock_project()
-        os.chdir(self._tmp_dir.name)
-        request.addfinalizer(self.switch_to_cwd)
-
     @pytest.mark.parametrize(
         "env,after_cmd",
         [

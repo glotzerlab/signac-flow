@@ -111,7 +111,7 @@ class IgnoreConditions(IntFlag):
     def __invert__(self):
         # Compute the largest number of bits used to represent one of the flags
         # so that we can XOR the appropriate number.
-        max_bits = len(bin(max([elem.value for elem in type(self)]))) - 2
+        max_bits = len(bin(max(elem.value for elem in type(self)))) - 2
         return self.__class__((2 ** max_bits - 1) ^ self._value_)
 
     NONE = 0
@@ -2316,7 +2316,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         Returns
         -------
         dict
-            A dictionary containing job status for all jobs.
+            A dictionary containing status for the requested job.
 
         """
         if cached_status is None:
@@ -2687,7 +2687,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 for hit in file_timing.iterHits()
             ]
             sorted_hits = reversed(sorted(hits, key=lambda hit: hit[2]))
-            total_num_hits = sum([hit[2] for hit in hits])
+            total_num_hits = sum(hit[2] for hit in hits)
 
             profiling_results = ["# Profiling:\n"]
 
@@ -3609,7 +3609,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         flags=None,
         force=False,
         template="script.sh",
-        pretend=False,
         show_template_help=False,
         **kwargs,
     ):
@@ -3630,9 +3629,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         template : str
             The name of the template file to be used to generate the submission
             script. (Default value = "script.sh")
-        pretend : bool
-            Do not actually submit, but only print the submission script to screen. Useful
-            for testing the submission workflow. (Default value = False)
         show_template_help : bool
             Show information about available template variables and filters and
             exit. (Default value = False)
@@ -3692,13 +3688,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     "the template script, including: %s",
                     ", ".join(sorted(keys_unused)),
                 )
-            if pretend:
-                print(script)
-
-            else:
-                return self._environment.submit(
-                    _id=_id, script=script, flags=flags, **kwargs
-                )
+            return self._environment.submit(
+                _id=_id, script=script, flags=flags, **kwargs
+            )
 
     def submit(
         self,

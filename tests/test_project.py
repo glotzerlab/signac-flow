@@ -193,7 +193,6 @@ class TestProjectBase:
         # Determine path to project module and construct command.
         fn_script = inspect.getsourcefile(type(self.project))
         _cmd = f"python {fn_script} {subcmd}"
-
         try:
             with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
                 with switch_to_directory(self.project.root_directory()):
@@ -1522,7 +1521,10 @@ class TestDirectivesProjectMainInterface(TestProjectBase):
         os.chdir(self._tmp_dir.name)
         request.addfinalizer(self.switch_to_cwd)
 
-    def test_main_submit_walltime_with_directive(self):
+    def test_main_submit_walltime_with_directive(self, monkeypatch):
+        # Force the submitting subprocess to use the TestEnvironment and
+        # FakeScheduler via the SIGNAC_FLOW_ENVIRONMENT environment variable.
+        monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", "TestEnvironment")
         assert len(self.project)
         output = self.call_subcmd(
             "submit -o op_walltime --pretend --template slurm.sh",
@@ -1530,21 +1532,30 @@ class TestDirectivesProjectMainInterface(TestProjectBase):
         ).decode("utf-8")
         assert "#SBATCH -t 01:00:00" in output
 
-    def test_main_submit_walltime_no_directive(self):
+    def test_main_submit_walltime_no_directive(self, monkeypatch):
+        # Force the submitting subprocess to use the TestEnvironment and
+        # FakeScheduler via the SIGNAC_FLOW_ENVIRONMENT environment variable.
+        monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", "TestEnvironment")
         assert len(self.project)
         output = self.call_subcmd(
             "submit -o op_walltime_2 --pretend --template slurm.sh", subprocess.STDOUT
         ).decode("utf-8")
         assert "#SBATCH -t" not in output
 
-    def test_main_submit_walltime_with_groups(self):
+    def test_main_submit_walltime_with_groups(self, monkeypatch):
+        # Force the submitting subprocess to use the TestEnvironment and
+        # FakeScheduler via the SIGNAC_FLOW_ENVIRONMENT environment variable.
+        monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", "TestEnvironment")
         assert len(self.project)
         output = self.call_subcmd(
             "submit -o walltimegroup --pretend --template slurm.sh", subprocess.STDOUT
         ).decode("utf-8")
         assert "#SBATCH -t 03:00:00" in output
 
-    def test_main_submit_walltime_serial(self):
+    def test_main_submit_walltime_serial(self, monkeypatch):
+        # Force the submitting subprocess to use the TestEnvironment and
+        # FakeScheduler via the SIGNAC_FLOW_ENVIRONMENT environment variable.
+        monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", "TestEnvironment")
         assert len(self.project)
         job_id = next(iter(self.project)).get_id()
         output = self.call_subcmd(
@@ -1554,7 +1565,10 @@ class TestDirectivesProjectMainInterface(TestProjectBase):
         ).decode("utf-8")
         assert "#SBATCH -t 03:00:00" in output
 
-    def test_main_submit_walltime_parallel(self):
+    def test_main_submit_walltime_parallel(self, monkeypatch):
+        # Force the submitting subprocess to use the TestEnvironment and
+        # FakeScheduler via the SIGNAC_FLOW_ENVIRONMENT environment variable.
+        monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", "TestEnvironment")
         assert len(self.project)
         job_id = next(iter(self.project)).get_id()
         output = self.call_subcmd(
@@ -1926,7 +1940,10 @@ class TestGroupProjectMainInterface(TestProjectBase):
             else:
                 assert not job.isfile("world.txt")
 
-    def test_main_submit(self):
+    def test_main_submit(self, monkeypatch):
+        # Force the submitting subprocess to use the TestEnvironment and
+        # FakeScheduler via the SIGNAC_FLOW_ENVIRONMENT environment variable.
+        monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", "TestEnvironment")
         project = self.mock_project()
         assert len(project)
         # Assert that correct output for group submission is given
@@ -2044,8 +2061,8 @@ class TestAggregationProjectMainInterface(TestAggregatesProjectBase):
             assert not job.doc.get("op2", False)
             assert not job.doc.get("op3", False)
 
-        even_sum = sum([job.sp.i for job in project if job.sp.i % 2 == 0])
-        odd_sum = sum([job.sp.i for job in project if job.sp.i % 2 != 0])
+        even_sum = sum(job.sp.i for job in project if job.sp.i % 2 == 0)
+        odd_sum = sum(job.sp.i for job in project if job.sp.i % 2 != 0)
 
         self.call_subcmd(
             "run -o agg_op1 agg_op1_different agg_op1_custom agg_op2 agg_op3 --show-traceback"
@@ -2069,7 +2086,10 @@ class TestAggregationProjectMainInterface(TestAggregatesProjectBase):
 
         assert "1 and 2" in run_output
 
-    def test_main_submit(self):
+    def test_main_submit(self, monkeypatch):
+        # Force the submitting subprocess to use the TestEnvironment and
+        # FakeScheduler via the SIGNAC_FLOW_ENVIRONMENT environment variable.
+        monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", "TestEnvironment")
         project = self.mock_project()
         assert len(project)
 
@@ -2096,7 +2116,10 @@ class TestAggregationGroupProjectMainInterface(TestAggregatesProjectBase):
             assert job.doc.op2
             assert job.doc.op3
 
-    def test_main_submit(self):
+    def test_main_submit(self, monkeypatch):
+        # Force the submitting subprocess to use the TestEnvironment and
+        # FakeScheduler via the SIGNAC_FLOW_ENVIRONMENT environment variable.
+        monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", "TestEnvironment")
         project = self.mock_project()
         assert len(project)
 

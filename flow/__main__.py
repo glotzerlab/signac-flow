@@ -151,9 +151,9 @@ def main():
         nargs=1,
         type=str,
         default=None,
-        help="Optional specify a template to use as the base template to "
-        "extend. If not specified, the currently detected environment's template is "
-        "used which on a system without a scheduler is 'base_script.sh'.",
+        help="Specify a template to extend. If not provided, the current environment's "
+        "template is used. For systems without a scheduler (or an unsupported "
+        "scheduler) this is 'base_script.sh'.",
     )
 
     parser_template_create.add_argument(

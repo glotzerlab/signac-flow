@@ -85,7 +85,7 @@ def main_template_create(args):
     else:
         print(
             f"Created user script template at '{script_path}' extending the template "
-            "{extend_template}."
+            f"'{extend_template}'."
         )
 
 

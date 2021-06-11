@@ -68,7 +68,8 @@ def main_template_create(args):
         string.whitespace
     )
 
-    script_name = args.name[0]
+    # If name is the default then it is a string if not it gets passed as a list
+    script_name = args.name if isinstance(args.name, str) else args.name[0]
     script_path = os.path.join(template_directory, script_name)
     try:
         with open(script_path, "x") as fh:

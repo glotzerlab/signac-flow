@@ -14,7 +14,7 @@ Version 0.15
 Added
 +++++
 
-- Add support for aggregation (operations acting on multiple jobs) via ``flow.aggregator`` (#464).
+- Add support for aggregation (operations acting on multiple jobs) via ``flow.aggregator`` (#464, #516, #542).
 - Add official support for Andes cluster (#500).
 - Decorator for setting directives while registering operation function ``FlowProject.operation.with_directives`` (#309, #502).
 

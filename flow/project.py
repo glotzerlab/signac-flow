@@ -4508,6 +4508,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             )
         else:
             for operation in self._next_operations():
+                # This filter cannot use the operation_names parameter to
+                # _next_operations because it must be an exact match, not a
+                # regex match.
                 if args.name == operation.name:
                     print(get_aggregate_id(operation._jobs))
 

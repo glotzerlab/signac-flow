@@ -2949,7 +2949,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             print("\n" + "\n".join(profiling_results), file=file)
 
     def _run_operations(
-        self, operations=None, pretend=False, np=None, timeout=None, progress=False
+        self, operations, pretend=False, np=None, timeout=None, progress=False
     ):
         """Execute the next operations as specified by the project's workflow.
 
@@ -2957,8 +2957,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Parameters
         ----------
-        operations : Sequence of instances of :class:`._JobOperation`
-            The operations to execute (optional). (Default value = None)
+        operations : Sequence of instances of :class:`_JobOperation`
+            The operations to execute.
         pretend : bool
             Do not actually execute the operations, but show the commands that
             would have been executed. (Default value = False)
@@ -2974,10 +2974,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         if timeout is not None and timeout < 0:
             timeout = None
-        if operations is None:
-            operations = list(self._next_operations())
-        else:
-            operations = list(operations)  # ensure list
+        operations = list(operations)  # ensure list
 
         if np is None or np == 1 or pretend:
             if progress:

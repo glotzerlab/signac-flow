@@ -667,7 +667,7 @@ class _JobAggregateCursor(_AggregatesCursor):
     """
 
     def __init__(self, project, filter=None, doc_filter=None):
-        self._project = project
+        super().__init__(project)
         self._cursor = project.find_jobs(filter, doc_filter)
 
     def __eq__(self, other):

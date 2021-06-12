@@ -2056,6 +2056,20 @@ class TestAggregationProjectMainInterface(TestAggregatesProjectBase):
             else:
                 assert job.doc.sum == job.doc.sum_other == job.doc.sum_custom == odd_sum
 
+    def test_main_run_abbreviated(self):
+        project = self.mock_project()
+        assert len(project)
+        for job in project:
+            assert not job.doc.get("op2", False)
+            assert not job.doc.get("op3", False)
+
+        # Use an abbreviated aggregate id
+        self.call_subcmd(f"run -o agg_op2 agg_op3 -j {get_aggregate_id(project)[:-5]}")
+
+        for job in project:
+            assert job.doc.op2
+            assert job.doc.op3
+
     def test_main_run_cmd(self):
         project = self.mock_project()
         assert len(project)

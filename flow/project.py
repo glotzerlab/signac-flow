@@ -3469,21 +3469,20 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 return aggregate_store[id]
             except KeyError:
                 pass
-        else:
-            if check_abbrevations:
-                # No direct match was found, so check for abbreviated ids. Requires
-                # iteration over all elements of all aggregate stores.
-                matches = set()
-                for aggregate_store in self._group_to_aggregate_store.inverse:
-                    for full_id in aggregate_store:
-                        if full_id.startswith(id):
-                            matches.add(aggregate_store[full_id])
-                if len(matches) == 1:
-                    return next(iter(matches))
-                elif len(matches) > 1:
-                    raise LookupError(f"Did not find aggregate with id {repr(id)}.")
-                # By elimination, len(matches) == 0
-            raise KeyError(f"Did not find aggregate with id {repr(id)}.")
+        if check_abbrevations:
+            # No direct match was found, so check for abbreviated ids. Requires
+            # iteration over all elements of all aggregate stores.
+            matches = set()
+            for aggregate_store in self._group_to_aggregate_store.inverse:
+                for full_id in aggregate_store:
+                    if full_id.startswith(id):
+                        matches.add(aggregate_store[full_id])
+            if len(matches) == 1:
+                return next(iter(matches))
+            elif len(matches) > 1:
+                raise LookupError(f"Did not find aggregate with id {repr(id)}.")
+            # By elimination, len(matches) == 0
+        raise KeyError(f"Did not find aggregate with id {repr(id)}.")
 
     def _convert_jobs_to_aggregates(self, jobs):
         """Convert sequences of signac jobs to aggregates.

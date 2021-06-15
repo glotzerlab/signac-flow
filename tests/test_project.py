@@ -193,7 +193,6 @@ class TestProjectBase:
         # Determine path to project module and construct command.
         fn_script = inspect.getsourcefile(type(self.project))
         _cmd = f"python {fn_script} {subcmd}"
-
         try:
             with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
                 with switch_to_directory(self.project.root_directory()):
@@ -1522,7 +1521,10 @@ class TestDirectivesProjectMainInterface(TestProjectBase):
         os.chdir(self._tmp_dir.name)
         request.addfinalizer(self.switch_to_cwd)
 
-    def test_main_submit_walltime_with_directive(self):
+    def test_main_submit_walltime_with_directive(self, monkeypatch):
+        # Force the submitting subprocess to use the TestEnvironment and
+        # FakeScheduler via the SIGNAC_FLOW_ENVIRONMENT environment variable.
+        monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", "TestEnvironment")
         assert len(self.project)
         output = self.call_subcmd(
             "submit -o op_walltime --pretend --template slurm.sh",
@@ -1530,21 +1532,30 @@ class TestDirectivesProjectMainInterface(TestProjectBase):
         ).decode("utf-8")
         assert "#SBATCH -t 01:00:00" in output
 
-    def test_main_submit_walltime_no_directive(self):
+    def test_main_submit_walltime_no_directive(self, monkeypatch):
+        # Force the submitting subprocess to use the TestEnvironment and
+        # FakeScheduler via the SIGNAC_FLOW_ENVIRONMENT environment variable.
+        monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", "TestEnvironment")
         assert len(self.project)
         output = self.call_subcmd(
             "submit -o op_walltime_2 --pretend --template slurm.sh", subprocess.STDOUT
         ).decode("utf-8")
         assert "#SBATCH -t" not in output
 
-    def test_main_submit_walltime_with_groups(self):
+    def test_main_submit_walltime_with_groups(self, monkeypatch):
+        # Force the submitting subprocess to use the TestEnvironment and
+        # FakeScheduler via the SIGNAC_FLOW_ENVIRONMENT environment variable.
+        monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", "TestEnvironment")
         assert len(self.project)
         output = self.call_subcmd(
             "submit -o walltimegroup --pretend --template slurm.sh", subprocess.STDOUT
         ).decode("utf-8")
         assert "#SBATCH -t 03:00:00" in output
 
-    def test_main_submit_walltime_serial(self):
+    def test_main_submit_walltime_serial(self, monkeypatch):
+        # Force the submitting subprocess to use the TestEnvironment and
+        # FakeScheduler via the SIGNAC_FLOW_ENVIRONMENT environment variable.
+        monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", "TestEnvironment")
         assert len(self.project)
         job_id = next(iter(self.project)).get_id()
         output = self.call_subcmd(
@@ -1554,7 +1565,10 @@ class TestDirectivesProjectMainInterface(TestProjectBase):
         ).decode("utf-8")
         assert "#SBATCH -t 03:00:00" in output
 
-    def test_main_submit_walltime_parallel(self):
+    def test_main_submit_walltime_parallel(self, monkeypatch):
+        # Force the submitting subprocess to use the TestEnvironment and
+        # FakeScheduler via the SIGNAC_FLOW_ENVIRONMENT environment variable.
+        monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", "TestEnvironment")
         assert len(self.project)
         job_id = next(iter(self.project)).get_id()
         output = self.call_subcmd(
@@ -1585,6 +1599,70 @@ class TestProjectDagDetection(TestProjectBase):
         ]
 
         assert adj == adj_correct
+
+
+class TestProjectSubmitOptions(TestProjectBase):
+    project_class = _TestProject
+    entrypoint = dict(
+        path=os.path.realpath(
+            os.path.join(os.path.dirname(__file__), "define_test_project.py")
+        )
+    )
+
+    @pytest.mark.parametrize(
+        "env,after_cmd",
+        [
+            ("DefaultSlurmEnvironment", "sbatch -W -d afterok:{}"),
+            ("DefaultPBSEnvironment", 'qsub -W depend="afterok:{}"'),
+            ("DefaultLSFEnvironment", 'bsub -w "done({})"'),
+        ],
+    )
+    def test_main_submit_after(self, env, after_cmd, monkeypatch):
+        # Ensure that the --after flag is included in submission commands.
+        # Force the detected environment via the SIGNAC_FLOW_ENVIRONMENT
+        # environment variable.
+        monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", env)
+        project = self.mock_project()
+        assert len(project)
+        # This monkeypatch prevents failures due to lacking the scheduler
+        # executable for checking existing scheduler jobs before submitting.
+        monkeypatch.setattr(
+            project, "_query_scheduler_status", lambda *args, **kwargs: {}
+        )
+
+        after_value = "123"
+        submit_output = StringIO()
+        with redirect_stdout(submit_output):
+            project.submit(names=["op1"], pretend=True, num=1, after=after_value)
+        submit_output = submit_output.getvalue()
+        assert ("# Submit command: " + after_cmd.format(after_value)) in submit_output
+
+    @pytest.mark.parametrize(
+        "env,hold_cmd",
+        [
+            ("DefaultSlurmEnvironment", "sbatch --hold"),
+            ("DefaultPBSEnvironment", "qsub -h"),
+            ("DefaultLSFEnvironment", "bsub -H"),
+        ],
+    )
+    def test_main_submit_hold(self, env, hold_cmd, monkeypatch):
+        # Ensure that the --hold flag is included in submission commands.
+        # Force the detected environment via the SIGNAC_FLOW_ENVIRONMENT
+        # environment variable.
+        monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", env)
+        project = self.mock_project()
+        assert len(project)
+        # This monkeypatch prevents failures due to lacking the scheduler
+        # executable for checking existing scheduler jobs before submitting.
+        monkeypatch.setattr(
+            project, "_query_scheduler_status", lambda *args, **kwargs: {}
+        )
+
+        submit_output = StringIO()
+        with redirect_stdout(submit_output):
+            project.submit(names=["op1"], pretend=True, num=1, hold=True)
+        submit_output = submit_output.getvalue()
+        assert ("# Submit command: " + hold_cmd) in submit_output
 
 
 # Tests for multiple operation groups or groups with options
@@ -1926,7 +2004,10 @@ class TestGroupProjectMainInterface(TestProjectBase):
             else:
                 assert not job.isfile("world.txt")
 
-    def test_main_submit(self):
+    def test_main_submit(self, monkeypatch):
+        # Force the submitting subprocess to use the TestEnvironment and
+        # FakeScheduler via the SIGNAC_FLOW_ENVIRONMENT environment variable.
+        monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", "TestEnvironment")
         project = self.mock_project()
         assert len(project)
         # Assert that correct output for group submission is given
@@ -2069,7 +2150,10 @@ class TestAggregationProjectMainInterface(TestAggregatesProjectBase):
 
         assert "1 and 2" in run_output
 
-    def test_main_submit(self):
+    def test_main_submit(self, monkeypatch):
+        # Force the submitting subprocess to use the TestEnvironment and
+        # FakeScheduler via the SIGNAC_FLOW_ENVIRONMENT environment variable.
+        monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", "TestEnvironment")
         project = self.mock_project()
         assert len(project)
 
@@ -2096,7 +2180,10 @@ class TestAggregationGroupProjectMainInterface(TestAggregatesProjectBase):
             assert job.doc.op2
             assert job.doc.op3
 
-    def test_main_submit(self):
+    def test_main_submit(self, monkeypatch):
+        # Force the submitting subprocess to use the TestEnvironment and
+        # FakeScheduler via the SIGNAC_FLOW_ENVIRONMENT environment variable.
+        monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", "TestEnvironment")
         project = self.mock_project()
         assert len(project)
 

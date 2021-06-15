@@ -3609,7 +3609,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         flags=None,
         force=False,
         template="script.sh",
-        pretend=False,
         show_template_help=False,
         **kwargs,
     ):
@@ -3630,9 +3629,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         template : str
             The name of the template file to be used to generate the submission
             script. (Default value = "script.sh")
-        pretend : bool
-            Do not actually submit, but only print the submission script to screen. Useful
-            for testing the submission workflow. (Default value = False)
         show_template_help : bool
             Show information about available template variables and filters and
             exit. (Default value = False)
@@ -3692,13 +3688,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     "the template script, including: %s",
                     ", ".join(sorted(keys_unused)),
                 )
-            if pretend:
-                print(script)
-
-            else:
-                return self._environment.submit(
-                    _id=_id, script=script, flags=flags, **kwargs
-                )
+            return self._environment.submit(
+                _id=_id, script=script, flags=flags, **kwargs
+            )
 
     def submit(
         self,
@@ -3834,18 +3826,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         cls._add_operation_selection_arg_group(parser)
         cls._add_operation_bundling_arg_group(parser)
-        cls._add_template_arg_group(parser)
-
-    @classmethod
-    def _add_script_args(cls, parser):
-        cls._add_operation_selection_arg_group(parser)
-        execution_group = parser.add_argument_group("execution")
-        execution_group.add_argument(
-            "-p",
-            "--parallel",
-            action="store_true",
-            help="Execute all operations in parallel.",
-        )
         cls._add_template_arg_group(parser)
 
     @classmethod

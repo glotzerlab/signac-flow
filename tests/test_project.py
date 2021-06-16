@@ -2139,6 +2139,32 @@ class TestAggregationGroupProjectMainInterface(TestAggregatesProjectBase):
             assert job.doc.op2
             assert job.doc.op3
 
+    def test_main_run_abbreviated_duplicate(self):
+        project = self.mock_project()
+        assert len(project)
+        for job in project:
+            assert not job.doc.get("op2", False)
+            assert not job.doc.get("op3", False)
+
+        # We provide an abbreviated aggregate id and an equivalent full id to
+        # the -j selection of job/aggregate ids. This should only result in a
+        # single execution, because the ids should be counted only once. The
+        # call to "set_all_job_docs" will fail if the operation runs twice
+        # for the aggregate of all jobs in the project.
+        self.call_subcmd(
+            f"run -o group_agg -j {get_aggregate_id(project)} {get_aggregate_id(project)[:-5]}"
+        )
+
+        # Make sure that the operation fails if run again.
+        with pytest.raises(subprocess.CalledProcessError):
+            self.call_subcmd(
+                f"run -o group_agg -j {get_aggregate_id(project)} {get_aggregate_id(project)[:-5]}"
+            )
+
+        for job in project:
+            assert job.doc.op2
+            assert job.doc.op3
+
     def test_main_submit(self, monkeypatch):
         # Force the submitting subprocess to use the TestEnvironment and
         # FakeScheduler via the SIGNAC_FLOW_ENVIRONMENT environment variable.

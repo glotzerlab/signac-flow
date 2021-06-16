@@ -13,6 +13,8 @@ def statepoint_i_even_odd_aggregator(jobs):
 
 def set_all_job_docs(jobs, key, value):
     for job in jobs:
+        if key in job.document and job.document[key] == value:
+            raise RuntimeError(f"Key {key} is already set to {value}!")
         job.document[key] = value
 
 

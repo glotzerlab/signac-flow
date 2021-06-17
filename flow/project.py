@@ -3017,15 +3017,17 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             The operations to execute (optional). (Default value = None)
         pretend : bool
             Do not actually execute the operations, but show the commands that
-            would have been executed. (Default value = False)
+            would have been executed (Default value = False).
         np : int
-            The number of processors to use for each operation. (Default value = None)
-        timeout : int
+            Parallelize to the specified number of processors. Use -1 to
+            parallelize over all available processors. The value None uses one
+            processor (Default value = None).
+        timeout : float
             An optional timeout for each operation in seconds after which
-            execution will be cancelled. Use -1 to indicate no timeout (the
-            default).
+            execution will be cancelled. Use None to indicate no timeout
+            (Default value = None).
         progress : bool
-            Show a progress bar during execution. (Default value = False)
+            Show a progress bar during execution (Default value = False).
 
         """
         if timeout is not None and timeout < 0:
@@ -3085,6 +3087,20 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         Since pickling of the project instance is likely to fail, we manually
         pickle the project instance and the operations before submitting them
         to the process pool.
+
+        Parameters
+        ----------
+        pool : :class:`multiprocessing.Pool`
+            Process pool.
+        operations : Sequence of instances of :class:`_JobOperation`
+            The operations to execute.
+        progress : bool
+            Show a progress bar during execution.
+        timeout : float
+            A timeout for each operation in seconds after which
+            execution will be cancelled. Use None to indicate no timeout
+            (Default value = None).
+
         """
         try:
             serialized_project = cloudpickle.dumps(self)
@@ -3105,10 +3121,27 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             pool.apply_async(_deserialize_and_run_operation, task)
             for task in serialized_tasks
         ]
-        for result in tqdm(results) if progress else results:
+        if progress:
+            results = tqdm(results)
+        for result in results:
             result.get(timeout=timeout)
 
     def _execute_operation(self, operation, timeout=None, pretend=False):
+        """Execute an operation.
+
+        Parameters
+        ----------
+        operation : :class:`_JobOperation`
+            The operation to execute.
+        timeout : float
+            An optional timeout for each operation in seconds after which
+            execution will be cancelled. Use None to indicate no timeout
+            (Default value = None).
+        pretend : bool
+            Do not actually execute the operations, but show the commands that
+            would have been executed (Default value = False).
+
+        """
         if pretend:
             print(operation.cmd)
             return None
@@ -3118,9 +3151,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if (
             # The 'fork' directive was provided and evaluates to True:
             operation.directives.get("fork", False)
-            # Separate process needed to cancel with timeout:
+            # A separate process is needed to cancel with timeout:
             or timeout is not None
-            # The operation function is of an instance of FlowCmdOperation:
+            # The operation function is an instance of FlowCmdOperation:
             or isinstance(self._operations[operation.name], FlowCmdOperation)
             # The specified executable is not the same as the interpreter instance:
             or operation.directives.get("executable", sys.executable) != sys.executable
@@ -3192,11 +3225,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             would have been executed. (Default value = False)
         np : int
             Parallelize to the specified number of processors. Use -1 to
-            parallelize to all available processing units. (Default value = None)
-        timeout : int
+            parallelize over all available processors. The value None uses one
+            processor (Default value = None).
+        timeout : float
             An optional timeout for each operation in seconds after which
-            execution will be cancelled. Use -1 to indicate no timeout (the
-            default).
+            execution will be cancelled. Use None to indicate no timeout
+            (Default value = None).
         num : int
             The total number of operations that are executed will not exceed
             this argument if provided. (Default value = None)
@@ -4455,6 +4489,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             )
         else:
             for operation in self._next_operations():
+                # This filter cannot use the operation_names parameter to
+                # _next_operations because it must be an exact match, not a
+                # regex match.
                 if args.name == operation.name:
                     print(get_aggregate_id(operation._jobs))
 
@@ -4678,7 +4715,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         execution_group.add_argument(
             "-t",
             "--timeout",
-            type=int,
+            type=float,
             help="A timeout in seconds after which the execution of one operation is canceled.",
         )
         execution_group.add_argument(
@@ -4809,7 +4846,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         except (TimeoutError, subprocess.TimeoutExpired) as error:
             print(
                 "Error: Failed to complete execution due to "
-                f"timeout ({args.timeout}s).",
+                f"timeout ({args.timeout} seconds).",
                 file=sys.stderr,
             )
             _show_traceback_and_exit(error)

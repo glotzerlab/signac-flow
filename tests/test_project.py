@@ -1601,6 +1601,70 @@ class TestProjectDagDetection(TestProjectBase):
         assert adj == adj_correct
 
 
+class TestProjectSubmitOptions(TestProjectBase):
+    project_class = _TestProject
+    entrypoint = dict(
+        path=os.path.realpath(
+            os.path.join(os.path.dirname(__file__), "define_test_project.py")
+        )
+    )
+
+    @pytest.mark.parametrize(
+        "env,after_cmd",
+        [
+            ("DefaultSlurmEnvironment", "sbatch -W -d afterok:{}"),
+            ("DefaultPBSEnvironment", 'qsub -W depend="afterok:{}"'),
+            ("DefaultLSFEnvironment", 'bsub -w "done({})"'),
+        ],
+    )
+    def test_main_submit_after(self, env, after_cmd, monkeypatch):
+        # Ensure that the --after flag is included in submission commands.
+        # Force the detected environment via the SIGNAC_FLOW_ENVIRONMENT
+        # environment variable.
+        monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", env)
+        project = self.mock_project()
+        assert len(project)
+        # This monkeypatch prevents failures due to lacking the scheduler
+        # executable for checking existing scheduler jobs before submitting.
+        monkeypatch.setattr(
+            project, "_query_scheduler_status", lambda *args, **kwargs: {}
+        )
+
+        after_value = "123"
+        submit_output = StringIO()
+        with redirect_stdout(submit_output):
+            project.submit(names=["op1"], pretend=True, num=1, after=after_value)
+        submit_output = submit_output.getvalue()
+        assert ("# Submit command: " + after_cmd.format(after_value)) in submit_output
+
+    @pytest.mark.parametrize(
+        "env,hold_cmd",
+        [
+            ("DefaultSlurmEnvironment", "sbatch --hold"),
+            ("DefaultPBSEnvironment", "qsub -h"),
+            ("DefaultLSFEnvironment", "bsub -H"),
+        ],
+    )
+    def test_main_submit_hold(self, env, hold_cmd, monkeypatch):
+        # Ensure that the --hold flag is included in submission commands.
+        # Force the detected environment via the SIGNAC_FLOW_ENVIRONMENT
+        # environment variable.
+        monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", env)
+        project = self.mock_project()
+        assert len(project)
+        # This monkeypatch prevents failures due to lacking the scheduler
+        # executable for checking existing scheduler jobs before submitting.
+        monkeypatch.setattr(
+            project, "_query_scheduler_status", lambda *args, **kwargs: {}
+        )
+
+        submit_output = StringIO()
+        with redirect_stdout(submit_output):
+            project.submit(names=["op1"], pretend=True, num=1, hold=True)
+        submit_output = submit_output.getvalue()
+        assert ("# Submit command: " + hold_cmd) in submit_output
+
+
 # Tests for multiple operation groups or groups with options
 class TestGroupProject(TestProjectBase):
     project_class = _TestProject

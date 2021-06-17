@@ -2003,7 +2003,6 @@ class TestAggregatesProjectUtilities(TestAggregatesProjectBase):
     def test_filters(self):
         project = self.mock_project()
         agg_cursor = _JobAggregateCursor(project=project, filter={"even": True})
-        assert agg_cursor._project == project
         assert len(agg_cursor) == 15
 
     def test_reregister_aggregates(self):

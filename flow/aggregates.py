@@ -392,7 +392,7 @@ class _AggregateStore(_BaseAggregateStore):
 
     def __init__(self, aggregator, project):
         self._aggregator = aggregator
-        super().__init__(project)
+        self._project = project
 
         # We need to register the aggregates for this instance using the
         # provided project. After registering, we store the aggregates mapped
@@ -663,7 +663,6 @@ class _JobAggregateCursor(_AggregatesCursor):
     """
 
     def __init__(self, project, filter=None, doc_filter=None):
-        super().__init__(project)
         self._cursor = project.find_jobs(filter, doc_filter)
 
     def __eq__(self, other):

@@ -36,7 +36,14 @@ from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
 from signac.contrib.filterparse import parse_filter_arg
 from tqdm.auto import tqdm
 
-from .aggregates import _AggregateStore, aggregator, get_aggregate_id
+from .aggregates import (
+    _AggregatesCursor,
+    _AggregateStore,
+    _AggregateStoresCursor,
+    _JobAggregateCursor,
+    aggregator,
+    get_aggregate_id,
+)
 from .environment import get_environment
 from .errors import (
     ConfigKeyError,
@@ -257,69 +264,6 @@ def _make_bundles(operations, size=None):
             yield bundle
         else:
             break
-
-
-class _AggregatesCursor:
-    """Utility class to iterate over aggregates stored in a FlowProject.
-
-    Parameters
-    ----------
-    project : :class:`~.FlowProject`
-        A FlowProject whose jobs are aggregated.
-    filter : dict
-        A mapping of key-value pairs that all indexed job state points are
-        compared against (Default value = None).
-    doc_filter : dict
-        A mapping of key-value pairs that all indexed job documents are
-        compared against (Default value = None).
-
-    """
-
-    def __init__(self, project, filter=None, doc_filter=None):
-        self._project = project
-        self._filter = filter
-        self._doc_filter = doc_filter
-        # If no filter or doc_filter is provided by the user, then select every
-        # aggregate present in the FlowProject. If filter or doc_filter are provided,
-        # then use the jobs returned via JobsCursor instance.
-        if filter is None and doc_filter is None:
-            self._cursor = project._group_to_aggregate_store.inverse.keys()
-        else:
-            self._cursor = project.find_jobs(filter, doc_filter)
-
-    def __eq__(self, other):
-        # Cursors cannot compare equal if one is over aggregates and the other
-        # is over jobs.
-        if not (
-            isinstance(other, type(self))
-            and isinstance(other._cursor, type(self._cursor))
-        ):
-            return NotImplemented
-        return self._cursor == other._cursor
-
-    def __contains__(self, aggregate):
-        if self._filter is None and self._doc_filter is None:
-            aggregate_id = get_aggregate_id(aggregate)
-            return any(
-                aggregate_id in aggregate_store for aggregate_store in self._cursor
-            )
-        else:
-            return aggregate[0] in self._cursor
-
-    def __len__(self):
-        if self._filter is None and self._doc_filter is None:
-            # Return number of unique aggregates present in the project
-            return sum(len(aggregate_store) for aggregate_store in self._cursor)
-        else:
-            return len(self._cursor)
-
-    def __iter__(self):
-        if self._filter is None and self._doc_filter is None:
-            for aggregate_store in self._cursor:
-                yield from aggregate_store.values()
-        else:
-            for job in self._cursor:
-                yield (job,)
 
 
 class _JobOperation:
@@ -3005,7 +2949,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             print("\n" + "\n".join(profiling_results), file=file)
 
     def _run_operations(
-        self, operations=None, pretend=False, np=None, timeout=None, progress=False
+        self, operations, pretend=False, np=None, timeout=None, progress=False
     ):
         """Execute the next operations as specified by the project's workflow.
 
@@ -3013,8 +2957,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Parameters
         ----------
-        operations : Sequence of instances of :class:`._JobOperation`
-            The operations to execute (optional). (Default value = None)
+        operations : Sequence of instances of :class:`_JobOperation`
+            The operations to execute.
         pretend : bool
             Do not actually execute the operations, but show the commands that
             would have been executed (Default value = False).
@@ -3032,10 +2976,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         if timeout is not None and timeout < 0:
             timeout = None
-        if operations is None:
-            operations = list(self._next_operations())
-        else:
-            operations = list(operations)  # ensure list
+        operations = list(operations)  # ensure list
 
         if np is None or np == 1 or pretend:
             if progress:
@@ -3542,9 +3483,18 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """Verify that all selected groups can be submitted together."""
         return all(a.isdisjoint(b) for a in groups for b in groups if a != b)
 
-    def _get_aggregate_from_id(self, id):
-        # Iterate over all the instances of stored aggregates and search for the
-        # aggregate id in those instances.
+    def _get_aggregate_from_id(self, id, check_abbrevations=True):
+        # The logic in this function slightly resembles that of signac's
+        # Project.open_job.
+        # We exit early if the id belongs to a single job.
+        if not id.startswith("agg-"):
+            try:
+                return (self.open_job(id=id),)
+            except LookupError:
+                raise LookupError(f"Did not find job with id {repr(id)}.")
+        # Next, attempt to find the id as a direct match by
+        # iterating over all the aggregate stores and trying to access the
+        # aggregate ids from those instances.
         for aggregate_store in self._group_to_aggregate_store.inverse:
             try:
                 # Assume the id exists and skip the __contains__ check for
@@ -3553,8 +3503,20 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 return aggregate_store[id]
             except KeyError:
                 pass
-        # Raise error as didn't find the id in any of the stored objects
-        raise LookupError(f"Did not find aggregate with id {repr(id)}.")
+        if check_abbrevations:
+            # No direct match was found, so check for abbreviated ids. Requires
+            # iteration over all elements of all aggregate stores.
+            matches = set()
+            for aggregate_store in self._group_to_aggregate_store.inverse:
+                for full_id in aggregate_store:
+                    if full_id.startswith(id):
+                        matches.add(aggregate_store[full_id])
+            if len(matches) == 1:
+                return next(iter(matches))
+            elif len(matches) > 1:
+                raise LookupError(f"Did not find aggregate with id {repr(id)}.")
+            # By elimination, len(matches) == 0
+        raise KeyError(f"Did not find aggregate with id {repr(id)}.")
 
     def _convert_jobs_to_aggregates(self, jobs):
         """Convert sequences of signac jobs to aggregates.
@@ -3565,7 +3527,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         aggregates (tuples containing single signac jobs).
         """
         if jobs is None:
-            return _AggregatesCursor(self)
+            return _AggregateStoresCursor(self)
         elif isinstance(jobs, _AggregatesCursor):
             return jobs
 
@@ -3594,7 +3556,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     # stores associated with this project. This will raise an
                     # error if not.
                     aggregate_from_id = self._get_aggregate_from_id(
-                        get_aggregate_id(aggregate)
+                        get_aggregate_id(aggregate), check_abbrevations=False
                     )
                     aggregates.append(aggregate_from_id)
         return aggregates
@@ -4162,7 +4124,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         """
         if jobs is None:
-            jobs = _AggregatesCursor(self)
+            jobs = _AggregateStoresCursor(self)
         if operation_names is None:
             selected_groups = {self._groups[name] for name in self.operations}
         else:
@@ -4571,22 +4533,25 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             # aggregates must be a set to prevent duplicate entries
             aggregates = set()
             for job_id in args.job_id:
-                if job_id.startswith("agg-"):
-                    aggregates.add(self._get_aggregate_from_id(job_id))
-                else:
-                    try:
-                        aggregates.add((self.open_job(id=job_id),))
-                    except KeyError as error:
-                        raise LookupError(f"Did not find job with id {error}.")
+                try:
+                    aggregates.add(
+                        self._get_aggregate_from_id(job_id, check_abbrevations=True)
+                    )
+                except KeyError as error:
+                    raise LookupError(error)
             return list(aggregates)
         elif args.func == self._main_exec:
-            # exec command used with job_id
-            return _AggregatesCursor(self)
-        else:
-            # filter or doc filter provided
+            # exec command does not support filters, so we must exit early.
+            return _AggregateStoresCursor(self)
+        elif args.filter or args.doc_filter:
+            # filter or doc_filter provided. Filters can only be used to select
+            # single jobs and not aggregates of multiple jobs.
             filter_ = parse_filter_arg(args.filter)
             doc_filter = parse_filter_arg(args.doc_filter)
-            return _AggregatesCursor(self, filter_, doc_filter)
+            return _JobAggregateCursor(self, filter_, doc_filter)
+        else:
+            # Use all aggregates
+            return _AggregateStoresCursor(self)
 
     def main(self, parser=None):
         """Call this function to use the main command line interface.

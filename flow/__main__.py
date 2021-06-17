@@ -82,6 +82,7 @@ def main_template_create(args):
             )
         else:
             logger.error(f"Error while trying to create custom template: '{error}'.")
+        raise
     else:
         print(
             f"Created user script template at '{script_path}' extending the template "

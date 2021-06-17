@@ -3098,7 +3098,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Show a progress bar during execution.
         timeout : float
             A timeout for each operation in seconds after which
-            execution will be cancelled. Use None to indicate no timeout.
+            execution will be cancelled. Use None to indicate no timeout
+            (Default value = None).
 
         """
         try:

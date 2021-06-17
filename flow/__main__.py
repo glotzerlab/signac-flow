@@ -138,8 +138,6 @@ def main():
     parser_template = subparsers.add_parser(
         "template", help="Create and manage custom user templates."
     )
-    # Set a flag to indicate that flow template was called without a subparser.
-    parser_template.set_defaults(bare_template=True)
     template_subparsers = parser_template.add_subparsers()
 
     # flow template create command
@@ -170,17 +168,12 @@ def main():
     )
 
     parser_template_create.set_defaults(func=main_template_create)
-    # All flow template subparsers must set bare_template to True.
-    parser_template_create.set_defaults(bare_template=False)
 
     if "--version" in sys.argv:
         print("signac-flow", __version__)
         sys.exit(0)
 
     args = parser.parse_args()
-    if getattr(args, "bare_template", False):
-        parser_template.print_help()
-        sys.exit(2)
     if args.debug:
         logging.basicConfig(level=logging.DEBUG)
     if not hasattr(args, "func"):

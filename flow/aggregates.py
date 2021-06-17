@@ -611,10 +611,6 @@ class _AggregatesCursor(Collection):
     """
 
     @abstractmethod
-    def __init__(self, project):
-        self._project = project
-
-    @abstractmethod
     def __eq__(self, other):
         pass
 

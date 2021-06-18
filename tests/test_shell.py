@@ -99,6 +99,7 @@ class TestCLI:
     def test_template_create_fail_on_recall(self):
         self.call("python -m flow init".split())
         self.call("python -m flow template create".split())
+        assert os.path.exists("templates/script.sh")
         with pytest.raises(ExitCodeError):
             self.call("python -m flow template create".split())
 

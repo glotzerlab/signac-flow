@@ -87,22 +87,31 @@ class TestCLI:
         assert str(signac.get_project()) == "project"
         assert os.path.exists("project.py")
 
-    def test_template_create_base(self):
+    @pytest.mark.parametrize(
+        "environment, template",
+        [
+            ("DefaultSlurmEnvironment", "slurm.sh"),
+            ("DefaultPBSEnvironment", "pbs.sh"),
+            ("Bridges2Environment", "bridges2.sh"),
+            ("SummitEnvironment", "summit.sh"),
+        ],
+    )
+    def test_template_create_base(self, environment, template):
         self.call("python -m flow init".split())
         # Explicitly set the environment via the SIGNAC_FLOW_ENVIRONMENT environment
         # variable for test consistency
         output = self.call(
-            "SIGNAC_FLOW_ENVIRONMENT='DefaultSlurmEnvironment' python -m flow template create",
+            f"SIGNAC_FLOW_ENVIRONMENT='{environment}' python -m flow template create",
             shell=True,
         )
         assert os.path.exists("templates/script.sh")
         with open("templates/script.sh") as fh:
             custom_script_lines = fh.read().splitlines()
-        assert '{% extends "slurm.sh" %}' == custom_script_lines[0]
+        assert f'{{% extends "{template}" %}}' == custom_script_lines[0]
         script_location = signac.get_project().fn("templates/script.sh")
         assert output == (
             f"Created user script template at '{script_location}' "
-            f"extending the template 'slurm.sh'.\n"
+            f"extending the template '{template}'.\n"
         )
 
     def test_template_create_fail_on_recall(self):

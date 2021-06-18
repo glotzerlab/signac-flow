@@ -143,7 +143,7 @@ def main():
     # flow template create command
     parser_template_create = template_subparsers.add_parser(
         "create",
-        help="Create a new custom template based on the detected or selected environment",
+        help="Create a new custom template based on the detected or selected environment.",
     )
     parser_template_create.add_argument(
         "--extends",
@@ -151,7 +151,7 @@ def main():
         nargs=1,
         type=str,
         default=None,
-        help="Specify a template to extend (including the file extension if present). "
+        help="Optionally specify a template to extend (including the file extension if present). "
         "If not provided, the current environment's template is used. For systems "
         "without a scheduler (or an unsupported scheduler) this is 'base_script.sh'.",
     )
@@ -162,8 +162,8 @@ def main():
         nargs=1,
         type=str,
         default="script.sh",
-        help="Optional specify a name to use as the the name of the custom user "
-        "template. Defaults to 'script.sh' which will be used by default in flow "
+        help="Optionally specify a name to use as the the name of the custom user "
+        "template. Defaults to 'script.sh', which will be used by default in flow "
         "submissions for the current project.",
     )
 

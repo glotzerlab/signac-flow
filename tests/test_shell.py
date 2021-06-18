@@ -91,7 +91,7 @@ class TestCLI:
         self.call("python -m flow init".split())
         self.call("python -m flow template create".split())
         assert os.path.exists("templates/script.sh")
-        template = flow.environment.get_environment().template
+        template = flow.get_environment().template
         with open("templates/script.sh") as fh:
             custom_script_lines = fh.read().splitlines()
         assert ('{% extends "' + template + '" %}') in custom_script_lines[0]
@@ -105,14 +105,14 @@ class TestCLI:
     @pytest.mark.parametrize("name_arg", ("-n foo.sh", "--name foo.sh"))
     def test_template_create_custom_name(self, name_arg):
         self.call("python -m flow init".split())
-        self.call(("python -m flow template create " + name_arg).split())
+        self.call(f"python -m flow template create {name_arg}".split())
         assert os.path.exists("templates/foo.sh")
 
     @pytest.mark.parametrize("extends_arg", ("-e slurm.sh", "--extends slurm.sh"))
-    def test_template_create_custom_exends(self, extends_arg):
+    def test_template_create_custom_extends(self, extends_arg):
         self.call("python -m flow init".split())
-        self.call(("python -m flow template create " + extends_arg).split())
+        self.call(f"python -m flow template create {extends_arg}".split())
         assert os.path.exists("templates/script.sh")
         with open("templates/script.sh") as fh:
             custom_script_lines = fh.read().splitlines()
-        assert ('{% extends "slurm.sh" %}') in custom_script_lines[0]
+        assert '{% extends "slurm.sh" %}' in custom_script_lines[0]

@@ -89,12 +89,17 @@ class TestCLI:
 
     def test_template_create_base(self):
         self.call("python -m flow init".split())
-        self.call("python -m flow template create".split())
+        output = self.call("python -m flow template create".split())
         assert os.path.exists("templates/script.sh")
         template = flow.get_environment().template
         with open("templates/script.sh") as fh:
             custom_script_lines = fh.read().splitlines()
-        assert ('{% extends "' + template + '" %}') in custom_script_lines[0]
+        assert f'{{% extends "{template}" %}}' in custom_script_lines[0]
+        script_location = signac.get_project().fn("templates/script.sh")
+        assert output == (
+            f"Created user script template at '{script_location}'"
+            f"extending the template 'base_script.sh'."
+        )
 
     def test_template_create_fail_on_recall(self):
         self.call("python -m flow init".split())

@@ -1747,6 +1747,19 @@ class TestGroupProject(TestProjectBase):
         with pytest.raises(ValueError):
             B.make_group("bar")
 
+    def test_group_operation_without_operation_definition(self):
+        class A(FlowProject):
+            pass
+
+        group = A.make_group("foo")
+
+        @group
+        def test_op(job):
+            pass
+
+        with pytest.raises(ValueError):
+            self.mock_project(A)
+
     def test_submission_combine_directives(self):
         class A(flow.FlowProject):
             pass

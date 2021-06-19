@@ -655,6 +655,10 @@ class FlowGroupEntry:
         # decorator placement in terms of `@FlowGroupEntry`, `@aggregator`, or
         # `@operation`.
         self.group_aggregator = group_aggregator
+        # We assign operations to a group using a decorator. In order to identify
+        # whether a function is assigned to a group but not as an operation, we need
+        # to store the names of the functions.
+        self.operations = []
 
     def __call__(self, func):
         """Add the function into the group's operations.
@@ -680,6 +684,7 @@ class FlowGroupEntry:
             func._flow_groups.append(self.name)
         else:
             func._flow_groups = [self.name]
+        self.operations.append(func.__name__)
         return func
 
     def _set_directives(self, func, directives):
@@ -4259,6 +4264,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # equivalent aggregators only generate once.
         created_aggregate_stores = {}
         for entry in group_entries:
+            for operation in entry.operations:
+                if operation not in self._operations:
+                    raise ValueError(
+                        f"Cannot register the function '{operation}' to a FlowGroup. "
+                        "Add `@FlowProject.operation` decorator to continue."
+                    )
             group = FlowGroup(entry.name, options=entry.options)
             self._groups[entry.name] = group
             # Handle unset aggregators

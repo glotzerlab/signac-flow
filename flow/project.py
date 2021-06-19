@@ -4267,8 +4267,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             for operation in entry.operations:
                 if operation not in self._operations:
                     raise ValueError(
-                        f"Cannot register the function '{operation}' to a FlowGroup. "
-                        "Add `@FlowProject.operation` decorator to continue."
+                        f"Cannot add the function '{operation}' to a "
+                        "FlowGroup because it is not registered as an "
+                        "operation. Add the `@FlowProject.operation` "
+                        "decorator to register the operation."
                     )
             group = FlowGroup(entry.name, options=entry.options)
             self._groups[entry.name] = group

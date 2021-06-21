@@ -102,6 +102,7 @@ class TestCLI:
         # variable for test consistency
         output = self.call(
             f"SIGNAC_FLOW_ENVIRONMENT='{environment}' python -m flow template create",
+            error=True,
             shell=True,
         )
         assert os.path.exists("templates/script.sh")

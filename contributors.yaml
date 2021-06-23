@@ -147,4 +147,9 @@ contributors:
     given-names: Charlotte
     orcid: "https://orcid.org/0000-0003-4915-1064"
     affiliation: "University of Michigan"
+  -
+    family-names: Kelly
+    given-names: Wang
+    orcid: "https://orcid.org/0000-0002-7326-3835"
+    affiliation: "University of Michigan"
 ...

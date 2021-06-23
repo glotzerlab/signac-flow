@@ -8,7 +8,7 @@ The numbers in brackets denote the related GitHub issue and/or pull request.
 Version 0.15
 ============
 
-[0.15.0] -- 2021-xx-xx
+[0.15.0] -- 2021-06-23
 ----------------------
 
 Added
@@ -26,12 +26,13 @@ Changed
 - ``flow.directives`` is deprecated in favor of ``flow.FlowProject.operation.with_directives`` (#309, #502).
 - All environments require a scheduler in order to submit, even in pretend mode (#533).
 - Submitting in pretend mode will show additional scheduler command information (#533).
+- Support fractional timeout value in Pythonic command line interface (#541).
 
 Fixed
 +++++
 
 - Errors raised during submission were not being shown to users (#517, #518).
-- Fixed dependency flag for SLURM submissions (#530).
+- Fixed dependency flag for SLURM submissions (#530, #531).
 
 Version 0.14
 ============

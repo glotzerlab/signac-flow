@@ -86,3 +86,53 @@ class TestCLI:
         self.call(f"python -m flow init -t {template}".split())
         assert str(signac.get_project()) == "project"
         assert os.path.exists("project.py")
+
+    @pytest.mark.parametrize(
+        "environment, template",
+        [
+            ("DefaultSlurmEnvironment", "slurm.sh"),
+            ("DefaultPBSEnvironment", "pbs.sh"),
+            ("Bridges2Environment", "bridges2.sh"),
+            ("SummitEnvironment", "summit.sh"),
+        ],
+    )
+    def test_template_create_base(self, environment, template):
+        self.call("python -m flow init".split())
+        # Explicitly set the environment via the SIGNAC_FLOW_ENVIRONMENT environment
+        # variable for test consistency
+        output = self.call(
+            f"SIGNAC_FLOW_ENVIRONMENT='{environment}' python -m flow template create",
+            error=True,
+            shell=True,
+        )
+        assert os.path.exists("templates/script.sh")
+        with open("templates/script.sh") as fh:
+            custom_script_lines = fh.read().splitlines()
+        assert f'{{% extends "{template}" %}}' == custom_script_lines[0]
+        script_location = signac.get_project().fn("templates/script.sh")
+        assert output == (
+            f"Created user script template at '{script_location}' "
+            f"extending the template '{template}'.\n"
+        )
+
+    def test_template_create_fail_on_recall(self):
+        self.call("python -m flow init".split())
+        self.call("python -m flow template create".split())
+        assert os.path.exists("templates/script.sh")
+        with pytest.raises(ExitCodeError):
+            self.call("python -m flow template create".split())
+
+    @pytest.mark.parametrize("name_arg", ("-n foo.sh", "--name foo.sh"))
+    def test_template_create_custom_name(self, name_arg):
+        self.call("python -m flow init".split())
+        self.call(f"python -m flow template create {name_arg}".split())
+        assert os.path.exists("templates/foo.sh")
+
+    @pytest.mark.parametrize("extends_arg", ("-e slurm.sh", "--extends slurm.sh"))
+    def test_template_create_custom_extends(self, extends_arg):
+        self.call("python -m flow init".split())
+        self.call(f"python -m flow template create {extends_arg}".split())
+        assert os.path.exists("templates/script.sh")
+        with open("templates/script.sh") as fh:
+            custom_script_lines = fh.read().splitlines()
+        assert '{% extends "slurm.sh" %}' in custom_script_lines[0]

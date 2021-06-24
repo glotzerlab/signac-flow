@@ -14,7 +14,7 @@ Version 0.16
 Fixed
 +++++
 
-- Error raised when a ``FlowGroup`` decorate non-operation functions (#544, #538).
+- Error raised when a ``FlowGroup`` decorates functions that are not FlowProject operations (#538, #544).
 
 Version 0.15
 ============

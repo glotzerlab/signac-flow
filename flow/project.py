@@ -31,6 +31,7 @@ from multiprocessing.pool import ThreadPool
 
 import cloudpickle
 import jinja2
+import jsonschema
 import signac
 from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
 from signac.contrib.filterparse import parse_filter_arg
@@ -1541,6 +1542,33 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def __init__(self, config=None, environment=None, entrypoint=None):
         super().__init__(config=config)
+
+        # Initialize the local config.
+        # TODO: In signac 2.0 we plan to deprecate config modification after
+        # project initialization. We should do the same for flow, but for now
+        # maybe we need a workaround to make such modifications work as
+        # expected.
+        # TODO: Once signac-flow no longer relies on configobj and stops
+        # supporting in-place config modification, we can store the config as a
+        # dictionary that can be updated by flow. For now, we store separately
+        # to avoid any side effects associated with modifying instances of
+        # signac.contrib._ProjectConfig.
+        self._flow_config = {
+            **flow_config._FLOW_CONFIG_DEFAULTS,
+            **self._config.get("flow"),
+        }
+        # TODO: Is there a more elegant solution to casting strings directly?
+        self._flow_config["eligible_jobs_max_lines"] = int(
+            self._flow_config["eligible_jobs_max_lines"]
+        )
+        self._flow_config["status_performance_warn_threshold"] = float(
+            self._flow_config["status_performance_warn_threshold"]
+        )
+        jsonschema.validate(
+            self._flow_config,
+            flow_config._FLOW_SCHEMA,
+            format_checker=jsonschema.draft7_format_checker,
+        )
 
         # Associate this class with a compute environment.
         self._environment = environment or get_environment()

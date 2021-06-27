@@ -42,6 +42,7 @@ __all__ = [
 ]
 
 
+# TODO: Rely on the schema for the default value.
 if _get_config_value("import_packaged_environments", default=True):
     from . import environments  # noqa: F401
 

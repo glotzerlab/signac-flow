@@ -2398,9 +2398,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         def compute_status(data):
             scheduler_id, scheduler_status, aggregate_id, aggregate, group = data
-            # Only single-operation groups are supported for status fetching
-            assert len(group.operations) == 1
-
             status = {}
             error_text = None
             try:
@@ -2437,7 +2434,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 self._generate_selected_aggregate_groups_with_status(
                     scheduler_info=scheduler_info,
                     selected_aggregates=aggregates,
-                    selected_groups=single_operation_groups,
                 )
             )
             status_results = parallel_executor(

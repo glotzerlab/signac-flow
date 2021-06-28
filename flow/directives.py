@@ -12,7 +12,7 @@ import operator
 import sys
 from collections.abc import MutableMapping
 
-from flow.errors import DirectivesError
+from flow.errors import DirectivesError, FlowProjectDefinitionError
 
 
 class _Directive:
@@ -144,7 +144,9 @@ class _Directives(MutableMapping):
                 f"Expected a _Directive object. Received {type(directive)}."
             )
         if directive._name in self._directive_definitions:
-            raise ValueError(f"Cannot redefine directive name {directive._name}.")
+            raise FlowProjectDefinitionError(
+                f"Cannot redefine directive name {directive._name}."
+            )
         self._directive_definitions[directive._name] = directive
         self._defined_directives[directive._name] = directive._default
 

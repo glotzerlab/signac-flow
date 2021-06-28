@@ -18,6 +18,7 @@ from textwrap import indent
 from deprecation import deprecated
 
 from .environment import ComputeEnvironment
+from .errors import FlowProjectDefinitionError
 from .version import __version__
 
 logger = logging.getLogger(__name__)
@@ -44,7 +45,7 @@ def cmd(func):
         prefixes to the shell command provided here.
     """
     if getattr(func, "_flow_with_job", False):
-        raise RuntimeError(
+        raise FlowProjectDefinitionError(
             "@cmd should appear below the @with_job decorator in your script"
         )
     setattr(func, "_flow_cmd", True)
@@ -97,7 +98,9 @@ def with_job(func):
             return 'trap "cd `pwd`" EXIT && cd {} && echo "hello {job}"'.format(job.ws)
     """
     if getattr(func, "_flow_aggregate", False):
-        raise RuntimeError("The @with_job decorator cannot be used with aggregation.")
+        raise FlowProjectDefinitionError(
+            "The @with_job decorator cannot be used with aggregation."
+        )
 
     @wraps(func)
     def decorated(*jobs):

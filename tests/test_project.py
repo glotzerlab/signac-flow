@@ -36,7 +36,7 @@ from flow import (
     with_job,
 )
 from flow.environment import ComputeEnvironment
-from flow.errors import DirectivesError, SubmitError
+from flow.errors import DirectivesError, FlowProjectDefinitionError, SubmitError
 from flow.project import IgnoreConditions, _AggregateStoresCursor, _JobAggregateCursor
 from flow.scheduling.base import ClusterJob, JobStatus, Scheduler
 from flow.util.misc import (
@@ -447,7 +447,7 @@ class TestProjectClass(TestProjectBase):
         class A(FlowProject):
             pass
 
-        with pytest.raises(RuntimeError):
+        with pytest.raises(FlowProjectDefinitionError):
 
             @A.operation
             @cmd
@@ -2087,7 +2087,7 @@ class TestAggregatesProjectUtilities(TestAggregatesProjectBase):
         class A(FlowProject):
             pass
 
-        with pytest.raises(RuntimeError):
+        with pytest.raises(FlowProjectDefinitionError):
 
             @A.operation
             @aggregator()
@@ -2099,7 +2099,7 @@ class TestAggregatesProjectUtilities(TestAggregatesProjectBase):
         class A(FlowProject):
             pass
 
-        with pytest.raises(RuntimeError):
+        with pytest.raises(FlowProjectDefinitionError):
 
             @A.operation
             @with_job

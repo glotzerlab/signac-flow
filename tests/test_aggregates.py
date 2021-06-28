@@ -5,6 +5,7 @@ import pytest
 import signac
 
 from flow.aggregates import _DefaultAggregateStore, aggregator, get_aggregate_id
+from flow.errors import FlowProjectDefinitionError
 
 
 @pytest.fixture
@@ -99,12 +100,12 @@ class TestAggregate(AggregateProjectSetup):
     def test_invalid_call(self):
         call_params = ["str", 1, None]
         for param in call_params:
-            with pytest.raises(TypeError):
+            with pytest.raises(FlowProjectDefinitionError):
                 aggregator()(param)
 
     def test_call_without_decorator(self):
         aggregate_instance = aggregator()
-        with pytest.raises(TypeError):
+        with pytest.raises(FlowProjectDefinitionError):
             aggregate_instance()
 
     def test_call_with_decorator(self):

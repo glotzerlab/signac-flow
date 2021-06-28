@@ -47,6 +47,7 @@ from .aggregates import (
 from .environment import get_environment
 from .errors import (
     ConfigKeyError,
+    FlowProjectDefinitionError,
     NoSchedulerError,
     SubmitError,
     TemplateError,
@@ -499,7 +500,7 @@ class BaseFlowOperation:
 
         """
         if not isinstance(ignore_conditions, IgnoreConditions):
-            raise ValueError(
+            raise FlowProjectDefinitionError(
                 "The ignore_conditions argument of FlowProject.run() "
                 "must be a member of class IgnoreConditions."
             )
@@ -674,7 +675,7 @@ class FlowGroupEntry:
         """
         if hasattr(func, "_flow_groups"):
             if self.name in func._flow_groups:
-                raise ValueError(
+                raise FlowProjectDefinitionError(
                     f"Cannot register existing name {func} with group {self.name}"
                 )
             func._flow_groups.append(self.name)
@@ -685,7 +686,7 @@ class FlowGroupEntry:
     def _set_directives(self, func, directives):
         if hasattr(func, "_flow_group_operation_directives"):
             if self.name in func._flow_group_operation_directives:
-                raise ValueError(
+                raise FlowProjectDefinitionError(
                     f"Cannot set directives because directives already exist "
                     f"for {func} in group {self.name}"
                 )
@@ -1250,7 +1251,7 @@ class _FlowProjectClass(type):
                     for operation in self._parent_class._collect_operations()
                 ]
                 if self.condition in operation_functions:
-                    raise ValueError(
+                    raise FlowProjectDefinitionError(
                         "Operation functions cannot be used as preconditions."
                     )
                 self._parent_class._OPERATION_PRECONDITIONS[func].insert(
@@ -1285,7 +1286,9 @@ class _FlowProjectClass(type):
                 if not all(
                     condition in operation_functions for condition in other_funcs
                 ):
-                    raise ValueError("The arguments to pre.after must be operations.")
+                    raise FlowProjectDefinitionError(
+                        "The arguments to pre.after must be operations."
+                    )
                 return cls(
                     _create_all_metacondition(
                         cls._parent_class._collect_postconditions(), *other_funcs
@@ -1339,7 +1342,7 @@ class _FlowProjectClass(type):
                     for operation in self._parent_class._collect_operations()
                 ]
                 if self.condition in operation_functions:
-                    raise ValueError(
+                    raise FlowProjectDefinitionError(
                         "Operation functions cannot be used as postconditions."
                     )
                 self._parent_class._OPERATION_POSTCONDITIONS[func].insert(
@@ -1407,7 +1410,7 @@ class _FlowProjectClass(type):
                     *self._parent_class._OPERATION_PRECONDITIONS.values(),
                     *self._parent_class._OPERATION_POSTCONDITIONS.values(),
                 ):
-                    raise ValueError(
+                    raise FlowProjectDefinitionError(
                         "A condition function cannot be used as an operation."
                     )
 
@@ -1419,15 +1422,15 @@ class _FlowProjectClass(type):
                     registered_func,
                 ) in self._parent_class._OPERATION_FUNCTIONS:
                     if name == registered_name:
-                        raise ValueError(
+                        raise FlowProjectDefinitionError(
                             f"An operation with name '{name}' is already registered."
                         )
                     if func is registered_func:
-                        raise ValueError(
+                        raise FlowProjectDefinitionError(
                             "An operation with this function is already registered."
                         )
                 if name in self._parent_class._GROUP_NAMES:
-                    raise ValueError(
+                    raise FlowProjectDefinitionError(
                         f"A group with name '{name}' is already registered."
                     )
 
@@ -3236,7 +3239,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             num = None
 
         if not isinstance(ignore_conditions, IgnoreConditions):
-            raise ValueError(
+            raise FlowProjectDefinitionError(
                 "The ignore_conditions argument of FlowProject.run() "
                 "must be a member of class IgnoreConditions."
             )
@@ -3750,7 +3753,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             )
 
         if not isinstance(ignore_conditions, IgnoreConditions):
-            raise ValueError(
+            raise FlowProjectDefinitionError(
                 "The ignore_conditions argument of FlowProject.run() "
                 "must be a member of class IgnoreConditions."
             )
@@ -4175,7 +4178,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         for name, func in operations:
             if name in self._operations:
-                raise ValueError(f"Repeat definition of operation with name '{name}'.")
+                raise FlowProjectDefinitionError(
+                    f"Repeat definition of operation with name '{name}'."
+                )
 
             # Extract preconditions/postconditions and directives from function:
             params = {
@@ -4227,11 +4232,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         """
         if name in cls._GROUP_NAMES:
-            raise ValueError(f"Repeat definition of group with name '{name}'.")
+            raise FlowProjectDefinitionError(
+                f"Repeat definition of group with name '{name}'."
+            )
         if any(
             name == operation_name for operation_name, _ in cls._OPERATION_FUNCTIONS
         ):
-            raise ValueError(
+            raise FlowProjectDefinitionError(
                 f"Cannot create a group with the same name as the existing operation {name}"
             )
         cls._GROUP_NAMES.add(name)

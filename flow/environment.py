@@ -514,6 +514,16 @@ class DefaultSlurmEnvironment(ComputeEnvironment):
             help="Schedule this job to be executed after "
             "completion of a cluster job with this id.",
         )
+        parser.add_argument(
+            "--job-output",
+            type=str,
+            help=(
+                "What to name the job output file. "
+                "If omitted, uses the system default "
+                '(SLURM default is "slurm-%%j.out"). '
+                "Both stdout and stderr will be combined."
+            ),
+        )
 
 
 class DefaultLSFEnvironment(ComputeEnvironment):
@@ -541,6 +551,16 @@ class DefaultLSFEnvironment(ComputeEnvironment):
             type=str,
             help="Schedule this job to be executed after "
             "completion of a cluster job with this id.",
+        )
+        parser.add_argument(
+            "--job-output",
+            type=str,
+            help=(
+                "What to name the job output file. "
+                "If omitted, uses the system default "
+                '(LSF default name is "job-%%j.out"). '
+                "Both stdout and stderr will be combined."
+            ),
         )
 
 

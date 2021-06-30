@@ -40,15 +40,6 @@ class CometEnvironment(DefaultSlurmEnvironment):
             help="Specify the partition to submit to.",
         )
 
-        parser.add_argument(
-            "--job-output",
-            help=(
-                "What to name the job output file. "
-                "If omitted, uses the system default "
-                '(slurm default is "slurm-%%j.out").'
-            ),
-        )
-
 
 _STAMPEDE_OFFSET = os.environ.get("_FLOW_STAMPEDE_OFFSET_`", 0)
 
@@ -136,14 +127,6 @@ class Stampede2Environment(DefaultSlurmEnvironment):
             ],
             default="skx-normal",
             help="Specify the partition to submit to.",
-        )
-        parser.add_argument(
-            "--job-output",
-            help=(
-                "What to name the job output file. "
-                "If omitted, uses the system default "
-                '(slurm default is "slurm-%%j.out").'
-            ),
         )
 
     @classmethod

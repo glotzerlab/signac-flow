@@ -472,6 +472,15 @@ class DefaultPBSEnvironment(ComputeEnvironment):
             "completion of a cluster job with this id.",
         )
         parser.add_argument(
+            "--job-output",
+            type=str,
+            help=(
+                "What to name the job output file. "
+                "If omitted, uses the scheduler default name. "
+                "Both stdout and stderr will be combined."
+            ),
+        )
+        parser.add_argument(
             "--no-copy-env",
             action="store_true",
             help="Do not copy current environment variables into compute node environment.",
@@ -519,8 +528,7 @@ class DefaultSlurmEnvironment(ComputeEnvironment):
             type=str,
             help=(
                 "What to name the job output file. "
-                "If omitted, uses the system default "
-                '(SLURM default is "slurm-%%j.out"). '
+                "If omitted, uses the scheduler default name. "
                 "Both stdout and stderr will be combined."
             ),
         )
@@ -557,8 +565,7 @@ class DefaultLSFEnvironment(ComputeEnvironment):
             type=str,
             help=(
                 "What to name the job output file. "
-                "If omitted, uses the system default "
-                '(LSF default name is "job-%%j.out"). '
+                "If omitted, uses the scheduler default name. "
                 "Both stdout and stderr will be combined."
             ),
         )

@@ -500,7 +500,7 @@ class BaseFlowOperation:
 
         """
         if not isinstance(ignore_conditions, IgnoreConditions):
-            raise FlowProjectDefinitionError(
+            raise ValueError(
                 "The ignore_conditions argument of FlowProject.run() "
                 "must be a member of class IgnoreConditions."
             )
@@ -676,7 +676,7 @@ class FlowGroupEntry:
         if hasattr(func, "_flow_groups"):
             if self.name in func._flow_groups:
                 raise FlowProjectDefinitionError(
-                    f"Cannot register existing name {func} with group {self.name}"
+                    f"Cannot reregister operation {func} with the group, {self.name}"
                 )
             func._flow_groups.append(self.name)
         else:
@@ -3239,7 +3239,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             num = None
 
         if not isinstance(ignore_conditions, IgnoreConditions):
-            raise FlowProjectDefinitionError(
+            raise ValueError(
                 "The ignore_conditions argument of FlowProject.run() "
                 "must be a member of class IgnoreConditions."
             )
@@ -3753,7 +3753,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             )
 
         if not isinstance(ignore_conditions, IgnoreConditions):
-            raise FlowProjectDefinitionError(
+            raise ValueError(
                 "The ignore_conditions argument of FlowProject.run() "
                 "must be a member of class IgnoreConditions."
             )

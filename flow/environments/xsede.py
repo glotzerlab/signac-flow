@@ -228,18 +228,21 @@ class ExpanseEnvironment(DefaultSlurmEnvironment):
 
     @classmethod
     def _get_mpi_prefix(cls, operation):
+        # The Expanse user guide recommends the usage of `srun`. However, this will not
+        # forward the MPI configuration to the container, meaning it cannot be used with
+        # one of flow's most common use cases, HPC with singularity containers. Thus we
+        # are using the default mpi command `mpiexec` with the other recommendations
+        # given by the Expanse user guide. Native MPI programs with Expanse also require
+        # the `--mpi=pmi2` option set, but this would cause errors for the container.
         if operation.directives["nranks"] == 0:
             return ""
-        # We must specify the pmi2 option as the SLURM configuration of Expanse uses the
-        # special pmi2 preprocessing. See `man srun` on an Expanse login node.
-        base_prefix = "srun --mpi=pmi2"
         rank_option = f"-n {operation.directives['nranks']} "
         # We have to handle the case with and without OpenMP differently due to the
-        # --cpus-per-task option.
+        # --cpus-per-task option recommended by the Expanse user guide.
         if operation.directives["omp_num_threads"] == 0:
-            return base_prefix + rank_option
+            return cls.mpi_cmd + rank_option
         cpus_per_task = f"--cpus-per-task={operation.directives['omp_num_threads']} "
-        return base_prefix + cpus_per_task + rank_option
+        return cls.mpi_cmd + cpus_per_task + rank_option
 
     @classmethod
     def add_args(cls, parser):

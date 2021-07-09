@@ -1553,9 +1553,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # dictionary that can be updated by flow. For now, we store separately
         # to avoid any side effects associated with modifying instances of
         # signac.contrib._ProjectConfig.
+        # TODO: Need a way to reload config if it's modified. Currently flow is
+        # different from signac, because signac project loads on instantiation
+        # whereas flow project loads from the file every time. The current
+        # changes are making flow more like signac, which is good, but then we
+        # need a way to force a reload.
         self._flow_config = {
             **flow_config._FLOW_CONFIG_DEFAULTS,
-            **self._config.get("flow"),
+            **self._config.get("flow", {}),
         }
         # TODO: Is there a more elegant solution to casting strings directly?
         self._flow_config["eligible_jobs_max_lines"] = int(
@@ -1648,10 +1653,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         template_environment.filters[
             "homogeneous_openmp_mpi_config"
         ] = template_filters.homogeneous_openmp_mpi_config
-        template_environment.filters["get_config_value"] = flow_config.get_config_value
-        template_environment.filters[
-            "require_config_value"
-        ] = flow_config.require_config_value
+        template_environment.filters["get_config_value"] = self._flow_config.get
+        template_environment.filters["require_config_value"] = self._flow_config.get
         template_environment.filters[
             "get_account_name"
         ] = template_filters.get_account_name
@@ -2638,11 +2641,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         aggregates = self._convert_jobs_to_aggregates(jobs)
 
         if eligible_jobs_max_lines is None:
-            eligible_jobs_max_lines = flow_config.get_config_value(
-                "eligible_jobs_max_lines"
-            )
+            eligible_jobs_max_lines = self._flow_config["eligible_jobs_max_lines"]
 
-        status_parallelization = self.config["flow"]["status_parallelization"]
+        status_parallelization = self._flow_config["status_parallelization"]
 
         # initialize jinja2 template environment and necessary filters
         template_environment = self._template_environment()
@@ -4468,7 +4469,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             # Use small offset to account for overhead with few jobs
             delta_t = (time.time() - start - 0.5) / max(length_jobs, 1)
             config_key = "status_performance_warn_threshold"
-            warn_threshold = flow_config.get_config_value(config_key)
+            warn_threshold = self._flow_config[config_key]
             if not args["profile"] and delta_t > warn_threshold >= 0:
                 print(
                     "WARNING: "
@@ -4806,7 +4807,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Read the config file and set the internal flag.
         # Do not overwrite with False if not present in config file
-        if flow_config.get_config_value("show_traceback"):
+        if self._flow_config["show_traceback"]:
             args.show_traceback = True
 
         if args.debug:  # Implies '-vv' and '--show-traceback'

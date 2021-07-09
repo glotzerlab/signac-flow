@@ -226,6 +226,7 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
         """
         pass
 
+    # TODO: Is this method being used anywhere? I don't see it.
     @classmethod
     def get_config_value(cls, key, default=flow_config._GET_CONFIG_VALUE_NONE):
         """Request a value from the user's configuration.
@@ -261,6 +262,8 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
             and no default value is provided.
 
         """
+        # TODO: Need to figure out how to handle environment-related config
+        # info if the FlowProject is pulling from an instance-level config now.
         return flow_config.require_config_value(key, ns=cls.__name__, default=default)
 
     @classmethod

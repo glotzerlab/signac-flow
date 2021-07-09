@@ -242,14 +242,6 @@ class ExpanseEnvironment(DefaultSlurmEnvironment):
         return base_prefix + cpus_per_task + rank_option
 
     @classmethod
-    def _get_omp_prefix(cls, operation):
-        # The current user states to run OpenMP jobs with mpirun even when not using MPI
-        base_prefix = super()._get_omp_prefix(operation)
-        if operation.directives["nranks"] == 0:
-            return base_prefix + f"mpirun -np {operation.directives['num_omp_threads']}"
-        return base_prefix
-
-    @classmethod
     def add_args(cls, parser):
         """Add arguments to parser.
 

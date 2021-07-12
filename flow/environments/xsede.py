@@ -227,7 +227,7 @@ class ExpanseEnvironment(DefaultSlurmEnvironment):
     gpus_per_node = 4
 
     @classmethod
-    def _get_mpi_prefix(cls, operation):
+    def _get_mpi_prefix(cls, operation, parallel):
         # The Expanse user guide recommends the usage of `srun`. However, this will not
         # forward the MPI configuration to the container, meaning it cannot be used with
         # one of flow's most common use cases, HPC with singularity containers. Thus we

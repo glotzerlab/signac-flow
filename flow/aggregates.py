@@ -8,7 +8,8 @@ jobs are grouped before being passed as arguments to the operation. The
 default aggregator produces individual jobs.
 """
 import itertools
-from collections.abc import Iterable, Mapping
+from abc import abstractmethod
+from collections.abc import Collection, Iterable, Mapping
 from hashlib import md5
 
 
@@ -41,7 +42,7 @@ def _get_unique_function_id(func):
         return hash(func)
 
 
-class _aggregator:
+class aggregator:
     """Decorator for operation functions that operate on aggregates.
 
     By default, if the ``aggregator_function`` is ``None``, an aggregate of all
@@ -67,16 +68,16 @@ class _aggregator:
         default behavior is creating a single aggregate of all jobs.
     sort_by : str, callable, or None
         Before aggregating, sort the jobs by a given statepoint parameter. If
-        the argument is callable, this will be passed as the callable
-        argument to :func:`sorted`. If None, no sorted is performed (Default
-        value = None).
+        the argument is a string, jobs are sorted by that state point key. If
+        the argument is callable, this will be passed as the ``key`` argument to
+        :func:`sorted`. If None, no sorting is performed (Default value = None).
     sort_ascending : bool
-        True if the jobs are to be sorted in ascending order. (Default value
-        = True)
+        True if the jobs are to be sorted in ascending order (Default value =
+        True).
     select : callable or None
         Condition for filtering individual jobs. This is passed as the
-        callable argument to :func:`filter`. If None, no filtering is
-        performed. (Default value = None)
+        ``function`` argument to :func:`filter`. If None, no filtering is
+        performed (Default value = None).
 
     """
 
@@ -138,17 +139,20 @@ class _aggregator:
         Parameters
         ----------
         num : int
-            The default size of aggregates excluding the final aggregate.
-        sort_by : str or None
-            Before aggregating, sort the jobs by a given statepoint parameter.
-            The default behavior is no sorting.
+            The default size of aggregates. The final aggregate contains the
+            remaining jobs and may have fewer than ``num`` jobs.
+        sort_by : str, callable, or None
+            Before aggregating, sort the jobs by a given statepoint parameter. If
+            the argument is a string, jobs are sorted by that state point key. If
+            the argument is callable, this will be passed as the ``key`` argument to
+            :func:`sorted`. If None, no sorting is performed (Default value = None).
         sort_ascending : bool
-            States if the jobs are to be sorted in ascending order.
-            The default value is True.
+            True if the jobs are to be sorted in ascending order (Default value
+            = True).
         select : callable or None
             Condition for filtering individual jobs. This is passed as the
-            callable argument to :func:`filter`. The default behavior is no
-            filtering.
+            ``function`` argument to :func:`filter`. If None, no filtering is
+            performed (Default value = None).
 
         Returns
         -------
@@ -187,12 +191,12 @@ class _aggregator:
         Examples
         --------
         The code block below provides an example of how to aggregate jobs
-        having a common state point parameter ``'sp'`` whose value, if not
-        found, is replaced by a default value of -1.
+        by a state point parameter ``"sp"``. If the state point does not
+        contain the key ``"sp"``, a default value of -1 is used.
 
         .. code-block:: python
 
-            @aggregator.groupby(key='sp', default=-1)
+            @aggregator.groupby(key="sp", default=-1)
             @FlowProject.operation
             def foo(*jobs):
                 print(len(jobs))
@@ -209,18 +213,20 @@ class _aggregator:
             Default value used for grouping if the key is missing or invalid.
             If ``key`` is an iterable, the default value must be a sequence
             of equal length. If ``key`` is a callable, this argument is
-            ignored. If None, the provided keys must exist for all jobs.
-            (Default value = None)
-        sort_by : str or None
-            State point parameter used to sort the jobs before grouping.
-            The default value is None, which does no sorting.
+            ignored. If None, the provided keys must exist for all jobs
+            (Default value = None).
+        sort_by : str, callable, or None
+            Before aggregating, sort the jobs by a given statepoint parameter. If
+            the argument is a string, jobs are sorted by that state point key. If
+            the argument is callable, this will be passed as the ``key`` argument to
+            :func:`sorted`. If None, no sorting is performed (Default value = None).
         sort_ascending : bool
-            Whether jobs are to be sorted in ascending order. (Default value
-            = True)
+            True if the jobs are to be sorted in ascending order (Default value
+            = True).
         select : callable or None
             Condition for filtering individual jobs. This is passed as the
-            callable argument to :func:`filter`. The default behavior is no
-            filtering.
+            ``function`` argument to :func:`filter`. If None, no filtering is
+            performed (Default value = None).
 
         Returns
         -------
@@ -340,14 +346,17 @@ class _aggregator:
             The function to decorate.
 
         """
-        if callable(func):
-            setattr(func, "_flow_aggregate", self)
-            return func
-        else:
+        if not callable(func):
             raise TypeError(
                 "Invalid argument passed while calling the aggregate "
                 f"instance. Expected a callable, got {type(func)}."
             )
+        if getattr(func, "_flow_with_job", False):
+            raise RuntimeError(
+                "The @with_job decorator cannot be used with aggregation."
+            )
+        setattr(func, "_flow_aggregate", self)
+        return func
 
 
 class _BaseAggregateStore(Mapping):
@@ -383,12 +392,11 @@ class _AggregateStore(_BaseAggregateStore):
 
     def __init__(self, aggregator, project):
         self._aggregator = aggregator
-        super().__init__(project)
+        self._project = project
 
         # We need to register the aggregates for this instance using the
         # provided project. After registering, we store the aggregates mapped
         # with the ids using :func:`get_aggregate_id`.
-        self._aggregates_by_id = {}
         self._register_aggregates()
 
     def __getitem__(self, id):
@@ -441,6 +449,8 @@ class _AggregateStore(_BaseAggregateStore):
 
         Every aggregate is required to be a tuple of jobs.
         """
+        # Initialize the internal mapping from id to aggregate
+        self._aggregates_by_id = {}
         for aggregate in self._generate_aggregates():
             for job in aggregate:
                 if job not in self._project:
@@ -453,7 +463,7 @@ class _AggregateStore(_BaseAggregateStore):
                 raise ValueError("Invalid aggregator_function provided by the user.")
             # Store aggregate by id to allow searching by id
             self._aggregates_by_id[
-                _get_aggregate_id(stored_aggregate)
+                get_aggregate_id(stored_aggregate)
             ] = stored_aggregate
 
     def _generate_aggregates(self):
@@ -562,7 +572,7 @@ class _DefaultAggregateStore(_BaseAggregateStore):
             yield (job.get_id(), (job,))
 
 
-def _get_aggregate_id(aggregate):
+def get_aggregate_id(aggregate):
     """Generate aggregate id for an aggregate of jobs.
 
     The aggregate id is a unique hash identifying a tuple of jobs. The
@@ -588,3 +598,86 @@ def _get_aggregate_id(aggregate):
     id_string = ",".join(job.get_id() for job in aggregate)
     hash_ = md5(id_string.encode("utf-8")).hexdigest()
     return f"agg-{hash_}"
+
+
+class _AggregatesCursor(Collection):
+    """Abstract class defining iterators over aggregates stored in a FlowProject.
+
+    Parameters
+    ----------
+    project : :class:`~.FlowProject`
+        A FlowProject whose jobs are aggregated.
+
+    """
+
+    @abstractmethod
+    def __eq__(self, other):
+        pass
+
+
+class _AggregateStoresCursor(_AggregatesCursor):
+    """Utility class to iterate over a collection of _AggregateStore instances.
+
+    Parameters
+    ----------
+    project : :class:`~.FlowProject`
+        A FlowProject whose jobs are aggregated.
+
+    """
+
+    def __init__(self, project):
+        self._stores = project._group_to_aggregate_store.inverse.keys()
+
+    def __eq__(self, other):
+        if not isinstance(other, type(self)):
+            return NotImplemented
+        return self._stores == other._stores
+
+    def __contains__(self, aggregate):
+        aggregate_id = get_aggregate_id(aggregate)
+        return any(aggregate_id in aggregate_store for aggregate_store in self._stores)
+
+    def __len__(self):
+        # Return number of aggregates summed across all aggregate stores
+        return sum(len(aggregate_store) for aggregate_store in self._stores)
+
+    def __iter__(self):
+        for aggregate_store in self._stores:
+            yield from aggregate_store.values()
+
+
+class _JobAggregateCursor(_AggregatesCursor):
+    """Utility class to iterate over single-job aggregates in a FlowProject.
+
+    Parameters
+    ----------
+    project : :class:`~.FlowProject`
+        A FlowProject whose jobs are aggregated.
+    filter : dict
+        A mapping of key-value pairs that all indexed job state points are
+        compared against (Default value = None).
+    doc_filter : dict
+        A mapping of key-value pairs that all indexed job documents are
+        compared against (Default value = None).
+
+    """
+
+    def __init__(self, project, filter=None, doc_filter=None):
+        self._cursor = project.find_jobs(filter, doc_filter)
+
+    def __eq__(self, other):
+        # Cursors cannot compare equal if one is over aggregates and the other
+        # is over jobs.
+        if not isinstance(other, type(self)):
+            return NotImplemented
+        return self._cursor == other._cursor
+
+    def __contains__(self, aggregate):
+        return len(aggregate) == 1 and aggregate[0] in self._cursor
+
+    def __len__(self):
+        return len(self._cursor)
+
+    def __iter__(self):
+        for job in self._cursor:
+            yield (job,)

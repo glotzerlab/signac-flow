@@ -5,25 +5,26 @@
 {% set cpu_tasks = operations|calc_tasks('np', parallel, force) %}
 {% set gpu_tasks = operations|calc_tasks('ngpu', parallel, force) %}
 {% if gpu_tasks %}
-{% if not ('gpu' in partition or force) %}
-{% raise "GPU operations require a GPU partition!" %}
-{% endif %} {# End check for correct partition #}
-{# GPU nodes have 4 NVIDIA V100-32GB SMX2 #}
-{% set nn_gpu = gpu_tasks|calc_num_nodes(4) %}
-{% set nn = nn_gpu %}
+    {% if not ('gpu' in partition or force) %}
+        {% raise "GPU operations require a GPU partition!" %}
+    {% endif %} {# End check for correct partition #}
+    {# GPU nodes have 4 NVIDIA V100-32GB SMX2 #}
+    {% set nn_gpu = gpu_tasks|calc_num_nodes(4) %}
+    {% set nn = nn_gpu %}
 {% else %} {# if no GPU tasks #}
-{% if 'gpu' in partition and not force %}
-{% raise "Requesting GPU partition, but no GPUs requested!" %}
-{% endif %}
-{% set nn = nn|default(cpu_tasks|calc_num_nodes(128), true) %}
+    {% if 'gpu' in partition and not force %}
+        {% raise "Requesting GPU partition, but no GPUs requested!" %}
+    {% endif %}
+    {% set nn = nn|default(cpu_tasks|calc_num_nodes(128), true) %}
 {% endif %}
 {% if 'gpu' in partition %}
-{% set gpus_per_node = (gpu_tasks / nn)|round(0, 'ceil')|int %}
-{% set cpus_per_node = (cpu_tasks / nn)|round(0, 'ceil')|int %}
-{% if cpus_per_node > gpus_per_node * 5 and not force %}
-{% raise "Cannot request more than 5 CPUs per GPU." %}
+    {% set gpus_per_node = (gpu_tasks / nn)|round(0, 'ceil')|int %}
+    {% set cpus_per_node = (cpu_tasks / nn)|round(0, 'ceil')|int %}
+    {% if cpus_per_node > gpus_per_node * 5 and not force %}
+        {% raise "Cannot request more than 5 CPUs per GPU." %}
+    {% endif %}
 {% endif %}
-{% endif %}
+
 {% if partition == 'gpu' %}
 #SBATCH -N {{ nn|check_utilization(gpu_tasks, 4, threshold, 'gpu') }}
 #SBATCH --ntasks-per-node={{ cpus_per_node }}
@@ -33,9 +34,9 @@
 #SBATCH --ntasks-per-node={{ cpus_per_node }}
 #SBATCH --gpus={{ gpu_tasks }}
 {% elif partition == 'shared' %}
-{% if nn|default(1, true) > 1 %}
-{% raise "Cannot request shared with multiple nodes." %}
-{% endif %}
+    {% if nn|default(1, true) > 1 %}
+        {% raise "Cannot request shared with multiple nodes." %}
+    {% endif %}
 #SBATCH -N 1
 #SBATCH --ntasks={{ cpu_tasks }}
 {% else %}

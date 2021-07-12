@@ -433,6 +433,7 @@ def _sum_not_none(value, other):
         return operator.add(value, other)
 
 
+# Definitions used for validating directives
 _bool = _OnlyTypes(bool)
 _natural_number = _OnlyTypes(int, postprocess=_raise_below(1))
 _nonnegative_int = _OnlyTypes(int, postprocess=_raise_below(0))
@@ -455,6 +456,28 @@ _positive_real_memory = _OnlyTypes(
 
 
 # Common directives and their instantiation as _Directive
+def _GET_EXECUTABLE():
+    # Evaluate the executable directive at call-time instead of definition time.
+    # This is because we mock `sys.executable` while generating template reference data.
+    _EXECUTABLE = _Directive(
+        "executable",
+        validator=_OnlyTypes(str),
+        default=sys.executable,
+        serial=_no_aggregation,
+        parallel=_no_aggregation,
+    )
+    _EXECUTABLE.__doc__ = """Return the path to the executable to be used for an operation.
+
+The executable directive expects a string pointing to a valid executable
+file in the current file system.
+
+When called, by default this should point to a Python executable (interpreter);
+however, if the :class:`FlowProject` path is an empty string, the executable
+can be a path to an executable Python script. Defaults to ``sys.executable``.
+"""
+    return _EXECUTABLE
+
+
 _FORK = _Directive("fork", validator=_bool, default=False)
 _FORK.__doc__ = """The fork directive can be set to True to enforce that a
 particular operation is always executed within a subprocess and not within the
@@ -466,6 +489,58 @@ Python interpreter's process even if there are no other reasons that would preve
     such as a timeout.
 """
 
+_MEMORY = _Directive(
+    "memory",
+    validator=_positive_real_memory,
+    default=None,
+    serial=_max_not_none,
+    parallel=_sum_not_none,
+)
+_MEMORY.__doc__ = """The memory to request for this operation.
+
+The memory to validate should be either a float, int, or string.
+A valid memory argument is defined as:
+
+- Positive numeric value with suffix "g" or "G" indicating memory requested in gigabytes.
+
+For example:
+
+.. code-block:: python
+
+    @Project.operation.with_directives({"memory": "4g"})
+    def op(job):
+        pass
+
+- Positive numeric value with suffix "m" or "M" indicating memory requested in megabytes.
+
+For example:
+
+.. code-block:: python
+
+    @Project.operation.with_directives({"memory": "512m"})
+    def op(job):
+        pass
+
+- Positive numeric value with no suffix indicating memory requested in gigabytes.
+
+For example:
+
+.. code-block:: python
+
+    @Project.operation.with_directives({"memory": "4"})
+    def op1(job):
+        pass
+
+    @Project.operation.with_directives({"memory": 4})
+    def op2(job):
+        pass
+"""
+
+_NGPU = _Directive("ngpu", validator=_nonnegative_int, default=0)
+_NGPU.__doc__ = """The number of GPUs to use for this operation.
+
+Expects a nonnegative integer. Defaults to 0.
+"""
 
 _NP = _Directive(
     "np", validator=_natural_number, default=_NP_DEFAULT, finalize=_finalize_np
@@ -478,12 +553,6 @@ the "nranks" or "omp_num_threads" directives and uses their product if it is
 greater than the current set value. Defaults to 1.
 """
 
-_NGPU = _Directive("ngpu", validator=_nonnegative_int, default=0)
-_NGPU.__doc__ = """The number of GPUs to use for this operation.
-
-Expects a nonnegative integer. Defaults to 0.
-"""
-
 _NRANKS = _Directive("nranks", validator=_nonnegative_int, default=0)
 _NRANKS.__doc__ = """The number of MPI ranks to use for this operation. Defaults to 0.
 
@@ -494,6 +563,23 @@ _OMP_NUM_THREADS = _Directive("omp_num_threads", validator=_nonnegative_int, def
 _OMP_NUM_THREADS.__doc__ = """The number of OpenMP threads to use for this operation. Defaults to 0.
 
 Expects a nonnegative integer.
+"""
+
+_PROCESSOR_FRACTION = _Directive(
+    "processor_fraction",
+    validator=_OnlyTypes(float, postprocess=_is_fraction),
+    default=1.0,
+    serial=_no_aggregation,
+    parallel=_no_aggregation,
+)
+_PROCESSOR_FRACTION.__doc__ = """Fraction of a resource to use on a single operation.
+
+If set to 0.5 for a bundled job with 20 operations (all with 'np' set to 1), 10
+CPUs will be used. Defaults to 1.
+
+.. note::
+
+    This can be particularly useful on Stampede2's launcher.
 """
 
 _WALLTIME = _Directive(
@@ -515,100 +601,9 @@ For example:
 
 .. code-block:: python
 
-    @Project.operation
-    @directives(walltime=24)
+    @Project.operation.with_directives({"walltime": 24})
     def op(job):
         # This operation takes 1 day to run
         pass
 
 """
-
-_MEMORY = _Directive(
-    "memory",
-    validator=_positive_real_memory,
-    default=None,
-    serial=_max_not_none,
-    parallel=_sum_not_none,
-)
-_MEMORY.__doc__ = """The memory to request for this operation.
-
-The memory to validate should be either a float, int, or string.
-A valid memory argument is defined as:
-
-- Positive numeric value with suffix "g" or "G" indicating memory requested in gigabytes.
-
-For example:
-
-.. code-block:: python
-
-    @Project.operation
-    @directives(memory="4g")
-    def op(job):
-        pass
-
-- Positive numeric value with suffix "m" or "M" indicating memory requested in megabytes.
-
-For example:
-
-.. code-block:: python
-
-    @Project.operation
-    @directives(memory="512m")
-    def op(job):
-        pass
-
-- Positive numeric value with no suffix indicating memory requested in gigabytes.
-
-For example:
-
-.. code-block:: python
-
-    @Project.operation
-    @directives(memory="4")
-    def op1(job):
-        pass
-
-    @Project.operation
-    @directives(memory=4)
-    def op2(job):
-        pass
-"""
-
-_PROCESSOR_FRACTION = _Directive(
-    "processor_fraction",
-    validator=_OnlyTypes(float, postprocess=_is_fraction),
-    default=1.0,
-    serial=_no_aggregation,
-    parallel=_no_aggregation,
-)
-_PROCESSOR_FRACTION.__doc__ = """Fraction of a resource to use on a single operation.
-
-If set to 0.5 for a bundled job with 20 operations (all with 'np' set to 1), 10
-CPUs will be used. Defaults to 1.
-
-.. note::
-
-    This can be particularly useful on Stampede2's launcher.
-"""
-
-
-def _GET_EXECUTABLE():
-    # Evaluate the executable directive at call-time instead of definition time.
-    # This is because we mock `sys.executable` while generating template reference data.
-    _EXECUTABLE = _Directive(
-        "executable",
-        validator=_OnlyTypes(str),
-        default=sys.executable,
-        serial=_no_aggregation,
-        parallel=_no_aggregation,
-    )
-    _EXECUTABLE.__doc__ = """Return the path to the executable to be used for an operation.
-
-The executable directive expects a string pointing to a valid executable
-file in the current file system.
-
-When called, by default this should point to a Python executable (interpreter);
-however, if the :class:`FlowProject` path is an empty string, the executable
-can be a path to an executable Python script. Defaults to ``sys.executable``.
-"""
-    return _EXECUTABLE

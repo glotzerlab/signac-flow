@@ -236,12 +236,12 @@ class ExpanseEnvironment(DefaultSlurmEnvironment):
         # the `--mpi=pmi2` option set, but this would cause errors for the container.
         if operation.directives["nranks"] == 0:
             return ""
-        rank_option = f"-n {operation.directives['nranks']} "
+        rank_option = f" -n {operation.directives['nranks']} "
         # We have to handle the case with and without OpenMP differently due to the
         # --cpus-per-task option recommended by the Expanse user guide.
         if operation.directives["omp_num_threads"] == 0:
             return cls.mpi_cmd + rank_option
-        cpus_per_task = f"--cpus-per-task={operation.directives['omp_num_threads']} "
+        cpus_per_task = f" --cpus-per-task={operation.directives['omp_num_threads']}"
         return cls.mpi_cmd + cpus_per_task + rank_option
 
     @classmethod

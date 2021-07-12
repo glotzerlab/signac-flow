@@ -110,7 +110,6 @@ def add_path_to_environment_pythonpath(path):
             yield
         finally:
             os.environ["PYTHONPATH"] = pythonpath
-            pass
     else:
         try:
             # The PYTHONPATH was previously not set, set to current working directory.

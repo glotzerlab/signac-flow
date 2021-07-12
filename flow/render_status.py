@@ -79,7 +79,12 @@ def _render_status(
 
         """
         assert value >= 0 and total > 0
-        bar_format = escape + f"|{{bar:{width}}}" + escape + "| {percentage:<0.2f}%"
+        bar_format = (
+            escape
+            + f"|{{bar:{width}}}"
+            + escape
+            + "| {n_fmt}/{total_fmt} ({percentage:<0.2f}%)"
+        )
         return tqdm.format_meter(n=value, total=total, elapsed=0, bar_format=bar_format)
 
     def job_filter(job_op, scheduler_status_code, all_ops):

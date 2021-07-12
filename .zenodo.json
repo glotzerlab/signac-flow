@@ -106,6 +106,16 @@
         {
             "affiliation": "",
             "name": "Ange-Desire Gnabro"
+        },
+        {
+            "affiliation": "University of Michigan",
+            "name": "Charlotte Zhao",
+            "orcid": "0000-0003-4915-1064"
+        },
+        {
+            "affiliation": "University of Michigan",
+            "name": "Kelly Wang",
+            "orcid": "0000-0002-7326-3835"
         }
     ],
     "creators": [
@@ -160,5 +170,5 @@
     },
     "title": "signac-flow",
     "upload_type": "software",
-    "version": "0.13.0"
+    "version": "0.15.0"
 }

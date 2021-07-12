@@ -60,7 +60,7 @@ def test_env(env, monkeypatch):
             jobs = fp.find_jobs(dict(environment=_env_name(env)))
             if not len(jobs):
                 raise RuntimeError(
-                    "No reference data for environment {}!".format(_env_name(env))
+                    f"No reference data for environment {_env_name(env)}!"
                 )
             reference = []
             generated = []

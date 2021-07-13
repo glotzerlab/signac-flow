@@ -35,7 +35,7 @@
 #SBATCH --gpus={{ gpu_tasks }}
 {% elif partition == 'shared' %}
     {% if nn|default(1, true) > 1 %}
-        {% raise "Cannot request shared with multiple nodes." %}
+        {% raise "Cannot request shared partition with resources spanning multiple nodes." %}
     {% endif %}
 #SBATCH -N 1
 #SBATCH --ntasks={{ cpu_tasks }}

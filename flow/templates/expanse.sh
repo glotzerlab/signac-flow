@@ -20,8 +20,8 @@
 {% if 'gpu' in partition %}
     {% set gpus_per_node = (gpu_tasks / nn)|round(0, 'ceil')|int %}
     {% set cpus_per_node = (cpu_tasks / nn)|round(0, 'ceil')|int %}
-    {% if cpus_per_node > gpus_per_node * 5 and not force %}
-        {% raise "Cannot request more than 5 CPUs per GPU." %}
+    {% if cpus_per_node > gpus_per_node * 10 and not force %}
+        {% raise "Cannot request more than 10 CPUs per GPU." %}
     {% endif %}
 {% endif %}
 

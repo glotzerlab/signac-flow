@@ -7,11 +7,11 @@
     {% if gpu_tasks %}
         {% if not ('gpu' in partition or force) %}
             {% raise "GPU operations require a GPU partition!" %}
-        {% endif %} {# End check for correct partition #}
+        {% endif %}
         {# GPU nodes have 4 NVIDIA V100-32GB SMX2 #}
         {% set nn_gpu = gpu_tasks|calc_num_nodes(4) %}
         {% set nn = nn_gpu %}
-    {% else %} {# if no GPU tasks #}
+    {% else %}
         {% if 'gpu' in partition and not force %}
             {% raise "Requesting GPU partition, but no GPUs requested!" %}
         {% endif %}

@@ -26,7 +26,7 @@
     {% endif %}
 
     {% if partition == 'gpu' %}
-#SBATCH -N {{ nn|check_utilization(gpu_tasks, 4, threshold, 'gpu') }}
+#SBATCH -N {{ nn|check_utilization(gpu_tasks, 4, threshold, 'GPU') }}
 #SBATCH --ntasks-per-node={{ cpus_per_node }}
 #SBATCH --gpus={{ gpu_tasks }}
     {% elif partition == 'gpu-shared' %}

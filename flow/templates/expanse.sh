@@ -30,6 +30,9 @@
 #SBATCH --ntasks-per-node={{ cpus_per_node }}
 #SBATCH --gpus={{ gpu_tasks }}
     {% elif partition == 'gpu-shared' %}
+        {% if nn|default(1, true) > 1 %}
+            {% raise "Cannot request shared partition with resources spanning multiple nodes." %}
+        {% endif %}
 #SBATCH -N {{ nn|check_utilization(gpu_tasks, 1, threshold, 'GPU') }}
 #SBATCH --ntasks-per-node={{ cpus_per_node }}
 #SBATCH --gpus={{ gpu_tasks }}

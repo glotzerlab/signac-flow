@@ -10,46 +10,6 @@ from ..environment import DefaultSlurmEnvironment, template_filter
 logger = logging.getLogger(__name__)
 
 
-class CometEnvironment(DefaultSlurmEnvironment):
-    """Environment profile for the Comet supercomputer.
-
-    https://www.sdsc.edu/services/hpc/hpc_systems.html#comet
-    """
-
-    hostname_pattern = "comet"
-    template = "comet.sh"
-    cores_per_node = 24
-    mpi_cmd = "ibrun"
-
-    @classmethod
-    def add_args(cls, parser):
-        """Add arguments to parser.
-
-        Parameters
-        ----------
-        parser : :class:`argparse.ArgumentParser`
-            The argument parser where arguments will be added.
-
-        """
-        super().add_args(parser)
-
-        parser.add_argument(
-            "--partition",
-            choices=["compute", "gpu", "gpu-shared", "shared", "large-shared", "debug"],
-            default="shared",
-            help="Specify the partition to submit to.",
-        )
-
-        parser.add_argument(
-            "--job-output",
-            help=(
-                "What to name the job output file. "
-                "If omitted, uses the system default "
-                '(slurm default is "slurm-%%j.out").'
-            ),
-        )
-
-
 _STAMPEDE_OFFSET = os.environ.get("_FLOW_STAMPEDE_OFFSET_`", 0)
 
 
@@ -253,7 +213,6 @@ class ExpanseEnvironment(DefaultSlurmEnvironment):
 
 
 __all__ = [
-    "CometEnvironment",
     "Stampede2Environment",
     "Bridges2Environment",
     "ExpanseEnvironment",

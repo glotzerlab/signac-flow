@@ -65,16 +65,6 @@ def init(project):
     # construct a minimal covering set of all test cases.
     environments = {
         "environment.StandardEnvironment": [],
-        "environments.xsede.CometEnvironment": [
-            {
-                "partition": ["compute", "shared", "gpu"],
-            },
-            {
-                "partition": ["compute"],
-                "parallel": [False, True],
-                "bundle": [["mpi_op", "omp_op"]],
-            },
-        ],
         "environments.xsede.Stampede2Environment": [
             {
                 "partition": ["skx-normal"],

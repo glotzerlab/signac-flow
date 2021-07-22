@@ -9,6 +9,13 @@ custom commands (e.g. `module load ...`).
 {% block header %}
     {{- super () -}}
 {% endblock header %}
+{% block custom_content %}
+{#
+    This block is not used by any other template and can be safely modified
+    without the need to call super(). We recommend most additions to the
+    templates go here if they are not direct changes to an existing template.
+#}
+{% endblock custom_content %}
 {% block body %}
     {{- super () -}}
 {% endblock body %}

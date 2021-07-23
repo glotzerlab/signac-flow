@@ -45,6 +45,7 @@ from .aggregates import (
     aggregator,
     get_aggregate_id,
 )
+from .directives import _document_directive
 from .environment import ComputeEnvironment, get_environment
 from .errors import (
     ConfigKeyError,
@@ -711,12 +712,12 @@ class FlowGroupEntry:
         Parameters
         ----------
         directives : dict
-            Directives to use for execution.
+            Directives to use for resource requests and execution.
 
         Returns
         -------
         function
-            A decorator which registers the function with the group using the
+            A decorator which registers the operation with the group using the
             specified directives.
         """
 
@@ -1176,13 +1177,6 @@ class FlowGroup:
         return directives
 
 
-def _document_directive(directive):
-    name = directive._name
-    name = name.replace("_", r"\_")
-    doc = directive.__doc__
-    return f"**{name}**\n\n{doc}"
-
-
 class _FlowProjectClass(type):
     """Metaclass for the FlowProject class."""
 
@@ -1478,7 +1472,7 @@ class _FlowProjectClass(type):
                 Parameters
                 ----------
                 directives : dict
-                    Directives to use for execution.
+                    Directives to use for resource requests and execution.
                 name : str
                     The operation name. Uses the name of the function if None
                     (Default value = None).

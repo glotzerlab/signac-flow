@@ -15,6 +15,7 @@ import logging
 from functools import wraps
 from textwrap import indent
 
+from .directives import _document_directive
 from .environment import ComputeEnvironment
 
 logger = logging.getLogger(__name__)
@@ -149,14 +150,6 @@ class directives:
         directives.update(self.kwargs)
         setattr(func, "_flow_directives", directives)
         return func
-
-
-# Remove when @flow.directives is removed
-def _document_directive(directive):
-    name = directive._name
-    name = name.replace("_", r"\_")
-    doc = directive.__doc__
-    return f"**{name}**\n\n{doc}"
 
 
 # Remove when @flow.directives is removed

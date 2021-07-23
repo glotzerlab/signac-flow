@@ -15,10 +15,7 @@ import logging
 from functools import wraps
 from textwrap import indent
 
-from deprecation import deprecated
-
 from .environment import ComputeEnvironment
-from .version import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -111,18 +108,16 @@ def with_job(func):
     return decorated
 
 
-@deprecated(
-    deprecated_in="0.15",
-    removed_in="1.0",
-    current_version=__version__,
-    details="Use FlowProject.operation.with_directives",
-)
 class directives:
     """Decorator for operation functions to provide additional execution directives.
 
     Directives can for example be used to provide information about required resources
     such as the number of processes required for execution of parallelized operations.
-    For more information, read about :ref:`signac-docs:directives`.
+    For more information, read about :ref:`signac-docs:cluster_submission_directives`.
+
+    .. deprecated:: 0.15
+        This decorator is deprecated and will be removed in 1.0.
+        Use :class:`FlowProject.operation.with_directives` instead.
 
     """
 

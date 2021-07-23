@@ -151,6 +151,7 @@ class directives:
         return func
 
 
+# Remove when @flow.directives is removed
 def _document_directive(directive):
     name = directive._name
     name = name.replace("_", r"\_")
@@ -158,6 +159,7 @@ def _document_directive(directive):
     return f"**{name}**\n\n{doc}"
 
 
+# Remove when @flow.directives is removed
 _directives_to_document = (
     ComputeEnvironment._get_default_directives()._directive_definitions.values()
 )

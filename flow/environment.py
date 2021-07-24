@@ -478,16 +478,6 @@ class DefaultPBSEnvironment(ComputeEnvironment):
         )
 
 
-@deprecated(
-    deprecated_in="0.14",
-    removed_in="0.16",
-    current_version=__version__,
-    details="DefaultTorqueEnvironment has been renamed to DefaultPBSEnvironment",
-)
-class DefaultTorqueEnvironment(DefaultPBSEnvironment):  # noqa: D101
-    pass
-
-
 class DefaultSlurmEnvironment(ComputeEnvironment):
     """Default environment for clusters with a SLURM scheduler."""
 

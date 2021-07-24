@@ -19,7 +19,7 @@ Changed
 Removed
 +++++++
 
-- Removed deprecated class ``DefaultTorqueEnvironment`` (#556).
+- Removed deprecated environment classes (#556).
 
 Version 0.15
 ============

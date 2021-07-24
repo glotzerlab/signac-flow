@@ -16,6 +16,11 @@ Changed
 
 - Improved documentation of directives (#554).
 
+Removed
++++++++
+
+- Removed deprecated environment classes (#556).
+
 Version 0.15
 ============
 

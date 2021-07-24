@@ -17,6 +17,7 @@ import random
 import re
 import subprocess
 import sys
+import textwrap
 import threading
 import time
 import traceback
@@ -44,7 +45,8 @@ from .aggregates import (
     aggregator,
     get_aggregate_id,
 )
-from .environment import get_environment
+from .directives import _document_directive
+from .environment import ComputeEnvironment, get_environment
 from .errors import (
     ConfigKeyError,
     NoSchedulerError,
@@ -694,20 +696,29 @@ class FlowGroupEntry:
             func._flow_group_operation_directives = {self.name: directives}
 
     def with_directives(self, directives):
-        """Return a decorator that sets group specific directives to the operation.
+        """Decorate an operation to provide additional execution directives for this group.
+
+        Directives can be used to provide information about required resources
+        such as the number of processors required for execution of parallelized
+        operations. For a list of supported directives, see
+        :meth:`.FlowProject.operation.with_directives`. For more information,
+        see :ref:`signac-docs:cluster_submission_directives`.
+
+        The directives specified in this decorator are only applied when
+        executing the operation through the :class:`FlowGroup`.
+        To apply directives to an individual operation executed outside of the
+        group, see :meth:`.FlowProject.operation.with_directives`.
 
         Parameters
         ----------
         directives : dict
-            Directives to use for resource requests and running the operation
-            through the group.
+            Directives to use for resource requests and execution.
 
         Returns
         -------
         function
-            A decorator which registers the function into the group with
+            A decorator which registers the operation with the group using the
             specified directives.
-
         """
 
         def decorator(func):
@@ -1449,22 +1460,29 @@ class _FlowProjectClass(type):
                 return func
 
             def with_directives(self, directives, name=None):
-                """Return a decorator that also sets directives for the operation.
+                """Decorate a function to make it an operation with additional execution directives.
+
+                Directives can be used to provide information about required
+                resources such as the number of processors required for
+                execution of parallelized operations. For more information, see
+                :ref:`signac-docs:cluster_submission_directives`. To apply
+                directives to an operation that is part of a group, use
+                :meth:`.FlowGroupEntry.with_directives`.
 
                 Parameters
                 ----------
                 directives : dict
-                    Directives to use for resource requests and running the operation through the
-                    group.
+                    Directives to use for resource requests and execution.
                 name : str
-                    The operation name. Uses the name of the function if None.
-                    (Default value = None)
+                    The operation name. Uses the name of the function if None
+                    (Default value = None).
 
                 Returns
                 -------
                 function
-                    A decorator which registers the function with the correct name and directives as
-                    an operation of the :class:`~.FlowProject` subclass.
+                    A decorator which registers the function with the provided
+                    name and directives as an operation of the
+                    :class:`~.FlowProject` subclass.
                 """
 
                 def add_operation_with_directives(function):
@@ -1472,6 +1490,18 @@ class _FlowProjectClass(type):
                     return self(function, name)
 
                 return add_operation_with_directives
+
+            _directives_to_document = (
+                ComputeEnvironment._get_default_directives()._directive_definitions.values()
+            )
+            with_directives.__doc__ += textwrap.indent(
+                "\n\n**Supported Directives:**\n\n"
+                + "\n\n".join(
+                    _document_directive(directive)
+                    for directive in _directives_to_document
+                ),
+                " " * 16,
+            )
 
         return OperationRegister()
 

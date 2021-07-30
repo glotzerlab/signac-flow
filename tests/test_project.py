@@ -1747,6 +1747,49 @@ class TestGroupProject(TestProjectBase):
         with pytest.raises(FlowProjectDefinitionError):
             B.make_group("bar")
 
+    def test_repeat_group_definition(self):
+        """Test that groups cannot be registered if a group with that name exists."""
+
+        class A(FlowProject):
+            pass
+
+        A.make_group("foo")
+
+        with pytest.raises(FlowProjectDefinitionError):
+            A.make_group("foo")
+
+    def test_repeat_operation_group_definition(self):
+        """Test that operations cannot be registered with a group multiple times."""
+
+        class A(FlowProject):
+            pass
+
+        foo_group = A.make_group("foo")
+
+        with pytest.raises(FlowProjectDefinitionError):
+
+            @foo_group
+            @foo_group
+            @A.operation
+            def foo_operation(job):
+                pass
+
+    def test_repeat_operation_group_directives_definition(self):
+        """Test that operations cannot be registered with group directives multiple times."""
+
+        class A(FlowProject):
+            pass
+
+        foo_group = A.make_group("foo")
+
+        with pytest.raises(FlowProjectDefinitionError):
+
+            @foo_group.with_directives({"np": 1})
+            @foo_group.with_directives({"np": 1})
+            @A.operation
+            def foo_operation(job):
+                pass
+
     def test_submission_combine_directives(self):
         class A(flow.FlowProject):
             pass

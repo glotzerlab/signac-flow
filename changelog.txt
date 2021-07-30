@@ -11,6 +11,11 @@ Version 0.16
 [0.16.0] -- 2021-xx-xx
 ----------------------
 
+Added
++++++
+
+- Added a ``custom_content`` block to templates for user customization (#553).
+
 Changed
 +++++++
 
@@ -31,7 +36,6 @@ Version 0.15
 Added
 +++++
 
-- Added a ``custom_content`` block to templates for user customization (#553).
 - Add support for aggregation (operations acting on multiple jobs) via ``flow.aggregator`` (#464, #516, #542).
 - Add official support for Andes cluster (#500).
 - Decorator for setting directives while registering operation function ``FlowProject.operation.with_directives`` (#309, #502).

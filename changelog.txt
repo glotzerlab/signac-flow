@@ -11,10 +11,21 @@ Version 0.16
 [0.16.0] -- 2021-xx-xx
 ----------------------
 
+Changed
++++++++
+
+- Improved documentation of directives (#554).
+
 Fixed
 +++++
 
-- Error raised when a ``FlowGroup`` decorates functions that are not FlowProject operations (#538, #544).
+- Error raised when a ``FlowGroup`` decorates functions that are not ``FlowProject`` operations (#538, #544).
+
+Removed
++++++++
+
+- Removed deprecated environment classes (#556).
+- Removed support for signac < 1.3.0 (#558).
 
 Version 0.15
 ============

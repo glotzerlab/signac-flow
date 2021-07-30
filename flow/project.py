@@ -17,6 +17,7 @@ import random
 import re
 import subprocess
 import sys
+import textwrap
 import threading
 import time
 import traceback
@@ -31,7 +32,6 @@ from multiprocessing.pool import ThreadPool
 import cloudpickle
 import jinja2
 import signac
-from deprecation import deprecated
 from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
 from signac.contrib.filterparse import parse_filter_arg
 from tqdm.auto import tqdm
@@ -44,7 +44,8 @@ from .aggregates import (
     aggregator,
     get_aggregate_id,
 )
-from .environment import get_environment
+from .directives import _document_directive
+from .environment import ComputeEnvironment, get_environment
 from .errors import (
     ConfigKeyError,
     NoSchedulerError,
@@ -70,7 +71,6 @@ from .util.misc import (
     switch_to_directory,
 )
 from .util.translate import abbreviate, shorten
-from .version import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +90,7 @@ The available template variables are:
 {template_vars}
 
 Filter functions can be used to format template variables in a specific way.
-For example: {{{{ project.get_id() | capitalize }}}}.
+For example: {{{{ project.id | capitalize }}}}.
 
 The available filters are:
 {filters}"""
@@ -699,20 +699,29 @@ class FlowGroupEntry:
             func._flow_group_operation_directives = {self.name: directives}
 
     def with_directives(self, directives):
-        """Return a decorator that sets group specific directives to the operation.
+        """Decorate an operation to provide additional execution directives for this group.
+
+        Directives can be used to provide information about required resources
+        such as the number of processors required for execution of parallelized
+        operations. For a list of supported directives, see
+        :meth:`.FlowProject.operation.with_directives`. For more information,
+        see :ref:`signac-docs:cluster_submission_directives`.
+
+        The directives specified in this decorator are only applied when
+        executing the operation through the :class:`FlowGroup`.
+        To apply directives to an individual operation executed outside of the
+        group, see :meth:`.FlowProject.operation.with_directives`.
 
         Parameters
         ----------
         directives : dict
-            Directives to use for resource requests and running the operation
-            through the group.
+            Directives to use for resource requests and execution.
 
         Returns
         -------
         function
-            A decorator which registers the function into the group with
+            A decorator which registers the operation with the group using the
             specified directives.
-
         """
 
         def decorator(func):
@@ -1454,22 +1463,29 @@ class _FlowProjectClass(type):
                 return func
 
             def with_directives(self, directives, name=None):
-                """Return a decorator that also sets directives for the operation.
+                """Decorate a function to make it an operation with additional execution directives.
+
+                Directives can be used to provide information about required
+                resources such as the number of processors required for
+                execution of parallelized operations. For more information, see
+                :ref:`signac-docs:cluster_submission_directives`. To apply
+                directives to an operation that is part of a group, use
+                :meth:`.FlowGroupEntry.with_directives`.
 
                 Parameters
                 ----------
                 directives : dict
-                    Directives to use for resource requests and running the operation through the
-                    group.
+                    Directives to use for resource requests and execution.
                 name : str
-                    The operation name. Uses the name of the function if None.
-                    (Default value = None)
+                    The operation name. Uses the name of the function if None
+                    (Default value = None).
 
                 Returns
                 -------
                 function
-                    A decorator which registers the function with the correct name and directives as
-                    an operation of the :class:`~.FlowProject` subclass.
+                    A decorator which registers the function with the provided
+                    name and directives as an operation of the
+                    :class:`~.FlowProject` subclass.
                 """
 
                 def add_operation_with_directives(function):
@@ -1477,6 +1493,18 @@ class _FlowProjectClass(type):
                     return self(function, name)
 
                 return add_operation_with_directives
+
+            _directives_to_document = (
+                ComputeEnvironment._get_default_directives()._directive_definitions.values()
+            )
+            with_directives.__doc__ += textwrap.indent(
+                "\n\n**Supported Directives:**\n\n"
+                + "\n\n".join(
+                    _document_directive(directive)
+                    for directive in _directives_to_document
+                ),
+                " " * 16,
+            )
 
         return OperationRegister()
 
@@ -2333,7 +2361,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         """
         result = {
-            "job_id": job.get_id(),
+            "job_id": job.id,
             "labels": [],
             "_labels_error": None,
         }
@@ -3012,7 +3040,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return (
             operation.id,
             operation.name,
-            [job.get_id() for job in operation._jobs],
+            [job.id for job in operation._jobs],
             operation.cmd,
             operation.directives,
         )
@@ -4070,20 +4098,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 yield label_value
             elif bool(label_value) is True:
                 yield label_name
-
-    @deprecated(
-        deprecated_in="0.14",
-        removed_in="0.16",
-        current_version=__version__,
-        details="Method has been removed.",
-    )
-    def add_operation(*args, **kwargs):  # noqa: D102
-        raise AttributeError(
-            "The add_operation() method was removed in version 0.14. "
-            "Please see https://docs.signac.io/en/latest/flow-project.html#defining-a-workflow "
-            "for instructions on how to define operations using the current API. This message "
-            "will be removed in version 0.16."
-        )
 
     def completed_operations(self, job):
         """Determine which operations have been completed for job.

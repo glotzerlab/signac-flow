@@ -455,7 +455,7 @@ class _AggregateStore(_BaseAggregateStore):
             for job in aggregate:
                 if job not in self._project:
                     raise LookupError(
-                        f"The signac job {job.get_id()} not found in {self._project}"
+                        f"The signac job {job.id} not found in {self._project}"
                     )
             try:
                 stored_aggregate = tuple(aggregate)
@@ -561,7 +561,7 @@ class _DefaultAggregateStore(_BaseAggregateStore):
 
     def keys(self):
         for job in self._project:
-            yield job.get_id()
+            yield job.id
 
     def values(self):
         for job in self._project:
@@ -569,7 +569,7 @@ class _DefaultAggregateStore(_BaseAggregateStore):
 
     def items(self):
         for job in self._project:
-            yield (job.get_id(), (job,))
+            yield (job.id, (job,))
 
 
 def get_aggregate_id(aggregate):
@@ -593,9 +593,9 @@ def get_aggregate_id(aggregate):
     """
     if len(aggregate) == 1:
         # Return job id as it's already unique
-        return aggregate[0].get_id()
+        return aggregate[0].id
 
-    id_string = ",".join(job.get_id() for job in aggregate)
+    id_string = ",".join(job.id for job in aggregate)
     hash_ = md5(id_string.encode("utf-8")).hexdigest()
     return f"agg-{hash_}"
 

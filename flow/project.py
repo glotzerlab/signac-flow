@@ -90,7 +90,7 @@ The available template variables are:
 {template_vars}
 
 Filter functions can be used to format template variables in a specific way.
-For example: {{{{ project.get_id() | capitalize }}}}.
+For example: {{{{ project.id | capitalize }}}}.
 
 The available filters are:
 {filters}"""
@@ -2356,7 +2356,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         """
         result = {
-            "job_id": job.get_id(),
+            "job_id": job.id,
             "labels": [],
             "_labels_error": None,
         }
@@ -3035,7 +3035,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return (
             operation.id,
             operation.name,
-            [job.get_id() for job in operation._jobs],
+            [job.id for job in operation._jobs],
             operation.cmd,
             operation.directives,
         )

@@ -17,6 +17,12 @@ Changed
 - Improved documentation of directives (#554).
 - Raise ``FlowProjectDefinitionError`` error for inaccurate ``FlowProject`` definitions (#549).
 
+Removed
++++++++
+
+- Removed deprecated environment classes (#556).
+- Removed support for signac < 1.3.0 (#558).
+
 Version 0.15
 ============
 

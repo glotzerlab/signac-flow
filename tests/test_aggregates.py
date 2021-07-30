@@ -358,5 +358,5 @@ class TestAggregateStore(AggregateProjectSetup):
         assert get_aggregate_id(jobs) in aggregator_instance
         assert get_aggregate_id(jobs) not in default_aggregator
         # Test for an aggregate of single job
-        assert not jobs[0].get_id() in aggregator_instance
-        assert jobs[0].get_id() in default_aggregator
+        assert not jobs[0].id in aggregator_instance
+        assert jobs[0].id in default_aggregator

@@ -32,7 +32,6 @@ from multiprocessing.pool import ThreadPool
 import cloudpickle
 import jinja2
 import signac
-from deprecation import deprecated
 from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
 from signac.contrib.filterparse import parse_filter_arg
 from tqdm.auto import tqdm
@@ -73,7 +72,6 @@ from .util.misc import (
     switch_to_directory,
 )
 from .util.translate import abbreviate, shorten
-from .version import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +91,7 @@ The available template variables are:
 {template_vars}
 
 Filter functions can be used to format template variables in a specific way.
-For example: {{{{ project.get_id() | capitalize }}}}.
+For example: {{{{ project.id | capitalize }}}}.
 
 The available filters are:
 {filters}"""
@@ -2361,7 +2359,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         """
         result = {
-            "job_id": job.get_id(),
+            "job_id": job.id,
             "labels": [],
             "_labels_error": None,
         }
@@ -3040,7 +3038,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return (
             operation.id,
             operation.name,
-            [job.get_id() for job in operation._jobs],
+            [job.id for job in operation._jobs],
             operation.cmd,
             operation.directives,
         )
@@ -4098,20 +4096,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 yield label_value
             elif bool(label_value) is True:
                 yield label_name
-
-    @deprecated(
-        deprecated_in="0.14",
-        removed_in="0.16",
-        current_version=__version__,
-        details="Method has been removed.",
-    )
-    def add_operation(*args, **kwargs):  # noqa: D102
-        raise AttributeError(
-            "The add_operation() method was removed in version 0.14. "
-            "Please see https://docs.signac.io/en/latest/flow-project.html#defining-a-workflow "
-            "for instructions on how to define operations using the current API. This message "
-            "will be removed in version 0.16."
-        )
 
     def completed_operations(self, job):
         """Determine which operations have been completed for job.

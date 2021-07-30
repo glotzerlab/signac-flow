@@ -44,7 +44,7 @@ def cmd(func):
     """
     if getattr(func, "_flow_with_job", False):
         raise FlowProjectDefinitionError(
-            "@cmd should appear below the @with_job decorator in your script"
+            "The @flow.cmd decorator must appear below the @flow.with_job decorator."
         )
     setattr(func, "_flow_cmd", True)
     return func

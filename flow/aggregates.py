@@ -355,7 +355,7 @@ class aggregator:
             )
         if getattr(func, "_flow_with_job", False):
             raise FlowProjectDefinitionError(
-                "The @with_job decorator cannot be used with aggregation."
+                "The @flow.with_job decorator cannot be used with aggregation."
             )
         setattr(func, "_flow_aggregate", self)
         return func

@@ -64,6 +64,6 @@ class TemplateError(Jinja2Extension):
 
 
 class FlowProjectDefinitionError(ValueError):
-    """Indicates that the project was incorrectly defined."""
+    """Indicates an invalid FlowProject definition."""
 
     pass

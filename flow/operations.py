@@ -15,10 +15,8 @@ import logging
 from functools import wraps
 from textwrap import indent
 
-from deprecation import deprecated
-
+from .directives import _document_directive
 from .environment import ComputeEnvironment
-from .version import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -111,18 +109,16 @@ def with_job(func):
     return decorated
 
 
-@deprecated(
-    deprecated_in="0.15",
-    removed_in="1.0",
-    current_version=__version__,
-    details="Use FlowProject.operation.with_directives",
-)
 class directives:
     """Decorator for operation functions to provide additional execution directives.
 
     Directives can for example be used to provide information about required resources
     such as the number of processes required for execution of parallelized operations.
-    For more information, read about :ref:`signac-docs:directives`.
+    For more information, read about :ref:`signac-docs:cluster_submission_directives`.
+
+    .. deprecated:: 0.15
+        This decorator is deprecated and will be removed in 1.0.
+        Use :class:`FlowProject.operation.with_directives` instead.
 
     """
 
@@ -156,13 +152,7 @@ class directives:
         return func
 
 
-def _document_directive(directive):
-    name = directive._name
-    name = name.replace("_", r"\_")
-    doc = directive.__doc__
-    return f"**{name}**\n\n{doc}"
-
-
+# Remove when @flow.directives is removed
 _directives_to_document = (
     ComputeEnvironment._get_default_directives()._directive_definitions.values()
 )

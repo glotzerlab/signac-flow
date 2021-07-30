@@ -282,7 +282,7 @@ class TestProjectClass(TestProjectBase):
         class A(FlowProject):
             pass
 
-        with pytest.raises(ValueError):
+        with pytest.raises(FlowProjectDefinitionError):
 
             @A.operation
             @A.operation("foo")
@@ -299,7 +299,7 @@ class TestProjectClass(TestProjectBase):
         def op1(job):
             pass
 
-        with pytest.raises(ValueError):
+        with pytest.raises(FlowProjectDefinitionError):
 
             @A.operation("op1")
             def op2(job):
@@ -317,7 +317,7 @@ class TestProjectClass(TestProjectBase):
         def op1(job):
             pass
 
-        with pytest.raises(ValueError):
+        with pytest.raises(FlowProjectDefinitionError):
             precondition = A.operation(precondition)
 
     def test_operation_as_condition(self):
@@ -328,7 +328,7 @@ class TestProjectClass(TestProjectBase):
         def attempted_precondition(job):
             pass
 
-        with pytest.raises(ValueError):
+        with pytest.raises(FlowProjectDefinitionError):
 
             @A.pre(attempted_precondition)
             def op1(job):
@@ -350,7 +350,7 @@ class TestProjectClass(TestProjectBase):
         with suspend_logging():
             A.get_project(root=self._tmp_dir.name)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(FlowProjectDefinitionError):
             B.get_project(root=self._tmp_dir.name)
 
     def test_label_definition(self):
@@ -826,21 +826,21 @@ class TestProjectClass(TestProjectBase):
         def op1(job):
             pass
 
-        with pytest.raises(ValueError):
+        with pytest.raises(FlowProjectDefinitionError):
 
             @A.operation
             @A.pre.after(condition_fun)
             def op2(job):
                 pass
 
-        with pytest.raises(ValueError):
+        with pytest.raises(FlowProjectDefinitionError):
 
             @A.operation
             @A.pre(op1)
             def op3(job):
                 pass
 
-        with pytest.raises(ValueError):
+        with pytest.raises(FlowProjectDefinitionError):
 
             @A.operation
             @A.post(op1)
@@ -1731,7 +1731,7 @@ class TestGroupProject(TestProjectBase):
 
         A.make_group("foo")
 
-        with pytest.raises(ValueError):
+        with pytest.raises(FlowProjectDefinitionError):
 
             @A.operation
             def foo(job):
@@ -1744,7 +1744,7 @@ class TestGroupProject(TestProjectBase):
         def bar(job):
             pass
 
-        with pytest.raises(ValueError):
+        with pytest.raises(FlowProjectDefinitionError):
             B.make_group("bar")
 
     def test_submission_combine_directives(self):

@@ -676,7 +676,7 @@ class FlowGroupEntry:
         if hasattr(func, "_flow_groups"):
             if self.name in func._flow_groups:
                 raise FlowProjectDefinitionError(
-                    f"Cannot reregister operation {func} with the group, {self.name}"
+                    f"Cannot reregister operation '{func}' with the group '{self.name}'."
                 )
             func._flow_groups.append(self.name)
         else:
@@ -687,8 +687,8 @@ class FlowGroupEntry:
         if hasattr(func, "_flow_group_operation_directives"):
             if self.name in func._flow_group_operation_directives:
                 raise FlowProjectDefinitionError(
-                    f"Cannot set directives because directives already exist "
-                    f"for {func} in group {self.name}"
+                    "Cannot set directives because directives already exist "
+                    f"for operation '{func}' in group '{self.name}'."
                 )
             func._flow_group_operation_directives[self.name] = directives
         else:
@@ -4253,7 +4253,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             name == operation_name for operation_name, _ in cls._OPERATION_FUNCTIONS
         ):
             raise FlowProjectDefinitionError(
-                f"Cannot create a group with the same name as the existing operation {name}"
+                f"Cannot create a group with the same name as the existing operation '{name}'."
             )
         cls._GROUP_NAMES.add(name)
         group_entry = FlowGroupEntry(

@@ -106,16 +106,14 @@ def init(alias=None, template=None, root=None):
             with open(fn, "x") as fw:
                 fw.write(code + "\n")
         except OSError as error:
+            error_message = (
+                f"Error while creating FlowProject module with name '{alias}': "
+            )
             if error.errno == errno.EEXIST:
-                logger.error(
-                    f"Error while trying to initialize flow project with alias '{alias}', "
-                    f"a file named '{fn}' already exists!"
-                )
+                error_message += f"a file named '{fn}' already exists!"
             else:
-                logger.error(
-                    f"Error while trying to initialize flow project with alias '{alias}': "
-                    f"'{error}'."
-                )
+                error_message += f"'{error}'."
+            raise OSError(error_message)
         else:
             files_created.append(fn)
             print(f"Created file '{fn}'.", file=sys.stderr)

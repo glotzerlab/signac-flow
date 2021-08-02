@@ -38,7 +38,7 @@ from flow import (
 )
 from flow.environment import ComputeEnvironment
 from flow.errors import DirectivesError, SubmitError
-from flow.project import IgnoreConditions, _AggregatesCursor
+from flow.project import IgnoreConditions, _AggregateStoresCursor, _JobAggregateCursor
 from flow.scheduling.base import ClusterJob, JobStatus, Scheduler
 from flow.util.misc import (
     add_cwd_to_environment_pythonpath,
@@ -194,7 +194,6 @@ class TestProjectBase:
         # Determine path to project module and construct command.
         fn_script = inspect.getsourcefile(type(self.project))
         _cmd = f"python {fn_script} {subcmd}"
-
         try:
             with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
                 with switch_to_directory(self.project.root_directory()):
@@ -238,7 +237,7 @@ class TestProjectStatusPerformance(TestProjectBase):
 
         time = timeit.timeit(
             lambda: project._fetch_status(
-                aggregates=_AggregatesCursor(project),
+                aggregates=_AggregateStoresCursor(project),
                 err=StringIO(),
                 ignore_errors=False,
             ),
@@ -902,7 +901,7 @@ class TestProject(TestProjectBase):
         project = self.mock_project()
         for job in project:
             status = project.get_job_status(job)
-            assert status["job_id"] == job.get_id()
+            assert status["job_id"] == job.id
             assert len(status["operations"]) == len(project.operations)
             for op in project._next_operations([(job,)]):
                 assert op.name in status["operations"]
@@ -1008,7 +1007,7 @@ execution_orders = (
     "cyclic",
     "by-job",
     "random",
-    lambda op: (op.name, op._jobs[0].get_id()),
+    lambda op: (op.name, op._jobs[0].id),
 )
 
 
@@ -1032,7 +1031,7 @@ class TestExecutionProject(TestProjectBase):
         # to the length of its set if and only if the job-operations are grouped
         # by job already.
         jobs_order_none = [
-            job.get_id() for job, _ in groupby(ops, key=lambda op: op._jobs[0])
+            job.id for job, _ in groupby(ops, key=lambda op: op._jobs[0])
         ]
         assert len(jobs_order_none) == len(set(jobs_order_none))
 
@@ -1468,7 +1467,7 @@ class TestProjectMainInterface(TestProjectBase):
         assert len(self.project)
         job_ids = set(self.call_subcmd("next op1").decode("utf-8").split())
         assert len(job_ids) > 0
-        even_jobs = [job.get_id() for job in self.project if job.sp.b % 2 == 0]
+        even_jobs = [job.id for job in self.project if job.sp.b % 2 == 0]
         assert job_ids == set(even_jobs)
         # Use only exact operation matches
         job_ids = set(self.call_subcmd("next op").decode("utf-8").split())
@@ -1494,7 +1493,7 @@ class TestProjectMainInterface(TestProjectBase):
         num_ops = len(project.operations)
         for line in lines:
             for job in project:
-                if job.get_id() in line:
+                if job.id in line:
                     op_lines = [line]
                     for i in range(num_ops - 1):
                         try:
@@ -1523,7 +1522,10 @@ class TestDirectivesProjectMainInterface(TestProjectBase):
         os.chdir(self._tmp_dir.name)
         request.addfinalizer(self.switch_to_cwd)
 
-    def test_main_submit_walltime_with_directive(self):
+    def test_main_submit_walltime_with_directive(self, monkeypatch):
+        # Force the submitting subprocess to use the TestEnvironment and
+        # FakeScheduler via the SIGNAC_FLOW_ENVIRONMENT environment variable.
+        monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", "TestEnvironment")
         assert len(self.project)
         output = self.call_subcmd(
             "submit -o op_walltime --pretend --template slurm.sh",
@@ -1531,23 +1533,32 @@ class TestDirectivesProjectMainInterface(TestProjectBase):
         ).decode("utf-8")
         assert "#SBATCH -t 01:00:00" in output
 
-    def test_main_submit_walltime_no_directive(self):
+    def test_main_submit_walltime_no_directive(self, monkeypatch):
+        # Force the submitting subprocess to use the TestEnvironment and
+        # FakeScheduler via the SIGNAC_FLOW_ENVIRONMENT environment variable.
+        monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", "TestEnvironment")
         assert len(self.project)
         output = self.call_subcmd(
             "submit -o op_walltime_2 --pretend --template slurm.sh", subprocess.STDOUT
         ).decode("utf-8")
         assert "#SBATCH -t" not in output
 
-    def test_main_submit_walltime_with_groups(self):
+    def test_main_submit_walltime_with_groups(self, monkeypatch):
+        # Force the submitting subprocess to use the TestEnvironment and
+        # FakeScheduler via the SIGNAC_FLOW_ENVIRONMENT environment variable.
+        monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", "TestEnvironment")
         assert len(self.project)
         output = self.call_subcmd(
             "submit -o walltimegroup --pretend --template slurm.sh", subprocess.STDOUT
         ).decode("utf-8")
         assert "#SBATCH -t 03:00:00" in output
 
-    def test_main_submit_walltime_serial(self):
+    def test_main_submit_walltime_serial(self, monkeypatch):
+        # Force the submitting subprocess to use the TestEnvironment and
+        # FakeScheduler via the SIGNAC_FLOW_ENVIRONMENT environment variable.
+        monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", "TestEnvironment")
         assert len(self.project)
-        job_id = next(iter(self.project)).get_id()
+        job_id = next(iter(self.project)).id
         output = self.call_subcmd(
             "submit -o op_walltime op_walltime_2 op_walltime_3 "
             f"-j {job_id} -b 3 --pretend --template slurm.sh",
@@ -1555,9 +1566,12 @@ class TestDirectivesProjectMainInterface(TestProjectBase):
         ).decode("utf-8")
         assert "#SBATCH -t 03:00:00" in output
 
-    def test_main_submit_walltime_parallel(self):
+    def test_main_submit_walltime_parallel(self, monkeypatch):
+        # Force the submitting subprocess to use the TestEnvironment and
+        # FakeScheduler via the SIGNAC_FLOW_ENVIRONMENT environment variable.
+        monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", "TestEnvironment")
         assert len(self.project)
-        job_id = next(iter(self.project)).get_id()
+        job_id = next(iter(self.project)).id
         output = self.call_subcmd(
             "submit -o op_walltime op_walltime_2 op_walltime_3 "
             f"-j {job_id} -b 3 --parallel --pretend --template slurm.sh",
@@ -1586,6 +1600,70 @@ class TestProjectDagDetection(TestProjectBase):
         ]
 
         assert adj == adj_correct
+
+
+class TestProjectSubmitOptions(TestProjectBase):
+    project_class = _TestProject
+    entrypoint = dict(
+        path=os.path.realpath(
+            os.path.join(os.path.dirname(__file__), "define_test_project.py")
+        )
+    )
+
+    @pytest.mark.parametrize(
+        "env,after_cmd",
+        [
+            ("DefaultSlurmEnvironment", "sbatch -W -d afterok:{}"),
+            ("DefaultPBSEnvironment", 'qsub -W depend="afterok:{}"'),
+            ("DefaultLSFEnvironment", 'bsub -w "done({})"'),
+        ],
+    )
+    def test_main_submit_after(self, env, after_cmd, monkeypatch):
+        # Ensure that the --after flag is included in submission commands.
+        # Force the detected environment via the SIGNAC_FLOW_ENVIRONMENT
+        # environment variable.
+        monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", env)
+        project = self.mock_project()
+        assert len(project)
+        # This monkeypatch prevents failures due to lacking the scheduler
+        # executable for checking existing scheduler jobs before submitting.
+        monkeypatch.setattr(
+            project, "_query_scheduler_status", lambda *args, **kwargs: {}
+        )
+
+        after_value = "123"
+        submit_output = StringIO()
+        with redirect_stdout(submit_output):
+            project.submit(names=["op1"], pretend=True, num=1, after=after_value)
+        submit_output = submit_output.getvalue()
+        assert ("# Submit command: " + after_cmd.format(after_value)) in submit_output
+
+    @pytest.mark.parametrize(
+        "env,hold_cmd",
+        [
+            ("DefaultSlurmEnvironment", "sbatch --hold"),
+            ("DefaultPBSEnvironment", "qsub -h"),
+            ("DefaultLSFEnvironment", "bsub -H"),
+        ],
+    )
+    def test_main_submit_hold(self, env, hold_cmd, monkeypatch):
+        # Ensure that the --hold flag is included in submission commands.
+        # Force the detected environment via the SIGNAC_FLOW_ENVIRONMENT
+        # environment variable.
+        monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", env)
+        project = self.mock_project()
+        assert len(project)
+        # This monkeypatch prevents failures due to lacking the scheduler
+        # executable for checking existing scheduler jobs before submitting.
+        monkeypatch.setattr(
+            project, "_query_scheduler_status", lambda *args, **kwargs: {}
+        )
+
+        submit_output = StringIO()
+        with redirect_stdout(submit_output):
+            project.submit(names=["op1"], pretend=True, num=1, hold=True)
+        submit_output = submit_output.getvalue()
+        assert ("# Submit command: " + hold_cmd) in submit_output
 
 
 # Tests for multiple operation groups or groups with options
@@ -1927,7 +2005,10 @@ class TestGroupProjectMainInterface(TestProjectBase):
             else:
                 assert not job.isfile("world.txt")
 
-    def test_main_submit(self):
+    def test_main_submit(self, monkeypatch):
+        # Force the submitting subprocess to use the TestEnvironment and
+        # FakeScheduler via the SIGNAC_FLOW_ENVIRONMENT environment variable.
+        monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", "TestEnvironment")
         project = self.mock_project()
         assert len(project)
         # Assert that correct output for group submission is given
@@ -1972,10 +2053,7 @@ class TestAggregatesProjectBase(TestProjectBase):
 class TestAggregatesProjectUtilities(TestAggregatesProjectBase):
     def test_AggregatesCursor(self):
         project = self.mock_project()
-        agg_cursor = _AggregatesCursor(project=project)
-        assert agg_cursor._project is project
-        assert agg_cursor._filter is None
-        assert agg_cursor._doc_filter is None
+        agg_cursor = _AggregateStoresCursor(project=project)
         # All operations will return aggregates, even if the aggregates are not
         # unique to that operation, because every operation/group in this
         # project has a custom aggregator defined. Only the default aggregator
@@ -1989,15 +2067,12 @@ class TestAggregatesProjectUtilities(TestAggregatesProjectBase):
 
     def test_filters(self):
         project = self.mock_project()
-        agg_cursor = _AggregatesCursor(project=project, filter={"even": True})
-        assert agg_cursor._project == project
-        assert agg_cursor._filter == {"even": True}
-        assert agg_cursor._doc_filter is None
+        agg_cursor = _JobAggregateCursor(project=project, filter={"even": True})
         assert len(agg_cursor) == 15
 
     def test_reregister_aggregates(self):
         project = self.mock_project()
-        agg_cursor = _AggregatesCursor(project=project)
+        agg_cursor = _AggregateStoresCursor(project=project)
         NUM_BEFORE_REREGISTRATION = 40
         assert len(agg_cursor) == NUM_BEFORE_REREGISTRATION
         new_job = project.open_job(dict(i=31, even=False))
@@ -2045,8 +2120,8 @@ class TestAggregationProjectMainInterface(TestAggregatesProjectBase):
             assert not job.doc.get("op2", False)
             assert not job.doc.get("op3", False)
 
-        even_sum = sum([job.sp.i for job in project if job.sp.i % 2 == 0])
-        odd_sum = sum([job.sp.i for job in project if job.sp.i % 2 != 0])
+        even_sum = sum(job.sp.i for job in project if job.sp.i % 2 == 0)
+        odd_sum = sum(job.sp.i for job in project if job.sp.i % 2 != 0)
 
         self.call_subcmd(
             "run -o agg_op1 agg_op1_different agg_op1_custom agg_op2 agg_op3 --show-traceback"
@@ -2062,6 +2137,20 @@ class TestAggregationProjectMainInterface(TestAggregatesProjectBase):
             else:
                 assert job.doc.sum == job.doc.sum_other == job.doc.sum_custom == odd_sum
 
+    def test_main_run_abbreviated(self):
+        project = self.mock_project()
+        assert len(project)
+        for job in project:
+            assert not job.doc.get("op2", False)
+            assert not job.doc.get("op3", False)
+
+        # Use an abbreviated aggregate id
+        self.call_subcmd(f"run -o agg_op2 agg_op3 -j {get_aggregate_id(project)[:-5]}")
+
+        for job in project:
+            assert job.doc.op2
+            assert job.doc.op3
+
     def test_main_run_cmd(self):
         project = self.mock_project()
         assert len(project)
@@ -2070,7 +2159,10 @@ class TestAggregationProjectMainInterface(TestAggregatesProjectBase):
 
         assert "1 and 2" in run_output
 
-    def test_main_submit(self):
+    def test_main_submit(self, monkeypatch):
+        # Force the submitting subprocess to use the TestEnvironment and
+        # FakeScheduler via the SIGNAC_FLOW_ENVIRONMENT environment variable.
+        monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", "TestEnvironment")
         project = self.mock_project()
         assert len(project)
 
@@ -2097,7 +2189,50 @@ class TestAggregationGroupProjectMainInterface(TestAggregatesProjectBase):
             assert job.doc.op2
             assert job.doc.op3
 
-    def test_main_submit(self):
+    def test_main_run_abbreviated(self):
+        project = self.mock_project()
+        assert len(project)
+        for job in project:
+            assert not job.doc.get("op2", False)
+            assert not job.doc.get("op3", False)
+
+        # Use an abbreviated aggregate id
+        self.call_subcmd(f"run -o group_agg -j {get_aggregate_id(project)[:-5]}")
+
+        for job in project:
+            assert job.doc.op2
+            assert job.doc.op3
+
+    def test_main_run_abbreviated_duplicate(self):
+        project = self.mock_project()
+        assert len(project)
+        for job in project:
+            assert not job.doc.get("op2", False)
+            assert not job.doc.get("op3", False)
+
+        # We provide an abbreviated aggregate id and an equivalent full id to
+        # the -j selection of job/aggregate ids. This should only result in a
+        # single execution, because the ids should be counted only once. The
+        # call to "set_all_job_docs" will fail if the operation runs twice
+        # for the aggregate of all jobs in the project.
+        self.call_subcmd(
+            f"run -o group_agg -j {get_aggregate_id(project)} {get_aggregate_id(project)[:-5]}"
+        )
+
+        # Make sure that the operation fails if run again.
+        with pytest.raises(subprocess.CalledProcessError):
+            self.call_subcmd(
+                f"run -o group_agg -j {get_aggregate_id(project)} {get_aggregate_id(project)[:-5]}"
+            )
+
+        for job in project:
+            assert job.doc.op2
+            assert job.doc.op3
+
+    def test_main_submit(self, monkeypatch):
+        # Force the submitting subprocess to use the TestEnvironment and
+        # FakeScheduler via the SIGNAC_FLOW_ENVIRONMENT environment variable.
+        monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", "TestEnvironment")
         project = self.mock_project()
         assert len(project)
 

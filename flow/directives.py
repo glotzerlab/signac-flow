@@ -433,6 +433,7 @@ def _sum_not_none(value, other):
         return operator.add(value, other)
 
 
+# Definitions used for validating directives
 _bool = _OnlyTypes(bool)
 _natural_number = _OnlyTypes(int, postprocess=_raise_below(1))
 _nonnegative_int = _OnlyTypes(int, postprocess=_raise_below(0))
@@ -455,6 +456,28 @@ _positive_real_memory = _OnlyTypes(
 
 
 # Common directives and their instantiation as _Directive
+def _GET_EXECUTABLE():
+    # Evaluate the executable directive at call-time instead of definition time.
+    # This is because we mock `sys.executable` while generating template reference data.
+    _EXECUTABLE = _Directive(
+        "executable",
+        validator=_OnlyTypes(str),
+        default=sys.executable,
+        serial=_no_aggregation,
+        parallel=_no_aggregation,
+    )
+    _EXECUTABLE.__doc__ = """Return the path to the executable to be used for an operation.
+
+The executable directive expects a string pointing to a valid executable
+file in the current file system.
+
+When called, by default this should point to a Python executable (interpreter);
+however, if the :class:`FlowProject` path is an empty string, the executable
+can be a path to an executable Python script. Defaults to ``sys.executable``.
+"""
+    return _EXECUTABLE
+
+
 _FORK = _Directive("fork", validator=_bool, default=False)
 _FORK.__doc__ = """The fork directive can be set to True to enforce that a
 particular operation is always executed within a subprocess and not within the
@@ -464,62 +487,6 @@ Python interpreter's process even if there are no other reasons that would preve
 
     Setting ``fork=False`` will not prevent forking if there are other reasons for forking,
     such as a timeout.
-"""
-
-
-_NP = _Directive(
-    "np", validator=_natural_number, default=_NP_DEFAULT, finalize=_finalize_np
-)
-_NP.__doc__ = """The number of tasks to launch for a given operation i.e., the number of CPU
-cores to be requested for a given operation.
-
-Expects a natural number (i.e. an integer >= 1). This directive introspects into
-the "nranks" or "omp_num_threads" directives and uses their product if it is
-greater than the current set value. Defaults to 1.
-"""
-
-_NGPU = _Directive("ngpu", validator=_nonnegative_int, default=0)
-_NGPU.__doc__ = """The number of GPUs to use for this operation.
-
-Expects a nonnegative integer. Defaults to 0.
-"""
-
-_NRANKS = _Directive("nranks", validator=_nonnegative_int, default=0)
-_NRANKS.__doc__ = """The number of MPI ranks to use for this operation. Defaults to 0.
-
-Expects a nonnegative integer.
-"""
-
-_OMP_NUM_THREADS = _Directive("omp_num_threads", validator=_nonnegative_int, default=0)
-_OMP_NUM_THREADS.__doc__ = """The number of OpenMP threads to use for this operation. Defaults to 0.
-
-Expects a nonnegative integer.
-"""
-
-_WALLTIME = _Directive(
-    "walltime",
-    validator=_positive_real_walltime,
-    default=None,
-    serial=_sum_not_none,
-    parallel=_max_not_none,
-)
-_WALLTIME.__doc__ = """The number of hours to request for executing this job.
-
-This directive expects a float representing the walltime in hours. Fractional
-values are supported. For example, a value of 0.5 will request 30 minutes of
-walltime. If no walltimes are requested, the submission will not specify a
-walltime in the output script. Some schedulers have a default value that will
-be used.
-
-For example:
-
-.. code-block:: python
-
-    @Project.operation.with_directives({"walltime": 24})
-    def op(job):
-        # This operation takes 1 day to run
-        pass
-
 """
 
 _MEMORY = _Directive(
@@ -569,6 +536,35 @@ For example:
         pass
 """
 
+_NGPU = _Directive("ngpu", validator=_nonnegative_int, default=0)
+_NGPU.__doc__ = """The number of GPUs to use for this operation.
+
+Expects a nonnegative integer. Defaults to 0.
+"""
+
+_NP = _Directive(
+    "np", validator=_natural_number, default=_NP_DEFAULT, finalize=_finalize_np
+)
+_NP.__doc__ = """The number of tasks to launch for a given operation i.e., the number of CPU
+cores to be requested for a given operation.
+
+Expects a natural number (i.e. an integer >= 1). This directive introspects into
+the "nranks" or "omp_num_threads" directives and uses their product if it is
+greater than the current set value. Defaults to 1.
+"""
+
+_NRANKS = _Directive("nranks", validator=_nonnegative_int, default=0)
+_NRANKS.__doc__ = """The number of MPI ranks to use for this operation. Defaults to 0.
+
+Expects a nonnegative integer.
+"""
+
+_OMP_NUM_THREADS = _Directive("omp_num_threads", validator=_nonnegative_int, default=0)
+_OMP_NUM_THREADS.__doc__ = """The number of OpenMP threads to use for this operation. Defaults to 0.
+
+Expects a nonnegative integer.
+"""
+
 _PROCESSOR_FRACTION = _Directive(
     "processor_fraction",
     validator=_OnlyTypes(float, postprocess=_is_fraction),
@@ -586,24 +582,36 @@ CPUs will be used. Defaults to 1.
     This can be particularly useful on Stampede2's launcher.
 """
 
+_WALLTIME = _Directive(
+    "walltime",
+    validator=_positive_real_walltime,
+    default=None,
+    serial=_sum_not_none,
+    parallel=_max_not_none,
+)
+_WALLTIME.__doc__ = """The number of hours to request for executing this job.
 
-def _GET_EXECUTABLE():
-    # Evaluate the executable directive at call-time instead of definition time.
-    # This is because we mock `sys.executable` while generating template reference data.
-    _EXECUTABLE = _Directive(
-        "executable",
-        validator=_OnlyTypes(str),
-        default=sys.executable,
-        serial=_no_aggregation,
-        parallel=_no_aggregation,
-    )
-    _EXECUTABLE.__doc__ = """Return the path to the executable to be used for an operation.
+This directive expects a float representing the walltime in hours. Fractional
+values are supported. For example, a value of 0.5 will request 30 minutes of
+walltime. If no walltimes are requested, the submission will not specify a
+walltime in the output script. Some schedulers have a default value that will
+be used.
 
-The executable directive expects a string pointing to a valid executable
-file in the current file system.
+For example:
 
-When called, by default this should point to a Python executable (interpreter);
-however, if the :class:`FlowProject` path is an empty string, the executable
-can be a path to an executable Python script. Defaults to ``sys.executable``.
+.. code-block:: python
+
+    @Project.operation.with_directives({"walltime": 24})
+    def op(job):
+        # This operation takes 1 day to run
+        pass
+
 """
-    return _EXECUTABLE
+
+
+def _document_directive(directive):
+    """Dynamically generates documentation for a directive."""
+    name = directive._name
+    name = name.replace("_", r"\_")
+    doc = directive.__doc__
+    return f"**{name}**\n\n{doc}"

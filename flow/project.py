@@ -17,6 +17,7 @@ import random
 import re
 import subprocess
 import sys
+import textwrap
 import threading
 import time
 import traceback
@@ -31,13 +32,20 @@ from multiprocessing.pool import ThreadPool
 import cloudpickle
 import jinja2
 import signac
-from deprecation import deprecated
 from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
 from signac.contrib.filterparse import parse_filter_arg
 from tqdm.auto import tqdm
 
-from .aggregates import _AggregateStore, aggregator, get_aggregate_id
-from .environment import get_environment
+from .aggregates import (
+    _AggregatesCursor,
+    _AggregateStore,
+    _AggregateStoresCursor,
+    _JobAggregateCursor,
+    aggregator,
+    get_aggregate_id,
+)
+from .directives import _document_directive
+from .environment import ComputeEnvironment, get_environment
 from .errors import (
     ConfigKeyError,
     NoSchedulerError,
@@ -64,7 +72,6 @@ from .util.misc import (
     switch_to_directory,
 )
 from .util.translate import abbreviate, shorten
-from .version import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +91,7 @@ The available template variables are:
 {template_vars}
 
 Filter functions can be used to format template variables in a specific way.
-For example: {{{{ project.get_id() | capitalize }}}}.
+For example: {{{{ project.id | capitalize }}}}.
 
 The available filters are:
 {filters}"""
@@ -112,7 +119,7 @@ class IgnoreConditions(IntFlag):
     def __invert__(self):
         # Compute the largest number of bits used to represent one of the flags
         # so that we can XOR the appropriate number.
-        max_bits = len(bin(max([elem.value for elem in type(self)]))) - 2
+        max_bits = len(bin(max(elem.value for elem in type(self)))) - 2
         return self.__class__((2 ** max_bits - 1) ^ self._value_)
 
     NONE = 0
@@ -258,69 +265,6 @@ def _make_bundles(operations, size=None):
             yield bundle
         else:
             break
-
-
-class _AggregatesCursor:
-    """Utility class to iterate over aggregates stored in a FlowProject.
-
-    Parameters
-    ----------
-    project : :class:`~.FlowProject`
-        A FlowProject whose jobs are aggregated.
-    filter : dict
-        A mapping of key-value pairs that all indexed job state points are
-        compared against (Default value = None).
-    doc_filter : dict
-        A mapping of key-value pairs that all indexed job documents are
-        compared against (Default value = None).
-
-    """
-
-    def __init__(self, project, filter=None, doc_filter=None):
-        self._project = project
-        self._filter = filter
-        self._doc_filter = doc_filter
-        # If no filter or doc_filter is provided by the user, then select every
-        # aggregate present in the FlowProject. If filter or doc_filter are provided,
-        # then use the jobs returned via JobsCursor instance.
-        if filter is None and doc_filter is None:
-            self._cursor = project._group_to_aggregate_store.inverse.keys()
-        else:
-            self._cursor = project.find_jobs(filter, doc_filter)
-
-    def __eq__(self, other):
-        # Cursors cannot compare equal if one is over aggregates and the other
-        # is over jobs.
-        if not (
-            isinstance(other, type(self))
-            and isinstance(other._cursor, type(self._cursor))
-        ):
-            return NotImplemented
-        return self._cursor == other._cursor
-
-    def __contains__(self, aggregate):
-        if self._filter is None and self._doc_filter is None:
-            aggregate_id = get_aggregate_id(aggregate)
-            return any(
-                aggregate_id in aggregate_store for aggregate_store in self._cursor
-            )
-        else:
-            return aggregate[0] in self._cursor
-
-    def __len__(self):
-        if self._filter is None and self._doc_filter is None:
-            # Return number of unique aggregates present in the project
-            return sum(len(aggregate_store) for aggregate_store in self._cursor)
-        else:
-            return len(self._cursor)
-
-    def __iter__(self):
-        if self._filter is None and self._doc_filter is None:
-            for aggregate_store in self._cursor:
-                yield from aggregate_store.values()
-        else:
-            for job in self._cursor:
-                yield (job,)
 
 
 class _HooksDecorator:
@@ -770,20 +714,29 @@ class FlowGroupEntry:
             func._flow_group_operation_directives = {self.name: directives}
 
     def with_directives(self, directives):
-        """Return a decorator that sets group specific directives to the operation.
+        """Decorate an operation to provide additional execution directives for this group.
+
+        Directives can be used to provide information about required resources
+        such as the number of processors required for execution of parallelized
+        operations. For a list of supported directives, see
+        :meth:`.FlowProject.operation.with_directives`. For more information,
+        see :ref:`signac-docs:cluster_submission_directives`.
+
+        The directives specified in this decorator are only applied when
+        executing the operation through the :class:`FlowGroup`.
+        To apply directives to an individual operation executed outside of the
+        group, see :meth:`.FlowProject.operation.with_directives`.
 
         Parameters
         ----------
         directives : dict
-            Directives to use for resource requests and running the operation
-            through the group.
+            Directives to use for resource requests and execution.
 
         Returns
         -------
         function
-            A decorator which registers the function into the group with
+            A decorator which registers the operation with the group using the
             specified directives.
-
         """
 
         def decorator(func):
@@ -1527,22 +1480,29 @@ class _FlowProjectClass(type):
                 return func
 
             def with_directives(self, directives, name=None):
-                """Return a decorator that also sets directives for the operation.
+                """Decorate a function to make it an operation with additional execution directives.
+
+                Directives can be used to provide information about required
+                resources such as the number of processors required for
+                execution of parallelized operations. For more information, see
+                :ref:`signac-docs:cluster_submission_directives`. To apply
+                directives to an operation that is part of a group, use
+                :meth:`.FlowGroupEntry.with_directives`.
 
                 Parameters
                 ----------
                 directives : dict
-                    Directives to use for resource requests and running the operation through the
-                    group.
+                    Directives to use for resource requests and execution.
                 name : str
-                    The operation name. Uses the name of the function if None.
-                    (Default value = None)
+                    The operation name. Uses the name of the function if None
+                    (Default value = None).
 
                 Returns
                 -------
                 function
-                    A decorator which registers the function with the correct name and directives as
-                    an operation of the :class:`~.FlowProject` subclass.
+                    A decorator which registers the function with the provided
+                    name and directives as an operation of the
+                    :class:`~.FlowProject` subclass.
                 """
 
                 def add_operation_with_directives(function):
@@ -1550,6 +1510,18 @@ class _FlowProjectClass(type):
                     return self(function, name)
 
                 return add_operation_with_directives
+
+            _directives_to_document = (
+                ComputeEnvironment._get_default_directives()._directive_definitions.values()
+            )
+            with_directives.__doc__ += textwrap.indent(
+                "\n\n**Supported Directives:**\n\n"
+                + "\n\n".join(
+                    _document_directive(directive)
+                    for directive in _directives_to_document
+                ),
+                " " * 16,
+            )
 
         return OperationRegister()
 
@@ -2347,7 +2319,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         Returns
         -------
         dict
-            A dictionary containing job status for all jobs.
+            A dictionary containing status for the requested job.
 
         """
         if cached_status is None:
@@ -2415,7 +2387,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         """
         result = {
-            "job_id": job.get_id(),
+            "job_id": job.id,
             "labels": [],
             "_labels_error": None,
         }
@@ -2718,7 +2690,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 for hit in file_timing.iterHits()
             ]
             sorted_hits = reversed(sorted(hits, key=lambda hit: hit[2]))
-            total_num_hits = sum([hit[2] for hit in hits])
+            total_num_hits = sum(hit[2] for hit in hits)
 
             profiling_results = ["# Profiling:\n"]
 
@@ -3036,7 +3008,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             print("\n" + "\n".join(profiling_results), file=file)
 
     def _run_operations(
-        self, operations=None, pretend=False, np=None, timeout=None, progress=False
+        self, operations, pretend=False, np=None, timeout=None, progress=False
     ):
         """Execute the next operations as specified by the project's workflow.
 
@@ -3044,27 +3016,26 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Parameters
         ----------
-        operations : Sequence of instances of :class:`._JobOperation`
-            The operations to execute (optional). (Default value = None)
+        operations : Sequence of instances of :class:`_JobOperation`
+            The operations to execute.
         pretend : bool
             Do not actually execute the operations, but show the commands that
-            would have been executed. (Default value = False)
+            would have been executed (Default value = False).
         np : int
-            The number of processors to use for each operation. (Default value = None)
-        timeout : int
+            Parallelize to the specified number of processors. Use -1 to
+            parallelize over all available processors. The value None uses one
+            processor (Default value = None).
+        timeout : float
             An optional timeout for each operation in seconds after which
-            execution will be cancelled. Use -1 to indicate no timeout (the
-            default).
+            execution will be cancelled. Use None to indicate no timeout
+            (Default value = None).
         progress : bool
-            Show a progress bar during execution. (Default value = False)
+            Show a progress bar during execution (Default value = False).
 
         """
         if timeout is not None and timeout < 0:
             timeout = None
-        if operations is None:
-            operations = list(self._next_operations())
-        else:
-            operations = list(operations)  # ensure list
+        operations = list(operations)  # ensure list
 
         if np is None or np == 1 or pretend:
             if progress:
@@ -3095,7 +3066,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return (
             operation.id,
             operation.name,
-            [job.get_id() for job in operation._jobs],
+            [job.id for job in operation._jobs],
             operation.cmd,
             operation.directives,
         )
@@ -3116,6 +3087,20 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         Since pickling of the project instance is likely to fail, we manually
         pickle the project instance and the operations before submitting them
         to the process pool.
+
+        Parameters
+        ----------
+        pool : :class:`multiprocessing.Pool`
+            Process pool.
+        operations : Sequence of instances of :class:`_JobOperation`
+            The operations to execute.
+        progress : bool
+            Show a progress bar during execution.
+        timeout : float
+            A timeout for each operation in seconds after which
+            execution will be cancelled. Use None to indicate no timeout
+            (Default value = None).
+
         """
         try:
             serialized_project = cloudpickle.dumps(self)
@@ -3136,7 +3121,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             pool.apply_async(_deserialize_and_run_operation, task)
             for task in serialized_tasks
         ]
-        for result in tqdm(results) if progress else results:
+        if progress:
+            results = tqdm(results)
+        for result in results:
             result.get(timeout=timeout)
 
     @contextlib.contextmanager
@@ -3163,6 +3150,21 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             op_hooks.on_finish(name, *jobs)
 
     def _execute_operation(self, operation, timeout=None, pretend=False):
+        """Execute an operation.
+
+        Parameters
+        ----------
+        operation : :class:`_JobOperation`
+            The operation to execute.
+        timeout : float
+            An optional timeout for each operation in seconds after which
+            execution will be cancelled. Use None to indicate no timeout
+            (Default value = None).
+        pretend : bool
+            Do not actually execute the operations, but show the commands that
+            would have been executed (Default value = False).
+
+        """
         if pretend:
             print(operation.cmd)
             return None
@@ -3172,9 +3174,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if (
             # The 'fork' directive was provided and evaluates to True:
             operation.directives.get("fork", False)
-            # Separate process needed to cancel with timeout:
+            # A separate process is needed to cancel with timeout:
             or timeout is not None
-            # The operation function is of an instance of FlowCmdOperation:
+            # The operation function is an instance of FlowCmdOperation:
             or isinstance(self._operations[operation.name], FlowCmdOperation)
             # The specified executable is not the same as the interpreter instance:
             or operation.directives.get("executable", sys.executable) != sys.executable
@@ -3248,11 +3250,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             would have been executed. (Default value = False)
         np : int
             Parallelize to the specified number of processors. Use -1 to
-            parallelize to all available processing units. (Default value = None)
-        timeout : int
+            parallelize over all available processors. The value None uses one
+            processor (Default value = None).
+        timeout : float
             An optional timeout for each operation in seconds after which
-            execution will be cancelled. Use -1 to indicate no timeout (the
-            default).
+            execution will be cancelled. Use None to indicate no timeout
+            (Default value = None).
         num : int
             The total number of operations that are executed will not exceed
             this argument if provided. (Default value = None)
@@ -3564,9 +3567,18 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """Verify that all selected groups can be submitted together."""
         return all(a.isdisjoint(b) for a in groups for b in groups if a != b)
 
-    def _get_aggregate_from_id(self, id):
-        # Iterate over all the instances of stored aggregates and search for the
-        # aggregate id in those instances.
+    def _get_aggregate_from_id(self, id, check_abbrevations=True):
+        # The logic in this function slightly resembles that of signac's
+        # Project.open_job.
+        # We exit early if the id belongs to a single job.
+        if not id.startswith("agg-"):
+            try:
+                return (self.open_job(id=id),)
+            except LookupError:
+                raise LookupError(f"Did not find job with id {repr(id)}.")
+        # Next, attempt to find the id as a direct match by
+        # iterating over all the aggregate stores and trying to access the
+        # aggregate ids from those instances.
         for aggregate_store in self._group_to_aggregate_store.inverse:
             try:
                 # Assume the id exists and skip the __contains__ check for
@@ -3575,8 +3587,20 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 return aggregate_store[id]
             except KeyError:
                 pass
-        # Raise error as didn't find the id in any of the stored objects
-        raise LookupError(f"Did not find aggregate with id {repr(id)}.")
+        if check_abbrevations:
+            # No direct match was found, so check for abbreviated ids. Requires
+            # iteration over all elements of all aggregate stores.
+            matches = set()
+            for aggregate_store in self._group_to_aggregate_store.inverse:
+                for full_id in aggregate_store:
+                    if full_id.startswith(id):
+                        matches.add(aggregate_store[full_id])
+            if len(matches) == 1:
+                return next(iter(matches))
+            elif len(matches) > 1:
+                raise LookupError(f"Did not find aggregate with id {repr(id)}.")
+            # By elimination, len(matches) == 0
+        raise KeyError(f"Did not find aggregate with id {repr(id)}.")
 
     def _convert_jobs_to_aggregates(self, jobs):
         """Convert sequences of signac jobs to aggregates.
@@ -3587,7 +3611,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         aggregates (tuples containing single signac jobs).
         """
         if jobs is None:
-            return _AggregatesCursor(self)
+            return _AggregateStoresCursor(self)
         elif isinstance(jobs, _AggregatesCursor):
             return jobs
 
@@ -3616,7 +3640,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     # stores associated with this project. This will raise an
                     # error if not.
                     aggregate_from_id = self._get_aggregate_from_id(
-                        get_aggregate_id(aggregate)
+                        get_aggregate_id(aggregate), check_abbrevations=False
                     )
                     aggregates.append(aggregate_from_id)
         return aggregates
@@ -3665,7 +3689,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         flags=None,
         force=False,
         template="script.sh",
-        pretend=False,
         show_template_help=False,
         **kwargs,
     ):
@@ -3686,9 +3709,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         template : str
             The name of the template file to be used to generate the submission
             script. (Default value = "script.sh")
-        pretend : bool
-            Do not actually submit, but only print the submission script to screen. Useful
-            for testing the submission workflow. (Default value = False)
         show_template_help : bool
             Show information about available template variables and filters and
             exit. (Default value = False)
@@ -3748,13 +3768,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     "the template script, including: %s",
                     ", ".join(sorted(keys_unused)),
                 )
-            if pretend:
-                print(script)
-
-            else:
-                return self._environment.submit(
-                    _id=_id, script=script, flags=flags, **kwargs
-                )
+            return self._environment.submit(
+                _id=_id, script=script, flags=flags, **kwargs
+            )
 
     def submit(
         self,
@@ -3890,18 +3906,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         cls._add_operation_selection_arg_group(parser)
         cls._add_operation_bundling_arg_group(parser)
-        cls._add_template_arg_group(parser)
-
-    @classmethod
-    def _add_script_args(cls, parser):
-        cls._add_operation_selection_arg_group(parser)
-        execution_group = parser.add_argument_group("execution")
-        execution_group.add_argument(
-            "-p",
-            "--parallel",
-            action="store_true",
-            help="Execute all operations in parallel.",
-        )
         cls._add_template_arg_group(parser)
 
     @classmethod
@@ -4146,20 +4150,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             elif bool(label_value) is True:
                 yield label_name
 
-    @deprecated(
-        deprecated_in="0.14",
-        removed_in="0.16",
-        current_version=__version__,
-        details="Method has been removed.",
-    )
-    def add_operation(*args, **kwargs):  # noqa: D102
-        raise AttributeError(
-            "The add_operation() method was removed in version 0.14. "
-            "Please see https://docs.signac.io/en/latest/flow-project.html#defining-a-workflow "
-            "for instructions on how to define operations using the current API. This message "
-            "will be removed in version 0.16."
-        )
-
     def completed_operations(self, job):
         """Determine which operations have been completed for job.
 
@@ -4204,7 +4194,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         """
         if jobs is None:
-            jobs = _AggregatesCursor(self)
+            jobs = _AggregateStoresCursor(self)
         if operation_names is None:
             selected_groups = {self._groups[name] for name in self.operations}
         else:
@@ -4534,6 +4524,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             )
         else:
             for operation in self._next_operations():
+                # This filter cannot use the operation_names parameter to
+                # _next_operations because it must be an exact match, not a
+                # regex match.
                 if args.name == operation.name:
                     print(get_aggregate_id(operation._jobs))
 
@@ -4613,22 +4606,25 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             # aggregates must be a set to prevent duplicate entries
             aggregates = set()
             for job_id in args.job_id:
-                if job_id.startswith("agg-"):
-                    aggregates.add(self._get_aggregate_from_id(job_id))
-                else:
-                    try:
-                        aggregates.add((self.open_job(id=job_id),))
-                    except KeyError as error:
-                        raise LookupError(f"Did not find job with id {error}.")
+                try:
+                    aggregates.add(
+                        self._get_aggregate_from_id(job_id, check_abbrevations=True)
+                    )
+                except KeyError as error:
+                    raise LookupError(error)
             return list(aggregates)
         elif args.func == self._main_exec:
-            # exec command used with job_id
-            return _AggregatesCursor(self)
-        else:
-            # filter or doc filter provided
+            # exec command does not support filters, so we must exit early.
+            return _AggregateStoresCursor(self)
+        elif args.filter or args.doc_filter:
+            # filter or doc_filter provided. Filters can only be used to select
+            # single jobs and not aggregates of multiple jobs.
             filter_ = parse_filter_arg(args.filter)
             doc_filter = parse_filter_arg(args.doc_filter)
-            return _AggregatesCursor(self, filter_, doc_filter)
+            return _JobAggregateCursor(self, filter_, doc_filter)
+        else:
+            # Use all aggregates
+            return _AggregateStoresCursor(self)
 
     def main(self, parser=None):
         """Call this function to use the main command line interface.
@@ -4757,7 +4753,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         execution_group.add_argument(
             "-t",
             "--timeout",
-            type=int,
+            type=float,
             help="A timeout in seconds after which the execution of one operation is canceled.",
         )
         execution_group.add_argument(
@@ -4888,7 +4884,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         except (TimeoutError, subprocess.TimeoutExpired) as error:
             print(
                 "Error: Failed to complete execution due to "
-                f"timeout ({args.timeout}s).",
+                f"timeout ({args.timeout} seconds).",
                 file=sys.stderr,
             )
             _show_traceback_and_exit(error)

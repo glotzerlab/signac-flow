@@ -8,7 +8,8 @@ jobs are grouped before being passed as arguments to the operation. The
 default aggregator produces individual jobs.
 """
 import itertools
-from collections.abc import Iterable, Mapping
+from abc import abstractmethod
+from collections.abc import Collection, Iterable, Mapping
 from hashlib import md5
 
 
@@ -190,12 +191,12 @@ class aggregator:
         Examples
         --------
         The code block below provides an example of how to aggregate jobs
-        by a state point parameter ``"sp"``. If the state point does not
-        contain the key ``"sp"``, a default value of -1 is used.
+        by a state point parameter ``"key"``. If the state point does not
+        contain the key ``"key"``, a default value of -1 is used.
 
         .. code-block:: python
 
-            @aggregator.groupby(key="sp", default=-1)
+            @aggregator.groupby(key="key", default=-1)
             @FlowProject.operation
             def foo(*jobs):
                 print(len(jobs))
@@ -391,7 +392,7 @@ class _AggregateStore(_BaseAggregateStore):
 
     def __init__(self, aggregator, project):
         self._aggregator = aggregator
-        super().__init__(project)
+        self._project = project
 
         # We need to register the aggregates for this instance using the
         # provided project. After registering, we store the aggregates mapped
@@ -454,7 +455,7 @@ class _AggregateStore(_BaseAggregateStore):
             for job in aggregate:
                 if job not in self._project:
                     raise LookupError(
-                        f"The signac job {job.get_id()} not found in {self._project}"
+                        f"The signac job {job.id} not found in {self._project}"
                     )
             try:
                 stored_aggregate = tuple(aggregate)
@@ -560,7 +561,7 @@ class _DefaultAggregateStore(_BaseAggregateStore):
 
     def keys(self):
         for job in self._project:
-            yield job.get_id()
+            yield job.id
 
     def values(self):
         for job in self._project:
@@ -568,7 +569,7 @@ class _DefaultAggregateStore(_BaseAggregateStore):
 
     def items(self):
         for job in self._project:
-            yield (job.get_id(), (job,))
+            yield (job.id, (job,))
 
 
 def get_aggregate_id(aggregate):
@@ -592,8 +593,91 @@ def get_aggregate_id(aggregate):
     """
     if len(aggregate) == 1:
         # Return job id as it's already unique
-        return aggregate[0].get_id()
+        return aggregate[0].id
 
-    id_string = ",".join(job.get_id() for job in aggregate)
+    id_string = ",".join(job.id for job in aggregate)
     hash_ = md5(id_string.encode("utf-8")).hexdigest()
     return f"agg-{hash_}"
+
+
+class _AggregatesCursor(Collection):
+    """Abstract class defining iterators over aggregates stored in a FlowProject.
+
+    Parameters
+    ----------
+    project : :class:`~.FlowProject`
+        A FlowProject whose jobs are aggregated.
+
+    """
+
+    @abstractmethod
+    def __eq__(self, other):
+        pass
+
+
+class _AggregateStoresCursor(_AggregatesCursor):
+    """Utility class to iterate over a collection of _AggregateStore instances.
+
+    Parameters
+    ----------
+    project : :class:`~.FlowProject`
+        A FlowProject whose jobs are aggregated.
+
+    """
+
+    def __init__(self, project):
+        self._stores = project._group_to_aggregate_store.inverse.keys()
+
+    def __eq__(self, other):
+        if not isinstance(other, type(self)):
+            return NotImplemented
+        return self._stores == other._stores
+
+    def __contains__(self, aggregate):
+        aggregate_id = get_aggregate_id(aggregate)
+        return any(aggregate_id in aggregate_store for aggregate_store in self._stores)
+
+    def __len__(self):
+        # Return number of aggregates summed across all aggregate stores
+        return sum(len(aggregate_store) for aggregate_store in self._stores)
+
+    def __iter__(self):
+        for aggregate_store in self._stores:
+            yield from aggregate_store.values()
+
+
+class _JobAggregateCursor(_AggregatesCursor):
+    """Utility class to iterate over single-job aggregates in a FlowProject.
+
+    Parameters
+    ----------
+    project : :class:`~.FlowProject`
+        A FlowProject whose jobs are aggregated.
+    filter : dict
+        A mapping of key-value pairs that all indexed job state points are
+        compared against (Default value = None).
+    doc_filter : dict
+        A mapping of key-value pairs that all indexed job documents are
+        compared against (Default value = None).
+
+    """
+
+    def __init__(self, project, filter=None, doc_filter=None):
+        self._cursor = project.find_jobs(filter, doc_filter)
+
+    def __eq__(self, other):
+        # Cursors cannot compare equal if one is over aggregates and the other
+        # is over jobs.
+        if not isinstance(other, type(self)):
+            return NotImplemented
+        return self._cursor == other._cursor
+
+    def __contains__(self, aggregate):
+        return len(aggregate) == 1 and aggregate[0] in self._cursor
+
+    def __len__(self):
+        return len(self._cursor)
+
+    def __iter__(self):
+        for job in self._cursor:
+            yield (job,)

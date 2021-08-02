@@ -607,3 +607,11 @@ For example:
         pass
 
 """
+
+
+def _document_directive(directive):
+    """Dynamically generates documentation for a directive."""
+    name = directive._name
+    name = name.replace("_", r"\_")
+    doc = directive.__doc__
+    return f"**{name}**\n\n{doc}"

@@ -5,6 +5,28 @@ Changelog
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 The numbers in brackets denote the related GitHub issue and/or pull request.
 
+Version 0.16
+============
+
+[0.16.0] -- 2021-xx-xx
+----------------------
+
+Added
++++++
+
+- Added a ``custom_content`` block to templates for user customization (#553).
+
+Changed
++++++++
+
+- Improved documentation of directives (#554).
+
+Removed
++++++++
+
+- Removed deprecated environment classes (#556).
+- Removed support for signac < 1.3.0 (#558).
+
 Version 0.15
 ============
 

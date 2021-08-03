@@ -15,6 +15,7 @@ Added
 +++++
 
 - Added a ``custom_content`` block to templates for user customization (#553).
+- Feature to install execution hooks for the automated execution of functions with operations (#28, #189, #508).
 
 Changed
 +++++++

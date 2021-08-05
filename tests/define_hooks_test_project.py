@@ -1,6 +1,9 @@
 from flow import FlowProject
 
 
+HOOKS_ERROR_MESSAGE = "You raised an error! Hooray!"
+
+
 class _HooksTestProject(FlowProject):
     pass
 
@@ -10,7 +13,7 @@ def set_true(key, operation_name, job):
 
 
 def set_true_with_error(key, operation_name, error, job):
-    job.doc[f"{operation_name}_{key}"] = (True, error)
+    job.doc[f"{operation_name}_{key}"] = (True, error.args[0])
 
 
 @_HooksTestProject.operation
@@ -25,7 +28,7 @@ def set_true_with_error(key, operation_name, error, job):
         "fail", operation_name, error, job))
 def base(job):
     if job.sp.raise_exception:
-        raise RuntimeError
+        raise RuntimeError(HOOKS_ERROR_MESSAGE)
 
 
 if __name__ == "__main__":

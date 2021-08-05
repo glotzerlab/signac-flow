@@ -22,7 +22,7 @@ import signac
 from define_aggregate_test_project import _AggregateTestProject
 from define_dag_test_project import DagTestProject
 from define_directives_test_project import _DirectivesTestProject
-from define_hooks_test_project import _HooksTestProject
+from define_hooks_test_project import _HooksTestProject, HOOKS_ERROR_MESSAGE
 from define_test_project import _DynamicTestProject, _TestProject
 from deprecation import fail_if_not_removed
 
@@ -2269,6 +2269,14 @@ class TestProjectHooks(TestProjectBase):
         project._entrypoint = self.entrypoint
         return project
 
+    def call_subcmd(self, subcmd, stderr=subprocess.DEVNULL):
+        # Bypass raising the error/checking output since it interferes with hook.on_failure
+        fn_script = inspect.getsourcefile(type(self.project))
+        _cmd = f"python {fn_script} {subcmd}"
+        with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
+            with switch_to_directory(self.project.root_directory()):
+                return subprocess.run(_cmd.split())
+
     def test_run_base_hooks_no_fail(self):
         project = self.mock_project()
         job = project.open_job(dict(raise_exception=False))
@@ -2297,8 +2305,8 @@ class TestProjectHooks(TestProjectBase):
 
         for key in self.keys:
             if key == "fail":
-                breakpoint()
-                assert get_job_doc_value(key) is None
+                assert get_job_doc_value(key)[0]
+                assert get_job_doc_value(key)[1] == HOOKS_ERROR_MESSAGE
             elif key == "success":
                 assert get_job_doc_value(key) is None
             else:

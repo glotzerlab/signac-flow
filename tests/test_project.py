@@ -2312,6 +2312,44 @@ class TestProjectHooks(TestProjectBase):
             else:
                 assert get_job_doc_value(key)
 
+    def test_run_base_cmd_no_fail(self):
+        project = self.mock_project()
+        job = project.open_job(dict(raise_exception=False))
+        operation_name = "base_cmd"
+        get_job_doc_value = self._get_job_doc_key(job, operation_name)
+        for key in self.keys:
+            assert get_job_doc_value(key) is None
+
+        self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+
+        assert job.isfile(f"{operation_name}.txt")
+
+        for key in self.keys:
+            if key == "fail":
+                assert get_job_doc_value(key) is None
+            else:
+                assert get_job_doc_value(key)
+
+    def test_run_base_cmd_fail(self):
+        project = self.mock_project()
+        job = project.open_job(dict(raise_exception=True))
+        operation_name = "base_cmd"
+        get_job_doc_value = self._get_job_doc_key(job, operation_name)
+        for key in self.keys:
+            assert get_job_doc_value(key) is None
+
+        self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+
+        assert not job.isfile(f"{operation_name}.txt")
+
+        for key in self.keys:
+            if key == "fail":
+                assert get_job_doc_value(key)[0]
+            elif key == "success":
+                assert get_job_doc_value(key) is None
+            else:
+                assert get_job_doc_value(key)
+
 
 class TestIgnoreConditions:
     def test_str(self):

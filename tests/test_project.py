@@ -2255,6 +2255,10 @@ class TestProjectHooks(TestProjectBase):
         )
     )
 
+    @staticmethod
+    def _get_job_doc_key(job, operation_name):
+        return lambda key: job.doc.get(f"{operation_name}_{key}")
+
     def mock_project(
         self, project_class=None, heterogeneous=False, config_overrides=None
     ):
@@ -2268,17 +2272,37 @@ class TestProjectHooks(TestProjectBase):
     def test_run_base_hooks_no_fail(self):
         project = self.mock_project()
         job = project.open_job(dict(raise_exception=False))
-        operation_name = 'base'
+        operation_name = "base"
+        get_job_doc_value = self._get_job_doc_key(job, operation_name)
         for key in self.keys:
-            assert job.doc.get(f"{operation_name}_{key}") is None
+            assert get_job_doc_value(key) is None
 
         self.call_subcmd(f"run -o {operation_name} -j {job.id}")
 
         for key in self.keys:
             if key == "fail":
-                assert job.doc.get(f"{operation_name}_{key}") is None
+                assert get_job_doc_value(key) is None
             else:
-                assert job.doc.get(f"{operation_name}_{key}")
+                assert get_job_doc_value(key)
+
+    def test_run_base_hooks_fail(self):
+        project = self.mock_project()
+        job = project.open_job(dict(raise_exception=True))
+        operation_name = "base"
+        get_job_doc_value = self._get_job_doc_key(job, operation_name)
+        for key in self.keys:
+            assert get_job_doc_value(key) is None
+
+        self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+
+        for key in self.keys:
+            if key == "fail":
+                breakpoint()
+                assert get_job_doc_value(key) is None
+            elif key == "success":
+                assert get_job_doc_value(key) is None
+            else:
+                assert get_job_doc_value(key)
 
 
 class TestIgnoreConditions:

@@ -5,13 +5,14 @@
 from ..environment import DefaultSlurmEnvironment
 
 
-class PicotteEnvironment(DefaultSlurmEnvironment): 
+class PicotteEnvironment(DefaultSlurmEnvironment):
     """Environment profile for the Picotte supercomputer.
 
     https://proteusmaster.urcf.drexel.edu/urcfwiki/
     """
-    hostname_pattern = r'.*\.cm\.cluster$'
-    template = 'drexel-picotte.sh'
+
+    hostname_pattern = r".*\.cm\.cluster$"
+    template = "drexel-picotte.sh"
 
     @classmethod
     def add_args(cls, parser):

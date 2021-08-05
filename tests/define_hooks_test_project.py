@@ -3,45 +3,42 @@ from flow import FlowProject
 
 
 HOOKS_ERROR_MESSAGE = "You raised an error! Hooray!"
+HOOK_KEYS = ("start", "finish", "success", "fail")
 
 
 class _HooksTestProject(FlowProject):
     pass
 
 
-def set_true(key, operation_name, job):
-    job.doc[f"{operation_name}_{key}"] = True
+def set_job_doc(key):
+    def set_true(operation_name, job):
+        job.doc[f"{operation_name}_{key}"] = True
+    return lambda operation_name, job: set_true(operation_name, job)
 
 
-def set_true_with_error(key, operation_name, error, job):
-    job.doc[f"{operation_name}_{key}"] = (True, error.args[0])
+def set_job_doc_w_error():
+    key = HOOK_KEYS[-1]
+
+    def set_true_with_error(operation_name, error, job):
+        job.doc[f"{operation_name}_{key}"] = (True, error.args[0])
+    return lambda operation_name, error, job: set_true_with_error(operation_name, error, job)
 
 
 @_HooksTestProject.operation
-@_HooksTestProject.hook.on_start(
-    lambda operation_name, job: set_true("start", operation_name, job))
-@_HooksTestProject.hook.on_finish(
-    lambda operation_name, job: set_true("finish", operation_name, job))
-@_HooksTestProject.hook.on_success(
-    lambda operation_name, job: set_true("success", operation_name, job))
-@_HooksTestProject.hook.on_fail(
-    lambda operation_name, error, job: set_true_with_error(
-        "fail", operation_name, error, job))
+@_HooksTestProject.hook.on_start(set_job_doc(HOOK_KEYS[0]))
+@_HooksTestProject.hook.on_finish(set_job_doc(HOOK_KEYS[1]))
+@_HooksTestProject.hook.on_success(set_job_doc(HOOK_KEYS[2]))
+@_HooksTestProject.hook.on_fail(set_job_doc_w_error())
 def base(job):
     if job.sp.raise_exception:
         raise RuntimeError(HOOKS_ERROR_MESSAGE)
 
 
 @_HooksTestProject.operation
-@_HooksTestProject.hook.on_start(
-    lambda operation_name, job: set_true("start", operation_name, job))
-@_HooksTestProject.hook.on_finish(
-    lambda operation_name, job: set_true("finish", operation_name, job))
-@_HooksTestProject.hook.on_success(
-    lambda operation_name, job: set_true("success", operation_name, job))
-@_HooksTestProject.hook.on_fail(
-    lambda operation_name, error, job: set_true_with_error(
-        "fail", operation_name, error, job))
+@_HooksTestProject.hook.on_start(set_job_doc(HOOK_KEYS[0]))
+@_HooksTestProject.hook.on_finish(set_job_doc(HOOK_KEYS[1]))
+@_HooksTestProject.hook.on_success(set_job_doc(HOOK_KEYS[2]))
+@_HooksTestProject.hook.on_fail(set_job_doc_w_error())
 @flow.with_job
 @flow.cmd
 def base_cmd(job):
@@ -49,6 +46,14 @@ def base_cmd(job):
         return f"exit 42"
     else:
         return "touch base_cmd.txt"
+
+
+def install_hooks(project):
+    project.hooks.on_start.append(set_job_doc(HOOK_KEYS[0]))
+    project.hooks.on_finish.append(set_job_doc(HOOK_KEYS[1]))
+    project.hooks.on_success.append(set_job_doc(HOOK_KEYS[2]))
+    project.hooks.on_fail.append(set_job_doc_w_error())
+    return project
 
 
 if __name__ == "__main__":

@@ -10,7 +10,6 @@ import subprocess
 import sys
 import tempfile
 import uuid
-from collections import defaultdict
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from distutils.version import StrictVersion
 from functools import partial
@@ -23,6 +22,7 @@ import signac
 from define_aggregate_test_project import _AggregateTestProject
 from define_dag_test_project import DagTestProject
 from define_directives_test_project import _DirectivesTestProject
+from define_hooks_test_project import _HooksTestProject
 from define_test_project import _DynamicTestProject, _TestProject
 from deprecation import fail_if_not_removed
 
@@ -2247,48 +2247,38 @@ class TestAggregationGroupProjectMainInterface(TestAggregatesProjectBase):
 
 
 class TestProjectHooks(TestProjectBase):
-    # TODO: Refactor this class to look more like the other test classes
-    # (override mock_project?)
-
-    def test_run_hooks(self):
-
-        ran = defaultdict(set)
-        raise_exception = False
-
-        class FooProject(FlowProject):
-            pass
-
-        @FooProject.operation
-        @FooProject.hook.on_start(lambda operation_name, job: ran["start"].add(job))
-        @FooProject.hook.on_finish(lambda operation_name, job: ran["finish"].add(job))
-        @FooProject.hook.on_success(lambda operation_name, job: ran["success"].add(job))
-        @FooProject.hook.on_fail(
-            lambda operation_name, error, job: ran["fail"].add(job)
+    project_class = _HooksTestProject  # TODO: Copy implementation, ref 2031
+    keys = ["start", "finish", "success", "fail"]
+    entrypoint = dict(
+        path=os.path.realpath(
+            os.path.join(os.path.dirname(__file__), "define_hooks_test_project.py")
         )
-        def foo(job):
-            if raise_exception:
-                raise RuntimeError
+    )
 
+    def mock_project(
+        self, project_class=None, heterogeneous=False, config_overrides=None
+    ):
+        project = self.project_class.get_project(root=self._tmp_dir.name)
+        project.open_job(dict(raise_exception=False)).init()
+        project.open_job(dict(raise_exception=True)).init()
+        project = project.get_project(root=self._tmp_dir.name)
+        project._entrypoint = self.entrypoint
+        return project
+
+    def test_run_base_hooks_no_fail(self):
         project = self.mock_project()
-        output = StringIO()
-        with redirect_stderr(output):
-            FooProject(config=project.config).run()
-            for job in project:
-                assert job in ran["start"]
-                assert job in ran["start"]
-                assert job in ran["finish"]
-                assert job in ran["success"]
-                assert job not in ran["fail"]
-            ran.clear()
-            raise_exception = True
-            foo_project = FooProject(config=project.config)
-            for job in foo_project:
-                with pytest.raises(RuntimeError):
-                    foo_project.run(jobs=[job])
-                assert job in ran["start"]
-                assert job in ran["finish"]
-                assert job not in ran["success"]
-                assert job in ran["fail"]
+        job = project.open_job(dict(raise_exception=False))
+        operation_name = 'base'
+        for key in self.keys:
+            assert job.doc.get(f"{operation_name}_{key}") is None
+
+        self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+
+        for key in self.keys:
+            if key == "fail":
+                assert job.doc.get(f"{operation_name}_{key}") is None
+            else:
+                assert job.doc.get(f"{operation_name}_{key}")
 
 
 class TestIgnoreConditions:

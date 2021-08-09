@@ -1,12 +1,16 @@
 from define_hooks_test_project import (
-    set_job_doc_w_error,
+    _HooksTestProject,
     set_job_doc,
-    _HooksTestProject)
+    set_job_doc_w_error,
+)
 
 
 class ProjectLevelHooks:
     keys = (
-        "installed_start", "installed_finish", "installed_success", "installed_fail"
+        "installed_start",
+        "installed_finish",
+        "installed_success",
+        "installed_fail",
     )
 
     def install_hooks(self, project):

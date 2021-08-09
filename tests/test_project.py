@@ -17,13 +17,13 @@ from io import StringIO
 from itertools import groupby
 from tempfile import TemporaryDirectory
 
+import define_hooks_install
+import define_hooks_test_project
 import pytest
 import signac
 from define_aggregate_test_project import _AggregateTestProject
 from define_dag_test_project import DagTestProject
 from define_directives_test_project import _DirectivesTestProject
-import define_hooks_test_project
-import define_hooks_install
 from define_test_project import _DynamicTestProject, _TestProject
 from deprecation import fail_if_not_removed
 
@@ -2276,7 +2276,7 @@ class TestHooksBase(TestProjectBase):
 
     def call_subcmd(self, subcmd, stderr=subprocess.DEVNULL):
         # Bypass raising the error/checking output since it interferes with hook.on_failure
-        fn_script = self.entrypoint['path']
+        fn_script = self.entrypoint["path"]
         _cmd = f"python {fn_script} {subcmd}"
         with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
             with switch_to_directory(self.project.root_directory()):
@@ -2347,14 +2347,14 @@ class TestHooksInstallBase(TestHooksBase):
 
         self.call_subcmd(f"run -o {operation_name} -j {job.id}")
 
-        if '_no_' in operation_name:
+        if "_no_" in operation_name:
             # No decorators, all hooks installed
-            assert get_job_doc_value('start') is None
-            assert get_job_doc_value('finish') is None
+            assert get_job_doc_value("start") is None
+            assert get_job_doc_value("finish") is None
         else:
             # Decorators
-            assert get_job_doc_value('start')
-            assert get_job_doc_value('finish')
+            assert get_job_doc_value("start")
+            assert get_job_doc_value("finish")
 
     def test_decorated_success(self, job, project, operation_name):
         get_job_doc_value = self._get_job_doc_key(job, operation_name)
@@ -2363,12 +2363,12 @@ class TestHooksInstallBase(TestHooksBase):
 
         self.call_subcmd(f"run -o {operation_name} -j {job.id}")
 
-        if '_no_' in operation_name or job.sp.raise_exception:
+        if "_no_" in operation_name or job.sp.raise_exception:
             # No decorators, all hooks installed
-            assert get_job_doc_value('success') is None
+            assert get_job_doc_value("success") is None
         else:
             # Decorators
-            assert get_job_doc_value('success')
+            assert get_job_doc_value("success")
 
     def test_decorated_fail(self, job, project, operation_name):
         get_job_doc_value = self._get_job_doc_key(job, operation_name)
@@ -2377,13 +2377,13 @@ class TestHooksInstallBase(TestHooksBase):
 
         self.call_subcmd(f"run -o {operation_name} -j {job.id}")
 
-        if '_no_' in operation_name or not job.sp.raise_exception:
+        if "_no_" in operation_name or not job.sp.raise_exception:
             # No decorators, all hooks installed
-            assert get_job_doc_value('fail') is None
+            assert get_job_doc_value("fail") is None
         else:
             # Decorators
-            assert get_job_doc_value('fail')[0]
-            assert get_job_doc_value('fail')[1] == self.error_message
+            assert get_job_doc_value("fail")[0]
+            assert get_job_doc_value("fail")[1] == self.error_message
 
 
 class TestHooksCmd(TestHooksBase):
@@ -2417,12 +2417,12 @@ class TestHooksInstallCmd(TestHooksCmd, TestHooksInstallBase):
 
         self.call_subcmd(f"run -o {operation_name} -j {job.id}")
 
-        if '_no_' in operation_name or not job.sp.raise_exception:
+        if "_no_" in operation_name or not job.sp.raise_exception:
             # No decorators, all hooks installed
-            assert get_job_doc_value('fail') is None
+            assert get_job_doc_value("fail") is None
         else:
             # Decorators
-            assert get_job_doc_value('fail')[0]
+            assert get_job_doc_value("fail")[0]
 
 
 class TestIgnoreConditions:

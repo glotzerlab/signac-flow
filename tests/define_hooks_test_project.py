@@ -1,7 +1,6 @@
 import flow
 from flow import FlowProject
 
-
 HOOKS_ERROR_MESSAGE = "You raised an error! Hooray!"
 HOOK_KEYS = ("start", "finish", "success", "fail")
 
@@ -13,6 +12,7 @@ class _HooksTestProject(FlowProject):
 def set_job_doc(key):
     def set_true(operation_name, job):
         job.doc[f"{operation_name}_{key}"] = True
+
     return lambda operation_name, job: set_true(operation_name, job)
 
 
@@ -22,7 +22,10 @@ def set_job_doc_w_error(key=None):
 
     def set_true_with_error(operation_name, error, job):
         job.doc[f"{operation_name}_{key}"] = (True, error.args[0])
-    return lambda operation_name, error, job: set_true_with_error(operation_name, error, job)
+
+    return lambda operation_name, error, job: set_true_with_error(
+        operation_name, error, job
+    )
 
 
 @_HooksTestProject.operation

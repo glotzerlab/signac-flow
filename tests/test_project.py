@@ -2276,7 +2276,6 @@ class TestHooksBase(TestProjectBase):
 
     def call_subcmd(self, subcmd, stderr=subprocess.DEVNULL):
         # Bypass raising the error/checking output since it interferes with hook.on_failure
-        # fn_script = inspect.getsourcefile(type(self.project))
         fn_script = self.entrypoint['path']
         _cmd = f"python {fn_script} {subcmd}"
         with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
@@ -2339,6 +2338,25 @@ class TestHooksInstallBase(TestHooksBase):
     @pytest.fixture(params=["base", "base_no_decorators"])
     def operation_name(self, request):
         return request.param
+
+
+class TestHooksCmd(TestHooksBase):
+    @pytest.fixture()
+    def operation_name(self):
+        return "base_cmd"
+
+    def test_fail(self, project, job, operation_name):
+        get_job_doc_value = self._get_job_doc_key(job, operation_name)
+
+        assert get_job_doc_value(self.keys[3]) is None
+
+        self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+
+        if job.sp.raise_exception:
+            assert get_job_doc_value(self.keys[3])[0]
+            assert get_job_doc_value(self.keys[3])[1] == 42
+        else:
+            assert get_job_doc_value(self.keys[3]) is None
 
 
 class TestIgnoreConditions:

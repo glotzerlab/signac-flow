@@ -2339,6 +2339,52 @@ class TestHooksInstallBase(TestHooksBase):
     def operation_name(self, request):
         return request.param
 
+    def test_decorated_start_and_finish(self, job, project, operation_name):
+        get_job_doc_value = self._get_job_doc_key(job, operation_name)
+
+        assert get_job_doc_value(self.keys[0]) is None
+        assert get_job_doc_value(self.keys[1]) is None
+
+        self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+
+        if '_no_' in operation_name:
+            # No decorators, all hooks installed
+            assert get_job_doc_value('start') is None
+            assert get_job_doc_value('finish') is None
+        else:
+            # Decorators
+            assert get_job_doc_value('start')
+            assert get_job_doc_value('finish')
+
+    def test_decorated_success(self, job, project, operation_name):
+        get_job_doc_value = self._get_job_doc_key(job, operation_name)
+
+        assert get_job_doc_value(self.keys[2]) is None
+
+        self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+
+        if '_no_' in operation_name or job.sp.raise_exception:
+            # No decorators, all hooks installed
+            assert get_job_doc_value('success') is None
+        else:
+            # Decorators
+            assert get_job_doc_value('success')
+
+    def test_decorated_fail(self, job, project, operation_name):
+        get_job_doc_value = self._get_job_doc_key(job, operation_name)
+
+        assert get_job_doc_value(self.keys[2]) is None
+
+        self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+
+        if '_no_' in operation_name:
+            # No decorators, all hooks installed
+            assert get_job_doc_value('fail') is None
+        else:
+            # Decorators
+            assert get_job_doc_value('fail')[0]
+            assert get_job_doc_value('fail')[1] == self.error_message
+
 
 class TestHooksCmd(TestHooksBase):
     @pytest.fixture()
@@ -2357,6 +2403,26 @@ class TestHooksCmd(TestHooksBase):
             assert get_job_doc_value(self.keys[3])[1] == 42
         else:
             assert get_job_doc_value(self.keys[3]) is None
+
+
+class TestHooksInstallCmd(TestHooksCmd, TestHooksInstallBase):
+    @pytest.fixture(params=["base_cmd", "base_cmd_no_decorators"])
+    def operation_name(self, request):
+        return request.param
+
+    def test_decorated_fail(self, job, project, operation_name):
+        get_job_doc_value = self._get_job_doc_key(job, operation_name)
+
+        assert get_job_doc_value(self.keys[2]) is None
+
+        self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+
+        if '_no_' in operation_name or not job.sp.raise_exception:
+            # No decorators, all hooks installed
+            assert get_job_doc_value('fail') is None
+        else:
+            # Decorators
+            assert get_job_doc_value('fail')[0]
 
 
 class TestIgnoreConditions:

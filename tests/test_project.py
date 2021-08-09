@@ -22,7 +22,8 @@ import signac
 from define_aggregate_test_project import _AggregateTestProject
 from define_dag_test_project import DagTestProject
 from define_directives_test_project import _DirectivesTestProject
-from define_hooks_test_project import _HooksTestProject, HOOKS_ERROR_MESSAGE
+import define_hooks_test_project
+import define_hooks_install
 from define_test_project import _DynamicTestProject, _TestProject
 from deprecation import fail_if_not_removed
 
@@ -2246,9 +2247,11 @@ class TestAggregationGroupProjectMainInterface(TestAggregatesProjectBase):
         assert f"exec agg_op3 {get_aggregate_id(project)}" in submit_output
 
 
-class TestProjectHooks(TestProjectBase):
-    project_class = _HooksTestProject  # TODO: Copy implementation, ref 2031
-    keys = ["start", "finish", "success", "fail"]
+class TestHooksBase(TestProjectBase):
+    error_message = define_hooks_test_project.HOOKS_ERROR_MESSAGE
+    keys = define_hooks_test_project.HOOK_KEYS
+    project_class = define_hooks_test_project._HooksTestProject
+    operation_name = "base"
     entrypoint = dict(
         path=os.path.realpath(
             os.path.join(os.path.dirname(__file__), "define_hooks_test_project.py")
@@ -2259,9 +2262,11 @@ class TestProjectHooks(TestProjectBase):
     def _get_job_doc_key(job, operation_name):
         return lambda key: job.doc.get(f"{operation_name}_{key}")
 
-    def mock_project(
-        self, project_class=None, heterogeneous=False, config_overrides=None
-    ):
+    @pytest.fixture(params=["base"])
+    def operation_name(self, request):
+        return request.param
+
+    def mock_project(self):
         project = self.project_class.get_project(root=self._tmp_dir.name)
         project.open_job(dict(raise_exception=False)).init()
         project.open_job(dict(raise_exception=True)).init()
@@ -2271,84 +2276,75 @@ class TestProjectHooks(TestProjectBase):
 
     def call_subcmd(self, subcmd, stderr=subprocess.DEVNULL):
         # Bypass raising the error/checking output since it interferes with hook.on_failure
-        fn_script = inspect.getsourcefile(type(self.project))
+        # fn_script = inspect.getsourcefile(type(self.project))
+        fn_script = self.entrypoint['path']
         _cmd = f"python {fn_script} {subcmd}"
         with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
             with switch_to_directory(self.project.root_directory()):
                 return subprocess.run(_cmd.split())
 
-    def test_run_base_hooks_no_fail(self):
-        project = self.mock_project()
-        job = project.open_job(dict(raise_exception=False))
-        operation_name = "base"
+    @pytest.fixture(scope="function")
+    def project(self):
+        return self.mock_project()
+
+    @pytest.fixture(params=[True, False], ids=["raise_exception", "no_exception"])
+    def job(self, request, project):
+        return project.open_job(dict(raise_exception=request.param))
+
+    def test_start_and_finish(self, project, job, operation_name):
         get_job_doc_value = self._get_job_doc_key(job, operation_name)
-        for key in self.keys:
-            assert get_job_doc_value(key) is None
+
+        assert get_job_doc_value(self.keys[0]) is None
+        assert get_job_doc_value(self.keys[1]) is None
 
         self.call_subcmd(f"run -o {operation_name} -j {job.id}")
 
-        for key in self.keys:
-            if key == "fail":
-                assert get_job_doc_value(key) is None
-            else:
-                assert get_job_doc_value(key)
+        assert get_job_doc_value(self.keys[0])
+        assert get_job_doc_value(self.keys[1])
 
-    def test_run_base_hooks_fail(self):
-        project = self.mock_project()
-        job = project.open_job(dict(raise_exception=True))
-        operation_name = "base"
+    def test_success(self, project, job, operation_name):
         get_job_doc_value = self._get_job_doc_key(job, operation_name)
-        for key in self.keys:
-            assert get_job_doc_value(key) is None
+
+        assert get_job_doc_value(self.keys[2]) is None
 
         self.call_subcmd(f"run -o {operation_name} -j {job.id}")
 
-        for key in self.keys:
-            if key == "fail":
-                assert get_job_doc_value(key)[0]
-                assert get_job_doc_value(key)[1] == HOOKS_ERROR_MESSAGE
-            elif key == "success":
-                assert get_job_doc_value(key) is None
-            else:
-                assert get_job_doc_value(key)
+        if job.sp.raise_exception:
+            assert not get_job_doc_value(self.keys[2])
+        else:
+            assert get_job_doc_value(self.keys[2])
 
-    def test_run_base_cmd_no_fail(self):
-        project = self.mock_project()
-        job = project.open_job(dict(raise_exception=False))
-        operation_name = "base_cmd"
+    def test_fail(self, project, job, operation_name):
         get_job_doc_value = self._get_job_doc_key(job, operation_name)
-        for key in self.keys:
-            assert get_job_doc_value(key) is None
+
+        assert get_job_doc_value(self.keys[3]) is None
 
         self.call_subcmd(f"run -o {operation_name} -j {job.id}")
 
-        assert job.isfile(f"{operation_name}.txt")
+        if job.sp.raise_exception:
+            assert get_job_doc_value(self.keys[3])[0]
+            assert get_job_doc_value(self.keys[3])[1] == self.error_message
+        else:
+            assert get_job_doc_value(self.keys[3]) is None
 
-        for key in self.keys:
-            if key == "fail":
-                assert get_job_doc_value(key) is None
-            else:
-                assert get_job_doc_value(key)
 
-    def test_run_base_cmd_fail(self):
-        project = self.mock_project()
-        job = project.open_job(dict(raise_exception=True))
-        operation_name = "base_cmd"
-        get_job_doc_value = self._get_job_doc_key(job, operation_name)
-        for key in self.keys:
-            assert get_job_doc_value(key) is None
+class TestHooksInstallBase(TestHooksBase):
+    keys = define_hooks_install.ProjectLevelHooks.keys
+    entrypoint = dict(
+        path=os.path.realpath(
+            os.path.join(os.path.dirname(__file__), "define_hooks_install.py")
+        )
+    )
 
-        self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+    @pytest.fixture(params=["base", "base_cmd", "base_no_decorators", "base_cmd_no_decorators"])
+    def operation_name(self, request):
+        return request.param
 
-        assert not job.isfile(f"{operation_name}.txt")
-
-        for key in self.keys:
-            if key == "fail":
-                assert get_job_doc_value(key)[0]
-            elif key == "success":
-                assert get_job_doc_value(key) is None
-            else:
-                assert get_job_doc_value(key)
+    def test_installed_project_hooks(self, project):
+        assert len(project.hooks.on_start) == 1
+        assert len(project.hooks.on_finish) == 1
+        assert len(project.hooks.on_success) == 1
+        assert len(project.hooks.on_fail) == 1
 
 
 class TestIgnoreConditions:

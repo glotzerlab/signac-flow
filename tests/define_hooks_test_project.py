@@ -16,8 +16,9 @@ def set_job_doc(key):
     return lambda operation_name, job: set_true(operation_name, job)
 
 
-def set_job_doc_w_error():
-    key = HOOK_KEYS[-1]
+def set_job_doc_w_error(key=None):
+    if key is None:
+        key = HOOK_KEYS[-1]
 
     def set_true_with_error(operation_name, error, job):
         job.doc[f"{operation_name}_{key}"] = (True, error.args[0])
@@ -48,12 +49,20 @@ def base_cmd(job):
         return "touch base_cmd.txt"
 
 
-def install_hooks(project):
-    project.hooks.on_start.append(set_job_doc(HOOK_KEYS[0]))
-    project.hooks.on_finish.append(set_job_doc(HOOK_KEYS[1]))
-    project.hooks.on_success.append(set_job_doc(HOOK_KEYS[2]))
-    project.hooks.on_fail.append(set_job_doc_w_error())
-    return project
+@_HooksTestProject.operation
+def base_no_decorators(job):
+    if job.sp.raise_exception:
+        raise RuntimeError(HOOKS_ERROR_MESSAGE)
+
+
+@_HooksTestProject.operation
+@flow.with_job
+@flow.cmd
+def base_cmd_no_decorators(job):
+    if job.sp.raise_exception:
+        return f"exit 42"
+    else:
+        return "touch base_cmd.txt"
 
 
 if __name__ == "__main__":

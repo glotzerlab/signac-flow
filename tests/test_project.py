@@ -2336,15 +2336,9 @@ class TestHooksInstallBase(TestHooksBase):
         )
     )
 
-    @pytest.fixture(params=["base", "base_cmd", "base_no_decorators", "base_cmd_no_decorators"])
+    @pytest.fixture(params=["base", "base_no_decorators"])
     def operation_name(self, request):
         return request.param
-
-    def test_installed_project_hooks(self, project):
-        assert len(project.hooks.on_start) == 1
-        assert len(project.hooks.on_finish) == 1
-        assert len(project.hooks.on_success) == 1
-        assert len(project.hooks.on_fail) == 1
 
 
 class TestIgnoreConditions:

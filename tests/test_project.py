@@ -2377,7 +2377,7 @@ class TestHooksInstallBase(TestHooksBase):
 
         self.call_subcmd(f"run -o {operation_name} -j {job.id}")
 
-        if '_no_' in operation_name:
+        if '_no_' in operation_name or not job.sp.raise_exception:
             # No decorators, all hooks installed
             assert get_job_doc_value('fail') is None
         else:

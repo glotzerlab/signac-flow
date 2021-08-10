@@ -7,6 +7,8 @@
 {% block header %}
     {% block preamble %}
     {% endblock preamble %}
+    {% block tasks %}
+    {% endblock tasks %}
 {% endblock header %}
 
 {% block project_header %}

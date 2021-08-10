@@ -900,7 +900,7 @@ class TestProject(TestProjectBase):
         project = self.mock_project()
         for job in project:
             status = project.get_job_status(job)
-            assert status["job_id"] == job.get_id()
+            assert status["job_id"] == job.id
             assert len(status["operations"]) == len(project.operations)
             for op in project._next_operations([(job,)]):
                 assert op.name in status["operations"]
@@ -1006,7 +1006,7 @@ execution_orders = (
     "cyclic",
     "by-job",
     "random",
-    lambda op: (op.name, op._jobs[0].get_id()),
+    lambda op: (op.name, op._jobs[0].id),
 )
 
 
@@ -1030,7 +1030,7 @@ class TestExecutionProject(TestProjectBase):
         # to the length of its set if and only if the job-operations are grouped
         # by job already.
         jobs_order_none = [
-            job.get_id() for job, _ in groupby(ops, key=lambda op: op._jobs[0])
+            job.id for job, _ in groupby(ops, key=lambda op: op._jobs[0])
         ]
         assert len(jobs_order_none) == len(set(jobs_order_none))
 
@@ -1466,7 +1466,7 @@ class TestProjectMainInterface(TestProjectBase):
         assert len(self.project)
         job_ids = set(self.call_subcmd("next op1").decode("utf-8").split())
         assert len(job_ids) > 0
-        even_jobs = [job.get_id() for job in self.project if job.sp.b % 2 == 0]
+        even_jobs = [job.id for job in self.project if job.sp.b % 2 == 0]
         assert job_ids == set(even_jobs)
         # Use only exact operation matches
         job_ids = set(self.call_subcmd("next op").decode("utf-8").split())
@@ -1492,7 +1492,7 @@ class TestProjectMainInterface(TestProjectBase):
         num_ops = len(project.operations)
         for line in lines:
             for job in project:
-                if job.get_id() in line:
+                if job.id in line:
                     op_lines = [line]
                     for i in range(num_ops - 1):
                         try:
@@ -1557,7 +1557,7 @@ class TestDirectivesProjectMainInterface(TestProjectBase):
         # FakeScheduler via the SIGNAC_FLOW_ENVIRONMENT environment variable.
         monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", "TestEnvironment")
         assert len(self.project)
-        job_id = next(iter(self.project)).get_id()
+        job_id = next(iter(self.project)).id
         output = self.call_subcmd(
             "submit -o op_walltime op_walltime_2 op_walltime_3 "
             f"-j {job_id} -b 3 --pretend --template slurm.sh",
@@ -1570,7 +1570,7 @@ class TestDirectivesProjectMainInterface(TestProjectBase):
         # FakeScheduler via the SIGNAC_FLOW_ENVIRONMENT environment variable.
         monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", "TestEnvironment")
         assert len(self.project)
-        job_id = next(iter(self.project)).get_id()
+        job_id = next(iter(self.project)).id
         output = self.call_subcmd(
             "submit -o op_walltime op_walltime_2 op_walltime_3 "
             f"-j {job_id} -b 3 --parallel --pretend --template slurm.sh",

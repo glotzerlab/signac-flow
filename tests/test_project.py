@@ -36,7 +36,7 @@ from flow import (
     with_job,
 )
 from flow.environment import ComputeEnvironment
-from flow.errors import DirectivesError, SubmitError
+from flow.errors import DirectivesError, FlowProjectDefinitionError, SubmitError
 from flow.project import IgnoreConditions, _AggregateStoresCursor, _JobAggregateCursor
 from flow.scheduling.base import ClusterJob, JobStatus, Scheduler
 from flow.util.misc import (
@@ -282,7 +282,7 @@ class TestProjectClass(TestProjectBase):
         class A(FlowProject):
             pass
 
-        with pytest.raises(ValueError):
+        with pytest.raises(FlowProjectDefinitionError):
 
             @A.operation
             @A.operation("foo")
@@ -299,7 +299,7 @@ class TestProjectClass(TestProjectBase):
         def op1(job):
             pass
 
-        with pytest.raises(ValueError):
+        with pytest.raises(FlowProjectDefinitionError):
 
             @A.operation("op1")
             def op2(job):
@@ -317,7 +317,7 @@ class TestProjectClass(TestProjectBase):
         def op1(job):
             pass
 
-        with pytest.raises(ValueError):
+        with pytest.raises(FlowProjectDefinitionError):
             precondition = A.operation(precondition)
 
     def test_operation_as_condition(self):
@@ -328,7 +328,7 @@ class TestProjectClass(TestProjectBase):
         def attempted_precondition(job):
             pass
 
-        with pytest.raises(ValueError):
+        with pytest.raises(FlowProjectDefinitionError):
 
             @A.pre(attempted_precondition)
             def op1(job):
@@ -350,7 +350,7 @@ class TestProjectClass(TestProjectBase):
         with suspend_logging():
             A.get_project(root=self._tmp_dir.name)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(FlowProjectDefinitionError):
             B.get_project(root=self._tmp_dir.name)
 
     def test_label_definition(self):
@@ -447,7 +447,7 @@ class TestProjectClass(TestProjectBase):
         class A(FlowProject):
             pass
 
-        with pytest.raises(RuntimeError):
+        with pytest.raises(FlowProjectDefinitionError):
 
             @A.operation
             @cmd
@@ -826,21 +826,21 @@ class TestProjectClass(TestProjectBase):
         def op1(job):
             pass
 
-        with pytest.raises(ValueError):
+        with pytest.raises(FlowProjectDefinitionError):
 
             @A.operation
             @A.pre.after(condition_fun)
             def op2(job):
                 pass
 
-        with pytest.raises(ValueError):
+        with pytest.raises(FlowProjectDefinitionError):
 
             @A.operation
             @A.pre(op1)
             def op3(job):
                 pass
 
-        with pytest.raises(ValueError):
+        with pytest.raises(FlowProjectDefinitionError):
 
             @A.operation
             @A.post(op1)
@@ -1760,7 +1760,7 @@ class TestGroupProject(TestProjectBase):
 
         A.make_group("foo")
 
-        with pytest.raises(ValueError):
+        with pytest.raises(FlowProjectDefinitionError):
 
             @A.operation
             def foo(job):
@@ -1773,8 +1773,51 @@ class TestGroupProject(TestProjectBase):
         def bar(job):
             pass
 
-        with pytest.raises(ValueError):
+        with pytest.raises(FlowProjectDefinitionError):
             B.make_group("bar")
+
+    def test_repeat_group_definition(self):
+        """Test that groups cannot be registered if a group with that name exists."""
+
+        class A(FlowProject):
+            pass
+
+        A.make_group("foo")
+
+        with pytest.raises(FlowProjectDefinitionError):
+            A.make_group("foo")
+
+    def test_repeat_operation_group_definition(self):
+        """Test that operations cannot be registered with a group multiple times."""
+
+        class A(FlowProject):
+            pass
+
+        foo_group = A.make_group("foo")
+
+        with pytest.raises(FlowProjectDefinitionError):
+
+            @foo_group
+            @foo_group
+            @A.operation
+            def foo_operation(job):
+                pass
+
+    def test_repeat_operation_group_directives_definition(self):
+        """Test that operations cannot be registered with group directives multiple times."""
+
+        class A(FlowProject):
+            pass
+
+        foo_group = A.make_group("foo")
+
+        with pytest.raises(FlowProjectDefinitionError):
+
+            @foo_group.with_directives({"np": 1})
+            @foo_group.with_directives({"np": 1})
+            @A.operation
+            def foo_operation(job):
+                pass
 
     def test_submission_combine_directives(self):
         class A(flow.FlowProject):
@@ -2116,7 +2159,7 @@ class TestAggregatesProjectUtilities(TestAggregatesProjectBase):
         class A(FlowProject):
             pass
 
-        with pytest.raises(RuntimeError):
+        with pytest.raises(FlowProjectDefinitionError):
 
             @A.operation
             @aggregator()
@@ -2128,7 +2171,7 @@ class TestAggregatesProjectUtilities(TestAggregatesProjectBase):
         class A(FlowProject):
             pass
 
-        with pytest.raises(RuntimeError):
+        with pytest.raises(FlowProjectDefinitionError):
 
             @A.operation
             @with_job

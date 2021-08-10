@@ -17,11 +17,13 @@ Added
 - The ``--job-output`` command line flag for submission can be set for SLURM, PBS, and LSF schedulers (#550).
 - Added a ``custom_content`` block to templates for user customization (#553).
 - Added official support for XSEDE Expanse cluster (#537).
+- Added ``FlowProjectDefinitionError`` for exceptions involving ``FlowProject`` definitions (#549).
 
 Changed
 +++++++
 
 - Improved documentation of directives (#554).
+- Raise ``FlowProjectDefinitionError`` error for inaccurate ``FlowProject`` definitions (#549).
 
 Removed
 +++++++

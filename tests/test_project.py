@@ -1664,6 +1664,35 @@ class TestProjectSubmitOptions(TestProjectBase):
         submit_output = submit_output.getvalue()
         assert ("# Submit command: " + hold_cmd) in submit_output
 
+    @pytest.mark.parametrize(
+        "env,job_output_flags",
+        [
+            ("DefaultSlurmEnvironment", ["#SBATCH --output=", "#SBATCH --error="]),
+            ("DefaultPBSEnvironment", ["#PBS -o ", "#PBS -e "]),
+            ("DefaultLSFEnvironment", ["#BSUB -eo "]),
+        ],
+    )
+    def test_main_submit_job_output(self, env, job_output_flags, monkeypatch):
+        # Ensure that the job output flag is included in submission commands.
+        # Force the detected environment via the SIGNAC_FLOW_ENVIRONMENT
+        # environment variable.
+        monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", env)
+        project = self.mock_project()
+        assert len(project)
+        # This monkeypatch prevents failures due to lacking the scheduler
+        # executable for checking existing scheduler jobs before submitting.
+        monkeypatch.setattr(
+            project, "_query_scheduler_status", lambda *args, **kwargs: {}
+        )
+
+        submit_output = StringIO()
+        job_output = "/home/user/job123.out"
+        with redirect_stdout(submit_output):
+            project.submit(names=["op1"], pretend=True, num=1, job_output=job_output)
+        submit_output = submit_output.getvalue()
+        for job_output_flag in job_output_flags:
+            assert (job_output_flag + job_output) in submit_output
+
 
 # Tests for multiple operation groups or groups with options
 class TestGroupProject(TestProjectBase):

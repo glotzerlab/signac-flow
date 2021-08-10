@@ -193,12 +193,12 @@ class aggregator:
         Examples
         --------
         The code block below provides an example of how to aggregate jobs
-        by a state point parameter ``"sp"``. If the state point does not
-        contain the key ``"sp"``, a default value of -1 is used.
+        by a state point parameter ``"key"``. If the state point does not
+        contain the key ``"key"``, a default value of -1 is used.
 
         .. code-block:: python
 
-            @aggregator.groupby(key="sp", default=-1)
+            @aggregator.groupby(key="key", default=-1)
             @FlowProject.operation
             def foo(*jobs):
                 print(len(jobs))

@@ -97,14 +97,6 @@ class Stampede2Environment(DefaultSlurmEnvironment):
             default="skx-normal",
             help="Specify the partition to submit to.",
         )
-        parser.add_argument(
-            "--job-output",
-            help=(
-                "What to name the job output file. "
-                "If omitted, uses the system default "
-                '(slurm default is "slurm-%%j.out").'
-            ),
-        )
 
     @classmethod
     def _get_mpi_prefix(cls, operation, parallel):

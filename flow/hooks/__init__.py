@@ -29,7 +29,37 @@ class _HooksList(list):
 
 
 class Hooks:
-    """Define execution hooks that are executed on certain conditions."""
+    """:class:`~.Hooks` execute an action or set of actions at specific stages of operation execution,
+    such as when an operation begins, fails, succeeds,
+    or finishes (regardless of if the operation executed successfully or failed).
+
+    Hooks can be installed at the operation level as decorators,
+    or at the flow-project level.
+
+    Examples
+    -------
+    In the example below, a operation level decorator that prints the operation name
+    and job id at the start of the operation execution.
+
+    .. code-block:: python
+        @Flowproject.operation
+        @Flowproject.hook.on_start(lambda operation_name, job: print(
+            f"Starting operation {operation.name} on job {job.id}")
+        def op(job):
+            pass
+
+    Parameters
+    ----------
+    on_start : function
+        Function(s) to execute when the operation begins execution.
+    on_finish : function
+        Function(s) to execute when the operation exits, with or without errors.
+    on_success : function
+        Function(s) to execute when the operation exits without error.
+    on_fail : function
+        Function(s) to execute when the operation exits with error.
+
+    """
 
     _hook_triggers = [
         "on_start",

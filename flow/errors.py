@@ -61,3 +61,9 @@ class TemplateError(Jinja2Extension):
     def err(self, msg, caller):
         """Raise a template error."""
         raise jinja2.TemplateError(msg)
+
+
+class FlowProjectDefinitionError(ValueError):
+    """Indicates an invalid FlowProject definition."""
+
+    pass

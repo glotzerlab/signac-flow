@@ -16,7 +16,6 @@ import re
 import socket
 from functools import lru_cache
 
-from deprecation import deprecated
 from signac.common import config
 
 from .directives import (
@@ -39,7 +38,6 @@ from .scheduling.pbs import PBSScheduler
 from .scheduling.simple_scheduler import SimpleScheduler
 from .scheduling.slurm import SlurmScheduler
 from .util import config as flow_config
-from .version import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -393,58 +391,6 @@ class SimpleSchedulerEnvironment(ComputeEnvironment):
     template = "simple_scheduler.sh"
 
 
-@deprecated(
-    deprecated_in="0.14",
-    removed_in="0.15",
-    current_version=__version__,
-    details="PBSEnvironment has been deprecated, instead use DefaultPBSEnvironment",
-)
-class PBSEnvironment(ComputeEnvironment):
-    """An environment with PBS scheduler."""
-
-    pass
-
-
-@deprecated(
-    deprecated_in="0.14",
-    removed_in="0.15",
-    current_version=__version__,
-    details="SlurmEnvironment has been deprecated, instead use DefaultSlurmEnvironment",
-)
-class SlurmEnvironment(ComputeEnvironment):
-    """An environment with SLURM scheduler."""
-
-    pass
-
-
-@deprecated(
-    deprecated_in="0.14",
-    removed_in="0.15",
-    current_version=__version__,
-    details="LSFEnvironment has been deprecated, instead use DefaultLSFEnvironment",
-)
-class LSFEnvironment(ComputeEnvironment):
-    """An environment with LSF scheduler."""
-
-    pass
-
-
-@deprecated(
-    deprecated_in="0.14",
-    removed_in="0.15",
-    current_version=__version__,
-    details="NodesEnvironment has been deprecated.",
-)
-class NodesEnvironment(ComputeEnvironment):
-    """A compute environment consisting of multiple compute nodes.
-
-    Each compute node is assumed to have a specific number of compute units,
-    e.g., CPUs.
-    """
-
-    pass
-
-
 class DefaultPBSEnvironment(ComputeEnvironment):
     """Default environment for clusters with a PBS scheduler."""
 
@@ -472,20 +418,19 @@ class DefaultPBSEnvironment(ComputeEnvironment):
             "completion of a cluster job with this id.",
         )
         parser.add_argument(
+            "--job-output",
+            type=str,
+            help=(
+                "What to name the job output file. "
+                "If omitted, uses the scheduler default name. "
+                "Both stdout and stderr will be combined."
+            ),
+        )
+        parser.add_argument(
             "--no-copy-env",
             action="store_true",
             help="Do not copy current environment variables into compute node environment.",
         )
-
-
-@deprecated(
-    deprecated_in="0.14",
-    removed_in="0.16",
-    current_version=__version__,
-    details="DefaultTorqueEnvironment has been renamed to DefaultPBSEnvironment",
-)
-class DefaultTorqueEnvironment(DefaultPBSEnvironment):  # noqa: D101
-    pass
 
 
 class DefaultSlurmEnvironment(ComputeEnvironment):
@@ -514,6 +459,15 @@ class DefaultSlurmEnvironment(ComputeEnvironment):
             help="Schedule this job to be executed after "
             "completion of a cluster job with this id.",
         )
+        parser.add_argument(
+            "--job-output",
+            type=str,
+            help=(
+                "What to name the job output file. "
+                "If omitted, uses the scheduler default name. "
+                "Both stdout and stderr will be combined."
+            ),
+        )
 
 
 class DefaultLSFEnvironment(ComputeEnvironment):
@@ -541,6 +495,15 @@ class DefaultLSFEnvironment(ComputeEnvironment):
             type=str,
             help="Schedule this job to be executed after "
             "completion of a cluster job with this id.",
+        )
+        parser.add_argument(
+            "--job-output",
+            type=str,
+            help=(
+                "What to name the job output file. "
+                "If omitted, uses the scheduler default name. "
+                "Both stdout and stderr will be combined."
+            ),
         )
 
 

@@ -17,6 +17,7 @@ import random
 import re
 import subprocess
 import sys
+import textwrap
 import threading
 import time
 import traceback
@@ -31,7 +32,6 @@ from multiprocessing.pool import ThreadPool
 import cloudpickle
 import jinja2
 import signac
-from deprecation import deprecated
 from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
 from signac.contrib.filterparse import parse_filter_arg
 from tqdm.auto import tqdm
@@ -44,9 +44,11 @@ from .aggregates import (
     aggregator,
     get_aggregate_id,
 )
-from .environment import get_environment
+from .directives import _document_directive
+from .environment import ComputeEnvironment, get_environment
 from .errors import (
     ConfigKeyError,
+    FlowProjectDefinitionError,
     NoSchedulerError,
     SubmitError,
     TemplateError,
@@ -70,7 +72,6 @@ from .util.misc import (
     switch_to_directory,
 )
 from .util.translate import abbreviate, shorten
-from .version import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +91,7 @@ The available template variables are:
 {template_vars}
 
 Filter functions can be used to format template variables in a specific way.
-For example: {{{{ project.get_id() | capitalize }}}}.
+For example: {{{{ project.id | capitalize }}}}.
 
 The available filters are:
 {filters}"""
@@ -678,8 +679,8 @@ class FlowGroupEntry:
         """
         if hasattr(func, "_flow_groups"):
             if self.name in func._flow_groups:
-                raise ValueError(
-                    f"Cannot register existing name {func} with group {self.name}"
+                raise FlowProjectDefinitionError(
+                    f"Cannot reregister operation '{func}' with the group '{self.name}'."
                 )
             func._flow_groups.append(self.name)
         else:
@@ -690,29 +691,38 @@ class FlowGroupEntry:
     def _set_directives(self, func, directives):
         if hasattr(func, "_flow_group_operation_directives"):
             if self.name in func._flow_group_operation_directives:
-                raise ValueError(
-                    f"Cannot set directives because directives already exist "
-                    f"for {func} in group {self.name}"
+                raise FlowProjectDefinitionError(
+                    "Cannot set directives because directives already exist "
+                    f"for operation '{func}' in group '{self.name}'."
                 )
             func._flow_group_operation_directives[self.name] = directives
         else:
             func._flow_group_operation_directives = {self.name: directives}
 
     def with_directives(self, directives):
-        """Return a decorator that sets group specific directives to the operation.
+        """Decorate an operation to provide additional execution directives for this group.
+
+        Directives can be used to provide information about required resources
+        such as the number of processors required for execution of parallelized
+        operations. For a list of supported directives, see
+        :meth:`.FlowProject.operation.with_directives`. For more information,
+        see :ref:`signac-docs:cluster_submission_directives`.
+
+        The directives specified in this decorator are only applied when
+        executing the operation through the :class:`FlowGroup`.
+        To apply directives to an individual operation executed outside of the
+        group, see :meth:`.FlowProject.operation.with_directives`.
 
         Parameters
         ----------
         directives : dict
-            Directives to use for resource requests and running the operation
-            through the group.
+            Directives to use for resource requests and execution.
 
         Returns
         -------
         function
-            A decorator which registers the function into the group with
+            A decorator which registers the operation with the group using the
             specified directives.
-
         """
 
         def decorator(func):
@@ -1255,7 +1265,7 @@ class _FlowProjectClass(type):
                     for operation in self._parent_class._collect_operations()
                 ]
                 if self.condition in operation_functions:
-                    raise ValueError(
+                    raise FlowProjectDefinitionError(
                         "Operation functions cannot be used as preconditions."
                     )
                 self._parent_class._OPERATION_PRECONDITIONS[func].insert(
@@ -1290,7 +1300,9 @@ class _FlowProjectClass(type):
                 if not all(
                     condition in operation_functions for condition in other_funcs
                 ):
-                    raise ValueError("The arguments to pre.after must be operations.")
+                    raise FlowProjectDefinitionError(
+                        "The arguments to pre.after must be operations."
+                    )
                 return cls(
                     _create_all_metacondition(
                         cls._parent_class._collect_postconditions(), *other_funcs
@@ -1344,7 +1356,7 @@ class _FlowProjectClass(type):
                     for operation in self._parent_class._collect_operations()
                 ]
                 if self.condition in operation_functions:
-                    raise ValueError(
+                    raise FlowProjectDefinitionError(
                         "Operation functions cannot be used as postconditions."
                     )
                 self._parent_class._OPERATION_POSTCONDITIONS[func].insert(
@@ -1412,7 +1424,7 @@ class _FlowProjectClass(type):
                     *self._parent_class._OPERATION_PRECONDITIONS.values(),
                     *self._parent_class._OPERATION_POSTCONDITIONS.values(),
                 ):
-                    raise ValueError(
+                    raise FlowProjectDefinitionError(
                         "A condition function cannot be used as an operation."
                     )
 
@@ -1424,15 +1436,15 @@ class _FlowProjectClass(type):
                     registered_func,
                 ) in self._parent_class._OPERATION_FUNCTIONS:
                     if name == registered_name:
-                        raise ValueError(
+                        raise FlowProjectDefinitionError(
                             f"An operation with name '{name}' is already registered."
                         )
                     if func is registered_func:
-                        raise ValueError(
+                        raise FlowProjectDefinitionError(
                             "An operation with this function is already registered."
                         )
                 if name in self._parent_class._GROUP_NAMES:
-                    raise ValueError(
+                    raise FlowProjectDefinitionError(
                         f"A group with name '{name}' is already registered."
                     )
 
@@ -1454,22 +1466,29 @@ class _FlowProjectClass(type):
                 return func
 
             def with_directives(self, directives, name=None):
-                """Return a decorator that also sets directives for the operation.
+                """Decorate a function to make it an operation with additional execution directives.
+
+                Directives can be used to provide information about required
+                resources such as the number of processors required for
+                execution of parallelized operations. For more information, see
+                :ref:`signac-docs:cluster_submission_directives`. To apply
+                directives to an operation that is part of a group, use
+                :meth:`.FlowGroupEntry.with_directives`.
 
                 Parameters
                 ----------
                 directives : dict
-                    Directives to use for resource requests and running the operation through the
-                    group.
+                    Directives to use for resource requests and execution.
                 name : str
-                    The operation name. Uses the name of the function if None.
-                    (Default value = None)
+                    The operation name. Uses the name of the function if None
+                    (Default value = None).
 
                 Returns
                 -------
                 function
-                    A decorator which registers the function with the correct name and directives as
-                    an operation of the :class:`~.FlowProject` subclass.
+                    A decorator which registers the function with the provided
+                    name and directives as an operation of the
+                    :class:`~.FlowProject` subclass.
                 """
 
                 def add_operation_with_directives(function):
@@ -1477,6 +1496,18 @@ class _FlowProjectClass(type):
                     return self(function, name)
 
                 return add_operation_with_directives
+
+            _directives_to_document = (
+                ComputeEnvironment._get_default_directives()._directive_definitions.values()
+            )
+            with_directives.__doc__ += textwrap.indent(
+                "\n\n**Supported Directives:**\n\n"
+                + "\n\n".join(
+                    _document_directive(directive)
+                    for directive in _directives_to_document
+                ),
+                " " * 16,
+            )
 
         return OperationRegister()
 
@@ -2333,7 +2364,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         """
         result = {
-            "job_id": job.get_id(),
+            "job_id": job.id,
             "labels": [],
             "_labels_error": None,
         }
@@ -3012,7 +3043,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return (
             operation.id,
             operation.name,
-            [job.get_id() for job in operation._jobs],
+            [job.id for job in operation._jobs],
             operation.cmd,
             operation.directives,
         )
@@ -4071,20 +4102,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             elif bool(label_value) is True:
                 yield label_name
 
-    @deprecated(
-        deprecated_in="0.14",
-        removed_in="0.16",
-        current_version=__version__,
-        details="Method has been removed.",
-    )
-    def add_operation(*args, **kwargs):  # noqa: D102
-        raise AttributeError(
-            "The add_operation() method was removed in version 0.14. "
-            "Please see https://docs.signac.io/en/latest/flow-project.html#defining-a-workflow "
-            "for instructions on how to define operations using the current API. This message "
-            "will be removed in version 0.16."
-        )
-
     def completed_operations(self, job):
         """Determine which operations have been completed for job.
 
@@ -4180,7 +4197,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         for name, func in operations:
             if name in self._operations:
-                raise ValueError(f"Repeat definition of operation with name '{name}'.")
+                raise FlowProjectDefinitionError(
+                    f"Repeat definition of operation with name '{name}'."
+                )
 
             # Extract preconditions/postconditions and directives from function:
             params = {
@@ -4232,12 +4251,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         """
         if name in cls._GROUP_NAMES:
-            raise ValueError(f"Repeat definition of group with name '{name}'.")
+            raise FlowProjectDefinitionError(
+                f"Repeat definition of group with name '{name}'."
+            )
         if any(
             name == operation_name for operation_name, _ in cls._OPERATION_FUNCTIONS
         ):
-            raise ValueError(
-                f"Cannot create a group with the same name as the existing operation {name}"
+            raise FlowProjectDefinitionError(
+                f"Cannot create a group with the same name as the existing operation '{name}'."
             )
         cls._GROUP_NAMES.add(name)
         group_entry = FlowGroupEntry(

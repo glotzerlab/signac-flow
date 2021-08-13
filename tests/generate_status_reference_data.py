@@ -67,14 +67,11 @@ def main(args):
         env.scheduler_type = FakeScheduler
         fp._environment = env
         for job in status_pr:
-            print(job)
             with job:
                 kwargs = job.statepoint()
                 fn = job.fn("status.txt")
-                print(fn)
 
                 with open(fn, "w") as f:
-                    fp.print_status(**kwargs)
                     with redirect_stdout(f):
                         fp.print_status(**kwargs)
 

@@ -29,15 +29,16 @@ class _HooksList(list):
 
 
 class Hooks:
-    """:class:`~.Hooks` execute an action or set of actions at specific stages of operation execution,
-    such as when an operation begins, fails, succeeds,
+    """:class:`~.Hooks` execute an action or set of actions at specific stages of operation execution.
+
+    :class:`~.Hooks` can execute a user defined function when an operation begins, fails, succeeds,
     or finishes (regardless of if the operation executed successfully or failed).
 
     Hooks can be installed at the operation level as decorators,
     or at the flow-project level.
 
     Examples
-    -------
+    --------
     In the example below, a operation level decorator that prints the operation name
     and job id at the start of the operation execution.
 

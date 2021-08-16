@@ -8,7 +8,8 @@ from ..environment import DefaultSlurmEnvironment
 class PicotteEnvironment(DefaultSlurmEnvironment):
     """Environment profile for the Picotte supercomputer.
 
-    https://proteusmaster.urcf.drexel.edu/urcfwiki/ (this link may require access to the Drexel University network)
+    https://proteusmaster.urcf.drexel.edu/urcfwiki/
+    Note: This link may require access to the Drexel University network.
     """
 
     hostname_pattern = r".*\.cm\.cluster$"

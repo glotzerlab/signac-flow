@@ -17,6 +17,7 @@ from textwrap import indent
 
 from .directives import _document_directive
 from .environment import ComputeEnvironment
+from .errors import FlowProjectDefinitionError
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +43,8 @@ def cmd(func):
         prefixes to the shell command provided here.
     """
     if getattr(func, "_flow_with_job", False):
-        raise RuntimeError(
-            "@cmd should appear below the @with_job decorator in your script"
+        raise FlowProjectDefinitionError(
+            "The @flow.cmd decorator must appear below the @flow.with_job decorator."
         )
     setattr(func, "_flow_cmd", True)
     return func
@@ -95,7 +96,9 @@ def with_job(func):
             return 'trap "cd `pwd`" EXIT && cd {} && echo "hello {job}"'.format(job.ws)
     """
     if getattr(func, "_flow_aggregate", False):
-        raise RuntimeError("The @with_job decorator cannot be used with aggregation.")
+        raise FlowProjectDefinitionError(
+            "The @with_job decorator cannot be used with aggregation."
+        )
 
     @wraps(func)
     def decorated(*jobs):

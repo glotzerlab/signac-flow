@@ -51,6 +51,7 @@ The FlowProject
     FlowProject.pre.never
     FlowProject.pre.not_
     FlowProject.pre.true
+    FlowProject.print_status
     FlowProject.run
     FlowProject.scheduler_jobs
     FlowProject.submit

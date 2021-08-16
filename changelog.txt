@@ -16,6 +16,7 @@ Added
 
 - Added a ``custom_content`` block to templates for user customization (#553).
 - Added official support for XSEDE Expanse cluster (#537).
+- Added official support for Drexel University's Picotte cluster (#561).
 
 Changed
 +++++++

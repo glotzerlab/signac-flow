@@ -12,6 +12,8 @@ from abc import abstractmethod
 from collections.abc import Collection, Iterable, Mapping
 from hashlib import md5
 
+from .errors import FlowProjectDefinitionError
+
 
 def _get_unique_function_id(func):
     """Generate unique id for the provided function.
@@ -347,13 +349,13 @@ class aggregator:
 
         """
         if not callable(func):
-            raise TypeError(
+            raise FlowProjectDefinitionError(
                 "Invalid argument passed while calling the aggregate "
                 f"instance. Expected a callable, got {type(func)}."
             )
         if getattr(func, "_flow_with_job", False):
-            raise RuntimeError(
-                "The @with_job decorator cannot be used with aggregation."
+            raise FlowProjectDefinitionError(
+                "The @flow.with_job decorator cannot be used with aggregation."
             )
         setattr(func, "_flow_aggregate", self)
         return func

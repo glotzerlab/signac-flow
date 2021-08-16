@@ -128,6 +128,16 @@ def init(project):
                 "bundle": [["mpi_op", "omp_op"]],
             },
         ],
+        "environments.drexel.PicotteEnvironment": [
+            {
+                "partition": ["def", "gpu"],
+            },
+            {
+                "partition": ["def"],
+                "parallel": [False, True],
+                "bundle": [["mpi_op", "omp_op"]],
+            },
+        ],
     }
 
     for environment, parameter_combinations in environments.items():

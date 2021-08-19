@@ -1786,7 +1786,7 @@ class TestGroupProject(TestProjectBase):
         def test_op(job):
             pass
 
-        with pytest.raises(ValueError):
+        with pytest.raises(FlowProjectDefinitionError):
             self.mock_project(A)
 
     def test_repeat_group_definition(self):

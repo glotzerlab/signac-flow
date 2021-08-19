@@ -4287,7 +4287,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for entry in group_entries:
             for operation in entry.operations:
                 if operation not in self._operations:
-                    raise ValueError(
+                    raise FlowProjectDefinitionError(
                         f"Cannot add the function '{operation}' to a "
                         "FlowGroup because it is not registered as an "
                         "operation. Add the `@FlowProject.operation` "

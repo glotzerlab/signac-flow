@@ -1793,6 +1793,8 @@ class TestGroupProject(TestProjectBase):
             B.make_group("bar")
 
     def test_group_operation_without_operation_definition(self):
+        """Test that groups can only be applied to operations."""
+
         class A(FlowProject):
             pass
 
@@ -1801,6 +1803,23 @@ class TestGroupProject(TestProjectBase):
         @group
         def test_op(job):
             pass
+
+        with pytest.raises(FlowProjectDefinitionError):
+            self.mock_project(A)
+
+        # Make test_op into an operation, then project creation should succeed.
+        A.operation(test_op)
+        self.mock_project(A)
+
+    def test_group_operation_without_operation_definition_anonymous(self):
+        """Test that groups cannot be applied to anonymous functions."""
+
+        class A(FlowProject):
+            pass
+
+        group = A.make_group("foo")
+
+        group(lambda job: print(job))
 
         with pytest.raises(FlowProjectDefinitionError):
             self.mock_project(A)

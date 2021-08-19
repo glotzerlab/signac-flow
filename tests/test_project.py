@@ -289,7 +289,23 @@ class TestProjectClass(TestProjectBase):
             def op1(job):
                 pass
 
-        return
+    def test_repeat_anonymous_operation_definition(self):
+        class A(FlowProject):
+            pass
+
+        A.operation(lambda job: print("Hello", job))
+
+        assert len(self.mock_project(A).operations) == 1
+
+        anonymous_func = lambda job: print("Hi", job)  # noqa: E731
+
+        with pytest.raises(FlowProjectDefinitionError):
+            # Only one anonymous operation is allowed, or else the name
+            # "<lambda>" conflicts between the operations.
+            A.operation(anonymous_func)
+
+        A.operation(anonymous_func, name="hi_operation")
+        assert len(self.mock_project(A).operations) == 2
 
     def test_repeat_operation_name(self):
         class A(FlowProject):

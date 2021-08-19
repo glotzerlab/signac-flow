@@ -24,7 +24,7 @@ Changed
 
 - Improved documentation of directives (#554).
 - Raise ``FlowProjectDefinitionError`` error for inaccurate ``FlowProject`` definitions (#549).
-- Error raised when a ``FlowGroup`` decorates functions that are not FlowProject operations (#538, #544).
+- Error raised when a ``FlowGroup`` decorates functions that are not ``FlowProject`` operations (#538, #544).
 
 Removed
 +++++++

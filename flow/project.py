@@ -659,7 +659,7 @@ class FlowGroupEntry:
         # We assign operations to a group using a decorator. In order to identify
         # whether a function is assigned to a group but not as an operation, we need
         # to store the names of the functions.
-        self.operations = []
+        self.operations = set()
 
     def __call__(self, func):
         """Add the function into the group's operations.
@@ -682,10 +682,10 @@ class FlowGroupEntry:
                 raise FlowProjectDefinitionError(
                     f"Cannot reregister operation '{func}' with the group '{self.name}'."
                 )
-            func._flow_groups.append(self.name)
+            func._flow_groups.add(self.name)
         else:
-            func._flow_groups = [self.name]
-        self.operations.append(func.__name__)
+            func._flow_groups = {self.name}
+        self.operations.add(func.__name__)
         return func
 
     def _set_directives(self, func, directives):
@@ -1460,9 +1460,9 @@ class _FlowProjectClass(type):
                 # `@operation`.
                 self._parent_class._GROUPS.append(FlowGroupEntry(name=name, options=""))
                 if hasattr(func, "_flow_groups"):
-                    func._flow_groups.append(name)
+                    func._flow_groups.add(name)
                 else:
-                    func._flow_groups = [name]
+                    func._flow_groups = {name}
                 return func
 
             def with_directives(self, directives, name=None):

@@ -659,7 +659,7 @@ class FlowGroupEntry:
         # We assign operations to a group using a decorator. In order to identify
         # whether a function is assigned to a group but not as an operation, we need
         # to store the names of the functions.
-        self.operations = set()
+        self._operations = set()
 
     def __call__(self, func):
         """Add the function into the group's operations.
@@ -685,7 +685,7 @@ class FlowGroupEntry:
             func._flow_groups.add(self.name)
         else:
             func._flow_groups = {self.name}
-        self.operations.add(func.__name__)
+        self._operations.add(func.__name__)
         return func
 
     def _set_directives(self, func, directives):
@@ -4285,7 +4285,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # equivalent aggregators only generate once.
         created_aggregate_stores = {}
         for entry in group_entries:
-            for operation in entry.operations:
+            for operation in entry._operations:
                 if operation not in self._operations:
                     raise FlowProjectDefinitionError(
                         f"Cannot add the function '{operation}' to a "

@@ -270,9 +270,9 @@ class TestProjectClass(TestProjectBase):
             pass
 
         with suspend_logging():
-            a = A.get_project(root=self._tmp_dir.name)
-            b = B.get_project(root=self._tmp_dir.name)
-            c = C.get_project(root=self._tmp_dir.name)
+            a = self.mock_project(A)
+            b = self.mock_project(B)
+            c = self.mock_project(C)
 
         assert len(a.operations) == 2
         assert len(b.operations) == 3
@@ -348,10 +348,10 @@ class TestProjectClass(TestProjectBase):
 
         # Should raise no error
         with suspend_logging():
-            A.get_project(root=self._tmp_dir.name)
+            self.mock_project(A)
 
         with pytest.raises(FlowProjectDefinitionError):
-            B.get_project(root=self._tmp_dir.name)
+            self.mock_project(B)
 
     def test_label_definition(self):
         class A(FlowProject):
@@ -372,9 +372,9 @@ class TestProjectClass(TestProjectBase):
         def label2(job):
             pass
 
-        a = A.get_project(root=self._tmp_dir.name)
-        b = B.get_project(root=self._tmp_dir.name)
-        c = C.get_project(root=self._tmp_dir.name)
+        a = self.mock_project(A)
+        b = self.mock_project(B)
+        c = self.mock_project(C)
 
         assert len(a._label_functions) == 1
         assert len(b._label_functions) == 2

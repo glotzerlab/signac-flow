@@ -47,7 +47,7 @@ def base(job):
 @flow.cmd
 def base_cmd(job):
     if job.sp.raise_exception:
-        return f"exit 42"
+        return "exit 42"
     else:
         return "touch base_cmd.txt"
 
@@ -63,7 +63,7 @@ def base_no_decorators(job):
 @flow.cmd
 def base_cmd_no_decorators(job):
     if job.sp.raise_exception:
-        return f"exit 42"
+        return "exit 42"
     else:
         return "touch base_cmd.txt"
 

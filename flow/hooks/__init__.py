@@ -35,7 +35,7 @@ class Hooks:
     or finishes (regardless of if the operation executed successfully or failed).
 
     Hooks can be installed at the operation level as decorators,
-    or at the flow-project level.
+    or at the :class:`~.FlowProject` level.
 
     Examples
     --------

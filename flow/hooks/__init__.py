@@ -40,8 +40,8 @@ class Hooks:
 
     Examples
     --------
-    In the example below, a operation level decorator that prints the operation name
-    and job id at the start of the operation execution.
+    The example below shows an operation level decorator that prints the
+    operation name and job id at the start of the operation execution.
 
     .. code-block:: python
         @FlowProject.operation

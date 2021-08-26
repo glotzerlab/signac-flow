@@ -46,7 +46,7 @@ class Hooks:
     .. code-block:: python
         @FlowProject.operation
         @FlowProject.hook.on_start(lambda operation, job: print(
-            f"Starting operation {operation.name} on job {job.id}")
+            f"Starting operation {operation.name} on job {job.id}"))
         def op(job):
             pass
 

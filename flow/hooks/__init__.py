@@ -31,34 +31,35 @@ class _HooksList(list):
 class Hooks:
     """:class:`~.Hooks` execute an action or set of actions at specific stages of operation execution.
 
-    :class:`~.Hooks` can execute a user defined function when an operation begins, fails, succeeds,
-    or finishes (regardless of if the operation executed successfully or failed).
+    :class:`~.Hooks` can execute a user defined function when an operation
+    starts, succeeds, fails, or finishes (regardless of whether the operation
+    executed successfully or failed).
 
     Hooks can be installed at the operation level as decorators,
     or at the :class:`~.FlowProject` level.
 
     Examples
     --------
-    In the example below, a operation level decorator that prints the operation name
-    and job id at the start of the operation execution.
+    The example below shows an operation level decorator that prints the
+    operation name and job id at the start of the operation execution.
 
     .. code-block:: python
-        @Flowproject.operation
-        @Flowproject.hook.on_start(lambda operation_name, job: print(
-            f"Starting operation {operation.name} on job {job.id}")
+        @FlowProject.operation
+        @FlowProject.hook.on_start(lambda operation, job: print(
+            f"Starting operation {operation.name} on job {job.id}"))
         def op(job):
             pass
 
     Parameters
     ----------
-    on_start : function
+    on_start : list of callables
         Function(s) to execute when the operation begins execution.
     on_finish : function
         Function(s) to execute when the operation exits, with or without errors.
     on_success : function
         Function(s) to execute when the operation exits without error.
     on_fail : function
-        Function(s) to execute when the operation exits with error.
+        Function(s) to execute when the operation exits with an error.
 
     """
 
@@ -97,10 +98,8 @@ class Hooks:
         return "{}({})".format(
             type(self).__name__,
             ", ".join(
-                [
-                    f"{hook_trigger}={getattr(self, hook_trigger)}"
-                    for hook_trigger in self._hook_triggers
-                ]
+                f"{hook_trigger}={getattr(self, hook_trigger)}"
+                for hook_trigger in self._hook_triggers
             ),
         )
 

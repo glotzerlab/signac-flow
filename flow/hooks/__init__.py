@@ -59,7 +59,7 @@ class Hooks:
     on_success : function
         Function(s) to execute when the operation exits without error.
     on_fail : function
-        Function(s) to execute when the operation exits with error.
+        Function(s) to execute when the operation exits with an error.
 
     """
 

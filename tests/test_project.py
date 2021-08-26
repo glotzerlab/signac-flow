@@ -2347,7 +2347,7 @@ class TestHooksBase(TestProjectBase):
         return project
 
     def call_subcmd(self, subcmd, stderr=subprocess.DEVNULL):
-        # Bypass raising the error/checking output since it interferes with hook.on_failure
+        # Bypass raising the error/checking output since it interferes with hook.on_fail
         fn_script = self.entrypoint["path"]
         _cmd = f"python {fn_script} {subcmd}"
         with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):

@@ -1702,7 +1702,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @property
     def hooks(self):
-        """Return a reference to the instance of :class:`.hooks.Hooks` of this project."""
+        """The :class:`.hooks.Hooks` defined for this project's operations."""
         return self._hooks
 
     @classmethod

@@ -31,8 +31,9 @@ class _HooksList(list):
 class Hooks:
     """:class:`~.Hooks` execute an action or set of actions at specific stages of operation execution.
 
-    :class:`~.Hooks` can execute a user defined function when an operation begins, fails, succeeds,
-    or finishes (regardless of if the operation executed successfully or failed).
+    :class:`~.Hooks` can execute a user defined function when an operation
+    starts, succeeds, fails, or finishes (regardless of whether the operation
+    executed successfully or failed).
 
     Hooks can be installed at the operation level as decorators,
     or at the :class:`~.FlowProject` level.

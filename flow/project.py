@@ -3144,7 +3144,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         except Exception as error:
             self.hooks.on_fail(name, error, *jobs)
             op_hooks.on_fail(name, error, *jobs)
-            raise error
+            raise
         else:
             self.hooks.on_success(name, *jobs)
             op_hooks.on_success(name, *jobs)

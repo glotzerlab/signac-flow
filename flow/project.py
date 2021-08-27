@@ -3132,25 +3132,25 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     @contextlib.contextmanager
     def _run_with_hooks(self, operation):
         # Determine operation hooks
-        op_hooks = self._operation_hooks.get(operation.name, Hooks())
+        operation_hooks = self._operation_hooks.get(operation.name, Hooks())
 
         name = operation.name
         jobs = operation._jobs
 
         self.hooks.on_start(name, *jobs)
-        op_hooks.on_start(name, *jobs)
+        operation_hooks.on_start(name, *jobs)
         try:
             yield
         except Exception as error:
             self.hooks.on_fail(name, error, *jobs)
-            op_hooks.on_fail(name, error, *jobs)
+            operation_hooks.on_fail(name, error, *jobs)
             raise error
         else:
             self.hooks.on_success(name, *jobs)
-            op_hooks.on_success(name, *jobs)
+            operation_hooks.on_success(name, *jobs)
         finally:
             self.hooks.on_finish(name, *jobs)
-            op_hooks.on_finish(name, *jobs)
+            operation_hooks.on_finish(name, *jobs)
 
     def _execute_operation(self, operation, timeout=None, pretend=False):
         """Execute an operation.

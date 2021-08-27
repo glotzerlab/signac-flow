@@ -49,7 +49,7 @@ def b_is_even(job):
 @group1
 @_TestProject.post.isfile("world.txt")
 def op1(job):
-    return f'echo "hello" > {job.ws}/world.txt'
+    return 'echo "hello" > {job.ws}/world.txt'
 
 
 def _need_to_fork(job):

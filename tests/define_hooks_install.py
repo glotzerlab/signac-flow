@@ -1,7 +1,7 @@
 from define_hooks_test_project import (
     _HooksTestProject,
     set_job_doc,
-    set_job_doc_w_error,
+    set_job_doc_with_error,
 )
 
 
@@ -17,7 +17,7 @@ class ProjectLevelHooks:
         project.hooks.on_start.append(set_job_doc(self.keys[0]))
         project.hooks.on_finish.append(set_job_doc(self.keys[1]))
         project.hooks.on_success.append(set_job_doc(self.keys[2]))
-        project.hooks.on_fail.append(set_job_doc_w_error(self.keys[3]))
+        project.hooks.on_fail.append(set_job_doc_with_error(self.keys[3]))
         return project
 
     __call__ = install_hooks

@@ -16,9 +16,8 @@ def set_job_doc(key):
     return set_true
 
 
-def set_job_doc_w_error(key=None):
-    if key is None:
-        key = HOOK_KEYS[-1]
+def set_job_doc_with_error():
+    key = HOOK_KEYS[-1]
 
     def set_true_with_error(operation_name, error, job):
         job.doc[f"{operation_name}_{key}"] = (True, error.args[0])
@@ -30,7 +29,7 @@ def set_job_doc_w_error(key=None):
 @_HooksTestProject.hook.on_start(set_job_doc(HOOK_KEYS[0]))
 @_HooksTestProject.hook.on_finish(set_job_doc(HOOK_KEYS[1]))
 @_HooksTestProject.hook.on_success(set_job_doc(HOOK_KEYS[2]))
-@_HooksTestProject.hook.on_fail(set_job_doc_w_error())
+@_HooksTestProject.hook.on_fail(set_job_doc_with_error())
 def base(job):
     if job.sp.raise_exception:
         raise RuntimeError(HOOKS_ERROR_MESSAGE)
@@ -40,7 +39,7 @@ def base(job):
 @_HooksTestProject.hook.on_start(set_job_doc(HOOK_KEYS[0]))
 @_HooksTestProject.hook.on_finish(set_job_doc(HOOK_KEYS[1]))
 @_HooksTestProject.hook.on_success(set_job_doc(HOOK_KEYS[2]))
-@_HooksTestProject.hook.on_fail(set_job_doc_w_error())
+@_HooksTestProject.hook.on_fail(set_job_doc_with_error())
 @flow.with_job
 @flow.cmd
 def base_cmd(job):

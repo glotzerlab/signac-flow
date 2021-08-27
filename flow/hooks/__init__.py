@@ -104,7 +104,7 @@ class Hooks:
         )
 
     def __bool__(self):
-        """Return true if hooks are defined."""
+        """Return True if hooks are defined."""
         return any(
             getattr(self, hook_trigger, None) for hook_trigger in self._hook_triggers
         )

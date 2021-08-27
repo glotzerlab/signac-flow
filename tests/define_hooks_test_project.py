@@ -16,9 +16,7 @@ def set_job_doc(key):
     return set_true
 
 
-def set_job_doc_with_error():
-    key = HOOK_KEYS[-1]
-
+def set_job_doc_with_error(key=HOOK_KEYS[-1]):
     def set_true_with_error(operation_name, error, job):
         job.doc[f"{operation_name}_{key}"] = (True, error.args[0])
 

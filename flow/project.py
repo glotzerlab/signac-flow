@@ -3131,11 +3131,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @contextlib.contextmanager
     def _run_with_hooks(self, operation):
-        # Determine operation hooks
-        op_hooks = self._operation_hooks.get(operation.name, Hooks())
-
         name = operation.name
         jobs = operation._jobs
+
+        # Determine operation hooks
+        op_hooks = self._operation_hooks.get(name, Hooks())
 
         self.hooks.on_start(name, *jobs)
         op_hooks.on_start(name, *jobs)

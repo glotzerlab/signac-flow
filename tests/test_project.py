@@ -2497,6 +2497,32 @@ class TestHooksInstallCmd(TestHooksCmd, TestHooksInstallBase):
             assert get_job_doc_value("fail")[0]
 
 
+class TestHooksInvalidOption:
+    def test_invalid_hook(self):
+        class A(FlowProject):
+            pass
+
+        with pytest.raises(Exception):
+
+            @A.operation
+            @A.hooks.invalid_option(lambda: None)
+            def test_invalid_decorators(_):
+                pass
+
+    def test_install_invalid_hook(self):
+        class A(FlowProject):
+            pass
+
+        class InstallInvalidHook:
+            def install_hook(self, project):
+                project.hooks.invalid_option.append("invalid_option")
+
+            __call__ = install_hook
+
+        with pytest.raises(Exception):
+            InstallInvalidHook().install_hook(A())
+
+
 class TestIgnoreConditions:
     def test_str(self):
         expected_results = {

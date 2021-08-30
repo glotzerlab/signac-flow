@@ -53,7 +53,7 @@ class Hooks:
     Parameters
     ----------
     on_start : list of callables
-        Function(s) to execute when the operation begins execution.
+        Function(s) to execute before the operation begins execution.
     on_finish : function
         Function(s) to execute when the operation exits, with or without errors.
     on_success : function

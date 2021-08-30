@@ -269,6 +269,8 @@ def _make_bundles(operations, size=None):
 
 
 class _HooksDecorator:
+    """Class defining hooks at the operation level, in the context of `:class:`~.FlowProject`."""
+
     def __init__(self):
         self._operation_hooks = defaultdict(lambda: defaultdict(list))
 

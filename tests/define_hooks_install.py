@@ -20,8 +20,6 @@ class ProjectLevelHooks:
         project.hooks.on_fail.append(set_job_doc_with_error(self.keys[3]))
         return project
 
-    __call__ = install_hooks
-
 
 if __name__ == "__main__":
     ProjectLevelHooks().install_hooks(_HooksTestProject()).main()

@@ -1702,7 +1702,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @property
     def hooks(self):
-        """Return a reference to the instance of :class:`.hooks.Hooks` of this project."""
+        """:class:`.hooks.Hooks` is defined for this project's operations."""
         return self._hooks
 
     @classmethod
@@ -3131,11 +3131,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @contextlib.contextmanager
     def _run_with_hooks(self, operation):
-        # Determine operation hooks
-        operation_hooks = self._operation_hooks.get(operation.name, Hooks())
-
         name = operation.name
         jobs = operation._jobs
+
+        # Determine operation hooks
+        operation_hooks = self._operation_hooks.get(name, Hooks())
 
         self.hooks.on_start(name, *jobs)
         operation_hooks.on_start(name, *jobs)

@@ -268,8 +268,12 @@ def _make_bundles(operations, size=None):
             break
 
 
-class _HooksDecorator:
-    """Class defining hooks at the operation level, in the context of `:class:`~.FlowProject`."""
+class _HooksRegistery:
+    """Class storing hooks at the operation level for an instance of `:class:`~.FlowProject`.
+
+    :class:`~._HooksRegistery` stores and installs operations hooks defined at the project level,
+    and as decorators at the operation level.
+    """
 
     def __init__(self):
         self._operation_hooks = defaultdict(lambda: defaultdict(list))
@@ -1237,7 +1241,7 @@ class _FlowProjectClass(type):
         cls._GROUPS = []
         cls._GROUP_NAMES = set()
 
-        cls.hook = _HooksDecorator()
+        cls.hook = _HooksRegistery()
 
         return cls
 

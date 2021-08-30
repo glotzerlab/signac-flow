@@ -269,11 +269,7 @@ def _make_bundles(operations, size=None):
 
 
 class _HooksRegistery:
-    """Class storing hooks at the operation level for an instance of `:class:`~.FlowProject`.
-
-    :class:`~._HooksRegistery` stores and installs operations hooks defined at the project level,
-    and as decorators at the operation level.
-    """
+    """Class storing hooks at the operation level for an instance of `:class:`~.FlowProject`."""
 
     def __init__(self):
         self._operation_hooks = defaultdict(lambda: defaultdict(list))

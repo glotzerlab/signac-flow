@@ -55,11 +55,11 @@ class Hooks:
     on_start : list of callables
         Function(s) to execute before the operation begins execution.
     on_finish : function
-        Function(s) to execute when the operation exits, with or without errors.
+        Function(s) to execute after the operation exits, with or without errors.
     on_success : function
-        Function(s) to execute when the operation exits without error.
+        Function(s) to execute after the operation exits without error.
     on_fail : function
-        Function(s) to execute when the operation exits with an error.
+        Function(s) to execute after the operation exits with an error.
 
     """
 

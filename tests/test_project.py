@@ -2505,7 +2505,7 @@ class TestHooksInvalidOption:
         with pytest.raises(Exception):
 
             @A.operation
-            @A.hooks.invalid_option(lambda: None)
+            @A.hook.invalid_option(lambda: None)
             def test_invalid_decorators(_):
                 pass
 

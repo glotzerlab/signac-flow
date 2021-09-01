@@ -268,7 +268,7 @@ def _make_bundles(operations, size=None):
             break
 
 
-class _HooksRegistery:
+class _HooksRegistry:
     """Class storing hooks at the operation level for an instance of `:class:`~.FlowProject`."""
 
     def __init__(self):
@@ -1241,7 +1241,7 @@ class _FlowProjectClass(type):
         cls._GROUPS = []
         cls._GROUP_NAMES = set()
 
-        cls.hook = _HooksRegistery()
+        cls.hook = _HooksRegistry()
 
         return cls
 

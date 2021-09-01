@@ -278,13 +278,21 @@ class _HooksRegistery:
         return self._operation_hooks[func]
 
     def __getattr__(self, name):
-        class _InstallHook:
-            def __init__(install_self, hook_func):
-                install_self.hook_func = hook_func
+        if name in ("on_start", "on_finish", "on_success", "on_fail"):
 
-            def __call__(install_self, func):
-                self._operation_hooks[func][name].append(install_self.hook_func)
-                return func
+            class _InstallHook:
+                def __init__(install_self, hook_func):
+                    install_self.hook_func = hook_func
+
+                def __call__(install_self, func):
+                    self._operation_hooks[func][name].append(install_self.hook_func)
+                    return func
+
+        else:
+            raise AttributeError(
+                f"The hook '{name}' is invalid. "
+                "Valid hooks are 'on_start', 'on_finish', 'on_success', and 'on_fail'."
+            )
 
         return _InstallHook
 

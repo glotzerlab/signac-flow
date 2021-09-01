@@ -2498,11 +2498,19 @@ class TestHooksInstallCmd(TestHooksCmd, TestHooksInstallBase):
 
 
 class TestHooksInvalidOption:
+    def mock_project(self):
+        project = self.project_class.get_project(root=self._tmp_dir.name)
+        project.open_job(dict(raise_exception=False)).init()
+        project.open_job(dict(raise_exception=True)).init()
+        project = project.get_project(root=self._tmp_dir.name)
+        project._entrypoint = self.entrypoint
+        return project
+
     def test_invalid_hook(self):
         class A(FlowProject):
             pass
 
-        with pytest.raises(Exception):
+        with pytest.raises(AttributeError):
 
             @A.operation
             @A.hook.invalid_option(lambda: None)
@@ -2510,17 +2518,12 @@ class TestHooksInvalidOption:
                 pass
 
     def test_install_invalid_hook(self):
-        class A(FlowProject):
-            pass
-
         class InstallInvalidHook:
             def install_hook(self, project):
                 project.hooks.invalid_option.append("invalid_option")
 
-            __call__ = install_hook
-
-        with pytest.raises(Exception):
-            InstallInvalidHook().install_hook(A())
+        with pytest.raises(AttributeError):
+            InstallInvalidHook().install_hook(self.mock_project())
 
 
 class TestIgnoreConditions:

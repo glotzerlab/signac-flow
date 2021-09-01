@@ -2319,7 +2319,7 @@ class TestAggregationGroupProjectMainInterface(TestAggregatesProjectBase):
         assert f"exec agg_op3 {get_aggregate_id(project)}" in submit_output
 
 
-class TestHooksBase(TestProjectBase):
+class TestHooksSetUp(TestProjectBase):
     error_message = define_hooks_test_project.HOOKS_ERROR_MESSAGE
     keys = define_hooks_test_project.HOOK_KEYS
     project_class = define_hooks_test_project._HooksTestProject
@@ -2346,13 +2346,16 @@ class TestHooksBase(TestProjectBase):
         project._entrypoint = self.entrypoint
         return project
 
-    def call_subcmd(self, subcmd, stderr=subprocess.DEVNULL):
+    def call_subcmd(self, subcmd, stderr=subprocess.STDOUT):
         # Bypass raising the error/checking output since it interferes with hook.on_fail
         fn_script = self.entrypoint["path"]
-        _cmd = f"python {fn_script} {subcmd}"
+        _cmd = f"python {fn_script} {subcmd} --debug"
         with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
-            with switch_to_directory(self.project.root_directory()):
-                return subprocess.run(_cmd.split())
+            try:
+                with switch_to_directory(self.project.root_directory()):
+                    return subprocess.check_output(_cmd.split(), stderr=stderr)
+            except subprocess.CalledProcessError as error:
+                return str(error.output)
 
     @pytest.fixture(scope="function")
     def project(self):
@@ -2362,6 +2365,8 @@ class TestHooksBase(TestProjectBase):
     def job(self, request, project):
         return project.open_job(dict(raise_exception=request.param))
 
+
+class TestHooksBase(TestHooksSetUp):
     def test_start_and_finish(self, project, job, operation_name):
         get_job_doc_value = self._get_job_doc_key(job, operation_name)
 
@@ -2497,15 +2502,7 @@ class TestHooksInstallCmd(TestHooksCmd, TestHooksInstallBase):
             assert get_job_doc_value("fail")[0]
 
 
-class TestHooksInvalidOption:
-    def mock_project(self):
-        project = self.project_class.get_project(root=self._tmp_dir.name)
-        project.open_job(dict(raise_exception=False)).init()
-        project.open_job(dict(raise_exception=True)).init()
-        project = project.get_project(root=self._tmp_dir.name)
-        project._entrypoint = self.entrypoint
-        return project
-
+class TestHooksInvalidOption(TestHooksSetUp):
     def test_invalid_hook(self):
         class A(FlowProject):
             pass
@@ -2524,6 +2521,24 @@ class TestHooksInvalidOption:
 
         with pytest.raises(AttributeError):
             InstallInvalidHook().install_hook(self.mock_project())
+
+    def test_raise_exception_in_hook(self):
+        job = self.mock_project().open_job(dict(raise_exception=False))
+
+        error_output = self.call_subcmd(f"run -o raise_exception_in_hook -j {job.id}")
+
+        assert "RuntimeError" in error_output
+        assert "Error occurred during execution of "
+
+    def test_raise_exception_in_hook_cmd(self):
+        job = self.mock_project().open_job(dict(raise_exception=False))
+
+        error_output = self.call_subcmd(
+            f"run -o raise_exception_in_hook_cmd -j {job.id}"
+        )
+
+        assert "RuntimeError" in error_output
+        assert "Error occurred during execution of "
 
 
 class TestIgnoreConditions:

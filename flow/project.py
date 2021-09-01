@@ -288,13 +288,9 @@ class _HooksRegistery:
                     self._operation_hooks[func][name].append(install_self.hook_func)
                     return func
 
+            return _InstallHook
         else:
-            raise AttributeError(
-                f"The hook '{name}' is invalid. "
-                "Valid hooks are 'on_start', 'on_finish', 'on_success', and 'on_fail'."
-            )
-
-        return _InstallHook
+            raise AttributeError
 
 
 class _JobOperation:

@@ -23,6 +23,10 @@ def set_job_doc_with_error(key=HOOK_KEYS[-1]):
     return set_true_with_error
 
 
+def raise_error(operation_name, job):
+    raise RuntimeError
+
+
 @_HooksTestProject.operation
 @_HooksTestProject.hook.on_start(set_job_doc(HOOK_KEYS[0]))
 @_HooksTestProject.hook.on_finish(set_job_doc(HOOK_KEYS[1]))
@@ -61,6 +65,20 @@ def base_cmd_no_decorators(job):
         return "exit 42"
     else:
         return "touch base_cmd.txt"
+
+
+@_HooksTestProject.operation
+@_HooksTestProject.hook.on_start(raise_error)
+def raise_exception_in_hook(job):
+    pass
+
+
+@_HooksTestProject.operation
+@_HooksTestProject.hook.on_start(raise_error)
+@flow.with_job
+@flow.cmd
+def raise_exception_in_hook_cmd(job):
+    pass
 
 
 if __name__ == "__main__":

@@ -17,7 +17,6 @@ from io import StringIO
 from itertools import groupby
 from tempfile import TemporaryDirectory
 
-import define_hooks_install
 import define_hooks_test_project
 import pytest
 import signac
@@ -2321,9 +2320,8 @@ class TestAggregationGroupProjectMainInterface(TestAggregatesProjectBase):
 
 class TestHooksSetUp(TestProjectBase):
     error_message = define_hooks_test_project.HOOKS_ERROR_MESSAGE
-    keys = define_hooks_test_project.HOOK_KEYS
+    keys = ["start", "finish", "success", "fail"]
     project_class = define_hooks_test_project._HooksTestProject
-    operation_name = "base"
     entrypoint = dict(
         path=os.path.realpath(
             os.path.join(os.path.dirname(__file__), "define_hooks_test_project.py")
@@ -2346,7 +2344,7 @@ class TestHooksSetUp(TestProjectBase):
         project._entrypoint = self.entrypoint
         return project
 
-    def call_subcmd(self, subcmd, stderr=subprocess.STDOUT):
+    def call_subcmd(self, subcmd, stderr=subprocess.DEVNULL):
         # Bypass raising the error/checking output since it interferes with hook.on_fail
         fn_script = self.entrypoint["path"]
         _cmd = f"python {fn_script} {subcmd} --debug"
@@ -2355,7 +2353,9 @@ class TestHooksSetUp(TestProjectBase):
                 with switch_to_directory(self.project.root_directory()):
                     return subprocess.check_output(_cmd.split(), stderr=stderr)
             except subprocess.CalledProcessError as error:
-                return str(error.output)
+                print(error, file=sys.stderr)
+                print(error.output, file=sys.stderr)
+                raise
 
     @pytest.fixture(scope="function")
     def project(self):
@@ -2373,7 +2373,11 @@ class TestHooksBase(TestHooksSetUp):
         assert get_job_doc_value(self.keys[0]) is None
         assert get_job_doc_value(self.keys[1]) is None
 
-        self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+        if job.sp.raise_exception:
+            with pytest.raises(subprocess.CalledProcessError):
+                self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+        else:
+            self.call_subcmd(f"run -o {operation_name} -j {job.id}")
 
         assert get_job_doc_value(self.keys[0])
         assert get_job_doc_value(self.keys[1])
@@ -2383,7 +2387,11 @@ class TestHooksBase(TestHooksSetUp):
 
         assert get_job_doc_value(self.keys[2]) is None
 
-        self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+        if job.sp.raise_exception:
+            with pytest.raises(subprocess.CalledProcessError):
+                self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+        else:
+            self.call_subcmd(f"run -o {operation_name} -j {job.id}")
 
         if job.sp.raise_exception:
             assert not get_job_doc_value(self.keys[2])
@@ -2395,7 +2403,11 @@ class TestHooksBase(TestHooksSetUp):
 
         assert get_job_doc_value(self.keys[3]) is None
 
-        self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+        if job.sp.raise_exception:
+            with pytest.raises(subprocess.CalledProcessError):
+                self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+        else:
+            self.call_subcmd(f"run -o {operation_name} -j {job.id}")
 
         if job.sp.raise_exception:
             assert get_job_doc_value(self.keys[3])[0]
@@ -2404,105 +2416,100 @@ class TestHooksBase(TestHooksSetUp):
             assert get_job_doc_value(self.keys[3]) is None
 
 
-class TestHooksInstallBase(TestHooksBase):
-    keys = define_hooks_install.ProjectLevelHooks.keys
+class TestHooksCmd(TestHooksBase):
+    # Tests hook decorators for a job operation with the @cmd decorator
+    error_message = 42
+
+    @pytest.fixture(params=["base_cmd"])
+    def operation_name(self, request):
+        return request.param
+
+
+class TestHooksInstallSetUp(TestHooksSetUp):
     entrypoint = dict(
         path=os.path.realpath(
             os.path.join(os.path.dirname(__file__), "define_hooks_install.py")
         )
     )
 
+
+class TestHooksInstallBase(TestHooksBase, TestHooksInstallSetUp):
+    # Tests project-wide hooks on job operations with and without operation level hooks
+
+    # Check job document for keys from installed, project-wide hooks
+    keys = [
+        "installed_start",
+        "installed_finish",
+        "installed_success",
+        "installed_fail",
+    ]
+
     @pytest.fixture(params=["base", "base_no_decorators"])
     def operation_name(self, request):
         return request.param
 
-    def test_decorated_start_and_finish(self, job, project, operation_name):
-        get_job_doc_value = self._get_job_doc_key(job, operation_name)
 
-        assert get_job_doc_value(self.keys[0]) is None
-        assert get_job_doc_value(self.keys[1]) is None
+class TestHooksInstallCmd(TestHooksCmd, TestHooksInstallSetUp):
+    # Tests project-wide hooks on job operations with the @cmd decorator.
+    # Job operations are with or without operation level hooks
 
-        self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+    # Check job document for keys from installed, project-wide hooks
+    keys = [
+        "installed_start",
+        "installed_finish",
+        "installed_success",
+        "installed_fail",
+    ]
 
-        if "no_decorators" in operation_name:
-            # No decorators, all hooks installed
-            assert get_job_doc_value("start") is None
-            assert get_job_doc_value("finish") is None
-        else:
-            # Decorators
-            assert get_job_doc_value("start")
-            assert get_job_doc_value("finish")
-
-    def test_decorated_success(self, job, project, operation_name):
-        get_job_doc_value = self._get_job_doc_key(job, operation_name)
-
-        assert get_job_doc_value(self.keys[2]) is None
-
-        self.call_subcmd(f"run -o {operation_name} -j {job.id}")
-
-        if "no_decorators" in operation_name or job.sp.raise_exception:
-            # No decorators, all hooks installed
-            assert get_job_doc_value("success") is None
-        else:
-            # Decorators
-            assert get_job_doc_value("success")
-
-    def test_decorated_fail(self, job, project, operation_name):
-        get_job_doc_value = self._get_job_doc_key(job, operation_name)
-
-        assert get_job_doc_value(self.keys[2]) is None
-
-        self.call_subcmd(f"run -o {operation_name} -j {job.id}")
-
-        if "_no_" in operation_name or not job.sp.raise_exception:
-            # No decorators, all hooks installed
-            assert get_job_doc_value("fail") is None
-        else:
-            # Decorators
-            assert get_job_doc_value("fail")[0]
-            assert get_job_doc_value("fail")[1] == self.error_message
-
-
-class TestHooksCmd(TestHooksBase):
-    @pytest.fixture()
-    def operation_name(self):
-        return "base_cmd"
-
-    def test_fail(self, project, job, operation_name):
-        get_job_doc_value = self._get_job_doc_key(job, operation_name)
-
-        assert get_job_doc_value(self.keys[3]) is None
-
-        self.call_subcmd(f"run -o {operation_name} -j {job.id}")
-
-        if job.sp.raise_exception:
-            assert get_job_doc_value(self.keys[3])[0]
-            assert get_job_doc_value(self.keys[3])[1] == 42
-        else:
-            assert get_job_doc_value(self.keys[3]) is None
-
-
-class TestHooksInstallCmd(TestHooksCmd, TestHooksInstallBase):
     @pytest.fixture(params=["base_cmd", "base_cmd_no_decorators"])
     def operation_name(self, request):
         return request.param
 
-    def test_decorated_fail(self, job, project, operation_name):
-        get_job_doc_value = self._get_job_doc_key(job, operation_name)
 
-        assert get_job_doc_value(self.keys[2]) is None
+class TestHooksInstallWithDecorators(TestHooksBase, TestHooksInstallSetUp):
+    # Tests if project-wide hooks interfere with operation level hooks
+    @pytest.fixture(params=["base"])
+    def operation_name(self, request):
+        return request.param
 
+
+class TestHooksInstallCmdWithDecorators(TestHooksCmd, TestHooksInstallSetUp):
+    # Tests if project-wide hooks interfere with operation level hooks
+    # in job operations with the @cmd decorator
+    @pytest.fixture()
+    def operation_name(self):
+        return "base_cmd"
+
+
+class TestHooksInstallNoDecorators(TestHooksInstallSetUp):
+    # Tests if operation level hooks interfere with project-level hooks
+    @pytest.fixture(params=["base_no_decorators", "base_cmd_no_decorators"])
+    def operation_name(self, request):
+        return request.param
+
+    @pytest.fixture()
+    def job(self, project):
+        return project.open_job(dict(raise_exception=False))
+
+    def test_no_decorator_keys(self, operation_name, job):
+        get_job_doc_key = self._get_job_doc_key(job, operation_name)
         self.call_subcmd(f"run -o {operation_name} -j {job.id}")
-
-        if "no_decorators" in operation_name or not job.sp.raise_exception:
-            # No decorators, all hooks installed
-            assert get_job_doc_value("fail") is None
-        else:
-            # Decorators
-            assert get_job_doc_value("fail")[0]
+        for key in self.keys:
+            assert get_job_doc_key(key) is None
 
 
 class TestHooksInvalidOption(TestHooksSetUp):
+    def call_subcmd(self, subcmd, stderr=subprocess.STDOUT):
+        # Return error as output instead of raising error
+        fn_script = self.entrypoint["path"]
+        _cmd = f"python {fn_script} {subcmd} --debug"
+        with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
+            try:
+                with switch_to_directory(self.project.root_directory()):
+                    return subprocess.check_output(_cmd.split(), stderr=stderr)
+            except subprocess.CalledProcessError as error:
+                return str(error.output)
+
     def test_invalid_hook(self):
         class A(FlowProject):
             pass

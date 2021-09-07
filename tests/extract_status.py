@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright (c) 2018 The Regents of the University of Michigan
+# Copyright (c) 2021 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 """Extract generated status into a signac project for simplified inspection."""
@@ -24,8 +24,8 @@ def main(args):
     else:
         return
 
-    p = signac.init_project(name=gen.PROJECT_NAME, root=PROJECT_DIR)
-    p.import_from(origin=gen.ARCHIVE_DIR)
+    p = signac.init_project(name=gen.STATUS_OPTIONS_PROJECT_NAME, root=PROJECT_DIR)
+    p.import_from(origin=gen.ARCHIVE_PATH)
 
 
 if __name__ == "__main__":

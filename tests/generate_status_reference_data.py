@@ -7,14 +7,14 @@ import os
 
 import signac
 from define_status_test_project import _TestProject
-from test_project import redirect_stdout
 
 import flow
 import flow.environments
 from flow.scheduling.fake_scheduler import FakeScheduler
 
 PROJECT_NAME = "StatusTest"
-ARCHIVE_DIR = os.path.normpath(
+STATUS_OPTIONS_PROJECT_NAME = "StatusOptionsData"
+ARCHIVE_PATH = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "./status_reference_data.tar.gz")
 )
 
@@ -30,53 +30,65 @@ def init(project):
 
 def init_status_options(project):
 
-    options = [{}, {"detailed": True}, {"parameters": ["a"]}, {"expand": True}]
+    options = [
+        {},  # default options
+        {"overview": False},  # --no-overview
+        {"overview_max_lines": 2},  # --overview-max-lines 2
+        {"detailed": True},  # -d, --detailed
+        {"parameters": ["a"]},  # -p a, --parameters a
+        {"param_max_width": 1},  # --param-max-width 1
+        {"expand": True},  # -e, --expand
+        {"all_ops": True},  # -a, --all-operations
+        {"only_incomplete": True},  # --only-incomplete-operations
+        {"dump_json": True},  # --json
+        {"unroll": False},  # --stack
+        {"compact": True},  # -1, --one-line
+        {"pretty": True},  # --pretty
+        {"profile": True},  # No CLI flag
+        {"eligible_jobs_max_lines": 2},  # --eligible-jobs-max-lines 2
+        {"output_format": "markdown"},  # -o markdown, --output-format markdown
+        {"output_format": "html"},  # -o html, --output-format html
+    ]
 
     for sp in options:
         project.open_job(sp).init()
 
 
 def main(args):
-    # If the ARCHIVE_DIR already exists, only recreate if forced.
-    if os.path.exists(ARCHIVE_DIR):
+    # If the ARCHIVE_PATH already exists, only recreate if forced.
+    if os.path.exists(ARCHIVE_PATH):
         if args.force:
-            print(f"Removing existing archive '{ARCHIVE_DIR}'.")
-            os.unlink(ARCHIVE_DIR)
+            print(f"Removing existing archive '{ARCHIVE_PATH}'.")
+            os.unlink(ARCHIVE_PATH)
         else:
             print(
                 "Archive '{}' already exists, exiting. "
-                "Use `-f/--force` to overwrite.".format(ARCHIVE_DIR)
+                "Use `-f/--force` to overwrite.".format(ARCHIVE_PATH)
             )
             return
 
     with signac.TemporaryProject(name=PROJECT_NAME) as p, signac.TemporaryProject(
-        name="StatusProject"
+        name=STATUS_OPTIONS_PROJECT_NAME
     ) as status_pr:
         init(p)
         init_status_options(status_pr)
         fp = _TestProject.get_project(root=p.root_directory())
         env = flow.environment.TestEnvironment
         # We need to set the scheduler manually. The FakeScheduler
-        # is used for two reasons. First, the FakeScheduler prints
-        # scripts to screen on submission and we can capture that
-        # output. Second, the FakeScheduler won't try to call any
-        # cluster executable (e.g. squeue) associated with the real
-        # schedulers used on supported clusters. Otherwise
-        # submission would fail when attempting to determine what
-        # jobs already exist on the scheduler.
+        # won't try to call any cluster executable (e.g. squeue)
+        # associated with the real schedulers used on supported
+        # clusters. Otherwise status check would fail when
+        # attempting to determine what jobs exist on the scheduler.
         env.scheduler_type = FakeScheduler
         fp._environment = env
         for job in status_pr:
-            with job:
-                kwargs = job.statepoint()
-                fn = job.fn("status.txt")
+            kwargs = job.statepoint()
+            print(kwargs)
+            with open(job.fn("status.txt"), "w") as status_file:
+                fp.print_status(**kwargs, file=status_file)
 
-                with open(fn, "w") as f:
-                    with redirect_stdout(f):
-                        fp.print_status(**kwargs)
-
-        # For compactness, we move the output into an ARCHIVE_DIR then delete the original data.
-        status_pr.export_to(target=ARCHIVE_DIR, path=False)
+        # For compactness, we move the output into an ARCHIVE_PATH then delete the original data.
+        status_pr.export_to(target=ARCHIVE_PATH, path=False)
 
 
 if __name__ == "__main__":
@@ -86,6 +98,6 @@ if __name__ == "__main__":
         "-f",
         "--force",
         action="store_true",
-        help="Recreate the data space even if the ARCHIVE_DIR already exists",
+        help="Recreate the data space even if the ARCHIVE_PATH already exists",
     )
     main(parser.parse_args())

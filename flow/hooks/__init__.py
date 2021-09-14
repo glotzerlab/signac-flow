@@ -4,4 +4,4 @@
 """Operation hooks."""
 from .hooks import Hooks
 
-Hooks
+Hooks  # Avoid flake8 error F401 '.hooks.Hooks' imported but unused

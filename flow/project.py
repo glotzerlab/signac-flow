@@ -1218,7 +1218,7 @@ class _FlowProjectClass(type):
         cls._GROUPS = []
         cls._GROUP_NAMES = set()
 
-        cls.hook = cls._setup_hook_object(parent_class=cls)
+        cls.add_hook = cls._setup_hook_object(parent_class=cls)
 
         return cls
 

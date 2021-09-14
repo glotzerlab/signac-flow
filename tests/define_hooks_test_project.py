@@ -24,7 +24,7 @@ def set_job_doc_with_error(key=HOOK_KEYS[-1]):
 
 
 def raise_error(operation_name, job):
-    raise RuntimeError
+    raise RuntimeError(HOOKS_ERROR_MESSAGE)
 
 
 @_HooksTestProject.operation

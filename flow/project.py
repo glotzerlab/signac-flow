@@ -1513,7 +1513,7 @@ class _FlowProjectClass(type):
 
     @staticmethod
     def _setup_hook_object(parent_class):
-        class _HooksRegistry:
+        class _HooksRegister:
 
             _parent_class = parent_class
 
@@ -1578,7 +1578,7 @@ class _FlowProjectClass(type):
                 ].append(self._hook_func)
                 return func
 
-        return _HooksRegistry
+        return _HooksRegister
 
 
 class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):

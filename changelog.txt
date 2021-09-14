@@ -16,12 +16,6 @@ Added
 
 - Feature to install execution hooks for the automated execution of functions with operations (#28, #189, #508).
 
-Changed
-+++++++
-
-Removed
-+++++++
-
 Version 0.16
 ============
 

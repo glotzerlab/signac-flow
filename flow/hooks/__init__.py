@@ -4,6 +4,4 @@
 """Operation hooks."""
 from .hooks import Hooks
 
-__all__ = [
-  "Hooks"
-]
+__all__ = ["Hooks"]

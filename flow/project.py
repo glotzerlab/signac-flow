@@ -639,6 +639,8 @@ class FlowGroupEntry:
     ----------
     name : str
         The name of the :class:`FlowGroup` to be created.
+    project : flow.FlowProject
+        The project the group is associated with.
     options : str
         The :meth:`FlowProject.run` options to pass when submitting the group.
         These will be included in all submissions. Submissions use run
@@ -647,8 +649,9 @@ class FlowGroupEntry:
         aggregator object associated with the :class:`FlowGroup` (Default value = None).
     """
 
-    def __init__(self, name, options="", group_aggregator=None):
+    def __init__(self, name, project, options="", group_aggregator=None):
         self.name = name
+        self._project = project
         self.options = options
         # We register aggregators associated with operation functions in
         # `_register_groups` and we do not set the aggregator explicitly.
@@ -656,10 +659,6 @@ class FlowGroupEntry:
         # decorator placement in terms of `@FlowGroupEntry`, `@aggregator`, or
         # `@operation`.
         self.group_aggregator = group_aggregator
-        # We assign operations to a group using a decorator. In order to identify
-        # whether a function is assigned to a group but not as an operation, we need
-        # to store the names of the functions.
-        self._operations = set()
 
     def __call__(self, func):
         """Add the function into the group's operations.
@@ -677,6 +676,14 @@ class FlowGroupEntry:
             The decorated function.
 
         """
+        if not any(
+            func == op_func for _, op_func in self._project._OPERATION_FUNCTIONS
+        ):
+            raise FlowProjectDefinitionError(
+                f"Cannot add function '{func}' to group without making the function an "
+                f"operation. Add @MyProjectClass.operation below group decorator."
+            )
+
         if hasattr(func, "_flow_groups"):
             if self.name in func._flow_groups:
                 raise FlowProjectDefinitionError(
@@ -685,7 +692,6 @@ class FlowGroupEntry:
             func._flow_groups.add(self.name)
         else:
             func._flow_groups = {self.name}
-        self._operations.add(func.__name__)
         return func
 
     def _set_directives(self, func, directives):
@@ -1458,7 +1464,9 @@ class _FlowProjectClass(type):
                 # delay setting the aggregator because we do not restrict the decorator
                 # placement in terms of `@FlowGroupEntry`, `@aggregator`, or
                 # `@operation`.
-                self._parent_class._GROUPS.append(FlowGroupEntry(name=name, options=""))
+                self._parent_class._GROUPS.append(
+                    FlowGroupEntry(name=name, project=self._parent_class, options="")
+                )
                 if hasattr(func, "_flow_groups"):
                     func._flow_groups.add(name)
                 else:
@@ -4262,7 +4270,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             )
         cls._GROUP_NAMES.add(name)
         group_entry = FlowGroupEntry(
-            name=name, options=options, group_aggregator=group_aggregator
+            name=name, project=cls, options=options, group_aggregator=group_aggregator
         )
         cls._GROUPS.append(group_entry)
         return group_entry
@@ -4285,14 +4293,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # equivalent aggregators only generate once.
         created_aggregate_stores = {}
         for entry in group_entries:
-            for operation in entry._operations:
-                if operation not in self._operations:
-                    raise FlowProjectDefinitionError(
-                        f"Cannot add the function '{operation}' to a "
-                        "FlowGroup because it is not registered as an "
-                        "operation. Add the `@FlowProject.operation` "
-                        "decorator to register the operation."
-                    )
             group = FlowGroup(entry.name, options=entry.options)
             self._groups[entry.name] = group
             # Handle unset aggregators

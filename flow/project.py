@@ -268,31 +268,6 @@ def _make_bundles(operations, size=None):
             break
 
 
-class _HooksRegistry:
-    """Class storing hooks at the operation level for an instance of `:class:`~.FlowProject`."""
-
-    def __init__(self):
-        self._operation_hooks = defaultdict(lambda: defaultdict(list))
-
-    def __getitem__(self, func):
-        return self._operation_hooks[func]
-
-    def __getattr__(self, name):
-        if name in ("on_start", "on_finish", "on_success", "on_fail"):
-
-            class _InstallHook:
-                def __init__(install_self, hook_func):
-                    install_self.hook_func = hook_func
-
-                def __call__(install_self, func):
-                    self._operation_hooks[func][name].append(install_self.hook_func)
-                    return func
-
-            return _InstallHook
-        else:
-            raise AttributeError
-
-
 class _JobOperation:
     """Class containing execution information for one group and one job.
 
@@ -1217,6 +1192,8 @@ class _FlowProjectClass(type):
         cls._OPERATION_FUNCTIONS = []
         cls._OPERATION_PRECONDITIONS = defaultdict(list)
         cls._OPERATION_POSTCONDITIONS = defaultdict(list)
+        cls._OPERATION_HOOK_REGISTRY = defaultdict(lambda: defaultdict(list))
+        cls._operation_hooks = defaultdict(list)
 
         # All label functions are registered with the label() classmethod,
         # which is intended to be used as decorator function. The
@@ -1241,7 +1218,7 @@ class _FlowProjectClass(type):
         cls._GROUPS = []
         cls._GROUP_NAMES = set()
 
-        cls.hook = _HooksRegistry()
+        cls.add_hook = cls._setup_hook_object(parent_class=cls)
 
         return cls
 
@@ -1533,6 +1510,75 @@ class _FlowProjectClass(type):
             )
 
         return OperationRegister()
+
+    @staticmethod
+    def _setup_hook_object(parent_class):
+        class _HooksRegister:
+
+            _parent_class = parent_class
+
+            def __init__(self, hook_func, trigger):
+                """Add hooks to an operation workflow.
+
+                This object is designed to be used as a decorator. For example:
+
+                .. code-block:: python
+
+                    @FlowProject.operation
+                    @FlowProject.hook.on_start(lambda op_name, job: print(op_name, job))
+                    def foo(job):
+                        pass
+
+                A hook is a function that is called at at specific points during the execution
+                of a job operation. In this example, the anonymous hook function
+                is executed before the operation **foo** runs. Hooks can also run after an
+                operation finish, when an operation exits with error,
+                or when an operation exists without error.
+
+                Parameters
+                ----------
+                hook_func : callable
+                    The function that will be executed at a specified point.
+                trigger: string
+                    The point when a hook operation is executed.
+                """
+                self._hook_func = hook_func
+                self._hook_trigger = trigger
+
+            @classmethod
+            def on_start(cls, hook_func):
+                """Add hook function with trigger "on_start"."""
+                return cls(hook_func, trigger="on_start")
+
+            @classmethod
+            def on_finish(cls, hook_func):
+                """Add hook function with trigger "on_finish"."""
+                return cls(hook_func, trigger="on_finish")
+
+            @classmethod
+            def on_success(cls, hook_func):
+                """Add hook function with trigger "on_success"."""
+                return cls(hook_func, trigger="on_success")
+
+            @classmethod
+            def on_fail(cls, hook_func):
+                """Add hook function with trigger "on_fail"."""
+                return cls(hook_func, trigger="on_fail")
+
+            def __call__(self, func):
+                """Add the decorated function to the operation hook registry.
+
+                Parameters
+                ----------
+                func : callable
+                    The operation function associated with the hook function.
+                """
+                self._parent_class._OPERATION_HOOK_REGISTRY[func][
+                    self._hook_trigger
+                ].append(self._hook_func)
+                return func
+
+        return _HooksRegister
 
 
 class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
@@ -4265,7 +4311,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             }
 
             # Update operation hooks
-            self._operation_hooks[name].update(Hooks(**self.hook[func]))
+            self._operation_hooks[name].update(
+                Hooks(**self._OPERATION_HOOK_REGISTRY[func])
+            )
 
             # Construct FlowOperation:
             if getattr(func, "_flow_cmd", False):

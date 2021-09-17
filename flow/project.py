@@ -1754,7 +1754,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @property
     def hooks(self):
-        """:class:`.hooks.Hooks` is defined for this project's operations."""
+        """:class:`.hooks.Hooks` hooks defined for all project operations."""
         return self._hooks
 
     @classmethod

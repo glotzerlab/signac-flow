@@ -2535,7 +2535,6 @@ class TestHooksInvalidOption(TestHooksSetUp):
         error_output = self.call_subcmd(f"run -o raise_exception_in_hook -j {job.id}")
 
         assert "RuntimeError" in error_output
-        assert "Error occurred during execution of "
 
     def test_raise_exception_in_hook_cmd(self):
         job = self.mock_project().open_job(dict(raise_exception=False))
@@ -2545,7 +2544,6 @@ class TestHooksInvalidOption(TestHooksSetUp):
         )
 
         assert "RuntimeError" in error_output
-        assert "Error occurred during execution of "
 
 
 class TestIgnoreConditions:

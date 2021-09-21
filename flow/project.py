@@ -15,6 +15,7 @@ import multiprocessing
 import os
 import random
 import re
+import shlex
 import subprocess
 import sys
 import textwrap
@@ -1635,6 +1636,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             template_environment.filters["max"] = max
         if "min" not in template_environment.filters:  # for jinja2 < 2.10
             template_environment.filters["min"] = min
+        template_environment.filters["quote_argument"] = shlex.quote
 
         return template_environment
 

@@ -16,6 +16,10 @@ Added
 
 - Feature to install execution hooks for the automated execution of functions with operations (#28, #189, #508).
 
+Fixed
++++++
+- Scripts are now generated correctly when project path contains spaces and special characters (#572).
+
 Version 0.16
 ============
 

@@ -1218,7 +1218,7 @@ class _FlowProjectClass(type):
         cls._GROUPS = []
         cls._GROUP_NAMES = set()
 
-        cls.add_hook = cls._setup_hook_object(parent_class=cls)
+        cls.operation_hook = cls._setup_hook_object(parent_class=cls)
 
         return cls
 
@@ -1525,7 +1525,7 @@ class _FlowProjectClass(type):
                 .. code-block:: python
 
                     @FlowProject.operation
-                    @FlowProject.hook.on_start(lambda op_name, job: print(op_name, job))
+                    @FlowProject.operation_hook.on_start(lambda op_name, job: print(op_name, job))
                     def foo(job):
                         pass
 
@@ -1753,7 +1753,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         sys.exit(2)
 
     @property
-    def hooks(self):
+    def project_hooks(self):
         """:class:`.hooks.Hooks` hooks defined for all project operations."""
         return self._hooks
 
@@ -3189,19 +3189,19 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Determine operation hooks
         operation_hooks = self._operation_hooks.get(name, Hooks())
 
-        self.hooks.on_start(name, *jobs)
+        self.project_hooks.on_start(name, *jobs)
         operation_hooks.on_start(name, *jobs)
         try:
             yield
         except Exception as error:
-            self.hooks.on_fail(name, error, *jobs)
+            self.project_hooks.on_fail(name, error, *jobs)
             operation_hooks.on_fail(name, error, *jobs)
             raise error
         else:
-            self.hooks.on_success(name, *jobs)
+            self.project_hooks.on_success(name, *jobs)
             operation_hooks.on_success(name, *jobs)
         finally:
-            self.hooks.on_finish(name, *jobs)
+            self.project_hooks.on_finish(name, *jobs)
             operation_hooks.on_finish(name, *jobs)
 
     def _execute_operation(self, operation, timeout=None, pretend=False):

@@ -2517,14 +2517,16 @@ class TestHooksInvalidOption(TestHooksSetUp):
         with pytest.raises(AttributeError):
 
             @A.operation
-            @A.add_hook.invalid_option(lambda operation_name, job: None)
+            @A.operation_hook.invalid_option(lambda operation_name, job: None)
             def test_invalid_decorators(_):
                 pass
 
     def test_install_invalid_hook(self):
         class InstallInvalidHook:
             def install_hook(self, project):
-                project.hooks.invalid_option.append(lambda operation_name, job: None)
+                project.project_hooks.invalid_option.append(
+                    lambda operation_name, job: None
+                )
 
         with pytest.raises(AttributeError):
             InstallInvalidHook().install_hook(self.mock_project())

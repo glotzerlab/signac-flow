@@ -1545,19 +1545,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Initialize the local config.
         # TODO: In signac 2.0 we plan to deprecate config modification after
-        # project initialization. We should do the same for flow, but for now
-        # maybe we need a workaround to make such modifications work as
-        # expected.
-        # TODO: Once signac-flow no longer relies on configobj and stops
-        # supporting in-place config modification, we can store the config as a
-        # dictionary that can be updated by flow. For now, we store separately
-        # to avoid any side effects associated with modifying instances of
+        # project initialization. After this PR, flow will begin to work like
+        # that immediately.  Once signac no longer relies on configobj and
+        # stops supporting in-place config modification, flow can make use of
+        # the the signac Project config directly dictionary that can be updated
+        # by flow. For now, we store the flow config separately to avoid any
+        # side effects associated with modifying instances of
         # signac.contrib._ProjectConfig.
-        # TODO: Need a way to reload config if it's modified. Currently flow is
-        # different from signac, because signac project loads on instantiation
-        # whereas flow project loads from the file every time. The current
-        # changes are making flow more like signac, which is good, but then we
-        # need a way to force a reload.
         self._flow_config = {
             **flow_config._FLOW_CONFIG_DEFAULTS,
             **self._config.get("flow", {}),
@@ -1653,8 +1647,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         template_environment.filters[
             "homogeneous_openmp_mpi_config"
         ] = template_filters.homogeneous_openmp_mpi_config
-        template_environment.filters["get_config_value"] = self._flow_config.get
-        template_environment.filters["require_config_value"] = self._flow_config.get
+        template_environment.filters["get_config_value"] = flow_config.get_config_value
+        template_environment.filters[
+            "require_config_value"
+        ] = flow_config.require_config_value
         template_environment.filters[
             "get_account_name"
         ] = template_filters.get_account_name

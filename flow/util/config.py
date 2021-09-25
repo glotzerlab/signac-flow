@@ -6,10 +6,6 @@ from signac.common import config
 
 from ..errors import ConfigKeyError
 
-"""
-THIS MODULE IS DEPRECATED.
-"""
-
 # # Monkeypatch the signac config spec to include flow-specific fields.
 # config.cfg += """
 # [flow]

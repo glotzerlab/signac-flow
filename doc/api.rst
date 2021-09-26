@@ -51,6 +51,7 @@ The FlowProject
     FlowProject.pre.never
     FlowProject.pre.not_
     FlowProject.pre.true
+    FlowProject.print_status
     FlowProject.run
     FlowProject.scheduler_jobs
     FlowProject.submit
@@ -190,22 +191,10 @@ Compute Environments
 .. autoclass:: flow.environment.StandardEnvironment
     :members:
 
-.. autoclass:: flow.environment.NodesEnvironment
-    :members:
-
 .. autoclass:: flow.environment.TestEnvironment
     :members:
 
 .. autoclass:: flow.environment.SimpleSchedulerEnvironment
-    :members:
-
-.. autoclass:: flow.environment.PBSEnvironment
-    :members:
-
-.. autoclass:: flow.environment.SlurmEnvironment
-    :members:
-
-.. autoclass:: flow.environment.LSFEnvironment
     :members:
 
 .. autofunction:: flow.environment.registered_environments

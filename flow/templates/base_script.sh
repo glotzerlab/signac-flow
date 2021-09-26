@@ -7,14 +7,19 @@
 {% block header %}
     {% block preamble %}
     {% endblock preamble %}
+    {% block tasks %}
+    {% endblock tasks %}
 {% endblock header %}
 
 {% block project_header %}
 set -e
 set -u
 
-cd {{ project.config.project_dir }}
+cd {{ project.config.project_dir|quote_argument }}
+
 {% endblock project_header %}
+{% block custom_content %}
+{% endblock custom_content %}
 {% block body %}
     {% set cmd_suffix = cmd_suffix|default('') ~ (' &' if parallel else '') %}
     {% for operation in operations %}

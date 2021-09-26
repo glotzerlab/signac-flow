@@ -26,7 +26,7 @@ PROJECT_NAME = "SubmissionTest"
 ARCHIVE_DIR = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "./template_reference_data.tar.gz")
 )
-PROJECT_DIRECTORY = "/home/user/project/"
+PROJECT_DIRECTORY = '/home/user/path with spaces and "quotes" and \\backslashes/'
 MOCK_EXECUTABLE = "/usr/local/bin/python"
 
 
@@ -65,16 +65,6 @@ def init(project):
     # construct a minimal covering set of all test cases.
     environments = {
         "environment.StandardEnvironment": [],
-        "environments.xsede.CometEnvironment": [
-            {
-                "partition": ["compute", "shared", "gpu"],
-            },
-            {
-                "partition": ["compute"],
-                "parallel": [False, True],
-                "bundle": [["mpi_op", "omp_op"]],
-            },
-        ],
         "environments.xsede.Stampede2Environment": [
             {
                 "partition": ["skx-normal"],
@@ -124,6 +114,16 @@ def init(project):
         "environments.umn.MangiEnvironment": [
             {},
             {
+                "parallel": [False, True],
+                "bundle": [["mpi_op", "omp_op"]],
+            },
+        ],
+        "environments.xsede.ExpanseEnvironment": [
+            {
+                "partition": ["compute", "shared", "gpu", "gpu-shared", "large-shared"],
+            },
+            {
+                "partition": ["compute"],
                 "parallel": [False, True],
                 "bundle": [["mpi_op", "omp_op"]],
             },

@@ -7,7 +7,7 @@ from setuptools import find_packages, setup
 
 requirements = [
     # The core package.
-    "signac>=1.0.0",
+    "signac>=1.3.0",
     # For the templated generation of (submission) scripts.
     "jinja2>=2.10",
     # To enable the parallelized execution of operations across processes.
@@ -30,7 +30,7 @@ except OSError:
 
 setup(
     name="signac-flow",
-    version="0.15.0",
+    version="0.16.0",
     packages=find_packages(),
     include_package_data=True,
     zip_safe=True,

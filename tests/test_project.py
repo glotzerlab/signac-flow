@@ -36,7 +36,7 @@ from flow import (
     with_job,
 )
 from flow.environment import ComputeEnvironment
-from flow.errors import DirectivesError, SubmitError
+from flow.errors import DirectivesError, FlowProjectDefinitionError, SubmitError
 from flow.project import IgnoreConditions, _AggregateStoresCursor, _JobAggregateCursor
 from flow.scheduling.base import ClusterJob, JobStatus, Scheduler
 from flow.util.misc import (
@@ -282,7 +282,7 @@ class TestProjectClass(TestProjectBase):
         class A(FlowProject):
             pass
 
-        with pytest.raises(ValueError):
+        with pytest.raises(FlowProjectDefinitionError):
 
             @A.operation
             @A.operation("foo")
@@ -299,7 +299,7 @@ class TestProjectClass(TestProjectBase):
         def op1(job):
             pass
 
-        with pytest.raises(ValueError):
+        with pytest.raises(FlowProjectDefinitionError):
 
             @A.operation("op1")
             def op2(job):
@@ -317,7 +317,7 @@ class TestProjectClass(TestProjectBase):
         def op1(job):
             pass
 
-        with pytest.raises(ValueError):
+        with pytest.raises(FlowProjectDefinitionError):
             precondition = A.operation(precondition)
 
     def test_operation_as_condition(self):
@@ -328,7 +328,7 @@ class TestProjectClass(TestProjectBase):
         def attempted_precondition(job):
             pass
 
-        with pytest.raises(ValueError):
+        with pytest.raises(FlowProjectDefinitionError):
 
             @A.pre(attempted_precondition)
             def op1(job):
@@ -350,7 +350,7 @@ class TestProjectClass(TestProjectBase):
         with suspend_logging():
             A.get_project(root=self._tmp_dir.name)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(FlowProjectDefinitionError):
             B.get_project(root=self._tmp_dir.name)
 
     def test_label_definition(self):
@@ -447,7 +447,7 @@ class TestProjectClass(TestProjectBase):
         class A(FlowProject):
             pass
 
-        with pytest.raises(RuntimeError):
+        with pytest.raises(FlowProjectDefinitionError):
 
             @A.operation
             @cmd
@@ -826,21 +826,21 @@ class TestProjectClass(TestProjectBase):
         def op1(job):
             pass
 
-        with pytest.raises(ValueError):
+        with pytest.raises(FlowProjectDefinitionError):
 
             @A.operation
             @A.pre.after(condition_fun)
             def op2(job):
                 pass
 
-        with pytest.raises(ValueError):
+        with pytest.raises(FlowProjectDefinitionError):
 
             @A.operation
             @A.pre(op1)
             def op3(job):
                 pass
 
-        with pytest.raises(ValueError):
+        with pytest.raises(FlowProjectDefinitionError):
 
             @A.operation
             @A.post(op1)
@@ -900,7 +900,7 @@ class TestProject(TestProjectBase):
         project = self.mock_project()
         for job in project:
             status = project.get_job_status(job)
-            assert status["job_id"] == job.get_id()
+            assert status["job_id"] == job.id
             assert len(status["operations"]) == len(project.operations)
             for op in project._next_operations([(job,)]):
                 assert op.name in status["operations"]
@@ -1006,7 +1006,7 @@ execution_orders = (
     "cyclic",
     "by-job",
     "random",
-    lambda op: (op.name, op._jobs[0].get_id()),
+    lambda op: (op.name, op._jobs[0].id),
 )
 
 
@@ -1030,7 +1030,7 @@ class TestExecutionProject(TestProjectBase):
         # to the length of its set if and only if the job-operations are grouped
         # by job already.
         jobs_order_none = [
-            job.get_id() for job, _ in groupby(ops, key=lambda op: op._jobs[0])
+            job.id for job, _ in groupby(ops, key=lambda op: op._jobs[0])
         ]
         assert len(jobs_order_none) == len(set(jobs_order_none))
 
@@ -1466,7 +1466,7 @@ class TestProjectMainInterface(TestProjectBase):
         assert len(self.project)
         job_ids = set(self.call_subcmd("next op1").decode("utf-8").split())
         assert len(job_ids) > 0
-        even_jobs = [job.get_id() for job in self.project if job.sp.b % 2 == 0]
+        even_jobs = [job.id for job in self.project if job.sp.b % 2 == 0]
         assert job_ids == set(even_jobs)
         # Use only exact operation matches
         job_ids = set(self.call_subcmd("next op").decode("utf-8").split())
@@ -1492,7 +1492,7 @@ class TestProjectMainInterface(TestProjectBase):
         num_ops = len(project.operations)
         for line in lines:
             for job in project:
-                if job.get_id() in line:
+                if job.id in line:
                     op_lines = [line]
                     for i in range(num_ops - 1):
                         try:
@@ -1557,7 +1557,7 @@ class TestDirectivesProjectMainInterface(TestProjectBase):
         # FakeScheduler via the SIGNAC_FLOW_ENVIRONMENT environment variable.
         monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", "TestEnvironment")
         assert len(self.project)
-        job_id = next(iter(self.project)).get_id()
+        job_id = next(iter(self.project)).id
         output = self.call_subcmd(
             "submit -o op_walltime op_walltime_2 op_walltime_3 "
             f"-j {job_id} -b 3 --pretend --template slurm.sh",
@@ -1570,7 +1570,7 @@ class TestDirectivesProjectMainInterface(TestProjectBase):
         # FakeScheduler via the SIGNAC_FLOW_ENVIRONMENT environment variable.
         monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", "TestEnvironment")
         assert len(self.project)
-        job_id = next(iter(self.project)).get_id()
+        job_id = next(iter(self.project)).id
         output = self.call_subcmd(
             "submit -o op_walltime op_walltime_2 op_walltime_3 "
             f"-j {job_id} -b 3 --parallel --pretend --template slurm.sh",
@@ -1664,6 +1664,35 @@ class TestProjectSubmitOptions(TestProjectBase):
         submit_output = submit_output.getvalue()
         assert ("# Submit command: " + hold_cmd) in submit_output
 
+    @pytest.mark.parametrize(
+        "env,job_output_flags",
+        [
+            ("DefaultSlurmEnvironment", ["#SBATCH --output=", "#SBATCH --error="]),
+            ("DefaultPBSEnvironment", ["#PBS -o ", "#PBS -e "]),
+            ("DefaultLSFEnvironment", ["#BSUB -eo "]),
+        ],
+    )
+    def test_main_submit_job_output(self, env, job_output_flags, monkeypatch):
+        # Ensure that the job output flag is included in submission commands.
+        # Force the detected environment via the SIGNAC_FLOW_ENVIRONMENT
+        # environment variable.
+        monkeypatch.setenv("SIGNAC_FLOW_ENVIRONMENT", env)
+        project = self.mock_project()
+        assert len(project)
+        # This monkeypatch prevents failures due to lacking the scheduler
+        # executable for checking existing scheduler jobs before submitting.
+        monkeypatch.setattr(
+            project, "_query_scheduler_status", lambda *args, **kwargs: {}
+        )
+
+        submit_output = StringIO()
+        job_output = "/home/user/job123.out"
+        with redirect_stdout(submit_output):
+            project.submit(names=["op1"], pretend=True, num=1, job_output=job_output)
+        submit_output = submit_output.getvalue()
+        for job_output_flag in job_output_flags:
+            assert (job_output_flag + job_output) in submit_output
+
 
 # Tests for multiple operation groups or groups with options
 class TestGroupProject(TestProjectBase):
@@ -1731,7 +1760,7 @@ class TestGroupProject(TestProjectBase):
 
         A.make_group("foo")
 
-        with pytest.raises(ValueError):
+        with pytest.raises(FlowProjectDefinitionError):
 
             @A.operation
             def foo(job):
@@ -1744,8 +1773,51 @@ class TestGroupProject(TestProjectBase):
         def bar(job):
             pass
 
-        with pytest.raises(ValueError):
+        with pytest.raises(FlowProjectDefinitionError):
             B.make_group("bar")
+
+    def test_repeat_group_definition(self):
+        """Test that groups cannot be registered if a group with that name exists."""
+
+        class A(FlowProject):
+            pass
+
+        A.make_group("foo")
+
+        with pytest.raises(FlowProjectDefinitionError):
+            A.make_group("foo")
+
+    def test_repeat_operation_group_definition(self):
+        """Test that operations cannot be registered with a group multiple times."""
+
+        class A(FlowProject):
+            pass
+
+        foo_group = A.make_group("foo")
+
+        with pytest.raises(FlowProjectDefinitionError):
+
+            @foo_group
+            @foo_group
+            @A.operation
+            def foo_operation(job):
+                pass
+
+    def test_repeat_operation_group_directives_definition(self):
+        """Test that operations cannot be registered with group directives multiple times."""
+
+        class A(FlowProject):
+            pass
+
+        foo_group = A.make_group("foo")
+
+        with pytest.raises(FlowProjectDefinitionError):
+
+            @foo_group.with_directives({"np": 1})
+            @foo_group.with_directives({"np": 1})
+            @A.operation
+            def foo_operation(job):
+                pass
 
     def test_submission_combine_directives(self):
         class A(flow.FlowProject):
@@ -2087,7 +2159,7 @@ class TestAggregatesProjectUtilities(TestAggregatesProjectBase):
         class A(FlowProject):
             pass
 
-        with pytest.raises(RuntimeError):
+        with pytest.raises(FlowProjectDefinitionError):
 
             @A.operation
             @aggregator()
@@ -2099,7 +2171,7 @@ class TestAggregatesProjectUtilities(TestAggregatesProjectBase):
         class A(FlowProject):
             pass
 
-        with pytest.raises(RuntimeError):
+        with pytest.raises(FlowProjectDefinitionError):
 
             @A.operation
             @with_job

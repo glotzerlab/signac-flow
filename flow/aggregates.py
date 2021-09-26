@@ -12,6 +12,8 @@ from abc import abstractmethod
 from collections.abc import Collection, Iterable, Mapping
 from hashlib import md5
 
+from .errors import FlowProjectDefinitionError
+
 
 def _get_unique_function_id(func):
     """Generate unique id for the provided function.
@@ -191,12 +193,12 @@ class aggregator:
         Examples
         --------
         The code block below provides an example of how to aggregate jobs
-        by a state point parameter ``"sp"``. If the state point does not
-        contain the key ``"sp"``, a default value of -1 is used.
+        by a state point parameter ``"key"``. If the state point does not
+        contain the key ``"key"``, a default value of -1 is used.
 
         .. code-block:: python
 
-            @aggregator.groupby(key="sp", default=-1)
+            @aggregator.groupby(key="key", default=-1)
             @FlowProject.operation
             def foo(*jobs):
                 print(len(jobs))
@@ -347,13 +349,13 @@ class aggregator:
 
         """
         if not callable(func):
-            raise TypeError(
+            raise FlowProjectDefinitionError(
                 "Invalid argument passed while calling the aggregate "
                 f"instance. Expected a callable, got {type(func)}."
             )
         if getattr(func, "_flow_with_job", False):
-            raise RuntimeError(
-                "The @with_job decorator cannot be used with aggregation."
+            raise FlowProjectDefinitionError(
+                "The @flow.with_job decorator cannot be used with aggregation."
             )
         setattr(func, "_flow_aggregate", self)
         return func
@@ -455,7 +457,7 @@ class _AggregateStore(_BaseAggregateStore):
             for job in aggregate:
                 if job not in self._project:
                     raise LookupError(
-                        f"The signac job {job.get_id()} not found in {self._project}"
+                        f"The signac job {job.id} not found in {self._project}"
                     )
             try:
                 stored_aggregate = tuple(aggregate)
@@ -561,7 +563,7 @@ class _DefaultAggregateStore(_BaseAggregateStore):
 
     def keys(self):
         for job in self._project:
-            yield job.get_id()
+            yield job.id
 
     def values(self):
         for job in self._project:
@@ -569,7 +571,7 @@ class _DefaultAggregateStore(_BaseAggregateStore):
 
     def items(self):
         for job in self._project:
-            yield (job.get_id(), (job,))
+            yield (job.id, (job,))
 
 
 def get_aggregate_id(aggregate):
@@ -593,9 +595,9 @@ def get_aggregate_id(aggregate):
     """
     if len(aggregate) == 1:
         # Return job id as it's already unique
-        return aggregate[0].get_id()
+        return aggregate[0].id
 
-    id_string = ",".join(job.get_id() for job in aggregate)
+    id_string = ",".join(job.id for job in aggregate)
     hash_ = md5(id_string.encode("utf-8")).hexdigest()
     return f"agg-{hash_}"
 

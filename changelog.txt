@@ -15,6 +15,11 @@ Fixed
 +++++
 - Scripts are now generated correctly when project path contains spaces and special characters (#572).
 
+Changed
++++++++
+- FlowProject schemas are now validated on construction of the FlowProject (#573).
+- jsonschema is now a dependency.
+
 Version 0.16
 ============
 

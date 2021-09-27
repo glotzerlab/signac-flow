@@ -181,7 +181,7 @@ def setup_random_project(
 
 class Timer(timeit.Timer):
     def timeit(self, number=10):
-        return number, timeit.Timer.timeit(self, number=number)
+        return number, super().timeit(self, number=number)
 
     def repeat(self, repeat=3, number=10):
         return timeit.Timer.repeat(self, repeat=repeat, number=number)

@@ -15,7 +15,8 @@
 set -e
 set -u
 
-cd {{ project.config.project_dir }}
+cd {{ project.config.project_dir|quote_argument }}
+
 {% endblock project_header %}
 {% block custom_content %}
 {% endblock custom_content %}

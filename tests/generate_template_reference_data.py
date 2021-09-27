@@ -26,7 +26,7 @@ PROJECT_NAME = "SubmissionTest"
 ARCHIVE_DIR = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "./template_reference_data.tar.gz")
 )
-PROJECT_DIRECTORY = "/home/user/project/"
+PROJECT_DIRECTORY = '/home/user/path with spaces and "quotes" and \\backslashes/'
 MOCK_EXECUTABLE = "/usr/local/bin/python"
 
 
@@ -124,6 +124,16 @@ def init(project):
             },
             {
                 "partition": ["compute"],
+                "parallel": [False, True],
+                "bundle": [["mpi_op", "omp_op"]],
+            },
+        ],
+        "environments.drexel.PicotteEnvironment": [
+            {
+                "partition": ["def", "gpu"],
+            },
+            {
+                "partition": ["def"],
                 "parallel": [False, True],
                 "bundle": [["mpi_op", "omp_op"]],
             },

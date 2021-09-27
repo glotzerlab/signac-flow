@@ -110,7 +110,7 @@ def _make_doc(i, num_keys=1, data_size=0):
     assert data_size >= 0
 
     doc = {f"b_{j}": _random_str(data_size) for j in range(num_keys - 1)}
-    doc["a"] = "{}{}".format(i, _random_str(max(0, data_size - len(str(i)))))
+    doc["a"] = f"{i}{_random_str(max(0, data_size - len(str(i))))}"
     return doc
 
 
@@ -343,7 +343,7 @@ def strip_complexity(cat):
 def normalize(data, N):
     for cat, x in data.items():
         cplx, cat_ = strip_complexity(cat)
-        x_mean = min([(y / n) for n, y in x])
+        x_mean = min((y / n) for n, y in x)
         if cplx is not None:
             x_mean /= eval(cplx)
         yield cat, 1e3 * x_mean

@@ -26,7 +26,7 @@ PROJECT_NAME = "SubmissionTest"
 ARCHIVE_DIR = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "./template_reference_data.tar.gz")
 )
-PROJECT_DIRECTORY = "/home/user/project/"
+PROJECT_DIRECTORY = '/home/user/path with spaces and "quotes" and \\backslashes/'
 MOCK_EXECUTABLE = "/usr/local/bin/python"
 
 
@@ -65,21 +65,9 @@ def init(project):
     # construct a minimal covering set of all test cases.
     environments = {
         "environment.StandardEnvironment": [],
-        "environments.xsede.CometEnvironment": [
-            {
-                "partition": ["compute", "shared", "gpu"],
-                "walltime": [None, 1],
-            },
-            {
-                "partition": ["compute"],
-                "parallel": [False, True],
-                "bundle": [["mpi_op", "omp_op"]],
-            },
-        ],
         "environments.xsede.Stampede2Environment": [
             {
                 "partition": ["skx-normal"],
-                "walltime": [None, 1],
             },
             {
                 "partition": ["skx-normal"],
@@ -87,10 +75,9 @@ def init(project):
                 "bundle": [["mpi_op", "mpi_op"], ["omp_op", "omp_op"]],
             },
         ],
-        "environments.xsede.BridgesEnvironment": [
+        "environments.xsede.Bridges2Environment": [
             {
-                "partition": ["RM", "RM-Shared", "GPU", "GPU-AI"],
-                "walltime": [None, 1],
+                "partition": ["RM", "RM-shared", "GPU", "GPU-shared"],
             },
             {
                 "partition": ["RM"],
@@ -101,7 +88,6 @@ def init(project):
         "environments.umich.GreatLakesEnvironment": [
             {
                 "partition": ["standard", "gpu"],
-                "walltime": [None, 1],
             },
             {
                 "parallel": [False, True],
@@ -109,19 +95,35 @@ def init(project):
             },
         ],
         "environments.incite.SummitEnvironment": [
-            {
-                "walltime": [None, 1],
-            },
+            {},
             {
                 "parallel": [False, True],
                 "bundle": [["mpi_op", "omp_op"]],
             },
         ],
-        "environments.umn.MangiEnvironment": [
+        "environments.incite.AndesEnvironment": [
             {
-                "walltime": [None, 1],
+                "partition": ["batch", "gpu"],
             },
             {
+                "partition": ["batch"],
+                "parallel": [False, True],
+                "bundle": [["mpi_op", "omp_op"]],
+            },
+        ],
+        "environments.umn.MangiEnvironment": [
+            {},
+            {
+                "parallel": [False, True],
+                "bundle": [["mpi_op", "omp_op"]],
+            },
+        ],
+        "environments.xsede.ExpanseEnvironment": [
+            {
+                "partition": ["compute", "shared", "gpu", "gpu-shared", "large-shared"],
+            },
+            {
+                "partition": ["compute"],
                 "parallel": [False, True],
                 "bundle": [["mpi_op", "omp_op"]],
             },

@@ -7,7 +7,7 @@ Support and Development
 Getting help and reporting issues
 =================================
 
-To get help using the **signac-flow** package, either send an email to `signac-support@umich.edu <mailto:signac-support@umich.edu>`_ or join the `signac gitter chatroom <https://gitter.im/signac/Lobby>`_.
+To get help using the **signac-flow** package, join the `signac Slack workspace <https://signac.io/slack-invite/>`_ or send an email to `signac-support@umich.edu <mailto:signac-support@umich.edu>`_.
 
 The **signac-flow** package is hosted on `GitHub <https://github.com/glotzerlab/signac-flow>`_ and licensed under the open-source BSD 3-Clause license.
 Please use the `repository's issue tracker <https://github.com/glotzerlab/signac-flow/issues>`_ to report bugs or request new features.

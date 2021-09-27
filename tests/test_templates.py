@@ -60,7 +60,7 @@ def test_env(env, monkeypatch):
             jobs = fp.find_jobs(dict(environment=_env_name(env)))
             if not len(jobs):
                 raise RuntimeError(
-                    "No reference data for environment {}!".format(_env_name(env))
+                    f"No reference data for environment {_env_name(env)}!"
                 )
             reference = []
             generated = []
@@ -115,4 +115,4 @@ def test_env(env, monkeypatch):
 
                         with open(job.fn(f"script_{op}.sh")) as file:
                             reference.extend([msg] + file.read().splitlines())
-            assert "\n".join(reference) == "\n".join(generated)
+            assert "\n".join(generated) == "\n".join(reference)

@@ -27,16 +27,14 @@ The FlowProject
 .. autosummary::
 
     FlowProject.ALIASES
-    FlowProject.add_operation
     FlowProject.completed_operations
-    FlowProject.export_job_statuses
     FlowProject.get_job_status
     FlowProject.label
     FlowProject.labels
     FlowProject.main
     FlowProject.make_group
-    FlowProject.next_operations
     FlowProject.operation
+    FlowProject.operation.with_directives
     FlowProject.operations
     FlowProject.post
     FlowProject.post.copy_from
@@ -53,19 +51,20 @@ The FlowProject
     FlowProject.pre.never
     FlowProject.pre.not_
     FlowProject.pre.true
+    FlowProject.print_status
     FlowProject.run
-    FlowProject.run_operations
     FlowProject.scheduler_jobs
-    FlowProject.script
     FlowProject.submit
-    FlowProject.submit_operations
 
 
 .. autoclass:: FlowProject
     :show-inheritance:
     :members:
-    :exclude-members: pre,post
+    :exclude-members: pre,post,operation
 
+.. automethod:: flow.FlowProject.operation(func, name=None)
+
+.. automethod:: flow.FlowProject.operation.with_directives(directives, name=None)
 
 .. automethod:: flow.FlowProject.post
 
@@ -148,11 +147,6 @@ Labels
     :members:
     :special-members: __call__
 
-flow.run()
-----------
-
-.. autofunction:: run
-
 flow.init()
 -----------
 
@@ -173,6 +167,15 @@ The FlowGroup
     :members:
     :special-members: __call__
 
+Aggregation
+-----------
+
+.. autoclass:: flow.aggregator
+    :members:
+    :special-members: __call__
+
+.. autofunction:: flow.get_aggregate_id
+
 Compute Environments
 --------------------
 
@@ -188,22 +191,10 @@ Compute Environments
 .. autoclass:: flow.environment.StandardEnvironment
     :members:
 
-.. autoclass:: flow.environment.NodesEnvironment
-    :members:
-
 .. autoclass:: flow.environment.TestEnvironment
     :members:
 
 .. autoclass:: flow.environment.SimpleSchedulerEnvironment
-    :members:
-
-.. autoclass:: flow.environment.TorqueEnvironment
-    :members:
-
-.. autoclass:: flow.environment.SlurmEnvironment
-    :members:
-
-.. autoclass:: flow.environment.LSFEnvironment
     :members:
 
 .. autofunction:: flow.environment.registered_environments
@@ -229,13 +220,13 @@ Schedulers
 .. autoclass:: flow.scheduling.lsf.LSFScheduler
     :members:
 
+.. autoclass:: flow.scheduling.pbs.PBSScheduler
+    :members:
+
 .. autoclass:: flow.scheduling.simple_scheduler.SimpleScheduler
     :members:
 
 .. autoclass:: flow.scheduling.slurm.SlurmScheduler
-    :members:
-
-.. autoclass:: flow.scheduling.torque.TorqueScheduler
     :members:
 
 Error Classes

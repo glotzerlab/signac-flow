@@ -140,9 +140,7 @@ class SlurmScheduler(Scheduler):
         submit_cmd = self.submit_cmd + flags
 
         if after is not None:
-            submit_cmd.extend(
-                ["-W", 'depend="afterany:{}"'.format(after.split(".")[0])]
-            )
+            submit_cmd.extend(["-W", "-d", f"afterok:{after}"])
 
         if hold:
             submit_cmd += ["--hold"]
@@ -154,6 +152,8 @@ class SlurmScheduler(Scheduler):
         """Return True if a SLURM scheduler is detected."""
         try:
             subprocess.check_output(["sbatch", "--version"], stderr=subprocess.STDOUT)
+        except subprocess.CalledProcessError:
+            return True
         except OSError:
             return False
         else:

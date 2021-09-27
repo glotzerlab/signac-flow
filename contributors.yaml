@@ -142,4 +142,19 @@ contributors:
     family-names: Gnabro
     given-names: Ange-Desire
     affiliation: ""
+  -
+    family-names: Zhao
+    given-names: Charlotte
+    orcid: "https://orcid.org/0000-0003-4915-1064"
+    affiliation: "University of Michigan"
+  -
+    family-names: Wang
+    given-names: Kelly
+    orcid: "https://orcid.org/0000-0002-7326-3835"
+    affiliation: "University of Michigan"
+  -
+    family-names: Barbero Gómez
+    given-names: Javier
+    orcid: "https://orcid.org/0000-0002-9317-1428"
+    affiliation: "University of Córdoba (Spain)"
 ...

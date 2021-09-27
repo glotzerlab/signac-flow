@@ -81,21 +81,26 @@ jobs:
           path: test-reports
           destination: test-reports
 
+  linux-python-39-signac-16:
+    <<: *test-template
+    environment:
+      DEPENDENCIES: "NEWEST"
+      SIGNAC_VERSION: "signac~=1.6.0"
   linux-python-39-signac-15:
     <<: *test-template
     environment:
       DEPENDENCIES: "NEWEST"
       SIGNAC_VERSION: "signac~=1.5.0"
-  linux-python-39-signac-14:
-    <<: *test-template
-    environment:
-      DEPENDENCIES: "NEWEST"
-      SIGNAC_VERSION: "signac~=1.4.0"
   linux-python-39-signac-latest:
     <<: *test-template
     environment:
       DEPENDENCIES: "NEWEST"
       SIGNAC_VERSION: "git+ssh://git@github.com/glotzerlab/signac.git"
+  linux-python-39-signac-next:
+    <<: *test-template
+    environment:
+      DEPENDENCIES: "NEWEST"
+      SIGNAC_VERSION: "git+ssh://git@github.com/glotzerlab/signac.git@next"
   linux-python-38:
     <<: *test-template
     docker:
@@ -108,7 +113,7 @@ jobs:
     <<: *test-template
     environment:
       DEPENDENCIES: "OLDEST"
-      SIGNAC_VERSION: "signac==1.0.0"
+      SIGNAC_VERSION: "signac==1.3.0"
     docker:
       - image: circleci/python:3.6
 
@@ -158,23 +163,15 @@ workflows:
   version: 2
   test:
     jobs:
-      - pre-checks
-      - linux-python-39:
-          requires:
-            - pre-checks
-      - linux-python-38:
-          requires:
-            - pre-checks
-      - linux-python-37:
-          requires:
-            - pre-checks
-      - linux-python-36-oldest:
-          requires:
-            - pre-checks
-      - linux-python-39-signac-15:
+#     - pre-checks
+      - linux-python-39
+      - linux-python-38
+      - linux-python-37
+      - linux-python-36-oldest
+      - linux-python-39-signac-16:
           requires:
             - linux-python-39
-      - linux-python-39-signac-14:
+      - linux-python-39-signac-15:
           requires:
             - linux-python-39
       - check-metadata:
@@ -190,8 +187,8 @@ workflows:
             - linux-python-38
             - linux-python-37
             - linux-python-36-oldest
+            - linux-python-39-signac-16
             - linux-python-39-signac-15
-            - linux-python-39-signac-14
   nightly:
     triggers:
       - schedule:
@@ -202,6 +199,7 @@ workflows:
                 - master
     jobs:
       - linux-python-39-signac-latest
+      - linux-python-39-signac-next
   deploy:
     jobs:
       - deploy-pypi:

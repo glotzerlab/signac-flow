@@ -16,11 +16,12 @@ import re
 import socket
 from functools import lru_cache
 
-from deprecation import deprecated
 from signac.common import config
 
 from .directives import (
+    _FORK,
     _GET_EXECUTABLE,
+    _MEMORY,
     _NGPU,
     _NP,
     _NRANKS,
@@ -33,11 +34,10 @@ from .errors import NoSchedulerError
 from .scheduling.base import JobStatus
 from .scheduling.fake_scheduler import FakeScheduler
 from .scheduling.lsf import LSFScheduler
+from .scheduling.pbs import PBSScheduler
 from .scheduling.simple_scheduler import SimpleScheduler
 from .scheduling.slurm import SlurmScheduler
-from .scheduling.torque import TorqueScheduler
 from .util import config as flow_config
-from .version import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -224,7 +224,7 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
             The argument parser where arguments will be added.
 
         """
-        return
+        pass
 
     @classmethod
     def get_config_value(cls, key, default=flow_config._GET_CONFIG_VALUE_NONE):
@@ -346,15 +346,17 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
     @classmethod
     def _get_default_directives(cls):
         return _Directives(
-            [
-                _NP,
+            (
+                _GET_EXECUTABLE(),
+                _FORK,
+                _MEMORY,
                 _NGPU,
+                _NP,
                 _NRANKS,
                 _OMP_NUM_THREADS,
-                _GET_EXECUTABLE(),
-                _WALLTIME,
                 _PROCESSOR_FRACTION,
-            ]
+                _WALLTIME,
+            )
         )
 
 
@@ -389,37 +391,11 @@ class SimpleSchedulerEnvironment(ComputeEnvironment):
     template = "simple_scheduler.sh"
 
 
-class TorqueEnvironment(ComputeEnvironment):
-    """An environment with TORQUE scheduler."""
+class DefaultPBSEnvironment(ComputeEnvironment):
+    """Default environment for clusters with a PBS scheduler."""
 
-    scheduler_type = TorqueScheduler
-    template = "torque.sh"
-
-
-class SlurmEnvironment(ComputeEnvironment):
-    """An environment with SLURM scheduler."""
-
-    scheduler_type = SlurmScheduler
-    template = "slurm.sh"
-
-
-class LSFEnvironment(ComputeEnvironment):
-    """An environment with LSF scheduler."""
-
-    scheduler_type = LSFScheduler
-    template = "lsf.sh"
-
-
-class NodesEnvironment(ComputeEnvironment):
-    """A compute environment consisting of multiple compute nodes.
-
-    Each compute node is assumed to have a specific number of compute units,
-    e.g., CPUs.
-    """
-
-
-class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
-    """Default environment for clusters with a TORQUE scheduler."""
+    scheduler_type = PBSScheduler
+    template = "pbs.sh"
 
     @classmethod
     def add_args(cls, parser):
@@ -433,9 +409,6 @@ class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
         """
         super().add_args(parser)
         parser.add_argument(
-            "-w", "--walltime", type=float, help="The wallclock time in hours."
-        )
-        parser.add_argument(
             "--hold", action="store_true", help="Submit jobs, but put them on hold."
         )
         parser.add_argument(
@@ -443,6 +416,15 @@ class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
             type=str,
             help="Schedule this job to be executed after "
             "completion of a cluster job with this id.",
+        )
+        parser.add_argument(
+            "--job-output",
+            type=str,
+            help=(
+                "What to name the job output file. "
+                "If omitted, uses the scheduler default name. "
+                "Both stdout and stderr will be combined."
+            ),
         )
         parser.add_argument(
             "--no-copy-env",
@@ -451,9 +433,12 @@ class DefaultTorqueEnvironment(NodesEnvironment, TorqueEnvironment):
         )
 
 
-class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
+class DefaultSlurmEnvironment(ComputeEnvironment):
     """Default environment for clusters with a SLURM scheduler."""
 
+    scheduler_type = SlurmScheduler
+    template = "slurm.sh"
+
     @classmethod
     def add_args(cls, parser):
         """Add arguments to the parser.
@@ -466,32 +451,30 @@ class DefaultSlurmEnvironment(NodesEnvironment, SlurmEnvironment):
         """
         super().add_args(parser)
         parser.add_argument(
-            "--memory",
+            "--hold", action="store_true", help="Submit jobs, but put them on hold."
+        )
+        parser.add_argument(
+            "--after",
+            type=str,
+            help="Schedule this job to be executed after "
+            "completion of a cluster job with this id.",
+        )
+        parser.add_argument(
+            "--job-output",
+            type=str,
             help=(
-                'Specify how much memory to reserve per node, e.g. "4g" for 4 gigabytes '
-                'or "512m" for 512 megabytes. Only relevant for shared queue jobs.'
+                "What to name the job output file. "
+                "If omitted, uses the scheduler default name. "
+                "Both stdout and stderr will be combined."
             ),
         )
-        parser.add_argument(
-            "-w",
-            "--walltime",
-            type=float,
-            default=12,
-            help="The wallclock time in hours.",
-        )
-        parser.add_argument(
-            "--hold", action="store_true", help="Submit jobs, but put them on hold."
-        )
-        parser.add_argument(
-            "--after",
-            type=str,
-            help="Schedule this job to be executed after "
-            "completion of a cluster job with this id.",
-        )
 
 
-class DefaultLSFEnvironment(NodesEnvironment, LSFEnvironment):
+class DefaultLSFEnvironment(ComputeEnvironment):
     """Default environment for clusters with a LSF scheduler."""
+
+    scheduler_type = LSFScheduler
+    template = "lsf.sh"
 
     @classmethod
     def add_args(cls, parser):
@@ -505,13 +488,6 @@ class DefaultLSFEnvironment(NodesEnvironment, LSFEnvironment):
         """
         super().add_args(parser)
         parser.add_argument(
-            "-w",
-            "--walltime",
-            type=float,
-            default=12,
-            help="The wallclock time in hours.",
-        )
-        parser.add_argument(
             "--hold", action="store_true", help="Submit jobs, but put them on hold."
         )
         parser.add_argument(
@@ -520,20 +496,15 @@ class DefaultLSFEnvironment(NodesEnvironment, LSFEnvironment):
             help="Schedule this job to be executed after "
             "completion of a cluster job with this id.",
         )
-
-
-@deprecated(deprecated_in="0.12", removed_in="0.14", current_version=__version__)
-class CPUEnvironment(ComputeEnvironment):
-    """An environment with CPUs."""
-
-    pass
-
-
-@deprecated(deprecated_in="0.12", removed_in="0.14", current_version=__version__)
-class GPUEnvironment(ComputeEnvironment):
-    """An environment with GPUs."""
-
-    pass
+        parser.add_argument(
+            "--job-output",
+            type=str,
+            help=(
+                "What to name the job output file. "
+                "If omitted, uses the scheduler default name. "
+                "Both stdout and stderr will be combined."
+            ),
+        )
 
 
 def _import_configured_environments():

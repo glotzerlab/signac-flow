@@ -10,19 +10,14 @@ space.
 
 See also: :class:`~.FlowProject`.
 """
-import argparse
 import inspect
 import logging
-import subprocess
-import sys
 from functools import wraps
-from multiprocessing import Pool
+from textwrap import indent
 
-from deprecation import deprecated
-from signac import get_project
-from tqdm.auto import tqdm
-
-from .version import __version__
+from .directives import _document_directive
+from .environment import ComputeEnvironment
+from .errors import FlowProjectDefinitionError
 
 logger = logging.getLogger(__name__)
 
@@ -48,8 +43,8 @@ def cmd(func):
         prefixes to the shell command provided here.
     """
     if getattr(func, "_flow_with_job", False):
-        raise RuntimeError(
-            "@cmd should appear below the @with_job decorator in your script"
+        raise FlowProjectDefinitionError(
+            "The @flow.cmd decorator must appear below the @flow.with_job decorator."
         )
     setattr(func, "_flow_cmd", True)
     return func
@@ -57,6 +52,8 @@ def cmd(func):
 
 def with_job(func):
     """Use ``arg`` as a context manager for ``func(arg)`` with this decorator.
+
+    This decorator can only be used for operations that accept a single job as a parameter.
 
     If this function is an operation function defined by :class:`~.FlowProject`, it will
     be the same as using ``with job:``.
@@ -98,12 +95,16 @@ def with_job(func):
         def hello_cmd(job):
             return 'trap "cd `pwd`" EXIT && cd {} && echo "hello {job}"'.format(job.ws)
     """
+    if getattr(func, "_flow_aggregate", False):
+        raise FlowProjectDefinitionError(
+            "The @with_job decorator cannot be used with aggregation."
+        )
 
     @wraps(func)
-    def decorated(job):
-        with job:
+    def decorated(*jobs):
+        with jobs[0] as job:
             if getattr(func, "_flow_cmd", False):
-                return 'trap "cd $(pwd)" EXIT && cd {} && {}'.format(job.ws, func(job))
+                return f'trap "cd $(pwd)" EXIT && cd {job.ws} && {func(job)}'
             else:
                 return func(job)
 
@@ -116,16 +117,12 @@ class directives:
 
     Directives can for example be used to provide information about required resources
     such as the number of processes required for execution of parallelized operations.
-    For more information, read about :ref:`signac-docs:directives`.
+    For more information, read about :ref:`signac-docs:cluster_submission_directives`.
 
-    In addition, you can use the ``@directives(fork=True)`` directive to enforce that a
-    particular operation is always executed within a subprocess and not within the
-    Python interpreter's process even if there are no other reasons that would prevent that.
+    .. deprecated:: 0.15
+        This decorator is deprecated and will be removed in 1.0.
+        Use :class:`FlowProject.operation.with_directives` instead.
 
-    .. note::
-
-        Setting ``fork=False`` will not prevent forking if there are other reasons for forking,
-        such as a timeout.
     """
 
     def __init__(self, **kwargs):
@@ -158,6 +155,19 @@ class directives:
         return func
 
 
+# Remove when @flow.directives is removed
+_directives_to_document = (
+    ComputeEnvironment._get_default_directives()._directive_definitions.values()
+)
+directives.__doc__ += indent(
+    "\n**Supported Directives:**\n\n"
+    + "\n\n".join(
+        _document_directive(directive) for directive in _directives_to_document
+    ),
+    "    ",
+)
+
+
 def _get_operations(include_private=False):
     """Yield the name of all functions that qualify as an operation function.
 
@@ -176,126 +186,4 @@ def _get_operations(include_private=False):
                 yield name
 
 
-@deprecated(deprecated_in="0.12", removed_in="0.14", current_version=__version__)
-def run(parser=None):
-    """Access to the "run" interface of an operations module.
-
-    Executing this function within a module will start a command line interface,
-    that can be used to execute operations defined within the same module.
-    All **top-level unary functions** will be interpreted as executable operation functions.
-
-    For example, if we have a module as such:
-
-    .. code-block:: python
-
-        # operations.py
-
-        def hello(job):
-            print('hello', job)
-
-        if __name__ == '__main__':
-            import flow
-            flow.run()
-
-    Then we can execute the ``hello`` operation for all jobs from the command like like this:
-
-    .. code-block:: bash
-
-        $ python operations.py hello
-
-    .. note::
-
-        You can control the degree of parallelization with the ``--np`` argument.
-
-    For more information, see:
-
-    .. code-block:: bash
-
-        $ python operations.py --help
-    """
-    if parser is None:
-        parser = argparse.ArgumentParser()
-
-    parser.add_argument(
-        "operation",
-        type=str,
-        choices=list(_get_operations()),
-        help="The operation to execute.",
-    )
-    parser.add_argument(
-        "job_id",
-        type=str,
-        nargs="*",
-        help="The job ids, as registered in the signac project. "
-        "Omit to default to all statepoints.",
-    )
-    parser.add_argument(
-        "--np",
-        type=int,
-        default=1,
-        help="Specify the number of cores to parallelize to (default=1) or 0 "
-        "to parallelize on as many cores as there are available.",
-    )
-    parser.add_argument(
-        "-t",
-        "--timeout",
-        type=int,
-        help="A timeout in seconds after which the parallel execution "
-        "of operations is canceled.",
-    )
-    parser.add_argument(
-        "--progress",
-        action="store_true",
-        help="Display a progress bar during execution.",
-    )
-    args = parser.parse_args()
-
-    project = get_project()
-
-    def _open_job_by_id(_id):
-        try:
-            return project.open_job(id=_id)
-        except KeyError:
-            msg = f"Did not find job corresponding to id '{_id}'."
-            raise KeyError(msg)
-        except LookupError:
-            raise LookupError(f"Multiple matches for id '{_id}'.")
-
-    if len(args.job_id):
-        try:
-            jobs = [_open_job_by_id(job_id) for job_id in args.job_id]
-        except (KeyError, LookupError) as error:
-            print(error, file=sys.stderr)
-            sys.exit(1)
-    else:
-        jobs = project
-
-    module = inspect.getmodule(inspect.currentframe().f_back)
-    try:
-        operation_func = getattr(module, args.operation)
-    except AttributeError:
-        raise KeyError(f"Unknown operation '{args.operation}'.")
-
-    if getattr(operation_func, "_flow_cmd", False):
-
-        def operation(job):
-            cmd = operation_func(job).format(job=job)
-            subprocess.run(cmd, shell=True, timeout=args.timeout, check=True)
-
-    else:
-        operation = operation_func
-
-    # Serial execution
-    if args.np == 1 or len(jobs) < 2:
-        if args.timeout is not None:
-            logger.warning("A timeout has no effect in serial execution!")
-        for job in tqdm(jobs) if args.progress else jobs:
-            operation(job)
-    else:
-        with Pool(args.np) as pool:
-            result = pool.imap_unordered(operation, jobs)
-            for _ in tqdm(jobs) if args.progress else jobs:
-                result.next(args.timeout)
-
-
-__all__ = ["cmd", "directives", "run"]
+__all__ = ["cmd", "directives", "with_job"]

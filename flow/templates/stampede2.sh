@@ -29,7 +29,7 @@
 
 {% block header %}
     {{- super () -}}
-    {% set account = account|default(environment|get_account_name(project._flow_config), true) %}
+    {% set account = account|default(environment|get_account_name, true) %}
     {% if account %}
 #SBATCH -A {{ account }}
     {% endif %}

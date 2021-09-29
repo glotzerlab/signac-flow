@@ -1548,13 +1548,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         super().__init__(config=config)
 
         # Initialize the local config.
-        # TODO: In signac 2.0 we plan to deprecate config modification after
-        # project initialization. After this PR, flow will begin to work like
-        # that immediately.  Once signac no longer relies on configobj and
-        # stops supporting in-place config modification, flow can make use of
-        # the the signac Project config directly dictionary that can be updated
-        # by flow. For now, we store the flow config separately to avoid any
-        # side effects associated with modifying instances of
+        # TODO: In signac 2.0 we will not allow config modification after
+        # project initialization. The flow config is already effectively
+        # immutable since it is an internal variable that is not exposed to the
+        # user in any way. Once signac no longer relies on configobj and stops
+        # supporting in-place config modification, flow can make use of the
+        # signac Project config dictionary directly and that can be updated by
+        # any flow config APIs. For now, we store the flow config separately to
+        # avoid any side effects associated with modifying instances of
         # signac.contrib._ProjectConfig.
         self._flow_config = {
             **flow_config._FLOW_CONFIG_DEFAULTS,

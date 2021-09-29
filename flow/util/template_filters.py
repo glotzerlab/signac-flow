@@ -7,7 +7,8 @@ import sys
 from functools import partial
 from math import ceil
 
-from ..errors import SubmitError
+from ..config import require_config_value
+from ..errors import ConfigKeyError, SubmitError
 
 
 def identical(iterable):
@@ -305,16 +306,13 @@ def print_warning(msg):
 _GET_ACCOUNT_NAME_MESSAGES_SHOWN = set()
 
 
-def get_account_name(environment, config, required=False):
+def get_account_name(environment, required=False):
     """Get account name for environment with user-friendly messages on failure.
 
     Parameters
     ----------
     environment : :class:`~.ComputeEnvironment`
         The environment for which to obtain the account variable.
-    config : dict
-        The dictionary of configuration information that may contain
-        environment-specific account information.
     required : bool
         Specify whether the account name is required instead of optional.
         (Default value = False)
@@ -332,8 +330,8 @@ def get_account_name(environment, config, required=False):
     """
     env_name = environment.__name__
     try:
-        return config[env_name]["account"]
-    except KeyError as error:
+        return require_config_value("account", ns=env_name)
+    except ConfigKeyError as error:
         ACCOUNT_MESSAGE = (
             "Environment '{env}' {requires_or_allows} the specification of an "
             "account name that will be charged for jobs' compute time.\n"

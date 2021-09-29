@@ -7,8 +7,8 @@ import sys
 from functools import partial
 from math import ceil
 
-from ..config import require_config_value
 from ..errors import ConfigKeyError, SubmitError
+from .config import require_config_value
 
 
 def identical(iterable):

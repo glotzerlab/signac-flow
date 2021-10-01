@@ -61,8 +61,8 @@ def main(args):
             os.unlink(ARCHIVE_PATH)
         else:
             print(
-                "Archive '{}' already exists, exiting. "
-                "Use `-f/--force` to overwrite.".format(ARCHIVE_PATH)
+                f"Archive '{ARCHIVE_PATH}' already exists, exiting. "
+                "Use `-f/--force` to overwrite."
             )
 
     with signac.TemporaryProject(name=PROJECT_NAME) as p, signac.TemporaryProject(

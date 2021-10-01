@@ -23,8 +23,6 @@ def test_print_status():
             msg = f"---------- Status options {kwargs} for job {job}."
             with open(os.devnull, "w") as devnull:
                 tmp_out = io.TextIOWrapper(io.BytesIO(), sys.stdout.encoding)
-                # with redirect_stderr(devnull):
-                #     with redirect_stdout(tmp_out):
                 fp.print_status(**kwargs, file=tmp_out, err=devnull)
                 tmp_out.seek(0)
                 generated = [msg] + tmp_out.read().splitlines()

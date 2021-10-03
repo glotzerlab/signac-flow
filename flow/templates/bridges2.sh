@@ -11,7 +11,7 @@
         {#- GPU nodes have 8 NVIDIA V100-32GB SXM2 #}
         {% set nn_gpu = gpu_tasks|calc_num_nodes(8) %}
         {% set nn = nn_gpu %}
-        {% else %}
+    {% else %}
         {% if 'GPU' in partition and not force %}
             {% raise "Requesting GPU partition, but no GPUs requested!" %}
         {% endif %}

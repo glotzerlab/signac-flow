@@ -49,7 +49,7 @@
     {% endif %}
 {% endblock tasks %}
 {% block header %}
-    {{ super() -}}
+    {{- super() -}}
     {% set account = account|default(environment|get_account_name, true) %}
     {% if account %}
 #SBATCH -A {{ account }}

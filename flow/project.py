@@ -1561,13 +1561,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             **flow_config._FLOW_CONFIG_DEFAULTS,
             **self._config.get("flow", {}),
         }
-        # TODO: Is there a more elegant solution to casting strings directly?
         self._flow_config["eligible_jobs_max_lines"] = int(
             self._flow_config["eligible_jobs_max_lines"]
         )
         self._flow_config["status_performance_warn_threshold"] = float(
             self._flow_config["status_performance_warn_threshold"]
         )
+        self._flow_config["show_traceback"] = bool(self._flow_config["show_traceback"])
         jsonschema.validate(
             self._flow_config,
             flow_config._FLOW_SCHEMA,

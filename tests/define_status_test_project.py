@@ -37,21 +37,22 @@ def b_is_even(job):
 
 @flow.cmd
 @group1
+@_TestProject.operation
 @_TestProject.pre(b_is_even)
 @_TestProject.post.isfile("world.txt")
 def op1(job):
     return 'echo "hello" > {job.ws}/world.txt'
 
 
-@_TestProject.operation
 @group1
+@_TestProject.operation
 @_TestProject.post.true("test")
 def op2(job):
     job.document.test = os.getpid()
 
 
-@_TestProject.operation
 @group2
+@_TestProject.operation
 @_TestProject.post.true("test2")
 def op3(job):
     job.document.test2 = True

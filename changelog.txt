@@ -5,19 +5,31 @@ Changelog
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 The numbers in brackets denote the related GitHub issue and/or pull request.
 
+Version 0.17
+============
+
+[0.17.0] -- 2021-xx-xx
+----------------------
+
+Fixed
++++++
+- Scripts are now generated correctly when project path contains spaces and special characters (#572).
+- XSEDE Expanse template has been fixed to remove leading spaces (#575, #576).
+
 Version 0.16
 ============
 
-[0.16.0] -- 2021-xx-xx
+[0.16.0] -- 2021-08-20
 ----------------------
 
 Added
 +++++
 
 - The ``--job-output`` command line flag for submission can be set for SLURM, PBS, and LSF schedulers (#550).
-- Added a ``custom_content`` block to templates for user customization (#553).
+- Added a ``custom_content`` block to templates for user customization (#553, #520).
 - Added official support for XSEDE Expanse cluster (#537).
 - Added ``FlowProjectDefinitionError`` for exceptions involving ``FlowProject`` definitions (#549).
+- Added official support for Drexel University's Picotte cluster (#561).
 
 Changed
 +++++++

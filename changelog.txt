@@ -11,6 +11,10 @@ Version 0.17
 [0.17.0] -- 2021-xx-xx
 ----------------------
 
+Added
++++++
+- Official Python 3.10 support.
+
 Fixed
 +++++
 - Scripts are now generated correctly when project path contains spaces and special characters (#572).

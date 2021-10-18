@@ -40,7 +40,7 @@ jobs:
           paths:
             - ".pre-commit-cache"
 
-  linux-python-39: &test-template
+  linux-python-310: &test-template
     environment:
       DEPENDENCIES: "NEWEST"
       SIGNAC_VERSION: "signac"
@@ -168,16 +168,17 @@ workflows:
   test:
     jobs:
 #     - pre-checks
+      - linux-python-310
       - linux-python-39
       - linux-python-38
       - linux-python-37
       - linux-python-36-oldest
-      - linux-python-39-signac-16:
+      - linux-python-310-signac-16:
           requires:
-            - linux-python-39
-      - linux-python-39-signac-15:
+            - linux-python-310
+      - linux-python-310-signac-15:
           requires:
-            - linux-python-39
+            - linux-python-310
       - check-metadata:
           filters:
             branches:
@@ -187,12 +188,13 @@ workflows:
             branches:
               only: /release\/.*/
           requires:
+            - linux-python-310
             - linux-python-39
             - linux-python-38
             - linux-python-37
             - linux-python-36-oldest
-            - linux-python-39-signac-16
-            - linux-python-39-signac-15
+            - linux-python-310-signac-16
+            - linux-python-310-signac-15
   nightly:
     triggers:
       - schedule:
@@ -202,8 +204,8 @@ workflows:
               only:
                 - master
     jobs:
-      - linux-python-39-signac-latest
-      - linux-python-39-signac-next
+      - linux-python-310-signac-latest
+      - linux-python-310-signac-next
   deploy:
     jobs:
       - deploy-pypi:

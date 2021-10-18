@@ -3,6 +3,7 @@
 # This software is licensed under the BSD 3-Clause License.
 import os
 import subprocess
+import sys
 from tempfile import TemporaryDirectory
 
 import pytest
@@ -62,7 +63,11 @@ class TestCLI:
     def test_help(self):
         out = self.call("python -m flow --help".split())
         assert "positional arguments:" in out
-        assert "optional arguments:" in out
+        # Help string changed in 3.10.
+        if sys.version_info[1] == 10:
+            assert "options:" in out
+        else:
+            assert "optional arguments:" in out
 
     def test_init_flowproject(self):
         self.call("python -m flow init".split())

@@ -64,10 +64,8 @@ class TestCLI:
         out = self.call("python -m flow --help".split())
         assert "positional arguments:" in out
         # Help string changed in 3.10.
-        if sys.version_info[1] == 10:
-            assert "options:" in out
-        else:
-            assert "optional arguments:" in out
+        py310_or_greater = sys.version_info >= (3, 10)
+        assert ("options:" if py310_or_greater else "optional arguments:") in out
 
     def test_init_flowproject(self):
         self.call("python -m flow init".split())

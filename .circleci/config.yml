@@ -45,7 +45,7 @@ jobs:
       DEPENDENCIES: "NEWEST"
       SIGNAC_VERSION: "signac"
     docker:
-      - image: circleci/python:3.10
+      - image: cimg/python:3.10
 
     working_directory: ~/repo
 
@@ -123,7 +123,7 @@ jobs:
 
   check-metadata:
     docker:
-      - image: circleci/python:3.10
+      - image: cimg/python:3.10
 
     working_directory: ~/repo
 
@@ -142,7 +142,7 @@ jobs:
 
   test-deploy-pypi:
     docker:
-      - image: circleci/python:3.10
+      - image: cimg/python:3.10
     working_directory: ~/repo
     steps:
       - checkout
@@ -153,7 +153,7 @@ jobs:
 
   deploy-pypi:
     docker:
-      - image: circleci/python:3.10
+      - image: cimg/python:3.10
     working_directory: ~/repo
     steps:
       - checkout

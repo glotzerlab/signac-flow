@@ -13,7 +13,7 @@ Version 0.17
 
 Added
 +++++
-- Official Python 3.10 support.
+- Add official support for Python version 3.10 (#578).
 
 Fixed
 +++++

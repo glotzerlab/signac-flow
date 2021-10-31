@@ -17,7 +17,7 @@ Fixed
 
 Changed
 +++++++
-- FlowProject schemas are now validated on construction of the FlowProject (#573).
+- FlowProject configuration is now validated independently of signac Project configuration (#573).
 - jsonschema is now a dependency.
 
 Version 0.16

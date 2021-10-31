@@ -1509,6 +1509,15 @@ class _FlowProjectClass(type):
         return OperationRegister()
 
 
+def _config_value_as_bool(value):
+    # Function to interpret a configobj bool-like value as a boolean.
+    if value.lower() in {"true", "on", "yes", "1"}:
+        return True
+    elif value.lower() in {"false", "off", "no", "0"}:
+        return False
+    raise ValueError("Invalid boolean config value.")
+
+
 class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     """A signac project class specialized for workflow management.
 
@@ -1567,7 +1576,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         self._flow_config["status_performance_warn_threshold"] = float(
             self._flow_config["status_performance_warn_threshold"]
         )
-        self._flow_config["show_traceback"] = bool(self._flow_config["show_traceback"])
+        self._flow_config["show_traceback"] = _config_value_as_bool(
+            self._flow_config["show_traceback"]
+        )
         jsonschema.validate(
             self._flow_config,
             flow_config._FLOW_SCHEMA,

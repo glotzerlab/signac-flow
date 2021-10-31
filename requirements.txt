@@ -3,3 +3,4 @@ jinja2>=2.10
 cloudpickle>=1.1.1
 deprecation>=2.0.0
 tqdm>=4.48.1
+jsonschema>=3.0.0

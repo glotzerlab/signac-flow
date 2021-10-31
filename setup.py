@@ -16,6 +16,8 @@ requirements = [
     "deprecation>=2.0.0",
     # Progress bars
     "tqdm>=4.48.1",
+    # For schema validation
+    "jsonschema>=3.0.0",
 ]
 
 description = "Simple workflow management for signac projects."

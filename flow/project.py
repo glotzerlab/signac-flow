@@ -1511,11 +1511,14 @@ class _FlowProjectClass(type):
 
 def _config_value_as_bool(value):
     # Function to interpret a configobj bool-like value as a boolean.
-    if value.lower() in {"true", "on", "yes", "1"}:
-        return True
-    elif value.lower() in {"false", "off", "no", "0"}:
-        return False
-    raise ValueError("Invalid boolean config value.")
+    if isinstance(value, str):
+        if value.lower() in {"true", "on", "yes", "1"}:
+            return True
+        elif value.lower() in {"false", "off", "no", "0"}:
+            return False
+        else:
+            raise ValueError("Invalid boolean config value.")
+    return bool(value)
 
 
 class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):

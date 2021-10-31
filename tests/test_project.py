@@ -11,7 +11,6 @@ import sys
 import tempfile
 import uuid
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
-from distutils.version import StrictVersion
 from functools import partial
 from io import StringIO
 from itertools import groupby
@@ -1062,10 +1061,7 @@ class TestExecutionProject(TestProjectBase):
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
                 with redirect_stderr(output):
-                    if StrictVersion(signac.__version__) < StrictVersion("0.9.4"):
-                        project.run(list(project.find_jobs(dict(a=0))))
-                    else:
-                        project.run(project.find_jobs(dict(a=0)))
+                    project.run(project.find_jobs(dict(a=0)))
         output.seek(0)
         output.read()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]

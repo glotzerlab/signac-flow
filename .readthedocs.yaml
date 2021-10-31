@@ -5,7 +5,7 @@ build:
         python: "3"
 python:
     install:
-          path: .
+        - path: .
 submodules:
     include: all
     recursive: true

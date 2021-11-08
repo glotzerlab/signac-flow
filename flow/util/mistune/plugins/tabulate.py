@@ -30,44 +30,23 @@ import re
 import math
 
 
-if python_version_tuple() >= ("3", "3", "0"):
-    from collections.abc import Iterable
-else:
-    from collections import Iterable
+from collections.abc import Iterable
+from itertools import zip_longest as izip_longest
+from functools import reduce, partial
 
-if python_version_tuple()[0] < "3":
-    from itertools import izip_longest
-    from functools import partial
+_none_type = type(None)
+_bool_type = bool
+_int_type = int
+_long_type = int
+_float_type = float
+_text_type = str
+_binary_type = bytes
+basestring = str
 
-    _none_type = type(None)
-    _bool_type = bool
-    _int_type = int
-    _long_type = long  # noqa
-    _float_type = float
-    _text_type = unicode  # noqa
-    _binary_type = str
+import io
 
-    def _is_file(f):
-        return hasattr(f, "read")
-
-
-else:
-    from itertools import zip_longest as izip_longest
-    from functools import reduce, partial
-
-    _none_type = type(None)
-    _bool_type = bool
-    _int_type = int
-    _long_type = int
-    _float_type = float
-    _text_type = str
-    _binary_type = bytes
-    basestring = str
-
-    import io
-
-    def _is_file(f):
-        return isinstance(f, io.IOBase)
+def _is_file(f):
+    return isinstance(f, io.IOBase)
 
 
 try:

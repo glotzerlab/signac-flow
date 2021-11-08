@@ -16,6 +16,7 @@ from .project import FlowProject, IgnoreConditions, classlabel, label, staticlab
 from .template import init
 
 # Import packaged environments unless disabled in config:
+from .util.config import _FLOW_CONFIG_DEFAULTS
 from .util.config import get_config_value as _get_config_value
 from .util.misc import redirect_log
 from .version import __version__
@@ -42,7 +43,10 @@ __all__ = [
 ]
 
 
-if _get_config_value("import_packaged_environments", default=True):
+if _get_config_value(
+    "import_packaged_environments",
+    default=_FLOW_CONFIG_DEFAULTS["import_packaged_environments"],
+):
     from . import environments  # noqa: F401
 
     __all__.append("environments")

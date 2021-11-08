@@ -32,6 +32,7 @@ from multiprocessing.pool import ThreadPool
 
 import cloudpickle
 import jinja2
+import jsonschema
 import signac
 from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
 from signac.contrib.filterparse import parse_filter_arg
@@ -1521,6 +1522,18 @@ class _FlowProjectClass(type):
         return OperationRegister()
 
 
+def _config_value_as_bool(value):
+    # Function to interpret a configobj bool-like value as a boolean.
+    if isinstance(value, str):
+        if value.lower() in {"true", "on", "yes", "1"}:
+            return True
+        elif value.lower() in {"false", "off", "no", "0"}:
+            return False
+        else:
+            raise ValueError("Invalid boolean config value.")
+    return bool(value)
+
+
 class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     """A signac project class specialized for workflow management.
 
@@ -1558,6 +1571,35 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def __init__(self, config=None, environment=None, entrypoint=None):
         super().__init__(config=config)
+
+        # Initialize the local config.
+        # TODO: In signac 2.0 we will not allow config modification after
+        # project initialization. The flow config is already effectively
+        # immutable since it is an internal variable that is not exposed to the
+        # user in any way. Once signac no longer relies on configobj and stops
+        # supporting in-place config modification, flow can make use of the
+        # signac Project config dictionary directly and that can be updated by
+        # any flow config APIs. For now, we store the flow config separately to
+        # avoid any side effects associated with modifying instances of
+        # signac.contrib._ProjectConfig.
+        self._flow_config = {
+            **flow_config._FLOW_CONFIG_DEFAULTS,
+            **self._config.get("flow", {}),
+        }
+        self._flow_config["eligible_jobs_max_lines"] = int(
+            self._flow_config["eligible_jobs_max_lines"]
+        )
+        self._flow_config["status_performance_warn_threshold"] = float(
+            self._flow_config["status_performance_warn_threshold"]
+        )
+        self._flow_config["show_traceback"] = _config_value_as_bool(
+            self._flow_config["show_traceback"]
+        )
+        jsonschema.validate(
+            self._flow_config,
+            flow_config._FLOW_SCHEMA,
+            format_checker=jsonschema.draft7_format_checker,
+        )
 
         # Associate this class with a compute environment.
         self._environment = environment or get_environment()
@@ -2628,11 +2670,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         aggregates = self._convert_jobs_to_aggregates(jobs)
 
         if eligible_jobs_max_lines is None:
-            eligible_jobs_max_lines = flow_config.get_config_value(
-                "eligible_jobs_max_lines"
-            )
+            eligible_jobs_max_lines = self._flow_config["eligible_jobs_max_lines"]
 
-        status_parallelization = self.config["flow"]["status_parallelization"]
+        status_parallelization = self._flow_config["status_parallelization"]
 
         # initialize jinja2 template environment and necessary filters
         template_environment = self._template_environment()
@@ -4462,7 +4502,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             # Use small offset to account for overhead with few jobs
             delta_t = (time.time() - start - 0.5) / max(length_jobs, 1)
             config_key = "status_performance_warn_threshold"
-            warn_threshold = flow_config.get_config_value(config_key)
+            warn_threshold = self._flow_config[config_key]
             if not args["profile"] and delta_t > warn_threshold >= 0:
                 print(
                     "WARNING: "
@@ -4800,7 +4840,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Read the config file and set the internal flag.
         # Do not overwrite with False if not present in config file
-        if flow_config.get_config_value("show_traceback"):
+        if self._flow_config["show_traceback"]:
             args.show_traceback = True
 
         if args.debug:  # Implies '-vv' and '--show-traceback'

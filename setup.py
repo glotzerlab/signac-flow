@@ -16,6 +16,8 @@ requirements = [
     "deprecation>=2.0.0",
     # Progress bars
     "tqdm>=4.48.1",
+    # For schema validation
+    "jsonschema>=3.0.0",
 ]
 
 description = "Simple workflow management for signac projects."
@@ -53,6 +55,7 @@ setup(
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
     ],
     entry_points={
         "console_scripts": [

@@ -6,15 +6,25 @@ from signac.common import config
 
 from ..errors import ConfigKeyError
 
-# Monkeypatch the signac config spec to include flow-specific fields.
-config.cfg += """
-[flow]
-import_packaged_environments = boolean()
-status_performance_warn_threshold = float(default=0.2)
-show_traceback = boolean()
-eligible_jobs_max_lines = int(default=10)
-status_parallelization = string(default='none')
-"""
+_FLOW_SCHEMA = {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+        "import_packaged_environments": {"type": "boolean"},
+        "status_performance_warn_threshold": {"type": "number"},
+        "show_traceback": {"type": "boolean"},
+        "eligible_jobs_max_lines": {"type": "integer"},
+        "status_parallelization": {"type": "string"},
+    },
+}
+
+_FLOW_CONFIG_DEFAULTS = {
+    "import_packaged_environments": True,
+    "status_performance_warn_threshold": 0.2,
+    "show_traceback": False,
+    "eligible_jobs_max_lines": 10,
+    "status_parallelization": "none",
+}
 
 
 class _GetConfigValueNoneType:

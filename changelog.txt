@@ -11,11 +11,23 @@ Version 0.17
 [0.17.0] -- 2021-xx-xx
 ----------------------
 
+Added
++++++
+
+- Add official support for Python version 3.10 (#578).
+
 Fixed
 +++++
+
 - Scripts are now generated correctly when project path contains spaces and special characters (#572).
 - XSEDE Expanse template has been fixed to remove leading spaces (#575, #576).
 - Error raised when a ``FlowGroup`` decorates functions that are not ``FlowProject`` operations (#538, #544).
+
+Changed
++++++++
+
+- FlowProject configuration is not validated independently of signac Project configuration (#573).
+- jsonschema is now a dependency.
 
 Version 0.16
 ============

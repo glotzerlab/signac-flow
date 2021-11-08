@@ -1541,7 +1541,7 @@ class _FlowProjectClass(type):
                 ----------
                 hook_func : callable
                     The function that will be executed at a specified point.
-                trigger: string
+                trigger : string
                     The point when a hook operation is executed.
                 """
                 self._hook_func = hook_func
@@ -1549,7 +1549,7 @@ class _FlowProjectClass(type):
 
             @classmethod
             def on_start(cls, hook_func):
-                """Add hook function with trigger "on_start"."""
+                """Add a hook function triggered before an operation starts."""
                 return cls(hook_func, trigger="on_start")
 
             @classmethod
@@ -1798,7 +1798,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @property
     def project_hooks(self):
-        """:class:`.hooks.Hooks` hooks defined for all project operations."""
+        """:class:`.hooks.Hooks` defined for all project operations."""
         return self._hooks
 
     @classmethod
@@ -3238,7 +3238,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         except Exception as error:
             self.project_hooks.on_fail(name, error, *jobs)
             operation_hooks.on_fail(name, error, *jobs)
-            raise error
+            raise
         else:
             self.project_hooks.on_success(name, *jobs)
             operation_hooks.on_success(name, *jobs)

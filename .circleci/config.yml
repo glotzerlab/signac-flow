@@ -15,7 +15,7 @@ references:
 jobs:
   pre-checks:
     docker:
-      - image: circleci/python:3.9
+      - image: cimg/python:3.10
 
     working_directory: ~/repo
 
@@ -40,12 +40,12 @@ jobs:
           paths:
             - ".pre-commit-cache"
 
-  linux-python-39: &test-template
+  linux-python-310: &test-template
     environment:
       DEPENDENCIES: "NEWEST"
       SIGNAC_VERSION: "signac"
     docker:
-      - image: circleci/python:3.9
+      - image: cimg/python:3.10
 
     working_directory: ~/repo
 
@@ -81,45 +81,49 @@ jobs:
           path: test-reports
           destination: test-reports
 
-  linux-python-39-signac-16:
+  linux-python-310-signac-16:
     <<: *test-template
     environment:
       DEPENDENCIES: "NEWEST"
       SIGNAC_VERSION: "signac~=1.6.0"
-  linux-python-39-signac-15:
+  linux-python-310-signac-15:
     <<: *test-template
     environment:
       DEPENDENCIES: "NEWEST"
       SIGNAC_VERSION: "signac~=1.5.0"
-  linux-python-39-signac-latest:
+  linux-python-310-signac-latest:
     <<: *test-template
     environment:
       DEPENDENCIES: "NEWEST"
       SIGNAC_VERSION: "git+ssh://git@github.com/glotzerlab/signac.git"
-  linux-python-39-signac-next:
+  linux-python-310-signac-next:
     <<: *test-template
     environment:
       DEPENDENCIES: "NEWEST"
       SIGNAC_VERSION: "git+ssh://git@github.com/glotzerlab/signac.git@next"
+  linux-python-39:
+    <<: *test-template
+    docker:
+      - image: cimg/python:3.9
   linux-python-38:
     <<: *test-template
     docker:
-      - image: circleci/python:3.8
+      - image: cimg/python:3.8
   linux-python-37:
     <<: *test-template
     docker:
-      - image: circleci/python:3.7
+      - image: cimg/python:3.7
   linux-python-36-oldest:
     <<: *test-template
     environment:
       DEPENDENCIES: "OLDEST"
       SIGNAC_VERSION: "signac==1.3.0"
     docker:
-      - image: circleci/python:3.6
+      - image: cimg/python:3.6
 
   check-metadata:
     docker:
-      - image: circleci/python:3.9
+      - image: cimg/python:3.10
 
     working_directory: ~/repo
 
@@ -138,7 +142,7 @@ jobs:
 
   test-deploy-pypi:
     docker:
-      - image: circleci/python:3.9
+      - image: cimg/python:3.10
     working_directory: ~/repo
     steps:
       - checkout
@@ -149,7 +153,7 @@ jobs:
 
   deploy-pypi:
     docker:
-      - image: circleci/python:3.9
+      - image: cimg/python:3.10
     working_directory: ~/repo
     steps:
       - checkout
@@ -164,16 +168,17 @@ workflows:
   test:
     jobs:
 #     - pre-checks
+      - linux-python-310
       - linux-python-39
       - linux-python-38
       - linux-python-37
       - linux-python-36-oldest
-      - linux-python-39-signac-16:
+      - linux-python-310-signac-16:
           requires:
-            - linux-python-39
-      - linux-python-39-signac-15:
+            - linux-python-310
+      - linux-python-310-signac-15:
           requires:
-            - linux-python-39
+            - linux-python-310
       - check-metadata:
           filters:
             branches:
@@ -183,12 +188,13 @@ workflows:
             branches:
               only: /release\/.*/
           requires:
+            - linux-python-310
             - linux-python-39
             - linux-python-38
             - linux-python-37
             - linux-python-36-oldest
-            - linux-python-39-signac-16
-            - linux-python-39-signac-15
+            - linux-python-310-signac-16
+            - linux-python-310-signac-15
   nightly:
     triggers:
       - schedule:
@@ -198,8 +204,8 @@ workflows:
               only:
                 - master
     jobs:
-      - linux-python-39-signac-latest
-      - linux-python-39-signac-next
+      - linux-python-310-signac-latest
+      - linux-python-310-signac-next
   deploy:
     jobs:
       - deploy-pypi:

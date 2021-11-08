@@ -3002,7 +3002,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         num_omitted_operations = len(op_counter) - len(context["op_counter"])
         if num_omitted_operations > 0:
             context["op_counter"].append(
-                (f"[{num_omitted_operations} more operations omitted]", "")
+                (f"[{num_omitted_operations} more operations omitted]", "", "")
             )
 
         # We have to make a deep copy of the template environment if we're

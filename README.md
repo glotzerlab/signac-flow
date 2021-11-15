@@ -33,6 +33,8 @@ That includes the definition of data pipelines, execution of data space operatio
 The recommended installation method for **signac-flow** is through **conda** or **pip**.
 The software is tested for Python versions 3.6+ and is built for all major platforms.
 
+__Note__: Python 3.10 is not supported for `flow` version 0.16.0 and below.
+
 To install **signac-flow** *via* the [conda-forge](https://conda-forge.github.io/) channel, execute:
 
 ```bash

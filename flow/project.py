@@ -1524,10 +1524,12 @@ class _FlowProjectClass(type):
                 This object is designed to be used as a decorator. For example:
 
                 .. code-block:: python
+                    def start_hook(operation_name, job):
+                        print(f"Starting operation {operation_name} on job {job.id}"))
 
                     @FlowProject.operation
-                    @FlowProject.operation_hook.on_start(lambda op_name, job: print(op_name, job))
-                    def foo(job):
+                    @FlowProject.operation_hook.on_start(start_hook)
+                    def op(job):
                         pass
 
                 A hook is a function that is called at specific points

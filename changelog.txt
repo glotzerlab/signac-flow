@@ -5,17 +5,26 @@ Changelog
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 The numbers in brackets denote the related GitHub issue and/or pull request.
 
+Version 0.18
+
+[0.18.0] -- 2022-xx-xx
+----------------------
+
+Added
++++++
+
+- Feature to install execution hooks for the automated execution of functions with operations (#28, #189, #508).
+
 Version 0.17
 ============
 
-[0.17.0] -- 2021-0x-xx
+[0.17.0] -- 2021-11-15
 ----------------------
 
 Added
 +++++
 
 - Add official support for Python version 3.10 (#578).
-- Feature to install execution hooks for the automated execution of functions with operations (#28, #189, #508).
 
 Fixed
 +++++
@@ -27,7 +36,7 @@ Changed
 +++++++
 
 - FlowProject configuration is not validated independently of signac Project configuration (#573).
-- jsonschema is now a dependency.
+- jsonschema is now a dependency (#573).
 
 Version 0.16
 ============

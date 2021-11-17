@@ -249,6 +249,19 @@ workflows:
   version: 2
   test:
     jobs:
+      # DEBUG: MOVE THIS BACK TO NIGHTLY AFTER TESTING
+      - test-install-pip-python-36
+      - test-install-pip-python-37
+      - test-install-pip-python-38
+      - test-install-pip-python-39
+      - test-install-pip-python-310
+      - test-install-conda
+      - test-install-conda-python-36
+      - test-install-conda-python-37
+      - test-install-conda-python-38
+      - test-install-conda-python-39
+      - test-install-conda-python-310
+      # END DEBUG
 #     - pre-checks
       - linux-python-310
       - linux-python-39
@@ -288,17 +301,6 @@ workflows:
     jobs:
       - linux-python-310-signac-latest
       - linux-python-310-signac-next
-      - test-install-pip-python-36
-      - test-install-pip-python-37
-      - test-install-pip-python-38
-      - test-install-pip-python-39
-      - test-install-pip-python-310
-      - test-install-conda
-      - test-install-conda-python-36
-      - test-install-conda-python-37
-      - test-install-conda-python-38
-      - test-install-conda-python-39
-      - test-install-conda-python-310
   deploy:
     jobs:
       - deploy-pypi:

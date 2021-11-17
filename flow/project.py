@@ -1195,7 +1195,6 @@ class _FlowProjectClass(type):
         cls._OPERATION_PRECONDITIONS = defaultdict(list)
         cls._OPERATION_POSTCONDITIONS = defaultdict(list)
         cls._OPERATION_HOOK_REGISTRY = defaultdict(lambda: defaultdict(list))
-        cls._operation_hooks = defaultdict(list)
 
         # All label functions are registered with the label() classmethod,
         # which is intended to be used as decorator function. The

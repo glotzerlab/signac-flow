@@ -116,6 +116,11 @@
             "affiliation": "University of Michigan",
             "name": "Kelly Wang",
             "orcid": "0000-0002-7326-3835"
+        },
+        {
+            "affiliation": "University of Córdoba (Spain)",
+            "name": "Javier Barbero Gómez",
+            "orcid": "0000-0002-9317-1428"
         }
     ],
     "creators": [
@@ -170,5 +175,5 @@
     },
     "title": "signac-flow",
     "upload_type": "software",
-    "version": "0.16.0"
+    "version": "0.17.0"
 }

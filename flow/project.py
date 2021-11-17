@@ -1683,7 +1683,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         self._template_environment_ = {}
 
         # Setup execution hooks
-        self._hooks = Hooks()
+        self._project_hooks = Hooks()
         self._operation_hooks = defaultdict(Hooks)
 
         # Register all label functions with this project instance.
@@ -1805,7 +1805,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     @property
     def project_hooks(self):
         """:class:`.hooks.Hooks` defined for all project operations."""
-        return self._hooks
+        return self._project_hooks
 
     @classmethod
     def label(cls, label_name_or_func=None):

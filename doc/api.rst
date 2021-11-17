@@ -35,6 +35,7 @@ The FlowProject
     FlowProject.make_group
     FlowProject.operation
     FlowProject.operation.with_directives
+    FlowProject.operation_hook
     FlowProject.operations
     FlowProject.post
     FlowProject.post.copy_from
@@ -52,6 +53,7 @@ The FlowProject
     FlowProject.pre.not_
     FlowProject.pre.true
     FlowProject.print_status
+    FlowProject.project_hooks
     FlowProject.run
     FlowProject.scheduler_jobs
     FlowProject.submit

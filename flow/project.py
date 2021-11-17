@@ -1521,23 +1521,27 @@ class _FlowProjectClass(type):
             def __init__(self, hook_func, trigger):
                 """Add hooks to an operation workflow.
 
-                This object is designed to be used as a decorator. For example:
+                This object is designed to be used as a decorator. The example
+                below shows an operation level decorator that prints the
+                operation name and job id at the start of the operation
+                execution.
 
                 .. code-block:: python
+
                     def start_hook(operation_name, job):
-                        print(f"Starting operation {operation_name} on job {job.id}"))
+                        print(f"Starting operation {operation_name} on job {job.id}.")
 
                     @FlowProject.operation
                     @FlowProject.operation_hook.on_start(start_hook)
-                    def op(job):
+                    def foo(job):
                         pass
 
-                A hook is a function that is called at specific points
-                during the execution of a job operation. In this example,
-                the anonymous hook function is executed before the operation
+                A hook is a function that is called at specific points during
+                the execution of a job operation. In the example above, the
+                ``start_hook`` hook function is executed before the operation
                 **foo** runs. Hooks can also run after an operation finishes,
-                when an operation exits with error, or when an operation
-                exits without error.
+                when an operation exits with error, or when an operation exits
+                without error.
 
                 Parameters
                 ----------
@@ -1804,7 +1808,21 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     @property
     def project_hooks(self):
-        """:class:`.hooks.Hooks` defined for all project operations."""
+        """:class:`.hooks.Hooks` defined for all project operations.
+
+        Project-wide hooks are added to an *instance* of the FlowProject, not
+        the class. For example:
+
+        .. code-block:: python
+
+            def finish_hook(operation_name, job):
+                print(f"Finished operation {operation_name} on job {job.id}")
+
+            if __name__ == "__main__":
+                project = FlowProject()
+                project.project_hooks.on_finish.append(finish_hook)
+                project.main()
+        """
         return self._project_hooks
 
     @classmethod

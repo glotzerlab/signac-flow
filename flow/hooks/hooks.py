@@ -29,8 +29,9 @@ class Hooks:
     starts, succeeds, fails, or finishes (regardless of whether the operation
     executed successfully or failed).
 
-    Hooks can be installed at the operation level as decorators,
-    or at the :class:`~.FlowProject` level.
+    Hooks can be installed at the operation level as decorators, or on an
+    instance of :class:`~.FlowProject` through
+    :meth:`~.FlowProject.project_hooks`.
 
     Examples
     --------
@@ -38,12 +39,13 @@ class Hooks:
     operation name and job id at the start of the operation execution.
 
     .. code-block:: python
+
         def start_hook(operation_name, job):
-            print(f"Starting operation {operation_name} on job {job.id}"))
+            print(f"Starting operation {operation_name} on job {job.id}.")
 
         @FlowProject.operation
         @FlowProject.operation_hook.on_start(start_hook)
-        def op(job):
+        def foo(job):
             pass
 
     Parameters

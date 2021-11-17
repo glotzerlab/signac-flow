@@ -1531,11 +1531,12 @@ class _FlowProjectClass(type):
                     def foo(job):
                         pass
 
-                A hook is a function that is called at at specific points during the execution
-                of a job operation. In this example, the anonymous hook function
-                is executed before the operation **foo** runs. Hooks can also run after an
-                operation finish, when an operation exits with error,
-                or when an operation exists without error.
+                A hook is a function that is called at specific points
+                during the execution of a job operation. In this example,
+                the anonymous hook function is executed before the operation
+                **foo** runs. Hooks can also run after an operation finishes,
+                when an operation exits with error, or when an operation
+                exits without error.
 
                 Parameters
                 ----------
@@ -1554,17 +1555,17 @@ class _FlowProjectClass(type):
 
             @classmethod
             def on_finish(cls, hook_func):
-                """Add hook function with trigger "on_finish"."""
+                """Add a hook function triggered after the operation exits, with or without errors."""
                 return cls(hook_func, trigger="on_finish")
 
             @classmethod
             def on_success(cls, hook_func):
-                """Add hook function with trigger "on_success"."""
+                """Add a hook function triggered after the operation exits without error."""
                 return cls(hook_func, trigger="on_success")
 
             @classmethod
             def on_fail(cls, hook_func):
-                """Add hook function with trigger "on_fail"."""
+                """Add a hook function triggered after the operation exits with an error."""
                 return cls(hook_func, trigger="on_fail")
 
             def __call__(self, func):

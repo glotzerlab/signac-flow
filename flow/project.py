@@ -1555,7 +1555,11 @@ class _FlowProjectClass(type):
 
             @classmethod
             def on_finish(cls, hook_func):
-                """Add a hook function triggered after the operation exits, with or without errors."""
+                """Add a hook function triggered after the operation exits.
+
+                The hook is triggered regardless of whether the operation exits
+                with or without an error.
+                """
                 return cls(hook_func, trigger="on_finish")
 
             @classmethod

@@ -121,6 +121,88 @@ jobs:
     docker:
       - image: cimg/python:3.6
 
+  test-install-pip-python-36: &test-install-pip
+    docker:
+      - image: cimg/python:3.6
+
+    steps:
+
+      - run:
+          name: install-with-pip
+          command: |
+            pip install --progress-bar off signac signac-flow
+
+      - run: &smoke-test
+          name: smoke-test
+          command: |
+            signac --version
+            python -c 'import signac'
+            flow --version
+            python -c 'import flow'
+
+  test-install-pip-python-37:
+    <<: *test-install-pip
+    docker:
+      - image: cimg/python:3.7
+
+  test-install-pip-python-38:
+    <<: *test-install-pip
+    docker:
+      - image: cimg/python:3.8
+
+  test-install-pip-python-39:
+    <<: *test-install-pip
+    docker:
+      - image: cimg/python:3.9
+
+  test-install-pip-python-310:
+    <<: *test-install-pip
+    docker:
+      - image: cimg/python:3.10
+
+  test-install-conda: &test-install-conda
+    environment:
+      # The default job does not specify the version, just like the
+      # instructions.
+      PYTHON_DEP: ""
+    docker:
+      - image: conda/miniconda3:latest
+
+    steps:
+
+      - run:
+          name: install-with-conda
+          command: |
+            conda install -c conda-forge signac signac-flow ${PYTHON_DEP} --yes
+
+      - run:
+          <<: *smoke-test
+
+  test-install-conda-python-36:
+    <<: *test-install-conda
+    environment:
+      PYTHON_DEP: "python=3.6"
+
+  test-install-conda-python-37:
+    <<: *test-install-conda
+    environment:
+      PYTHON_DEP: "python=3.7"
+
+  test-install-conda-python-38:
+    <<: *test-install-conda
+    environment:
+      PYTHON_DEP: "python=3.8"
+
+  test-install-conda-python-39:
+    <<: *test-install-conda
+    environment:
+      PYTHON_DEP: "python=3.9"
+
+  test-install-conda-python-310:
+    <<: *test-install-conda
+    environment:
+      PYTHON_DEP: "python=3.10"
+
   check-metadata:
     docker:
       - image: cimg/python:3.10
@@ -206,6 +288,17 @@ workflows:
     jobs:
       - linux-python-310-signac-latest
       - linux-python-310-signac-next
+      - test-install-pip-python-36
+      - test-install-pip-python-37
+      - test-install-pip-python-38
+      - test-install-pip-python-39
+      - test-install-pip-python-310
+      - test-install-conda
+      - test-install-conda-python-36
+      - test-install-conda-python-37
+      - test-install-conda-python-38
+      - test-install-conda-python-39
+      - test-install-conda-python-310
   deploy:
     jobs:
       - deploy-pypi:

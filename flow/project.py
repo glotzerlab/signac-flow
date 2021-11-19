@@ -1539,8 +1539,8 @@ class _FlowProjectClass(type):
             when an operation exits with error, or when an operation exits
             without error.
 
-            The available triggers are `on_start`, `on_finish`, `on_fail`, and
-            `on_success` which run when the operation starts, completes, fails, and
+            The available triggers are ``on_start``, ``on_finish``, ``on_fail``, and
+            ``on_success`` which run when the operation starts, completes, fails, and
             succeeds respectively.
 
             Parameters

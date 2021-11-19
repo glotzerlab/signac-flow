@@ -72,7 +72,7 @@ The FlowProject
 
 .. automethod:: flow.FlowProject.operation.with_directives(directives, name=None)
 
-.. automethod:: flow.FlowProject.operation_hook
+.. automethod:: flow.FlowProject.operation_hook(hook_func, trigger)
 
 .. automethod:: flow.FlowProject.operation_hook.on_fail
 

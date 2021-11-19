@@ -1468,8 +1468,7 @@ class _FlowProjectClass(type):
                 )
                 if not hasattr(func, "_flow_groups"):
                     func._flow_groups = {}
-                if self._parent_class not in func._flow_groups:
-                    func._flow_groups[self._parent_class] = {name}
+                func._flow_groups[self._parent_class] = {name}
                 return func
 
             def with_directives(self, directives, name=None):

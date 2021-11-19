@@ -686,14 +686,11 @@ class FlowGroupEntry:
                 f"operation. Add @MyProjectClass.operation below group decorator."
             )
 
-        if hasattr(func, "_flow_groups"):
-            if self.name in func._flow_groups:
-                raise FlowProjectDefinitionError(
-                    f"Cannot reregister operation '{func}' with the group '{self.name}'."
-                )
-            func._flow_groups.add(self.name)
-        else:
-            func._flow_groups = {self.name}
+        if self.name in func._flow_groups[self._project]:
+            raise FlowProjectDefinitionError(
+                f"Cannot reregister operation '{func}' with the group '{self.name}'."
+            )
+        func._flow_groups[self._project].add(self.name)
         return func
 
     def _set_directives(self, func, directives):
@@ -1469,10 +1466,10 @@ class _FlowProjectClass(type):
                 self._parent_class._GROUPS.append(
                     FlowGroupEntry(name=name, project=self._parent_class, options="")
                 )
-                if hasattr(func, "_flow_groups"):
-                    func._flow_groups.add(name)
-                else:
-                    func._flow_groups = {name}
+                if not hasattr(func, "_flow_groups"):
+                    func._flow_groups = {}
+                if self._parent_class not in func._flow_groups:
+                    func._flow_groups[self._parent_class] = {name}
                 return func
 
             def with_directives(self, directives, name=None):
@@ -4366,9 +4363,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             else:
                 func = operation._op_func
 
-            if hasattr(func, "_flow_groups"):
-                op_directives = getattr(func, "_flow_group_operation_directives", {})
-                for group_name in func._flow_groups:
+            op_directives = getattr(func, "_flow_group_operation_directives", {})
+            for cls in self.__class__.__mro__:
+                # Need to use `get` since we don't know which class in the
+                # hierarchy this function was registered to.
+                for group_name in func._flow_groups.get(cls, []):
                     directives = op_directives.get(group_name)
                     self._groups[group_name].add_operation(
                         operation_name, operation, directives

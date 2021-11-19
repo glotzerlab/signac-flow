@@ -1802,7 +1802,7 @@ class TestGroupProject(TestProjectBase):
             def test_op(job):
                 pass
 
-        # Make test_op into an operation, then project creation should succeed.
+        # Make test_op into an operation, then group addition should succeed.
         @group
         @A.operation
         def test_op_2(job):

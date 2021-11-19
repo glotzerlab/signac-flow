@@ -1515,41 +1515,45 @@ class _FlowProjectClass(type):
     @staticmethod
     def _setup_hook_object(parent_class):
         class _HooksRegister:
+            """Add hooks to an operation.
+
+            This object is designed to be used as a decorator. The example
+            below shows an operation level decorator that prints the
+            operation name and job id at the start of the operation
+            execution.
+
+            .. code-block:: python
+
+                def start_hook(operation_name, job):
+                    print(f"Starting operation {operation_name} on job {job.id}.")
+
+                @FlowProject.operation
+                @FlowProject.operation_hook.on_start(start_hook)
+                def foo(job):
+                    pass
+
+            A hook is a function that is called at specific points during
+            the execution of a job operation. In the example above, the
+            ``start_hook`` hook function is executed before the operation
+            **foo** runs. Hooks can also run after an operation finishes,
+            when an operation exits with error, or when an operation exits
+            without error.
+
+            The available triggers are `on_start`, `on_finish`, `on_fail`, and
+            `on_success` which run when the operation starts, completes, fails, and
+            succeeds respectively.
+
+            Parameters
+            ----------
+            hook_func : callable
+                The function that will be executed at a specified point.
+            trigger : string
+                The point when a hook operation is executed.
+            """
 
             _parent_class = parent_class
 
             def __init__(self, hook_func, trigger):
-                """Add hooks to an operation workflow.
-
-                This object is designed to be used as a decorator. The example
-                below shows an operation level decorator that prints the
-                operation name and job id at the start of the operation
-                execution.
-
-                .. code-block:: python
-
-                    def start_hook(operation_name, job):
-                        print(f"Starting operation {operation_name} on job {job.id}.")
-
-                    @FlowProject.operation
-                    @FlowProject.operation_hook.on_start(start_hook)
-                    def foo(job):
-                        pass
-
-                A hook is a function that is called at specific points during
-                the execution of a job operation. In the example above, the
-                ``start_hook`` hook function is executed before the operation
-                **foo** runs. Hooks can also run after an operation finishes,
-                when an operation exits with error, or when an operation exits
-                without error.
-
-                Parameters
-                ----------
-                hook_func : callable
-                    The function that will be executed at a specified point.
-                trigger : string
-                    The point when a hook operation is executed.
-                """
                 self._hook_func = hook_func
                 self._hook_trigger = trigger
 

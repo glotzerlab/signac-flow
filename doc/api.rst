@@ -36,6 +36,10 @@ The FlowProject
     FlowProject.operation
     FlowProject.operation.with_directives
     FlowProject.operation_hook
+    FlowProject.operation_hook.on_fail
+    FlowProject.operation_hook.on_finish
+    FlowProject.operation_hook.on_start
+    FlowProject.operation_hook.on_success
     FlowProject.operations
     FlowProject.post
     FlowProject.post.copy_from
@@ -62,11 +66,21 @@ The FlowProject
 .. autoclass:: FlowProject
     :show-inheritance:
     :members:
-    :exclude-members: pre,post,operation
+    :exclude-members: pre,post,operation,operation_hook
 
 .. automethod:: flow.FlowProject.operation(func, name=None)
 
 .. automethod:: flow.FlowProject.operation.with_directives(directives, name=None)
+
+.. automethod:: flow.FlowProject.operation_hook
+
+.. automethod:: flow.FlowProject.operation_hook.on_fail
+
+.. automethod:: flow.FlowProject.operation_hook.on_finish
+
+.. automethod:: flow.FlowProject.operation_hook.on_start
+
+.. automethod:: flow.FlowProject.operation_hook.on_success
 
 .. automethod:: flow.FlowProject.post
 

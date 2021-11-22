@@ -57,7 +57,7 @@ from .errors import (
     UserConditionError,
     UserOperationError,
 )
-from .hooks import Hooks
+from .hooks import _Hooks
 from .labels import _is_label_func, classlabel, label, staticlabel
 from .render_status import _render_status
 from .scheduling.base import ClusterJob, JobStatus
@@ -1691,8 +1691,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         self._template_environment_ = {}
 
         # Setup execution hooks
-        self._project_hooks = Hooks()
-        self._operation_hooks = defaultdict(Hooks)
+        self._project_hooks = _Hooks()
+        self._operation_hooks = defaultdict(_Hooks)
 
         # Register all label functions with this project instance.
         self._label_functions = {}
@@ -3257,7 +3257,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         jobs = operation._jobs
 
         # Determine operation hooks
-        operation_hooks = self._operation_hooks.get(name, Hooks())
+        operation_hooks = self._operation_hooks.get(name, _Hooks())
 
         self.project_hooks.on_start(name, *jobs)
         operation_hooks.on_start(name, *jobs)
@@ -4382,7 +4382,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
             # Update operation hooks
             self._operation_hooks[name].update(
-                Hooks(**self._OPERATION_HOOK_REGISTRY[func])
+                _Hooks(**self._OPERATION_HOOK_REGISTRY[func])
             )
 
             # Construct FlowOperation:

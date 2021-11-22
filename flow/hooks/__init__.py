@@ -2,6 +2,6 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 """Operation hooks."""
-from .hooks import Hooks
+from .hooks import _Hooks
 
-__all__ = ["Hooks"]
+__all__ = ["_Hooks"]

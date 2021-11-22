@@ -1527,8 +1527,8 @@ class _FlowProjectClass(type):
                 def start_hook(operation_name, job):
                     print(f"Starting operation {operation_name} on job {job.id}.")
 
-                @FlowProject.operation
                 @FlowProject.operation_hook.on_start(start_hook)
+                @FlowProject.operation
                 def foo(job):
                     pass
 

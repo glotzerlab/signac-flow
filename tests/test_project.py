@@ -2512,8 +2512,8 @@ class TestHooksInvalidOption(TestHooksSetUp):
 
         with pytest.raises(AttributeError):
 
-            @A.operation
             @A.operation_hooks.invalid_option(lambda operation_name, job: None)
+            @A.operation
             def test_invalid_decorators(_):
                 pass
 

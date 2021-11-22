@@ -1219,7 +1219,7 @@ class _FlowProjectClass(type):
         cls._GROUPS = []
         cls._GROUP_NAMES = set()
 
-        cls.operation_hook = cls._setup_hook_object(parent_class=cls)
+        cls.operation_hooks = cls._setup_hooks_object(parent_class=cls)
 
         return cls
 
@@ -1513,7 +1513,7 @@ class _FlowProjectClass(type):
         return OperationRegister()
 
     @staticmethod
-    def _setup_hook_object(parent_class):
+    def _setup_hooks_object(parent_class):
         class _HooksRegister:
             """Add hooks to an operation.
 

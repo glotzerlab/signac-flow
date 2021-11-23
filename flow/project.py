@@ -642,6 +642,8 @@ class FlowGroupEntry:
     ----------
     name : str
         The name of the :class:`FlowGroup` to be created.
+    project : flow.FlowProject
+        The project the group is associated with.
     options : str
         The :meth:`FlowProject.run` options to pass when submitting the group.
         These will be included in all submissions. Submissions use run
@@ -650,8 +652,9 @@ class FlowGroupEntry:
         aggregator object associated with the :class:`FlowGroup` (Default value = None).
     """
 
-    def __init__(self, name, options="", group_aggregator=None):
+    def __init__(self, name, project, options="", group_aggregator=None):
         self.name = name
+        self._project = project
         self.options = options
         # We register aggregators associated with operation functions in
         # `_register_groups` and we do not set the aggregator explicitly.
@@ -676,14 +679,19 @@ class FlowGroupEntry:
             The decorated function.
 
         """
-        if hasattr(func, "_flow_groups"):
-            if self.name in func._flow_groups:
-                raise FlowProjectDefinitionError(
-                    f"Cannot reregister operation '{func}' with the group '{self.name}'."
-                )
-            func._flow_groups.append(self.name)
-        else:
-            func._flow_groups = [self.name]
+        if not any(
+            func == op_func for _, op_func in self._project._OPERATION_FUNCTIONS
+        ):
+            raise FlowProjectDefinitionError(
+                f"Cannot add function '{func}' to group without making the function an "
+                f"operation. Add @MyProjectClass.operation below group decorator."
+            )
+
+        if self.name in func._flow_groups[self._project]:
+            raise FlowProjectDefinitionError(
+                f"Cannot reregister operation '{func}' with the group '{self.name}'."
+            )
+        func._flow_groups[self._project].add(self.name)
         return func
 
     def _set_directives(self, func, directives):
@@ -1459,11 +1467,12 @@ class _FlowProjectClass(type):
                 # delay setting the aggregator because we do not restrict the decorator
                 # placement in terms of `@FlowGroupEntry`, `@aggregator`, or
                 # `@operation`.
-                self._parent_class._GROUPS.append(FlowGroupEntry(name=name, options=""))
-                if hasattr(func, "_flow_groups"):
-                    func._flow_groups.append(name)
-                else:
-                    func._flow_groups = [name]
+                self._parent_class._GROUPS.append(
+                    FlowGroupEntry(name=name, project=self._parent_class, options="")
+                )
+                if not hasattr(func, "_flow_groups"):
+                    func._flow_groups = {}
+                func._flow_groups[self._parent_class] = {name}
                 return func
 
             def with_directives(self, directives, name=None):
@@ -3100,7 +3109,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         num_omitted_operations = len(op_counter) - len(context["op_counter"])
         if num_omitted_operations > 0:
             context["op_counter"].append(
-                (f"[{num_omitted_operations} more operations omitted]", "")
+                (f"[{num_omitted_operations} more operations omitted]", "", "")
             )
 
         # We have to make a deep copy of the template environment if we're
@@ -4440,7 +4449,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             )
         cls._GROUP_NAMES.add(name)
         group_entry = FlowGroupEntry(
-            name=name, options=options, group_aggregator=group_aggregator
+            name=name, project=cls, options=options, group_aggregator=group_aggregator
         )
         cls._GROUPS.append(group_entry)
         return group_entry
@@ -4494,9 +4503,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             else:
                 func = operation._op_func
 
-            if hasattr(func, "_flow_groups"):
-                op_directives = getattr(func, "_flow_group_operation_directives", {})
-                for group_name in func._flow_groups:
+            op_directives = getattr(func, "_flow_group_operation_directives", {})
+            for cls in self.__class__.__mro__:
+                # Need to use `get` since we don't know which class in the
+                # hierarchy this function was registered to.
+                for group_name in func._flow_groups.get(cls, []):
                     directives = op_directives.get(group_name)
                     self._groups[group_name].add_operation(
                         operation_name, operation, directives

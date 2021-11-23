@@ -64,6 +64,7 @@ def main(args):
                 f"Archive '{ARCHIVE_PATH}' already exists, exiting. "
                 "Use `-f/--force` to overwrite."
             )
+            return
 
     with signac.TemporaryProject(name=PROJECT_NAME) as p, signac.TemporaryProject(
         name=STATUS_OPTIONS_PROJECT_NAME

@@ -49,15 +49,15 @@ def agg_op1_custom(*jobs):
     set_all_job_docs(jobs, "sum_custom", sum_custom)
 
 
-@_AggregateTestProject.operation
 @group1
+@_AggregateTestProject.operation
 @aggregator.groupsof(30)
 def agg_op2(*jobs):
     set_all_job_docs(jobs, "op2", True)
 
 
-@_AggregateTestProject.operation
 @group1
+@_AggregateTestProject.operation
 @aggregator()
 def agg_op3(*jobs):
     set_all_job_docs(jobs, "op3", True)

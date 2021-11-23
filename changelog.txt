@@ -21,6 +21,7 @@ Fixed
 
 - Scripts are now generated correctly when project path contains spaces and special characters (#572).
 - XSEDE Expanse template has been fixed to remove leading spaces (#575, #576).
+- Error raised when a ``FlowGroup`` decorates functions that are not ``FlowProject`` operations (#538, #544).
 
 Changed
 +++++++

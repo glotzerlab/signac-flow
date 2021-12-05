@@ -13,14 +13,14 @@ class TestProject(flow.FlowProject):
 group1 = TestProject.make_group(name="group1")
 
 
-@TestProject.operation
 @group1
+@TestProject.operation
 def serial_op(job):
     pass
 
 
-@TestProject.operation.with_directives({"np": TestProject.np})
 @group1
+@TestProject.operation.with_directives({"np": TestProject.np})
 def parallel_op(job):
     pass
 
@@ -56,14 +56,14 @@ def mpi_gpu_op(job):
     pass
 
 
-@TestProject.operation.with_directives({"memory": TestProject.memory})
 @group1
+@TestProject.operation.with_directives({"memory": TestProject.memory})
 def memory_op(job):
     pass
 
 
-@TestProject.operation.with_directives({"walltime": TestProject.walltime})
 @group1
+@TestProject.operation.with_directives({"walltime": TestProject.walltime})
 def walltime_op(job):
     pass
 

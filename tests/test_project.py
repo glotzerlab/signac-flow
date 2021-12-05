@@ -269,9 +269,9 @@ class TestProjectClass(TestProjectBase):
             pass
 
         with suspend_logging():
-            a = A.get_project(root=self._tmp_dir.name)
-            b = B.get_project(root=self._tmp_dir.name)
-            c = C.get_project(root=self._tmp_dir.name)
+            a = self.mock_project(A)
+            b = self.mock_project(B)
+            c = self.mock_project(C)
 
         assert len(a.operations) == 2
         assert len(b.operations) == 3
@@ -288,7 +288,23 @@ class TestProjectClass(TestProjectBase):
             def op1(job):
                 pass
 
-        return
+    def test_repeat_anonymous_operation_definition(self):
+        class A(FlowProject):
+            pass
+
+        A.operation(lambda job: print("Hello", job))
+
+        assert len(self.mock_project(A).operations) == 1
+
+        anonymous_func = lambda job: print("Hi", job)  # noqa: E731
+
+        with pytest.raises(FlowProjectDefinitionError):
+            # Only one anonymous operation is allowed, or else the name
+            # "<lambda>" conflicts between the operations.
+            A.operation(anonymous_func)
+
+        A.operation(anonymous_func, name="hi_operation")
+        assert len(self.mock_project(A).operations) == 2
 
     def test_repeat_operation_name(self):
         class A(FlowProject):
@@ -347,10 +363,10 @@ class TestProjectClass(TestProjectBase):
 
         # Should raise no error
         with suspend_logging():
-            A.get_project(root=self._tmp_dir.name)
+            self.mock_project(A)
 
         with pytest.raises(FlowProjectDefinitionError):
-            B.get_project(root=self._tmp_dir.name)
+            self.mock_project(B)
 
     def test_label_definition(self):
         class A(FlowProject):
@@ -371,9 +387,9 @@ class TestProjectClass(TestProjectBase):
         def label2(job):
             pass
 
-        a = A.get_project(root=self._tmp_dir.name)
-        b = B.get_project(root=self._tmp_dir.name)
-        c = C.get_project(root=self._tmp_dir.name)
+        a = self.mock_project(A)
+        b = self.mock_project(B)
+        c = self.mock_project(C)
 
         assert len(a._label_functions) == 1
         assert len(b._label_functions) == 2
@@ -1771,6 +1787,37 @@ class TestGroupProject(TestProjectBase):
 
         with pytest.raises(FlowProjectDefinitionError):
             B.make_group("bar")
+
+    def test_group_operation_without_operation_definition(self):
+        """Test that groups can only be applied to operations."""
+
+        class A(FlowProject):
+            pass
+
+        group = A.make_group("foo")
+
+        with pytest.raises(FlowProjectDefinitionError):
+
+            @group
+            def test_op(job):
+                pass
+
+        # Make test_op into an operation, then group addition should succeed.
+        @group
+        @A.operation
+        def test_op_2(job):
+            pass
+
+    def test_group_operation_without_operation_definition_anonymous(self):
+        """Test that groups cannot be applied to anonymous functions."""
+
+        class A(FlowProject):
+            pass
+
+        group = A.make_group("foo")
+
+        with pytest.raises(FlowProjectDefinitionError):
+            group(lambda job: print(job))
 
     def test_repeat_group_definition(self):
         """Test that groups cannot be registered if a group with that name exists."""

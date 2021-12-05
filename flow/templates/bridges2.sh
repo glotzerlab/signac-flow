@@ -26,11 +26,9 @@
     {% endif %}
     {% if partition == 'GPU' %}
 #SBATCH -N {{ nn|check_utilization(gpu_tasks, 8, threshold, 'GPU') }}
-#SBATCH --ntasks-per-node={{ cpus_per_node }}
 #SBATCH --gpus={{ gpu_tasks }}
     {% elif partition == 'GPU-shared' %}
 #SBATCH -N {{ nn|check_utilization(gpu_tasks, 1, threshold, 'GPU') }}
-#SBATCH --ntasks-per-node={{ cpus_per_node }}
 #SBATCH --gpus={{ gpu_tasks }}
     {% elif partition == 'EM' %}
 #SBATCH -N {{ nn|check_utilization(cpu_tasks, 96, threshold, 'CPU') }}

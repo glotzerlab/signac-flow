@@ -12,7 +12,11 @@ from ..errors import SubmitError
 
 
 class JobStatus(enum.IntEnum):
-    """Classifies the job's execution status."""
+    """Classifies the job's execution status.
+
+    Group statuses exist to enable status output for individual operations within a
+    larger group.
+    """
 
     unknown = 1
     """Unknown cluster job status."""
@@ -45,11 +49,46 @@ class JobStatus(enum.IntEnum):
     error = 8
     """The cluster job is in an error or failed state."""
 
+    group_registered = 9
+    """The operation via a group is registered with the scheduler.but no other status is known."""
+
+    group_inactive = 10
+    """The operation via a group is inactive.
+
+    This includes states like completed, cancelled, or timed out.
+    """
+
+    group_submitted = 11
+    """The operation via a group has been submitted.
+
+    Note that this state is never returned by a scheduler, but is an assumed
+    state immediately after a operation via a group is submitted.
+    """
+
+    group_held = 12
+    """The operation via a group is held."""
+
+    group_queued = 13
+    """The operation via a group is queued."""
+
+    group_active = 14
+    """The operation via a group is actively running."""
+
+    group_error = 15
+    """The operation via a group is in an error or failed state."""
+
     placeholder = 127
     """A placeholder state that is used for status rendering when no operations are eligible."""
 
     user = 128
     """All user-defined states must be >=128 in value."""
+
+    @classmethod
+    def _to_group(cls, status):
+        """Convert to an operation within a group status."""
+        if status == JobStatus.unknown or int(status) > 127:
+            raise ValueError(f"No equivalent group status for {status}.")
+        return cls(int(status) + 7)
 
 
 class ClusterJob:

@@ -108,6 +108,13 @@ _FMT_SCHEDULER_STATUS = {
     JobStatus.active: "A",
     JobStatus.error: "E",
     JobStatus.placeholder: " ",
+    JobStatus.group_registered: "GR",
+    JobStatus.group_inactive: "GI",
+    JobStatus.group_submitted: "GS",
+    JobStatus.group_held: "GH",
+    JobStatus.group_queued: "GQ",
+    JobStatus.group_active: "GA",
+    JobStatus.group_error: "GE",
 }
 
 
@@ -2963,11 +2970,19 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for job in context["jobs"]:
             for group_name, group_status in job["groups"].items():
                 if group_name != "":
+                    scheduler_status = group_status["scheduler_status"]
                     if group_status["eligible"]:
                         op_counter[group_name] += 1
-                    op_submission_status_counter[group_name][
-                        group_status["scheduler_status"]
-                    ] += 1
+                    op_submission_status_counter[group_name][scheduler_status] += 1
+                    if (
+                        group_name not in self._operations
+                        and scheduler_status > JobStatus.unknown
+                        and scheduler_status != JobStatus.placeholder
+                    ):
+                        for operation_name in self._groups[group_name].operations:
+                            op_submission_status_counter[operation_name][
+                                JobStatus._to_group(scheduler_status)
+                            ] += 1
 
         def _op_submission_summary(counter):
             """Generate string of statuses and counts, sorted by status."""

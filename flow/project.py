@@ -2522,7 +2522,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             ):
                 operation_status = {
                     **status,
-                    "scheduler_status": JobStatus._to_group(status["scheduler_status"]),
+                    "scheduler_status": JobStatus._to_group(scheduler_status),
                 }
                 for op_name in group.operations:
                     result.append(
@@ -2573,6 +2573,20 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 file=err,
             )
 
+        def combine_group_and_operation_status(aggregate_status_results):
+            group_statuses = {}
+            for status_result in aggregate_status_results:
+                group_name = status_result["group_name"]
+                # Only true when both a user group and singleton group report a status. We use the
+                # one that is not unknown.
+                if (
+                    group_name in group_statuses
+                    and status_result["status"]["scheduler_status"] == JobStatus.unknown
+                ):
+                    continue
+                group_statuses[group_name] = status_result["status"]
+            return group_statuses
+
         status_results_combined = []
         for aggregate_id, aggregate_results in groupby(
             sorted(status_results, key=lambda result: result["aggregate_id"]),
@@ -2590,10 +2604,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             status_results_combined.append(
                 {
                     "aggregate_id": aggregate_id,
-                    "groups": {
-                        result["group_name"]: result["status"]
-                        for result in aggregate_results
-                    },
+                    "groups": combine_group_and_operation_status(aggregate_results),
                     "_error": error_message,
                 }
             )

@@ -26,10 +26,14 @@ Overview: {{ total_num_jobs_or_aggregates }} jobs/aggregates, {{ total_num_eligi
         {% endblock progress %}
 
         {% block operation_summary %}
-| operation | number of eligible jobs | submission status |
-| --------- | ----------------------- | ----------------- |
+| operation/group | number of eligible jobs | submission status |
+| --------------- | ----------------------- | ----------------- |
             {% for op, n_jobs, op_submission_status in op_counter %}
+                {% if op in project.operations or op.endswith("more operations omitted]")%}
 | {{ op }} | {{ n_jobs }} | {{ op_submission_status }} |
+                {% else %}
+| {{ op }} ({{ project.groups[op].operations | length }} ops) | {{ n_jobs }} | {{ op_submission_status }} |
+                {% endif %}
             {% endfor %}
         {% endblock operation_summary %}
     {% endif %}

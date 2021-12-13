@@ -2258,12 +2258,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         starting_dict = functools.partial(dict, scheduler_status=JobStatus.unknown)
         status_dict = defaultdict(starting_dict)
 
-        # TODO: Add support for groups that are not single operations.
-        single_operation_groups = {self._groups[name] for name in self.operations}
-
         for aggregate_id, aggregate, group, in self._generate_selected_aggregate_groups(
             selected_aggregates=[aggregate],
-            selected_groups=single_operation_groups,
         ):
             completed = group._complete(aggregate)
             # If the group is not completed, it is sufficient to determine
@@ -2473,7 +2469,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             )
 
         parallel_executor = _get_parallel_executor(status_parallelization)
-        single_operation_groups = {self._groups[name] for name in self.operations}
 
         # Update the project's status cache
         scheduler_info = self._query_scheduler_status(
@@ -2482,8 +2477,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         def compute_status(data):
             scheduler_id, scheduler_status, aggregate_id, aggregate, group = data
-            # Only single-operation groups are supported for status fetching
-            assert len(group.operations) == 1
 
             status = {}
             error_text = None
@@ -2521,7 +2514,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 self._generate_selected_aggregate_groups_with_status(
                     scheduler_info=scheduler_info,
                     selected_aggregates=aggregates,
-                    selected_groups=single_operation_groups,
                 )
             )
             status_results = parallel_executor(
@@ -2533,7 +2525,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             # aggregate_groups is a list of tuples containing scheduler,
             # aggregate, and group information. To compute labels, we fetch the
             # unique jobs from the aggregates containing only one job.
-            if len(single_operation_groups) > 0:
+            if len(self._groups) > 0:
                 individual_jobs = {
                     aggregate_group[3][0]
                     for aggregate_group in aggregate_groups

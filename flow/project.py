@@ -2524,7 +2524,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     **status,
                     "scheduler_status": JobStatus._to_group(status["scheduler_status"]),
                 }
-                for op_name in group.opreations:
+                for op_name in group.operations:
                     result.append(
                         {
                             "aggregate_id": aggregate_id,
@@ -2685,8 +2685,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         aggregates = self._convert_jobs_to_aggregates(jobs)
 
+        if eligible_jobs_max_lines is not None:
+            print(f"Already set in function {eligible_jobs_max_lines}.")
         if eligible_jobs_max_lines is None:
+            print("Configuration setting of eligible-jobs-max-lines: ", end="")
             eligible_jobs_max_lines = self._flow_config["eligible_jobs_max_lines"]
+            print(eligible_jobs_max_lines)
 
         status_parallelization = self._flow_config["status_parallelization"]
 

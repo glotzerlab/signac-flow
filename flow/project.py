@@ -2508,12 +2508,31 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 error_text = str(error)
                 status["completed"] = False
                 status["eligible"] = False
-            result = {
-                "aggregate_id": aggregate_id,
-                "group_name": group.name,
-                "status": status,
-                "_error": error_text,
-            }
+            result = [
+                {
+                    "aggregate_id": aggregate_id,
+                    "group_name": group.name,
+                    "status": status,
+                    "_error": error_text,
+                }
+            ]
+            if (
+                scheduler_status > JobStatus.unknown
+                and group.name not in self._operations
+            ):
+                operation_status = {
+                    **status,
+                    "scheduler_status": JobStatus._to_group(status["scheduler_status"]),
+                }
+                for op_name in group.opreations:
+                    result.append(
+                        {
+                            "aggregate_id": aggregate_id,
+                            "group_name": op_name,
+                            "status": operation_status,
+                            "_error": error_text,
+                        }
+                    )
             return result
 
         with self._buffered():
@@ -2523,12 +2542,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     selected_aggregates=aggregates,
                 )
             )
-            status_results = parallel_executor(
+            status_results = []
+            for result in parallel_executor(
                 compute_status,
                 aggregate_groups,
                 desc="Fetching status",
                 file=err,
-            )
+            ):
+                status_results.extend(result)
             # aggregate_groups is a list of tuples containing scheduler,
             # aggregate, and group information. To compute labels, we fetch the
             # unique jobs from the aggregates containing only one job.
@@ -2799,7 +2820,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         total_num_jobs_or_aggregates = len(status_results)
 
         def _has_any_eligible_group(status_entry):
-            return any(group["eligible"] for group in status_entry["groups"].values())
+            return any(
+                group["eligible"]
+                for group_name, group in status_entry["groups"].items()
+                if group_name in self._operations
+            )
 
         if only_incomplete:
             # Remove jobs with no eligible groups from the status info.
@@ -2903,7 +2928,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             # get detailed view info
 
             if compact:
-                num_operations = len(self._operations)
+                num_operations = len(self._groups)
 
             if pretty:
                 OPERATION_STATUS_SYMBOLS = {
@@ -2970,19 +2995,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for job in context["jobs"]:
             for group_name, group_status in job["groups"].items():
                 if group_name != "":
-                    scheduler_status = group_status["scheduler_status"]
                     if group_status["eligible"]:
                         op_counter[group_name] += 1
-                    op_submission_status_counter[group_name][scheduler_status] += 1
-                    if (
-                        group_name not in self._operations
-                        and scheduler_status > JobStatus.unknown
-                        and scheduler_status != JobStatus.placeholder
-                    ):
-                        for operation_name in self._groups[group_name].operations:
-                            op_submission_status_counter[operation_name][
-                                JobStatus._to_group(scheduler_status)
-                            ] += 1
+                    op_submission_status_counter[group_name][
+                        group_status["scheduler_status"]
+                    ] += 1
 
         def _op_submission_summary(counter):
             """Generate string of statuses and counts, sorted by status."""

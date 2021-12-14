@@ -177,6 +177,7 @@ class ExpanseEnvironment(DefaultSlurmEnvironment):
     template = "expanse.sh"
     cores_per_node = 128
     gpus_per_node = 4
+    mpi_cmd = "mpirun"
 
     @classmethod
     def add_args(cls, parser):

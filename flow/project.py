@@ -2696,12 +2696,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         aggregates = self._convert_jobs_to_aggregates(jobs)
 
-        if eligible_jobs_max_lines is not None:
-            print(f"Already set in function {eligible_jobs_max_lines}.")
         if eligible_jobs_max_lines is None:
-            print("Configuration setting of eligible-jobs-max-lines: ", end="")
             eligible_jobs_max_lines = self._flow_config["eligible_jobs_max_lines"]
-            print(eligible_jobs_max_lines)
 
         status_parallelization = self._flow_config["status_parallelization"]
 

@@ -2831,11 +2831,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         total_num_jobs_or_aggregates = len(status_results)
 
         def _has_any_eligible_group(status_entry):
-            return any(
-                group["eligible"]
-                for group_name, group in status_entry["groups"].items()
-                if group_name in self._operations
-            )
+            return any(group["eligible"] for group in status_entry["groups"].values())
 
         if only_incomplete:
             # Remove jobs with no eligible groups from the status info.

@@ -86,9 +86,20 @@ class JobStatus(enum.IntEnum):
     @classmethod
     def _to_group(cls, status):
         """Convert to an operation within a group status."""
-        if status == JobStatus.unknown or int(status) > 127:
+        try:
+            return cls(
+                {
+                    JobStatus.registered: JobStatus.group_registered,
+                    JobStatus.submitted: JobStatus.group_submitted,
+                    JobStatus.inactive: JobStatus.group_inactive,
+                    JobStatus.held: JobStatus.group_held,
+                    JobStatus.queued: JobStatus.group_queued,
+                    JobStatus.active: JobStatus.group_active,
+                    JobStatus.error: JobStatus.group_error,
+                }[status]
+            )
+        except KeyError:
             raise ValueError(f"No equivalent group status for {status}.")
-        return cls(int(status) + 7)
 
 
 class ClusterJob:

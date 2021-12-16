@@ -50,32 +50,32 @@ class JobStatus(enum.IntEnum):
     """The cluster job is in an error or failed state."""
 
     group_registered = 9
-    """The operation via a group is registered with the scheduler.but no other status is known."""
+    """The operation is in a group that is registered with the scheduler."""
 
     group_inactive = 10
-    """The operation via a group is inactive.
+    """The operation is in a group that is inactive.
 
     This includes states like completed, cancelled, or timed out.
     """
 
     group_submitted = 11
-    """The operation via a group has been submitted.
+    """The operation is in a group that has been submitted.
 
     Note that this state is never returned by a scheduler, but is an assumed
-    state immediately after a operation via a group is submitted.
+    state immediately after a operation  is in a group that is submitted.
     """
 
     group_held = 12
-    """The operation via a group is held."""
+    """The operation is in a group that is held."""
 
     group_queued = 13
-    """The operation via a group is queued."""
+    """The operation is in a group that is queued."""
 
     group_active = 14
-    """The operation via a group is actively running."""
+    """The operation is in a group that is actively running."""
 
     group_error = 15
-    """The operation via a group is in an error or failed state."""
+    """The operation is in a group that is in an error or failed state."""
 
     placeholder = 127
     """A placeholder state that is used for status rendering when no operations are eligible."""

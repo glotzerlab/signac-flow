@@ -107,7 +107,6 @@ _FMT_SCHEDULER_STATUS = {
     JobStatus.queued: "Q",
     JobStatus.active: "A",
     JobStatus.error: "E",
-    JobStatus.placeholder: " ",
     JobStatus.group_registered: "GR",
     JobStatus.group_inactive: "GI",
     JobStatus.group_submitted: "GS",
@@ -115,6 +114,7 @@ _FMT_SCHEDULER_STATUS = {
     JobStatus.group_queued: "GQ",
     JobStatus.group_active: "GA",
     JobStatus.group_error: "GE",
+    JobStatus.placeholder: " ",
 }
 
 

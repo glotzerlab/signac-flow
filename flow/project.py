@@ -1695,6 +1695,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if "min" not in template_environment.filters:  # for jinja2 < 2.10
             template_environment.filters["min"] = min
         template_environment.filters["quote_argument"] = shlex.quote
+        template_environment.filters[
+            "format_operation_name"
+        ] = template_filters.format_operation_name
 
         return template_environment
 

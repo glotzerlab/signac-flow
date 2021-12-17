@@ -356,3 +356,13 @@ def get_account_name(environment, required=False):
                 file=sys.stderr,
             )
             _GET_ACCOUNT_NAME_MESSAGES_SHOWN.add(env_name)
+
+
+def format_operation_name(operation_name, project):
+    """Return the operation name or group name with number of operations."""
+    # both checks are necessary to ensure the operations omitted line passes through
+    if operation_name not in project._operations and operation_name in project._groups:
+        return (
+            operation_name + f" ({len(project._groups[operation_name].operations)} ops)"
+        )
+    return operation_name

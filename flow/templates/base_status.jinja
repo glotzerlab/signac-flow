@@ -29,11 +29,7 @@ Overview: {{ total_num_jobs_or_aggregates }} jobs/aggregates, {{ total_num_eligi
 | operation/group | number of eligible jobs | submission status |
 | --------------- | ----------------------- | ----------------- |
             {% for op, n_jobs, op_submission_status in op_counter %}
-                {% if op in project.operations or op.endswith("more operations omitted]")%}
-| {{ op }} | {{ n_jobs }} | {{ op_submission_status }} |
-                {% else %}
-| {{ op }} ({{ project.groups[op].operations | length }} ops) | {{ n_jobs }} | {{ op_submission_status }} |
-                {% endif %}
+| {{ op|format_operation_name(project) }} | {{ n_jobs }} | {{ op_submission_status }} |
             {% endfor %}
         {% endblock operation_summary %}
     {% endif %}
@@ -43,7 +39,7 @@ Overview: {{ total_num_jobs_or_aggregates }} jobs/aggregates, {{ total_num_eligi
     {% if detailed %}
 Detailed View:
 
-| job id | operation | {{ para_head }}labels |
+| job id | operation/group | {{ para_head }}labels |
 | ------ | --------- | {{ ns.dash }}-------- |
         {% for job in jobs %}
             {% if parameters %}
@@ -51,9 +47,9 @@ Detailed View:
             {% endif %}
             {% for key, value in job['groups'].items() if value | job_filter(scheduler_status_code, all_ops) %}
                 {% if loop.first %}
-| {{job['aggregate_id']}} | {{ field_operation | highlight(value['eligible'], pretty) | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }} | {{ para_output }}{{ job['labels'] | join(', ') }} |
+| {{job['aggregate_id']}} | {{ field_operation|format_operation_name(project) | highlight(value['eligible'], pretty) | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }} | {{ para_output }}{{ job['labels'] | join(', ') }} |
                 {% else %}
-|  | {{ field_operation | highlight(value['eligible'], pretty) | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }} | {{ para_output }}{{ job['labels'] | join(', ') }} |
+|  | {{ field_operation|format_operation_name(project) | highlight(value['eligible'], pretty) | format(key, '['+scheduler_status_code[value['scheduler_status']]+']') }} | {{ para_output }}{{ job['labels'] | join(', ') }} |
                 {% endif %}
             {% endfor %}
         {% endfor %}

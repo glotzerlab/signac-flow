@@ -11,7 +11,7 @@ Detailed View:
         {% endif %}
 | {{job['aggregate_id']}} | {{ para_output }}{{ job['labels'] | join(', ') }} |
         {% for key, value in job['groups'].items() if value | job_filter(scheduler_status_code, all_ops) %}
-| {{ field_operation | highlight(value['eligible'], pretty) | format(value | get_operation_status(operation_status_symbols), key, '['+scheduler_status_code[value['scheduler_status']]+']') }} |
+| {{ field_operation|format_operation_name(project) | highlight(value['eligible'], pretty) | format(value | get_operation_status(operation_status_symbols), key, '['+scheduler_status_code[value['scheduler_status']]+']') }} |
         {% endfor %}
     {% endfor %}
 {{ operation_status_legend }}

@@ -8,7 +8,7 @@ configure and implement a workflow to operate on a signac_ data space.
 
 .. _signac: https://signac.io/
 """
-from . import environment, errors, scheduling, testing
+from . import environment, errors, hooks, scheduling, testing
 from .aggregates import aggregator, get_aggregate_id
 from .environment import get_environment
 from .operations import cmd, directives, with_job
@@ -24,6 +24,7 @@ from .version import __version__
 __all__ = [
     "environment",
     "errors",
+    "hooks",
     "scheduling",
     "testing",
     "aggregator",

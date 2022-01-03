@@ -5,18 +5,6 @@ API Reference
 
 This is the API for the **signac-flow** application.
 
-Command Line Interface
-----------------------
-
-Some core **signac-flow** functions are---in addition to the Python interface---accessible
-directly via the ``$ flow`` command.
-
-For more information, please see ``$ flow --help``.
-
-.. literalinclude:: cli-help.txt
-    :language: none
-
-
 The FlowProject
 ---------------
 

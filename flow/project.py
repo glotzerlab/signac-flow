@@ -2490,6 +2490,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
             status = {}
             error_text = None
+            is_user_defined_group = group.name not in self._operations
             try:
                 status["scheduler_status"] = scheduler_status
                 completed = group._complete(aggregate)
@@ -2497,9 +2498,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 # If the group is not completed, it is sufficient to determine
                 # eligibility while ignoring postconditions (we know at least
                 # one postcondition is not met).
-                status["eligible"] = not completed and group._eligible(
-                    aggregate, ignore_conditions=IgnoreConditions.POST
-                )
+                if is_user_defined_group:
+                    status["eligible"] = group._eligible(aggregate)
+                else:
+                    status["eligible"] = not completed and group._eligible(
+                        aggregate, ignore_conditions=IgnoreConditions.POST
+                    )
             except Exception as error:
                 logger.debug(
                     "Error while getting operations status for job '%s': '%s'.",
@@ -2519,10 +2523,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     "_error": error_text,
                 }
             ]
-            if (
-                scheduler_status > JobStatus.unknown
-                and group.name not in self._operations
-            ):
+            if is_user_defined_group and scheduler_status > JobStatus.unknown:
                 operation_status = {
                     **status,
                     "scheduler_status": JobStatus._to_group(scheduler_status),

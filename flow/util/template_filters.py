@@ -361,8 +361,13 @@ def get_account_name(environment, required=False):
 def format_operation_name(operation_name, project):
     """Return the operation name or group name with number of operations."""
     # both checks are necessary to ensure the operations omitted line passes through
-    if operation_name not in project._operations and operation_name in project._groups:
-        return (
-            operation_name + f" ({len(project._groups[operation_name].operations)} ops)"
+    return (
+        f"{operation_name} ({len(project._groups[operation_name].operations)} ops)"
+        if (
+            # both checks are necessary to ensure the operations omitted line
+            # passes through
+            operation_name in project._groups
+            and operation_name not in project._operations
         )
-    return operation_name
+        else str(operation_name)
+    )

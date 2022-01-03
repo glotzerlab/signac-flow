@@ -14,7 +14,7 @@ Version 0.18
 Changed
 +++++++
 
-- Added user defined ``FlowGroups`` to status output (#593, #547).
+- Add user defined ``FlowGroups`` to status output (#593, #547).
 
 Version 0.17
 ============

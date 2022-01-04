@@ -57,6 +57,7 @@ from .errors import (
     UserConditionError,
     UserOperationError,
 )
+from .hooks import _Hooks
 from .labels import _is_label_func, classlabel, label, staticlabel
 from .render_status import _render_status
 from .scheduling.base import ClusterJob, JobStatus
@@ -1208,6 +1209,7 @@ class _FlowProjectClass(type):
         cls._OPERATION_FUNCTIONS = []
         cls._OPERATION_PRECONDITIONS = defaultdict(list)
         cls._OPERATION_POSTCONDITIONS = defaultdict(list)
+        cls._OPERATION_HOOK_REGISTRY = defaultdict(lambda: defaultdict(list))
 
         # All label functions are registered with the label() classmethod,
         # which is intended to be used as decorator function. The
@@ -1231,6 +1233,8 @@ class _FlowProjectClass(type):
         # set stores whether a group name has already been used.
         cls._GROUPS = []
         cls._GROUP_NAMES = set()
+
+        cls.operation_hooks = cls._setup_hooks_object(parent_class=cls)
 
         return cls
 
@@ -1524,6 +1528,90 @@ class _FlowProjectClass(type):
 
         return OperationRegister()
 
+    @staticmethod
+    def _setup_hooks_object(parent_class):
+        class _HooksRegister:
+            """Add hooks to an operation.
+
+            This object is designed to be used as a decorator. The example
+            below shows an operation level decorator that prints the
+            operation name and job id at the start of the operation
+            execution.
+
+            .. code-block:: python
+
+                def start_hook(operation_name, job):
+                    print(f"Starting operation {operation_name} on job {job.id}.")
+
+                @FlowProject.operation_hook.on_start(start_hook)
+                @FlowProject.operation
+                def foo(job):
+                    pass
+
+            A hook is a function that is called at specific points during
+            the execution of a job operation. In the example above, the
+            ``start_hook`` hook function is executed before the operation
+            **foo** runs. Hooks can also run after an operation finishes,
+            when an operation exits with error, or when an operation exits
+            without error.
+
+            The available triggers are ``on_start``, ``on_finish``, ``on_fail``, and
+            ``on_success`` which run when the operation starts, completes, fails, and
+            succeeds respectively.
+
+            Parameters
+            ----------
+            hook_func : callable
+                The function that will be executed at a specified point.
+            trigger : string
+                The point when a hook operation is executed.
+            """
+
+            _parent_class = parent_class
+
+            def __init__(self, hook_func, trigger):
+                self._hook_func = hook_func
+                self._hook_trigger = trigger
+
+            @classmethod
+            def on_start(cls, hook_func):
+                """Add a hook function triggered before an operation starts."""
+                return cls(hook_func, trigger="on_start")
+
+            @classmethod
+            def on_finish(cls, hook_func):
+                """Add a hook function triggered after the operation exits.
+
+                The hook is triggered regardless of whether the operation exits
+                with or without an error.
+                """
+                return cls(hook_func, trigger="on_finish")
+
+            @classmethod
+            def on_success(cls, hook_func):
+                """Add a hook function triggered after the operation exits without error."""
+                return cls(hook_func, trigger="on_success")
+
+            @classmethod
+            def on_fail(cls, hook_func):
+                """Add a hook function triggered after the operation exits with an error."""
+                return cls(hook_func, trigger="on_fail")
+
+            def __call__(self, func):
+                """Add the decorated function to the operation hook registry.
+
+                Parameters
+                ----------
+                func : callable
+                    The operation function associated with the hook function.
+                """
+                self._parent_class._OPERATION_HOOK_REGISTRY[func][
+                    self._hook_trigger
+                ].append(self._hook_func)
+                return func
+
+        return _HooksRegister
+
 
 def _config_value_as_bool(value):
     # Function to interpret a configobj bool-like value as a boolean.
@@ -1617,6 +1705,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             self.root_directory(), self._config.get("template_dir", "templates")
         )
         self._template_environment_ = {}
+
+        # Setup execution hooks
+        self._project_hooks = _Hooks()
+        self._operation_hooks = defaultdict(_Hooks)
 
         # Register all label functions with this project instance.
         self._label_functions = {}
@@ -1736,6 +1828,25 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             )
         )
         sys.exit(2)
+
+    @property
+    def project_hooks(self):
+        """:class:`.hooks.Hooks` defined for all project operations.
+
+        Project-wide hooks are added to an *instance* of the FlowProject, not
+        the class. For example:
+
+        .. code-block:: python
+
+            def finish_hook(operation_name, job):
+                print(f"Finished operation {operation_name} on job {job.id}")
+
+            if __name__ == "__main__":
+                project = FlowProject()
+                project.project_hooks.on_finish.append(finish_hook)
+                project.main()
+        """
+        return self._project_hooks
 
     @classmethod
     def label(cls, label_name_or_func=None):
@@ -3184,6 +3295,29 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for result in results:
             result.get(timeout=timeout)
 
+    @contextlib.contextmanager
+    def _run_with_hooks(self, operation):
+        name = operation.name
+        jobs = operation._jobs
+
+        # Determine operation hooks
+        operation_hooks = self._operation_hooks.get(name, _Hooks())
+
+        self.project_hooks.on_start(name, *jobs)
+        operation_hooks.on_start(name, *jobs)
+        try:
+            yield
+        except Exception as error:
+            self.project_hooks.on_fail(name, error, *jobs)
+            operation_hooks.on_fail(name, error, *jobs)
+            raise
+        else:
+            self.project_hooks.on_success(name, *jobs)
+            operation_hooks.on_success(name, *jobs)
+        finally:
+            self.project_hooks.on_finish(name, *jobs)
+            operation_hooks.on_finish(name, *jobs)
+
     def _execute_operation(self, operation, timeout=None, pretend=False):
         """Execute an operation.
 
@@ -3222,7 +3356,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 operation,
                 operation.cmd,
             )
-            subprocess.run(operation.cmd, shell=True, timeout=timeout, check=True)
+            with self._run_with_hooks(operation):
+                subprocess.run(operation.cmd, shell=True, timeout=timeout, check=True)
         else:
             # ... executing operation in interpreter process as function:
             logger.debug(
@@ -3231,7 +3366,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 os.getpid(),
             )
             try:
-                self._operations[operation.name](*operation._jobs)
+                with self._run_with_hooks(operation):
+                    self._operations[operation.name](*operation._jobs)
             except Exception as error:
                 raise UserOperationError(
                     f"An exception was raised during operation {operation.name} "
@@ -4287,6 +4423,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "pre": preconditions.get(func, None),
                 "post": postconditions.get(func, None),
             }
+
+            # Update operation hooks
+            self._operation_hooks[name].update(
+                _Hooks(**self._OPERATION_HOOK_REGISTRY[func])
+            )
 
             # Construct FlowOperation:
             if getattr(func, "_flow_cmd", False):

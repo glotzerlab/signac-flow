@@ -8,8 +8,13 @@ The numbers in brackets denote the related GitHub issue and/or pull request.
 Version 0.18
 ============
 
-[0.18.0] -- ????-??-??
+[0.18.0] -- 2022-xx-xx
 ----------------------
+
+Added
++++++
+
+- Feature to install execution hooks for the automated execution of functions with operations (#28, #189, #508).
 
 Changed
 +++++++

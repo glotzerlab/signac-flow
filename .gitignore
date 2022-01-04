@@ -28,6 +28,8 @@ pip-log.txt
 .mypy_cache
 nosetests.xml
 .pytest_cache
+coverage.xml
+htmlcov
 
 # Translations
 *.mo
@@ -41,8 +43,6 @@ nosetests.xml
 .*.swp
 
 # custom
+doc/_build
 *.log
-
 .DS_Store
-
-_build

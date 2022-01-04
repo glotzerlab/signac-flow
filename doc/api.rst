@@ -5,18 +5,6 @@ API Reference
 
 This is the API for the **signac-flow** application.
 
-Command Line Interface
-----------------------
-
-Some core **signac-flow** functions are---in addition to the Python interface---accessible
-directly via the ``$ flow`` command.
-
-For more information, please see ``$ flow --help``.
-
-.. literalinclude:: cli-help.txt
-    :language: none
-
-
 The FlowProject
 ---------------
 
@@ -35,6 +23,11 @@ The FlowProject
     FlowProject.make_group
     FlowProject.operation
     FlowProject.operation.with_directives
+    FlowProject.operation_hooks
+    FlowProject.operation_hooks.on_fail
+    FlowProject.operation_hooks.on_finish
+    FlowProject.operation_hooks.on_start
+    FlowProject.operation_hooks.on_success
     FlowProject.operations
     FlowProject.post
     FlowProject.post.copy_from
@@ -52,6 +45,7 @@ The FlowProject
     FlowProject.pre.not_
     FlowProject.pre.true
     FlowProject.print_status
+    FlowProject.project_hooks
     FlowProject.run
     FlowProject.scheduler_jobs
     FlowProject.submit
@@ -60,11 +54,21 @@ The FlowProject
 .. autoclass:: FlowProject
     :show-inheritance:
     :members:
-    :exclude-members: pre,post,operation
+    :exclude-members: pre,post,operation,operation_hooks
 
 .. automethod:: flow.FlowProject.operation(func, name=None)
 
 .. automethod:: flow.FlowProject.operation.with_directives(directives, name=None)
+
+.. automethod:: flow.FlowProject.operation_hooks(hook_func, trigger)
+
+.. automethod:: flow.FlowProject.operation_hooks.on_fail
+
+.. automethod:: flow.FlowProject.operation_hooks.on_finish
+
+.. automethod:: flow.FlowProject.operation_hooks.on_start
+
+.. automethod:: flow.FlowProject.operation_hooks.on_success
 
 .. automethod:: flow.FlowProject.post
 

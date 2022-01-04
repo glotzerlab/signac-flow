@@ -62,7 +62,7 @@ class JobStatus(enum.IntEnum):
     """The operation is in a group that has been submitted.
 
     Note that this state is never returned by a scheduler, but is an assumed
-    state immediately after a operation  is in a group that is submitted.
+    state immediately after a group containing the operation is submitted.
     """
 
     group_held = 12

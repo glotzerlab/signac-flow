@@ -3304,43 +3304,48 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             return None
 
         logger.info("Execute operation '%s'...", operation)
-        try:
-            # Check if we need to fork for operation execution...
-            if (
-                # The 'fork' directive was provided and evaluates to True:
-                operation.directives.get("fork", False)
-                # A separate process is needed to cancel with timeout:
-                or timeout is not None
-                # The operation function is an instance of FlowCmdOperation:
-                or isinstance(self._operations[operation.name], FlowCmdOperation)
-                # The specified executable is not the same as the interpreter instance:
-                or operation.directives.get("executable", sys.executable)
-                != sys.executable
-            ):
-                # ... need to fork:
-                logger.debug(
-                    "Forking to execute operation '%s' with cmd '%s'.",
-                    operation,
-                    operation.cmd,
-                )
-                with self._run_with_hooks(operation):
+        # Check if we need to fork for operation execution...
+        if (
+            # The 'fork' directive was provided and evaluates to True:
+            operation.directives.get("fork", False)
+            # A separate process is needed to cancel with timeout:
+            or timeout is not None
+            # The operation function is an instance of FlowCmdOperation:
+            or isinstance(self._operations[operation.name], FlowCmdOperation)
+            # The specified executable is not the same as the interpreter instance:
+            or operation.directives.get("executable", sys.executable) != sys.executable
+        ):
+            # ... need to fork:
+            logger.debug(
+                "Forking to execute operation '%s' with cmd '%s'.",
+                operation,
+                operation.cmd,
+            )
+            with self._run_with_hooks(operation):
+                try:
                     subprocess.run(
                         operation.cmd, shell=True, timeout=timeout, check=True
                     )
-            else:
-                # ... executing operation in interpreter process as function:
-                logger.debug(
-                    "Executing operation '%s' with current interpreter process (%s).",
-                    operation,
-                    os.getpid(),
-                )
-                with self._run_with_hooks(operation):
+                except subprocess.CalledProcessError as error:
+                    raise UserOperationError(
+                        f"An exception was raised during operation {operation.name} "
+                        f"for job or aggregate with id {get_aggregate_id(operation._jobs)}."
+                    ) from error
+        else:
+            # ... executing operation in interpreter process as function:
+            logger.debug(
+                "Executing operation '%s' with current interpreter process (%s).",
+                operation,
+                os.getpid(),
+            )
+            with self._run_with_hooks(operation):
+                try:
                     self._operations[operation.name](*operation._jobs)
-        except Exception as error:
-            raise UserOperationError(
-                f"An exception was raised during operation {operation.name} "
-                f"for job or aggregate with id {get_aggregate_id(operation._jobs)}."
-            ) from error
+                except Exception as error:
+                    raise UserOperationError(
+                        f"An exception was raised during operation {operation.name} "
+                        f"for job or aggregate with id {get_aggregate_id(operation._jobs)}."
+                    ) from error
 
     def _get_default_directives(self):
         return {

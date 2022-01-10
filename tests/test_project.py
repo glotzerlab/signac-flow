@@ -16,6 +16,7 @@ from io import StringIO
 from itertools import groupby
 from tempfile import TemporaryDirectory
 
+import define_hooks_test_project
 import pytest
 import signac
 from define_aggregate_test_project import _AggregateTestProject
@@ -2359,6 +2360,236 @@ class TestAggregationGroupProjectMainInterface(TestAggregatesProjectBase):
         assert f"run -o group_agg -j {get_aggregate_id(project)}" in submit_output
         assert f"exec agg_op2 {get_aggregate_id(project)}" in submit_output
         assert f"exec agg_op3 {get_aggregate_id(project)}" in submit_output
+
+
+class TestHooksSetUp(TestProjectBase):
+    error_message = define_hooks_test_project.HOOKS_ERROR_MESSAGE
+    keys = ["start", "finish", "success", "fail"]
+    project_class = define_hooks_test_project._HooksTestProject
+    entrypoint = dict(
+        path=os.path.realpath(
+            os.path.join(os.path.dirname(__file__), "define_hooks_test_project.py")
+        )
+    )
+
+    @staticmethod
+    def _get_job_doc_key(job, operation_name):
+        return lambda key: job.doc.get(f"{operation_name}_{key}")
+
+    @pytest.fixture(params=["base"])
+    def operation_name(self, request):
+        return request.param
+
+    def mock_project(self):
+        project = self.project_class.get_project(root=self._tmp_dir.name)
+        project.open_job(dict(raise_exception=False)).init()
+        project.open_job(dict(raise_exception=True)).init()
+        project = project.get_project(root=self._tmp_dir.name)
+        project._entrypoint = self.entrypoint
+        return project
+
+    def call_subcmd(self, subcmd, stderr=subprocess.DEVNULL):
+        # Bypass raising the error/checking output since it interferes with hook.on_fail
+        fn_script = self.entrypoint["path"]
+        _cmd = f"python {fn_script} {subcmd} --debug"
+        with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
+            try:
+                with switch_to_directory(self.project.root_directory()):
+                    return subprocess.check_output(_cmd.split(), stderr=stderr)
+            except subprocess.CalledProcessError as error:
+                print(error, file=sys.stderr)
+                print(error.output, file=sys.stderr)
+                raise
+
+    @pytest.fixture(scope="function")
+    def project(self):
+        return self.mock_project()
+
+    @pytest.fixture(params=[True, False], ids=["raise_exception", "no_exception"])
+    def job(self, request, project):
+        return project.open_job(dict(raise_exception=request.param))
+
+
+class TestHooksBase(TestHooksSetUp):
+    def test_start_and_finish(self, project, job, operation_name):
+        get_job_doc_value = self._get_job_doc_key(job, operation_name)
+
+        assert get_job_doc_value(self.keys[0]) is None
+        assert get_job_doc_value(self.keys[1]) is None
+
+        if job.sp.raise_exception:
+            with pytest.raises(subprocess.CalledProcessError):
+                self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+        else:
+            self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+
+        assert get_job_doc_value(self.keys[0])
+        assert get_job_doc_value(self.keys[1])
+
+    def test_success(self, project, job, operation_name):
+        get_job_doc_value = self._get_job_doc_key(job, operation_name)
+
+        assert get_job_doc_value(self.keys[2]) is None
+
+        if job.sp.raise_exception:
+            with pytest.raises(subprocess.CalledProcessError):
+                self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+        else:
+            self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+
+        if job.sp.raise_exception:
+            assert not get_job_doc_value(self.keys[2])
+        else:
+            assert get_job_doc_value(self.keys[2])
+
+    def test_fail(self, project, job, operation_name):
+        get_job_doc_value = self._get_job_doc_key(job, operation_name)
+
+        assert get_job_doc_value(self.keys[3]) is None
+
+        if job.sp.raise_exception:
+            with pytest.raises(subprocess.CalledProcessError):
+                self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+        else:
+            self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+
+        if job.sp.raise_exception:
+            assert get_job_doc_value(self.keys[3])[0]
+            assert get_job_doc_value(self.keys[3])[1] == self.error_message
+        else:
+            assert get_job_doc_value(self.keys[3]) is None
+
+
+class TestHooksCmd(TestHooksBase):
+    # Tests hook decorators for a job operation with the @cmd decorator
+    error_message = 42
+
+    @pytest.fixture(params=["base_cmd"])
+    def operation_name(self, request):
+        return request.param
+
+
+class TestHooksInstallSetUp(TestHooksSetUp):
+    entrypoint = dict(
+        path=os.path.realpath(
+            os.path.join(os.path.dirname(__file__), "define_hooks_install.py")
+        )
+    )
+
+
+class TestHooksInstallBase(TestHooksBase, TestHooksInstallSetUp):
+    # Tests project-wide hooks on job operations with and without operation level hooks
+
+    # Check job document for keys from installed, project-wide hooks
+    keys = [
+        "installed_start",
+        "installed_finish",
+        "installed_success",
+        "installed_fail",
+    ]
+
+    @pytest.fixture(params=["base", "base_no_decorators"])
+    def operation_name(self, request):
+        return request.param
+
+
+class TestHooksInstallCmd(TestHooksCmd, TestHooksInstallSetUp):
+    # Tests project-wide hooks on job operations with the @cmd decorator.
+    # Job operations are with or without operation level hooks
+
+    # Check job document for keys from installed, project-wide hooks
+    keys = [
+        "installed_start",
+        "installed_finish",
+        "installed_success",
+        "installed_fail",
+    ]
+
+    @pytest.fixture(params=["base_cmd", "base_cmd_no_decorators"])
+    def operation_name(self, request):
+        return request.param
+
+
+class TestHooksInstallWithDecorators(TestHooksBase, TestHooksInstallSetUp):
+    # Tests if project-wide hooks interfere with operation level hooks
+    @pytest.fixture(params=["base"])
+    def operation_name(self, request):
+        return request.param
+
+
+class TestHooksInstallCmdWithDecorators(TestHooksCmd, TestHooksInstallSetUp):
+    # Tests if project-wide hooks interfere with operation level hooks
+    # in job operations with the @cmd decorator
+    @pytest.fixture()
+    def operation_name(self):
+        return "base_cmd"
+
+
+class TestHooksInstallNoDecorators(TestHooksInstallSetUp):
+    # Tests if operation level hooks interfere with project-level hooks
+    @pytest.fixture(params=["base_no_decorators", "base_cmd_no_decorators"])
+    def operation_name(self, request):
+        return request.param
+
+    @pytest.fixture()
+    def job(self, project):
+        return project.open_job(dict(raise_exception=False))
+
+    def test_no_decorator_keys(self, operation_name, job):
+        get_job_doc_key = self._get_job_doc_key(job, operation_name)
+        self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+        for key in self.keys:
+            assert get_job_doc_key(key) is None
+
+
+class TestHooksInvalidOption(TestHooksSetUp):
+    def call_subcmd(self, subcmd, stderr=subprocess.STDOUT):
+        # Return error as output instead of raising error
+        fn_script = self.entrypoint["path"]
+        _cmd = f"python {fn_script} {subcmd} --debug"
+        with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
+            try:
+                with switch_to_directory(self.project.root_directory()):
+                    return subprocess.check_output(_cmd.split(), stderr=stderr)
+            except subprocess.CalledProcessError as error:
+                return str(error.output)
+
+    def test_invalid_hook(self):
+        class A(FlowProject):
+            pass
+
+        with pytest.raises(AttributeError):
+
+            @A.operation_hooks.invalid_option(lambda operation_name, job: None)
+            @A.operation
+            def test_invalid_decorators(_):
+                pass
+
+    def test_install_invalid_hook(self):
+        class InstallInvalidHook:
+            def install_hook(self, project):
+                project.project_hooks.invalid_option.append(
+                    lambda operation_name, job: None
+                )
+
+        with pytest.raises(AttributeError):
+            InstallInvalidHook().install_hook(self.mock_project())
+
+    def test_raise_exception_in_hook(self):
+        job = self.mock_project().open_job(dict(raise_exception=False))
+
+        error_output = self.call_subcmd(f"run -o raise_exception_in_hook -j {job.id}")
+
+        assert "RuntimeError" in error_output
+
+    def test_raise_exception_in_hook_cmd(self):
+        job = self.mock_project().open_job(dict(raise_exception=False))
+
+        error_output = self.call_subcmd(
+            f"run -o raise_exception_in_hook_cmd -j {job.id}"
+        )
+
+        assert "RuntimeError" in error_output
 
 
 class TestIgnoreConditions:

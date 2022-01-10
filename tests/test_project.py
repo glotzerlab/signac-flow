@@ -35,7 +35,12 @@ from flow import (
     with_job,
 )
 from flow.environment import ComputeEnvironment
-from flow.errors import DirectivesError, FlowProjectDefinitionError, SubmitError
+from flow.errors import (
+    DirectivesError,
+    FlowProjectDefinitionError,
+    SubmitError,
+    UserOperationError,
+)
 from flow.project import IgnoreConditions, _AggregateStoresCursor, _JobAggregateCursor
 from flow.scheduling.base import ClusterJob, JobStatus, Scheduler
 from flow.util.misc import (
@@ -441,6 +446,39 @@ class TestProjectClass(TestProjectBase):
         assert len(B._collect_postconditions()[op2]) == 2
         assert len(C._collect_postconditions()[op2]) == 3
 
+    def test_operations_user_error_handling(self):
+        class A(FlowProject):
+            pass
+
+        @A.operation
+        def test_basic_op_error(job):
+            raise Exception
+
+        @A.operation
+        @cmd
+        def test_cmd_op_error(job):
+            raise Exception
+
+        @A.operation
+        @with_job
+        def test_with_job_op_error(job):
+            raise Exception
+
+        @A.operation
+        @with_job
+        @cmd
+        def test_with_job_cmd_error(job):
+            raise Exception
+
+        project = self.mock_project(A)
+        with add_cwd_to_environment_pythonpath():
+            with switch_to_directory(project.root_directory()):
+                with pytest.raises(UserOperationError):
+                    starting_dir = os.getcwd()
+                    with redirect_stderr(StringIO()):
+                        project.run()
+                    assert os.getcwd() == starting_dir
+
     def test_with_job_decorator(self):
         class A(FlowProject):
             pass
@@ -489,43 +527,6 @@ class TestProjectClass(TestProjectBase):
                 assert os.getcwd() == starting_dir
                 for job in project:
                     assert os.path.isfile(job.fn("world.txt"))
-
-    def test_with_job_error_handling(self):
-        class A(FlowProject):
-            pass
-
-        @A.operation
-        @with_job
-        def test_context(job):
-            raise Exception
-
-        project = self.mock_project(A)
-        with add_cwd_to_environment_pythonpath():
-            with switch_to_directory(project.root_directory()):
-                starting_dir = os.getcwd()
-                with pytest.raises(Exception):
-                    with redirect_stderr(StringIO()):
-                        project.run()
-                assert os.getcwd() == starting_dir
-
-    def test_cmd_with_job_error_handling(self):
-        class A(FlowProject):
-            pass
-
-        @A.operation
-        @with_job
-        @cmd
-        def test_context(job):
-            return "exit 1"
-
-        project = self.mock_project(A)
-        with add_cwd_to_environment_pythonpath():
-            with switch_to_directory(project.root_directory()):
-                starting_dir = os.getcwd()
-                with pytest.raises(subprocess.CalledProcessError):
-                    with redirect_stderr(StringIO()):
-                        project.run()
-                assert os.getcwd() == starting_dir
 
     def test_function_in_directives(self):
         class A(FlowProject):

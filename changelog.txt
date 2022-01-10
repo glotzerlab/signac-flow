@@ -15,6 +15,11 @@ Added
 
 - Feature to install execution hooks for the automated execution of functions with operations (#28, #189, #508).
 
+Changed
++++++
+
+- Raise ``UserOperationError`` for failed execution of ``FlowProject`` operations (#571, #601).
+
 Version 0.17
 ============
 

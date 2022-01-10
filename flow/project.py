@@ -3326,7 +3326,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     subprocess.run(
                         operation.cmd, shell=True, timeout=timeout, check=True
                     )
-            except Exception as error:
+            except subprocess.CalledProcessError as error:
                 raise UserOperationError(
                     f"An exception was raised during operation {operation.name} "
                     f"for job or aggregate with id {get_aggregate_id(operation._jobs)}."

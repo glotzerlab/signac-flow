@@ -3321,16 +3321,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 operation,
                 operation.cmd,
             )
-            with self._run_with_hooks(operation):
-                try:
+            try:
+                with self._run_with_hooks(operation):
                     subprocess.run(
                         operation.cmd, shell=True, timeout=timeout, check=True
                     )
-                except subprocess.CalledProcessError as error:
-                    raise UserOperationError(
-                        f"An exception was raised during operation {operation.name} "
-                        f"for job or aggregate with id {get_aggregate_id(operation._jobs)}."
-                    ) from error
+            except Exception as error:
+                raise UserOperationError(
+                    f"An exception was raised during operation {operation.name} "
+                    f"for job or aggregate with id {get_aggregate_id(operation._jobs)}."
+                ) from error
         else:
             # ... executing operation in interpreter process as function:
             logger.debug(
@@ -3338,14 +3338,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 operation,
                 os.getpid(),
             )
-            with self._run_with_hooks(operation):
-                try:
+            try:
+                with self._run_with_hooks(operation):
                     self._operations[operation.name](*operation._jobs)
-                except Exception as error:
-                    raise UserOperationError(
-                        f"An exception was raised during operation {operation.name} "
-                        f"for job or aggregate with id {get_aggregate_id(operation._jobs)}."
-                    ) from error
+            except Exception as error:
+                raise UserOperationError(
+                    f"An exception was raised during operation {operation.name} "
+                    f"for job or aggregate with id {get_aggregate_id(operation._jobs)}."
+                ) from error
 
     def _get_default_directives(self):
         return {

@@ -3342,6 +3342,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             return None
 
         logger.info("Execute operation '%s'...", operation)
+
+        execution_error_message = (
+            f"An exception was raised during operation {operation.name} for "
+            f"job or aggregate with id {get_aggregate_id(operation._jobs)}."
+        )
+
         # Check if we need to fork for operation execution...
         if (
             # The 'fork' directive was provided and evaluates to True:
@@ -3359,8 +3365,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 operation,
                 operation.cmd,
             )
-            with self._run_with_hooks(operation):
-                subprocess.run(operation.cmd, shell=True, timeout=timeout, check=True)
+            try:
+                with self._run_with_hooks(operation):
+                    subprocess.run(
+                        operation.cmd, shell=True, timeout=timeout, check=True
+                    )
+            except subprocess.CalledProcessError as error:
+                raise UserOperationError(execution_error_message) from error
         else:
             # ... executing operation in interpreter process as function:
             logger.debug(
@@ -3372,10 +3383,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 with self._run_with_hooks(operation):
                     self._operations[operation.name](*operation._jobs)
             except Exception as error:
-                raise UserOperationError(
-                    f"An exception was raised during operation {operation.name} "
-                    f"for job or aggregate with id {get_aggregate_id(operation._jobs)}."
-                ) from error
+                raise UserOperationError(execution_error_message) from error
 
     def _get_default_directives(self):
         return {

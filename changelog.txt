@@ -20,6 +20,7 @@ Changed
 +++++++
 
 - Add user defined ``FlowGroups`` to status output (#593, #547).
+- Raise ``UserOperationError`` for failed execution of ``FlowProject`` operations (#571, #601).
 
 Version 0.17
 ============

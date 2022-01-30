@@ -2605,12 +2605,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 status["scheduler_status"] = scheduler_status
                 completed = group._complete(aggregate)
                 status["completed"] = completed
-                # If the group is not completed, it is sufficient to determine
-                # eligibility while ignoring postconditions (we know at least
-                # one postcondition is not met).
                 if len(group.operations) > 1:
                     status["eligible"] = group._eligible(aggregate)
                 else:
+                    # For groups with only one operation, if the group is not
+                    # complete, it is sufficient to determine eligibility while
+                    # ignoring postconditions (we know at least one
+                    # postcondition is not met).
                     status["eligible"] = not completed and group._eligible(
                         aggregate, ignore_conditions=IgnoreConditions.POST
                     )

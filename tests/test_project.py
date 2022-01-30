@@ -36,7 +36,12 @@ from flow import (
     with_job,
 )
 from flow.environment import ComputeEnvironment
-from flow.errors import DirectivesError, FlowProjectDefinitionError, SubmitError
+from flow.errors import (
+    DirectivesError,
+    FlowProjectDefinitionError,
+    SubmitError,
+    UserOperationError,
+)
 from flow.project import IgnoreConditions, _AggregateStoresCursor, _JobAggregateCursor
 from flow.scheduling.base import ClusterJob, JobStatus, Scheduler
 from flow.util.misc import (
@@ -491,7 +496,24 @@ class TestProjectClass(TestProjectBase):
                 for job in project:
                     assert os.path.isfile(job.fn("world.txt"))
 
-    def test_with_job_error_handling(self):
+    def test_operations_user_error_handling(self):
+        class A(FlowProject):
+            pass
+
+        @A.operation
+        def test_basic_op_error(job):
+            raise Exception
+
+        project = self.mock_project(A)
+        with add_cwd_to_environment_pythonpath():
+            with switch_to_directory(project.root_directory()):
+                starting_dir = os.getcwd()
+                with pytest.raises(UserOperationError):
+                    with redirect_stderr(StringIO()):
+                        project.run()
+                assert os.getcwd() == starting_dir
+
+    def test_with_job_user_error_handling(self):
         class A(FlowProject):
             pass
 
@@ -504,12 +526,12 @@ class TestProjectClass(TestProjectBase):
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
                 starting_dir = os.getcwd()
-                with pytest.raises(Exception):
+                with pytest.raises(UserOperationError):
                     with redirect_stderr(StringIO()):
                         project.run()
                 assert os.getcwd() == starting_dir
 
-    def test_cmd_with_job_error_handling(self):
+    def test_cmd_with_job_user_error_handling(self):
         class A(FlowProject):
             pass
 
@@ -523,7 +545,7 @@ class TestProjectClass(TestProjectBase):
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
                 starting_dir = os.getcwd()
-                with pytest.raises(subprocess.CalledProcessError):
+                with pytest.raises(UserOperationError):
                     with redirect_stderr(StringIO()):
                         project.run()
                 assert os.getcwd() == starting_dir

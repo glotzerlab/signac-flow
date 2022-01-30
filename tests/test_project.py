@@ -507,11 +507,11 @@ class TestProjectClass(TestProjectBase):
         project = self.mock_project(A)
         with add_cwd_to_environment_pythonpath():
             with switch_to_directory(project.root_directory()):
+                starting_dir = os.getcwd()
                 with pytest.raises(UserOperationError):
-                    starting_dir = os.getcwd()
                     with redirect_stderr(StringIO()):
                         project.run()
-                    assert os.getcwd() == starting_dir
+                assert os.getcwd() == starting_dir
 
     def test_with_job_user_error_handling(self):
         class A(FlowProject):

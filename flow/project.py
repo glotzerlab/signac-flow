@@ -2970,7 +2970,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             return group_name
 
         statuses = {}
-        # We store the name for display in statuses[aggregate_id][group_name][display_name] to
+        # We store the name for display in statuses[aggregate_id][group_name]["display_name"] to
         # prevent the need for a Jinja filter. We store this as an additional parameter as multiple
         # places in the templates need this value including the statuses dictionary itself.
         for status_entry in status_results:

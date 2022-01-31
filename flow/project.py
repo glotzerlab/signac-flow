@@ -2636,7 +2636,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             ]
             if (
                 group.name not in self._operations
-                and scheduler_status > JobStatus.unknown
+                and scheduler_status != JobStatus.unknown
             ):
                 operation_status = {
                     **status,

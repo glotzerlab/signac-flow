@@ -2690,10 +2690,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         def combine_group_and_operation_status(aggregate_status_results):
             group_statuses = {}
+            # Iterate over all status results for singleton groups and all user created groups.
+            # Given group job statuses being exclusive with respect to standard statuses we can
+            # store only the group status (e.g. Group Active) in group submission.
             for status_result in aggregate_status_results:
                 group_name = status_result["group_name"]
                 # Only true when both a user group and singleton group report a status. We use the
-                # one that is not unknown.
+                # one that is not unknown, so we don't store this status and continue.
                 if (
                     group_name in group_statuses
                     and status_result["status"]["scheduler_status"] == JobStatus.unknown

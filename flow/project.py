@@ -1787,9 +1787,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if "min" not in template_environment.filters:  # for jinja2 < 2.10
             template_environment.filters["min"] = min
         template_environment.filters["quote_argument"] = shlex.quote
-        template_environment.filters[
-            "format_operation_name"
-        ] = template_filters.format_operation_name
 
         return template_environment
 
@@ -2960,10 +2957,24 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 1 for _ in filter(_has_any_eligible_group, status_results)
             )
 
-        statuses = {
-            status_entry["aggregate_id"]: status_entry
-            for status_entry in status_results
-        }
+        def display_group_name(group_name):
+            """Return the operation name or group name with number of operations."""
+            # If the name is from a group that is not an operation, we append the
+            # number of operations to its name in the status.
+            if group_name not in self._operations:
+                num_operations = len(self._groups[group_name].operations)
+                return f"{group_name} ({num_operations} ops)"
+            return group_name
+
+        statuses = {}
+        # We store the name for display in statuses[aggregate_id][group_name][display_name] to
+        # prevent the need for a Jinja filter. We store this as an additional parameter as multiple
+        # places in the templates need this value including the statuses dictionary itself.
+        for status_entry in status_results:
+            statuses[status_entry["aggregate_id"]] = status_entry
+            group_statuses = status_entry["groups"]
+            for group_name, group_status in group_statuses.items():
+                group_status["display_name"] = display_group_name(group_name)
 
         # Add labels to the status information.
         for job_label_data in job_labels:
@@ -3119,10 +3130,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         op_submission_status_counter = defaultdict(Counter)
         for job in context["jobs"]:
             for group_name, group_status in job["groups"].items():
+                display_name = group_status["display_name"]
                 if group_name != "":
                     if group_status["eligible"]:
-                        op_counter[group_name] += 1
-                    op_submission_status_counter[group_name][
+                        op_counter[display_name] += 1
+                    op_submission_status_counter[display_name][
                         group_status["scheduler_status"]
                     ] += 1
 

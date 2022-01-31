@@ -14,9 +14,10 @@ Operations:
     {% for job in jobs %}
         {% for key, value in job['groups'].items() if value | job_filter(scheduler_status_code, all_ops) %}
             {% if loop.first %}
-| {{ job['aggregate_id'] }} | {{ '%s' | highlight(value['eligible'], pretty) | format(key|format_operation_name(project)) }} | {{ alias_bool[value['eligible']] }} | {{ scheduler_status_code[value['scheduler_status']] }} |
+| {{ job['aggregate_id'] }} | {{ '%s' | highlight(value['eligible'], pretty) |
+format(value['display_name']) }} | {{ alias_bool[value['eligible']] }} | {{ scheduler_status_code[value['scheduler_status']] }} |
             {% else %}
-|  | {{ '%s' | highlight(value['eligible'], pretty) | format(key|format_operation_name(project)) }} | {{ alias_bool[value['eligible']] }} | {{ scheduler_status_code[value['scheduler_status']] }} |
+|  | {{ '%s' | highlight(value['eligible'], pretty) | format(value['display_name']) }} | {{ alias_bool[value['eligible']] }} | {{ scheduler_status_code[value['scheduler_status']] }} |
             {% endif %}
         {% endfor %}
     {% endfor %}

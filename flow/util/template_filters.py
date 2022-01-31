@@ -356,13 +356,3 @@ def get_account_name(environment, required=False):
                 file=sys.stderr,
             )
             _GET_ACCOUNT_NAME_MESSAGES_SHOWN.add(env_name)
-
-
-def format_operation_name(operation_name, project):
-    """Return the operation name or group name with number of operations."""
-    # If the name is from a group that is not an operation, we append the
-    # number of operations to its name in the status.
-    if operation_name in project._groups and operation_name not in project._operations:
-        num_operations = len(project._groups[operation_name].operations)
-        return f"{operation_name} ({num_operations} ops)"
-    return operation_name

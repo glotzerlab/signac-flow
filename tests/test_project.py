@@ -1524,7 +1524,7 @@ class TestProjectMainInterface(TestProjectBase):
         )
         lines = iter(status_output)
         project = self.mock_project()
-        num_ops = len(project.operations)
+        num_ops = len(project.groups)
         for line in lines:
             for job in project:
                 if job.id in line:

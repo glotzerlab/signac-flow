@@ -3,7 +3,7 @@
     {% set field_operation = '%s %s %s' %}
 Detailed View:
 
-| job id | operation | {{ para_head }}labels |
+| job id | operation/group | {{ para_head }}labels |
 | ------ | --------- | {{ ns.dash }}-------- |
     {% for job in jobs %}
         {% if parameters %}
@@ -11,14 +11,14 @@ Detailed View:
         {% endif %}
         {% if all_ops %}
             {% set key, value = job['groups'].items() | first() %}
-| {{ job['aggregate_id'] }} | {{ field_operation | highlight(value['eligible'], pretty) | format(key, '[' + scheduler_status_code[value['scheduler_status']] + ']', '+(' + extra_num_operations | string() + ')') }} | {{ para_output }}{{ job['labels'] | join(', ') }} |
+| {{ job['aggregate_id'] }} | {{ field_operation | highlight(value['eligible'], pretty) | format(value['display_name'], '[' + scheduler_status_code[value['scheduler_status']] + ']', '+(' + extra_num_operations | string() + ')') }} | {{ para_output }}{{ job['labels'] | join(', ') }} |
         {% else %}
             {% set ns.extra_num_operation = -1 %}
             {% set ns.if_first_eligible_operation = True %}
-            {% for key, value in job['groups'].items() if value | job_filter(scheduler_status_code, all_ops) %}
+            {% for value['display_name'], value in job['groups'].items() if value | job_filter(scheduler_status_code, all_ops) %}
                 {% set ns.extra_num_operation = ns.extra_num_operation + 1 %}
                 {% if loop.first %}
-                    {% set ns.first_operation_key = key %}
+                    {% set ns.first_operation_key = value['display_name'] %}
                     {% set ns.first_operation_value = value %}
                 {% endif %}
             {% endfor %}

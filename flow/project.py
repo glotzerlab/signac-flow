@@ -108,6 +108,13 @@ _FMT_SCHEDULER_STATUS = {
     JobStatus.queued: "Q",
     JobStatus.active: "A",
     JobStatus.error: "E",
+    JobStatus.group_registered: "GR",
+    JobStatus.group_inactive: "GI",
+    JobStatus.group_submitted: "GS",
+    JobStatus.group_held: "GH",
+    JobStatus.group_queued: "GQ",
+    JobStatus.group_active: "GA",
+    JobStatus.group_error: "GE",
     JobStatus.placeholder: " ",
 }
 
@@ -2369,12 +2376,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         starting_dict = functools.partial(dict, scheduler_status=JobStatus.unknown)
         status_dict = defaultdict(starting_dict)
 
-        # TODO: Add support for groups that are not single operations.
-        single_operation_groups = {self._groups[name] for name in self.operations}
-
         for aggregate_id, aggregate, group, in self._generate_selected_aggregate_groups(
             selected_aggregates=[aggregate],
-            selected_groups=single_operation_groups,
         ):
             completed = group._complete(aggregate)
             # If the group is not completed, it is sufficient to determine
@@ -2584,7 +2587,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             )
 
         parallel_executor = _get_parallel_executor(status_parallelization)
-        single_operation_groups = {self._groups[name] for name in self.operations}
 
         # Update the project's status cache
         scheduler_info = self._query_scheduler_status(
@@ -2593,8 +2595,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         def compute_status(data):
             scheduler_id, scheduler_status, aggregate_id, aggregate, group = data
-            # Only single-operation groups are supported for status fetching
-            assert len(group.operations) == 1
 
             status = {}
             error_text = None
@@ -2602,12 +2602,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 status["scheduler_status"] = scheduler_status
                 completed = group._complete(aggregate)
                 status["completed"] = completed
-                # If the group is not completed, it is sufficient to determine
-                # eligibility while ignoring postconditions (we know at least
-                # one postcondition is not met).
-                status["eligible"] = not completed and group._eligible(
-                    aggregate, ignore_conditions=IgnoreConditions.POST
-                )
+                if len(group.operations) > 1:
+                    status["eligible"] = group._eligible(aggregate)
+                else:
+                    # For groups with only one operation, if the group is not
+                    # complete, it is sufficient to determine eligibility while
+                    # ignoring postconditions (we know at least one
+                    # postcondition is not met).
+                    status["eligible"] = not completed and group._eligible(
+                        aggregate, ignore_conditions=IgnoreConditions.POST
+                    )
             except Exception as error:
                 logger.debug(
                     "Error while getting operations status for job '%s': '%s'.",
@@ -2619,12 +2623,31 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 error_text = str(error)
                 status["completed"] = False
                 status["eligible"] = False
-            result = {
-                "aggregate_id": aggregate_id,
-                "group_name": group.name,
-                "status": status,
-                "_error": error_text,
-            }
+            result = [
+                {
+                    "aggregate_id": aggregate_id,
+                    "group_name": group.name,
+                    "status": status,
+                    "_error": error_text,
+                }
+            ]
+            if (
+                group.name not in self._operations
+                and scheduler_status != JobStatus.unknown
+            ):
+                operation_status = {
+                    **status,
+                    "scheduler_status": JobStatus._to_group(scheduler_status),
+                }
+                for op_name in group.operations:
+                    result.append(
+                        {
+                            "aggregate_id": aggregate_id,
+                            "group_name": op_name,
+                            "status": operation_status,
+                            "_error": error_text,
+                        }
+                    )
             return result
 
         with self._buffered():
@@ -2632,19 +2655,20 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 self._generate_selected_aggregate_groups_with_status(
                     scheduler_info=scheduler_info,
                     selected_aggregates=aggregates,
-                    selected_groups=single_operation_groups,
                 )
             )
-            status_results = parallel_executor(
+            status_results = []
+            for result in parallel_executor(
                 compute_status,
                 aggregate_groups,
                 desc="Fetching status",
                 file=err,
-            )
+            ):
+                status_results.extend(result)
             # aggregate_groups is a list of tuples containing scheduler,
             # aggregate, and group information. To compute labels, we fetch the
             # unique jobs from the aggregates containing only one job.
-            if len(single_operation_groups) > 0:
+            if len(self._groups) > 0:
                 individual_jobs = {
                     aggregate_group[3][0]
                     for aggregate_group in aggregate_groups
@@ -2664,6 +2688,23 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 file=err,
             )
 
+        def combine_group_and_operation_status(aggregate_status_results):
+            group_statuses = {}
+            # Iterate over all status results for singleton groups and all user created groups.
+            # Given group job statuses being exclusive with respect to standard statuses we can
+            # store only the group status (e.g. Group Active) in group submission.
+            for status_result in aggregate_status_results:
+                group_name = status_result["group_name"]
+                # Only true when both a user group and singleton group report a status. We use the
+                # one that is not unknown, so we don't store this status and continue.
+                if (
+                    group_name in group_statuses
+                    and status_result["status"]["scheduler_status"] == JobStatus.unknown
+                ):
+                    continue
+                group_statuses[group_name] = status_result["status"]
+            return group_statuses
+
         status_results_combined = []
         for aggregate_id, aggregate_results in groupby(
             sorted(status_results, key=lambda result: result["aggregate_id"]),
@@ -2681,10 +2722,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             status_results_combined.append(
                 {
                     "aggregate_id": aggregate_id,
-                    "groups": {
-                        result["group_name"]: result["status"]
-                        for result in aggregate_results
-                    },
+                    "groups": combine_group_and_operation_status(aggregate_results),
                     "_error": error_message,
                 }
             )
@@ -2922,10 +2960,24 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 1 for _ in filter(_has_any_eligible_group, status_results)
             )
 
-        statuses = {
-            status_entry["aggregate_id"]: status_entry
-            for status_entry in status_results
-        }
+        def display_group_name(group_name):
+            """Return the operation name or group name with number of operations."""
+            # If the name is from a group that is not an operation, we append the
+            # number of operations to its name in the status.
+            if group_name not in self._operations:
+                num_operations = len(self._groups[group_name].operations)
+                return f"{group_name} ({num_operations} ops)"
+            return group_name
+
+        statuses = {}
+        # We store the name for display in statuses[aggregate_id][group_name]["display_name"] to
+        # prevent the need for a Jinja filter. We store this as an additional parameter as multiple
+        # places in the templates need this value including the statuses dictionary itself.
+        for status_entry in status_results:
+            statuses[status_entry["aggregate_id"]] = status_entry
+            group_statuses = status_entry["groups"]
+            for group_name, group_status in group_statuses.items():
+                group_status["display_name"] = display_group_name(group_name)
 
         # Add labels to the status information.
         for job_label_data in job_labels:
@@ -3015,7 +3067,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             # get detailed view info
 
             if compact:
-                num_operations = len(self._operations)
+                num_operations = len(self._groups)
 
             if pretty:
                 OPERATION_STATUS_SYMBOLS = {
@@ -3081,10 +3133,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         op_submission_status_counter = defaultdict(Counter)
         for job in context["jobs"]:
             for group_name, group_status in job["groups"].items():
+                display_name = group_status["display_name"]
                 if group_name != "":
                     if group_status["eligible"]:
-                        op_counter[group_name] += 1
-                    op_submission_status_counter[group_name][
+                        op_counter[display_name] += 1
+                    op_submission_status_counter[display_name][
                         group_status["scheduler_status"]
                     ] += 1
 

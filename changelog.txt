@@ -8,7 +8,7 @@ The numbers in brackets denote the related GitHub issue and/or pull request.
 Version 0.18
 ============
 
-[0.18.0] -- 2022-xx-xx
+[0.18.0] -- 2022-02-03
 ----------------------
 
 Added
@@ -21,6 +21,11 @@ Changed
 
 - Add user defined ``FlowGroups`` to status output (#547, #593).
 - Raise ``UserOperationError`` for failed execution of ``FlowProject`` operations (#571, #601).
+
+Fixed
++++++
+
+- Fix issue with GPU submission on Bridges-2 (#588, #589).
 
 Version 0.17
 ============

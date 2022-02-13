@@ -4689,7 +4689,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     "complete the update anyways or '--show-traceback' to show "
                     "the full traceback."
                 )
-                error = error.__cause__  # Always show the user traceback cause.
+                if isinstance(error, (UserOperationError, UserConditionError)):
+                    # Always show the user traceback cause.
+                    error = error.__cause__
             traceback.print_exception(type(error), error, error.__traceback__)
         else:
             if aggregates is None:
@@ -5060,21 +5062,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         logging.basicConfig(level=max(0, logging.WARNING - 10 * args.verbose))
 
         def _show_traceback_and_exit(error):
-            if args.show_traceback:
-                traceback.print_exception(type(error), error, error.__traceback__)
-            elif isinstance(error, (UserOperationError, UserConditionError)):
+            is_user_error = isinstance(error, (UserOperationError, UserConditionError))
+            if is_user_error:
                 # Always show the user traceback cause.
                 error = error.__cause__
+            if args.show_traceback or is_user_error:
                 traceback.print_exception(type(error), error, error.__traceback__)
+            if not args.show_traceback:
                 print(
                     "Execute with '--show-traceback' or '--debug' to show the "
                     "full traceback.",
-                    file=sys.stderr,
-                )
-            else:
-                print(
-                    "Execute with '--show-traceback' or '--debug' to get more "
-                    "information.",
                     file=sys.stderr,
                 )
             sys.exit(1)

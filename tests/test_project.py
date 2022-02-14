@@ -250,6 +250,30 @@ class TestProjectStatusPerformance(TestProjectBase):
         assert time < 10
 
 
+class TestProjectStatusNoEligibleOperations(TestProjectBase):
+    class Project(FlowProject):
+        pass
+
+    @Project.operation
+    @Project.post(lambda job: True)
+    def foo(job):
+        pass
+
+    project_class = Project
+
+    def mock_project(self):
+        project = self.project_class.get_project(root=self._tmp_dir.name)
+        project.open_job(dict(i=0)).init()
+        return project
+
+    def test_status_no_eligible_operations(self):
+        """Test printing the project status when no operations are eligible."""
+        project = self.mock_project()
+        with redirect_stdout(StringIO()):
+            with redirect_stderr(StringIO()):
+                project.print_status()
+
+
 class TestProjectClass(TestProjectBase):
     def test_operation_definition(self):
         class A(FlowProject):

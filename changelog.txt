@@ -5,19 +5,16 @@ Changelog
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 The numbers in brackets denote the related GitHub issue and/or pull request.
 
-Version 0.19
+Version 0.18
 ============
 
-[0.19.0] -- 2022-xx-xx
+[0.18.1] -- 2022-xx-xx
 ----------------------
 
 Fixed
 +++++
 
 - Improved traceback handling for errors in signac-flow (#608).
-
-Version 0.18
-============
 
 [0.18.0] -- 2022-02-03
 ----------------------

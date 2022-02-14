@@ -3133,7 +3133,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         op_submission_status_counter = defaultdict(Counter)
         for job in context["jobs"]:
             for group_name, group_status in job["groups"].items():
-                # Exclude placeholder operations, which have no display name
+                # Exclude placeholder operations, which have no display name.
                 if group_name != "":
                     display_name = group_status["display_name"]
                     if group_status["eligible"]:

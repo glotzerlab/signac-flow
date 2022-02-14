@@ -15,6 +15,7 @@ Fixed
 +++++
 
 - Fixed bug in project status output when no operations are eligible (#607, #609).
+- Improved traceback handling for errors in signac-flow (#608).
 
 [0.18.0] -- 2022-02-03
 ----------------------

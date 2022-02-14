@@ -3118,7 +3118,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 context["operation_status_symbols"] = OPERATION_STATUS_SYMBOLS
 
         def _add_placeholder_operation(job):
-            job["groups"][None] = {
+            job["groups"][""] = {
                 "completed": False,
                 "eligible": False,
                 "scheduler_status": JobStatus.placeholder,
@@ -3134,7 +3134,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for job in context["jobs"]:
             for group_name, group_status in job["groups"].items():
                 # Exclude placeholder operations, which have no display name
-                if group_name is not None:
+                if group_name != "":
                     display_name = group_status["display_name"]
                     if group_status["eligible"]:
                         op_counter[display_name] += 1

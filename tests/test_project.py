@@ -263,7 +263,7 @@ class TestProjectStatusNoEligibleOperations(TestProjectBase):
 
     def mock_project(self):
         project = self.project_class.get_project(root=self._tmp_dir.name)
-        project.open_job({i: 0}).init()
+        project.open_job({"i": 0}).init()
         return project
 
     def test_status_no_eligible_operations(self):

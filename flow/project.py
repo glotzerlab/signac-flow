@@ -36,7 +36,16 @@ import jsonschema
 import signac
 from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
 from signac.contrib.filterparse import parse_filter_arg
-from tqdm.auto import tqdm
+
+try:
+    # If ipywidgets is installed, use "auto" tqdm to improve notebook support.
+    # Otherwise, use only text-based progress bars. This workaround can be
+    # removed after https://github.com/tqdm/tqdm/pull/1218.
+    import ipywidgets  # noqa: F401
+except ImportError:
+    from tqdm import tqdm
+else:
+    from tqdm.auto import tqdm
 
 from .aggregates import (
     _AggregatesCursor,

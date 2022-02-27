@@ -2,7 +2,15 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 """Status rendering logic."""
-from tqdm.auto import tqdm
+try:
+    # If ipywidgets is installed, use "auto" tqdm to improve notebook support.
+    # Otherwise, use only text-based progress bars. This workaround can be
+    # removed after https://github.com/tqdm/tqdm/pull/1218.
+    import ipywidgets  # noqa: F401
+except ImportError:
+    from tqdm import tqdm
+else:
+    from tqdm.auto import tqdm
 
 from .scheduling.base import JobStatus
 from .util import mistune

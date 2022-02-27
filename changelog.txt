@@ -5,6 +5,17 @@ Changelog
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 The numbers in brackets denote the related GitHub issue and/or pull request.
 
+Version 0.19
+============
+
+[0.19.0] -- 2022-xx-xx
+----------------------
+
+Removed
++++++++
+
+- Several internal utility functions have been removed from the public API (#615).
+
 Version 0.18
 ============
 

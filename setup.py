@@ -15,7 +15,7 @@ requirements = [
     # Deprecation management
     "deprecation>=2.0.0",
     # Progress bars
-    "tqdm>=4.48.1",
+    "tqdm>=4.60.0",
     # For schema validation
     "jsonschema>=3.0.0",
 ]

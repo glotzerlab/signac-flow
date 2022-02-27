@@ -84,7 +84,7 @@ def redirect_log(job, filename="run.log", formatter=None, logger=None):
 
 
 @contextmanager
-def add_path_to_environment_pythonpath(path):
+def _add_path_to_environment_pythonpath(path):
     """Insert the provided path into the environment PYTHONPATH variable.
 
     This method is a context manager. It restores the previous PYTHONPATH when
@@ -120,14 +120,14 @@ def add_path_to_environment_pythonpath(path):
 
 
 @contextmanager
-def add_cwd_to_environment_pythonpath():
+def _add_cwd_to_environment_pythonpath():
     """Add current working directory to PYTHONPATH."""
-    with add_path_to_environment_pythonpath(os.getcwd()):
+    with _add_path_to_environment_pythonpath(os.getcwd()):
         yield
 
 
 @contextmanager
-def switch_to_directory(root=None):
+def _switch_to_directory(root=None):
     """Temporarily switch into the given root directory (if not None).
 
     This method is a context manager. It switches to the previous working
@@ -151,7 +151,7 @@ def switch_to_directory(root=None):
             os.chdir(cwd)
 
 
-class TrackGetItemDict(dict):
+class _TrackGetItemDict(dict):
     """A dict that tracks which keys have been accessed.
 
     Keys accessed with ``__getitem__`` are stored in the property
@@ -182,7 +182,7 @@ class TrackGetItemDict(dict):
         return self._keys_used.copy()
 
 
-def roundrobin(*iterables):
+def _roundrobin(*iterables):
     """Round robin iterator.
 
     Cycles through a sequence of iterables, taking one item from each iterable
@@ -377,3 +377,8 @@ def _get_parallel_executor(parallelization="none"):
             return list(tmap(func, iterable, **kwargs))
 
     return parallel_executor
+
+
+__all__ = [
+    "redirect_log",
+]

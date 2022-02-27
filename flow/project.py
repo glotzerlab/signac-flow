@@ -64,15 +64,15 @@ from .scheduling.base import ClusterJob, JobStatus
 from .util import config as flow_config
 from .util import template_filters
 from .util.misc import (
-    TrackGetItemDict,
+    _add_cwd_to_environment_pythonpath,
     _bidict,
     _cached_partial,
     _get_parallel_executor,
     _positive_int,
+    _roundrobin,
+    _switch_to_directory,
     _to_hashable,
-    add_cwd_to_environment_pythonpath,
-    roundrobin,
-    switch_to_directory,
+    _TrackGetItemDict,
 )
 from .util.translate import abbreviate, shorten
 
@@ -320,7 +320,7 @@ class _JobOperation:
         # We use a special dictionary that tracks all keys that have been
         # evaluated by the template engine and compare them to those explicitly
         # set by the user. See also comment below.
-        self.directives = TrackGetItemDict(directives)
+        self.directives = _TrackGetItemDict(directives)
 
         # Keys which were explicitly set by the user, but are not evaluated by
         # the template engine are cause for concern and might hint at a bug in
@@ -3625,7 +3625,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         sorted(operations, key=key_func_by_job), key=key_func_by_job
                     )
                 ]
-                operations = list(roundrobin(*groups))
+                operations = list(_roundrobin(*groups))
             elif order == "random":
                 random.shuffle(operations)
             elif order is None or order in ("none", "by-job"):
@@ -4759,8 +4759,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         )
 
         if args.switch_to_project_root:
-            with add_cwd_to_environment_pythonpath():
-                with switch_to_directory(self.root_directory()):
+            with _add_cwd_to_environment_pythonpath():
+                with _switch_to_directory(self.root_directory()):
                     run()
         else:
             run()

@@ -45,9 +45,9 @@ from flow.errors import (
 from flow.project import IgnoreConditions, _AggregateStoresCursor, _JobAggregateCursor
 from flow.scheduling.base import ClusterJob, JobStatus, Scheduler
 from flow.util.misc import (
-    add_cwd_to_environment_pythonpath,
-    add_path_to_environment_pythonpath,
-    switch_to_directory,
+    _add_cwd_to_environment_pythonpath,
+    _add_path_to_environment_pythonpath,
+    _switch_to_directory,
 )
 
 
@@ -199,8 +199,8 @@ class TestProjectBase:
         fn_script = inspect.getsourcefile(type(self.project))
         _cmd = f"python {fn_script} {subcmd}"
         try:
-            with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
-                with switch_to_directory(self.project.root_directory()):
+            with _add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
+                with _switch_to_directory(self.project.root_directory()):
                     return subprocess.check_output(_cmd.split(), stderr=stderr)
         except subprocess.CalledProcessError as error:
             print(error, file=sys.stderr)
@@ -481,8 +481,8 @@ class TestProjectClass(TestProjectBase):
             assert os.path.realpath(os.getcwd()) == os.path.realpath(job.ws)
 
         project = self.mock_project(A)
-        with add_cwd_to_environment_pythonpath():
-            with switch_to_directory(project.root_directory()):
+        with _add_cwd_to_environment_pythonpath():
+            with _switch_to_directory(project.root_directory()):
                 starting_dir = os.getcwd()
                 with redirect_stderr(StringIO()):
                     project.run()
@@ -511,8 +511,8 @@ class TestProjectClass(TestProjectBase):
             return "echo 'hello' > world.txt"
 
         project = self.mock_project(A)
-        with add_cwd_to_environment_pythonpath():
-            with switch_to_directory(project.root_directory()):
+        with _add_cwd_to_environment_pythonpath():
+            with _switch_to_directory(project.root_directory()):
                 starting_dir = os.getcwd()
                 with redirect_stderr(StringIO()):
                     project.run()
@@ -529,8 +529,8 @@ class TestProjectClass(TestProjectBase):
             raise Exception
 
         project = self.mock_project(A)
-        with add_cwd_to_environment_pythonpath():
-            with switch_to_directory(project.root_directory()):
+        with _add_cwd_to_environment_pythonpath():
+            with _switch_to_directory(project.root_directory()):
                 starting_dir = os.getcwd()
                 with pytest.raises(UserOperationError):
                     with redirect_stderr(StringIO()):
@@ -547,8 +547,8 @@ class TestProjectClass(TestProjectBase):
             raise Exception
 
         project = self.mock_project(A)
-        with add_cwd_to_environment_pythonpath():
-            with switch_to_directory(project.root_directory()):
+        with _add_cwd_to_environment_pythonpath():
+            with _switch_to_directory(project.root_directory()):
                 starting_dir = os.getcwd()
                 with pytest.raises(UserOperationError):
                     with redirect_stderr(StringIO()):
@@ -566,8 +566,8 @@ class TestProjectClass(TestProjectBase):
             return "exit 1"
 
         project = self.mock_project(A)
-        with add_cwd_to_environment_pythonpath():
-            with switch_to_directory(project.root_directory()):
+        with _add_cwd_to_environment_pythonpath():
+            with _switch_to_directory(project.root_directory()):
                 starting_dir = os.getcwd()
                 with pytest.raises(UserOperationError):
                     with redirect_stderr(StringIO()):
@@ -1105,8 +1105,8 @@ class TestExecutionProject(TestProjectBase):
     def test_run_order(self, order):
         project = self.mock_project()
         output = StringIO()
-        with add_cwd_to_environment_pythonpath():
-            with switch_to_directory(project.root_directory()):
+        with _add_cwd_to_environment_pythonpath():
+            with _switch_to_directory(project.root_directory()):
                 with redirect_stderr(output):
                     project.run(order=order)
         output.seek(0)
@@ -1121,8 +1121,8 @@ class TestExecutionProject(TestProjectBase):
     def test_run_with_selection(self):
         project = self.mock_project()
         output = StringIO()
-        with add_cwd_to_environment_pythonpath():
-            with switch_to_directory(project.root_directory()):
+        with _add_cwd_to_environment_pythonpath():
+            with _switch_to_directory(project.root_directory()):
                 with redirect_stderr(output):
                     project.run(project.find_jobs(dict(a=0)))
         output.seek(0)
@@ -1137,8 +1137,8 @@ class TestExecutionProject(TestProjectBase):
     def test_run_with_operation_selection(self):
         project = self.mock_project()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
-        with add_cwd_to_environment_pythonpath():
-            with switch_to_directory(project.root_directory()):
+        with _add_cwd_to_environment_pythonpath():
+            with _switch_to_directory(project.root_directory()):
                 with pytest.raises(ValueError):
                     # The names argument must be a sequence of strings, not a string.
                     project.run(names="op1")
@@ -1156,8 +1156,8 @@ class TestExecutionProject(TestProjectBase):
     def test_run_parallel(self):
         project = self.mock_project()
         output = StringIO()
-        with add_cwd_to_environment_pythonpath():
-            with switch_to_directory(project.root_directory()):
+        with _add_cwd_to_environment_pythonpath():
+            with _switch_to_directory(project.root_directory()):
                 with redirect_stderr(output):
                     project.run(np=2)
         output.seek(0)
@@ -1233,8 +1233,8 @@ class TestExecutionProject(TestProjectBase):
             job.doc.fork = True
             break
 
-        with add_cwd_to_environment_pythonpath():
-            with switch_to_directory(project.root_directory()):
+        with _add_cwd_to_environment_pythonpath():
+            with _switch_to_directory(project.root_directory()):
                 with redirect_stderr(output):
                     project.run()
 
@@ -1984,8 +1984,8 @@ class TestGroupExecutionProject(TestProjectBase):
     def test_run_with_operation_selection(self):
         project = self.mock_project()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
-        with add_cwd_to_environment_pythonpath():
-            with switch_to_directory(project.root_directory()):
+        with _add_cwd_to_environment_pythonpath():
+            with _switch_to_directory(project.root_directory()):
                 with pytest.raises(ValueError):
                     # The names argument must be a sequence of strings, not a string.
                     project.run(names="op1")
@@ -2004,8 +2004,8 @@ class TestGroupExecutionProject(TestProjectBase):
     def test_run_parallel(self):
         project = self.mock_project()
         output = StringIO()
-        with add_cwd_to_environment_pythonpath():
-            with switch_to_directory(project.root_directory()):
+        with _add_cwd_to_environment_pythonpath():
+            with _switch_to_directory(project.root_directory()):
                 with redirect_stderr(output):
                     project.run(names=["group1"], np=2)
         output.seek(0)
@@ -2437,9 +2437,9 @@ class TestHooksSetUp(TestProjectBase):
         # Bypass raising the error/checking output since it interferes with hook.on_fail
         fn_script = self.entrypoint["path"]
         _cmd = f"python {fn_script} {subcmd} --debug"
-        with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
+        with _add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
             try:
-                with switch_to_directory(self.project.root_directory()):
+                with _switch_to_directory(self.project.root_directory()):
                     return subprocess.check_output(_cmd.split(), stderr=stderr)
             except subprocess.CalledProcessError as error:
                 print(error, file=sys.stderr)
@@ -2592,9 +2592,9 @@ class TestHooksInvalidOption(TestHooksSetUp):
         # Return error as output instead of raising error
         fn_script = self.entrypoint["path"]
         _cmd = f"python {fn_script} {subcmd} --debug"
-        with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
+        with _add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
             try:
-                with switch_to_directory(self.project.root_directory()):
+                with _switch_to_directory(self.project.root_directory()):
                     return subprocess.check_output(_cmd.split(), stderr=stderr)
             except subprocess.CalledProcessError as error:
                 return str(error.output)

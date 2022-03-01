@@ -67,8 +67,8 @@ jobs:
               python -m pip install --progress-bar off -r .circleci/ci-oldest-reqs.txt
             else
               python -m pip install --progress-bar off -r requirements.txt
+              python -m pip install --progress-bar off -r requirements/requirements-test.txt
             fi
-            python -m pip install --progress-bar off -r requirements/requirements-test.txt
 
       - run:
           name: Run tests

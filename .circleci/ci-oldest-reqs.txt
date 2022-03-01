@@ -1,5 +1,10 @@
+click==8.0.3
 cloudpickle==1.1.1
+coverage==6.2
 deprecation==2.0.0
 jinja2==2.10
-tqdm==4.48.1
 jsonschema==3.0.0
+pytest-cov==3.0.0
+pytest==7.0.1
+ruamel.yaml==0.17.21
+tqdm==4.48.1

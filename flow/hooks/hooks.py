@@ -68,7 +68,15 @@ class _Hooks:
         "on_exception",
     ]
 
-    def __init__(self, *, on_start=None, on_exit=None, on_success=None, on_exception=None, **kwargs):
+    def __init__(
+        self,
+        *,
+        on_start=None,
+        on_exit=None,
+        on_success=None,
+        on_exception=None,
+        **kwargs,
+    ):
         def set_hooks(self, trigger_name, trigger_value):
             if trigger_value is None:
                 trigger_value = []

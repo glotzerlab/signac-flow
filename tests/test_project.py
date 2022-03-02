@@ -2409,7 +2409,7 @@ class TestAggregationGroupProjectMainInterface(TestAggregatesProjectBase):
 
 class TestHooksSetUp(TestProjectBase):
     error_message = define_hooks_test_project.HOOKS_ERROR_MESSAGE
-    keys = ["start", "exit", "success", "exception"]
+    keys = ["start", "finish", "success", "fail"]
     project_class = define_hooks_test_project._HooksTestProject
     entrypoint = dict(
         path=os.path.realpath(
@@ -2434,7 +2434,7 @@ class TestHooksSetUp(TestProjectBase):
         return project
 
     def call_subcmd(self, subcmd, stderr=subprocess.DEVNULL):
-        # Bypass raising the error/checking output since it interferes with hook.on_exception
+        # Bypass raising the error/checking output since it interferes with hook.on_fail
         fn_script = self.entrypoint["path"]
         _cmd = f"python {fn_script} {subcmd} --debug"
         with add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
@@ -2456,7 +2456,7 @@ class TestHooksSetUp(TestProjectBase):
 
 
 class TestHooksBase(TestHooksSetUp):
-    def test_start_and_exit(self, project, job, operation_name):
+    def test_start_and_finish(self, project, job, operation_name):
         get_job_doc_value = self._get_job_doc_key(job, operation_name)
 
         assert get_job_doc_value(self.keys[0]) is None
@@ -2528,9 +2528,9 @@ class TestHooksInstallBase(TestHooksBase, TestHooksInstallSetUp):
     # Check job document for keys from installed, project-wide hooks
     keys = [
         "installed_start",
-        "installed_exit",
+        "installed_finish",
         "installed_success",
-        "installed_exception",
+        "installed_fail",
     ]
 
     @pytest.fixture(params=["base", "base_no_decorators"])
@@ -2545,9 +2545,9 @@ class TestHooksInstallCmd(TestHooksCmd, TestHooksInstallSetUp):
     # Check job document for keys from installed, project-wide hooks
     keys = [
         "installed_start",
-        "installed_exit",
+        "installed_finish",
         "installed_success",
-        "installed_exception",
+        "installed_fail",
     ]
 
     @pytest.fixture(params=["base_cmd", "base_cmd_no_decorators"])

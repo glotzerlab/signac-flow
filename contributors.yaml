@@ -157,4 +157,9 @@ contributors:
     given-names: Javier
     orcid: "https://orcid.org/0000-0002-9317-1428"
     affiliation: "University of Córdoba (Spain)"
+  -
+    family-names: Babbar
+    given-names: Rohan
+    orcid: "https://orcid.org/0000-0002-7203-7641"
+    affiliation: "University of Delhi (India)"
 ...

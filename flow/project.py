@@ -36,7 +36,6 @@ import jsonschema
 import signac
 from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
 from signac.contrib.filterparse import parse_filter_arg
-from tqdm.auto import tqdm
 
 from .aggregates import (
     _AggregatesCursor,
@@ -73,6 +72,7 @@ from .util.misc import (
     _switch_to_directory,
     _to_hashable,
     _TrackGetItemDict,
+    tqdm,
 )
 from .util.translate import abbreviate, shorten
 

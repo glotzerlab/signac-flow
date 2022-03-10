@@ -14,6 +14,16 @@ import cloudpickle
 from tqdm.contrib import tmap
 from tqdm.contrib.concurrent import process_map, thread_map
 
+try:
+    # If ipywidgets is installed, use "auto" tqdm to improve notebook support.
+    # Otherwise, use only text-based progress bars. This workaround can be
+    # removed after https://github.com/tqdm/tqdm/pull/1218.
+    import ipywidgets  # noqa: F401
+except ImportError:
+    from tqdm import tqdm
+else:
+    from tqdm.auto import tqdm
+
 
 def _positive_int(value):
     """Parse a command line argument as a positive integer.
@@ -348,7 +358,10 @@ def _get_parallel_executor(parallelization="none"):
 
     """
     if parallelization == "thread":
-        parallel_executor = thread_map
+
+        def parallel_executor(func, iterable, **kwargs):
+            return thread_map(func, iterable, tqdm_class=tqdm, **kwargs)
+
     elif parallelization == "process":
 
         def parallel_executor(func, iterable, **kwargs):
@@ -365,6 +378,7 @@ def _get_parallel_executor(parallelization="none"):
                 # regardless of whether it is a local function.
                 partial(_run_cloudpickled_func, cloudpickle.dumps(func)),
                 map(cloudpickle.dumps, iterable),
+                tqdm_class=tqdm,
                 **kwargs,
             )
 
@@ -374,7 +388,7 @@ def _get_parallel_executor(parallelization="none"):
             if "chunksize" in kwargs:
                 # Chunk size only applies to thread/process parallel executors
                 del kwargs["chunksize"]
-            return list(tmap(func, iterable, **kwargs))
+            return list(tmap(func, iterable, tqdm_class=tqdm, **kwargs))
 
     return parallel_executor
 

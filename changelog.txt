@@ -11,6 +11,16 @@ Version 0.19
 [0.19.0] -- 2022-xx-xx
 ----------------------
 
+Changed
++++++++
+
+- Drop support for `tqdm <https://github.com/tqdm/tqdm>`__ versions older than `4.60.0` (#614).
+
+Fixed
++++++
+
+- Progress bars shown in notebooks fall back to text-based output if ipywidgets is not available (#602, #614).
+
 Removed
 +++++++
 

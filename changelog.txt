@@ -21,6 +21,11 @@ Fixed
 
 - Progress bars shown in notebooks fall back to text-based output if ipywidgets is not available (#602, #614).
 
+Removed
++++++++
+
+- Internal utility functions have been removed from the public API (#615).
+
 Version 0.18
 ============
 

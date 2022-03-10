@@ -24,7 +24,7 @@ Fixed
 Removed
 +++++++
 
-- Several internal utility functions have been removed from the public API (#615).
+- Internal utility functions have been removed from the public API (#615).
 
 Version 0.18
 ============

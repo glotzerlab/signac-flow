@@ -15,6 +15,7 @@ Changed
 +++++++
 
 - Drop support for `tqdm <https://github.com/tqdm/tqdm>`__ versions older than `4.60.0` (#614).
+- Renamed hook triggers `on_finish` to `on_exit` and `on_fail` to `on_exception` (#612, #627).
 
 Fixed
 +++++

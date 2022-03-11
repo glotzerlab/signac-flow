@@ -2,7 +2,7 @@ import flow
 from flow import FlowProject
 
 HOOKS_ERROR_MESSAGE = "You raised an error! Hooray!"
-HOOK_KEYS = ("start", "finish", "success", "fail")
+HOOK_KEYS = ("start", "exit", "success", "exception")
 
 
 class _HooksTestProject(FlowProject):

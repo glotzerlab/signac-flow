@@ -2528,9 +2528,9 @@ class TestHooksInstallBase(TestHooksBase, TestHooksInstallSetUp):
     # Check job document for keys from installed, project-wide hooks
     keys = [
         "installed_start",
-        "installed_finish",
+        "installed_exit",
         "installed_success",
-        "installed_fail",
+        "installed_exception",
     ]
 
     @pytest.fixture(params=["base", "base_no_decorators"])
@@ -2545,9 +2545,9 @@ class TestHooksInstallCmd(TestHooksCmd, TestHooksInstallSetUp):
     # Check job document for keys from installed, project-wide hooks
     keys = [
         "installed_start",
-        "installed_finish",
+        "installed_exit",
         "installed_success",
-        "installed_fail",
+        "installed_exception",
     ]
 
     @pytest.fixture(params=["base_cmd", "base_cmd_no_decorators"])

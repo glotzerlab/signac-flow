@@ -44,7 +44,7 @@ class _Hooks:
             print(f"Starting operation {operation_name} on job {job.id}.")
 
         @FlowProject.operation
-        @FlowProject.operation_hook.on_start(start_hook)
+        @FlowProject.operation_hooks.on_start(start_hook)
         def foo(job):
             pass
 
@@ -52,32 +52,34 @@ class _Hooks:
     ----------
     on_start : list of callables
         Function(s) to execute before the operation begins execution.
-    on_finish : list of callables
+    on_exit : list of callables
         Function(s) to execute after the operation exits, with or without errors.
     on_success : list of callables
         Function(s) to execute after the operation exits without error.
-    on_fail : list of callables
+    on_exception : list of callables
         Function(s) to execute after the operation exits with an error.
 
     """
 
     _hook_triggers = [
         "on_start",
-        "on_finish",
+        "on_exit",
         "on_success",
-        "on_fail",
+        "on_exception",
     ]
 
-    def __init__(self, *, on_start=None, on_finish=None, on_success=None, on_fail=None):
+    def __init__(
+        self, *, on_start=None, on_exit=None, on_success=None, on_exception=None
+    ):
         def set_hooks(self, trigger_name, trigger_value):
             if trigger_value is None:
                 trigger_value = []
             setattr(self, trigger_name, _HooksList(trigger_value))
 
         set_hooks(self, "on_start", on_start)
-        set_hooks(self, "on_finish", on_finish)
+        set_hooks(self, "on_exit", on_exit)
         set_hooks(self, "on_success", on_success)
-        set_hooks(self, "on_fail", on_fail)
+        set_hooks(self, "on_exception", on_exception)
 
     def __setattr__(self, name, value):
         """Convert to _HooksList when setting a hook trigger attribute."""

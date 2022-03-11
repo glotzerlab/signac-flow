@@ -1555,7 +1555,7 @@ class _FlowProjectClass(type):
             when an operation exits with error, or when an operation exits
             without error.
 
-            The available triggers are ``on_start``, ``on_finish``, ``on_fail``, and
+            The available triggers are ``on_start``, ``on_exit``, ``on_exception``, and
             ``on_success`` which run when the operation starts, completes, fails, and
             succeeds respectively.
 
@@ -1579,13 +1579,13 @@ class _FlowProjectClass(type):
                 return cls(hook_func, trigger="on_start")
 
             @classmethod
-            def on_finish(cls, hook_func):
+            def on_exit(cls, hook_func):
                 """Add a hook function triggered after the operation exits.
 
                 The hook is triggered regardless of whether the operation exits
                 with or without an error.
                 """
-                return cls(hook_func, trigger="on_finish")
+                return cls(hook_func, trigger="on_exit")
 
             @classmethod
             def on_success(cls, hook_func):
@@ -1593,9 +1593,9 @@ class _FlowProjectClass(type):
                 return cls(hook_func, trigger="on_success")
 
             @classmethod
-            def on_fail(cls, hook_func):
+            def on_exception(cls, hook_func):
                 """Add a hook function triggered after the operation exits with an error."""
-                return cls(hook_func, trigger="on_fail")
+                return cls(hook_func, trigger="on_exception")
 
             def __call__(self, func):
                 """Add the decorated function to the operation hook registry.
@@ -1840,7 +1840,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
             if __name__ == "__main__":
                 project = FlowProject()
-                project.project_hooks.on_finish.append(finish_hook)
+                project.project_hooks.on_exit.append(finish_hook)
                 project.main()
         """
         return self._project_hooks
@@ -3327,15 +3327,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         try:
             yield
         except Exception as error:
-            self.project_hooks.on_fail(name, error, *jobs)
-            operation_hooks.on_fail(name, error, *jobs)
+            self.project_hooks.on_exception(name, error, *jobs)
+            operation_hooks.on_exception(name, error, *jobs)
             raise
         else:
             self.project_hooks.on_success(name, *jobs)
             operation_hooks.on_success(name, *jobs)
         finally:
-            self.project_hooks.on_finish(name, *jobs)
-            operation_hooks.on_finish(name, *jobs)
+            self.project_hooks.on_exit(name, *jobs)
+            operation_hooks.on_exit(name, *jobs)
 
     def _execute_operation(self, operation, timeout=None, pretend=False):
         """Execute an operation.

@@ -2,7 +2,7 @@ import flow
 from flow import FlowProject
 
 HOOKS_ERROR_MESSAGE = "You raised an error! Hooray!"
-HOOK_KEYS = ("start", "finish", "success", "fail")
+HOOK_KEYS = ("start", "exit", "success", "exception")
 
 
 class _HooksTestProject(FlowProject):
@@ -28,9 +28,9 @@ def raise_error(operation_name, job):
 
 
 @_HooksTestProject.operation_hooks.on_start(set_job_doc(HOOK_KEYS[0]))
-@_HooksTestProject.operation_hooks.on_finish(set_job_doc(HOOK_KEYS[1]))
+@_HooksTestProject.operation_hooks.on_exit(set_job_doc(HOOK_KEYS[1]))
 @_HooksTestProject.operation_hooks.on_success(set_job_doc(HOOK_KEYS[2]))
-@_HooksTestProject.operation_hooks.on_fail(set_job_doc_with_error())
+@_HooksTestProject.operation_hooks.on_exception(set_job_doc_with_error())
 @_HooksTestProject.operation
 def base(job):
     if job.sp.raise_exception:
@@ -38,9 +38,9 @@ def base(job):
 
 
 @_HooksTestProject.operation_hooks.on_start(set_job_doc(HOOK_KEYS[0]))
-@_HooksTestProject.operation_hooks.on_finish(set_job_doc(HOOK_KEYS[1]))
+@_HooksTestProject.operation_hooks.on_exit(set_job_doc(HOOK_KEYS[1]))
 @_HooksTestProject.operation_hooks.on_success(set_job_doc(HOOK_KEYS[2]))
-@_HooksTestProject.operation_hooks.on_fail(set_job_doc_with_error())
+@_HooksTestProject.operation_hooks.on_exception(set_job_doc_with_error())
 @_HooksTestProject.operation
 @flow.with_job
 @flow.cmd

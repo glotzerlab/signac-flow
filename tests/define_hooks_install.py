@@ -8,16 +8,16 @@ from define_hooks_test_project import (
 class ProjectLevelHooks:
     keys = (
         "installed_start",
-        "installed_finish",
+        "installed_exit",
         "installed_success",
-        "installed_fail",
+        "installed_exception",
     )
 
     def install_hooks(self, project):
         project.project_hooks.on_start.append(set_job_doc(self.keys[0]))
-        project.project_hooks.on_finish.append(set_job_doc(self.keys[1]))
+        project.project_hooks.on_exit.append(set_job_doc(self.keys[1]))
         project.project_hooks.on_success.append(set_job_doc(self.keys[2]))
-        project.project_hooks.on_fail.append(set_job_doc_with_error(self.keys[3]))
+        project.project_hooks.on_exception.append(set_job_doc_with_error(self.keys[3]))
         return project
 
 

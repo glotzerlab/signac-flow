@@ -2409,7 +2409,7 @@ class TestAggregationGroupProjectMainInterface(TestAggregatesProjectBase):
 
 class TestHooksSetUp(TestProjectBase):
     error_message = define_hooks_test_project.HOOKS_ERROR_MESSAGE
-    keys = ["start", "finish", "success", "fail"]
+    keys = ["start", "exit", "success", "exception"]
     project_class = define_hooks_test_project._HooksTestProject
     entrypoint = dict(
         path=os.path.realpath(
@@ -2434,7 +2434,7 @@ class TestHooksSetUp(TestProjectBase):
         return project
 
     def call_subcmd(self, subcmd, stderr=subprocess.DEVNULL):
-        # Bypass raising the error/checking output since it interferes with hook.on_fail
+        # Bypass raising the error/checking output since it interferes with hook.on_exception
         fn_script = self.entrypoint["path"]
         _cmd = f"python {fn_script} {subcmd} --debug"
         with _add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
@@ -2528,9 +2528,9 @@ class TestHooksInstallBase(TestHooksBase, TestHooksInstallSetUp):
     # Check job document for keys from installed, project-wide hooks
     keys = [
         "installed_start",
-        "installed_finish",
+        "installed_exit",
         "installed_success",
-        "installed_fail",
+        "installed_exception",
     ]
 
     @pytest.fixture(params=["base", "base_no_decorators"])
@@ -2545,9 +2545,9 @@ class TestHooksInstallCmd(TestHooksCmd, TestHooksInstallSetUp):
     # Check job document for keys from installed, project-wide hooks
     keys = [
         "installed_start",
-        "installed_finish",
+        "installed_exit",
         "installed_success",
-        "installed_fail",
+        "installed_exception",
     ]
 
     @pytest.fixture(params=["base_cmd", "base_cmd_no_decorators"])

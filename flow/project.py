@@ -1782,10 +1782,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             "get_account_name"
         ] = template_filters.get_account_name
         template_environment.filters["print_warning"] = template_filters.print_warning
-        if "max" not in template_environment.filters:  # for jinja2 < 2.10
-            template_environment.filters["max"] = max
-        if "min" not in template_environment.filters:  # for jinja2 < 2.10
-            template_environment.filters["min"] = min
         template_environment.filters["quote_argument"] = shlex.quote
 
         return template_environment

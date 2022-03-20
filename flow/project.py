@@ -130,7 +130,7 @@ class IgnoreConditions(IntFlag):
         # Compute the largest number of bits used to represent one of the flags
         # so that we can XOR the appropriate number.
         max_bits = len(bin(max(elem.value for elem in type(self)))) - 2
-        return self.__class__((2 ** max_bits - 1) ^ self._value_)
+        return self.__class__((2**max_bits - 1) ^ self._value_)
 
     NONE = 0
     """Check all conditions."""

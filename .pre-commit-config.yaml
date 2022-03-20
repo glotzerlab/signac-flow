@@ -13,7 +13,7 @@ repos:
         exclude: 'setup.cfg'
       - id: debug-statements
   - repo: https://github.com/asottile/pyupgrade
-    rev: 'v2.31.0'
+    rev: 'v2.31.1'
     hooks:
       - id: pyupgrade
         args:
@@ -23,7 +23,7 @@ repos:
     hooks:
       - id: isort
   - repo: https://github.com/psf/black
-    rev: '21.12b0'
+    rev: '22.1.0'
     hooks:
       - id: black
   - repo: https://github.com/PyCQA/flake8

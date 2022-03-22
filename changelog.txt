@@ -27,6 +27,7 @@ Removed
 
 - Internal utility functions have been removed from the public API (#615).
 - Dropped support for Python 3.6 and Python 3.7 (#715) following the recommended support schedules of `NEP 29 <https://numpy.org/neps/nep-0029-deprecation_policy.html>`__.
+- Drop support for `Jinja2 <https://palletsprojects.com/p/jinja/>`__ versions below `3.0.0` (#436).
 
 Version 0.18
 ============

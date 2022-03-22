@@ -14,11 +14,13 @@ references:
 
 jobs:
   linux-python-310: &test-template
+    docker:
+      - image: cimg/python:3.10
+
     environment:
       DEPENDENCIES: "NEWEST"
       SIGNAC_VERSION: "signac"
-    docker:
-      - image: cimg/python:3.10
+      PYTHON: python
 
     working_directory: ~/repo
 
@@ -28,27 +30,27 @@ jobs:
       - run:
           name: Install dependencies
           command: |
-            python -m pip install --progress-bar off -U virtualenv --user
+            ${PYTHON} -m pip install --progress-bar off -U virtualenv --user
             mkdir -p ./venv
-            python -m virtualenv ./venv --clear
+            ${PYTHON} -m virtualenv ./venv --clear
             . venv/bin/activate
-            python -m pip install --progress-bar off -U pip>=20.3
-            python -m pip install --progress-bar off -U codecov
-            python -m pip install --progress-bar off ${SIGNAC_VERSION}
+            ${PYTHON} -m pip install --progress-bar off -U pip>=20.3
+            ${PYTHON} -m pip install --progress-bar off -U codecov
+            ${PYTHON} -m pip install --progress-bar off ${SIGNAC_VERSION}
             # DEPENDENCIES can be "OLDEST" or "NEWEST"
             if [ "${DEPENDENCIES}" == "OLDEST" ]; then
-              python -m pip install --progress-bar off -r .circleci/ci-oldest-reqs.txt
+              ${PYTHON} -m pip install --progress-bar off -r .circleci/ci-oldest-reqs.txt
             else
-              python -m pip install --progress-bar off -r requirements.txt
-              python -m pip install --progress-bar off -r requirements/requirements-test.txt
+              ${PYTHON} -m pip install --progress-bar off -r requirements.txt
+              ${PYTHON} -m pip install --progress-bar off -r requirements/requirements-test.txt
             fi
 
       - run:
           name: Run tests
           command: |
             . venv/bin/activate
-            python -m pytest --cov=flow --cov-config=setup.cfg --cov-report=xml tests/ -v
-            codecov
+            ${PYTHON} -m pytest --cov=flow --cov-config=setup.cfg --cov-report=xml tests/ -v
+            ${PYTHON} -m codecov
 
       - store_artifacts:
           path: test-reports
@@ -59,21 +61,25 @@ jobs:
     environment:
       DEPENDENCIES: "NEWEST"
       SIGNAC_VERSION: "signac~=1.6.0"
+      PYTHON: python
   linux-python-310-signac-15:
     <<: *test-template
     environment:
       DEPENDENCIES: "NEWEST"
       SIGNAC_VERSION: "signac~=1.5.0"
+      PYTHON: python
   linux-python-310-signac-latest:
     <<: *test-template
     environment:
       DEPENDENCIES: "NEWEST"
       SIGNAC_VERSION: "git+ssh://git@github.com/glotzerlab/signac.git"
+      PYTHON: python
   linux-python-310-signac-next:
     <<: *test-template
     environment:
       DEPENDENCIES: "NEWEST"
       SIGNAC_VERSION: "git+ssh://git@github.com/glotzerlab/signac.git@next"
+      PYTHON: python
   linux-python-39:
     <<: *test-template
     docker:
@@ -82,62 +88,53 @@ jobs:
     <<: *test-template
     docker:
       - image: cimg/python:3.8
-  linux-python-37:
+  linux-python-38-oldest:
     <<: *test-template
     docker:
-      - image: cimg/python:3.7
-  linux-python-36-oldest:
-    <<: *test-template
+      - image: cimg/python:3.8
     environment:
       DEPENDENCIES: "OLDEST"
       SIGNAC_VERSION: "signac==1.3.0"
-    docker:
-      - image: cimg/python:3.6
+      PYTHON: python
 
-  test-install-pip-python-36: &test-install-pip
+  test-install-pip-python-310: &test-install-pip
     docker:
-      - image: cimg/python:3.6
+      - image: cimg/python:3.10
+
+    environment:
+      PYTHON: python
 
     steps:
 
       - run:
           name: install-with-pip
           command: |
-            pip install --progress-bar off signac signac-flow
+            ${PYTHON} -m pip install --progress-bar off signac signac-flow
 
       - run: &smoke-test
           name: smoke-test
           command: |
-            signac --version
-            python -c 'import signac'
-            flow --version
-            python -c 'import flow'
-
-  test-install-pip-python-37:
-    <<: *test-install-pip
-    docker:
-      - image: cimg/python:3.7
-
-  test-install-pip-python-38:
-    <<: *test-install-pip
-    docker:
-      - image: cimg/python:3.8
+            ${PYTHON} -m signac --version
+            ${PYTHON} -c 'import signac'
+            ${PYTHON} -m flow --version
+            ${PYTHON} -c 'import flow'
 
   test-install-pip-python-39:
     <<: *test-install-pip
     docker:
       - image: cimg/python:3.9
 
-  test-install-pip-python-310:
+  test-install-pip-python-38:
     <<: *test-install-pip
     docker:
-      - image: cimg/python:3.10
+      - image: cimg/python:3.8
 
   test-install-conda: &test-install-conda
     environment:
       # The default job does not specify the version, just like the
       # instructions.
       PYTHON_DEP: ""
+      PYTHON: python
     docker:
       - image: conda/miniconda3:latest
 
@@ -151,30 +148,23 @@ jobs:
       - run:
           <<: *smoke-test
 
-  test-install-conda-python-36:
+  test-install-conda-python-310:
     <<: *test-install-conda
     environment:
-      PYTHON_DEP: "python=3.6"
-
-  test-install-conda-python-37:
-    <<: *test-install-conda
-    environment:
-      PYTHON_DEP: "python=3.7"
-
-  test-install-conda-python-38:
-    <<: *test-install-conda
-    environment:
-      PYTHON_DEP: "python=3.8"
+      PYTHON_DEP: "python=3.10"
+      PYTHON: python
 
   test-install-conda-python-39:
     <<: *test-install-conda
     environment:
       PYTHON_DEP: "python=3.9"
+      PYTHON: python
 
-  test-install-conda-python-310:
+  test-install-conda-python-38:
     <<: *test-install-conda
     environment:
-      PYTHON_DEP: "python=3.10"
+      PYTHON_DEP: "python=3.8"
+      PYTHON: python
 
   check-metadata:
     docker:
@@ -225,8 +215,7 @@ workflows:
       - linux-python-310
       - linux-python-39
       - linux-python-38
-      - linux-python-37
-      - linux-python-36-oldest
+      - linux-python-38-oldest
       - linux-python-310-signac-16:
           requires:
             - linux-python-310
@@ -245,8 +234,7 @@ workflows:
             - linux-python-310
             - linux-python-39
             - linux-python-38
-            - linux-python-37
-            - linux-python-36-oldest
+            - linux-python-38-oldest
             - linux-python-310-signac-16
             - linux-python-310-signac-15
   nightly:
@@ -260,17 +248,13 @@ workflows:
     jobs:
       - linux-python-310-signac-latest
 #     - linux-python-310-signac-next
-      - test-install-pip-python-36
-      - test-install-pip-python-37
-      - test-install-pip-python-38
-      - test-install-pip-python-39
       - test-install-pip-python-310
+      - test-install-pip-python-39
+      - test-install-pip-python-38
       - test-install-conda
-      - test-install-conda-python-36
-      - test-install-conda-python-37
-      - test-install-conda-python-38
-      - test-install-conda-python-39
       - test-install-conda-python-310
+      - test-install-conda-python-39
+      - test-install-conda-python-38
   deploy:
     jobs:
       - deploy-pypi:

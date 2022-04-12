@@ -121,6 +121,11 @@
             "affiliation": "University of Córdoba (Spain)",
             "name": "Javier Barbero Gómez",
             "orcid": "0000-0002-9317-1428"
+        },
+        {
+            "affiliation": "University of Delhi (India)",
+            "name": "Rohan Babbar",
+            "orcid": "0000-0002-7203-7641"
         }
     ],
     "creators": [
@@ -175,5 +180,5 @@
     },
     "title": "signac-flow",
     "upload_type": "software",
-    "version": "0.18.1"
+    "version": "0.19.0"
 }

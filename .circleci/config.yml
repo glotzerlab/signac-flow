@@ -216,15 +216,25 @@ workflows:
       - linux-python-310:
           post-steps:
             - codecov/upload
-      - linux-python-39
-      - linux-python-38
-      - linux-python-38-oldest
+      - linux-python-39:
+          post-steps:
+            - codecov/upload
+      - linux-python-38:
+          post-steps:
+            - codecov/upload
+      - linux-python-38-oldest:
+          post-steps:
+            - codecov/upload
       - linux-python-310-signac-16:
           requires:
             - linux-python-310
+          post-steps:
+            - codecov/upload
       - linux-python-310-signac-15:
           requires:
             - linux-python-310
+          post-steps:
+            - codecov/upload
       - check-metadata:
           filters:
             branches:

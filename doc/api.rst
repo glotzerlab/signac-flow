@@ -24,8 +24,8 @@ The FlowProject
     FlowProject.operation
     FlowProject.operation.with_directives
     FlowProject.operation_hooks
-    FlowProject.operation_hooks.on_fail
-    FlowProject.operation_hooks.on_finish
+    FlowProject.operation_hooks.on_exception
+    FlowProject.operation_hooks.on_exit
     FlowProject.operation_hooks.on_start
     FlowProject.operation_hooks.on_success
     FlowProject.operations
@@ -62,9 +62,9 @@ The FlowProject
 
 .. automethod:: flow.FlowProject.operation_hooks(hook_func, trigger)
 
-.. automethod:: flow.FlowProject.operation_hooks.on_fail
+.. automethod:: flow.FlowProject.operation_hooks.on_exception
 
-.. automethod:: flow.FlowProject.operation_hooks.on_finish
+.. automethod:: flow.FlowProject.operation_hooks.on_exit
 
 .. automethod:: flow.FlowProject.operation_hooks.on_start
 

@@ -1,4 +1,4 @@
-Signac-flow package documentation
+signac-flow package documentation
 =================================
 
 .. note::

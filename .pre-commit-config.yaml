@@ -37,6 +37,7 @@ repos:
         exclude: |
           (?x)^(
             ^doc/|
+            ^testing/|
             ^tests/|
             ^flow/util/mistune/
           )

@@ -2320,6 +2320,15 @@ class TestAggregationProjectMainInterface(TestAggregatesProjectBase):
 
         assert "1 and 2" in run_output
 
+    def test_main_run_parallel(self):
+        project = self.mock_project()
+        assert len(project)
+        # Test whether aggregate operations could run in parallel
+        run_output = self.call_subcmd(
+            "run -o agg_op_parallel_testor --parallel --show-traceback"
+        ).decode("utf-8")
+        assert len(run_output.split()) == 2
+
     def test_main_submit(self, monkeypatch):
         # Force the submitting subprocess to use the TestEnvironment and
         # FakeScheduler via the SIGNAC_FLOW_ENVIRONMENT environment variable.

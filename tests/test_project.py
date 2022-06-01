@@ -2325,9 +2325,9 @@ class TestAggregationProjectMainInterface(TestAggregatesProjectBase):
         assert len(project)
         # Test whether aggregate operations could run in parallel
         run_output = self.call_subcmd(
-            "run -o agg_op_parallel_testor --parallel --show-traceback"
-        ).decode("utf-8")
-        assert "15\n15" in run_output
+            "run -o agg_op_parallel --parallel 1"
+        ).decode("utf-8").split()
+        assert run_output == ["15", "15"]
 
     def test_main_submit(self, monkeypatch):
         # Force the submitting subprocess to use the TestEnvironment and

@@ -31,7 +31,8 @@ def op1(job):
 @_AggregateTestProject.operation
 @cmd
 @aggregator.groupby("even")
-def agg_op_parallel_testor(*jobs):
+def agg_op_parallel(*jobs):
+    # This is used to test parallel execution of aggregation operations
     return f"echo '{len(jobs)}'"
 
 

@@ -2327,7 +2327,7 @@ class TestAggregationProjectMainInterface(TestAggregatesProjectBase):
         run_output = self.call_subcmd(
             "run -o agg_op_parallel_testor --parallel --show-traceback"
         ).decode("utf-8")
-        assert len(run_output.split()) == 2
+        assert "15\n15" in run_output
 
     def test_main_submit(self, monkeypatch):
         # Force the submitting subprocess to use the TestEnvironment and

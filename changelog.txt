@@ -12,7 +12,7 @@ Version 0.20
 ----------------------
 
 Added
-+++++++
++++++
 
 - Added support to run aggregate operations in parallel (#642, #644).
 

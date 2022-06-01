@@ -2324,9 +2324,11 @@ class TestAggregationProjectMainInterface(TestAggregatesProjectBase):
         project = self.mock_project()
         assert len(project)
         # Test whether aggregate operations could run in parallel
-        run_output = self.call_subcmd(
-            "run -o agg_op_parallel --parallel 2"
-        ).decode("utf-8").split()
+        run_output = (
+            self.call_subcmd("run -o agg_op_parallel --parallel 2")
+            .decode("utf-8")
+            .split()
+        )
         assert run_output == ["15", "15"]
 
     def test_main_submit(self, monkeypatch):

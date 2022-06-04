@@ -11,7 +11,7 @@ requirements = [
     # For the templated generation of (submission) scripts.
     "jinja2>=3.0.0",
     # To enable the parallelized execution of operations across processes.
-    "cloudpickle>=1.1.1",
+    "cloudpickle>=1.6.0",
     # Deprecation management
     "deprecation>=2.0.0",
     # Progress bars

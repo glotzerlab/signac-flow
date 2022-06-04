@@ -2221,7 +2221,7 @@ class TestAggregatesProjectUtilities(TestAggregatesProjectBase):
         # can de-duplicate the returned results in the cursor, thus it is
         # expected that the length of the cursor is larger than the number of
         # unique ids present in the cursor.
-        assert len(agg_cursor) == 40
+        assert len(agg_cursor) == 42
         assert len({get_aggregate_id(agg) for agg in agg_cursor}) == 34
         assert tuple(project) in agg_cursor
         assert all((job,) in agg_cursor for job in project)
@@ -2234,7 +2234,7 @@ class TestAggregatesProjectUtilities(TestAggregatesProjectBase):
     def test_reregister_aggregates(self):
         project = self.mock_project()
         agg_cursor = _AggregateStoresCursor(project=project)
-        NUM_BEFORE_REREGISTRATION = 40
+        NUM_BEFORE_REREGISTRATION = 42
         assert len(agg_cursor) == NUM_BEFORE_REREGISTRATION
         new_job = project.open_job(dict(i=31, even=False))
         assert new_job not in project
@@ -2319,6 +2319,17 @@ class TestAggregationProjectMainInterface(TestAggregatesProjectBase):
         run_output = self.call_subcmd("run -o agg_op4").decode("utf-8")
 
         assert "1 and 2" in run_output
+
+    def test_main_run_parallel(self):
+        project = self.mock_project()
+        assert len(project)
+        # Test whether aggregate operations could run in parallel
+        run_output = (
+            self.call_subcmd("run -o agg_op_parallel --parallel 2")
+            .decode("utf-8")
+            .split()
+        )
+        assert run_output[:2] == ["15", "15"]
 
     def test_main_submit(self, monkeypatch):
         # Force the submitting subprocess to use the TestEnvironment and

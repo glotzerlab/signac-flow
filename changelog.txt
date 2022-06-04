@@ -16,6 +16,11 @@ Added
 
 - Added support to run aggregate operations in parallel (#642, #644).
 
+Removed
++++++++
+
+- Dropped support for cloudpickle versions below `1.6.0` (#644).
+
 Version 0.19
 ============
 

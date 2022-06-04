@@ -1,5 +1,5 @@
 click==8.0.4
-cloudpickle==1.1.1
+cloudpickle==1.6.0
 coverage==6.2
 deprecation==2.0.0
 jinja2==3.0.0

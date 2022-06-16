@@ -46,7 +46,7 @@ from .aggregates import (
     get_aggregate_id,
 )
 from .directives import _document_directive
-from .environment import ComputeEnvironment, get_environment
+from .environment import ComputeEnvironment, get_environment, registered_environments
 from .errors import (
     ConfigKeyError,
     FlowProjectDefinitionError,
@@ -1730,10 +1730,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         script() and _submit_operations() / submit() function and the
         corresponding command line subcommands.
         """
-        if self._config.get("flow") and self._config["flow"].get("environment_modules"):
-            envs = self._config["flow"].as_list("environment_modules")
-        else:
-            envs = []
+        envs = [
+            cls.__module__
+            for cls in registered_environments()
+            if not cls.__module__.startswith("flow.environments")
+        ]
 
         # Templates are searched in the local template directory first, then in additionally
         # installed packages, then in the main package 'templates' directory.
@@ -1743,6 +1744,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 extra_packages.append(jinja2.PackageLoader(env, "templates"))
             except ImportError as error:
                 logger.warning(f"Unable to load template from package '{error.name}'.")
+            except ValueError as error:
+                logger.warning(
+                    f"Unable to load template from package. Original Error '{error}'."
+                )
 
         load_envs = (
             [jinja2.FileSystemLoader(self._template_dir)]

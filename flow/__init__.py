@@ -8,6 +8,8 @@ configure and implement a workflow to operate on a signac_ data space.
 
 .. _signac: https://signac.io/
 """
+import warnings
+
 from . import environment, errors, hooks, scheduling, testing
 from .aggregates import aggregator, get_aggregate_id
 from .environment import get_environment
@@ -44,10 +46,23 @@ __all__ = [
 ]
 
 
-if _get_config_value(
+_import_packaged_environments = _get_config_value(
     "import_packaged_environments",
-    default=_FLOW_CONFIG_DEFAULTS["import_packaged_environments"],
-):
+    default=None,  # Use None to determine if this is being used or not.
+)
+
+if _import_packaged_environments is None:
+    _import_packaged_environments = _FLOW_CONFIG_DEFAULTS[
+        "import_packaged_environments"
+    ]
+else:
+    warnings.warn(
+        "Config key import_packaged_environments will be removed in signac-flow version 0.21. "
+        "Environments will always install once removed. Remove key from config to remove warning.",
+        FutureWarning,
+    )
+
+if _import_packaged_environments:
     from . import environments  # noqa: F401
 
     __all__.append("environments")

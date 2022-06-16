@@ -1968,8 +1968,51 @@ class TestGroupProject(TestProjectBase):
         assert all(op in rep_string for op in ["op1", "op2", "op3"])
         assert "'nranks': 4" in rep_string
         assert "'ngpu': 2" in rep_string
-        assert "options=''" in rep_string
+        assert "submit_options=''" in rep_string
+        assert "run_options=''" in rep_string
         assert "name='group'" in rep_string
+
+    def test_submit_options(self):
+        class A(flow.FlowProject):
+            pass
+
+        group = A.make_group("group", submit_options="--debug")
+
+        @group
+        @A.operation
+        def op1(job):
+            pass
+
+        project = self.mock_project(A)
+        group = project.groups["group"]
+        job = (next(iter(project)),)
+        submission_cmd = group._submit_cmd(
+            project._entrypoint, ignore_conditions=flow.IgnoreConditions, jobs=job
+        )
+        assert " --debug" in submission_cmd
+
+    def test_run_options(self):
+        class A(flow.FlowProject):
+            pass
+
+        group = A.make_group("group", run_options="--debug")
+
+        @group
+        @A.operation
+        def op1(job):
+            pass
+
+        project = self.mock_project(A)
+        group = project.groups["group"]
+        job = (next(iter(project)),)
+        run_cmd = group._run_cmd(
+            entrypoint=project._entrypoint,
+            operation_name="op1",
+            operation=project.operations["op1"],
+            directives={},
+            jobs=job,
+        )
+        assert " --debug" in run_cmd
 
 
 class TestGroupExecutionProject(TestProjectBase):

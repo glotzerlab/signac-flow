@@ -2005,14 +2005,15 @@ class TestGroupProject(TestProjectBase):
         project = self.mock_project(A)
         group = project.groups["group"]
         job = (next(iter(project)),)
-        run_cmd = group._run_cmd(
-            entrypoint=project._entrypoint,
-            operation_name="op1",
-            operation=project.operations["op1"],
-            directives={},
-            jobs=job,
+        run_ops = list(
+            group._create_run_job_operations(
+                entrypoint=project._entrypoint,
+                default_directives={},
+                jobs=job,
+            )
         )
-        assert " --debug" in run_cmd
+        assert all(" --debug" in op.cmd for op in run_ops)
+        assert all(op.directives["fork"] for op in run_ops)
 
 
 class TestGroupExecutionProject(TestProjectBase):

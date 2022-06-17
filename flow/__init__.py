@@ -57,8 +57,8 @@ if _import_packaged_environments is None:
     ]
 else:
     warnings.warn(
-        "Config key import_packaged_environments will be removed in signac-flow version 0.21. "
-        "Environments will always install once removed. Remove key from config to remove warning.",
+        "The configuration key flow.import_packaged_environments will be removed in signac-flow version 0.21. "
+        "To remove this warning, remove the flow.import_packaged_environments key from your signac configuration. In the future, environments provided by signac-flow will always be imported."
         FutureWarning,
     )
 

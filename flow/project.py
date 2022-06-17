@@ -791,11 +791,12 @@ class FlowGroup:
         the directives of the singleton group containing that operation are
         used. To prevent this, set the directives to an empty dictionary for
         that operation.
+    submit_options : str
+        The :meth:`FlowProject.run` options to pass when submitting the group. These will be
+        included in all submissions. Submissions use run commands to execute.
     run_options : str
         The options to pass to ``entrypoint exec`` when running the group. These will only be used
         when the operation is forked instead of running in the same Python interpretor.
-    group_aggregator : :class:`~.aggregator`
-        aggregator object associated with the :class:`FlowGroup` (Default value = None).
     """
 
     MAX_LEN_ID = 100

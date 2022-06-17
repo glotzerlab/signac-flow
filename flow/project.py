@@ -656,7 +656,9 @@ class FlowGroupEntry:
         These will be included in all submissions. Submissions use run
         commands to execute.
     run_options : str
-        The options to pass to ``entrypoint exec`` when running the group. These will only be used
+        The options to pass to ``entrypoint exec`` when running the group. Specifying this will
+        cause the operation to be forked even if it otherwise would run in the current Python
+        interpreter.
         when the operation is forked instead of running in the same Python interpretor.
     group_aggregator : :class:`~.aggregator`
         aggregator object associated with the :class:`FlowGroup` (Default value = None).
@@ -795,8 +797,9 @@ class FlowGroup:
         The :meth:`FlowProject.run` options to pass when submitting the group. These will be
         included in all submissions. Submissions use run commands to execute.
     run_options : str
-        The options to pass to ``entrypoint exec`` when running the group. These will only be used
-        when the operation is forked instead of running in the same Python interpretor.
+        The options to pass to ``entrypoint exec`` when running the group. Specifying this will
+        cause the operation to be forked even if it otherwise would run in the current Python
+        interpreter.
     """
 
     MAX_LEN_ID = 100
@@ -1184,7 +1187,7 @@ class FlowGroup:
                 # to True since we must launch a separate process. Override
                 # the command directly.
                 prefix = jobs[0]._project._environment.get_prefix(job_op)
-                if prefix != "":
+                if prefix != "" or self.run_options != "":
                     job_op.directives["fork"] = True
                     job_op._cmd = f"{prefix} {job_op.cmd}"
                 yield job_op
@@ -4505,8 +4508,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             The :meth:`FlowProject.run` options to pass when submitting the group. These will be
             included in all submissions. Submissions use run commands to execute.
         run_options : str
-            The options to pass to ``entrypoint exec`` when running the group. These will only be
-            used when the operation is forked instead of running in the same Python interpretor.
+            The options to pass to ``entrypoint exec`` when running the group. Specifying this will
+            cause the operation to be forked even if it otherwise would run in the current Python
+            interpreter.
         group_aggregator : :class:`~.aggregator`
             An instance of :class:`~flow.aggregator` to associate with the :class:`FlowGroup`.
             If None, no aggregation takes place (Default value = None).

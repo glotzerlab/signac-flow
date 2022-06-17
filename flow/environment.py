@@ -60,14 +60,10 @@ def setup(py_modules, **attrs):
     an environment's module, but also register it with the global signac
     configuration. Once registered, the environment is automatically
     imported when the :meth:`~flow.get_environment` function is called.
-
-    Warning
-    -------
-        This function is deprecated. Install user environments manually.
     """
     warnings.warn(
-        "The configuration key flow.environment_modules will be removed in signac-flow version 0.21. "
-        "Users should manually import user-defined environments instead.",
+        "The configuration key flow.environment_modules will be removed in signac-flow version "
+        "0.21. Users should manually import user-defined environments instead.",
         FutureWarning,
     )
     import setuptools
@@ -529,8 +525,8 @@ def _import_configured_environments():
         pass
     else:
         warnings.warn(
-            "The configuration key flow.environment_modules will be removed in signac-flow version 0.21. "
-            "Users should manually import user-defined environments instead.",
+            "The configuration key flow.environment_modules will be removed in signac-flow version "
+            "0.21. Users should manually import user-defined environments instead.",
             FutureWarning,
         )
 

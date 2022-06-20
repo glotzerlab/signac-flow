@@ -659,7 +659,6 @@ class FlowGroupEntry:
         The options to pass to ``entrypoint exec`` when running the group. Specifying this will
         cause the operation to be forked even if it otherwise would run in the current Python
         interpreter.
-        when the operation is forked instead of running in the same Python interpretor.
     group_aggregator : :class:`~.aggregator`
         aggregator object associated with the :class:`FlowGroup` (Default value = None).
     """

@@ -879,16 +879,10 @@ class FlowGroup:
 
     def __repr__(self):
         return (
-            "{type}(name='{name}', operations='{operations}', "
-            "operation_directives={directives}, submit_options='{submit_options}', "
-            "run_options='{run_options}')".format(
-                type=type(self).__name__,
-                name=self.name,
-                operations=" ".join(list(self.operations)),
-                directives=self.operation_directives,
-                submit_options=self.submit_options,
-                run_options=self.run_options,
-            )
+            f"{type(self).__name__}(name={repr(self.name)}, operations='"
+            f"{' '.join(list(self.operations))}',"
+            f"operation_directives={self.operation_directives}, "
+            f"submit_options={repr(self.submit_options)}, run_options={repr(self.run_options)})"
         )
 
     def _eligible(self, aggregate, ignore_conditions=IgnoreConditions.NONE):

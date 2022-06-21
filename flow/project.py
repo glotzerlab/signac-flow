@@ -1730,7 +1730,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         script() and _submit_operations() / submit() function and the
         corresponding command line subcommands.
         """
-        envs = [
+        environment_modules = [
             cls.__module__
             for cls in registered_environments()
             if not cls.__module__.startswith("flow.environments")
@@ -1739,7 +1739,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Templates are searched in the local template directory first, then in additionally
         # installed packages, then in the main package 'templates' directory.
         extra_packages = []
-        for env in envs:
+        for env in environment_modules:
             try:
                 extra_packages.append(jinja2.PackageLoader(env, "templates"))
             except ImportError as error:

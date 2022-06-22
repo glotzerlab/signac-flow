@@ -20,6 +20,7 @@ Removed
 +++++++
 
 - Dropped support for cloudpickle versions below `1.6.0` (#644).
+- Removed upper bound on ``python_requires`` (#654).
 
 Version 0.19
 ============

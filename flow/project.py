@@ -651,18 +651,25 @@ class FlowGroupEntry:
         The name of the :class:`FlowGroup` to be created.
     project : flow.FlowProject
         The project the group is associated with.
-    options : str
+    submit_options : str
         The :meth:`FlowProject.run` options to pass when submitting the group.
         These will be included in all submissions. Submissions use run
         commands to execute.
+    run_options : str
+        The options to pass to ``entrypoint exec`` when running the group. Specifying this will
+        cause the operation to be forked even if it otherwise would run in the current Python
+        interpreter.
     group_aggregator : :class:`~.aggregator`
         aggregator object associated with the :class:`FlowGroup` (Default value = None).
     """
 
-    def __init__(self, name, project, options="", group_aggregator=None):
+    def __init__(
+        self, name, project, submit_options="", run_options="", group_aggregator=None
+    ):
         self.name = name
         self._project = project
-        self.options = options
+        self.submit_options = submit_options
+        self.run_options = run_options
         # We register aggregators associated with operation functions in
         # `_register_groups` and we do not set the aggregator explicitly.
         # We delay setting the aggregator because we do not restrict the
@@ -785,17 +792,28 @@ class FlowGroup:
         the directives of the singleton group containing that operation are
         used. To prevent this, set the directives to an empty dictionary for
         that operation.
-    options : str
-        A string of options to append to the output of the object's call method.
-        This allows options like ``--num_passes`` to be given to a group.
-
+    submit_options : str
+        The :meth:`FlowProject.run` options to pass when submitting the group. These will be
+        included in all submissions. Submissions use run commands to execute.
+    run_options : str
+        The options to pass to ``entrypoint exec`` when running the group. Specifying this will
+        cause the operation to be forked even if it otherwise would run in the current Python
+        interpreter.
     """
 
     MAX_LEN_ID = 100
 
-    def __init__(self, name, operations=None, operation_directives=None, options=""):
+    def __init__(
+        self,
+        name,
+        operations=None,
+        operation_directives=None,
+        submit_options="",
+        run_options="",
+    ):
         self.name = name
-        self.options = options
+        self.submit_options = submit_options
+        self.run_options = run_options
         # Requires Python >=3.6: dict must be ordered to ensure consistent
         # pretend submission output for templates.
         self.operations = {} if operations is None else dict(operations)
@@ -840,34 +858,31 @@ class FlowGroup:
             all_directives.update(defaults.get(name, {}))
         return all_directives
 
-    def _submit_cmd(self, entrypoint, ignore_conditions, jobs=None):
+    def _submit_cmd(self, entrypoint, ignore_conditions, jobs):
         entrypoint = self._determine_entrypoint(entrypoint, {}, jobs)
         cmd = f"{entrypoint} run -o {self.name}"
         cmd = cmd if jobs is None else cmd + f" -j {get_aggregate_id(jobs)}"
-        cmd = cmd if self.options is None else cmd + " " + self.options
+        options = self.submit_options
         if ignore_conditions != IgnoreConditions.NONE:
-            return cmd.strip() + " --ignore-conditions=" + str(ignore_conditions)
-        return cmd.strip()
+            options += " --ignore-conditions=" + str(ignore_conditions)
+        return " ".join((cmd, options)).strip()
 
     def _run_cmd(self, entrypoint, operation_name, operation, directives, jobs):
         if isinstance(operation, FlowCmdOperation):
             return operation(*jobs).lstrip()
         entrypoint = self._determine_entrypoint(entrypoint, directives, jobs)
-        return f"{entrypoint} exec {operation_name} {get_aggregate_id(jobs)}".lstrip()
+        cmd = f"{entrypoint} exec {operation_name} {get_aggregate_id(jobs)} {self.run_options}"
+        return cmd.strip()
 
     def __iter__(self):
         yield from self.operations.values()
 
     def __repr__(self):
         return (
-            "{type}(name='{name}', operations='{operations}', "
-            "operation_directives={directives}, options='{options}')".format(
-                type=type(self).__name__,
-                name=self.name,
-                operations=" ".join(list(self.operations)),
-                directives=self.operation_directives,
-                options=self.options,
-            )
+            f"{type(self).__name__}(name={repr(self.name)}, operations='"
+            f"{' '.join(list(self.operations))}',"
+            f"operation_directives={self.operation_directives}, "
+            f"submit_options={repr(self.submit_options)}, run_options={repr(self.run_options)})"
         )
 
     def _eligible(self, aggregate, ignore_conditions=IgnoreConditions.NONE):
@@ -1165,7 +1180,7 @@ class FlowGroup:
                 # to True since we must launch a separate process. Override
                 # the command directly.
                 prefix = jobs[0]._project._environment.get_prefix(job_op)
-                if prefix != "":
+                if prefix != "" or self.run_options != "":
                     job_op.directives["fork"] = True
                     job_op._cmd = f"{prefix} {job_op.cmd}"
                 yield job_op
@@ -1475,7 +1490,7 @@ class _FlowProjectClass(type):
                 # placement in terms of `@FlowGroupEntry`, `@aggregator`, or
                 # `@operation`.
                 self._parent_class._GROUPS.append(
-                    FlowGroupEntry(name=name, project=self._parent_class, options="")
+                    FlowGroupEntry(name=name, project=self._parent_class)
                 )
                 if not hasattr(func, "_flow_groups"):
                     func._flow_groups = {}
@@ -4464,7 +4479,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 self._operations[name] = FlowOperation(op_func=func, **params)
 
     @classmethod
-    def make_group(cls, name, options="", group_aggregator=None):
+    def make_group(cls, name, submit_options="", run_options="", group_aggregator=None):
         r"""Make a :class:`~.FlowGroup` named ``name`` and return a decorator to make groups.
 
         A :class:`~.FlowGroup` is used to group operations together for
@@ -4487,9 +4502,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         ----------
         name : str
             The name of the :class:`~.FlowGroup`.
-        options : str
-            A string to append to submissions. Can be any valid
-            :meth:`FlowOperation.run` option. (Default value = "")
+        submit_options : str
+            The :meth:`FlowProject.run` options to pass when submitting the group. These will be
+            included in all submissions. Submissions use run commands to execute.
+        run_options : str
+            The options to pass to ``entrypoint exec`` when running the group. Specifying this will
+            cause the operation to be forked even if it otherwise would run in the current Python
+            interpreter.
         group_aggregator : :class:`~.aggregator`
             An instance of :class:`~flow.aggregator` to associate with the :class:`FlowGroup`.
             If None, no aggregation takes place (Default value = None).
@@ -4512,7 +4531,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             )
         cls._GROUP_NAMES.add(name)
         group_entry = FlowGroupEntry(
-            name=name, project=cls, options=options, group_aggregator=group_aggregator
+            name=name,
+            project=cls,
+            submit_options=submit_options,
+            run_options=run_options,
+            group_aggregator=group_aggregator,
         )
         cls._GROUPS.append(group_entry)
         return group_entry
@@ -4535,7 +4558,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # equivalent aggregators only generate once.
         created_aggregate_stores = {}
         for entry in group_entries:
-            group = FlowGroup(entry.name, options=entry.options)
+            group = FlowGroup(
+                entry.name,
+                submit_options=entry.submit_options,
+                run_options=entry.run_options,
+            )
             self._groups[entry.name] = group
             # Handle unset aggregators
             if entry.group_aggregator is None:

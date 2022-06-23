@@ -9,7 +9,7 @@ class _TestProject(FlowProject):
 
 
 group1 = _TestProject.make_group(name="group1")
-group2 = _TestProject.make_group(name="group2", options="--num-passes=2")
+group2 = _TestProject.make_group(name="group2", submit_options="--num-passes=2")
 
 
 @_TestProject.label

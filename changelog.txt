@@ -15,11 +15,14 @@ Added
 +++++
 
 - Added support to run aggregate operations in parallel (#642, #644).
+- Added an argument, ``run_options``, to ``FlowProject.make_group`` which allows passing options to ``exec`` for operations running in a different process (#650).
 
 Changed
 +++++++
+
 - Deprecated configuaration key 'flow.environment_modules' (#651).
 - Deprecated configuration key 'flow.import_packaged_environments' (#651).
+- Changed argument ``options`` to ``submit_options`` in ``FlowProject.make_group`` (#650).
 
 Removed
 +++++++

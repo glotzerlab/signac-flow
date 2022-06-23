@@ -14,6 +14,7 @@ import logging
 import os
 import re
 import socket
+import warnings
 from functools import lru_cache
 
 from signac.common import config
@@ -60,6 +61,11 @@ def setup(py_modules, **attrs):
     configuration. Once registered, the environment is automatically
     imported when the :meth:`~flow.get_environment` function is called.
     """
+    warnings.warn(
+        "The configuration key flow.environment_modules will be removed in signac-flow version "
+        "0.21. Users should manually import user-defined environments instead.",
+        FutureWarning,
+    )
     import setuptools
     from setuptools.command.install import install
 
@@ -517,6 +523,12 @@ def _import_configured_environments():
                 logger.warning(error)
     except KeyError:
         pass
+    else:
+        warnings.warn(
+            "The configuration key flow.environment_modules will be removed in signac-flow version "
+            "0.21. Users should manually import user-defined environments instead.",
+            FutureWarning,
+        )
 
 
 def registered_environments(import_configured=True):

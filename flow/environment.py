@@ -66,8 +66,8 @@ def setup(py_modules, **attrs):
         This function is deprecated. Install user environments manually.
     """
     warnings.warn(
-        "Config key environment_modules will be removed in signac-flow version 0.21. "
-        "Manual install environments instead.",
+        "The configuration key flow.environment_modules will be removed in signac-flow version "
+        "0.21. Users should manually import user-defined environments instead.",
         FutureWarning,
     )
     import setuptools
@@ -529,8 +529,8 @@ def _import_configured_environments():
         pass
     else:
         warnings.warn(
-            "Config key environment_modules will be removed  in signac-flow version 0.21. "
-            "Manual import environments instead.",
+            "The configuration key flow.environment_modules will be removed in signac-flow version "
+            "0.21. Users should manually import user-defined environments instead.",
             FutureWarning,
         )
 

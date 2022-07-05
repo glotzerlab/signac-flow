@@ -5,7 +5,7 @@ exclude: '(?:^flow/util/mistune/)'
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: 'v4.1.0'
+    rev: 'v4.3.0'
     hooks:
       - id: end-of-file-fixer
         exclude: 'setup.cfg'
@@ -13,7 +13,7 @@ repos:
         exclude: 'setup.cfg'
       - id: debug-statements
   - repo: https://github.com/asottile/pyupgrade
-    rev: 'v2.31.1'
+    rev: 'v2.34.0'
     hooks:
       - id: pyupgrade
         args:
@@ -23,7 +23,7 @@ repos:
     hooks:
       - id: isort
   - repo: https://github.com/psf/black
-    rev: '22.3.0'
+    rev: '22.6.0'
     hooks:
       - id: black
   - repo: https://github.com/PyCQA/flake8

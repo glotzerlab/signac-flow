@@ -2,7 +2,6 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 """Contains logic for working with flow related information stored in the signac config."""
-from signac.common import config
 
 from ..errors import ConfigKeyError
 
@@ -32,11 +31,13 @@ class _GetConfigValueNoneType:
 _GET_CONFIG_VALUE_NONE = _GetConfigValueNoneType()
 
 
-def require_config_value(key, ns=None, default=_GET_CONFIG_VALUE_NONE):
+def require_config_value(project, key, ns=None, default=_GET_CONFIG_VALUE_NONE):
     """Request a value from the user's configuration, failing if not available.
 
     Parameters
     ----------
+    project : flow.FlowProject
+        The project whose config is queried.
     key : str
         The environment specific configuration key.
     ns : str
@@ -59,9 +60,9 @@ def require_config_value(key, ns=None, default=_GET_CONFIG_VALUE_NONE):
     """
     try:
         if ns is None:
-            return config.load_config()["flow"][key]
+            return project.config["flow"][key]
         else:
-            return config.load_config()["flow"][ns][key]
+            return project.config["flow"][ns][key]
     except KeyError:
         if default is _GET_CONFIG_VALUE_NONE:
             k = str(key) if ns is None else f"{ns}.{key}"
@@ -70,11 +71,13 @@ def require_config_value(key, ns=None, default=_GET_CONFIG_VALUE_NONE):
             return default
 
 
-def get_config_value(key, ns=None, default=None):
+def get_config_value(project, key, ns=None, default=None):
     """Request a value from the user's configuration.
 
     Parameters
     ----------
+    project : flow.FlowProject
+        The project whose config is queried.
     key : str
         The configuration key.
     ns : str
@@ -89,4 +92,4 @@ def get_config_value(key, ns=None, default=None):
         The value if found, None if not found.
 
     """
-    return require_config_value(key=key, ns=ns, default=default)
+    return require_config_value(project=project, key=key, ns=ns, default=default)

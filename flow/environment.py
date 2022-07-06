@@ -34,7 +34,6 @@ from .scheduling.lsf import LSFScheduler
 from .scheduling.pbs import PBSScheduler
 from .scheduling.simple_scheduler import SimpleScheduler
 from .scheduling.slurm import SlurmScheduler
-from .util import config as flow_config
 
 logger = logging.getLogger(__name__)
 
@@ -187,43 +186,6 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
 
         """
         pass
-
-    @classmethod
-    def get_config_value(cls, key, default=flow_config._GET_CONFIG_VALUE_NONE):
-        """Request a value from the user's configuration.
-
-        This method should be used whenever values need to be provided
-        that are specific to a user's environment, e.g. account names.
-
-        When a key is not configured and no default value is provided, a
-        :class:`~flow.errors.SubmitError` will be raised and the user will be
-        prompted to add the missing key to their configuration.
-
-        Please note, that the key will be automatically expanded to
-        be specific to this environment definition. For example, a
-        key should be ``'account'``, not ``'MyEnvironment.account'``.
-
-        Parameters
-        ----------
-        key : str
-            The environment specific configuration key.
-        default : str
-            A default value in case the key cannot be found
-            within the user's configuration.
-
-        Returns
-        -------
-        object
-            The value or default value.
-
-        Raises
-        ------
-        :class:`~flow.errors.SubmitError`
-            If the key is not in the user's configuration
-            and no default value is provided.
-
-        """
-        return flow_config.require_config_value(key, ns=cls.__name__, default=default)
 
     @classmethod
     def _get_omp_prefix(cls, operation):

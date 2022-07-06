@@ -15,6 +15,7 @@ Removed
 +++++++
 
 - Removed configuration key 'flow.import_packaged_environments' (#653).
+- Removed configuaration key 'flow.environment_modules' (#651).
 
 Version 0.20
 ============

@@ -9,15 +9,11 @@ subclassed to automatically detect specific computational environments.
 This enables the user to adjust their workflow based on the present
 environment, e.g. for the adjustment of scheduler submission scripts.
 """
-import importlib
 import logging
 import os
 import re
 import socket
-import warnings
 from functools import lru_cache
-
-from signac.common import config
 
 from .directives import (
     _FORK,
@@ -51,50 +47,6 @@ def _cached_fqdn():
     be slow on macOS.
     """
     return socket.getfqdn()
-
-
-def setup(py_modules, **attrs):
-    """Set up user-defined environment modules.
-
-    Use this function in place of :meth:`setuptools.setup` to not only install
-    an environment's module, but also register it with the global signac
-    configuration. Once registered, the environment is automatically
-    imported when the :meth:`~flow.get_environment` function is called.
-
-    Warning
-    -------
-        This function is deprecated. Install user environments manually.
-    """
-    warnings.warn(
-        "The configuration key flow.environment_modules will be removed in signac-flow version "
-        "0.21. Users should manually import user-defined environments instead.",
-        FutureWarning,
-    )
-    import setuptools
-    from setuptools.command.install import install
-
-    class InstallAndConfig(install):
-        def run(self):
-            super().run()
-            cfg = config.read_config_file(config.FN_CONFIG)
-            try:
-                envs = cfg["flow"].as_list("environment_modules")
-            except KeyError:
-                envs = []
-            new = set(py_modules).difference(envs)
-            if new:
-                for name in new:
-                    self.announce(
-                        msg=f"registering module '{name}' in global signac configuration",
-                        level=2,
-                    )
-                cfg.setdefault("flow", {})
-                cfg["flow"]["environment_modules"] = envs + list(new)
-                cfg.write()
-
-    return setuptools.setup(
-        py_modules=py_modules, cmdclass={"install": InstallAndConfig}, **attrs
-    )
 
 
 class _ComputeEnvironmentType(type):
@@ -517,32 +469,8 @@ class DefaultLSFEnvironment(ComputeEnvironment):
         )
 
 
-def _import_configured_environments():
-    cfg = config.load_config(config.FN_CONFIG)
-    try:
-        for name in cfg["flow"].as_list("environment_modules"):
-            try:
-                importlib.import_module(name)
-            except ImportError as error:
-                logger.warning(error)
-    except KeyError:
-        pass
-    else:
-        warnings.warn(
-            "The configuration key flow.environment_modules will be removed in signac-flow version "
-            "0.21. Users should manually import user-defined environments instead.",
-            FutureWarning,
-        )
-
-
-def registered_environments(import_configured=True):
+def registered_environments():
     """Return a list of registered environments.
-
-    Parameters
-    ----------
-    import_configured : bool
-        Whether to import environments specified in the flow configuration.
-        (Default value = True)
 
     Returns
     -------
@@ -550,12 +478,10 @@ def registered_environments(import_configured=True):
         List of registered environments.
 
     """
-    if import_configured:
-        _import_configured_environments()
     return list(ComputeEnvironment.registry.values())
 
 
-def get_environment(test=False, import_configured=True):
+def get_environment(test=False):
     """Attempt to detect the present environment.
 
     This function iterates through all defined :class:`~.ComputeEnvironment`
@@ -581,7 +507,7 @@ def get_environment(test=False, import_configured=True):
         return TestEnvironment
 
     # Obtain a list of all registered environments
-    env_types = registered_environments(import_configured=import_configured)
+    env_types = registered_environments()
     logger.debug(
         "List of registered environments:\n\t{}".format(
             "\n\t".join(str(env.__name__) for env in env_types)

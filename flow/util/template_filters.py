@@ -330,7 +330,7 @@ def get_account_name(project, required=False):
     """
     env_name = project._environment.__name__
     try:
-        return get_config_value("account", ns=env_name)
+        return get_config_value(project, "account", ns=env_name)
     except ConfigKeyError as error:
         ACCOUNT_MESSAGE = (
             "Environment '{env}' {requires_or_allows} the specification of an "

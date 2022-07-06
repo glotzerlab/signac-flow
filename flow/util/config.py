@@ -10,7 +10,6 @@ _FLOW_SCHEMA = {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "type": "object",
     "properties": {
-        "import_packaged_environments": {"type": "boolean"},
         "status_performance_warn_threshold": {"type": "number"},
         "show_traceback": {"type": "boolean"},
         "eligible_jobs_max_lines": {"type": "integer"},
@@ -19,7 +18,6 @@ _FLOW_SCHEMA = {
 }
 
 _FLOW_CONFIG_DEFAULTS = {
-    "import_packaged_environments": True,
     "status_performance_warn_threshold": 0.2,
     "show_traceback": False,
     "eligible_jobs_max_lines": 10,

@@ -31,7 +31,7 @@ class _GetConfigValueNoneType:
 _GET_CONFIG_VALUE_NONE = _GetConfigValueNoneType()
 
 
-def require_config_value(project, key, ns=None, default=_GET_CONFIG_VALUE_NONE):
+def get_config_value(project, key, ns=None, default=_GET_CONFIG_VALUE_NONE):
     """Request a value from the user's configuration, failing if not available.
 
     Parameters
@@ -43,8 +43,9 @@ def require_config_value(project, key, ns=None, default=_GET_CONFIG_VALUE_NONE):
     ns : str
         The namespace in which to look for the key. (Default value = None)
     default
-        A default value in case the key cannot be found
-        within the user's configuration.
+        A default value in case the key cannot be found within the user's configuration. If not
+        provided, the behavior if the key is not present is to raise a :class:`~.ConfigKeyError`
+        exception.
 
     Returns
     -------
@@ -54,8 +55,7 @@ def require_config_value(project, key, ns=None, default=_GET_CONFIG_VALUE_NONE):
     Raises
     ------
     :class:`~.ConfigKeyError`
-        If the key is not in the user's configuration
-        and no default value is provided.
+        If the key is not in the user's configuration and no default value is provided.
 
     """
     try:
@@ -69,27 +69,3 @@ def require_config_value(project, key, ns=None, default=_GET_CONFIG_VALUE_NONE):
             raise ConfigKeyError("flow." + k)
         else:
             return default
-
-
-def get_config_value(project, key, ns=None, default=None):
-    """Request a value from the user's configuration.
-
-    Parameters
-    ----------
-    project : flow.FlowProject
-        The project whose config is queried.
-    key : str
-        The configuration key.
-    ns : str
-        The namespace in which to look for the key. (Default value = None)
-    default
-        A default value returned if the key cannot be found within the user
-        configuration.
-
-    Returns
-    -------
-    object
-        The value if found, None if not found.
-
-    """
-    return require_config_value(project=project, key=key, ns=ns, default=default)

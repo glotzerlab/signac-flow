@@ -30,9 +30,7 @@ class TestConfigFilter(TestProjectBase):
     def test_set_key_with_default(self):
         default = 52
         set_value = 4
-        project = self.mock_project(
-            config_overrides={"flow": {"foo": set_value}}
-        )
+        project = self.mock_project(config_overrides={"flow": {"foo": set_value}})
         assert get_config_value(project, "foo", default=default) == set_value
 
     def test_with_namespace(self):

@@ -27,15 +27,25 @@ class TestConfigFilter(TestProjectBase):
         default = 52
         assert get_config_value(project, "foo", default=default) == default
 
+    def test_set_key_with_default(self):
+        default = 52
+        set_value = 4
+        project = self.mock_project(
+            config_overrides={"flow": {"foo": set_value}}
+        )
+        assert get_config_value(project, "foo", default=default) == set_value
+
     def test_with_namespace(self):
         project = self.mock_project(config_overrides={"flow": {"bar": {"foo": 4}}})
         assert get_config_value(project, "foo", ns="bar") == 4
 
-    def test_with_all_arguments(self):
+    def test_missing_key_with_default_with_namespace(self):
         default = 52
         project = self.mock_project()
         assert get_config_value(project, "foo", ns="bar", default=default) == default
 
+    def test_set_key_with_default_with_namespace(self):
+        default = 52
         set_value = 4
         project = self.mock_project(
             config_overrides={"flow": {"bar": {"foo": set_value}}}

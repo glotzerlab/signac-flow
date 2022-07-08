@@ -1,6 +1,6 @@
 import pytest
-
 from conftest import TestProjectBase
+
 from flow import FlowProject
 from flow.errors import ConfigKeyError
 from flow.util.config import get_config_value

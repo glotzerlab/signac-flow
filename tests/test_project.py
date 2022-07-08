@@ -14,6 +14,7 @@ from itertools import groupby
 import define_hooks_test_project
 import pytest
 import signac
+from conftest import MockScheduler, TestProjectBase
 from define_aggregate_test_project import _AggregateTestProject
 from define_dag_test_project import DagTestProject
 from define_directives_test_project import _DirectivesTestProject
@@ -21,7 +22,6 @@ from define_test_project import _DynamicTestProject, _TestProject
 from deprecation import fail_if_not_removed
 
 import flow
-from conftest import MockScheduler, TestProjectBase
 from flow import (
     FlowProject,
     aggregator,

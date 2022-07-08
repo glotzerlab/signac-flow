@@ -11,9 +11,16 @@ Version 0.21
 [0.21.0] -- 2022-xx-xx
 ----------------------
 
+Changed
++++++++
+
+- Changed `get_config_value` template filter to error without default on missing key (#649).
+- Changed `get_config_value` template filter now takes a ``FlowProject`` as its first argument (#649).
+
 Removed
 +++++++
 
+- Removed `require_config_value` template filter (#649).
 - Removed configuration key 'flow.import_packaged_environments' (#653).
 - Removed configuaration key 'flow.environment_modules' (#651).
 

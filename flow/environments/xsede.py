@@ -204,8 +204,41 @@ class ExpanseEnvironment(DefaultSlurmEnvironment):
         )
 
 
+class DeltaEnvironment(DefaultSlurmEnvironment):
+    """Environment profile for the Great Lakes supercomputer.
+
+    https:https://wiki.ncsa.illinois.edu/display/DSC/Delta+User+Guide
+    """
+
+    # Example hostnames
+    # login: dt-login02.delta.internal.ncsa.edu
+    # host: cn001.delta.internal.ncsa.edu
+    hostname_pattern = r"(dt|cn)(-login)?[0-9]+\.delta\.internal\.ncsa\.edu"
+    template = "delta.sh"
+    cores_per_node = 128
+
+    @classmethod
+    def add_args(cls, parser):
+        """Add arguments to parser.
+
+        Parameters
+        ----------
+        parser : :class:`argparse.ArgumentParser`
+            The argument parser where arguments will be added.
+
+        """
+        super().add_args(parser)
+        parser.add_argument(
+            "--partition",
+            choices=("cpu", "gpuA40x4", "gpuA100x4", "gpuA100x8", "gpuMI100x8"),
+            default="cpu",
+            help="Specify the partition to submit to. (default=cpu)",
+        )
+
+
 __all__ = [
     "Stampede2Environment",
     "Bridges2Environment",
     "ExpanseEnvironment",
+    "DeltaEnvironment"
 ]

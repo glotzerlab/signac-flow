@@ -240,5 +240,5 @@ __all__ = [
     "Stampede2Environment",
     "Bridges2Environment",
     "ExpanseEnvironment",
-    "DeltaEnvironment"
+    "DeltaEnvironment",
 ]

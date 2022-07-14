@@ -1,0 +1,12 @@
+.. _delta:
+
+XSEDE Delta
+===========
+
+`Link to official documentation <https://https://wiki.ncsa.illinois.edu/display/DSC/Delta+User+Guide>`_
+
+.. autoclass:: flow.environments.xsede.DeltaEnvironment
+
+.. literalinclude:: ../../flow/templates/delta.sh
+   :language: jinja
+   :caption: delta.sh

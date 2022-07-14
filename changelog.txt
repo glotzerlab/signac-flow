@@ -11,6 +11,11 @@ Version 0.21
 [0.21.0] -- 2022-xx-xx
 ----------------------
 
+Added
++++++
+
+- XSEDE Delta environment and template (#658).
+
 Removed
 +++++++
 

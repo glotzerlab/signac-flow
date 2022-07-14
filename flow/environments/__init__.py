@@ -5,7 +5,6 @@
 from . import drexel, incite, umich, umn, xsede
 
 __all__ = [
-    "delta",
     "drexel",
     "incite",
     "umich",

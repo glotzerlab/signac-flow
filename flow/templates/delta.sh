@@ -4,6 +4,9 @@
     {% set threshold = 0 if force else 0.9 %}
     {% set cpu_tasks = operations|calc_tasks('np', parallel, force) %}
     {% set gpu_tasks = operations|calc_tasks('ngpu', parallel, force) %}
+    {% if partition in ["gpuA100x8", "gpuMI100x8"] %}
+        {% raise "Cannot use given partition in default Delta template." %}
+    {% endif %}
     {% if gpu_tasks %}
         {% if partition == "gpuA40x4" %}
             {% set nn_gpu = gpu_tasks|calc_num_nodes(4) %}

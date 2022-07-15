@@ -10,14 +10,8 @@
     {% if gpu_tasks %}
         {% if partition == "gpuA40x4" %}
             {% set nn_gpu = gpu_tasks|calc_num_nodes(4) %}
-            {% if nn_gpu > 100 %}
-                {% raise "More nodes requested than exist on the system." %}
-            {% endif %}
         {% elif partition == "gpuA100x4" %}
             {% set nn_gpu = gpu_tasks|calc_num_nodes(4) %}
-            {% if nn_gpu > 100 %}
-                {% raise "More nodes requested than exist on the system." %}
-            {% endif %}
         {# We do not allow submission to the partitions below as they have few #}
         {# nodes, should be rarely needed, and have increased charges for use. #}
         {% elif partition == "gpuA100x8" %}

@@ -207,7 +207,7 @@ class ExpanseEnvironment(DefaultSlurmEnvironment):
 class DeltaEnvironment(DefaultSlurmEnvironment):
     """Environment profile for the Great Lakes supercomputer.
 
-    https:https://wiki.ncsa.illinois.edu/display/DSC/Delta+User+Guide
+    https://wiki.ncsa.illinois.edu/display/DSC/Delta+User+Guide
     """
 
     # Example hostnames

@@ -205,7 +205,7 @@ class ExpanseEnvironment(DefaultSlurmEnvironment):
 
 
 class DeltaEnvironment(DefaultSlurmEnvironment):
-    """Environment profile for the Great Lakes supercomputer.
+    """Environment profile for the Delta supercomputer.
 
     https://wiki.ncsa.illinois.edu/display/DSC/Delta+User+Guide
     """

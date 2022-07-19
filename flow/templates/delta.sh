@@ -14,10 +14,10 @@
             {% set nn_gpu = gpu_tasks|calc_num_nodes(4) %}
         {# We do not allow submission to the partitions below as they have few #}
         {# nodes, should be rarely needed, and have increased charges for use. #}
-        {% elif partition == "gpuA100x8" %}
-            {% raise "Submitting to gpuA100x8 partition is not allowed." %}
-        {% elif partition == "gpuMI100x8" %}
-            {% raise "Submitting to gpuMI100x8 partition is not allowed." %}
+        {% elif partition in ["gpuA100x8", "gpuMI100x8"] %}
+            {% raise "This partition is not supported as it has few nodes,
+                      increased charges and is expected to be suitable for a
+                      minority of use cases." %}
         {% else %}
             {% raise "GPU operations require a GPU partition!" %}
         {% endif %}

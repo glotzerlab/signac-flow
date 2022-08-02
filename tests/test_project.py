@@ -11,6 +11,7 @@ from functools import partial
 from io import StringIO
 from itertools import groupby
 
+import define_hooks_logging_project
 import define_hooks_test_project
 import pytest
 import signac
@@ -2558,6 +2559,140 @@ class TestHooksInvalidOption(TestHooksSetUp):
         )
 
         assert "RuntimeError" in error_output
+
+
+class TestHooksLogOperationSetUp(TestHooksSetUp):
+    project_class = define_hooks_logging_project._HooksLogOperationsProject
+    entrypoint = dict(
+        path=os.path.realpath(
+            os.path.join(os.path.dirname(__file__), "define_hooks_logging_project.py")
+        )
+    )
+
+    @staticmethod
+    def get_log_filename(operation_name, key):
+        return f"{operation_name}_{key}.log"
+
+    @staticmethod
+    def get_log_output(job, log_filename):
+        return "".join(line for line in open(job.fn(log_filename)))
+
+
+class TestHooksLogCmd(TestHooksLogOperationSetUp):
+    error_message = "42"
+    runtime_message = ""
+
+    @pytest.fixture(params=["base_cmd"])
+    def operation_name(self, request):
+        return request.param
+
+    def test_success(self, project, job, operation_name):
+        log_fn = self.get_log_filename(operation_name, self.keys[2])
+
+        assert not job.isfile(log_fn)
+
+        if job.sp.raise_exception:
+            with pytest.raises(subprocess.CalledProcessError):
+                self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+        else:
+            self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+
+        if job.sp.raise_exception:
+            assert not job.isfile(log_fn)
+        else:
+            assert job.isfile(log_fn)
+            log_output = self.get_log_output(job, log_fn)
+            assert self.runtime_message in log_output
+            assert f"Executed operation '{operation_name}'" in log_output
+
+    def test_exception(self, project, job, operation_name):
+        log_fn = self.get_log_filename(operation_name, self.keys[3])
+
+        assert not job.isfile(log_fn)
+
+        if job.sp.raise_exception:
+            with pytest.raises(subprocess.CalledProcessError):
+                self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+        else:
+            self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+
+        if job.sp.raise_exception:
+            assert job.isfile(log_fn)
+            log_output = self.get_log_output(job, log_fn)
+            assert self.error_message in log_output
+            assert (
+                f"Execution of operation '{operation_name}' failed with" in log_output
+            )
+        else:
+            assert not job.isfile(log_fn)
+
+
+class TestHooksLogBase(TestHooksLogCmd):
+    error_message = define_hooks_logging_project.HOOKS_ERROR_MESSAGE
+
+    @pytest.fixture(params=["base"])
+    def operation_name(self, request):
+        return request.param
+
+    def test_start(self, project, job, operation_name):
+        log_fn = self.get_log_filename(operation_name, self.keys[0])
+
+        assert not job.isfile(log_fn)
+
+        if job.sp.raise_exception:
+            with pytest.raises(subprocess.CalledProcessError):
+                self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+        else:
+            self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+
+        assert job.isfile(log_fn)
+
+        log_output = self.get_log_output(job, log_fn)
+
+        assert self.runtime_message in log_output
+
+        if job.sp.raise_exception:
+            assert self.error_message in log_output
+            assert (
+                f"Execution of operation '{operation_name}' failed with" in log_output
+            )
+        else:
+            assert self.error_message not in log_output
+            assert f"Executed operation '{operation_name}'" in log_output
+
+
+class TestHooksLogInstall(TestHooksLogOperationSetUp):
+    entrypoint = dict(
+        path=os.path.realpath(
+            os.path.join(os.path.dirname(__file__), "define_hooks_logging_install.py")
+        )
+    )
+
+    def test_install(self, project, job):
+        log_fn = job.fn("operations.log")
+
+        assert not job.isfile(log_fn)
+
+        if job.sp.raise_exception:
+            with pytest.raises(subprocess.CalledProcessError):
+                self.call_subcmd(f"run -j {job.id} -o base")
+            with pytest.raises(subprocess.CalledProcessError):
+                self.call_subcmd(f"run -j {job.id} -o base_cmd")
+        else:
+            self.call_subcmd(f"run -j {job.id} -o base")
+            self.call_subcmd(f"run -j {job.id} -o base_cmd")
+
+        assert job.isfile(log_fn)
+        log_output = self.get_log_output(job, log_fn)
+
+        if job.sp.raise_exception:
+            assert "42" in log_output
+            assert define_hooks_logging_project.HOOKS_ERROR_MESSAGE in log_output
+            assert "Execution of operation 'base' failed with" in log_output
+            assert "Execution of operation 'base_cmd' failed with" in log_output
+        else:
+            assert "Executed operation 'base'" in log_output
+            assert "Executed operation 'base_cmd'" in log_output
 
 
 class TestIgnoreConditions:

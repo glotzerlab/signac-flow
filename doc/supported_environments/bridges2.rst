@@ -1,7 +1,7 @@
 .. _bridges2:
 
-XSEDE Bridges-2
-===============
+PSC Bridges-2
+=============
 
 `Link to official documentation <https://www.psc.edu/resources/bridges-2/user-guide-2/>`_
 

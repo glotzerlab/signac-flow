@@ -424,6 +424,10 @@ class _AggregateStore(_BaseAggregateStore):
         """
         return id in self._aggregates_by_id
 
+    def __getstate__(self):
+        state = {"_aggregator": self._aggregator}
+        return state
+
     def __len__(self):
         return len(self._aggregates_by_id)
 

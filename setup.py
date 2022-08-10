@@ -11,7 +11,7 @@ requirements = [
     # For the templated generation of (submission) scripts.
     "jinja2>=3.0.0",
     # To enable the parallelized execution of operations across processes.
-    "cloudpickle>=1.1.1",
+    "cloudpickle>=1.6.0",
     # Deprecation management
     "deprecation>=2.0.0",
     # Progress bars
@@ -32,7 +32,7 @@ except OSError:
 
 setup(
     name="signac-flow",
-    version="0.19.0",
+    version="0.20.0",
     packages=find_packages(),
     include_package_data=True,
     zip_safe=True,
@@ -66,5 +66,5 @@ setup(
     install_requires=requirements,
     # Supported versions are determined according to NEP 29.
     # https://numpy.org/neps/nep-0029-deprecation_policy.html
-    python_requires=">=3.8, <4",
+    python_requires=">=3.8",
 )

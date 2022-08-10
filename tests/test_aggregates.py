@@ -3,13 +3,13 @@ from math import ceil
 
 import pytest
 import signac
-from conftest import FlowProjectSetup
+from conftest import TestProjectBase
 
 from flow.aggregates import _DefaultAggregateStore, aggregator, get_aggregate_id
 from flow.errors import FlowProjectDefinitionError
 
 
-class AggregateProjectSetup(FlowProjectSetup):
+class AggregateProjectSetup(TestProjectBase):
     project_name = "AggregateTestProject"
 
     def mock_project(self):
@@ -21,6 +21,10 @@ class AggregateProjectSetup(FlowProjectSetup):
             else:
                 project.open_job(dict(i=i, even=even)).init()
         return project
+
+    @pytest.fixture
+    def mocked_project(self):
+        return self.mock_project()
 
 
 class AggregateFixtures:
@@ -62,8 +66,8 @@ class AggregateFixtures:
             aggregator.groupby(["half", "even"], default=[-1, -1]),
         ]
 
-    def create_aggregate_store(self, aggregator_instance, project):
-        return aggregator_instance._create_AggregateStore(project)
+    def create_aggregate_store(self, aggregator_instance, mocked_project):
+        return aggregator_instance._create_AggregateStore(mocked_project)
 
     def get_aggregates_from_store(self, aggregate_store):
         return tuple(aggregate_store.values())
@@ -72,55 +76,57 @@ class AggregateFixtures:
 # Test the _AggregateStore and _DefaultAggregateStore classes
 class TestAggregateStore(AggregateProjectSetup, AggregateFixtures):
     def test_custom_aggregator_function(
-        self, project, get_single_job_aggregate, get_all_job_aggregate
+        self, mocked_project, get_single_job_aggregate, get_all_job_aggregate
     ):
         # Testing aggregator function returning aggregates of 1
         aggregate_store = self.create_aggregate_store(
-            aggregator(get_single_job_aggregate), project
+            aggregator(get_single_job_aggregate), mocked_project
         )
-        aggregate_job_manual = tuple(get_single_job_aggregate(project))
+        aggregate_job_manual = tuple(get_single_job_aggregate(mocked_project))
         assert self.get_aggregates_from_store(aggregate_store) == aggregate_job_manual
 
         # Testing aggregator function returning aggregates of all the jobs
         aggregate_store = self.create_aggregate_store(
-            aggregator(get_all_job_aggregate), project
+            aggregator(get_all_job_aggregate), mocked_project
         )
         assert self.get_aggregates_from_store(aggregate_store) == get_all_job_aggregate(
-            project
+            mocked_project
         )
 
-    def test_sort_by(self, project):
+    def test_sort_by(self, mocked_project):
         helper_sort = partial(sorted, key=lambda job: job.sp.i)
-        aggregate_store = self.create_aggregate_store(aggregator(sort_by="i"), project)
+        aggregate_store = self.create_aggregate_store(
+            aggregator(sort_by="i"), mocked_project
+        )
         assert self.get_aggregates_from_store(aggregate_store) == (
-            tuple(helper_sort(project)),
+            tuple(helper_sort(mocked_project)),
         )
 
-    def test_sort_by_callable(self, project):
+    def test_sort_by_callable(self, mocked_project):
         def keyfunction(job):
             return job.sp.i
 
         helper_sort = partial(sorted, key=keyfunction)
         aggregate_store = self.create_aggregate_store(
-            aggregator(sort_by=keyfunction), project
+            aggregator(sort_by=keyfunction), mocked_project
         )
         assert self.get_aggregates_from_store(aggregate_store) == (
-            tuple(helper_sort(project)),
+            tuple(helper_sort(mocked_project)),
         )
 
-    def test_sort_descending(self, project):
+    def test_sort_descending(self, mocked_project):
         helper_sort = partial(sorted, key=lambda job: job.sp.i, reverse=True)
         aggregate_store = self.create_aggregate_store(
-            aggregator(sort_by="i", sort_ascending=False), project
+            aggregator(sort_by="i", sort_ascending=False), mocked_project
         )
         assert self.get_aggregates_from_store(aggregate_store) == (
-            tuple(helper_sort(project)),
+            tuple(helper_sort(mocked_project)),
         )
 
     @pytest.mark.parametrize("aggregate_length", [1, 2, 3, 6, 10])
-    def test_groups_of_valid_num(self, project, aggregate_length):
+    def test_groups_of_valid_num(self, mocked_project, aggregate_length):
         aggregate_store = self.create_aggregate_store(
-            aggregator.groupsof(aggregate_length), project
+            aggregator.groupsof(aggregate_length), mocked_project
         )
         expected_len = ceil(10 / aggregate_length)
         assert len(aggregate_store) == expected_len
@@ -136,47 +142,51 @@ class TestAggregateStore(AggregateProjectSetup, AggregateFixtures):
             else:
                 assert len(aggregate) == aggregate_length
 
-    def test_groupby_with_valid_string_key(self, project):
+    def test_groupby_with_valid_string_key(self, mocked_project):
         aggregate_store = self.create_aggregate_store(
-            aggregator.groupby("even"), project
+            aggregator.groupby("even"), mocked_project
         )
         assert len(aggregate_store) == 2
         for aggregate in aggregate_store.values():
             even = aggregate[0].sp.even
             assert all(even == job.sp.even for job in aggregate)
 
-    def test_groupby_with_invalid_string_key(self, project):
+    def test_groupby_with_invalid_string_key(self, mocked_project):
         with pytest.raises(KeyError):
             # We will attempt to generate aggregates but will fail in
             # doing so due to the invalid key
-            self.create_aggregate_store(aggregator.groupby("invalid_key"), project)
+            self.create_aggregate_store(
+                aggregator.groupby("invalid_key"), mocked_project
+            )
 
-    def test_groupby_with_default_key_for_string(self, project):
+    def test_groupby_with_default_key_for_string(self, mocked_project):
         aggregate_store = self.create_aggregate_store(
-            aggregator.groupby("half", default=-1), project
+            aggregator.groupby("half", default=-1), mocked_project
         )
         assert len(aggregate_store) == 6
         for aggregate in aggregate_store.values():
             half = aggregate[0].sp.get("half", -1)
             assert all(half == job.sp.get("half", -1) for job in aggregate)
 
-    def test_groupby_with_Iterable_key(self, project):
+    def test_groupby_with_Iterable_key(self, mocked_project):
         aggregate_store = self.create_aggregate_store(
-            aggregator.groupby(["i", "even"]), project
+            aggregator.groupby(["i", "even"]), mocked_project
         )
         # No aggregation takes place hence this means we don't need to check
         # whether all the aggregate members are equivalent.
         assert len(aggregate_store) == 10
 
-    def test_groupby_with_invalid_Iterable_key(self, project):
+    def test_groupby_with_invalid_Iterable_key(self, mocked_project):
         with pytest.raises(KeyError):
             # We will attempt to generate aggregates but will fail in
             # doing so due to the invalid keys
-            self.create_aggregate_store(aggregator.groupby(["half", "even"]), project)
+            self.create_aggregate_store(
+                aggregator.groupby(["half", "even"]), mocked_project
+            )
 
-    def test_groupby_with_valid_default_key_for_Iterable(self, project):
+    def test_groupby_with_valid_default_key_for_Iterable(self, mocked_project):
         aggregate_store = self.create_aggregate_store(
-            aggregator.groupby(["half", "even"], default=[-1, -1]), project
+            aggregator.groupby(["half", "even"], default=[-1, -1]), mocked_project
         )
         assert len(aggregate_store) == 6
         for aggregate in aggregate_store.values():
@@ -187,47 +197,47 @@ class TestAggregateStore(AggregateProjectSetup, AggregateFixtures):
                 for job in aggregate
             )
 
-    def test_groupby_with_callable_key(self, project):
+    def test_groupby_with_callable_key(self, mocked_project):
         def keyfunction(job):
             return job.sp["even"]
 
         aggregate_store = self.create_aggregate_store(
-            aggregator.groupby(keyfunction), project
+            aggregator.groupby(keyfunction), mocked_project
         )
         assert len(aggregate_store) == 2
         for aggregate in aggregate_store.values():
             even = aggregate[0].sp.even
             assert all(even == job.sp.even for job in aggregate)
 
-    def test_groupby_with_invalid_callable_key(self, project):
+    def test_groupby_with_invalid_callable_key(self, mocked_project):
         def keyfunction(job):
             return job.sp["half"]
 
         with pytest.raises(KeyError):
             # We will attempt to generate aggregates but will fail in
             # doing so due to the invalid key
-            self.create_aggregate_store(aggregator.groupby(keyfunction), project)
+            self.create_aggregate_store(aggregator.groupby(keyfunction), mocked_project)
 
-    def test_valid_select(self, project):
+    def test_valid_select(self, mocked_project):
         def _select(job):
             return job.sp.i > 5
 
         aggregate_store = self.create_aggregate_store(
-            aggregator.groupsof(1, select=_select), project
+            aggregator.groupsof(1, select=_select), mocked_project
         )
         selected_jobs = []
-        for job in project:
+        for job in mocked_project:
             if _select(job):
                 selected_jobs.append((job,))
         assert self.get_aggregates_from_store(aggregate_store) == tuple(selected_jobs)
 
-    def test_store_hashing(self, project):
-        # Since we need to store groups on a per aggregate basis in the project,
+    def test_store_hashing(self, mocked_project):
+        # Since we need to store groups on a per aggregate basis in the mocked_project,
         # we need to be sure that the aggregates are hashing and compared correctly.
         # This test ensures this feature.
         total_aggregators = AggregateFixtures.list_of_aggregators()
         list_of_stores = [
-            self.create_aggregate_store(aggregator, project)
+            self.create_aggregate_store(aggregator, mocked_project)
             for aggregator in total_aggregators
         ]
         assert len(list_of_stores) == len(total_aggregators)
@@ -243,12 +253,14 @@ class TestAggregateStore(AggregateProjectSetup, AggregateFixtures):
     @pytest.mark.parametrize(
         "aggregator_instance", AggregateFixtures.list_of_aggregators()
     )
-    def test_aggregates_are_tuples(self, project, aggregator_instance):
+    def test_aggregates_are_tuples(self, mocked_project, aggregator_instance):
         # This test ensures that all aggregator functions return tuples. All
         # aggregate stores are expected to return tuples for their values, but
         # this also tests that the aggregator functions (groupsof, groupby) are
         # generating tuples internally.
-        aggregate_store = self.create_aggregate_store(aggregator_instance, project)
+        aggregate_store = self.create_aggregate_store(
+            aggregator_instance, mocked_project
+        )
         if not isinstance(aggregate_store, _DefaultAggregateStore):
             for aggregate in aggregate_store._generate_aggregates():
                 assert isinstance(aggregate, tuple)
@@ -260,17 +272,19 @@ class TestAggregateStore(AggregateProjectSetup, AggregateFixtures):
     @pytest.mark.parametrize(
         "aggregator_instance", AggregateFixtures.list_of_aggregators()
     )
-    def test_get_by_id(self, project, aggregator_instance):
+    def test_get_by_id(self, mocked_project, aggregator_instance):
         # Ensure that all aggregates can be fetched by id.
-        aggregate_store = self.create_aggregate_store(aggregator_instance, project)
+        aggregate_store = self.create_aggregate_store(
+            aggregator_instance, mocked_project
+        )
         for aggregate in aggregate_store.values():
             assert aggregate == aggregate_store[get_aggregate_id(aggregate)]
 
-    def test_get_invalid_id(self, project):
-        jobs = tuple(project)
-        full_aggregate_store = self.create_aggregate_store(aggregator(), project)
+    def test_get_invalid_id(self, mocked_project):
+        jobs = tuple(mocked_project)
+        full_aggregate_store = self.create_aggregate_store(aggregator(), mocked_project)
         default_aggregate_store = self.create_aggregate_store(
-            aggregator.groupsof(1), project
+            aggregator.groupsof(1), mocked_project
         )
         # Test for an aggregate of single job for aggregator instance
         with pytest.raises(LookupError):
@@ -279,10 +293,12 @@ class TestAggregateStore(AggregateProjectSetup, AggregateFixtures):
         with pytest.raises(LookupError):
             default_aggregate_store[get_aggregate_id(jobs)]
 
-    def test_contains(self, project):
-        jobs = tuple(project)
-        full_aggregate_store = self.create_aggregate_store(aggregator(), project)
-        default_aggregate_store = aggregator.groupsof(1)._create_AggregateStore(project)
+    def test_contains(self, mocked_project):
+        jobs = tuple(mocked_project)
+        full_aggregate_store = self.create_aggregate_store(aggregator(), mocked_project)
+        default_aggregate_store = aggregator.groupsof(1)._create_AggregateStore(
+            mocked_project
+        )
         # Test for an aggregate of all jobs
         assert get_aggregate_id(jobs) in full_aggregate_store
         assert get_aggregate_id(jobs) not in default_aggregate_store

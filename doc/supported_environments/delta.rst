@@ -1,7 +1,7 @@
 .. _delta:
 
-XSEDE Delta
-===========
+NCSA Delta
+==========
 
 `Link to official documentation <https://wiki.ncsa.illinois.edu/display/DSC/Delta+User+Guide>`_
 

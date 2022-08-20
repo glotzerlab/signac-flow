@@ -605,7 +605,7 @@ class FlowCmdOperation(BaseFlowOperation):
                     format_arguments[arg_name] = args[arg_name].default
 
             if argspec.varargs:
-                format_arguments[argspec.varargs] = jobs[len(args):]
+                format_arguments[argspec.varargs] = jobs[len(args) :]
 
             if format_arguments.get("jobs", None) is None:
                 if re.search("{jobs}", cmd) or re.search(r"{jobs\..*}", cmd):

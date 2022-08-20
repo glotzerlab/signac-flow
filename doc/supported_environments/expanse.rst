@@ -1,7 +1,7 @@
 .. _expanse:
 
-XSEDE Expanse
-=============
+SDSC Expanse
+============
 
 `Link to official documentation <https://www.sdsc.edu/support/user_guides/expanse.html>`__
 

@@ -1,7 +1,7 @@
 .. _stampede2:
 
-XSEDE Stampede2
-===============
+TACC Stampede2
+==============
 
 `Link to official documentation <https://portal.tacc.utexas.edu/user-guides/stampede2>`_
 

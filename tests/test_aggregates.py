@@ -2,7 +2,6 @@ from functools import partial
 from math import ceil
 
 import pytest
-import signac
 from conftest import TestProjectBase
 
 from flow.aggregates import aggregator, get_aggregate_id
@@ -28,32 +27,29 @@ class AggregateProjectSetup(TestProjectBase):
 
 
 class AggregateFixtures:
-    @classmethod
-    def _get_single_job_aggregate(cls, jobs):
-        for job in jobs:
-            yield (job,)
-
-    @classmethod
-    def _get_all_job_aggregate(cls, jobs):
-        return (tuple(jobs),)
-
     @pytest.fixture
     def get_single_job_aggregate(self):
-        return AggregateFixtures._get_single_job_aggregate
+        def generator(jobs):
+            yield from ((job,) for job in jobs)
+
+        return generator
 
     @pytest.fixture
     def get_all_job_aggregate(self):
-        return AggregateFixtures._get_all_job_aggregate
+        def generator(jobs):
+            return (tuple(jobs),)
 
-    @classmethod
-    def list_of_aggregators(cls):
+        return generator
+
+    @pytest.fixture
+    def list_of_aggregators(self, get_single_job_aggregate, get_all_job_aggregate):
         # The below list contains 14 distinct aggregator objects and some duplicates.
         return [
             aggregator(),
             aggregator(),
-            aggregator(cls._get_all_job_aggregate),
-            aggregator(cls._get_single_job_aggregate),
-            aggregator(cls._get_single_job_aggregate),
+            aggregator(get_all_job_aggregate),
+            aggregator(get_single_job_aggregate),
+            aggregator(get_single_job_aggregate),
             aggregator.groupsof(1),
             aggregator.groupsof(1),
             aggregator.groupsof(2),
@@ -226,12 +222,12 @@ class TestAggregateStore(AggregateProjectSetup, AggregateFixtures):
         selected_jobs = tuple((job,) for job in mocked_project if select(job))
         assert self.get_aggregates_from_store(aggregate_store) == selected_jobs
 
-    def test_store_hashing(self, mocked_project):
+    def test_store_hashing(self, mocked_project, list_of_aggregators):
         # Since we need to store groups on a per aggregate basis in the mocked_project,
         # we need to be sure that the aggregates are hashing and compared correctly.
         list_of_stores = [
             self.create_aggregate_store(aggregator, mocked_project)
-            for aggregator in AggregateFixtures.list_of_aggregators()
+            for aggregator in list_of_aggregators
         ]
         # The above list contains 14 distinct store objects (because a
         # store object is differentiated on the basis of the
@@ -243,22 +239,17 @@ class TestAggregateStore(AggregateProjectSetup, AggregateFixtures):
         assert len(set(list_of_stores)) == 14
 
     @pytest.mark.parametrize(
-        "aggregator_instance", AggregateFixtures.list_of_aggregators()
-    )
-    def test_aggregates_are_tuples(self, mocked_project, aggregator_instance):
-        # This test ensures that all aggregator functions return tuples. All
-        # aggregate stores are expected to return tuples for their values, but
-        # this also tests that the aggregator functions (groupsof, groupby) are
-        # generating tuples internally.
-        aggregate_store = self.create_aggregate_store(
-            aggregator_instance, mocked_project
-        )
-        for aggregate in aggregate_store.values():
-            assert isinstance(aggregate, tuple)
-            assert all(isinstance(job, signac.contrib.job.Job) for job in aggregate)
-
-    @pytest.mark.parametrize(
-        "aggregator_instance", AggregateFixtures.list_of_aggregators()
+        "aggregator_instance",
+        [
+            aggregator(),
+            aggregator.groupsof(1),
+            aggregator.groupsof(2),
+            aggregator.groupsof(3),
+            aggregator.groupsof(4),
+            aggregator.groupby("is_even"),
+            aggregator.groupby("half", -1),
+            aggregator.groupby(["half", "is_even"], default=[-1, -1]),
+        ],
     )
     def test_get_by_id(self, mocked_project, aggregator_instance):
         # Ensure that all aggregates can be fetched by id.
@@ -297,17 +288,13 @@ class TestAggregateStore(AggregateProjectSetup, AggregateFixtures):
 
 # Test the decorator class aggregator
 class TestAggregate(AggregateProjectSetup, AggregateFixtures):
-    @pytest.mark.parametrize("agg_value", [(1, 2, 3, 4, 5), (), [1, 2, 3, 4, 5], []])
-    def test_default_init(self, agg_value):
+    def test_default_init(self):
         aggregate_instance = aggregator()
         assert not aggregate_instance._is_default_aggregator
         assert aggregate_instance._sort_by is None
         assert aggregate_instance._sort_ascending
         assert aggregate_instance._select is None
-        # Test if default aggregator aggregates everything in a single group
-        assert list(aggregate_instance._aggregator_function(agg_value)) == [
-            tuple(agg_value)
-        ]
+        assert next(aggregate_instance._aggregator_function((1, 2, 3))) == (1, 2, 3)
 
     @pytest.mark.parametrize("aggregator_function", ["str", 1, {}])
     def test_invalid_aggregator_function(self, aggregator_function):
@@ -362,7 +349,7 @@ class TestAggregate(AggregateProjectSetup, AggregateFixtures):
         with pytest.raises(ValueError):
             aggregator.groupby(["half", "is_even"], default=[-1, -1, -1])
 
-    def test_aggregate_hashing(self):
+    def test_aggregate_hashing(self, list_of_aggregators):
         # Since we need to store groups on a per aggregate basis in the project,
         # we need to be sure that the aggregates are hashing and compared correctly.
         # This test ensures this feature.
@@ -371,10 +358,9 @@ class TestAggregate(AggregateProjectSetup, AggregateFixtures):
         # When this list is converted to set, then these objects are hashed first
         # and then compared. Since sets don't carry duplicate values, we test
         # whether the length of the set obtained from the list is equal to 14 or not.
-        total_aggregators = AggregateFixtures.list_of_aggregators()
-        assert len(set(total_aggregators)) == 14
+        assert len(set(list_of_aggregators)) == 14
         # Ensure that equality implies hash equality.
-        for agg1 in total_aggregators:
-            for agg2 in total_aggregators:
+        for agg1 in list_of_aggregators:
+            for agg2 in list_of_aggregators:
                 if agg1 == agg2:
                     assert hash(agg1) == hash(agg2)

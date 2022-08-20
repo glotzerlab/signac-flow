@@ -396,6 +396,42 @@ class TestProjectClass(TestProjectBase):
                 for job in project:
                     assert not os.path.isfile(job.fn("output.txt"))
 
+    def test_cmd_operation_keyword_only_jobs_argument(self):
+        class A(FlowProject):
+            pass
+
+        @A.operation
+        @cmd
+        def test_cmd(*jobs, invalid_arg=None):
+            return "echo '{jobs}' > output.txt"
+
+        project = self.mock_project(A)
+        with _add_cwd_to_environment_pythonpath():
+            with _switch_to_directory(project.root_directory()):
+                with redirect_stderr(StringIO()):
+                    with pytest.raises(RuntimeError):
+                        project.run()
+                for job in project:
+                    assert not os.path.isfile(job.fn("output.txt"))
+
+    def test_cmd_operation_kwargs_jobs_argument(self):
+        class A(FlowProject):
+            pass
+
+        @A.operation
+        @cmd
+        def test_cmd(job, **kwargs):
+            return "echo '{job}' > output.txt"
+
+        project = self.mock_project(A)
+        with _add_cwd_to_environment_pythonpath():
+            with _switch_to_directory(project.root_directory()):
+                with redirect_stderr(StringIO()):
+                    with pytest.raises(RuntimeError):
+                        project.run()
+                for job in project:
+                    assert not os.path.isfile(job.fn("output.txt"))
+
     def test_cmd_argument_deprecated_jobs_argument(self):
         class A(FlowProject):
             pass

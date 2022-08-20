@@ -104,8 +104,10 @@ def with_job(func):
     def decorated(__flow_internal_with_job_argument):
         with __flow_internal_with_job_argument:
             if getattr(func, "_flow_cmd", False):
-                return f'trap "cd $(pwd)" EXIT && cd {__flow_internal_with_job_argument.ws} && " \
-                        f"{func(__flow_internal_with_job_argument)}'
+                return (
+                    f'trap "cd $(pwd)" EXIT && cd {__flow_internal_with_job_argument.ws} && '
+                    f"{func(__flow_internal_with_job_argument)}"
+                )
             else:
                 return func(__flow_internal_with_job_argument)
 

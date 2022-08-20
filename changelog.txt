@@ -5,6 +5,22 @@ Changelog
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 The numbers in brackets denote the related GitHub issue and/or pull request.
 
+Version 0.22
+============
+
+[0.22.0] -- 2022-xx-xx
+----------------------
+
+Added
++++++
+
+- Support for formatting with operation function arguments for ``FlowCmdOperation`` (#666, #630).
+
+Changed
++++++++
+
+- Deprecated default formatting with ``jobs`` and ``job`` for ``FlowCmdOperation`` (#666, #630).
+
 Version 0.21
 ============
 

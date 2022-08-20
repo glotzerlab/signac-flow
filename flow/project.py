@@ -22,6 +22,7 @@ import textwrap
 import threading
 import time
 import traceback
+import warnings
 from collections import Counter, defaultdict
 from copy import deepcopy
 from enum import IntFlag
@@ -77,6 +78,8 @@ from .util.misc import (
 from .util.translate import abbreviate, shorten
 
 logger = logging.getLogger(__name__)
+
+warnings.simplefilter("once", DeprecationWarning)
 
 
 # The TEMPLATE_HELP can be shown with the --template-help option available to all
@@ -556,7 +559,7 @@ class FlowCmdOperation(BaseFlowOperation):
     ----------
     cmd : str or callable
         The command to execute the operation. Callable values will be
-        provided one or more positional arguments (``*jobs``) that are
+        provided one or more positional arguments that are
         instances of :class:`~signac.contrib.job.Job`. String values will be
         formatted with ``cmd.format(jobs=jobs)`` where ``jobs`` is a tuple of
         :class:`~signac.contrib.job.Job`, or ``cmd.format(jobs=jobs,
@@ -578,9 +581,60 @@ class FlowCmdOperation(BaseFlowOperation):
     def __call__(self, *jobs):
         """Return the command formatted with the supplied job(s)."""
         cmd = self._cmd(*jobs) if callable(self._cmd) else self._cmd
-        format_arguments = {"jobs": jobs}
-        if len(jobs) == 1:
-            format_arguments["job"] = jobs[0]
+        format_arguments = {}
+        if callable(self._cmd):
+            argspec = inspect.getfullargspec(self._cmd)
+            if argspec.varkw or argspec.kwonlyargs:
+                raise RuntimeError(
+                    "FlowProject cmd operations doesn't support keyword only arguments"
+                )
+
+            signature = inspect.signature(self._cmd)
+
+            args = {
+                k: v
+                for k, v in signature.parameters.items()
+                if (k != argspec.varargs and k != "__flow_internal_with_job_argument")
+            }
+
+            # Only functions with arguments followed by variable
+            for i, arg_name in enumerate(args.keys()):
+                try:
+                    format_arguments[arg_name] = jobs[i]
+                except IndexError:
+                    format_arguments[arg_name] = args[arg_name].default
+
+            if argspec.varargs:
+                format_arguments[argspec.varargs] = jobs[len(args):]
+
+            if format_arguments.get("jobs", None) is None:
+                if re.search("{jobs}", cmd) or re.search(r"{jobs\..*}", cmd):
+                    warnings.warn(
+                        "Argument names for the flow cmd operations must match that of "
+                        "in the function definition. Auto assignment of the jobs "
+                        "argument has been deprecated as of 0.21.0 "
+                        "and will be removed in 0.23.0.",
+                        DeprecationWarning,
+                    )
+                    format_arguments["jobs"] = jobs
+
+            if format_arguments.get("job", None) is None:
+                if len(jobs) == 1 and (
+                    re.search("{job}", cmd) or re.search(r"{job\..*}", cmd)
+                ):
+                    warnings.warn(
+                        "Argument names for the flow cmd operations must match that of "
+                        "in the function definition. Auto assignment of the job "
+                        "argument has been deprecated as of 0.21.0 "
+                        "and will be removed in 0.23.0.",
+                        DeprecationWarning,
+                    )
+                    format_arguments["job"] = jobs[0]
+        else:
+            format_arguments["jobs"] = jobs
+            if len(jobs) == 1:
+                format_arguments["job"] = jobs[0]
+
         return cmd.format(**format_arguments)
 
 
@@ -4807,7 +4861,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if isinstance(operation, FlowCmdOperation):
 
                 def operation_function(job):
-                    cmd = operation(job).format(job=job)
+                    cmd = operation(job)
                     subprocess.run(cmd, shell=True, check=True)
 
             else:

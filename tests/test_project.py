@@ -356,6 +356,84 @@ class TestProjectClass(TestProjectBase):
                     project.run()
                 assert os.getcwd() == starting_dir
 
+    def test_cmd_operation_argument_as_command(self):
+        class A(FlowProject):
+            pass
+
+        @A.operation
+        @with_job
+        @cmd
+        def test_cmd(joba, jobb="test"):
+            return "echo '{joba} {jobb}' > output.txt"
+
+        project = self.mock_project(A)
+        with _add_cwd_to_environment_pythonpath():
+            with _switch_to_directory(project.root_directory()):
+                with redirect_stderr(StringIO()):
+                    project.run()
+                for job in project:
+                    assert os.path.isfile(job.fn("output.txt"))
+                    with open(job.fn("output.txt")) as f:
+                        lines = f.readlines()
+                        assert f"{job.id} test\n" == lines[0]
+
+    def test_cmd_operation_argument_as_command_invalid(self):
+        class A(FlowProject):
+            pass
+
+        @A.operation
+        @with_job
+        @cmd
+        def test_cmd(job):
+            return "echo '{jobabc}' > output.txt"
+
+        project = self.mock_project(A)
+        with _add_cwd_to_environment_pythonpath():
+            with _switch_to_directory(project.root_directory()):
+                with redirect_stderr(StringIO()):
+                    with pytest.raises(KeyError):
+                        project.run()
+                for job in project:
+                    assert not os.path.isfile(job.fn("output.txt"))
+
+    def test_cmd_argument_deprecated_jobs_argument(self):
+        class A(FlowProject):
+            pass
+
+        @A.operation
+        @with_job
+        @cmd
+        def test_cmd(job123):
+            return "echo '{jobs}' > output.txt"
+
+        project = self.mock_project(A)
+        with _add_cwd_to_environment_pythonpath():
+            with _switch_to_directory(project.root_directory()):
+                with redirect_stderr(StringIO()):
+                    with pytest.warns(DeprecationWarning):
+                        project.run()
+                for job in project:
+                    assert os.path.isfile(job.fn("output.txt"))
+
+    def test_cmd_argument_deprecated_job_argument(self):
+        class A(FlowProject):
+            pass
+
+        @A.operation
+        @with_job
+        @cmd
+        def test_cmd(job123):
+            return "echo '{job}' > output.txt"
+
+        project = self.mock_project(A)
+        with _add_cwd_to_environment_pythonpath():
+            with _switch_to_directory(project.root_directory()):
+                with redirect_stderr(StringIO()):
+                    with pytest.warns(DeprecationWarning):
+                        project.run()
+                for job in project:
+                    assert os.path.isfile(job.fn("output.txt"))
+
     def test_cmd_with_job_wrong_order(self):
         class A(FlowProject):
             pass

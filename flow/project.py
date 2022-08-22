@@ -3053,6 +3053,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     # TODO: Fill parameters with empty values (or shared values?)
                     raise ValueError("Cannot show parameters for aggregates.")
                 statepoint = self.open_job(id=aggregate_id).statepoint()
+                document = None
 
                 def dotted_get(mapping, key):
                     """Fetch a value from a nested mapping using a dotted key."""
@@ -3065,10 +3066,18 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
                 status["parameters"] = {}
                 for parameter in parameters:
-                    status["parameters"][parameter] = shorten(
-                        str(self._alias(dotted_get(statepoint, parameter))),
-                        param_max_width,
-                    )
+                    if not parameter.startswith("doc."):
+                        status["parameters"][parameter] = shorten(
+                            str(self._alias(dotted_get(statepoint, parameter))),
+                            param_max_width,
+                        )
+                    else:
+                        if document is None:
+                            document = self.open_job(id=aggregate_id).document()
+                        status["parameters"][parameter] = shorten(
+                            str(self._alias(dotted_get(document, parameter[4:]))),
+                            param_max_width,
+                        )
 
             for status in statuses.values():
                 _add_parameters(status)

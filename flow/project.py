@@ -62,6 +62,7 @@ from .render_status import _render_status
 from .scheduling.base import ClusterJob, JobStatus
 from .util import config as flow_config
 from .util import template_filters
+from .util._decorate import decorate_with_job
 from .util.misc import (
     _add_cwd_to_environment_pythonpath,
     _bidict,
@@ -1447,7 +1448,7 @@ class _FlowProjectClass(type):
 
             _parent_class = parent_class
 
-            def __call__(self, func, name=None):
+            def __call__(self, func, name=None, cmd=False, with_job=False):
                 if isinstance(func, str):
                     return lambda op: self(op, name=func)
 
@@ -1461,6 +1462,12 @@ class _FlowProjectClass(type):
 
                 if name is None:
                     name = func.__name__
+
+                if cmd:
+                    self._setup_cmd(func)
+
+                if with_job:
+                    func = self._decorate_with_job(func)
 
                 for (
                     registered_name,
@@ -1496,6 +1503,33 @@ class _FlowProjectClass(type):
                     func._flow_groups = {}
                 func._flow_groups[self._parent_class] = {name}
                 return func
+
+            def _setup_cmd(self, func):
+                if getattr(func, "_flow_with_job", False):
+                    # Check to support backwards compatibility with @flow.with_job decorator
+                    # This check should be removed in the 1.0.0.
+                    raise FlowProjectDefinitionError(
+                        "The @flow.with_job decorator must appear above the @FlowProject.operation decorator."
+                    )
+
+                setattr(func, "_flow_cmd", True)
+
+            def _decorate_with_job(self, func):
+                if getattr(func, "_flow_with_job", False):
+                    # Check to support backwards compatibility with @flow.with_job decorator
+                    # This check should be removed in the 1.0.0.
+                    raise FlowProjectDefinitionError(
+                        "Cannot use with_job as both decorator and argument."
+                    )
+
+                if getattr(func, "_flow_aggregate", False):
+                    # Check to support backwards compatibility with @flow.aggregator decorator
+                    # This check should be removed in the 1.0.0.
+                    raise FlowProjectDefinitionError(
+                        "The with_job argument cannot be used with aggregation."
+                    )
+
+                return decorate_with_job(func)
 
             def with_directives(self, directives, name=None):
                 """Decorate a function to make it an operation with additional execution directives.

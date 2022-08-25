@@ -12,12 +12,12 @@ See also: :class:`~.FlowProject`.
 """
 import inspect
 import logging
-from functools import wraps
 from textwrap import indent
 
 from .directives import _document_directive
 from .environment import ComputeEnvironment
 from .errors import FlowProjectDefinitionError
+from .util._decorate import decorate_with_job
 
 logger = logging.getLogger(__name__)
 
@@ -100,16 +100,7 @@ def with_job(func):
             "The @with_job decorator cannot be used with aggregation."
         )
 
-    @wraps(func)
-    def decorated(*jobs):
-        with jobs[0] as job:
-            if getattr(func, "_flow_cmd", False):
-                return f'trap "cd $(pwd)" EXIT && cd {job.ws} && {func(job)}'
-            else:
-                return func(job)
-
-    setattr(decorated, "_flow_with_job", True)
-    return decorated
+    return decorate_with_job(func)
 
 
 class directives:

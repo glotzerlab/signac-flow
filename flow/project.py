@@ -3060,9 +3060,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     if mapping is None:
                         return None
                     tokens = key.split(".")
-                    if len(tokens) > 1:
-                        return dotted_get(mapping.get(tokens[0]), ".".join(tokens[1:]))
-                    return mapping.get(key)
+                    v = mapping
+                    for token in tokens:
+                        v = v.get(token)
+                    return v
 
                 status["parameters"] = {}
                 for parameter in parameters:

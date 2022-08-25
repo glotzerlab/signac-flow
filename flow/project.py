@@ -3057,11 +3057,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
                 def dotted_get(mapping, key):
                     """Fetch a value from a nested mapping using a dotted key."""
-                    if mapping is None:
-                        return None
                     tokens = key.split(".")
                     v = mapping
                     for token in tokens:
+                        if v is None:
+                            return None
                         v = v.get(token)
                     return v
 

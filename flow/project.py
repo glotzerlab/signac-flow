@@ -3052,7 +3052,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 if aggregate_id.startswith("agg-"):
                     # TODO: Fill parameters with empty values (or shared values?)
                     raise ValueError("Cannot show parameters for aggregates.")
-                statepoint = self.open_job(id=aggregate_id).statepoint()
+                job = self.open_job(id=aggregate_id)
+                # Cache the job state point and document if used to render status parameters.
+                statepoint = None
                 document = None
 
                 def dotted_get(mapping, key):

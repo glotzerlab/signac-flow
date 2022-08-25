@@ -30,6 +30,7 @@ repos:
     rev: '4.0.1'
     hooks:
       - id: flake8
+        args: ['--extend-ignore=E203']
   - repo: https://github.com/PyCQA/pydocstyle
     rev: '6.1.1'
     hooks:

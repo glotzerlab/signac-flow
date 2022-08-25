@@ -3070,6 +3070,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 status["parameters"] = {}
                 for parameter in parameters:
                     if not parameter.startswith("doc."):
+                        if statepoint is None:
+                            statepoint = job.statepoint()
                         status["parameters"][parameter] = shorten(
                             str(self._alias(dotted_get(statepoint, parameter))),
                             param_max_width,

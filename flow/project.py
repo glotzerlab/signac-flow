@@ -3074,7 +3074,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         )
                     else:
                         if document is None:
-                            document = self.open_job(id=aggregate_id).document()
+                            document = job.document()
                         status["parameters"][parameter] = shorten(
                             str(self._alias(dotted_get(document, parameter[4:]))),
                             param_max_width,

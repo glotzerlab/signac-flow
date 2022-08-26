@@ -1,8 +1,15 @@
+"""TODO: Add docs"""
+
+import textwrap
 from itertools import chain
 
+from flow.aggregates import aggregator
+from flow.environment import ComputeEnvironment
 from flow.errors import FlowProjectDefinitionError
+from flow.project import FlowGroupEntry
 
-"""TODO: Add docs"""
+from .directives import _document_directive
+from .util._decorate import decorate_with_job
 
 
 class OperationRegister:
@@ -41,6 +48,7 @@ class OperationRegister:
     _parent_class = None
 
     def __call__(self, func=None, name=None, cmd=False, with_job=False):
+        """TODO: Add documentation"""
         if not func:
             return
         if isinstance(func, str):
@@ -103,7 +111,8 @@ class OperationRegister:
             # Check to support backwards compatibility with @flow.with_job decorator
             # This check should be removed in the 1.0.0.
             raise FlowProjectDefinitionError(
-                "The @flow.with_job decorator must appear above the @FlowProject.operation decorator."
+                "The @flow.with_job decorator must appear above the "
+                "@FlowProject.operation decorator."
             )
 
         setattr(func, "_flow_cmd", True)

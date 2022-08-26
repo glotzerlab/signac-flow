@@ -14,3 +14,6 @@ def decorate_with_job(func):
 
     setattr(decorated, "_flow_with_job", True)
     return decorated
+
+
+__all__ = ["decorate_with_job"]

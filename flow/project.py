@@ -56,7 +56,6 @@ from .errors import (
 )
 from .hooks import _Hooks
 from .labels import _is_label_func, classlabel, label, staticlabel
-from .operation import OperationRegister
 from .render_status import _render_status
 from .scheduling.base import ClusterJob, JobStatus
 from .util import config as flow_config
@@ -1411,9 +1410,186 @@ class _FlowProjectClass(type):
 
     @staticmethod
     def _setup_operation_object(parent_class):
-        operation_register = OperationRegister()
-        operation_register._parent_class = parent_class
-        return operation_register
+        class OperationRegister:
+            """Add operation functions to the class workflow definition.
+
+            This object is designed to be used as a decorator, for example:
+
+            .. code-block:: python
+
+                @FlowProject.operation
+                def hello(job):
+                    print('Hello', job)
+
+            Directives can also be specified by using :meth:`FlowProject.operation.with_directives`.
+
+            .. code-block:: python
+
+                @FlowProject.operation.with_directives({"nranks": 4})
+                def mpi_hello(job):
+                    print("hello")
+
+            Parameters
+            ----------
+            func : callable
+                The function to add to the workflow.
+            name : str
+                The operation name. Uses the name of the function if None.
+                (Default value = None)
+
+            Returns
+            -------
+            callable
+                The operation function.
+            """
+
+            _parent_class = parent_class
+
+            def __call__(self, func=None, *, name=None, cmd=False, with_job=False):
+                if func is None and (name or cmd or with_job):
+                    return lambda op: self(op, name=name, cmd=cmd, with_job=with_job)
+                
+                if func is None:
+                    return self
+
+                if func in chain(
+                    *self._parent_class._OPERATION_PRECONDITIONS.values(),
+                    *self._parent_class._OPERATION_POSTCONDITIONS.values(),
+                ):
+                    raise FlowProjectDefinitionError(
+                        "A condition function cannot be used as an operation."
+                    )
+
+                if name is None:
+                    name = func.__name__
+
+                if cmd:
+                    self._setup_cmd(func)
+                    setattr(func, "_flow_cmd_through_args", True)
+
+                if with_job:
+                    func = self._decorate_with_job(func)
+                    setattr(func, "_flow_with_job_through_args", True)
+
+                for (
+                    registered_name,
+                    registered_func,
+                ) in self._parent_class._OPERATION_FUNCTIONS:
+                    if name == registered_name:
+                        raise FlowProjectDefinitionError(
+                            f"An operation with name '{name}' is already registered."
+                        )
+                    if func is registered_func:
+                        raise FlowProjectDefinitionError(
+                            "An operation with this function is already registered."
+                        )
+                if name in self._parent_class._GROUP_NAMES:
+                    raise FlowProjectDefinitionError(
+                        f"A group with name '{name}' is already registered."
+                    )
+
+                if not getattr(func, "_flow_aggregate", False):
+                    func._flow_aggregate = aggregator.groupsof(1)
+
+                # Append the name and function to the class registry
+                self._parent_class._OPERATION_FUNCTIONS.append((name, func))
+                # We register aggregators associated with operation functions in
+                # `_register_groups` and we do not set the aggregator explicitly.  We
+                # delay setting the aggregator because we do not restrict the decorator
+                # placement in terms of `@FlowGroupEntry`, `@aggregator`, or
+                # `@operation`.
+                self._parent_class._GROUPS.append(
+                    FlowGroupEntry(name=name, project=self._parent_class)
+                )
+                if not hasattr(func, "_flow_groups"):
+                    func._flow_groups = {}
+                func._flow_groups[self._parent_class] = {name}
+                return func
+
+            def _setup_cmd(self, func):
+                if getattr(func, "_flow_with_job_through_decorator", False):
+                    # Check to support backwards compatibility with @flow.with_job decorator
+                    # This check should be removed in the 1.0.0.
+                    raise FlowProjectDefinitionError(
+                        "The @flow.with_job decorator cannot be used with cmd argument. "
+                        "Please use the FlowProject.operation's with_job argument instead."
+                    )
+
+                if getattr(func, "_flow_cmd_through_decorator", False):
+                    raise FlowProjectDefinitionError(
+                        "Cannot use cmd as both decorator and argument."
+                    )
+
+                setattr(func, "_flow_cmd", True)
+
+            def _decorate_with_job(self, func):
+                if getattr(func, "_flow_with_job_through_decorator", False):
+                    # This check should be removed in the 1.0.0.
+                    raise FlowProjectDefinitionError(
+                        "Cannot use with_job as both decorator and argument."
+                    )
+
+                if getattr(func, "_flow_cmd_through_decorator", False):
+                    # This check should be removed in the 1.0.0.
+                    raise FlowProjectDefinitionError(
+                        "The @flow.cmd decorator cannot be used with with_job argument. "
+                        "Please use the FlowProject.operation's cmd argument instead."
+                    )
+                    
+                if getattr(func, "_flow_aggregate", False):
+                    if not func._flow_aggregate._is_default_aggregator:
+                        # This check should be removed in the 1.0.0 if aggregator is passed
+                        # as operation argument
+                        raise FlowProjectDefinitionError(
+                            "The with_job argument cannot be used with aggregation."
+                        )
+
+                return decorate_with_job(func)
+
+            def with_directives(self, directives, name=None):
+                """Decorate a function to make it an operation with additional execution directives.
+
+                Directives can be used to provide information about required
+                resources such as the number of processors required for
+                execution of parallelized operations. For more information, see
+                :ref:`signac-docs:cluster_submission_directives`. To apply
+                directives to an operation that is part of a group, use
+                :meth:`.FlowGroupEntry.with_directives`.
+
+                Parameters
+                ----------
+                directives : dict
+                    Directives to use for resource requests and execution.
+                name : str
+                    The operation name. Uses the name of the function if None
+                    (Default value = None).
+
+                Returns
+                -------
+                function
+                    A decorator which registers the function with the provided
+                    name and directives as an operation of the
+                    :class:`~.FlowProject` subclass.
+                """
+
+                def add_operation_with_directives(function):
+                    function._flow_directives = directives
+                    return self(function, name=name)
+
+                return add_operation_with_directives
+
+            _directives_to_document = (
+                ComputeEnvironment._get_default_directives()._directive_definitions.values()
+            )
+            with_directives.__doc__ += textwrap.indent(
+                "\n\n**Supported Directives:**\n\n"
+                + "\n\n".join(
+                    _document_directive(directive) for directive in _directives_to_document
+                ),
+                " " * 16,
+            )
+
+        return OperationRegister()
 
     @staticmethod
     def _setup_hooks_object(parent_class):
@@ -1510,6 +1686,16 @@ def _config_value_as_bool(value):
         else:
             raise ValueError("Invalid boolean config value.")
     return bool(value)
+
+import textwrap
+from itertools import chain
+
+from flow.aggregates import aggregator
+from flow.environment import ComputeEnvironment
+from flow.errors import FlowProjectDefinitionError
+
+from .directives import _document_directive
+from .util._decorate import decorate_with_job
 
 
 class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):

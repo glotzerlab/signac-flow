@@ -42,11 +42,24 @@ def cmd(func):
         :meth:`~.FlowProject.submit` still respects directives and will prepend e.g. MPI or OpenMP
         prefixes to the shell command provided here.
     """
-    if getattr(func, "_flow_with_job", False):
+    if getattr(func, "_flow_cmd_through_args", False):
+        raise FlowProjectDefinitionError(
+            "Cannot use cmd as both decorator and argument."
+        )
+
+    if getattr(func, "_flow_with_job_through_args", False):
+        raise FlowProjectDefinitionError(
+            "The @flow.cmd decorator cannot be used with with_job argument. "
+            "Please use the FlowProject.operation's cmd argument instead."
+        )
+
+    if getattr(func, "_flow_with_job_through_decorator", False):
         raise FlowProjectDefinitionError(
             "The @flow.cmd decorator must appear below the @flow.with_job decorator."
         )
+
     setattr(func, "_flow_cmd", True)
+    setattr(func, "_flow_cmd_through_decorator", True)
     return func
 
 
@@ -95,12 +108,26 @@ def with_job(func):
         def hello_cmd(job):
             return 'trap "cd `pwd`" EXIT && cd {} && echo "hello {job}"'.format(job.ws)
     """
-    if getattr(func, "_flow_aggregate", False):
+    if getattr(func, "_flow_with_job_through_args", False):
         raise FlowProjectDefinitionError(
-            "The @with_job decorator cannot be used with aggregation."
+            "Cannot use with_job as both decorator and argument."
         )
 
-    return decorate_with_job(func)
+    if getattr(func, "_flow_cmd_through_args", False):
+        raise FlowProjectDefinitionError(
+            "The @flow.with_job decorator cannot be used with cmd argument. "
+            "Please use the FlowProject.operation's with_job argument instead."
+        )
+
+    if hasattr(func, "_flow_aggregate"):
+        if not func._flow_aggregate._is_default_aggregator:
+            raise FlowProjectDefinitionError(
+                "The @with_job decorator cannot be used with aggregation."
+            )
+
+    func = decorate_with_job(func)
+    setattr(func, "_flow_with_job_through_decorator", True)
+    return func
 
 
 class directives:

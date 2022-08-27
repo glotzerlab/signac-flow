@@ -5,8 +5,8 @@ def decorate_with_job(func):
     """TODO: Add docs."""
 
     @wraps(func)
-    def decorated(*jobs):
-        with jobs[0] as job:
+    def decorated(job):
+        with job:
             if getattr(func, "_flow_cmd", False):
                 return f'trap "cd $(pwd)" EXIT && cd {job.ws} && {func(job)}'
             else:

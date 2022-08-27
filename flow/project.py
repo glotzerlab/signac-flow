@@ -22,6 +22,7 @@ import textwrap
 import threading
 import time
 import traceback
+import warnings
 from collections import Counter, defaultdict
 from copy import deepcopy
 from enum import IntFlag
@@ -79,6 +80,7 @@ from .util.translate import abbreviate, shorten
 
 logger = logging.getLogger(__name__)
 
+warnings.simplefilter("once", DeprecationWarning)
 
 # The TEMPLATE_HELP can be shown with the --template-help option available to all
 # command line subcommands that use the templating system.
@@ -1455,6 +1457,13 @@ class _FlowProjectClass(type):
                 if func is None:
                     return self
 
+                if isinstance(func, str):
+                    warnings.warn(
+                        "The use of 'name' as a positional argument has been deprecated as of "
+                        "0.22.0 and will be removed in 0.24.0. Please pass name as a keyword "
+                        "argument instead."
+                    )
+                    return lambda op: self(op, name=func)
                 # Check for with_job decorator to make sure that with_job
                 # decorator is used below the operation decorator.
                 # This is done because with_job returns a "decorated" function

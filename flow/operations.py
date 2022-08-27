@@ -12,6 +12,7 @@ See also: :class:`~.FlowProject`.
 """
 import inspect
 import logging
+import warnings
 from textwrap import indent
 
 from .directives import _document_directive
@@ -20,6 +21,8 @@ from .errors import FlowProjectDefinitionError
 from .util._decorate import decorate_with_job
 
 logger = logging.getLogger(__name__)
+
+warnings.simplefilter("once", DeprecationWarning)
 
 
 def cmd(func):
@@ -57,6 +60,12 @@ def cmd(func):
         raise FlowProjectDefinitionError(
             "The @flow.cmd decorator must appear below the @flow.with_job decorator."
         )
+
+    warnings.warn(
+        "@flow.cmd decorator has been deprecated as of 0.22.0 and will be removed in "
+        "1.0.0. Use @FlowProject.operation(cmd=True) instead.",
+        DeprecationWarning,
+    )
 
     setattr(func, "_flow_cmd", True)
     setattr(func, "_flow_cmd_through_decorator", True)
@@ -119,7 +128,7 @@ def with_job(func):
             "Please use the FlowProject.operation's with_job argument instead."
         )
 
-    if hasattr(func, "_operation_initialized", False):
+    if getattr(func, "_operation_initialized", False):
         raise FlowProjectDefinitionError(
             "The @flow.with_job decorator must appear below @FlowProject.operation decorator"
         )
@@ -130,6 +139,11 @@ def with_job(func):
                 "The @with_job decorator cannot be used with aggregation."
             )
 
+    warnings.warn(
+        "@flow.with_job decorator has been deprecated as of 0.22.0 and will be removed in "
+        "1.0.0. Use @FlowProject.operation(with_job=True) instead.",
+        DeprecationWarning,
+    )
     func = decorate_with_job(func)
     setattr(func, "_flow_with_job_through_decorator", True)
     return func

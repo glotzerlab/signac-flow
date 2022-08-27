@@ -9,42 +9,11 @@ def decorate_with_job(func):
     If this function is an operation function defined by :class:`~.FlowProject`, it will
     be the same as using ``with job:``.
 
-    For example:
+    .. note::
 
-    .. code-block:: python
+        This class is used by the :class:`~._FlowProjectClass` metaclass for the setup of
+        operation functions and should not be used by users themselves.
 
-        @FlowProject.operation
-        @flow.with_job
-        def hello(job):
-            print("hello {}".format(job))
-
-    Is equivalent to:
-
-    .. code-block:: python
-
-        @FlowProject.operation
-        def hello(job):
-            with job:
-                print("hello {}".format(job))
-
-    This also works with the `@cmd` decorator:
-
-    .. code-block:: python
-
-        @FlowProject.operation
-        @with_job
-        @cmd
-        def hello(job):
-            return "echo 'hello {}'".format(job)
-
-    Is equivalent to:
-
-    .. code-block:: python
-
-        @FlowProject.operation
-        @cmd
-        def hello_cmd(job):
-            return 'trap "cd `pwd`" EXIT && cd {} && echo "hello {job}"'.format(job.ws)
     """
 
     @wraps(func)

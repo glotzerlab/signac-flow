@@ -18,6 +18,7 @@ import re
 import shlex
 import subprocess
 import sys
+import textwrap
 import threading
 import time
 import traceback
@@ -25,7 +26,7 @@ from collections import Counter, defaultdict
 from copy import deepcopy
 from enum import IntFlag
 from hashlib import md5, sha1
-from itertools import count, groupby, islice
+from itertools import chain, count, groupby, islice
 from multiprocessing import Event, Pool, TimeoutError, cpu_count
 from multiprocessing.pool import ThreadPool
 
@@ -44,7 +45,8 @@ from .aggregates import (
     aggregator,
     get_aggregate_id,
 )
-from .environment import get_environment, registered_environments
+from .directives import _document_directive
+from .environment import ComputeEnvironment, get_environment, registered_environments
 from .errors import (
     ConfigKeyError,
     FlowProjectDefinitionError,
@@ -60,6 +62,7 @@ from .render_status import _render_status
 from .scheduling.base import ClusterJob, JobStatus
 from .util import config as flow_config
 from .util import template_filters
+from .util._decorate import decorate_with_job
 from .util.misc import (
     _add_cwd_to_environment_pythonpath,
     _bidict,
@@ -1448,9 +1451,17 @@ class _FlowProjectClass(type):
             def __call__(self, func=None, *, name=None, cmd=False, with_job=False):
                 if func is None and (name or cmd or with_job):
                     return lambda op: self(op, name=name, cmd=cmd, with_job=with_job)
-                
+
                 if func is None:
                     return self
+
+                # Check for with_job decorator to make sure that with_job
+                # decorator is used below the operation decorator.
+                # This is done because with_job returns a "decorated" function
+                # with a different memory location than what's already set in
+                # _FlowProjectClass._OPERATION_FUNCTIONS hence the use of it above
+                # @FlowProject.operation would effectively do nothing.
+                setattr(func, "_operation_initialized", True)
 
                 if func in chain(
                     *self._parent_class._OPERATION_PRECONDITIONS.values(),
@@ -1508,7 +1519,6 @@ class _FlowProjectClass(type):
 
             def _setup_cmd(self, func):
                 if getattr(func, "_flow_with_job_through_decorator", False):
-                    # Check to support backwards compatibility with @flow.with_job decorator
                     # This check should be removed in the 1.0.0.
                     raise FlowProjectDefinitionError(
                         "The @flow.with_job decorator cannot be used with cmd argument. "
@@ -1516,6 +1526,7 @@ class _FlowProjectClass(type):
                     )
 
                 if getattr(func, "_flow_cmd_through_decorator", False):
+                    # This check should be removed in the 1.0.0.
                     raise FlowProjectDefinitionError(
                         "Cannot use cmd as both decorator and argument."
                     )
@@ -1535,11 +1546,10 @@ class _FlowProjectClass(type):
                         "The @flow.cmd decorator cannot be used with with_job argument. "
                         "Please use the FlowProject.operation's cmd argument instead."
                     )
-                    
+
                 if getattr(func, "_flow_aggregate", False):
                     if not func._flow_aggregate._is_default_aggregator:
-                        # This check should be removed in the 1.0.0 if aggregator is passed
-                        # as operation argument
+                        # This check should be removed in the 1.0.0.
                         raise FlowProjectDefinitionError(
                             "The with_job argument cannot be used with aggregation."
                         )
@@ -1584,7 +1594,8 @@ class _FlowProjectClass(type):
             with_directives.__doc__ += textwrap.indent(
                 "\n\n**Supported Directives:**\n\n"
                 + "\n\n".join(
-                    _document_directive(directive) for directive in _directives_to_document
+                    _document_directive(directive)
+                    for directive in _directives_to_document
                 ),
                 " " * 16,
             )
@@ -1686,16 +1697,6 @@ def _config_value_as_bool(value):
         else:
             raise ValueError("Invalid boolean config value.")
     return bool(value)
-
-import textwrap
-from itertools import chain
-
-from flow.aggregates import aggregator
-from flow.environment import ComputeEnvironment
-from flow.errors import FlowProjectDefinitionError
-
-from .directives import _document_directive
-from .util._decorate import decorate_with_job
 
 
 class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):

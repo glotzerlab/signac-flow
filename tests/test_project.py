@@ -356,7 +356,6 @@ class TestProjectClass(TestProjectBase):
                     project.run()
                 assert os.getcwd() == starting_dir
 
-    
     def test_cmd_decorator_with_cmd_argument(self):
         class A(FlowProject):
             pass
@@ -367,8 +366,9 @@ class TestProjectClass(TestProjectBase):
             @cmd
             def op1(job):
                 pass
-        
+
         with pytest.raises(FlowProjectDefinitionError):
+
             @cmd
             @A.operation(cmd=True)
             def op2(job):
@@ -384,42 +384,48 @@ class TestProjectClass(TestProjectBase):
             @with_job
             def op1(job):
                 pass
-        
+
         with pytest.raises(FlowProjectDefinitionError):
+
             @with_job
             @A.operation(with_job=True)
             def op2(job):
                 pass
-        
+
     def test_cmd_with_job_invalid_ordering(self):
         class A(FlowProject):
             pass
 
         with pytest.raises(FlowProjectDefinitionError):
+
             @A.operation(cmd=True)
             @with_job
             def op1(job):
                 pass
-        
+
         with pytest.raises(FlowProjectDefinitionError):
+
             @with_job
             @A.operation(cmd=True)
             def op2(job):
                 pass
-        
+
         with pytest.raises(FlowProjectDefinitionError):
+
             @A.operation(with_job=True)
             @cmd
             def op3(job):
                 pass
 
         with pytest.raises(FlowProjectDefinitionError):
+
             @cmd
             @A.operation(with_job=True)
             def op4(job):
                 pass
-        
+
         with pytest.raises(FlowProjectDefinitionError):
+
             @A.operation
             @cmd
             @with_job

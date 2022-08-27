@@ -119,6 +119,11 @@ def with_job(func):
             "Please use the FlowProject.operation's with_job argument instead."
         )
 
+    if hasattr(func, "_operation_initialized", False):
+        raise FlowProjectDefinitionError(
+            "The @flow.with_job decorator must appear below @FlowProject.operation decorator"
+        )
+
     if hasattr(func, "_flow_aggregate"):
         if not func._flow_aggregate._is_default_aggregator:
             raise FlowProjectDefinitionError(

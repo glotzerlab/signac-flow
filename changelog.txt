@@ -14,7 +14,7 @@ next -- 2022-xx-xx
 Added
 +++++
 
-- Added functionality to status call to show document parameters by using flag `-p doc.PARAM`
+- The CLI ``status`` command can show document parameters by using flag ``-p doc.PARAM`` (#667).
 
 Version 0.21
 ============

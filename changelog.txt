@@ -5,6 +5,9 @@ Changelog
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 The numbers in brackets denote the related GitHub issue and/or pull request.
 
+next
+====
+
 next -- 2022-xx-xx
 ------------------
 

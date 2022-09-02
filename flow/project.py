@@ -1698,9 +1698,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         self._flow_config["status_performance_warn_threshold"] = float(
             self._flow_config["status_performance_warn_threshold"]
         )
-        self._flow_config["ignore_traceback"] = _config_value_as_bool(
-            self._flow_config["ignore_traceback"]
-        )
         jsonschema.validate(
             self._flow_config,
             flow_config._FLOW_SCHEMA,
@@ -4690,7 +4687,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "func",
                 "verbose",
                 "debug",
-                "ignore_traceback",
                 "job_id",
                 "filter",
                 "doc_filter",
@@ -4707,13 +4703,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 f"Error during status update: {str(error)}\nUse '--ignore-errors' to "
                 "complete the update anyways."
             )
-            if args.ignore_traceback:
-                if isinstance(error, (UserOperationError, UserConditionError)):
-                    # Always show the user traceback cause.
-                    error = error.__cause__
-                traceback.print_exception(type(error), error, error.__traceback__)
-            else:
-                raise error
+            raise error
         else:
             if aggregates is None:
                 length_jobs = sum(
@@ -4907,12 +4897,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 help="Increase output verbosity.",
             )
             _parser.add_argument(
-                "--ignore-traceback",
-                dest=prefix + "ignore_traceback",
-                action="store_true",
-                help="Show the full traceback on error.",
-            )
-            _parser.add_argument(
                 "--debug",
                 dest=prefix + "debug",
                 action="store_true",
@@ -5057,15 +5041,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Manually 'merge' the various global options defined for both the main parser
         # and the parent parser that are shared by all subparsers:
-        for dest in ("verbose", "ignore_traceback", "debug"):
+        for dest in ("verbose", "debug"):
             setattr(args, dest, getattr(args, "main_" + dest) or getattr(args, dest))
             delattr(args, "main_" + dest)
-
-        # Read the config file and set the internal flag.
-        # Do not overwrite with False if not present in config file
-        args.ignore_traceback = self._flow_config.get(
-            "ignore_errors", args.ignore_traceback
-        )
 
         if args.debug:  # Implies '-vv'
             args.verbose = max(2, args.verbose)

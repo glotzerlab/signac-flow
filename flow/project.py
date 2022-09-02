@@ -21,6 +21,7 @@ import sys
 import textwrap
 import threading
 import time
+import warnings
 from collections import Counter, defaultdict
 from copy import deepcopy
 from enum import IntFlag
@@ -4896,6 +4897,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 help="Increase output verbosity.",
             )
             _parser.add_argument(
+                "--show-traceback",
+                dest="show_traceback",
+                action="store_true",
+                help="No op. Exists to be backwards comaptible with flow <= 0.21.",
+            )
+            _parser.add_argument(
                 "--debug",
                 dest=prefix + "debug",
                 action="store_true",
@@ -5037,6 +5044,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if not hasattr(args, "func"):
             parser.print_usage()
             sys.exit(2)
+
+        if args.show_traceback:
+            warnings.warn(
+                "--show-traceback is deprecated and to be removed in flow 0.23.",
+                FutureWarning,
+            )
 
         # Manually 'merge' the various global options defined for both the main parser
         # and the parent parser that are shared by all subparsers:

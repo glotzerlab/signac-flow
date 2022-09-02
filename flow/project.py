@@ -5072,52 +5072,18 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Set verbosity level according to the `-v` argument.
         logging.basicConfig(level=max(0, logging.WARNING - 10 * args.verbose))
 
-        def _show_traceback_and_exit(error):
-            is_user_error = isinstance(error, (UserOperationError, UserConditionError))
-            if is_user_error:
-                # Always show the user traceback cause.
-                error = error.__cause__
-            raise error
-
         try:
             args.func(args)
-        except SubmitError as error:
-            print("Submission error:", error, file=sys.stderr)
-            _show_traceback_and_exit(error)
         except (TimeoutError, subprocess.TimeoutExpired) as error:
             print(
                 "Error: Failed to complete execution due to "
                 f"timeout ({args.timeout} seconds).",
                 file=sys.stderr,
             )
-            _show_traceback_and_exit(error)
+            raise error
         except Jinja2TemplateNotFound as error:
             print(f"Did not find template script '{error}'.", file=sys.stderr)
-            _show_traceback_and_exit(error)
-        except AssertionError as error:
-            _show_traceback_and_exit(error)
-        except (UserOperationError, UserConditionError) as error:
-            if str(error):
-                print(f"ERROR: {error}\n", file=sys.stderr)
-            else:
-                print(
-                    "ERROR: Encountered error during program execution.\n",
-                    file=sys.stderr,
-                )
-            _show_traceback_and_exit(error)
-        except Exception as error:
-            if str(error):
-                print(
-                    "ERROR: Encountered error during program execution: "
-                    f"'{error}'\n",
-                    file=sys.stderr,
-                )
-            else:
-                print(
-                    "ERROR: Encountered error during program execution.\n",
-                    file=sys.stderr,
-                )
-            _show_traceback_and_exit(error)
+            raise error
 
 
 def _deserialize_and_run_operation(loads, project, operation_data):

@@ -18,7 +18,7 @@ _FLOW_SCHEMA = {
 
 _FLOW_CONFIG_DEFAULTS = {
     "status_performance_warn_threshold": 0.2,
-    "show_traceback": False,
+    "ignore_traceback": False,
     "eligible_jobs_max_lines": 10,
     "status_parallelization": "none",
 }

@@ -4900,7 +4900,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "--show-traceback",
                 dest="show_traceback",
                 action="store_true",
-                help="No op. Exists to be backwards comaptible with flow <= 0.21.",
+                help="No op. Exists to be backwards comaptible with signac-flow version <= 0.21.",
             )
             _parser.add_argument(
                 "--debug",
@@ -5047,7 +5047,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         if args.show_traceback:
             warnings.warn(
-                "--show-traceback is deprecated and to be removed in flow 0.23.",
+                "--show-traceback is deprecated and to be removed in signac-flow version 0.23.",
                 FutureWarning,
             )
 

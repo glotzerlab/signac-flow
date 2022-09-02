@@ -21,7 +21,6 @@ import sys
 import textwrap
 import threading
 import time
-import traceback
 from collections import Counter, defaultdict
 from copy import deepcopy
 from enum import IntFlag
@@ -5065,8 +5064,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if is_user_error:
                 # Always show the user traceback cause.
                 error = error.__cause__
-            traceback.print_exception(type(error), error, error.__traceback__)
-            sys.exit(1)
+            raise error
 
         try:
             args.func(args)

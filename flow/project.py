@@ -4316,8 +4316,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             "--parameters",
             type=str,
             nargs="*",
-            help="Display select parameters of the job's "
-            "statepoint with the detailed view.",
+            help="Display select parameters of the job state point "
+            "(with optional prefix 'sp.') or job document (by using prefix 'doc.') "
+            "in the detailed view.",
         )
         view_group.add_argument(
             "--param-max-width", type=int, help="Limit the width of each parameter row."

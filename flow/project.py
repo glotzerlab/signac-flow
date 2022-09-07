@@ -625,7 +625,7 @@ class FlowCmdOperation(BaseFlowOperation):
                     warnings.warn(
                         "Argument names for the flow cmd operations must match that of "
                         "in the function definition. Auto assignment of the job "
-                        "argument has been deprecated as of 0.21.0 "
+                        "argument has been deprecated as of 0.22.0 "
                         "and will be removed in 0.23.0.",
                         DeprecationWarning,
                     )

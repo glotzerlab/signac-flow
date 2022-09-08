@@ -16,6 +16,11 @@ Added
 
 - The CLI ``status`` command can show document parameters by using flag ``-p doc.PARAM`` (#667).
 
+Changed
++++++++
+
+- Broke ``TestBidict`` and ``TestTemplateFilters`` into smaller and simpler functions (#626).
+
 Version 0.21
 ============
 

@@ -24,8 +24,10 @@ def init(project):
 
     for a in range(2, 4):
         for b in range(2):
-            project.open_job(dict(a=a, b=b)).init()
-            project.open_job(dict(a=dict(a=a), b=b)).init()
+            job = project.open_job(dict(a=a, b=b)).init()
+            job.doc.a = a
+            job = project.open_job(dict(a=dict(a=a), b=b)).init()
+            job.doc.b = b
 
 
 def init_status_options(project):
@@ -36,6 +38,8 @@ def init_status_options(project):
         {"overview_max_lines": 2},  # --overview-max-lines 2
         {"detailed": True},  # -d, --detailed
         {"parameters": ["a"]},  # -p a, --parameters a
+        {"parameters": ["sp.a"]},  # -p sp.a, --parameters sp.a
+        {"parameters": ["doc.a"]},  # -p doc.a, --parameters doc.a
         {"param_max_width": 1},  # --param-max-width 1
         {"expand": True},  # -e, --expand
         {"all_ops": True},  # -a, --all-operations

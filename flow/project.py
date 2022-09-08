@@ -21,7 +21,7 @@ import sys
 import textwrap
 import threading
 import time
-import traceback
+import warnings
 from collections import Counter, defaultdict
 from copy import deepcopy
 from enum import IntFlag
@@ -1697,9 +1697,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         )
         self._flow_config["status_performance_warn_threshold"] = float(
             self._flow_config["status_performance_warn_threshold"]
-        )
-        self._flow_config["show_traceback"] = _config_value_as_bool(
-            self._flow_config["show_traceback"]
         )
         jsonschema.validate(
             self._flow_config,
@@ -4702,7 +4699,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "The -1/--one-line argument is incompatible with "
                 "'--stack' and will be ignored."
             )
-        show_traceback = args.debug or args.show_traceback
         args = {
             key: val
             for key, val in vars(args).items()
@@ -4711,10 +4707,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "func",
                 "verbose",
                 "debug",
-                "show_traceback",
                 "job_id",
                 "filter",
                 "doc_filter",
+                "show_traceback",
             ]
         }
         if args.pop("full"):
@@ -4724,21 +4720,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         try:
             self.print_status(jobs=aggregates, **args)
         except Exception as error:
-            if show_traceback:
-                logger.error(
-                    f"Error during status update: {str(error)}\nUse '--ignore-errors' to "
-                    "complete the update anyways."
-                )
-            else:
-                logger.error(
-                    f"Error during status update: {str(error)}\nUse '--ignore-errors' to "
-                    "complete the update anyways or '--show-traceback' to show "
-                    "the full traceback."
-                )
-                if isinstance(error, (UserOperationError, UserConditionError)):
-                    # Always show the user traceback cause.
-                    error = error.__cause__
-            traceback.print_exception(type(error), error, error.__traceback__)
+            logger.error(
+                f"Error during status update: {str(error)}\nUse '--ignore-errors' to "
+                "complete the update anyways."
+            )
+            raise error
         else:
             if aggregates is None:
                 length_jobs = sum(
@@ -4933,15 +4919,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             )
             _parser.add_argument(
                 "--show-traceback",
-                dest=prefix + "show_traceback",
+                dest="show_traceback",
                 action="store_true",
-                help="Show the full traceback on error.",
+                help="No op. Exists to be backwards comaptible with signac-flow version <= 0.21.",
             )
             _parser.add_argument(
                 "--debug",
                 dest=prefix + "debug",
                 action="store_true",
-                help="This option implies `-vv --show-traceback`.",
+                help="This option implies `-vv`.",
             )
 
         subparsers = parser.add_subparsers()
@@ -5080,20 +5066,20 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             parser.print_usage()
             sys.exit(2)
 
+        if args.show_traceback:
+            warnings.warn(
+                "--show-traceback is deprecated and to be removed in signac-flow version 0.23.",
+                FutureWarning,
+            )
+
         # Manually 'merge' the various global options defined for both the main parser
         # and the parent parser that are shared by all subparsers:
-        for dest in ("verbose", "show_traceback", "debug"):
+        for dest in ("verbose", "debug"):
             setattr(args, dest, getattr(args, "main_" + dest) or getattr(args, dest))
             delattr(args, "main_" + dest)
 
-        # Read the config file and set the internal flag.
-        # Do not overwrite with False if not present in config file
-        if self._flow_config["show_traceback"]:
-            args.show_traceback = True
-
-        if args.debug:  # Implies '-vv' and '--show-traceback'
+        if args.debug:  # Implies '-vv'
             args.verbose = max(2, args.verbose)
-            args.show_traceback = True
 
         # Support print_status argument alias
         if args.func == self._main_status and args.full:
@@ -5107,65 +5093,18 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Set verbosity level according to the `-v` argument.
         logging.basicConfig(level=max(0, logging.WARNING - 10 * args.verbose))
 
-        def _show_traceback_and_exit(error):
-            is_user_error = isinstance(error, (UserOperationError, UserConditionError))
-            if is_user_error:
-                # Always show the user traceback cause.
-                error = error.__cause__
-            if args.show_traceback or is_user_error:
-                traceback.print_exception(type(error), error, error.__traceback__)
-            if not args.show_traceback:
-                print(
-                    "Execute with '--show-traceback' or '--debug' to show the "
-                    "full traceback.",
-                    file=sys.stderr,
-                )
-            sys.exit(1)
-
         try:
             args.func(args)
-        except SubmitError as error:
-            print("Submission error:", error, file=sys.stderr)
-            _show_traceback_and_exit(error)
         except (TimeoutError, subprocess.TimeoutExpired) as error:
             print(
                 "Error: Failed to complete execution due to "
                 f"timeout ({args.timeout} seconds).",
                 file=sys.stderr,
             )
-            _show_traceback_and_exit(error)
+            raise error
         except Jinja2TemplateNotFound as error:
             print(f"Did not find template script '{error}'.", file=sys.stderr)
-            _show_traceback_and_exit(error)
-        except AssertionError as error:
-            if not args.show_traceback:
-                print(
-                    "ERROR: Encountered internal error during program execution.",
-                    file=sys.stderr,
-                )
-            _show_traceback_and_exit(error)
-        except (UserOperationError, UserConditionError) as error:
-            if str(error):
-                print(f"ERROR: {error}\n", file=sys.stderr)
-            else:
-                print(
-                    "ERROR: Encountered error during program execution.\n",
-                    file=sys.stderr,
-                )
-            _show_traceback_and_exit(error)
-        except Exception as error:
-            if str(error):
-                print(
-                    "ERROR: Encountered error during program execution: "
-                    f"'{error}'\n",
-                    file=sys.stderr,
-                )
-            else:
-                print(
-                    "ERROR: Encountered error during program execution.\n",
-                    file=sys.stderr,
-                )
-            _show_traceback_and_exit(error)
+            raise error
 
 
 def _deserialize_and_run_operation(loads, project, operation_data):

@@ -89,16 +89,23 @@ class TestBidict:
 
 
 class TestTemplateFilters:
-    def test_calc_memory(self, mock_operations):
-        op1 = mock_operations[0]
-        op2 = mock_operations[1]
-        op3 = mock_operations[2]
-
+    def test_calc_memory_serial(self, mock_operations):
         # Test when operations run in serial
-        assert calc_memory([op1], False) == 1
-        assert calc_memory([op1, op2, op3], False) == 8
+        assert calc_memory([mock_operations[0]], False) == 1
+        assert (
+            calc_memory(
+                [mock_operations[0], mock_operations[1], mock_operations[2]], False
+            )
+            == 8
+        )
 
+    def test_calc_memory_parallel(self, mock_operations):
         # Test when operations run in parallel
-        assert calc_memory([op1, op2], True) == 9
-        assert calc_memory([op3], True) == 0
-        assert calc_memory([op1, op2, op3], True) == 9
+        assert calc_memory([mock_operations[0], mock_operations[1]], True) == 9
+        assert calc_memory([mock_operations[2]], True) == 0
+        assert (
+            calc_memory(
+                [mock_operations[0], mock_operations[1], mock_operations[2]], True
+            )
+            == 9
+        )

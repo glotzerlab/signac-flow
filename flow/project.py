@@ -3049,23 +3049,42 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 if aggregate_id.startswith("agg-"):
                     # TODO: Fill parameters with empty values (or shared values?)
                     raise ValueError("Cannot show parameters for aggregates.")
-                statepoint = self.open_job(id=aggregate_id).statepoint()
+                job = self.open_job(id=aggregate_id)
+                # Cache the job state point and document if used to render status parameters.
+                statepoint = None
+                document = None
 
                 def dotted_get(mapping, key):
                     """Fetch a value from a nested mapping using a dotted key."""
-                    if mapping is None:
-                        return None
                     tokens = key.split(".")
-                    if len(tokens) > 1:
-                        return dotted_get(mapping.get(tokens[0]), ".".join(tokens[1:]))
-                    return mapping.get(key)
+                    v = mapping
+                    for token in tokens:
+                        if v is None:
+                            return None
+                        v = v.get(token)
+                    return v
 
                 status["parameters"] = {}
                 for parameter in parameters:
-                    status["parameters"][parameter] = shorten(
-                        str(self._alias(dotted_get(statepoint, parameter))),
-                        param_max_width,
-                    )
+                    if not parameter.startswith("doc."):
+                        if parameter.startswith("sp."):
+                            parameter_name = parameter[3:]
+                        else:
+                            parameter_name = parameter
+                        if statepoint is None:
+                            statepoint = job.statepoint()
+                        status["parameters"][parameter] = shorten(
+                            str(self._alias(dotted_get(statepoint, parameter_name))),
+                            param_max_width,
+                        )
+                    else:
+                        parameter_name = parameter[4:]
+                        if document is None:
+                            document = job.document()
+                        status["parameters"][parameter] = shorten(
+                            str(self._alias(dotted_get(document, parameter_name))),
+                            param_max_width,
+                        )
 
             for status in statuses.values():
                 _add_parameters(status)
@@ -4294,8 +4313,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             "--parameters",
             type=str,
             nargs="*",
-            help="Display select parameters of the job's "
-            "statepoint with the detailed view.",
+            help="Display select parameters of the job state point "
+            "(with optional prefix 'sp.') or job document (by using prefix 'doc.') "
+            "in the detailed view.",
         )
         view_group.add_argument(
             "--param-max-width", type=int, help="Limit the width of each parameter row."

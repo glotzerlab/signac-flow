@@ -4690,6 +4690,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "job_id",
                 "filter",
                 "doc_filter",
+                "show_traceback",
             ]
         }
         if args.pop("full"):

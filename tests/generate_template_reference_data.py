@@ -138,6 +138,16 @@ def init(project):
                 "bundle": [["mpi_op", "omp_op"]],
             },
         ],
+        "environments.xsede.DeltaEnvironment": [
+            {
+                "partition": ["cpu", "gpuA40x4", "gpuA100x4"],
+            },
+            {
+                "partition": ["cpu"],
+                "parallel": [False, True],
+                "bundle": [["mpi_op", "omp_op"]],
+            },
+        ],
     }
 
     for environment, parameter_combinations in environments.items():

@@ -1,7 +1,7 @@
 .. _andes:
 
-INCITE Andes
-============
+OLCF Andes
+==========
 
 `Link to official documentation <https://docs.olcf.ornl.gov/systems/andes_user_guide.html#running-jobs>`
 

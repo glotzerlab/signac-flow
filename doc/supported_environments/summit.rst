@@ -1,7 +1,7 @@
 .. _summit:
 
-INCITE Summit
-=============
+OLCF Summit
+===========
 
 `Link to official documentation <https://www.olcf.ornl.gov/for-users/system-user-guides/summit/running-jobs/#batch-scripts>`_
 

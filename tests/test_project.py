@@ -2198,7 +2198,7 @@ class TestAggregationProjectMainInterface(TestAggregatesProjectBase):
         odd_sum = sum(job.sp.i for job in project if job.sp.i % 2 != 0)
 
         self.call_subcmd(
-            "run -o agg_op1 agg_op1_different agg_op1_custom agg_op2 agg_op3 --show-traceback"
+            "run -o agg_op1 agg_op1_different agg_op1_custom agg_op2 agg_op3"
         )
 
         for job in project:

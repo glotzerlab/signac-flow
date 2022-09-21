@@ -28,4 +28,4 @@ def test_print_status():
                 generated = [msg] + tmp_out.read().splitlines()
             with open(job.fn("status.txt")) as file:
                 reference = [msg] + file.read().splitlines()
-        assert "\n".join(generated) == "\n".join(reference)
+            assert "\n".join(generated) == "\n".join(reference)

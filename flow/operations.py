@@ -12,6 +12,7 @@ See also: :class:`~.FlowProject`.
 """
 import inspect
 import logging
+import warnings
 from functools import wraps
 from textwrap import indent
 
@@ -42,6 +43,11 @@ def cmd(func):
         :meth:`~.FlowProject.submit` still respects directives and will prepend e.g. MPI or OpenMP
         prefixes to the shell command provided here.
     """
+    warnings.warn(
+        FutureWarning,
+        "@flow.cmd has been deprecated as of 0.22.0 and will be removed in "
+        "0.23.0. Use @FlowProject.operation(cmd=True) instead.",
+    )
     if getattr(func, "_flow_with_job", False):
         raise FlowProjectDefinitionError(
             "The @flow.cmd decorator must appear below the @flow.with_job decorator."
@@ -95,6 +101,11 @@ def with_job(func):
         def hello_cmd(job):
             return 'trap "cd `pwd`" EXIT && cd {} && echo "hello {job}"'.format(job.ws)
     """
+    warnings.warn(
+        FutureWarning,
+        "@flow.with_job has been deprecated as of 0.22.0 and will be removed in "
+        "0.23.0. Use @FlowProject.operation(with_job=True) instead.",
+    )
     if getattr(func, "_flow_aggregate", False):
         raise FlowProjectDefinitionError(
             "The @with_job decorator cannot be used with aggregation."

@@ -1539,6 +1539,12 @@ class _FlowProjectClass(type):
                     name and directives as an operation of the
                     :class:`~.FlowProject` subclass.
                 """
+                warnings.warn(
+                    FutureWarning,
+                    "@FlowProject.operation.with_directives has been deprecated as of 0.22.0 and "
+                    "will be removed in 0.23.0. Use @FlowProject.operation(directives={...}) "
+                    "instead.",
+                )
 
                 def add_operation_with_directives(function):
                     function._flow_directives = directives

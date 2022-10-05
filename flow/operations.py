@@ -16,6 +16,7 @@ import warnings
 from functools import wraps
 from textwrap import indent
 
+from .aggregates import aggregator
 from .directives import _document_directive
 from .environment import ComputeEnvironment
 from .errors import FlowProjectDefinitionError
@@ -51,6 +52,10 @@ def cmd(func):
     if getattr(func, "_flow_with_job", False):
         raise FlowProjectDefinitionError(
             "The @flow.cmd decorator must appear below the @flow.with_job decorator."
+        )
+    if hasattr(func, "_flow_cmd"):
+        raise FlowProjectDefinitionError(
+            f"Cannot specify that {func} is a command operation twice."
         )
     setattr(func, "_flow_cmd", True)
     return func
@@ -106,7 +111,11 @@ def with_job(func):
         "0.23.0. Use @FlowProject.operation(with_job=True) instead.",
         FutureWarning,
     )
-    if getattr(func, "_flow_aggregate", False):
+    base_aggregator = aggregator.groupsof(1)
+    if hasattr(func, "_flow_with_job"):
+        raise FlowProjectDefinitionError(f"Cannot specify with_job for {func} twice.")
+
+    if getattr(func, "_flow_aggregate", base_aggregator) != base_aggregator:
         raise FlowProjectDefinitionError(
             "The @with_job decorator cannot be used with aggregation."
         )

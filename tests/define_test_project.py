@@ -1,6 +1,5 @@
 import os
 
-import flow
 from flow import FlowProject
 
 
@@ -36,16 +35,16 @@ def b_is_even(job):
 
 
 @group1
-@_TestProject.operation.with_directives(
-    {
+@_TestProject.operation(
+    cmd=True,
+    directives={
         # Explicitly set a "bad" directive that is unused by the template.
         # The submit interface should warn about unused directives.
         "bad_directive": 0,
         # But not this one:
         "np": 1,
-    }
+    },
 )
-@flow.cmd
 @_TestProject.pre(b_is_even)
 @_TestProject.post.isfile("world.txt")
 def op1(job):
@@ -57,14 +56,14 @@ def _need_to_fork(job):
 
 
 @group1
-@_TestProject.operation.with_directives({"fork": _need_to_fork})
+@_TestProject.operation(directives={"fork": _need_to_fork})
 @_TestProject.post.true("test")
 def op2(job):
     job.document.test = os.getpid()
 
 
 @group2.with_directives(dict(omp_num_threads=4))
-@_TestProject.operation.with_directives({"ngpu": 1, "omp_num_threads": 1})
+@_TestProject.operation(directives={"ngpu": 1, "omp_num_threads": 1})
 @_TestProject.post.true("test3_true")
 @_TestProject.post.false("test3_false")
 @_TestProject.post.not_(lambda job: job.doc.test3_false)

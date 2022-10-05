@@ -343,8 +343,7 @@ class TestProjectClass(TestProjectBase):
         class A(FlowProject):
             pass
 
-        @A.operation
-        @with_job
+        @A.operation(with_job=True)
         def test_context(job):
             assert os.path.realpath(os.getcwd()) == os.path.realpath(job.ws)
 
@@ -356,6 +355,7 @@ class TestProjectClass(TestProjectBase):
                     project.run()
                 assert os.getcwd() == starting_dir
 
+    @pytest.mark.filterwarnings("ignore:@flow.cmd")
     def test_cmd_decorator_with_cmd_argument(self):
         class A(FlowProject):
             pass
@@ -374,6 +374,7 @@ class TestProjectClass(TestProjectBase):
             def op2(job):
                 pass
 
+    @pytest.mark.filterwarnings("ignore:@flow.with_job")
     def test_with_job_decorator_with_with_job_argument(self):
         class A(FlowProject):
             pass
@@ -392,6 +393,7 @@ class TestProjectClass(TestProjectBase):
             def op2(job):
                 pass
 
+    @pytest.mark.filterwarnings("ignore:@flow.cmd")
     def test_cmd_with_job_invalid_ordering(self):
         class A(FlowProject):
             pass
@@ -401,20 +403,6 @@ class TestProjectClass(TestProjectBase):
             @A.operation(cmd=True)
             @with_job
             def op1(job):
-                pass
-
-        with pytest.raises(FlowProjectDefinitionError):
-
-            @with_job
-            @A.operation(cmd=True)
-            def op2(job):
-                pass
-
-        with pytest.raises(FlowProjectDefinitionError):
-
-            @A.operation(with_job=True)
-            @cmd
-            def op3(job):
                 pass
 
         with pytest.raises(FlowProjectDefinitionError):
@@ -436,9 +424,7 @@ class TestProjectClass(TestProjectBase):
         class A(FlowProject):
             pass
 
-        @A.operation
-        @with_job
-        @cmd
+        @A.operation(cmd=True, with_job=True)
         def test_context(job):
             return "echo 'hello' > world.txt"
 
@@ -473,8 +459,7 @@ class TestProjectClass(TestProjectBase):
         class A(FlowProject):
             pass
 
-        @A.operation
-        @with_job
+        @A.operation(with_job=True)
         def test_context(job):
             raise Exception
 
@@ -491,9 +476,7 @@ class TestProjectClass(TestProjectBase):
         class A(FlowProject):
             pass
 
-        @A.operation
-        @with_job
-        @cmd
+        @A.operation(cmd=True, with_job=True)
         def test_context(job):
             return "exit 1"
 
@@ -510,8 +493,8 @@ class TestProjectClass(TestProjectBase):
         class A(FlowProject):
             pass
 
-        @A.operation.with_directives(
-            {"executable": lambda job: f"mpirun -np {job.doc.np} python"}
+        @A.operation(
+            directives={"executable": lambda job: f"mpirun -np {job.doc.np} python"}
         )
         def test_context(job):
             return "exit 1"
@@ -529,7 +512,7 @@ class TestProjectClass(TestProjectBase):
             class A(FlowProject):
                 pass
 
-            @A.operation.with_directives({"memory": value})
+            @A.operation(directives={"memory": value})
             def op1(job):
                 pass
 
@@ -557,7 +540,7 @@ class TestProjectClass(TestProjectBase):
             class A(FlowProject):
                 pass
 
-            @A.operation.with_directives({"memory": value})
+            @A.operation(directives={"memory": value})
             def op1(job):
                 pass
 
@@ -582,7 +565,7 @@ class TestProjectClass(TestProjectBase):
             class A(FlowProject):
                 pass
 
-            @A.operation.with_directives({"walltime": value})
+            @A.operation(directives={"walltime": value})
             def op1(job):
                 pass
 
@@ -600,7 +583,7 @@ class TestProjectClass(TestProjectBase):
             class A(FlowProject):
                 pass
 
-            @A.operation.with_directives({"walltime": value})
+            @A.operation(directives={"walltime": value})
             def op1(job):
                 pass
 
@@ -623,8 +606,8 @@ class TestProjectClass(TestProjectBase):
         class A(FlowProject):
             pass
 
-        @A.operation.with_directives(
-            {
+        @A.operation(
+            directives={
                 "nranks": lambda job: job.doc.get("nranks", 1),
                 "omp_num_threads": lambda job: job.doc.get("omp_num_threads", 1),
             }
@@ -691,8 +674,8 @@ class TestProjectClass(TestProjectBase):
         group = A.make_group("group")
 
         @group
-        @A.operation.with_directives(
-            {
+        @A.operation(
+            directives={
                 "nranks": lambda job: job.doc.get("nranks", 1),
                 "omp_num_threads": lambda job: job.doc.get("omp_num_threads", 1),
             }
@@ -701,8 +684,8 @@ class TestProjectClass(TestProjectBase):
             return "hello!"
 
         @group
-        @A.operation.with_directives(
-            {
+        @A.operation(
+            directives={
                 "nranks": lambda job: job.doc.get("nranks", 1),
                 "omp_num_threads": lambda job: job.doc.get("omp_num_threads", 1),
             }
@@ -724,6 +707,7 @@ class TestProjectClass(TestProjectBase):
             not callable(value) for value in submit_job_operation.directives.values()
         )
 
+    @pytest.mark.filterwarnings("ignore:@FlowProject.operation.with_directives")
     def test_operation_with_directives(self):
         class A(FlowProject):
             pass
@@ -2227,9 +2211,8 @@ class TestAggregatesProjectUtilities(TestAggregatesProjectBase):
 
         with pytest.raises(FlowProjectDefinitionError):
 
-            @A.operation
             @aggregator()
-            @with_job
+            @A.operation(with_job=True)
             def test_invalid_decorators(job):
                 pass
 
@@ -2239,9 +2222,8 @@ class TestAggregatesProjectUtilities(TestAggregatesProjectBase):
 
         with pytest.raises(FlowProjectDefinitionError):
 
-            @A.operation
-            @with_job
             @aggregator()
+            @A.operation(with_job=True)
             def test_invalid_decorators(job):
                 pass
 

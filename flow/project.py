@@ -1446,6 +1446,8 @@ class _FlowProjectClass(type):
             with_job : bool, optional, keyword-only
                 Whether to change directories to the job workspace when running the job. Defaults to
                 ``False``.
+            directives : dict, optional, keyword-only
+                Directives to use for resource requests and execution.
 
             Returns
             -------
@@ -1455,9 +1457,13 @@ class _FlowProjectClass(type):
 
             _parent_class = parent_class
 
-            def __call__(self, func, name=None, *, cmd=False, with_job=False):
+            def __call__(
+                self, func, name=None, *, cmd=False, with_job=False, directives=None
+            ):
                 if isinstance(func, str):
-                    return lambda op: self(op, name=func, cmd=cmd, with_job=with_job)
+                    return lambda op: self(
+                        op, name=func, cmd=cmd, with_job=with_job, directives=directives
+                    )
 
                 if func in chain(
                     *self._parent_class._OPERATION_PRECONDITIONS.values(),
@@ -1466,6 +1472,9 @@ class _FlowProjectClass(type):
                     raise FlowProjectDefinitionError(
                         "A condition function cannot be used as an operation."
                     )
+
+                # Store directives
+                self._flow_directives = {} if directives is None else directives
 
                 if name is None:
                     name = func.__name__

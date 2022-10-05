@@ -44,9 +44,9 @@ def cmd(func):
         prefixes to the shell command provided here.
     """
     warnings.warn(
-        FutureWarning,
         "@flow.cmd has been deprecated as of 0.22.0 and will be removed in "
         "0.23.0. Use @FlowProject.operation(cmd=True) instead.",
+        FutureWarning,
     )
     if getattr(func, "_flow_with_job", False):
         raise FlowProjectDefinitionError(
@@ -102,9 +102,9 @@ def with_job(func):
             return 'trap "cd `pwd`" EXIT && cd {} && echo "hello {job}"'.format(job.ws)
     """
     warnings.warn(
-        FutureWarning,
         "@flow.with_job has been deprecated as of 0.22.0 and will be removed in "
         "0.23.0. Use @FlowProject.operation(with_job=True) instead.",
+        FutureWarning,
     )
     if getattr(func, "_flow_aggregate", False):
         raise FlowProjectDefinitionError(

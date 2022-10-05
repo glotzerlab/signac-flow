@@ -1458,13 +1458,27 @@ class _FlowProjectClass(type):
             _parent_class = parent_class
 
             def __call__(
-                self, func, name=None, *, cmd=False, with_job=False, directives=None
+                self,
+                func=None,
+                name=None,
+                *,
+                cmd=False,
+                with_job=False,
+                directives=None,
             ):
                 if isinstance(func, str):
-                    return lambda op: self(
+                    return lambda op: self._internal_call(
                         op, name=func, cmd=cmd, with_job=with_job, directives=directives
                     )
+                if func is None:
+                    return lambda op: self._internal_call(
+                        op, name=name, cmd=cmd, with_job=with_job, directives=directives
+                    )
+                return self._internal_call(
+                    func, name=name, cmd=cmd, with_job=with_job, directives=directives
+                )
 
+            def _internal_call(self, func, name, *, cmd, with_job, directives):
                 if func in chain(
                     *self._parent_class._OPERATION_PRECONDITIONS.values(),
                     *self._parent_class._OPERATION_POSTCONDITIONS.values(),
@@ -1473,8 +1487,20 @@ class _FlowProjectClass(type):
                         "A condition function cannot be used as an operation."
                     )
 
+                # Handle cmd and with_job options. Use the deprecated decorators internally until
+                # the decorators are removed. These must be done first for now as with_job actually
+                # wraps the original function meaning that any other labels we apply will be masked
+                # if we do this later or not even captured it not added to _OPERATION_FUNCTIONS.
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", FutureWarning)
+                    if cmd:
+                        _cmd(func)
+                    if with_job:
+                        func = _with_job(func)
+
                 # Store directives
-                self._flow_directives = {} if directives is None else directives
+                if directives is not None:
+                    func._flow_directives = directives
 
                 if name is None:
                     name = func.__name__
@@ -1498,15 +1524,6 @@ class _FlowProjectClass(type):
 
                 if not getattr(func, "_flow_aggregate", False):
                     func._flow_aggregate = aggregator.groupsof(1)
-
-                # Handle cmd and with_job options. Use the deprecated decorators internally until
-                # the decorators are removed.
-                with warnings.catch_warnings:
-                    warnings.simplefilter("ignore:FutureWarnings")
-                    if with_job:
-                        _with_job(func)
-                    if cmd:
-                        _cmd(func)
 
                 # Append the name and function to the class registry
                 self._parent_class._OPERATION_FUNCTIONS.append((name, func))
@@ -1549,10 +1566,10 @@ class _FlowProjectClass(type):
                     :class:`~.FlowProject` subclass.
                 """
                 warnings.warn(
-                    FutureWarning,
                     "@FlowProject.operation.with_directives has been deprecated as of 0.22.0 and "
                     "will be removed in 0.23.0. Use @FlowProject.operation(directives={...}) "
                     "instead.",
+                    FutureWarning,
                 )
 
                 def add_operation_with_directives(function):

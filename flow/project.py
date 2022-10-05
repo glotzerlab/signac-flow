@@ -58,6 +58,8 @@ from .errors import (
 )
 from .hooks import _Hooks
 from .labels import _is_label_func, classlabel, label, staticlabel
+from .operations import cmd as _cmd
+from .operations import with_job as _with_job
 from .render_status import _render_status
 from .scheduling.base import ClusterJob, JobStatus
 from .util import config as flow_config
@@ -1438,6 +1440,12 @@ class _FlowProjectClass(type):
             name : str
                 The operation name. Uses the name of the function if None.
                 (Default value = None)
+            cmd : bool, optional, keyword-only
+                Whether the decorated function returns a shell executable string or not. When
+                ``True``, the returned string is executed by the shell. Defaults to ``False``.
+            with_job : bool, optional, keyword-only
+                Whether to change directories to the job workspace when running the job. Defaults to
+                ``False``.
 
             Returns
             -------
@@ -1447,9 +1455,9 @@ class _FlowProjectClass(type):
 
             _parent_class = parent_class
 
-            def __call__(self, func, name=None):
+            def __call__(self, func, name=None, *, cmd=False, with_job=False):
                 if isinstance(func, str):
-                    return lambda op: self(op, name=func)
+                    return lambda op: self(op, name=func, cmd=cmd, with_job=with_job)
 
                 if func in chain(
                     *self._parent_class._OPERATION_PRECONDITIONS.values(),
@@ -1481,6 +1489,15 @@ class _FlowProjectClass(type):
 
                 if not getattr(func, "_flow_aggregate", False):
                     func._flow_aggregate = aggregator.groupsof(1)
+
+                # Handle cmd and with_job options. Use the deprecated decorators internally until
+                # the decorators are removed.
+                with warnings.catch_warnings:
+                    warnings.simplefilter("ignore:FutureWarnings")
+                    if with_job:
+                        _with_job(func)
+                    if cmd:
+                        _cmd(func)
 
                 # Append the name and function to the class registry
                 self._parent_class._OPERATION_FUNCTIONS.append((name, func))

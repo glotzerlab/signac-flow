@@ -71,7 +71,6 @@ def walltime_op(job):
     pass
 
 
-@TestProject.operation
-@flow.cmd
+@TestProject.operation(cmd=True)
 def multiline_cmd(job):
     return 'echo "First line"\necho "Second line"'

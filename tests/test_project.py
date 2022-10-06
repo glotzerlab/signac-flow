@@ -393,6 +393,7 @@ class TestProjectClass(TestProjectBase):
             def op2(job):
                 pass
 
+    @pytest.mark.filterwarnings("ignore:@flow.with_job")
     @pytest.mark.filterwarnings("ignore:@flow.cmd")
     def test_cmd_with_job_invalid_ordering(self):
         class A(FlowProject):

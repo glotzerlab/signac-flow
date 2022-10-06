@@ -1492,7 +1492,7 @@ class _FlowProjectClass(type):
                 # wraps the original function meaning that any other labels we apply will be masked
                 # if we do this later or not even captured it not added to _OPERATION_FUNCTIONS.
                 with warnings.catch_warnings():
-                    warnings.simplefilter("ignore", FutureWarning)
+                    warnings.simplefilter(action="ignore", category=FutureWarning)
                     if cmd:
                         _cmd(func)
                     if with_job:

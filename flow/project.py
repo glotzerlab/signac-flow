@@ -540,7 +540,7 @@ class BaseFlowOperation:
 class FlowCmdOperation(BaseFlowOperation):
     """An operation that executes a shell command.
 
-    When an operation has the ``@cmd`` directive specified, it is
+    When an operation has the ``FlowProject.operation(cmd=True)`` directive specified, it is
     instantiated as a :class:`~.FlowCmdOperation`. The operation should be a
     function of one or more positional arguments that are instances of
     :class:`~signac.contrib.job.Job`. The command (cmd) may either be a
@@ -589,7 +589,7 @@ class FlowCmdOperation(BaseFlowOperation):
 class FlowOperation(BaseFlowOperation):
     """An operation that executes a Python function.
 
-    All operations without the ``@cmd`` directive use this class. The
+    All operations without the ``FlowProject.operation(cmd=True)`` directive use this class. The
     callable ``op_func`` should be a function of one or more instances of
     :class:`~signac.contrib.job.Job`.
 

@@ -101,15 +101,12 @@ def with_job(func):
         )
 
     @wraps(func)
-    def decorated(__flow_internal_with_job_argument):
-        with __flow_internal_with_job_argument:
+    def decorated(*jobs):
+        with jobs[0] as job:
             if getattr(func, "_flow_cmd", False):
-                return (
-                    f'trap "cd $(pwd)" EXIT && cd {__flow_internal_with_job_argument.ws} && '
-                    f"{func(__flow_internal_with_job_argument)}"
-                )
+                return f'trap "cd $(pwd)" EXIT && cd {job.ws} && {func(job)}'
             else:
-                return func(__flow_internal_with_job_argument)
+                return func(job)
 
     setattr(decorated, "_flow_with_job", True)
     return decorated

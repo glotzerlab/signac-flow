@@ -58,6 +58,8 @@ from .errors import (
 )
 from .hooks import _Hooks
 from .labels import _is_label_func, classlabel, label, staticlabel
+from .operations import cmd as _cmd
+from .operations import with_job as _with_job
 from .render_status import _render_status
 from .scheduling.base import ClusterJob, JobStatus
 from .util import config as flow_config
@@ -538,7 +540,7 @@ class BaseFlowOperation:
 class FlowCmdOperation(BaseFlowOperation):
     """An operation that executes a shell command.
 
-    When an operation has the ``@cmd`` directive specified, it is
+    When an operation has the ``FlowProject.operation(cmd=True)`` directive specified, it is
     instantiated as a :class:`~.FlowCmdOperation`. The operation should be a
     function of one or more positional arguments that are instances of
     :class:`~signac.contrib.job.Job`. The command (cmd) may either be a
@@ -587,7 +589,7 @@ class FlowCmdOperation(BaseFlowOperation):
 class FlowOperation(BaseFlowOperation):
     """An operation that executes a Python function.
 
-    All operations without the ``@cmd`` directive use this class. The
+    All operations without the ``FlowProject.operation(cmd=True)`` directive use this class. The
     callable ``op_func`` should be a function of one or more instances of
     :class:`~signac.contrib.job.Job`.
 
@@ -1438,6 +1440,14 @@ class _FlowProjectClass(type):
             name : str
                 The operation name. Uses the name of the function if None.
                 (Default value = None)
+            cmd : bool, optional, keyword-only
+                Whether the decorated function returns a shell executable string or not. When
+                ``True``, the returned string is executed by the shell. Defaults to ``False``.
+            with_job : bool, optional, keyword-only
+                Whether to change directories to the job workspace when running the job. Defaults to
+                ``False``.
+            directives : dict, optional, keyword-only
+                Directives to use for resource requests and execution.
 
             Returns
             -------
@@ -1447,10 +1457,28 @@ class _FlowProjectClass(type):
 
             _parent_class = parent_class
 
-            def __call__(self, func, name=None):
+            def __call__(
+                self,
+                func=None,
+                name=None,
+                *,
+                cmd=False,
+                with_job=False,
+                directives=None,
+            ):
                 if isinstance(func, str):
-                    return lambda op: self(op, name=func)
+                    return lambda op: self._internal_call(
+                        op, name=func, cmd=cmd, with_job=with_job, directives=directives
+                    )
+                if func is None:
+                    return lambda op: self._internal_call(
+                        op, name=name, cmd=cmd, with_job=with_job, directives=directives
+                    )
+                return self._internal_call(
+                    func, name=name, cmd=cmd, with_job=with_job, directives=directives
+                )
 
+            def _internal_call(self, func, name, *, cmd, with_job, directives):
                 if func in chain(
                     *self._parent_class._OPERATION_PRECONDITIONS.values(),
                     *self._parent_class._OPERATION_POSTCONDITIONS.values(),
@@ -1458,6 +1486,21 @@ class _FlowProjectClass(type):
                     raise FlowProjectDefinitionError(
                         "A condition function cannot be used as an operation."
                     )
+
+                # Handle cmd and with_job options. Use the deprecated decorators internally until
+                # the decorators are removed. These must be done first for now as with_job actually
+                # wraps the original function meaning that any other labels we apply will be masked
+                # if we do this later or not even captured it not added to _OPERATION_FUNCTIONS.
+                with warnings.catch_warnings():
+                    warnings.simplefilter(action="ignore", category=FutureWarning)
+                    if cmd:
+                        _cmd(func)
+                    if with_job:
+                        func = _with_job(func)
+
+                # Store directives
+                if directives is not None:
+                    func._flow_directives = directives
 
                 if name is None:
                     name = func.__name__
@@ -1522,6 +1565,12 @@ class _FlowProjectClass(type):
                     name and directives as an operation of the
                     :class:`~.FlowProject` subclass.
                 """
+                warnings.warn(
+                    "@FlowProject.operation.with_directives has been deprecated as of 0.22.0 and "
+                    "will be removed in 0.23.0. Use @FlowProject.operation(directives={...}) "
+                    "instead.",
+                    FutureWarning,
+                )
 
                 def add_operation_with_directives(function):
                     function._flow_directives = directives

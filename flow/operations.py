@@ -12,9 +12,11 @@ See also: :class:`~.FlowProject`.
 """
 import inspect
 import logging
+import warnings
 from functools import wraps
 from textwrap import indent
 
+from .aggregates import aggregator
 from .directives import _document_directive
 from .environment import ComputeEnvironment
 from .errors import FlowProjectDefinitionError
@@ -42,9 +44,18 @@ def cmd(func):
         :meth:`~.FlowProject.submit` still respects directives and will prepend e.g. MPI or OpenMP
         prefixes to the shell command provided here.
     """
+    warnings.warn(
+        "@flow.cmd has been deprecated as of 0.22.0 and will be removed in "
+        "0.23.0. Use @FlowProject.operation(cmd=True) instead.",
+        FutureWarning,
+    )
     if getattr(func, "_flow_with_job", False):
         raise FlowProjectDefinitionError(
             "The @flow.cmd decorator must appear below the @flow.with_job decorator."
+        )
+    if hasattr(func, "_flow_cmd"):
+        raise FlowProjectDefinitionError(
+            f"Cannot specify that {func} is a command operation twice."
         )
     setattr(func, "_flow_cmd", True)
     return func
@@ -95,7 +106,16 @@ def with_job(func):
         def hello_cmd(job):
             return 'trap "cd `pwd`" EXIT && cd {} && echo "hello {job}"'.format(job.ws)
     """
-    if getattr(func, "_flow_aggregate", False):
+    warnings.warn(
+        "@flow.with_job has been deprecated as of 0.22.0 and will be removed in "
+        "0.23.0. Use @FlowProject.operation(with_job=True) instead.",
+        FutureWarning,
+    )
+    base_aggregator = aggregator.groupsof(1)
+    if hasattr(func, "_flow_with_job"):
+        raise FlowProjectDefinitionError(f"Cannot specify with_job for {func} twice.")
+
+    if getattr(func, "_flow_aggregate", base_aggregator) != base_aggregator:
         raise FlowProjectDefinitionError(
             "The @with_job decorator cannot be used with aggregation."
         )

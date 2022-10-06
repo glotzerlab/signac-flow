@@ -1,4 +1,4 @@
-from flow import FlowProject, aggregator, cmd
+from flow import FlowProject, aggregator
 
 
 class _AggregateTestProject(FlowProject):
@@ -28,8 +28,7 @@ def op1(job):
     pass
 
 
-@_AggregateTestProject.operation
-@cmd
+@_AggregateTestProject.operation(cmd=True)
 @aggregator.groupby("even")
 def agg_op_parallel(*jobs):
     # This is used to test parallel execution of aggregation operations
@@ -71,8 +70,7 @@ def agg_op3(*jobs):
     set_all_job_docs(jobs, "op3", True)
 
 
-@_AggregateTestProject.operation
-@cmd
+@_AggregateTestProject.operation(cmd=True)
 @aggregator(sort_by="i", select=lambda job: job.sp.i <= 2)
 def agg_op4(*jobs):
     return "echo '{jobs[0].sp.i} and {jobs[1].sp.i}'"

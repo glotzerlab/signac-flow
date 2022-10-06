@@ -581,61 +581,54 @@ class FlowCmdOperation(BaseFlowOperation):
     def __call__(self, *jobs):
         """Return the command formatted with the supplied job(s)."""
         cmd = self._cmd(*jobs) if callable(self._cmd) else self._cmd
+        # Inconclusive test if cmd is a format string. If {} with anything in the interior is found
+        # though it is guarenteed not to be a format string.
+        if not re.search(r"\{.*\}", cmd):
+            return cmd
+        warnings.warn(
+            "Returning format strings in a cmd operation is deprecated as of version 0.22.0 and "
+            "will be removed in  0.23.0",
+            FutureWarning,
+        )
         format_arguments = {}
-        if callable(self._cmd):
-            argspec = inspect.getfullargspec(self._cmd)
-            if argspec.varkw or argspec.kwonlyargs:
-                raise RuntimeError(
-                    "FlowProject cmd operations doesn't support keyword only arguments"
-                )
-
-            signature = inspect.signature(self._cmd)
-
-            args = {
-                k: v
-                for k, v in signature.parameters.items()
-                if (k != argspec.varargs and k != "__flow_internal_with_job_argument")
-            }
-
-            # Only functions with arguments followed by variable
-            for i, arg_name in enumerate(args.keys()):
-                try:
-                    format_arguments[arg_name] = jobs[i]
-                except IndexError:
-                    format_arguments[arg_name] = args[arg_name].default
-
-            if argspec.varargs:
-                format_arguments[argspec.varargs] = jobs[len(args) :]
-
-            if format_arguments.get("jobs", None) is None:
-                if re.search("{jobs}", cmd) or re.search(r"{jobs\..*}", cmd):
-                    warnings.warn(
-                        "Argument names for the flow cmd operations must match that of "
-                        "in the function definition. Auto assignment of the jobs "
-                        "argument has been deprecated as of 0.21.0 "
-                        "and will be removed in 0.23.0.",
-                        DeprecationWarning,
-                    )
-                    format_arguments["jobs"] = jobs
-
-            if format_arguments.get("job", None) is None:
-                if len(jobs) == 1 and (
-                    re.search("{job}", cmd) or re.search(r"{job\..*}", cmd)
-                ):
-                    warnings.warn(
-                        "Argument names for the flow cmd operations must match that of "
-                        "in the function definition. Auto assignment of the job "
-                        "argument has been deprecated as of 0.22.0 "
-                        "and will be removed in 0.23.0.",
-                        DeprecationWarning,
-                    )
-                    format_arguments["job"] = jobs[0]
-        else:
+        if not callable(self._cmd):
             format_arguments["jobs"] = jobs
             if len(jobs) == 1:
                 format_arguments["job"] = jobs[0]
+            return cmd.format(**format_arguments)
 
-        return cmd.format(**format_arguments)
+        argspec = inspect.getfullargspec(self._cmd)
+        if argspec.varkw or argspec.kwonlyargs:
+            raise RuntimeError(
+                "FlowProject cmd operations doesn't support keyword only arguments"
+            )
+
+        signature = inspect.signature(self._cmd)
+
+        args = {
+            k: v
+            for k, v in signature.parameters.items()
+            if (k != argspec.varargs and k != "__flow_internal_with_job_argument")
+        }
+
+        # get all named positional/keyword arguments with individual names.
+        for i, arg_name in enumerate(args):
+            try:
+                format_arguments[arg_name] = jobs[i]
+            except IndexError:
+                format_arguments[arg_name] = args[arg_name].default
+
+        # capture any remaining variable positional arguments.
+        if argspec.varargs:
+            format_arguments[argspec.varargs] = jobs[len(args) :]
+
+        # Capture old behavior which assumes job or jobs in the format string. We need to test
+        # the truthiness of the key versus the inclusion because in the case of with_job the above
+        # logic results in format_arguments["jobs"] = ().
+        if not any(format_arguments.get(key, False) for key in ("jobs", "job")):
+            if match := re.search("{.*(jobs?).*}", cmd):
+                # Saves in key jobs or job based on regex match.
+                format_arguments[match.group(1)] = jobs
 
 
 class FlowOperation(BaseFlowOperation):

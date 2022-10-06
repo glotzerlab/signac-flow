@@ -446,7 +446,7 @@ class TestProjectClass(TestProjectBase):
         with _add_cwd_to_environment_pythonpath():
             with _switch_to_directory(project.root_directory()):
                 with redirect_stderr(StringIO()):
-                    with pytest.warns(DeprecationWarning):
+                    with pytest.warns(FutureWarning):
                         project.run()
                 for job in project:
                     assert os.path.isfile(job.fn("output.txt"))
@@ -465,7 +465,7 @@ class TestProjectClass(TestProjectBase):
         with _add_cwd_to_environment_pythonpath():
             with _switch_to_directory(project.root_directory()):
                 with redirect_stderr(StringIO()):
-                    with pytest.warns(DeprecationWarning):
+                    with pytest.warns(FutureWarning):
                         project.run()
                 for job in project:
                     assert os.path.isfile(job.fn("output.txt"))

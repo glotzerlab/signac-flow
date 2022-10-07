@@ -581,7 +581,7 @@ class FlowCmdOperation(BaseFlowOperation):
         """Return the command formatted with the supplied job(s)."""
         cmd = self._cmd(*jobs) if callable(self._cmd) else self._cmd
         # Inconclusive test if cmd is a format string. If {} with anything in the interior is found
-        # though it is guarenteed not to be a format string.
+        # though it is guaranteed not to be a format string.
         if not re.search(r"\{.*\}", cmd):
             return cmd
         warnings.warn(
@@ -599,7 +599,7 @@ class FlowCmdOperation(BaseFlowOperation):
         argspec = inspect.getfullargspec(self._cmd)
         if argspec.varkw or argspec.kwonlyargs:
             raise RuntimeError(
-                "FlowProject cmd operations doesn't support keyword only arguments"
+                "FlowProject cmd operations do not support keyword-only arguments."
             )
 
         signature = inspect.signature(self._cmd)

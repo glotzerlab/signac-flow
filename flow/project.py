@@ -586,47 +586,40 @@ class FlowCmdOperation(BaseFlowOperation):
             if len(jobs) == 1:
                 format_arguments["job"] = jobs[0]
             formatted_cmd = cmd.format(**format_arguments)
-            if formatted_cmd != cmd:
-                warnings.warn(
-                    "Returning format strings in a cmd operation is deprecated as of version "
-                    "0.22.0 and will be removed in  0.23.0",
-                    FutureWarning,
+        else:
+            argspec = inspect.getfullargspec(self._cmd)
+            if argspec.varkw or argspec.kwonlyargs:
+                raise RuntimeError(
+                    "FlowProject cmd operations do not support keyword-only arguments."
                 )
-            return formatted_cmd
 
-        argspec = inspect.getfullargspec(self._cmd)
-        if argspec.varkw or argspec.kwonlyargs:
-            raise RuntimeError(
-                "FlowProject cmd operations do not support keyword-only arguments."
-            )
+            signature = inspect.signature(self._cmd)
 
-        signature = inspect.signature(self._cmd)
+            args = {
+                k: v
+                for k, v in signature.parameters.items()
+                if (k != argspec.varargs and k != "__flow_internal_with_job_argument")
+            }
 
-        args = {
-            k: v
-            for k, v in signature.parameters.items()
-            if (k != argspec.varargs and k != "__flow_internal_with_job_argument")
-        }
+            # get all named positional/keyword arguments with individual names.
+            for i, arg_name in enumerate(args):
+                try:
+                    format_arguments[arg_name] = jobs[i]
+                except IndexError:
+                    format_arguments[arg_name] = args[arg_name].default
 
-        # get all named positional/keyword arguments with individual names.
-        for i, arg_name in enumerate(args):
-            try:
-                format_arguments[arg_name] = jobs[i]
-            except IndexError:
-                format_arguments[arg_name] = args[arg_name].default
+            # capture any remaining variable positional arguments.
+            if argspec.varargs:
+                format_arguments[argspec.varargs] = jobs[len(args) :]
 
-        # capture any remaining variable positional arguments.
-        if argspec.varargs:
-            format_arguments[argspec.varargs] = jobs[len(args) :]
-
-        # Capture old behavior which assumes job or jobs in the format string. We need to test
-        # the truthiness of the key versus the inclusion because in the case of with_job the above
-        # logic results in format_arguments["jobs"] = ().
-        if not any(format_arguments.get(key, False) for key in ("jobs", "job")):
-            if match := re.search("{.*(jobs?).*}", cmd):
-                # Saves in key jobs or job based on regex match.
-                format_arguments[match.group(1)] = jobs
-        formatted_cmd = cmd.format(**format_arguments)
+            # Capture old behavior which assumes job or jobs in the format string. We need to test
+            # the truthiness of the key versus the inclusion because in the case of with_job the
+            # above logic results in format_arguments["jobs"] = ().
+            if not any(format_arguments.get(key, False) for key in ("jobs", "job")):
+                if match := re.search("{.*(jobs?).*}", cmd):
+                    # Saves in key jobs or job based on regex match.
+                    format_arguments[match.group(1)] = jobs
+            formatted_cmd = cmd.format(**format_arguments)
         if formatted_cmd != cmd:
             warnings.warn(
                 "Returning format strings in a cmd operation is deprecated as of version 0.22.0 "

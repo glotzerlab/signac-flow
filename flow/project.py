@@ -630,6 +630,7 @@ class FlowCmdOperation(BaseFlowOperation):
             if match := re.search("{.*(jobs?).*}", cmd):
                 # Saves in key jobs or job based on regex match.
                 format_arguments[match.group(1)] = jobs
+        return cmd.format(**format_arguments)
 
 
 class FlowOperation(BaseFlowOperation):

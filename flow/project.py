@@ -580,21 +580,19 @@ class FlowCmdOperation(BaseFlowOperation):
     def __call__(self, *jobs):
         """Return the command formatted with the supplied job(s)."""
         cmd = self._cmd(*jobs) if callable(self._cmd) else self._cmd
-        # Inconclusive test if cmd is a format string. If {} with anything in the interior is found
-        # though it is guaranteed not to be a format string.
-        if not re.search(r"\{.*\}", cmd):
-            return cmd
-        warnings.warn(
-            "Returning format strings in a cmd operation is deprecated as of version 0.22.0 and "
-            "will be removed in  0.23.0",
-            FutureWarning,
-        )
         format_arguments = {}
         if not callable(self._cmd):
             format_arguments["jobs"] = jobs
             if len(jobs) == 1:
                 format_arguments["job"] = jobs[0]
-            return cmd.format(**format_arguments)
+            formatted_cmd = cmd.format(**format_arguments)
+            if formatted_cmd != cmd:
+                warnings.warn(
+                    "Returning format strings in a cmd operation is deprecated as of version "
+                    "0.22.0 and will be removed in  0.23.0",
+                    FutureWarning,
+                )
+            return formatted_cmd
 
         argspec = inspect.getfullargspec(self._cmd)
         if argspec.varkw or argspec.kwonlyargs:
@@ -628,7 +626,14 @@ class FlowCmdOperation(BaseFlowOperation):
             if match := re.search("{.*(jobs?).*}", cmd):
                 # Saves in key jobs or job based on regex match.
                 format_arguments[match.group(1)] = jobs
-        return cmd.format(**format_arguments)
+        formatted_cmd = cmd.format(**format_arguments)
+        if formatted_cmd != cmd:
+            warnings.warn(
+                "Returning format strings in a cmd operation is deprecated as of version 0.22.0 "
+                "and will be removed in  0.23.0",
+                FutureWarning,
+            )
+        return formatted_cmd
 
 
 class FlowOperation(BaseFlowOperation):

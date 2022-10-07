@@ -23,9 +23,9 @@ class _HooksList(list):
 
 
 class _Hooks:
-    """:class:`~._Hooks` execute an action or set of actions at specific stages of operation execution.
+    """:class:`~._Hooks` execute actions at specific stages of operation execution.
 
-    :class:`~._Hooks` can execute a user defined function when an operation
+    :class:`~._Hooks` can execute user defined functions when an operation
     starts, succeeds, fails, or finishes (regardless of whether the operation
     executed successfully or failed).
 

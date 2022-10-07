@@ -1,6 +1,5 @@
 import os
 
-import flow
 from flow import FlowProject
 
 
@@ -35,9 +34,8 @@ def b_is_even(job):
         return False
 
 
-@flow.cmd
 @group1
-@_TestProject.operation
+@_TestProject.operation(cmd=True)
 @_TestProject.pre(b_is_even)
 @_TestProject.post.isfile("world.txt")
 def op1(job):

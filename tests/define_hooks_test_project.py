@@ -1,4 +1,3 @@
-import flow
 from flow import FlowProject
 
 HOOKS_ERROR_MESSAGE = "You raised an error! Hooray!"
@@ -41,9 +40,7 @@ def base(job):
 @_HooksTestProject.operation_hooks.on_exit(set_job_doc(HOOK_KEYS[1]))
 @_HooksTestProject.operation_hooks.on_success(set_job_doc(HOOK_KEYS[2]))
 @_HooksTestProject.operation_hooks.on_exception(set_job_doc_with_error())
-@_HooksTestProject.operation
-@flow.with_job
-@flow.cmd
+@_HooksTestProject.operation(cmd=True, with_job=True)
 def base_cmd(job):
     if job.sp.raise_exception:
         return "exit 42"
@@ -57,9 +54,7 @@ def base_no_decorators(job):
         raise RuntimeError(HOOKS_ERROR_MESSAGE)
 
 
-@_HooksTestProject.operation
-@flow.with_job
-@flow.cmd
+@_HooksTestProject.operation(cmd=True, with_job=True)
 def base_cmd_no_decorators(job):
     if job.sp.raise_exception:
         return "exit 42"
@@ -74,9 +69,7 @@ def raise_exception_in_hook(job):
 
 
 @_HooksTestProject.operation_hooks.on_start(raise_error)
-@_HooksTestProject.operation
-@flow.with_job
-@flow.cmd
+@_HooksTestProject.operation(cmd=True, with_job=True)
 def raise_exception_in_hook_cmd(job):
     pass
 

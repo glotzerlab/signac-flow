@@ -21,7 +21,6 @@ import sys
 import textwrap
 import threading
 import time
-import traceback
 import warnings
 from collections import Counter, defaultdict
 from copy import deepcopy
@@ -59,6 +58,8 @@ from .errors import (
 )
 from .hooks import _Hooks
 from .labels import _is_label_func, classlabel, label, staticlabel
+from .operations import cmd as _cmd
+from .operations import with_job as _with_job
 from .render_status import _render_status
 from .scheduling.base import ClusterJob, JobStatus
 from .util import config as flow_config
@@ -541,7 +542,7 @@ class BaseFlowOperation:
 class FlowCmdOperation(BaseFlowOperation):
     """An operation that executes a shell command.
 
-    When an operation has the ``@cmd`` directive specified, it is
+    When an operation has the ``FlowProject.operation(cmd=True)`` directive specified, it is
     instantiated as a :class:`~.FlowCmdOperation`. The operation should be a
     function of one or more positional arguments that are instances of
     :class:`~signac.contrib.job.Job`. The command (cmd) may either be a
@@ -634,7 +635,7 @@ class FlowCmdOperation(BaseFlowOperation):
 class FlowOperation(BaseFlowOperation):
     """An operation that executes a Python function.
 
-    All operations without the ``@cmd`` directive use this class. The
+    All operations without the ``FlowProject.operation(cmd=True)`` directive use this class. The
     callable ``op_func`` should be a function of one or more instances of
     :class:`~signac.contrib.job.Job`.
 
@@ -1485,6 +1486,14 @@ class _FlowProjectClass(type):
             name : str
                 The operation name. Uses the name of the function if None.
                 (Default value = None)
+            cmd : bool, optional, keyword-only
+                Whether the decorated function returns a shell executable string or not. When
+                ``True``, the returned string is executed by the shell. Defaults to ``False``.
+            with_job : bool, optional, keyword-only
+                Whether to change directories to the job workspace when running the job. Defaults to
+                ``False``.
+            directives : dict, optional, keyword-only
+                Directives to use for resource requests and execution.
 
             Returns
             -------
@@ -1494,10 +1503,28 @@ class _FlowProjectClass(type):
 
             _parent_class = parent_class
 
-            def __call__(self, func, name=None):
+            def __call__(
+                self,
+                func=None,
+                name=None,
+                *,
+                cmd=False,
+                with_job=False,
+                directives=None,
+            ):
                 if isinstance(func, str):
-                    return lambda op: self(op, name=func)
+                    return lambda op: self._internal_call(
+                        op, name=func, cmd=cmd, with_job=with_job, directives=directives
+                    )
+                if func is None:
+                    return lambda op: self._internal_call(
+                        op, name=name, cmd=cmd, with_job=with_job, directives=directives
+                    )
+                return self._internal_call(
+                    func, name=name, cmd=cmd, with_job=with_job, directives=directives
+                )
 
+            def _internal_call(self, func, name, *, cmd, with_job, directives):
                 if func in chain(
                     *self._parent_class._OPERATION_PRECONDITIONS.values(),
                     *self._parent_class._OPERATION_POSTCONDITIONS.values(),
@@ -1505,6 +1532,21 @@ class _FlowProjectClass(type):
                     raise FlowProjectDefinitionError(
                         "A condition function cannot be used as an operation."
                     )
+
+                # Handle cmd and with_job options. Use the deprecated decorators internally until
+                # the decorators are removed. These must be done first for now as with_job actually
+                # wraps the original function meaning that any other labels we apply will be masked
+                # if we do this later or not even captured it not added to _OPERATION_FUNCTIONS.
+                with warnings.catch_warnings():
+                    warnings.simplefilter(action="ignore", category=FutureWarning)
+                    if cmd:
+                        _cmd(func)
+                    if with_job:
+                        func = _with_job(func)
+
+                # Store directives
+                if directives is not None:
+                    func._flow_directives = directives
 
                 if name is None:
                     name = func.__name__
@@ -1569,6 +1611,12 @@ class _FlowProjectClass(type):
                     name and directives as an operation of the
                     :class:`~.FlowProject` subclass.
                 """
+                warnings.warn(
+                    "@FlowProject.operation.with_directives has been deprecated as of 0.22.0 and "
+                    "will be removed in 0.23.0. Use @FlowProject.operation(directives={...}) "
+                    "instead.",
+                    FutureWarning,
+                )
 
                 def add_operation_with_directives(function):
                     function._flow_directives = directives
@@ -1744,9 +1792,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         )
         self._flow_config["status_performance_warn_threshold"] = float(
             self._flow_config["status_performance_warn_threshold"]
-        )
-        self._flow_config["show_traceback"] = _config_value_as_bool(
-            self._flow_config["show_traceback"]
         )
         jsonschema.validate(
             self._flow_config,
@@ -3099,23 +3144,42 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 if aggregate_id.startswith("agg-"):
                     # TODO: Fill parameters with empty values (or shared values?)
                     raise ValueError("Cannot show parameters for aggregates.")
-                statepoint = self.open_job(id=aggregate_id).statepoint()
+                job = self.open_job(id=aggregate_id)
+                # Cache the job state point and document if used to render status parameters.
+                statepoint = None
+                document = None
 
                 def dotted_get(mapping, key):
                     """Fetch a value from a nested mapping using a dotted key."""
-                    if mapping is None:
-                        return None
                     tokens = key.split(".")
-                    if len(tokens) > 1:
-                        return dotted_get(mapping.get(tokens[0]), ".".join(tokens[1:]))
-                    return mapping.get(key)
+                    v = mapping
+                    for token in tokens:
+                        if v is None:
+                            return None
+                        v = v.get(token)
+                    return v
 
                 status["parameters"] = {}
                 for parameter in parameters:
-                    status["parameters"][parameter] = shorten(
-                        str(self._alias(dotted_get(statepoint, parameter))),
-                        param_max_width,
-                    )
+                    if not parameter.startswith("doc."):
+                        if parameter.startswith("sp."):
+                            parameter_name = parameter[3:]
+                        else:
+                            parameter_name = parameter
+                        if statepoint is None:
+                            statepoint = job.statepoint()
+                        status["parameters"][parameter] = shorten(
+                            str(self._alias(dotted_get(statepoint, parameter_name))),
+                            param_max_width,
+                        )
+                    else:
+                        parameter_name = parameter[4:]
+                        if document is None:
+                            document = job.document()
+                        status["parameters"][parameter] = shorten(
+                            str(self._alias(dotted_get(document, parameter_name))),
+                            param_max_width,
+                        )
 
             for status in statuses.values():
                 _add_parameters(status)
@@ -4344,8 +4408,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             "--parameters",
             type=str,
             nargs="*",
-            help="Display select parameters of the job's "
-            "statepoint with the detailed view.",
+            help="Display select parameters of the job state point "
+            "(with optional prefix 'sp.') or job document (by using prefix 'doc.') "
+            "in the detailed view.",
         )
         view_group.add_argument(
             "--param-max-width", type=int, help="Limit the width of each parameter row."
@@ -4729,7 +4794,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "The -1/--one-line argument is incompatible with "
                 "'--stack' and will be ignored."
             )
-        show_traceback = args.debug or args.show_traceback
         args = {
             key: val
             for key, val in vars(args).items()
@@ -4738,10 +4802,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "func",
                 "verbose",
                 "debug",
-                "show_traceback",
                 "job_id",
                 "filter",
                 "doc_filter",
+                "show_traceback",
             ]
         }
         if args.pop("full"):
@@ -4751,21 +4815,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         try:
             self.print_status(jobs=aggregates, **args)
         except Exception as error:
-            if show_traceback:
-                logger.error(
-                    f"Error during status update: {str(error)}\nUse '--ignore-errors' to "
-                    "complete the update anyways."
-                )
-            else:
-                logger.error(
-                    f"Error during status update: {str(error)}\nUse '--ignore-errors' to "
-                    "complete the update anyways or '--show-traceback' to show "
-                    "the full traceback."
-                )
-                if isinstance(error, (UserOperationError, UserConditionError)):
-                    # Always show the user traceback cause.
-                    error = error.__cause__
-            traceback.print_exception(type(error), error, error.__traceback__)
+            logger.error(
+                f"Error during status update: {str(error)}\nUse '--ignore-errors' to "
+                "complete the update anyways."
+            )
+            raise error
         else:
             if aggregates is None:
                 length_jobs = sum(
@@ -4960,15 +5014,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             )
             _parser.add_argument(
                 "--show-traceback",
-                dest=prefix + "show_traceback",
+                dest="show_traceback",
                 action="store_true",
-                help="Show the full traceback on error.",
+                help="No op. Exists to be backwards comaptible with signac-flow version <= 0.21.",
             )
             _parser.add_argument(
                 "--debug",
                 dest=prefix + "debug",
                 action="store_true",
-                help="This option implies `-vv --show-traceback`.",
+                help="This option implies `-vv`.",
             )
 
         subparsers = parser.add_subparsers()
@@ -5107,20 +5161,20 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             parser.print_usage()
             sys.exit(2)
 
+        if args.show_traceback:
+            warnings.warn(
+                "--show-traceback is deprecated and to be removed in signac-flow version 0.23.",
+                FutureWarning,
+            )
+
         # Manually 'merge' the various global options defined for both the main parser
         # and the parent parser that are shared by all subparsers:
-        for dest in ("verbose", "show_traceback", "debug"):
+        for dest in ("verbose", "debug"):
             setattr(args, dest, getattr(args, "main_" + dest) or getattr(args, dest))
             delattr(args, "main_" + dest)
 
-        # Read the config file and set the internal flag.
-        # Do not overwrite with False if not present in config file
-        if self._flow_config["show_traceback"]:
-            args.show_traceback = True
-
-        if args.debug:  # Implies '-vv' and '--show-traceback'
+        if args.debug:  # Implies '-vv'
             args.verbose = max(2, args.verbose)
-            args.show_traceback = True
 
         # Support print_status argument alias
         if args.func == self._main_status and args.full:
@@ -5134,65 +5188,18 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Set verbosity level according to the `-v` argument.
         logging.basicConfig(level=max(0, logging.WARNING - 10 * args.verbose))
 
-        def _show_traceback_and_exit(error):
-            is_user_error = isinstance(error, (UserOperationError, UserConditionError))
-            if is_user_error:
-                # Always show the user traceback cause.
-                error = error.__cause__
-            if args.show_traceback or is_user_error:
-                traceback.print_exception(type(error), error, error.__traceback__)
-            if not args.show_traceback:
-                print(
-                    "Execute with '--show-traceback' or '--debug' to show the "
-                    "full traceback.",
-                    file=sys.stderr,
-                )
-            sys.exit(1)
-
         try:
             args.func(args)
-        except SubmitError as error:
-            print("Submission error:", error, file=sys.stderr)
-            _show_traceback_and_exit(error)
         except (TimeoutError, subprocess.TimeoutExpired) as error:
             print(
                 "Error: Failed to complete execution due to "
                 f"timeout ({args.timeout} seconds).",
                 file=sys.stderr,
             )
-            _show_traceback_and_exit(error)
+            raise error
         except Jinja2TemplateNotFound as error:
             print(f"Did not find template script '{error}'.", file=sys.stderr)
-            _show_traceback_and_exit(error)
-        except AssertionError as error:
-            if not args.show_traceback:
-                print(
-                    "ERROR: Encountered internal error during program execution.",
-                    file=sys.stderr,
-                )
-            _show_traceback_and_exit(error)
-        except (UserOperationError, UserConditionError) as error:
-            if str(error):
-                print(f"ERROR: {error}\n", file=sys.stderr)
-            else:
-                print(
-                    "ERROR: Encountered error during program execution.\n",
-                    file=sys.stderr,
-                )
-            _show_traceback_and_exit(error)
-        except Exception as error:
-            if str(error):
-                print(
-                    "ERROR: Encountered error during program execution: "
-                    f"'{error}'\n",
-                    file=sys.stderr,
-                )
-            else:
-                print(
-                    "ERROR: Encountered error during program execution.\n",
-                    file=sys.stderr,
-                )
-            _show_traceback_and_exit(error)
+            raise error
 
 
 def _deserialize_and_run_operation(loads, project, operation_data):

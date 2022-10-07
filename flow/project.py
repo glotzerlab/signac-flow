@@ -80,8 +80,6 @@ from .util.translate import abbreviate, shorten
 
 logger = logging.getLogger(__name__)
 
-warnings.simplefilter("once", DeprecationWarning)
-
 
 # The TEMPLATE_HELP can be shown with the --template-help option available to all
 # command line subcommands that use the templating system.

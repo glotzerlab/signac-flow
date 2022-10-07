@@ -19,43 +19,33 @@ class LogOperations:
 
     def __init__(self, fn_logfile=".operations.log"):
         self._fn_logfile = fn_logfile
+        # getLogger keep its own cache. This just serves to reduce the time spent setting up loggers
+        # by only doing it once.
         self._loggers = dict()
 
     def log_operation(self, operation, job):
         """TODO: Add user-defined job operation to logger."""
-        if str(job) in self._loggers:
-            logger = self._loggers[str(job)]
-        else:
-            logger = self._loggers[str(job)] = logging.getLogger(str(job))
-            logger.setLevel(logging.DEBUG)
+        self._get_logger(job).info(f"Executed operation '{operation}'.")
 
-            fh = logging.FileHandler(job.fn(self._fn_logfile))
-            fh.setLevel(logging.DEBUG)
-            formatter = logging.Formatter(
-                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-            )
-            fh.setFormatter(formatter)
+    def _get_logger(self, job):
+        if job not in self._loggers:
+            self._loggers[job] = self._setup_logger(job)
+        return self._loggers[job]
 
-            logger.addHandler(fh)
-            logger.info(f"Executed operation '{operation}'.")
+    def _setup_logger(self, job):
+        logger = logging.getLogger(job)
+        fh = logging.FileHandler(job.fn(self._fn_logfile))
+        fh.setLevel(logging.DEBUG)
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
+        return logger
 
     def log_operation_on_exception(self, operation, error, job):
         """TODO: Add user-defined job operation to logger."""
-        if str(job) in self._loggers:
-            logger = self._loggers[str(job)]
-        else:
-            logger = self._loggers[str(job)] = logging.getLogger(str(job))
-            logger.setLevel(logging.DEBUG)
-
-            fh = logging.FileHandler(job.fn(self._fn_logfile))
-            fh.setLevel(logging.DEBUG)
-            formatter = logging.Formatter(
-                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-            )
-            fh.setFormatter(formatter)
-
-            logger.addHandler(fh)
-
+        logger = self._get_logger(job)
         if error is None:
             logger.info(f"Executed operation '{operation}'.")
         else:

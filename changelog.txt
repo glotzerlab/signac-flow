@@ -23,6 +23,11 @@ Changed
 - ``@flow.cmd`` and ``flow.with_job`` are deprecated (#679, #669, #665).
 - ``@FlowProject.operation.with_directives`` is deprecated (#679, #665).
 
+Changed
++++++++
+
+- Broke ``TestBidict`` and ``TestTemplateFilters`` into smaller and simpler functions (#626).
+
 Version 0.21
 ============
 

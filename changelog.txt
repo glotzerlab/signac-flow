@@ -15,6 +15,13 @@ Added
 +++++
 
 - The CLI ``status`` command can show document parameters by using flag ``-p doc.PARAM`` (#667).
+- ``FlowProject.operation`` now has ``cmd``, ``with_job``, and ``directives`` keyword only arguments (#679, #655, #669).
+
+Changed
++++++++
+
+- ``@flow.cmd`` and ``flow.with_job`` are deprecated (#679, #669, #665).
+- ``@FlowProject.operation.with_directives`` is deprecated (#679, #665).
 
 Version 0.21
 ============

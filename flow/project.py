@@ -588,17 +588,9 @@ class FlowCmdOperation(BaseFlowOperation):
             formatted_cmd = cmd.format(**format_arguments)
         else:
             argspec = inspect.getfullargspec(self._cmd)
-            if argspec.varkw or argspec.kwonlyargs:
-                raise RuntimeError(
-                    "FlowProject cmd operations do not support keyword-only arguments."
-                )
-
             signature = inspect.signature(self._cmd)
-
             args = {
-                k: v
-                for k, v in signature.parameters.items()
-                if (k != argspec.varargs and k != "__flow_internal_with_job_argument")
+                k: v for k, v in signature.parameters.items() if k != argspec.varargs
             }
 
             # get all named positional/keyword arguments with individual names.

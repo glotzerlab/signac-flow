@@ -6,7 +6,7 @@ import logging
 
 
 class LogOperations:
-    """:class:`~.LogOperations` logs basic information about the execution of operations to a log file.
+    """:class:`~.LogOperations` logs information about the execution of operations to a log file.
 
     #TODO: Add detail
 

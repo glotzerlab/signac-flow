@@ -4,21 +4,11 @@ from flow.util.misc import _bidict
 from flow.util.template_filters import calc_memory
 
 
-@pytest.fixture()
-def mock_operations():
-    class MockOp:
-        def __init__(self, memory=None):
-            self.directives = {"memory": memory}
-
-    return [MockOp(1), MockOp(8), MockOp()]
-
-
-@pytest.fixture()
-def bd():
-    return _bidict({"a": 1, "b": 2})
-
-
 class TestBidict:
+    @pytest.fixture()
+    def bd(self):
+        return _bidict({"a": 1, "b": 2})
+
     def test_basic_dict(self, bd):
 
         bd["c"] = 1
@@ -33,18 +23,18 @@ class TestBidict:
         assert bd.get("a") == 1
         assert bd.get("q", 42) == 42
 
-    def test_belonging_func(self, bd):
+    def test_contains(self, bd):
         assert "a" in bd
         assert "q" not in bd
 
-    def test_del_c(self, bd):
+    def test_delitem(self, bd):
         bd["c"] = 1
         del bd["c"]
         assert bd == {"a": 1, "b": 2}
         assert bd.inverse == {1: ["a"], 2: ["b"]}
         assert len(bd) == 2
 
-    def test_add_b(self, bd):
+    def test_setitem(self, bd):
         bd["b"] = 3
         assert bd == {"a": 1, "b": 3}
         assert bd.inverse == {3: ["b"], 1: ["a"]}
@@ -62,12 +52,12 @@ class TestBidict:
         assert bd == {"b": 2}
         assert bd.inverse == {2: ["b"]}
 
-    def test_set_default_overlap(self, bd):
+    def test_setdefault_existing_key(self, bd):
         bd.setdefault("b", 7)
         assert bd == {"b": 2, "a": 1}
         assert bd.inverse == {1: ["a"], 2: ["b"]}
 
-    def test_default_no_overlap(self, bd):
+    def test_setdefault_nonexistant_key(self, bd):
         bd.setdefault("c", 9)
         assert bd == {"a": 1, "b": 2, "c": 9}
         assert bd.inverse == {2: ["b"], 9: ["c"], 1: ["a"]}
@@ -84,6 +74,14 @@ class TestBidict:
 
 
 class TestTemplateFilters:
+    @pytest.fixture()
+    def mock_operations(self):
+        class MockOp:
+            def __init__(self, memory=None):
+                self.directives = {"memory": memory}
+
+        return [MockOp(1), MockOp(8), MockOp()]
+
     def test_calc_memory_serial(self, mock_operations):
         # Test when operations run in serial
         assert calc_memory([mock_operations[0]], False) == 1

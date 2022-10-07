@@ -615,7 +615,7 @@ class FlowCmdOperation(BaseFlowOperation):
         if formatted_cmd != cmd:
             warnings.warn(
                 "Returning format strings in a cmd operation is deprecated as of version 0.22.0 "
-                "and will be removed in  0.23.0",
+                "and will be removed in  0.23.0. Users should format the command string.",
                 FutureWarning,
             )
         return formatted_cmd

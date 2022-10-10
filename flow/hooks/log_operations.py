@@ -8,13 +8,16 @@ import logging
 class LogOperations:
     """:class:`~.LogOperations` logs information about the execution of operations to a log file.
 
-    #TODO: Add detail
+    This hooks provides information, optionally, on the start, successful completion, and/or
+    erroring of one or more operations in a `flow.FlowProject` instance. The logs are stored in a
+    file given by the parameter ``fn_logfile``. This file will be appended to if it already exists.
+
+    The default formating for the log provides the time, job id, log level, and log message.
 
     Parameters
     ----------
     fn_logfile: log filename
-        #TODO.
-        Default is ".operations.logs"
+        The name of the log file in the job workspace. Default is ".operations.logs".
     """
 
     def __init__(self, fn_logfile=".operations.log"):

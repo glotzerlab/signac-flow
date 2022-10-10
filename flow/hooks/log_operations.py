@@ -58,8 +58,28 @@ class LogOperations:
         logger.addHandler(fh)
         return logger
 
+    def install_operation_hooks(self, op, project_cls):
+        """Install log operation to one operation in a signac-flow project.
+
+        Parameters
+        ----------
+        op : function
+            An operation function to log.
+        project_cls : type
+            A subclass of `flow.FlowProject`.
+        """
+        project_cls.operation.on_start(op, self.on_start)
+        project_cls.operation.on_success(op, self.on_success)
+        project_cls.operation.on_exception(op, self.on_exception)
+
     def install_project_hooks(self, project):
-        """Install log operation to all operations in a signac-flow project."""
+        """Install log operation to all operations in a signac-flow project.
+
+        Parameters
+        ----------
+        project : flow.FlowProject
+            The project to install project wide hooks on.
+        """
         project.project_hooks.on_start.append(self.on_start)
         project.project_hooks.on_success.append(self.on_success)
         project.project_hooks.on_exception.append(self.on_exception)

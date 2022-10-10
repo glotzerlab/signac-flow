@@ -33,7 +33,7 @@ class LogOperations:
         return self._loggers[job]
 
     def _setup_logger(self, job):
-        logger = logging.getLogger(job)
+        logger = logging.getLogger(str(job))
         fh = logging.FileHandler(job.fn(self._fn_logfile))
         fh.setLevel(logging.DEBUG)
         formatter = logging.Formatter(

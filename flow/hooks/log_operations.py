@@ -84,5 +84,3 @@ class LogOperations:
         project.project_hooks.on_success.append(self.on_success)
         project.project_hooks.on_exception.append(self.on_exception)
         return project
-
-    __call__ = install_project_hooks

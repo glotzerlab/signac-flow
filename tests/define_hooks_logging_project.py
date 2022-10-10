@@ -13,16 +13,7 @@ class _HooksLogOperationsProject(FlowProject):
     pass
 
 
-def log_operation(fn_log_file, trigger):
-    lo = LogOperations(fn_log_file).log_operation
-    return trigger(lambda operation, job: lo(operation, job))
-
-
-def log_operation_on_exception(fn_log_file):
-    lo = LogOperations(fn_log_file).log_operation_on_exception
-    return _HooksLogOperationsProject.operation_hooks.on_exception(
-        lambda operation, error, job: lo(operation, error, job)
-    )
+operation_log = LogOperations("operations.log")
 
 
 def set_logger(job):
@@ -32,15 +23,8 @@ def set_logger(job):
     return logger
 
 
-on_start = _HooksLogOperationsProject.operation_hooks.on_start
-on_exit = _HooksLogOperationsProject.operation_hooks.on_exit
-on_success = _HooksLogOperationsProject.operation_hooks.on_success
-
-
+@operation_log.install_operation_hooks(_HooksLogOperationsProject)
 @_HooksLogOperationsProject.operation
-@log_operation("base_start.log", on_start)
-@log_operation("base_success.log", on_success)
-@log_operation_on_exception("base_exception.log")
 def base(job):
     logger = set_logger(job)
 
@@ -50,9 +34,10 @@ def base(job):
         raise RuntimeError(HOOKS_ERROR_MESSAGE)
 
 
+@_HooksLogOperationsProject.operation_hooks.on_start(operation_log.on_start)
+@_HooksLogOperationsProject.operation_hooks.on_success(operation_log.on_success)
+@_HooksLogOperationsProject.operation_hooks.on_exception(operation_log.on_exception)
 @_HooksLogOperationsProject.operation
-@log_operation("base_cmd_success.log", on_success)
-@log_operation_on_exception("base_cmd_exception.log")
 @flow.cmd
 def base_cmd(job):
     if job.sp.raise_exception:

@@ -2404,7 +2404,7 @@ class TestHooksSetUp(TestProjectBase):
         project._entrypoint = self.entrypoint
         return project
 
-    def call_subcmd(self, subcmd, stderr=subprocess.DEVNULL):
+    def call_subcmd(self, subcmd, stderr=subprocess.PIPE):
         # Bypass raising the error/checking output since it interferes with hook.on_exception
         fn_script = self.entrypoint["path"]
         _cmd = f"python {fn_script} {subcmd} --debug"
@@ -2413,8 +2413,8 @@ class TestHooksSetUp(TestProjectBase):
                 with _switch_to_directory(self.project.root_directory()):
                     return subprocess.check_output(_cmd.split(), stderr=stderr)
             except subprocess.CalledProcessError as error:
-                print(error, file=sys.stderr)
-                print(error.output, file=sys.stderr)
+                print("STDOUT:", error.stdout, sep="\n", file=sys.stderr)
+                print("STDERR:", error.stderr, sep="\n", file=sys.stderr)
                 raise
 
     @pytest.fixture(scope="function")
@@ -2625,9 +2625,13 @@ class TestHooksLogOperationSetUp(TestHooksSetUp):
         )
     )
 
+    ON_START_MSG = "Starting execution of operation '{}'."
+    SUCCESS_MSG = "Successfully finished execution of operation '{}'."
+    EXCEPTION_MSG = "Execution of operation '{}' failed with error"
+
     @staticmethod
-    def get_log_filename(operation_name, key):
-        return f"{operation_name}_{key}.log"
+    def get_log_filename():
+        return "operations.log"
 
     @staticmethod
     def get_log_output(job, log_filename):
@@ -2643,8 +2647,7 @@ class TestHooksLogCmd(TestHooksLogOperationSetUp):
         return request.param
 
     def test_success(self, project, job, operation_name):
-        log_fn = self.get_log_filename(operation_name, self.keys[2])
-
+        log_fn = self.get_log_filename()
         assert not job.isfile(log_fn)
 
         if job.sp.raise_exception:
@@ -2659,10 +2662,11 @@ class TestHooksLogCmd(TestHooksLogOperationSetUp):
             assert job.isfile(log_fn)
             log_output = self.get_log_output(job, log_fn)
             assert self.runtime_message in log_output
-            assert f"Executed operation '{operation_name}'" in log_output
+            assert self.ON_START_MSG.format(operation_name) in log_output
+            assert self.SUCCESS_MSG.format(operation_name) in log_output
 
     def test_exception(self, project, job, operation_name):
-        log_fn = self.get_log_filename(operation_name, self.keys[3])
+        log_fn = self.get_log_filename()
 
         assert not job.isfile(log_fn)
 
@@ -2676,9 +2680,7 @@ class TestHooksLogCmd(TestHooksLogOperationSetUp):
             assert job.isfile(log_fn)
             log_output = self.get_log_output(job, log_fn)
             assert self.error_message in log_output
-            assert (
-                f"Execution of operation '{operation_name}' failed with" in log_output
-            )
+            assert self.EXCEPTION_MSG.format(operation_name)
         else:
             assert not job.isfile(log_fn)
 
@@ -2691,7 +2693,7 @@ class TestHooksLogBase(TestHooksLogCmd):
         return request.param
 
     def test_start(self, project, job, operation_name):
-        log_fn = self.get_log_filename(operation_name, self.keys[0])
+        log_fn = self.get_log_filename()
 
         assert not job.isfile(log_fn)
 
@@ -2707,14 +2709,13 @@ class TestHooksLogBase(TestHooksLogCmd):
 
         assert self.runtime_message in log_output
 
+        assert self.ON_START_MSG.format(operation_name) in log_output
         if job.sp.raise_exception:
             assert self.error_message in log_output
-            assert (
-                f"Execution of operation '{operation_name}' failed with" in log_output
-            )
+            assert self.EXCEPTION_MSG.format(operation_name)
         else:
             assert self.error_message not in log_output
-            assert f"Executed operation '{operation_name}'" in log_output
+            assert self.SUCCESS_MSG.format(operation_name) in log_output
 
 
 class TestHooksLogInstall(TestHooksLogOperationSetUp):
@@ -2744,11 +2745,11 @@ class TestHooksLogInstall(TestHooksLogOperationSetUp):
         if job.sp.raise_exception:
             assert "42" in log_output
             assert define_hooks_logging_project.HOOKS_ERROR_MESSAGE in log_output
-            assert "Execution of operation 'base' failed with" in log_output
-            assert "Execution of operation 'base_cmd' failed with" in log_output
+            assert self.EXCEPTION_MSG.format("base") in log_output
+            assert self.EXCEPTION_MSG.format("base_cmd") in log_output
         else:
-            assert "Executed operation 'base'" in log_output
-            assert "Executed operation 'base_cmd'" in log_output
+            assert self.SUCCESS_MSG.format("base") in log_output
+            assert self.SUCCESS_MSG.format("base_cmd") in log_output
 
 
 class TestIgnoreConditions:

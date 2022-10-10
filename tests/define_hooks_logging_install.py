@@ -32,4 +32,6 @@ def base_cmd(job):
 
 
 if __name__ == "__main__":
-    LogOperations("operations.log").install_hooks(_HooksLogOperationsProject()).main()
+    LogOperations("operations.log").install_project_hooks(
+        _HooksLogOperationsProject()
+    ).main()

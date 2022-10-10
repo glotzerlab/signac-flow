@@ -23,9 +23,21 @@ class LogOperations:
         # by only doing it once.
         self._loggers = dict()
 
-    def log_operation(self, operation, job):
-        """TODO: Add user-defined job operation to logger."""
-        self._get_logger(job).info(f"Executed operation '{operation}'.")
+    def on_start(self, operation, job):
+        """Log the start of execution of a given job(s) operation pair."""
+        self._get_logger(job).info(f"Starting execution of operation '{operation}'.")
+
+    def on_success(self, operation, job):
+        """Log the successful completion of a given job(s) operation pair."""
+        self._get_logger(job).info(
+            f"Successfully finished execution of operation '{operation}'."
+        )
+
+    def on_exception(self, operation, error, job):
+        """Log the raising of an error in the execution of a given job(s) operation pair."""
+        self._get_logger(job).info(
+            f"Execution of operation '{operation}' failed with error '{error}'."
+        )
 
     def _get_logger(self, job):
         if job not in self._loggers:
@@ -43,21 +55,11 @@ class LogOperations:
         logger.addHandler(fh)
         return logger
 
-    def log_operation_on_exception(self, operation, error, job):
-        """TODO: Add user-defined job operation to logger."""
-        logger = self._get_logger(job)
-        if error is None:
-            logger.info(f"Executed operation '{operation}'.")
-        else:
-            logger.info(
-                "Execution of operation '{}' failed with "
-                "error '{}'.".format(operation, error)
-            )
-
-    def install_hooks(self, project):
-        """Install log operation to all operations in a signac project."""
-        project.project_hooks.on_success.append(self.log_operation)
-        project.project_hooks.on_exception.append(self.log_operation_on_exception)
+    def install_project_hooks(self, project):
+        """Install log operation to all operations in a signac-flow project."""
+        project.project_hooks.on_start.append(self.on_start)
+        project.project_hooks.on_success.append(self.on_success)
+        project.project_hooks.on_exception.append(self.on_exception)
         return project
 
-    __call__ = install_hooks
+    __call__ = install_project_hooks

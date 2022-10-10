@@ -2559,8 +2559,13 @@ class TestHooksInstallNoDecorators(TestHooksInstallSetUp):
 
 
 class TestHooksInvalidOption(TestHooksSetUp):
-    def call_subcmd(self, subcmd, stderr=subprocess.STDOUT):
-        # Return error as output instead of raising error
+    def call_subcmd(self, subcmd, stderr=subprocess.PIPE):
+        """Call a flow command through the CLI.
+
+        Return error as output instead of raising error. By default we also print out the stdout and
+        stderr of the `CalledProcessError` since pytest will capture it by default anyways. This
+        aids the debugging of tests by providing a traceback of the internal error.
+        """
         fn_script = self.entrypoint["path"]
         _cmd = f"python {fn_script} {subcmd} --debug"
         with _add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
@@ -2568,7 +2573,11 @@ class TestHooksInvalidOption(TestHooksSetUp):
                 with _switch_to_directory(self.project.root_directory()):
                     return subprocess.check_output(_cmd.split(), stderr=stderr)
             except subprocess.CalledProcessError as error:
-                return str(error.output)
+                if error.stderr:
+                    print("STDERR:", error.stderr, sep="\n")
+                if error.stdout:
+                    print("STDOUT:", error.stderr, sep="\n")
+                return str(error.stdout) + str(error.stderr)
 
     def test_invalid_hook(self):
         class A(FlowProject):

@@ -57,24 +57,15 @@ def suspend_logging():
 
 
 @contextmanager
-def setup_project_subprocess_execution(
-    project, capture_stderr=True, stderr_output=None
-):
+def setup_project_subprocess_execution(project, stderr_output=sys.stderr):
     """Prepend CWD to PYTHONPATH and change to the project's directory.
 
-    Optionally capture stderr with a passed in output or by default a thrown away `StringIO`
-    instance.
+    Optionally capture stderr with a passed in output or by default output to stderr like normal.
     """
     with _add_cwd_to_environment_pythonpath(), _switch_to_directory(
         project.root_directory()
-    ):
-        if capture_stderr:
-            if stderr_output is None:
-                stderr_output = StringIO()
-            with redirect_stderr(stderr_output):
-                yield
-        else:
-            yield
+    ), redirect_stderr(stderr_output):
+        yield
 
 
 class MockEnvironment(ComputeEnvironment):
@@ -1117,7 +1108,7 @@ class TestExecutionProject(TestProjectBase):
     def test_run_with_operation_selection(self):
         project = self.mock_project()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
-        with setup_project_subprocess_execution(project, capture_stderr=False):
+        with setup_project_subprocess_execution(project):
             with pytest.raises(ValueError):
                 # The names argument must be a sequence of strings, not a string.
                 project.run(names="op1")
@@ -1999,7 +1990,7 @@ class TestGroupExecutionProject(TestProjectBase):
     def test_run_with_operation_selection(self):
         project = self.mock_project()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
-        with setup_project_subprocess_execution(project, capture_stderr=False):
+        with setup_project_subprocess_execution(project):
             with pytest.raises(ValueError):
                 # The names argument must be a sequence of strings, not a string.
                 project.run(names="op1")

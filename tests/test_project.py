@@ -389,7 +389,7 @@ class TestProjectClass(TestProjectBase):
             assert os.path.isfile(job.fn("output.txt"))
             with open(job.fn("output.txt")) as f:
                 lines = f.readlines()
-                assert f"{job.id} test\n" == lines[0]
+            assert f"{job.id} test\n" == lines[0]
 
     def test_cmd_operation_argument_as_command_invalid(self):
         class A(FlowProject):

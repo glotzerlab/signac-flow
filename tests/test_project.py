@@ -2646,7 +2646,7 @@ class TestHooksLogCmd(TestHooksLogOperationSetUp):
     def operation_name(self, request):
         return request.param
 
-    def test_success(self, project, job, operation_name):
+    def test_logging(self, project, job, operation_name):
         log_fn = self.get_log_filename()
         assert not job.isfile(log_fn)
 
@@ -2656,33 +2656,15 @@ class TestHooksLogCmd(TestHooksLogOperationSetUp):
         else:
             self.call_subcmd(f"run -o {operation_name} -j {job.id}")
 
+        assert job.isfile(log_fn)
+        log_output = self.get_log_output(job, log_fn)
+        assert self.ON_START_MSG.format(operation_name) in log_output
         if job.sp.raise_exception:
-            assert not job.isfile(log_fn)
-        else:
-            assert job.isfile(log_fn)
-            log_output = self.get_log_output(job, log_fn)
-            assert self.runtime_message in log_output
-            assert self.ON_START_MSG.format(operation_name) in log_output
-            assert self.SUCCESS_MSG.format(operation_name) in log_output
-
-    def test_exception(self, project, job, operation_name):
-        log_fn = self.get_log_filename()
-
-        assert not job.isfile(log_fn)
-
-        if job.sp.raise_exception:
-            with pytest.raises(subprocess.CalledProcessError):
-                self.call_subcmd(f"run -o {operation_name} -j {job.id}")
-        else:
-            self.call_subcmd(f"run -o {operation_name} -j {job.id}")
-
-        if job.sp.raise_exception:
-            assert job.isfile(log_fn)
-            log_output = self.get_log_output(job, log_fn)
             assert self.error_message in log_output
             assert self.EXCEPTION_MSG.format(operation_name)
         else:
-            assert not job.isfile(log_fn)
+            assert self.runtime_message in log_output
+            assert self.SUCCESS_MSG.format(operation_name) in log_output
 
 
 class TestHooksLogBase(TestHooksLogCmd):

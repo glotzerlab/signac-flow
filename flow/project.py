@@ -580,6 +580,8 @@ class FlowCmdOperation(BaseFlowOperation):
     def __call__(self, *jobs):
         """Return the command formatted with the supplied job(s)."""
         cmd = self._cmd(*jobs) if callable(self._cmd) else self._cmd
+        # The logic below will be removed after version 0.23.0. This is only to temporary fix an
+        # issue in supporting the formatting of cmd operation in the interim.
         format_arguments = {}
         if not callable(self._cmd):
             format_arguments["jobs"] = jobs

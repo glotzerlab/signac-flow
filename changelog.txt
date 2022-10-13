@@ -24,6 +24,8 @@ Changed
 - Deprecated formatting the output of a ``FlowCmdOperation`` (#666, #630).
 - ``@flow.cmd`` and ``flow.with_job`` are deprecated (#679, #669, #665).
 - ``@FlowProject.operation.with_directives`` is deprecated (#679, #665).
+- Deprecated ``flow`` CLI ``run`` and ``submit`` ``--show-traceback`` (#674, #169).
+- ``flow`` CLI ``run`` and ``submit`` show tracebacks by default (#674, #169).
 
 Changed
 +++++++

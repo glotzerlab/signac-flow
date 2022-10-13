@@ -26,10 +26,6 @@ Changed
 - ``@FlowProject.operation.with_directives`` is deprecated (#679, #665).
 - Deprecated ``flow`` CLI ``run`` and ``submit`` ``--show-traceback`` (#674, #169).
 - ``flow`` CLI ``run`` and ``submit`` show tracebacks by default (#674, #169).
-
-Changed
-+++++++
-
 - Broke ``TestBidict`` and ``TestTemplateFilters`` into smaller and simpler functions (#626).
 
 Version 0.21

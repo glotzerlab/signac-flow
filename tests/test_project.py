@@ -56,6 +56,18 @@ def suspend_logging():
         logging.disable(logging.NOTSET)
 
 
+@contextmanager
+def setup_project_subprocess_execution(project, stderr_output=sys.stderr):
+    """Prepend CWD to PYTHONPATH and change to the project's directory.
+
+    Optionally capture stderr with a passed in output or by default output to stderr like normal.
+    """
+    with _add_cwd_to_environment_pythonpath(), _switch_to_directory(
+        project.root_directory()
+    ), redirect_stderr(stderr_output):
+        yield
+
+
 class MockEnvironment(ComputeEnvironment):
     scheduler_type = MockScheduler
 
@@ -348,12 +360,72 @@ class TestProjectClass(TestProjectBase):
             assert os.path.realpath(os.getcwd()) == os.path.realpath(job.ws)
 
         project = self.mock_project(A)
-        with _add_cwd_to_environment_pythonpath():
-            with _switch_to_directory(project.root_directory()):
-                starting_dir = os.getcwd()
-                with redirect_stderr(StringIO()):
-                    project.run()
-                assert os.getcwd() == starting_dir
+        with setup_project_subprocess_execution(project):
+            starting_dir = os.getcwd()
+            project.run()
+            assert os.getcwd() == starting_dir
+
+    def test_cmd_operation_argument_as_command(self):
+        class A(FlowProject):
+            pass
+
+        @A.operation(with_job=True, cmd=True)
+        def test_cmd(joba, jobb="test"):
+            return "echo '{joba} {jobb}' > output.txt"
+
+        project = self.mock_project(A)
+        with setup_project_subprocess_execution(project):
+            project.run()
+        for job in project:
+            assert os.path.isfile(job.fn("output.txt"))
+            with open(job.fn("output.txt")) as f:
+                lines = f.readlines()
+            assert f"{job.id} test\n" == lines[0]
+
+    def test_cmd_operation_argument_as_command_invalid(self):
+        class A(FlowProject):
+            pass
+
+        @A.operation(with_job=True, cmd=True)
+        def test_cmd(job):
+            return "echo '{jobabc}' > output.txt"
+
+        project = self.mock_project(A)
+        with setup_project_subprocess_execution(project):
+            with pytest.raises(KeyError):
+                project.run()
+        for job in project:
+            assert not os.path.isfile(job.fn("output.txt"))
+
+    def test_cmd_argument_deprecated_jobs_argument(self):
+        class A(FlowProject):
+            pass
+
+        @A.operation(cmd=True, with_job=True)
+        def test_cmd(job123):
+            return "echo '{jobs}' > output.txt"
+
+        project = self.mock_project(A)
+        with setup_project_subprocess_execution(project):
+            with pytest.warns(FutureWarning):
+                project.run()
+        for job in project:
+            assert os.path.isfile(job.fn("output.txt"))
+
+    def test_cmd_argument_deprecated_job_argument(self):
+        class A(FlowProject):
+            pass
+
+        @A.operation(with_job=True, cmd=True)
+        def test_cmd(job123):
+            return "echo '{job}' > output.txt"
+
+        project = self.mock_project(A)
+        with setup_project_subprocess_execution(project):
+            with pytest.warns(FutureWarning):
+                project.run()
+        for job in project:
+            assert os.path.isfile(job.fn("output.txt"))
 
     @pytest.mark.filterwarnings("ignore:@flow.cmd")
     def test_cmd_decorator_with_cmd_argument(self):
@@ -430,14 +502,12 @@ class TestProjectClass(TestProjectBase):
             return "echo 'hello' > world.txt"
 
         project = self.mock_project(A)
-        with _add_cwd_to_environment_pythonpath():
-            with _switch_to_directory(project.root_directory()):
-                starting_dir = os.getcwd()
-                with redirect_stderr(StringIO()):
-                    project.run()
-                assert os.getcwd() == starting_dir
-                for job in project:
-                    assert os.path.isfile(job.fn("world.txt"))
+        with setup_project_subprocess_execution(project):
+            starting_dir = os.getcwd()
+            project.run()
+            assert os.getcwd() == starting_dir
+        for job in project:
+            assert os.path.isfile(job.fn("world.txt"))
 
     def test_operations_user_error_handling(self):
         class A(FlowProject):
@@ -448,13 +518,11 @@ class TestProjectClass(TestProjectBase):
             raise Exception
 
         project = self.mock_project(A)
-        with _add_cwd_to_environment_pythonpath():
-            with _switch_to_directory(project.root_directory()):
-                starting_dir = os.getcwd()
-                with pytest.raises(UserOperationError):
-                    with redirect_stderr(StringIO()):
-                        project.run()
-                assert os.getcwd() == starting_dir
+        with setup_project_subprocess_execution(project):
+            starting_dir = os.getcwd()
+            with pytest.raises(UserOperationError):
+                project.run()
+            assert os.getcwd() == starting_dir
 
     def test_with_job_user_error_handling(self):
         class A(FlowProject):
@@ -465,13 +533,11 @@ class TestProjectClass(TestProjectBase):
             raise Exception
 
         project = self.mock_project(A)
-        with _add_cwd_to_environment_pythonpath():
-            with _switch_to_directory(project.root_directory()):
-                starting_dir = os.getcwd()
-                with pytest.raises(UserOperationError):
-                    with redirect_stderr(StringIO()):
-                        project.run()
-                assert os.getcwd() == starting_dir
+        with setup_project_subprocess_execution(project):
+            starting_dir = os.getcwd()
+            with pytest.raises(UserOperationError):
+                project.run()
+            assert os.getcwd() == starting_dir
 
     def test_cmd_with_job_user_error_handling(self):
         class A(FlowProject):
@@ -482,13 +548,11 @@ class TestProjectClass(TestProjectBase):
             return "exit 1"
 
         project = self.mock_project(A)
-        with _add_cwd_to_environment_pythonpath():
-            with _switch_to_directory(project.root_directory()):
-                starting_dir = os.getcwd()
-                with pytest.raises(UserOperationError):
-                    with redirect_stderr(StringIO()):
-                        project.run()
-                assert os.getcwd() == starting_dir
+        with setup_project_subprocess_execution(project):
+            starting_dir = os.getcwd()
+            with pytest.raises(UserOperationError):
+                project.run()
+            assert os.getcwd() == starting_dir
 
     def test_function_in_directives(self):
         class A(FlowProject):
@@ -1021,13 +1085,8 @@ class TestExecutionProject(TestProjectBase):
     @pytest.mark.parametrize("order", execution_orders)
     def test_run_order(self, order):
         project = self.mock_project()
-        output = StringIO()
-        with _add_cwd_to_environment_pythonpath():
-            with _switch_to_directory(project.root_directory()):
-                with redirect_stderr(output):
-                    project.run(order=order)
-        output.seek(0)
-        output.read()
+        with setup_project_subprocess_execution(project):
+            project.run(order=order)
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
         for job in project:
             if job in even_jobs:
@@ -1037,13 +1096,8 @@ class TestExecutionProject(TestProjectBase):
 
     def test_run_with_selection(self):
         project = self.mock_project()
-        output = StringIO()
-        with _add_cwd_to_environment_pythonpath():
-            with _switch_to_directory(project.root_directory()):
-                with redirect_stderr(output):
-                    project.run(project.find_jobs(dict(a=0)))
-        output.seek(0)
-        output.read()
+        with setup_project_subprocess_execution(project):
+            project.run(project.find_jobs(dict(a=0)))
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
         for job in project:
             if job in even_jobs and job.sp.a == 0:
@@ -1054,31 +1108,25 @@ class TestExecutionProject(TestProjectBase):
     def test_run_with_operation_selection(self):
         project = self.mock_project()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
-        with _add_cwd_to_environment_pythonpath():
-            with _switch_to_directory(project.root_directory()):
-                with pytest.raises(ValueError):
-                    # The names argument must be a sequence of strings, not a string.
-                    project.run(names="op1")
-                project.run(names=["non-existent-op"])
-                assert not any(job.isfile("world.txt") for job in even_jobs)
-                assert not any(job.doc.get("test") for job in project)
-                project.run(names=["op1", "non-existent-op"])
-                assert all(job.isfile("world.txt") for job in even_jobs)
-                assert not any(job.doc.get("test") for job in project)
-                project.run(names=["op[^4]", "non-existent-op"])
-                assert all(job.isfile("world.txt") for job in even_jobs)
-                assert all(job.doc.get("test") for job in project)
-                assert all("dynamic" not in job.doc for job in project)
+        with setup_project_subprocess_execution(project):
+            with pytest.raises(ValueError):
+                # The names argument must be a sequence of strings, not a string.
+                project.run(names="op1")
+            project.run(names=["non-existent-op"])
+            assert not any(job.isfile("world.txt") for job in even_jobs)
+            assert not any(job.doc.get("test") for job in project)
+            project.run(names=["op1", "non-existent-op"])
+            assert all(job.isfile("world.txt") for job in even_jobs)
+            assert not any(job.doc.get("test") for job in project)
+            project.run(names=["op[^4]", "non-existent-op"])
+            assert all(job.isfile("world.txt") for job in even_jobs)
+            assert all(job.doc.get("test") for job in project)
+            assert all("dynamic" not in job.doc for job in project)
 
     def test_run_parallel(self):
         project = self.mock_project()
-        output = StringIO()
-        with _add_cwd_to_environment_pythonpath():
-            with _switch_to_directory(project.root_directory()):
-                with redirect_stderr(output):
-                    project.run(np=2)
-        output.seek(0)
-        output.read()
+        with setup_project_subprocess_execution(project):
+            project.run(np=2)
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
         for job in project:
             if job in even_jobs:
@@ -1145,15 +1193,12 @@ class TestExecutionProject(TestProjectBase):
 
     def test_run_fork(self):
         project = self.mock_project()
-        output = StringIO()
         for job in project:
             job.doc.fork = True
             break
 
-        with _add_cwd_to_environment_pythonpath():
-            with _switch_to_directory(project.root_directory()):
-                with redirect_stderr(output):
-                    project.run()
+        with setup_project_subprocess_execution(project):
+            project.run()
 
         for job in project:
             if job.doc.get("fork"):
@@ -1945,32 +1990,26 @@ class TestGroupExecutionProject(TestProjectBase):
     def test_run_with_operation_selection(self):
         project = self.mock_project()
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
-        with _add_cwd_to_environment_pythonpath():
-            with _switch_to_directory(project.root_directory()):
-                with pytest.raises(ValueError):
-                    # The names argument must be a sequence of strings, not a string.
-                    project.run(names="op1")
-                project.run(names=["nonexistent-op"])
-                assert not any(job.isfile("world.txt") for job in even_jobs)
-                assert not any(job.doc.get("test") for job in project)
-                project.run(names=["group1"])
-                assert all(job.isfile("world.txt") for job in even_jobs)
-                assert all(job.doc.get("test") for job in project)
-                project.run(names=["group2"])
-                assert all(job.isfile("world.txt") for job in even_jobs)
-                assert all(job.doc.get("test3_true") for job in project)
-                assert all(not job.doc.get("test3_false") for job in project)
-                assert all("dynamic" not in job.doc for job in project)
+        with setup_project_subprocess_execution(project):
+            with pytest.raises(ValueError):
+                # The names argument must be a sequence of strings, not a string.
+                project.run(names="op1")
+            project.run(names=["nonexistent-op"])
+            assert not any(job.isfile("world.txt") for job in even_jobs)
+            assert not any(job.doc.get("test") for job in project)
+            project.run(names=["group1"])
+            assert all(job.isfile("world.txt") for job in even_jobs)
+            assert all(job.doc.get("test") for job in project)
+            project.run(names=["group2"])
+            assert all(job.isfile("world.txt") for job in even_jobs)
+            assert all(job.doc.get("test3_true") for job in project)
+            assert all(not job.doc.get("test3_false") for job in project)
+            assert all("dynamic" not in job.doc for job in project)
 
     def test_run_parallel(self):
         project = self.mock_project()
-        output = StringIO()
-        with _add_cwd_to_environment_pythonpath():
-            with _switch_to_directory(project.root_directory()):
-                with redirect_stderr(output):
-                    project.run(names=["group1"], np=2)
-        output.seek(0)
-        output.read()
+        with setup_project_subprocess_execution(project):
+            project.run(names=["group1"], np=2)
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
         for job in project:
             if job in even_jobs:

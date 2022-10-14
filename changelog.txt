@@ -8,7 +8,7 @@ The numbers in brackets denote the related GitHub issue and/or pull request.
 Version 0.22
 ============
 
-[0.22.0] -- 2022-xx-xx
+[0.22.0] -- 2022-10-14
 ----------------------
 
 Added
@@ -24,10 +24,8 @@ Changed
 - Deprecated formatting the output of a ``FlowCmdOperation`` (#666, #630).
 - ``@flow.cmd`` and ``flow.with_job`` are deprecated (#679, #669, #665).
 - ``@FlowProject.operation.with_directives`` is deprecated (#679, #665).
-
-Changed
-+++++++
-
+- Deprecated the ``--show-traceback`` for ``flow``'s CLI ``run`` and ``submit`` commands (#674, #169).
+- ``flow`` CLI ``run`` and ``submit`` show tracebacks by default (#674, #169).
 - Broke ``TestBidict`` and ``TestTemplateFilters`` into smaller and simpler functions (#626).
 
 Version 0.21

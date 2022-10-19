@@ -13,6 +13,7 @@ from collections.abc import Collection, Iterable, Mapping
 from hashlib import md5
 
 from .errors import FlowProjectDefinitionError
+from .util.misc import _deprecated_warning
 
 
 def _get_unique_function_id(func):
@@ -348,6 +349,12 @@ class aggregator:
             The function to decorate.
 
         """
+        _deprecated_warning(
+            deprecation="@aggregator(...)",
+            alternative="Use FlowProject.operation(aggregator=aggegator) instead.",
+            deprecated_in="0.23.0",
+            removed_in="0.24.0",
+        )
         if not callable(func):
             raise FlowProjectDefinitionError(
                 "Invalid argument passed while calling the aggregate "
@@ -356,6 +363,11 @@ class aggregator:
         if getattr(func, "_flow_with_job", False):
             raise FlowProjectDefinitionError(
                 "The with_job option cannot be used with aggregation."
+            )
+        current_agg = getattr(func, "_flow_aggregate", None)
+        if current_agg is not None and current_agg != aggregator.groupsof(1):
+            raise FlowProjectDefinitionError(
+                "Cannot specify aggregates in function and decorator."
             )
         setattr(func, "_flow_aggregate", self)
         return func

@@ -7,6 +7,8 @@ from conftest import TestProjectBase
 from flow.aggregates import aggregator, get_aggregate_id
 from flow.errors import FlowProjectDefinitionError
 
+ignore_call_warning = pytest.mark.filterwarnings("ignore:@aggregator():FutureWarning")
+
 
 class AggregateProjectSetup(TestProjectBase):
     project_name = "AggregateTestProject"
@@ -311,17 +313,20 @@ class TestAggregate(AggregateProjectSetup, AggregateFixtures):
         with pytest.raises(TypeError):
             aggregator(select=select)
 
+    @ignore_call_warning
     @pytest.mark.parametrize("param", ["str", 1, None])
     def test_invalid_call(self, param):
         aggregator_instance = aggregator()
         with pytest.raises(FlowProjectDefinitionError):
             aggregator_instance(param)
 
+    @ignore_call_warning
     def test_call_without_argument(self):
         aggregate_instance = aggregator()
         with pytest.raises(FlowProjectDefinitionError):
             aggregate_instance()
 
+    @ignore_call_warning
     def test_call_with_decorator(self):
         @aggregator()
         def test_function(x):

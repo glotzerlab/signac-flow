@@ -46,7 +46,7 @@ def _get_unique_function_id(func):
 
 
 class aggregator:
-    """Decorator for operation functions that operate on aggregates.
+    """Class for generating aggregates for use in operations.
 
     By default, if the ``aggregator_function`` is ``None``, an aggregate of all
     jobs will be created.
@@ -58,8 +58,7 @@ class aggregator:
 
     .. code-block:: python
 
-        @aggregator()
-        @FlowProject.operation
+        @FlowProject.operation(aggregator=aggregator())
         def foo(*jobs):
             print(len(jobs))
 
@@ -134,8 +133,7 @@ class aggregator:
 
         .. code-block:: python
 
-            @aggregator.groupsof(num=2)
-            @FlowProject.operation
+            @FlowProject.operation(aggregator=aggregator.groupsof(num=2))
             def foo(*jobs):
                 print(len(jobs))
 
@@ -199,8 +197,7 @@ class aggregator:
 
         .. code-block:: python
 
-            @aggregator.groupby(key="key", default=-1)
-            @FlowProject.operation
+            @FlowProject.operation(aggegator=aggregator.groupby(key="key", default=-1))
             def foo(*jobs):
                 print(len(jobs))
 

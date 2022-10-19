@@ -1487,6 +1487,9 @@ class _FlowProjectClass(type):
                 ``False``.
             directives : dict, optional, keyword-only
                 Directives to use for resource requests and execution.
+            aggregator : flow.aggregator, optional, keyword-only
+                The aggregator to use for the operation. Default value uses aggregator of size one
+                (i.e. individual jobs).
 
             Returns
             -------

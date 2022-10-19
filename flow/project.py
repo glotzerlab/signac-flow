@@ -68,6 +68,7 @@ from .util.misc import (
     _add_cwd_to_environment_pythonpath,
     _bidict,
     _cached_partial,
+    _deprecated_warning,
     _get_parallel_executor,
     _positive_int,
     _roundrobin,
@@ -615,10 +616,11 @@ class FlowCmdOperation(BaseFlowOperation):
                     format_arguments[match.group(1)] = jobs
             formatted_cmd = cmd.format(**format_arguments)
         if formatted_cmd != cmd:
-            warnings.warn(
-                "Returning format strings in a cmd operation is deprecated as of version 0.22.0 "
-                "and will be removed in  0.23.0. Users should format the command string.",
-                FutureWarning,
+            _deprecated_warning(
+                "Returning format strings in a cmd operation",
+                "Users should format the command string.",
+                "0.22.0",
+                "0.23.0",
             )
         return formatted_cmd
 
@@ -1602,11 +1604,11 @@ class _FlowProjectClass(type):
                     name and directives as an operation of the
                     :class:`~.FlowProject` subclass.
                 """
-                warnings.warn(
-                    "@FlowProject.operation.with_directives has been deprecated as of 0.22.0 and "
-                    "will be removed in 0.23.0. Use @FlowProject.operation(directives={...}) "
-                    "instead.",
-                    FutureWarning,
+                _deprecated_warning(
+                    "@FlowProject.operation.with_directives",
+                    "Use @FlowProject.operation(directives={...}) instead.",
+                    "0.22.0",
+                    "0.23.0",
                 )
 
                 def add_operation_with_directives(function):
@@ -5153,10 +5155,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             sys.exit(2)
 
         if args.show_traceback:
-            warnings.warn(
-                "--show-traceback is deprecated and to be removed in signac-flow version 0.23.",
-                FutureWarning,
-            )
+            _deprecated_warning("--show-traceback", "", "0.22.0", "0.23.0")
 
         # Manually 'merge' the various global options defined for both the main parser
         # and the parent parser that are shared by all subparsers:

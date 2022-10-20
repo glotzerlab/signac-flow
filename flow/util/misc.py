@@ -400,7 +400,7 @@ def _deprecated_warning(
     alternative: str,
     deprecated_in: str,
     removed_in: str,
-    category: "Warning" = FutureWarning,
+    category: Warning = FutureWarning,
 ):
     warnings.warn(
         " ".join(

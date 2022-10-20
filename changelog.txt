@@ -5,6 +5,16 @@ Changelog
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 The numbers in brackets denote the related GitHub issue and/or pull request.
 
+Version 0.23
+============
+
+[0.23.0] -- 20xx-xx-xx
+
+Fixed
++++++
+
+- Detecting correct environment on Delta GPU nodes (#682).
+
 Version 0.22
 ============
 

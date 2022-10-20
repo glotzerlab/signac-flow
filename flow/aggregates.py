@@ -197,7 +197,7 @@ class aggregator:
 
         .. code-block:: python
 
-            @FlowProject.operation(aggegator=aggregator.groupby(key="key", default=-1))
+            @FlowProject.operation(aggregator=aggregator.groupby(key="key", default=-1))
             def foo(*jobs):
                 print(len(jobs))
 
@@ -348,7 +348,7 @@ class aggregator:
         """
         _deprecated_warning(
             deprecation="@aggregator(...)",
-            alternative="Use FlowProject.operation(aggregator=aggegator) instead.",
+            alternative="Use FlowProject.operation(aggregator=aggregator(...)) instead.",
             deprecated_in="0.23.0",
             removed_in="0.24.0",
         )

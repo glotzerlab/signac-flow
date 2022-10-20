@@ -414,6 +414,7 @@ def _deprecated_warning(
             )
         ),
         category,
+        stacklevel=2,
     )
 
 

@@ -617,10 +617,10 @@ class FlowCmdOperation(BaseFlowOperation):
             formatted_cmd = cmd.format(**format_arguments)
         if formatted_cmd != cmd:
             _deprecated_warning(
-                "Returning format strings in a cmd operation",
-                "Users should format the command string.",
-                "0.22.0",
-                "0.23.0",
+                deprecation="Returning format strings in a cmd operation",
+                alternative="Users should format the command string.",
+                deprecated_in="0.22.0",
+                removed_in="0.23.0",
             )
         return formatted_cmd
 
@@ -1634,10 +1634,10 @@ class _FlowProjectClass(type):
                     :class:`~.FlowProject` subclass.
                 """
                 _deprecated_warning(
-                    "@FlowProject.operation.with_directives",
-                    "Use @FlowProject.operation(directives={...}) instead.",
-                    "0.22.0",
-                    "0.23.0",
+                    deprecation="@FlowProject.operation.with_directives",
+                    alternative="Use @FlowProject.operation(directives={...}) instead.",
+                    deprecated_in="0.22.0",
+                    removed_in="0.23.0",
                 )
 
                 def add_operation_with_directives(function):
@@ -5184,7 +5184,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             sys.exit(2)
 
         if args.show_traceback:
-            _deprecated_warning("--show-traceback", "", "0.22.0", "0.23.0")
+            _deprecated_warning(
+                deprecation="--show-traceback",
+                alternative="",
+                deprecated_in="0.22.0",
+                removed_in="0.23.0",
+            )
 
         # Manually 'merge' the various global options defined for both the main parser
         # and the parent parser that are shared by all subparsers:

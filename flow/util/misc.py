@@ -395,6 +395,7 @@ def _get_parallel_executor(parallelization="none"):
 
 
 def _deprecated_warning(
+    *,
     deprecation: str,
     alternative: str,
     deprecated_in: str,

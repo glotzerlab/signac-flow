@@ -91,7 +91,7 @@ variable, for example in the project configuration file. The current template di
 {template_dir}
 
 All template variables can be placed within a template using the standard jinja2
-syntax, e.g., the project root directory can be written as: {{{{ project.root_directory() }}}}.
+syntax, e.g., the project root directory can be written as: {{{{ project.path }}}}.
 The available template variables are:
 {template_vars}
 
@@ -1027,7 +1027,7 @@ class FlowGroup:
         else:
             op_string = operation_name
 
-        root_directory = project.root_directory()
+        root_directory = project.path
         aggregate_id = get_aggregate_id(aggregate)
         full_name = f"{root_directory}%{aggregate_id}%{op_string}"
         # The job_op_id is a hash computed from the unique full name.
@@ -1800,7 +1800,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # the project root directory. This directory may be specified with the 'template_dir'
         # configuration variable.
         self._template_dir = os.path.join(
-            self.root_directory(), self._config.get("template_dir", "templates")
+            self.path, self._config.get("template_dir", "templates")
         )
         self._template_environment_ = {}
 
@@ -2173,7 +2173,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _fn_bundle(self, bundle_id):
         """Return the canonical name to store bundle information."""
-        return os.path.join(self.root_directory(), ".bundles", bundle_id)
+        return os.path.join(self.path, ".bundles", bundle_id)
 
     def _store_bundled(self, operations):
         """Store operation-ids as part of a bundle and return bundle id.
@@ -4877,7 +4877,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         if args.switch_to_project_root:
             with _add_cwd_to_environment_pythonpath():
-                with _switch_to_directory(self.root_directory()):
+                with _switch_to_directory(self.path):
                     run()
         else:
             run()

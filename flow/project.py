@@ -2622,6 +2622,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         err,
         ignore_errors,
         status_parallelization="none",
+        progress=True,
     ):
         """Fetch status for the provided aggregates / jobs.
 
@@ -2636,6 +2637,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         status_parallelization : str
             Parallelization mode for fetching the status. Allowed values are
             "thread", "process", or "none". (Default value = "none")
+        progress : bool TODO
 
         Returns
         -------
@@ -2660,7 +2662,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "Valid choices are 'thread', 'process', or 'none'."
             )
 
-        parallel_executor = _get_parallel_executor(status_parallelization)
+        parallel_executor = _get_parallel_executor(status_parallelization, progress)
 
         # Update the project's status cache
         scheduler_info = self._query_scheduler_status(
@@ -2800,7 +2802,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     "_error": error_message,
                 }
             )
-
         return status_results_combined, job_labels, individual_jobs
 
     PRINT_STATUS_ALL_VARYING_PARAMETERS = True
@@ -2829,6 +2830,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         profile=False,
         eligible_jobs_max_lines=None,
         output_format="terminal",
+        no_progress=False,
+        print_status=True,
     ):
         """Print the status of the project.
 
@@ -2879,6 +2882,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         output_format : str
             Status output format, supports:
             'terminal' (default), 'markdown' or 'html'.
+        progress : bool
+            TODO
 
         """
         if file is None:
@@ -2923,6 +2928,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     err=err,
                     ignore_errors=ignore_errors,
                     status_parallelization=status_parallelization,
+                    progress=not no_progress,
                 )
 
             prof._mergeFileTiming()
@@ -3002,6 +3008,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 err=err,
                 ignore_errors=ignore_errors,
                 status_parallelization=status_parallelization,
+                progress=not no_progress,
             )
             profiling_results = None
 
@@ -5006,7 +5013,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             "for the majority of runtime required for status determination. "
             "Optionally provide a filename pattern to select for what files "
             "to show result for. Defaults to the main module. "
-            "(requires pprofile)",
+            "(requires profile)",
+        )
+        parser_status.add_argument(
+            "--no-progress", action="store_true", help="Do not show progress bar"
         )
         parser_status.set_defaults(func=self._main_status)
 

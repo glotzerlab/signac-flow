@@ -7,6 +7,7 @@ import logging
 import os
 import warnings
 from collections.abc import MutableMapping
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from contextlib import contextmanager
 from functools import lru_cache, partial
 from itertools import cycle, islice
@@ -335,7 +336,7 @@ def _run_cloudpickled_func(func, *args):
     return unpickled_func(*args)
 
 
-def _get_parallel_executor(parallelization="none"):
+def _get_parallel_executor(parallelization="none", progress=True):
     """Get an executor for the desired parallelization strategy.
 
     This executor shows a progress bar while executing a function over an
@@ -359,37 +360,59 @@ def _get_parallel_executor(parallelization="none"):
 
     """
     if parallelization == "thread":
+        if progress:
 
-        def parallel_executor(func, iterable, **kwargs):
-            return thread_map(func, iterable, tqdm_class=tqdm, **kwargs)
+            def parallel_executor(func, iterable, **kwargs):
+                return thread_map(func, iterable, tqdm_class=tqdm, **kwargs)
+
+        else:
+
+            def parallel_executor(func, iterable, **kwargs):
+                # mwe did not assign any maxworkers under the threadpool executor, is this ok?
+                return ThreadPoolExecutor().map(func, iterable)
 
     elif parallelization == "process":
+        if progress:
 
-        def parallel_executor(func, iterable, **kwargs):
-            # The tqdm progress bar requires a total. We compute the total in
-            # advance because a map iterable (which has no total) is passed to
-            # process_map.
-            if "total" not in kwargs:
-                kwargs["total"] = len(iterable)
+            def parallel_executor(func, iterable, **kwargs):
+                # The tqdm progress bar requires a total. We compute the total in
+                # advance because a map iterable (which has no total) is passed to
+                # process_map.
+                if "total" not in kwargs:
+                    kwargs["total"] = len(iterable)
 
-            return process_map(
-                # The top-level function called on each process cannot be a
-                # local function, it must be a module-level function. Creating
-                # a partial here allows us to use the passed function "func"
-                # regardless of whether it is a local function.
-                partial(_run_cloudpickled_func, cloudpickle.dumps(func)),
-                map(cloudpickle.dumps, iterable),
-                tqdm_class=tqdm,
-                **kwargs,
-            )
+                return process_map(
+                    # The top-level function called on each process cannot be a
+                    # local function, it must be a module-level function. Creating
+                    # a partial here allows us to use the passed function "func"
+                    # regardless of whether it is a local function.
+                    partial(_run_cloudpickled_func, cloudpickle.dumps(func)),
+                    map(cloudpickle.dumps, iterable),
+                    tqdm_class=tqdm,
+                    **kwargs,
+                )
+
+        else:
+
+            def parallel_executor(func, iterable, **kwargs):
+                return ProcessPoolExecutor().map(func, iterable)
 
     else:
+        if progress:
 
-        def parallel_executor(func, iterable, **kwargs):
-            if "chunksize" in kwargs:
-                # Chunk size only applies to thread/process parallel executors
-                del kwargs["chunksize"]
-            return list(tmap(func, iterable, tqdm_class=tqdm, **kwargs))
+            def parallel_executor(func, iterable, **kwargs):
+                if "chunksize" in kwargs:
+                    # Chunk size only applies to thread/process parallel executors
+                    del kwargs["chunksize"]
+                return list(tmap(func, iterable, tqdm_class=tqdm, **kwargs))
+
+        else:
+
+            def parallel_executor(func, iterable, **kwargs):
+                result = []
+                for i in iterable:
+                    result.append(func(i))
+                return result
 
     return parallel_executor
 

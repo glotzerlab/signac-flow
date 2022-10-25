@@ -768,7 +768,7 @@ class FlowGroupEntry:
         The directives specified in this decorator are only applied when
         executing the operation through the :class:`FlowGroup`.
         To apply directives to an individual operation executed outside of the
-        group, see :meth:`.FlowProject.operation.with_directives`.
+        group, see :meth:`.FlowProject.operation`.
 
         Parameters
         ----------
@@ -805,12 +805,12 @@ class FlowGroup:
         group = FlowProject.make_group(name='example_group')
 
         @group.with_directives({"nranks": 4})
-        @FlowProject.operation.with_directives({"nranks": 2, "executable": "python3"})
+        @FlowProject.operation({"nranks": 2, "executable": "python3"})
         def op1(job):
             pass
 
         @group
-        @FlowProject.operation.with_directives({"nranks": 2, "executable": "python3"})
+        @FlowProject.operation({"nranks": 2, "executable": "python3"})
         def op2(job):
             pass
 
@@ -1460,11 +1460,11 @@ class _FlowProjectClass(type):
                 def hello(job):
                     print('Hello', job)
 
-            Directives can also be specified by using :meth:`FlowProject.operation.with_directives`.
+            Directives can also be specified by using :meth:`FlowProject.operation`.
 
             .. code-block:: python
 
-                @FlowProject.operation.with_directives({"nranks": 4})
+                @FlowProject.operation({"nranks": 4})
                 def mpi_hello(job):
                     print("hello")
 
@@ -1590,48 +1590,10 @@ class _FlowProjectClass(type):
                 setattr(decorated, "_flow_cmd", getattr(func, "_flow_cmd", False))
                 return decorated
 
-            def with_directives(self, directives, name=None):
-                """Decorate a function to make it an operation with additional execution directives.
-
-                Directives can be used to provide information about required
-                resources such as the number of processors required for
-                execution of parallelized operations. For more information, see
-                :ref:`signac-docs:cluster_submission_directives`. To apply
-                directives to an operation that is part of a group, use
-                :meth:`.FlowGroupEntry.with_directives`.
-
-                Parameters
-                ----------
-                directives : dict
-                    Directives to use for resource requests and execution.
-                name : str
-                    The operation name. Uses the name of the function if None
-                    (Default value = None).
-
-                Returns
-                -------
-                function
-                    A decorator which registers the function with the provided
-                    name and directives as an operation of the
-                    :class:`~.FlowProject` subclass.
-                """
-                warnings.warn(
-                    "@FlowProject.operation.with_directives has been deprecated as of 0.22.0 and "
-                    "will be removed in 0.23.0. Use @FlowProject.operation(directives={...}) "
-                    "instead.",
-                    FutureWarning,
-                )
-
-                def add_operation_with_directives(function):
-                    function._flow_directives = directives
-                    return self(function, name)
-
-                return add_operation_with_directives
-
             _directives_to_document = (
                 ComputeEnvironment._get_default_directives()._directive_definitions.values()
             )
-            with_directives.__doc__ += textwrap.indent(
+            __call__.__doc__ += textwrap.indent(
                 "\n\n**Supported Directives:**\n\n"
                 + "\n\n".join(
                     _document_directive(directive)

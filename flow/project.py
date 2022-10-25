@@ -58,8 +58,6 @@ from .errors import (
 )
 from .hooks import _Hooks
 from .labels import _is_label_func, classlabel, label, staticlabel
-from .operations import cmd as _cmd
-from .operations import with_job as _with_job
 from .render_status import _render_status
 from .scheduling.base import ClusterJob, JobStatus
 from .util import config as flow_config
@@ -1524,16 +1522,10 @@ class _FlowProjectClass(type):
                         "A condition function cannot be used as an operation."
                     )
 
-                # Handle cmd and with_job options. Use the deprecated decorators internally until
-                # the decorators are removed. These must be done first for now as with_job actually
-                # wraps the original function meaning that any other labels we apply will be masked
-                # if we do this later or not even captured it not added to _OPERATION_FUNCTIONS.
-                with warnings.catch_warnings():
-                    warnings.simplefilter(action="ignore", category=FutureWarning)
-                    if cmd:
-                        _cmd(func)
-                    if with_job:
-                        func = _with_job(func)
+                if cmd:
+                    setattr(func, "_flow_cmd", True)
+                if with_job:
+                    func = self._with_job(func)
 
                 # Store directives
                 if directives is not None:
@@ -1576,6 +1568,27 @@ class _FlowProjectClass(type):
                     func._flow_groups = {}
                 func._flow_groups[self._parent_class] = {name}
                 return func
+
+            def _with_job(self, func):
+                base_aggregator = aggregator.groupsof(1)
+                if getattr(func, "_flow_aggregate", base_aggregator) != base_aggregator:
+                    raise FlowProjectDefinitionError(
+                        "The @with_job decorator cannot be used with aggregation."
+                    )
+
+                @functools.wraps(func)
+                def decorated(*jobs):
+                    with jobs[0] as job:
+                        if getattr(func, "_flow_cmd", False):
+                            return (
+                                f'trap "cd $(pwd)" EXIT && cd {job.ws} && {func(job)}'
+                            )
+                        else:
+                            return func(job)
+
+                setattr(decorated, "_flow_with_job", True)
+                setattr(decorated, "_flow_cmd", getattr(func, "_flow_cmd", False))
+                return decorated
 
             def with_directives(self, directives, name=None):
                 """Decorate a function to make it an operation with additional execution directives.

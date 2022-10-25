@@ -27,8 +27,8 @@ class directives:
     For more information, read about :ref:`signac-docs:cluster_submission_directives`.
 
     .. deprecated:: 0.15
-        This decorator is deprecated and will be removed in 0.23.
-        Use :class:`FlowProject.operation` directives keyword argument instead.
+        This decorator is deprecated and will be removed in 1.0.
+        Use :class:`FlowProject.operation.with_directives` instead.
 
     """
 

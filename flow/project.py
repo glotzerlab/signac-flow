@@ -1549,17 +1549,16 @@ class _FlowProjectClass(type):
                 setattr(decorated, "_flow_cmd", getattr(func, "_flow_cmd", False))
                 return decorated
 
-            _directives_to_document = (
-                ComputeEnvironment._get_default_directives()._directive_definitions.values()
-            )
-            __call__.__doc__ += textwrap.indent(
-                "\n\n**Supported Directives:**\n\n"
-                + "\n\n".join(
-                    _document_directive(directive)
-                    for directive in _directives_to_document
-                ),
-                " " * 16,
-            )
+        _directives_to_document = (
+            ComputeEnvironment._get_default_directives()._directive_definitions.values()
+        )
+        OperationRegister.__doc__ += textwrap.indent(
+            "\n\n**Supported Directives:**\n\n"
+            + "\n\n".join(
+                _document_directive(directive) for directive in _directives_to_document
+            ),
+            " " * 16,
+        )
 
         return OperationRegister()
 

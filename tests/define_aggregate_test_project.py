@@ -73,7 +73,7 @@ def agg_op3(*jobs):
 @_AggregateTestProject.operation(cmd=True)
 @aggregator(sort_by="i", select=lambda job: job.sp.i <= 2)
 def agg_op4(*jobs):
-    return "echo '{jobs[0].sp.i} and {jobs[1].sp.i}'"
+    return f"echo '{jobs[0].sp.i} and {jobs[1].sp.i}'"
 
 
 if __name__ == "__main__":

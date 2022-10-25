@@ -22,15 +22,7 @@ from define_test_project import _DynamicTestProject, _TestProject
 from deprecation import fail_if_not_removed
 
 import flow
-from flow import (
-    FlowProject,
-    aggregator,
-    cmd,
-    directives,
-    get_aggregate_id,
-    init,
-    with_job,
-)
+from flow import FlowProject, aggregator, get_aggregate_id, init
 from flow.environment import ComputeEnvironment
 from flow.errors import (
     DirectivesError,
@@ -351,7 +343,7 @@ class TestProjectClass(TestProjectBase):
         assert len(B._collect_postconditions()[op2]) == 2
         assert len(C._collect_postconditions()[op2]) == 3
 
-    def test_with_job_decorator(self):
+    def test_with_job_argument(self):
         class A(FlowProject):
             pass
 
@@ -426,72 +418,6 @@ class TestProjectClass(TestProjectBase):
                 project.run()
         for job in project:
             assert os.path.isfile(job.fn("output.txt"))
-
-    @pytest.mark.filterwarnings("ignore:@flow.cmd")
-    def test_cmd_decorator_with_cmd_argument(self):
-        class A(FlowProject):
-            pass
-
-        with pytest.raises(FlowProjectDefinitionError):
-
-            @A.operation(cmd=True)
-            @cmd
-            def op1(job):
-                pass
-
-        with pytest.raises(FlowProjectDefinitionError):
-
-            @cmd
-            @A.operation(cmd=True)
-            def op2(job):
-                pass
-
-    @pytest.mark.filterwarnings("ignore:@flow.with_job")
-    def test_with_job_decorator_with_with_job_argument(self):
-        class A(FlowProject):
-            pass
-
-        with pytest.raises(FlowProjectDefinitionError):
-
-            @A.operation(with_job=True)
-            @with_job
-            def op1(job):
-                pass
-
-        with pytest.raises(FlowProjectDefinitionError):
-
-            @with_job
-            @A.operation(with_job=True)
-            def op2(job):
-                pass
-
-    @pytest.mark.filterwarnings("ignore:@flow.with_job")
-    @pytest.mark.filterwarnings("ignore:@flow.cmd")
-    def test_cmd_with_job_invalid_ordering(self):
-        class A(FlowProject):
-            pass
-
-        with pytest.raises(FlowProjectDefinitionError):
-
-            @A.operation(cmd=True)
-            @with_job
-            def op1(job):
-                pass
-
-        with pytest.raises(FlowProjectDefinitionError):
-
-            @cmd
-            @A.operation(with_job=True)
-            def op4(job):
-                pass
-
-        with pytest.raises(FlowProjectDefinitionError):
-
-            @A.operation
-            @cmd
-            @with_job
-            def op5(job):
-                pass
 
     def test_with_job_works_with_cmd(self):
         class A(FlowProject):
@@ -771,39 +697,6 @@ class TestProjectClass(TestProjectBase):
         assert all(
             not callable(value) for value in submit_job_operation.directives.values()
         )
-
-    @pytest.mark.filterwarnings("ignore:@FlowProject.operation.with_directives")
-    def test_operation_with_directives(self):
-        class A(FlowProject):
-            pass
-
-        @A.operation.with_directives({"executable": "python3", "nranks": 4})
-        def test_context(job):
-            return "exit 1"
-
-        project = self.mock_project(A)
-        for job in project:
-            for next_op in project._next_operations([(job,)]):
-                assert next_op.directives["executable"] == "python3"
-                assert next_op.directives["nranks"] == 4
-            break
-
-    def test_old_directives_decorator(self):
-        class A(FlowProject):
-            pass
-
-        # TODO: Add deprecation warning context manager in v0.15
-        @A.operation
-        @directives(executable=lambda job: f"mpirun -np {job.doc.np} python")
-        def test_context(job):
-            return "exit 1"
-
-        project = self.mock_project(A)
-        for job in project:
-            job.doc.np = 3
-            for next_op in project._next_operations([(job,)]):
-                assert "mpirun -np 3 python" in next_op.cmd
-            break
 
     def test_copy_conditions(self):
         class A(FlowProject):
@@ -1888,8 +1781,7 @@ class TestGroupProject(TestProjectBase):
             pass
 
         @group
-        @A.operation
-        @flow.directives(nranks=2)
+        @A.operation(directives={"nranks": 2})
         def op3(job):
             pass
 
@@ -1920,8 +1812,7 @@ class TestGroupProject(TestProjectBase):
             pass
 
         @group
-        @A.operation
-        @flow.directives(nranks=2)
+        @A.operation(directives={"nranks": 2})
         def op3(job):
             pass
 
@@ -2515,7 +2406,7 @@ class TestHooksBase(TestHooksSetUp):
 
 
 class TestHooksCmd(TestHooksBase):
-    # Tests hook decorators for a job operation with the @cmd decorator
+    # Tests hook decorators for a job operation with the cmd keyword argument
     error_message = 42
 
     @pytest.fixture(params=["base_cmd"])
@@ -2548,7 +2439,7 @@ class TestHooksInstallBase(TestHooksBase, TestHooksInstallSetUp):
 
 
 class TestHooksInstallCmd(TestHooksCmd, TestHooksInstallSetUp):
-    # Tests project-wide hooks on job operations with the @cmd decorator.
+    # Tests project-wide hooks on job operations with the cmd keyword argument.
     # Job operations are with or without operation level hooks
 
     # Check job document for keys from installed, project-wide hooks
@@ -2573,7 +2464,7 @@ class TestHooksInstallWithDecorators(TestHooksBase, TestHooksInstallSetUp):
 
 class TestHooksInstallCmdWithDecorators(TestHooksCmd, TestHooksInstallSetUp):
     # Tests if project-wide hooks interfere with operation level hooks
-    # in job operations with the @cmd decorator
+    # in job operations with the cmd keyword argument
     @pytest.fixture()
     def operation_name(self):
         return "base_cmd"

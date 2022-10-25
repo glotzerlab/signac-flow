@@ -1573,7 +1573,7 @@ class _FlowProjectClass(type):
                 base_aggregator = aggregator.groupsof(1)
                 if getattr(func, "_flow_aggregate", base_aggregator) != base_aggregator:
                     raise FlowProjectDefinitionError(
-                        "The @with_job decorator cannot be used with aggregation."
+                        "The with_job keyword argument cannot be used with aggregation."
                     )
 
                 @functools.wraps(func)

@@ -1545,8 +1545,8 @@ class _FlowProjectClass(type):
                         else:
                             return func(job)
 
-                setattr(decorated, "_flow_with_job", True)
-                setattr(decorated, "_flow_cmd", getattr(func, "_flow_cmd", False))
+                decorated._flow_with_job = True
+                decorated._flow_cmd = getattr(func, "_flow_cmd", False)
                 return decorated
 
         _directives_to_document = (

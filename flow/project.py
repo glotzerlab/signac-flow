@@ -68,6 +68,7 @@ from .util.misc import (
     _add_cwd_to_environment_pythonpath,
     _bidict,
     _cached_partial,
+    _deprecated_warning,
     _get_parallel_executor,
     _positive_int,
     _roundrobin,
@@ -615,10 +616,11 @@ class FlowCmdOperation(BaseFlowOperation):
                     format_arguments[match.group(1)] = jobs
             formatted_cmd = cmd.format(**format_arguments)
         if formatted_cmd != cmd:
-            warnings.warn(
-                "Returning format strings in a cmd operation is deprecated as of version 0.22.0 "
-                "and will be removed in  0.23.0. Users should format the command string.",
-                FutureWarning,
+            _deprecated_warning(
+                deprecation="Returning format strings in a cmd operation",
+                alternative="Users should format the command string.",
+                deprecated_in="0.22.0",
+                removed_in="0.23.0",
             )
         return formatted_cmd
 
@@ -1485,6 +1487,9 @@ class _FlowProjectClass(type):
                 ``False``.
             directives : dict, optional, keyword-only
                 Directives to use for resource requests and execution.
+            aggregator : flow.aggregator, optional, keyword-only
+                The aggregator to use for the operation. Default value uses aggregator of size one
+                (i.e. individual jobs).
 
             Returns
             -------
@@ -1502,20 +1507,38 @@ class _FlowProjectClass(type):
                 cmd=False,
                 with_job=False,
                 directives=None,
+                aggregator=None,
             ):
                 if isinstance(func, str):
                     return lambda op: self._internal_call(
-                        op, name=func, cmd=cmd, with_job=with_job, directives=directives
+                        op,
+                        name=func,
+                        cmd=cmd,
+                        with_job=with_job,
+                        directives=directives,
+                        op_aggregator=aggregator,
                     )
                 if func is None:
                     return lambda op: self._internal_call(
-                        op, name=name, cmd=cmd, with_job=with_job, directives=directives
+                        op,
+                        name=name,
+                        cmd=cmd,
+                        with_job=with_job,
+                        directives=directives,
+                        op_aggregator=aggregator,
                     )
                 return self._internal_call(
-                    func, name=name, cmd=cmd, with_job=with_job, directives=directives
+                    func,
+                    name=name,
+                    cmd=cmd,
+                    with_job=with_job,
+                    directives=directives,
+                    op_aggregator=aggregator,
                 )
 
-            def _internal_call(self, func, name, *, cmd, with_job, directives):
+            def _internal_call(
+                self, func, name, *, cmd, with_job, directives, op_aggregator
+            ):
                 if func in chain(
                     *self._parent_class._OPERATION_PRECONDITIONS.values(),
                     *self._parent_class._OPERATION_POSTCONDITIONS.values(),
@@ -1560,7 +1583,15 @@ class _FlowProjectClass(type):
                     )
 
                 if not getattr(func, "_flow_aggregate", False):
-                    func._flow_aggregate = aggregator.groupsof(1)
+                    default_aggregator = aggregator.groupsof(1)
+                    if op_aggregator is None:
+                        op_aggregator = default_aggregator
+                    elif op_aggregator != default_aggregator:
+                        if getattr(func, "_flow_with_job", False):
+                            raise FlowProjectDefinitionError(
+                                "The with_job option cannot be used with aggregation."
+                            )
+                    func._flow_aggregate = op_aggregator
 
                 # Append the name and function to the class registry
                 self._parent_class._OPERATION_FUNCTIONS.append((name, func))
@@ -1602,11 +1633,11 @@ class _FlowProjectClass(type):
                     name and directives as an operation of the
                     :class:`~.FlowProject` subclass.
                 """
-                warnings.warn(
-                    "@FlowProject.operation.with_directives has been deprecated as of 0.22.0 and "
-                    "will be removed in 0.23.0. Use @FlowProject.operation(directives={...}) "
-                    "instead.",
-                    FutureWarning,
+                _deprecated_warning(
+                    deprecation="@FlowProject.operation.with_directives",
+                    alternative="Use @FlowProject.operation(directives={...}) instead.",
+                    deprecated_in="0.22.0",
+                    removed_in="0.23.0",
                 )
 
                 def add_operation_with_directives(function):
@@ -5153,9 +5184,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             sys.exit(2)
 
         if args.show_traceback:
-            warnings.warn(
-                "--show-traceback is deprecated and to be removed in signac-flow version 0.23.",
-                FutureWarning,
+            _deprecated_warning(
+                deprecation="--show-traceback",
+                alternative="",
+                deprecated_in="0.22.0",
+                removed_in="0.23.0",
             )
 
         # Manually 'merge' the various global options defined for both the main parser

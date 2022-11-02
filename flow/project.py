@@ -4318,7 +4318,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             dest="operation_name",
             nargs="+",
             help="Only select operation or groups that match the given "
-            "operation/group name(s).",
+            "operation/group name(s). These are interpreted as regular expressions.",
         )
         selection_group.add_argument(
             "-n",

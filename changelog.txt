@@ -11,6 +11,11 @@ Version 0.23
 [0.23.0] -- 20xx-xx-xx
 ----------------------
 
+Added
++++++
+
+- Added feature to hide the status of the progress bar (#685).
+
 Changed
 +++++++
 

@@ -352,6 +352,8 @@ def _get_parallel_executor(parallelization="none", progress=True):
     parallelization : str
         Parallelization mode. Allowed values are "thread", "process", or
         "none". (Default value = "none")
+    progress : bool
+        Show a progress bar when printing status output (Default value = False).
 
     Returns
     -------

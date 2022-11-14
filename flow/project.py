@@ -2637,7 +2637,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         status_parallelization : str
             Parallelization mode for fetching the status. Allowed values are
             "thread", "process", or "none". (Default value = "none")
-        progress : bool TODO
+        progress : bool
+            Show a progress bar when printing status output (Default value = False).
 
         Returns
         -------
@@ -2883,7 +2884,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Status output format, supports:
             'terminal' (default), 'markdown' or 'html'.
         no_progress : bool
-            TODO
+            Hide the progress bar from the status output. (Default value = False)
 
         """
         if file is None:
@@ -3318,7 +3319,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             execution will be cancelled. Use None to indicate no timeout
             (Default value = None).
         progress : bool
-            Show a progress bar during execution (Default value = False).
+            Show a progress bar when printing status output (Default value = False).
 
         """
         if timeout is not None and timeout < 0:
@@ -3383,7 +3384,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         operations : Sequence of instances of :class:`_JobOperation`
             The operations to execute.
         progress : bool
-            Show a progress bar during execution.
+            Show a progress bar when printing status output (Default value = False).
         timeout : float
             A timeout for each operation in seconds after which
             execution will be cancelled. Use None to indicate no timeout
@@ -3560,7 +3561,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             will not exceed this argument. The default is 1, there is no limit
             if this argument is None.
         progress : bool
-            Show a progress bar during execution. (Default value = False)
+            Show a progress bar when printing status output (Default value = False).
         order : str, callable, or None
             Specify the order of operations. Possible values are:
 

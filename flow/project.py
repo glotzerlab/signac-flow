@@ -2882,7 +2882,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         output_format : str
             Status output format, supports:
             'terminal' (default), 'markdown' or 'html'.
-        progress : bool
+        no_progress : bool
             TODO
 
         """

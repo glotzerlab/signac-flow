@@ -21,7 +21,6 @@ import sys
 import textwrap
 import threading
 import time
-import warnings
 from collections import Counter, defaultdict
 from copy import deepcopy
 from enum import IntFlag
@@ -58,8 +57,6 @@ from .errors import (
 )
 from .hooks import _Hooks
 from .labels import _is_label_func, classlabel, label, staticlabel
-from .operations import cmd as _cmd
-from .operations import with_job as _with_job
 from .render_status import _render_status
 from .scheduling.base import ClusterJob, JobStatus
 from .util import config as flow_config
@@ -580,49 +577,7 @@ class FlowCmdOperation(BaseFlowOperation):
 
     def __call__(self, *jobs):
         """Return the command formatted with the supplied job(s)."""
-        cmd = self._cmd(*jobs) if callable(self._cmd) else self._cmd
-        # The logic below will be removed after version 0.23.0. This is only to temporary fix an
-        # issue in supporting the formatting of cmd operation in the interim.
-        format_arguments = {}
-        if not callable(self._cmd):
-            format_arguments["jobs"] = jobs
-            if len(jobs) == 1:
-                format_arguments["job"] = jobs[0]
-            formatted_cmd = cmd.format(**format_arguments)
-        else:
-            argspec = inspect.getfullargspec(self._cmd)
-            signature = inspect.signature(self._cmd)
-            args = {
-                k: v for k, v in signature.parameters.items() if k != argspec.varargs
-            }
-
-            # get all named positional/keyword arguments with individual names.
-            for i, arg_name in enumerate(args):
-                try:
-                    format_arguments[arg_name] = jobs[i]
-                except IndexError:
-                    format_arguments[arg_name] = args[arg_name].default
-
-            # capture any remaining variable positional arguments.
-            if argspec.varargs:
-                format_arguments[argspec.varargs] = jobs[len(args) :]
-
-            # Capture old behavior which assumes job or jobs in the format string. We need to test
-            # the truthiness of the key versus the inclusion because in the case of with_job the
-            # above logic results in format_arguments["jobs"] = ().
-            if not any(format_arguments.get(key, False) for key in ("jobs", "job")):
-                if match := re.search("{.*(jobs?).*}", cmd):
-                    # Saves in key jobs or job based on regex match.
-                    format_arguments[match.group(1)] = jobs
-            formatted_cmd = cmd.format(**format_arguments)
-        if formatted_cmd != cmd:
-            _deprecated_warning(
-                deprecation="Returning format strings in a cmd operation",
-                alternative="Users should format the command string.",
-                deprecated_in="0.22.0",
-                removed_in="0.23.0",
-            )
-        return formatted_cmd
+        return self._cmd(*jobs) if callable(self._cmd) else self._cmd
 
 
 class FlowOperation(BaseFlowOperation):
@@ -772,7 +727,7 @@ class FlowGroupEntry:
         The directives specified in this decorator are only applied when
         executing the operation through the :class:`FlowGroup`.
         To apply directives to an individual operation executed outside of the
-        group, see :meth:`.FlowProject.operation.with_directives`.
+        group, see :meth:`.FlowProject.operation`.
 
         Parameters
         ----------
@@ -809,12 +764,12 @@ class FlowGroup:
         group = FlowProject.make_group(name='example_group')
 
         @group.with_directives({"nranks": 4})
-        @FlowProject.operation.with_directives({"nranks": 2, "executable": "python3"})
+        @FlowProject.operation({"nranks": 2, "executable": "python3"})
         def op1(job):
             pass
 
         @group
-        @FlowProject.operation.with_directives({"nranks": 2, "executable": "python3"})
+        @FlowProject.operation({"nranks": 2, "executable": "python3"})
         def op2(job):
             pass
 
@@ -1464,11 +1419,11 @@ class _FlowProjectClass(type):
                 def hello(job):
                     print('Hello', job)
 
-            Directives can also be specified by using :meth:`FlowProject.operation.with_directives`.
+            Directives can also be specified by using :meth:`FlowProject.operation`.
 
             .. code-block:: python
 
-                @FlowProject.operation.with_directives({"nranks": 4})
+                @FlowProject.operation({"nranks": 4})
                 def mpi_hello(job):
                     print("hello")
 
@@ -1547,16 +1502,10 @@ class _FlowProjectClass(type):
                         "A condition function cannot be used as an operation."
                     )
 
-                # Handle cmd and with_job options. Use the deprecated decorators internally until
-                # the decorators are removed. These must be done first for now as with_job actually
-                # wraps the original function meaning that any other labels we apply will be masked
-                # if we do this later or not even captured it not added to _OPERATION_FUNCTIONS.
-                with warnings.catch_warnings():
-                    warnings.simplefilter(action="ignore", category=FutureWarning)
-                    if cmd:
-                        _cmd(func)
-                    if with_job:
-                        func = _with_job(func)
+                if cmd:
+                    setattr(func, "_flow_cmd", True)
+                if with_job:
+                    func = self._with_job(func)
 
                 # Store directives
                 if directives is not None:
@@ -1608,56 +1557,37 @@ class _FlowProjectClass(type):
                 func._flow_groups[self._parent_class] = {name}
                 return func
 
-            def with_directives(self, directives, name=None):
-                """Decorate a function to make it an operation with additional execution directives.
+            def _with_job(self, func):
+                base_aggregator = aggregator.groupsof(1)
+                if getattr(func, "_flow_aggregate", base_aggregator) != base_aggregator:
+                    raise FlowProjectDefinitionError(
+                        "The with_job keyword argument cannot be used with aggregation."
+                    )
 
-                Directives can be used to provide information about required
-                resources such as the number of processors required for
-                execution of parallelized operations. For more information, see
-                :ref:`signac-docs:cluster_submission_directives`. To apply
-                directives to an operation that is part of a group, use
-                :meth:`.FlowGroupEntry.with_directives`.
+                @functools.wraps(func)
+                def decorated(*jobs):
+                    with jobs[0] as job:
+                        if getattr(func, "_flow_cmd", False):
+                            return (
+                                f'trap "cd $(pwd)" EXIT && cd {job.ws} && {func(job)}'
+                            )
+                        else:
+                            return func(job)
 
-                Parameters
-                ----------
-                directives : dict
-                    Directives to use for resource requests and execution.
-                name : str
-                    The operation name. Uses the name of the function if None
-                    (Default value = None).
+                decorated._flow_with_job = True
+                decorated._flow_cmd = getattr(func, "_flow_cmd", False)
+                return decorated
 
-                Returns
-                -------
-                function
-                    A decorator which registers the function with the provided
-                    name and directives as an operation of the
-                    :class:`~.FlowProject` subclass.
-                """
-                _deprecated_warning(
-                    deprecation="@FlowProject.operation.with_directives",
-                    alternative="Use @FlowProject.operation(directives={...}) instead.",
-                    deprecated_in="0.22.0",
-                    removed_in="0.23.0",
-                )
-
-                def add_operation_with_directives(function):
-                    function._flow_directives = directives
-                    return self(function, name)
-
-                return add_operation_with_directives
-
-            _directives_to_document = (
-                ComputeEnvironment._get_default_directives()._directive_definitions.values()
-            )
-            with_directives.__doc__ += textwrap.indent(
-                "\n\n**Supported Directives:**\n\n"
-                + "\n\n".join(
-                    _document_directive(directive)
-                    for directive in _directives_to_document
-                ),
-                " " * 16,
-            )
-
+        _directives_to_document = (
+            ComputeEnvironment._get_default_directives()._directive_definitions.values()
+        )
+        OperationRegister.__doc__ += textwrap.indent(
+            "\n\n**Supported Directives:**\n\n"
+            + "\n\n".join(
+                _document_directive(directive) for directive in _directives_to_document
+            ),
+            " " * 16,
+        )
         return OperationRegister()
 
     @staticmethod

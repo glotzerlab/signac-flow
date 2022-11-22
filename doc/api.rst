@@ -22,7 +22,6 @@ The FlowProject
     FlowProject.main
     FlowProject.make_group
     FlowProject.operation
-    FlowProject.operation.with_directives
     FlowProject.operation_hooks
     FlowProject.operation_hooks.on_exception
     FlowProject.operation_hooks.on_exit
@@ -57,8 +56,6 @@ The FlowProject
     :exclude-members: pre,post,operation,operation_hooks
 
 .. automethod:: flow.FlowProject.operation(func, name=None)
-
-.. automethod:: flow.FlowProject.operation.with_directives(directives, name=None)
 
 .. automethod:: flow.FlowProject.operation_hooks(hook_func, trigger)
 
@@ -131,23 +128,6 @@ Labels
     :special-members: __call__
 
 .. autoclass:: flow.classlabel
-    :members:
-    :special-members: __call__
-
-@flow.cmd
----------
-
-.. autofunction:: cmd
-
-@flow.with_job
---------------
-
-.. autofunction:: with_job
-
-@flow.directives
-----------------
-
-.. autoclass:: directives
     :members:
     :special-members: __call__
 

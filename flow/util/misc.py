@@ -5,6 +5,7 @@
 import argparse
 import logging
 import os
+import warnings
 from collections.abc import MutableMapping
 from contextlib import contextmanager
 from functools import lru_cache, partial
@@ -391,6 +392,30 @@ def _get_parallel_executor(parallelization="none"):
             return list(tmap(func, iterable, tqdm_class=tqdm, **kwargs))
 
     return parallel_executor
+
+
+def _deprecated_warning(
+    *,
+    deprecation: str,
+    alternative: str,
+    deprecated_in: str,
+    removed_in: str,
+    category: Warning = FutureWarning,
+):
+    warnings.warn(
+        " ".join(
+            (
+                deprecation,
+                "has been deprecated as of",
+                deprecated_in,
+                "and will be removed in",
+                removed_in + ".",
+                alternative,
+            )
+        ),
+        category,
+        stacklevel=2,
+    )
 
 
 __all__ = [

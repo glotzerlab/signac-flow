@@ -2091,6 +2091,7 @@ class TestAggregatesProjectUtilities(TestAggregatesProjectBase):
         # The operation agg_op2 adds another aggregate in the project.
         assert len(agg_cursor) == NUM_BEFORE_REREGISTRATION + 2
 
+    @pytest.mark.filterwarnings("ignore:@aggregator():FutureWarning")
     def test_aggregator_with_job(self):
         class A(FlowProject):
             pass
@@ -2102,15 +2103,17 @@ class TestAggregatesProjectUtilities(TestAggregatesProjectBase):
             def test_invalid_decorators(job):
                 pass
 
-    def test_with_job_aggregator(self):
-        class A(FlowProject):
-            pass
+        with pytest.raises(FlowProjectDefinitionError):
+
+            @A.operation(with_job=True)
+            @aggregator()
+            def test_invalid_decorators_2(job):
+                pass
 
         with pytest.raises(FlowProjectDefinitionError):
 
-            @aggregator()
-            @A.operation(with_job=True)
-            def test_invalid_decorators(job):
+            @A.operation(with_job=True, aggregator=aggregator())
+            def test_invalid_decorator_combination(job):
                 pass
 
 

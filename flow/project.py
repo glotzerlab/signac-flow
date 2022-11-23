@@ -1260,15 +1260,14 @@ class _FlowProjectClass(type):
 
             .. code-block:: python
 
-                @Project.operation
                 @Project.pre(lambda job: not job.doc.get('hello'))
+                @Project.operation
                 def hello(job):
                     print('hello', job)
                     job.doc.hello = True
 
-                @Project.operation
-                @aggregator()
                 @Project.pre(lambda *jobs: all("hi_all" not in job.doc for job in jobs))
+                @Project.operation(aggregator=aggregator())
                 def hi_all(*jobs):
                     print('hi', jobs)
                     for job in jobs:
@@ -1358,15 +1357,14 @@ class _FlowProjectClass(type):
 
             .. code-block:: python
 
-                @Project.operation
                 @Project.post(lambda job: job.doc.get('bye'))
+                @Project.operation
                 def bye(job):
                     print('bye', job)
                     job.doc.bye = True
 
-                @Project.operation
-                @aggregator()
                 @Project.post(lambda *jobs: all("bye_all" in job.doc for job in jobs))
+                @Project.operation(aggregator=aggregator())
                 def bye_all(*jobs):
                     print('bye', jobs)
                     for job in jobs:

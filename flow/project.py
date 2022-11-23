@@ -65,7 +65,6 @@ from .util.misc import (
     _add_cwd_to_environment_pythonpath,
     _bidict,
     _cached_partial,
-    _deprecated_warning,
     _get_parallel_executor,
     _positive_int,
     _roundrobin,
@@ -4757,7 +4756,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "job_id",
                 "filter",
                 "doc_filter",
-                "show_traceback",
             ]
         }
         if args.pop("full"):
@@ -4965,12 +4963,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 help="Increase output verbosity.",
             )
             _parser.add_argument(
-                "--show-traceback",
-                dest="show_traceback",
-                action="store_true",
-                help="No op. Exists to be backwards comaptible with signac-flow version <= 0.21.",
-            )
-            _parser.add_argument(
                 "--debug",
                 dest=prefix + "debug",
                 action="store_true",
@@ -5112,14 +5104,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if not hasattr(args, "func"):
             parser.print_usage()
             sys.exit(2)
-
-        if args.show_traceback:
-            _deprecated_warning(
-                deprecation="--show-traceback",
-                alternative="",
-                deprecated_in="0.22.0",
-                removed_in="0.23.0",
-            )
 
         # Manually 'merge' the various global options defined for both the main parser
         # and the parent parser that are shared by all subparsers:

@@ -65,6 +65,7 @@ from .util.misc import (
     _add_cwd_to_environment_pythonpath,
     _bidict,
     _cached_partial,
+    _deprecated_warning,
     _get_parallel_executor,
     _positive_int,
     _roundrobin,
@@ -1286,6 +1287,15 @@ class _FlowProjectClass(type):
             _parent_class = parent_class
 
             def __call__(self, func):
+                if func not in self._parent_class._OPERATION_FUNCTIONS:
+                    _deprecated_warning(
+                        deprecation="Placing conditions below the @FlowProject.operation "
+                        "decorator.",
+                        alternative="Place decorator above @FlowProject.operation to remove the "
+                        "warning.",
+                        deprecated_in="0.23.0",
+                        removed_in="0.24.0",
+                    )
                 operation_functions = [
                     operation[1]
                     for operation in self._parent_class._collect_operations()

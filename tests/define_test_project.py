@@ -35,6 +35,8 @@ def b_is_even(job):
 
 
 @group1
+@_TestProject.pre(b_is_even)
+@_TestProject.post.isfile("world.txt")
 @_TestProject.operation(
     cmd=True,
     directives={
@@ -45,8 +47,6 @@ def b_is_even(job):
         "np": 1,
     },
 )
-@_TestProject.pre(b_is_even)
-@_TestProject.post.isfile("world.txt")
 def op1(job):
     return f'echo "hello" > {job.ws}/world.txt'
 
@@ -56,17 +56,17 @@ def _need_to_fork(job):
 
 
 @group1
-@_TestProject.operation(directives={"fork": _need_to_fork})
 @_TestProject.post.true("test")
+@_TestProject.operation(directives={"fork": _need_to_fork})
 def op2(job):
     job.document.test = os.getpid()
 
 
 @group2.with_directives(dict(omp_num_threads=4))
-@_TestProject.operation(directives={"ngpu": 1, "omp_num_threads": 1})
 @_TestProject.post.true("test3_true")
 @_TestProject.post.false("test3_false")
 @_TestProject.post.not_(lambda job: job.doc.test3_false)
+@_TestProject.operation(directives={"ngpu": 1, "omp_num_threads": 1})
 def op3(job):
     job.document.test3_true = True
     job.document.test3_false = False
@@ -80,9 +80,9 @@ group3 = _DynamicTestProject.make_group(name="group3")
 
 
 @group3
-@_DynamicTestProject.operation
 @_DynamicTestProject.pre.after(op1)
 @_DynamicTestProject.post(lambda job: job.sp.get("dynamic", False))
+@_DynamicTestProject.operation
 def op4(job):
     job.sp.dynamic = True  # migration during execution
 

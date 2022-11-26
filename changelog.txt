@@ -18,7 +18,7 @@ Fixed
 Removed
 +++++++
 
-- Removed the ``signac.testing`` module (#691).
+- The ``signac.testing`` module (#691).
 
 Version 0.22
 ============

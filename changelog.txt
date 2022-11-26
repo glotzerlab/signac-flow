@@ -15,6 +15,11 @@ Fixed
 
 - Detecting correct environment on Delta GPU nodes (#682).
 
+Removed
++++++++
+
+- Removed the ``signac.testing`` module (#691).
+
 Version 0.22
 ============
 

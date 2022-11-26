@@ -18,7 +18,7 @@ Fixed
 Removed
 +++++++
 
-- The ``signac.testing`` module (#691).
+- The ``flow.testing`` module (#691).
 
 Version 0.22
 ============

@@ -411,10 +411,7 @@ def _get_parallel_executor(parallelization="none", progress=True):
         else:
 
             def parallel_executor(func, iterable, **kwargs):
-                result = []
-                for i in iterable:
-                    result.append(func(i))
-                return result
+                return [func(i) for i in iterable]
 
     return parallel_executor
 

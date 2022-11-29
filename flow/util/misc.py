@@ -361,20 +361,13 @@ def _get_parallel_executor(parallelization="none", progress=True):
         A callable with signature ``func, iterable, **kwargs``.
 
     """
-    if parallelization == "thread":
-        if progress:
+    if progress:
+        if parallelization == "thread":
 
             def parallel_executor(func, iterable, **kwargs):
                 return thread_map(func, iterable, tqdm_class=tqdm, **kwargs)
 
-        else:
-
-            def parallel_executor(func, iterable, **kwargs):
-                # mwe did not assign any maxworkers under the threadpool executor, is this ok?
-                return ThreadPoolExecutor().map(func, iterable)
-
-    elif parallelization == "process":
-        if progress:
+        elif parallelization == "process":
 
             def parallel_executor(func, iterable, **kwargs):
                 # The tqdm progress bar requires a total. We compute the total in
@@ -397,16 +390,21 @@ def _get_parallel_executor(parallelization="none", progress=True):
         else:
 
             def parallel_executor(func, iterable, **kwargs):
-                return ProcessPoolExecutor().map(func, iterable)
-
-    else:
-        if progress:
-
-            def parallel_executor(func, iterable, **kwargs):
                 if "chunksize" in kwargs:
                     # Chunk size only applies to thread/process parallel executors
                     del kwargs["chunksize"]
                 return list(tmap(func, iterable, tqdm_class=tqdm, **kwargs))
+
+    else:
+        if parallelization == "thread":
+
+            def parallel_executor(func, iterable, **kwargs):
+                return ThreadPoolExecutor().map(func, iterable)
+
+        elif parallelization == "process":
+
+            def parallel_executor(func, iterable, **kwargs):
+                return ProcessPoolExecutor().map(func, iterable)
 
         else:
 

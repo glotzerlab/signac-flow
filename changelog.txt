@@ -10,6 +10,11 @@ Version 0.23
 
 [0.23.0] -- 20xx-xx-xx
 
+Changed
++++++++
+
+- Deprecated ``alias`` CLI argument to ``flow init`` (#693).
+
 Fixed
 +++++
 

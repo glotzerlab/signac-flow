@@ -18,13 +18,13 @@ logger = logging.getLogger(__name__)
 
 TEMPLATES = {
     "minimal": [
-        ("{alias}.py", "project_minimal.pyt"),
+        ("project.py", "project_minimal.pyt"),
     ],
     "example": [
-        ("{alias}.py", "project_example.pyt"),
+        ("project.py", "project_example.pyt"),
     ],
     "testing": [
-        ("{alias}.py", "project_testing.pyt"),
+        ("project.py", "project_testing.pyt"),
     ],
 }
 

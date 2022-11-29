@@ -63,12 +63,6 @@ jobs:
       DEPENDENCIES: "NEWEST"
       SIGNAC_VERSION: "git+ssh://git@github.com/glotzerlab/signac.git"
       PYTHON: python
-  linux-python-310-signac-next:
-    <<: *test-template
-    environment:
-      DEPENDENCIES: "NEWEST"
-      SIGNAC_VERSION: "git+ssh://git@github.com/glotzerlab/signac.git@next"
-      PYTHON: python
   linux-python-39:
     <<: *test-template
     docker:
@@ -236,7 +230,6 @@ workflows:
                 - master
     jobs:
       - linux-python-310-signac-latest
-#     - linux-python-310-signac-next
       - test-install-pip-python-310
       - test-install-pip-python-39
       - test-install-pip-python-38

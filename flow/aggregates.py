@@ -657,8 +657,13 @@ class _AggregateStoresCursor(_AggregatesCursor):
         return sum(len(aggregate_store) for aggregate_store in self._stores)
 
     def __iter__(self):
+        existing_stores = set()
         for aggregate_store in self._stores:
-            yield from aggregate_store.values()
+            for agg_id, aggregate in aggregate_store.items():
+                if agg_id in existing_stores:
+                    continue
+                existing_stores.add(agg_id)
+                yield aggregate
 
 
 class _JobAggregateCursor(_AggregatesCursor):

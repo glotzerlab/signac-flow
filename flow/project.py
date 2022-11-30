@@ -1286,7 +1286,12 @@ class _FlowProjectClass(type):
             _parent_class = parent_class
 
             def __call__(self, func):
-                if func not in self._parent_class._OPERATION_FUNCTIONS:
+                # Have to traverse the mro to ensure that func is already an operation and that
+                # self.condition is not.
+                operation_functions = [
+                    func for name, func in self._parent_class._collect_operations()
+                ]
+                if func not in operation_functions:
                     _deprecated_warning(
                         deprecation="Placing conditions below the @FlowProject.operation "
                         "decorator.",
@@ -1295,10 +1300,6 @@ class _FlowProjectClass(type):
                         deprecated_in="0.23.0",
                         removed_in="0.24.0",
                     )
-                operation_functions = [
-                    operation[1]
-                    for operation in self._parent_class._collect_operations()
-                ]
                 if self.condition in operation_functions:
                     raise FlowProjectDefinitionError(
                         "Operation functions cannot be used as preconditions."
@@ -1385,10 +1386,20 @@ class _FlowProjectClass(type):
             _parent_class = parent_class
 
             def __call__(self, func):
+                # Have to traverse the mro to ensure that func is already an operation and that
+                # self.condition is not.
                 operation_functions = [
-                    operation[1]
-                    for operation in self._parent_class._collect_operations()
+                    func for name, func in self._parent_class._collect_operations()
                 ]
+                if func not in operation_functions:
+                    _deprecated_warning(
+                        deprecation="Placing conditions below the @FlowProject.operation "
+                        "decorator.",
+                        alternative="Place decorator above @FlowProject.operation to remove the "
+                        "warning.",
+                        deprecated_in="0.23.0",
+                        removed_in="0.24.0",
+                    )
                 if self.condition in operation_functions:
                     raise FlowProjectDefinitionError(
                         "Operation functions cannot be used as postconditions."

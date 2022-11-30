@@ -14,6 +14,7 @@ Fixed
 +++++
 
 - Detecting correct environment on Delta GPU nodes (#682).
+- Identical aggregates are used only once in submission and running (#694).
 
 Version 0.22
 ============

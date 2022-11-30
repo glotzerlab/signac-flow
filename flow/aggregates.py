@@ -654,7 +654,9 @@ class _AggregateStoresCursor(_AggregatesCursor):
 
     def __len__(self):
         # Return number of aggregates summed across all aggregate stores
-        return sum(len(aggregate_store) for aggregate_store in self._stores)
+        return len(
+            {id_ for aggregate_store in self._stores for id_ in aggregate_store.keys()}
+        )
 
     def __iter__(self):
         existing_stores = set()

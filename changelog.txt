@@ -13,6 +13,7 @@ Version 0.23
 Changed
 +++++++
 
+- Require ``signac`` version 1.8.0 (#693).
 - Deprecated ``alias`` CLI argument to ``flow init`` (#693).
 
 Fixed

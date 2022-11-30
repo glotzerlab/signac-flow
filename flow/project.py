@@ -632,14 +632,11 @@ class FlowGroupEntry:
     Application developers should not directly instantiate this class, but
     use :meth:`~.FlowProject.make_group` instead.
 
-    Operation functions can be marked for inclusion into a :class:`FlowGroup`
-    by decorating the functions with a corresponding :class:`FlowGroupEntry`.
-    If the operation requires specific directives, :meth:`~.with_directives`
-    accepts keyword arguments that are mapped to directives and returns a
-    decorator that can be applied to the operation to mark it for inclusion in
-    the group and indicate that it should be executed using the specified
-    directives. This overrides the default directives specified by
-    :meth:`flow.directives`.
+    Operation functions can be marked for inclusion into a :class:`FlowGroup` by decorating the
+    functions with a corresponding :class:`FlowGroupEntry`. If the operation requires specific
+    directives, the `__call__` method accepts the keyword argument ``directives`` to indicate that
+    it should be executed using the specified directives. This overrides the default directives
+    specified by :meth:`FlowProject.operation`.
 
     Parameters
     ----------
@@ -673,7 +670,7 @@ class FlowGroupEntry:
         # `@operation`.
         self.group_aggregator = group_aggregator
 
-    def __call__(self, func):
+    def __call__(self, func=None, *, directives=None):
         """Add the function into the group's operations.
 
         This call operator allows the class to be used as a decorator.
@@ -683,12 +680,23 @@ class FlowGroupEntry:
         func : callable
             The function to decorate.
 
+        directives : dict
+            Directives to use for resource requests and execution.
+            The directives specified in this decorator are only applied when
+            executing the operation through the :class:`FlowGroup`.
+            To apply directives to an individual operation executed outside of the
+            group, see :meth:`.FlowProject.operation`.
+
         Returns
         -------
-        callable
+        func
             The decorated function.
-
         """
+        if func is None:
+            return functools.partial(self._internal_call, directives=directives)
+        return self._internal_call(func, directives=directives)
+
+    def _internal_call(self, func, *, directives):
         if not any(
             func == op_func for _, op_func in self._project._OPERATION_FUNCTIONS
         ):
@@ -702,6 +710,12 @@ class FlowGroupEntry:
                 f"Cannot reregister operation '{func}' with the group '{self.name}'."
             )
         func._flow_groups[self._project].add(self.name)
+        if directives is None:
+            return func
+        if hasattr(func, "_flow_group_operation_directives"):
+            func._flow_group_operation_directives[self.name] = directives
+        else:
+            func._flow_group_operation_directives = {self.name: directives}
         return func
 
     def _set_directives(self, func, directives):
@@ -729,6 +743,9 @@ class FlowGroupEntry:
         To apply directives to an individual operation executed outside of the
         group, see :meth:`.FlowProject.operation`.
 
+        Note:
+            This method has been deprecated and will be removed in 0.24.0.
+
         Parameters
         ----------
         directives : dict
@@ -740,6 +757,12 @@ class FlowGroupEntry:
             A decorator which registers the operation with the group using the
             specified directives.
         """
+        _deprecated_warning(
+            deprecation="@FlowGroupEntry.with_directives",
+            alternative="Use the directives keyword argument of @FlowGroupEntry.__call__",
+            deprecated_in="0.23.0",
+            removed_in="0.24.0",
+        )
 
         def decorator(func):
             self._set_directives(func, directives)
@@ -763,7 +786,7 @@ class FlowGroup:
 
         group = FlowProject.make_group(name='example_group')
 
-        @group.with_directives({"nranks": 4})
+        @group(directives={"nranks": 4})
         @FlowProject.operation({"nranks": 2, "executable": "python3"})
         def op1(job):
             pass

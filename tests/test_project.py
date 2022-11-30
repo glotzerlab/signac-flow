@@ -248,7 +248,15 @@ class TestProjectClass(TestProjectBase):
         with pytest.raises(FlowProjectDefinitionError):
 
             @A.pre(attempted_precondition)
+            @A.operation
             def op1(job):
+                pass
+
+        with pytest.raises(FlowProjectDefinitionError):
+
+            @A.post(attempted_precondition)
+            @A.operation
+            def op2(job):
                 pass
 
     def test_repeat_operation_definition_with_inheritance(self):
@@ -322,6 +330,7 @@ class TestProjectClass(TestProjectBase):
         @B.pre.true("test_B")
         @A.operation
         @B.operation
+        @C.operation
         def op1(job):
             pass
 
@@ -336,6 +345,7 @@ class TestProjectClass(TestProjectBase):
         @B.post.true("test_B")
         @A.operation
         @B.operation
+        @C.operation
         def op2(job):
             pass
 
@@ -724,18 +734,10 @@ class TestProjectClass(TestProjectBase):
             def op2(job):
                 pass
 
-        with pytest.raises(FlowProjectDefinitionError):
+        with pytest.warns(FutureWarning):
 
-            @A.pre(op1)
-            @A.operation
+            @A.post(condition_fun)
             def op3(job):
-                pass
-
-        with pytest.raises(FlowProjectDefinitionError):
-
-            @A.post(op1)
-            @A.operation
-            def op4(job):
                 pass
 
     def test_condition_using_functools(self):

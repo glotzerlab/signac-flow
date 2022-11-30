@@ -120,7 +120,7 @@ def main():
         type=str,
         nargs="?",
         default="",
-        help="Unused will be removed in flow 0.24.0.",
+        help="Unused, will be removed in flow 0.24.0.",
     )
     parser_init.add_argument(
         "-t",

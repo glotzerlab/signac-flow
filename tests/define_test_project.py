@@ -62,7 +62,7 @@ def op2(job):
     job.document.test = os.getpid()
 
 
-@group2.with_directives(dict(omp_num_threads=4))
+@group2(directives={"omp_num_threads": 4})
 @_TestProject.operation(directives={"ngpu": 1, "omp_num_threads": 1})
 @_TestProject.post.true("test3_true")
 @_TestProject.post.false("test3_false")

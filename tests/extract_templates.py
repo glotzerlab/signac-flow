@@ -24,7 +24,7 @@ def main(args):
     else:
         return
 
-    p = signac.init_project(name=gen.PROJECT_NAME, root=PROJECT_DIR)
+    p = signac.init_project(root=PROJECT_DIR)
     p.import_from(origin=gen.ARCHIVE_DIR)
 
 

@@ -90,9 +90,7 @@ class TestProjectBase:
         MockScheduler.reset()
         self._tmp_dir = tempfile.TemporaryDirectory(prefix="signac-flow_")
         request.addfinalizer(self._tmp_dir.cleanup)
-        self.project = self.project_class.init_project(
-            name="FlowTestProject", root=self._tmp_dir.name
-        )
+        self.project = self.project_class.init_project(root=self._tmp_dir.name)
         self.cwd = os.getcwd()
 
     def switch_to_cwd(self):
@@ -134,7 +132,7 @@ class TestProjectBase:
         _cmd = f"python {fn_script} {subcmd}"
         try:
             with _add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
-                with _switch_to_directory(self.project.root_directory()):
+                with _switch_to_directory(self.project.path):
                     return subprocess.check_output(_cmd.split(), stderr=stderr)
         except subprocess.CalledProcessError as error:
             print(error, file=sys.stderr)

@@ -10,11 +10,17 @@ Version 0.23
 
 [0.23.0] -- 20xx-xx-xx
 
+Added
++++++
+
+- ``directives`` keyword argument in ``FlowGroupEntry.__call__``(#696).
+
 Changed
 +++++++
 
 - Require ``signac`` version 1.8.0 (#693).
 - Deprecated ``alias`` CLI argument to ``flow init`` (#693).
+- Deprecated ``FlowGroupEntry.with_directives`` in favor of keyword argument in ``FlowGroupEntry.__call__``(#696).
 
 Fixed
 +++++

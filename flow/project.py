@@ -1002,7 +1002,7 @@ class FlowGroup:
         separator = getattr(project._environment, "JOB_ID_SEPARATOR", "/")
         readable_name = "{project}{sep}{aggregate_id}{sep}{op_string}{sep}".format(
             sep=separator,
-            project=str(project)[:12],
+            project=project.__class__.__name__[:12],
             aggregate_id=aggregate_id,
             op_string=op_string[:12],
         )[:max_len]
@@ -2159,7 +2159,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             return operations[0].id
         sep = getattr(self._environment, "JOB_ID_SEPARATOR", "/")
         _id = sha1(".".join(op.id for op in operations).encode("utf-8")).hexdigest()
-        bundle_id = f"{self}{sep}bundle{sep}{_id}"
+        bundle_id = f"{self.__class__.__name__}{sep}bundle{sep}{_id}"
         fn_bundle = self._fn_bundle(bundle_id)
         os.makedirs(os.path.dirname(fn_bundle), exist_ok=True)
         with open(fn_bundle, "w") as file:

@@ -4,7 +4,8 @@ from math import ceil
 import pytest
 from conftest import TestProjectBase
 
-from flow.aggregates import aggregator, get_aggregate_id
+import flow
+from flow.aggregates import _AggregateStoresCursor, aggregator, get_aggregate_id
 from flow.errors import FlowProjectDefinitionError
 
 ignore_call_warning = pytest.mark.filterwarnings("ignore:@aggregator():FutureWarning")
@@ -369,3 +370,23 @@ class TestAggregate(AggregateProjectSetup, AggregateFixtures):
             for agg2 in list_of_aggregators:
                 if agg1 == agg2:
                     assert hash(agg1) == hash(agg2)
+
+
+class TestAggregateCursor(AggregateProjectSetup):
+    def test_skips_duplicate_aggregates(self, mocked_project):
+        class A(flow.FlowProject):
+            pass
+
+        @A.operation(aggregator=aggregator.groupby("is_even"))
+        def op1(job):
+            pass
+
+        @A.operation(aggregator=aggregator.groupby("is_even"))
+        def op2(job):
+            pass
+
+        project = A.get_project(self._tmp_dir.name)
+        # Check that length and actual iteration are the same and correct.
+        # If this did not skip duplicates the length would be 4.
+        assert len(_AggregateStoresCursor(project)) == 2
+        assert len(list(_AggregateStoresCursor(project))) == 2

@@ -16,6 +16,10 @@ references:
     key: python-env-v1-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "setup.py" }}-{{ checksum "requirements/requirements-test.txt" }}-{{ checksum ".circleci/ci-oldest-reqs.txt" }}
 
 jobs:
+  linux-python-311: &test-template
+    docker:
+      - image: cimg/python:3.11
+
   linux-python-310: &test-template
     docker:
       - image: cimg/python:3.10
@@ -57,7 +61,7 @@ jobs:
           path: test-reports
           destination: test-reports
 
-  linux-python-310-signac-latest:
+  linux-python-311-signac-latest:
     <<: *test-template
     environment:
       DEPENDENCIES: "NEWEST"
@@ -79,6 +83,29 @@ jobs:
       DEPENDENCIES: "OLDEST"
       SIGNAC_VERSION: "signac==1.8.0"
       PYTHON: python
+
+  test-install-pip-python-311: &test-install-pip
+    docker:
+      - image: cimg/python:3.10
+
+    environment:
+      PYTHON: python
+
+    steps:
+
+      - run:
+          name: install-with-pip
+          command: |
+            ${PYTHON} -m pip install --progress-bar off signac signac-flow
+
+      - run: &smoke-test
+          name: smoke-test
+          command: |
+            ${PYTHON} -m signac --version
+            ${PYTHON} -c 'import signac'
+            ${PYTHON} -m flow --version
+            ${PYTHON} -c 'import flow'
+
 
   test-install-pip-python-310: &test-install-pip
     docker:
@@ -130,6 +157,12 @@ jobs:
 
       - run:
           <<: *smoke-test
+
+  test-install-conda-python-311:
+    <<: *test-install-conda
+    environment:
+      PYTHON_DEP: "python=3.10"
+      PYTHON: python
 
   test-install-conda-python-310:
     <<: *test-install-conda
@@ -195,6 +228,9 @@ workflows:
   version: 2
   test:
     jobs:
+      - linux-python-311:
+          post-steps:
+            - codecov/upload
       - linux-python-310:
           post-steps:
             - codecov/upload
@@ -216,6 +252,7 @@ workflows:
             branches:
               only: /release\/.*/
           requires:
+            - linux-python-311
             - linux-python-310
             - linux-python-39
             - linux-python-38
@@ -229,11 +266,13 @@ workflows:
               only:
                 - master
     jobs:
-      - linux-python-310-signac-latest
+      - linux-python-311-signac-latest
+      - test-install-pip-python-311
       - test-install-pip-python-310
       - test-install-pip-python-39
       - test-install-pip-python-38
       - test-install-conda
+      - test-install-conda-python-311
       - test-install-conda-python-310
       - test-install-conda-python-39
       - test-install-conda-python-38

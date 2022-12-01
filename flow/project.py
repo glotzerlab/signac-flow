@@ -713,6 +713,7 @@ class FlowGroupEntry:
         func._flow_groups[self._project].add(self.name)
         if directives is None:
             return func
+
         if hasattr(func, "_flow_group_operation_directives"):
             func._flow_group_operation_directives[self.name] = directives
         else:

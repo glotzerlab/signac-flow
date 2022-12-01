@@ -13,14 +13,14 @@ Version 0.23
 Added
 +++++
 
-- ``directives`` keyword argument in ``FlowGroupEntry.__call__``(#696).
+- The ``FlowGroupEntry`` class can be called with a ``directives`` keyword argument now e.g. ``FlowGroupEntry(directives={...})``(#696).
 
 Changed
 +++++++
 
 - Require ``signac`` version 1.8.0 (#693).
 - Deprecated ``alias`` CLI argument to ``flow init`` (#693).
-- Deprecated ``FlowGroupEntry.with_directives`` in favor of keyword argument in ``FlowGroupEntry.__call__``(#696).
+- Deprecated ``FlowGroupEntry.with_directives`` in favor of a directives keyword argument in ``FlowGroupEntry()``(#696).
 
 Fixed
 +++++

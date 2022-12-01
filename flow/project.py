@@ -632,11 +632,12 @@ class FlowGroupEntry:
     Application developers should not directly instantiate this class, but
     use :meth:`~.FlowProject.make_group` instead.
 
-    Operation functions can be marked for inclusion into a :class:`FlowGroup` by decorating the
-    functions with a corresponding :class:`FlowGroupEntry`. If the operation requires specific
-    directives, the `__call__` method accepts the keyword argument ``directives`` to indicate that
-    it should be executed using the specified directives. This overrides the default directives
-    specified by :meth:`FlowProject.operation`.
+    Operation functions can be marked for inclusion into a :class:`FlowGroup`
+    by decorating the functions with a corresponding :class:`FlowGroupEntry`.
+    If the operation requires group specific directives, calling the
+    :class:`FlowGroupEntry` with the keyword argument ``directives`` allows the
+    setting of directives for the exclusively for the group. Doing this overrides
+    the default directives specified by :meth:`FlowProject.operation`.
 
     Parameters
     ----------
@@ -759,7 +760,8 @@ class FlowGroupEntry:
         """
         _deprecated_warning(
             deprecation="@FlowGroupEntry.with_directives",
-            alternative="Use the directives keyword argument of @FlowGroupEntry.__call__",
+            alternative="Use the directives keyword argument in base decorator e.g. "
+            "@FlowGroupEntry(directives={...}).",
             deprecated_in="0.23.0",
             removed_in="0.24.0",
         )

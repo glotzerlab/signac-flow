@@ -80,7 +80,7 @@ jobs:
       SIGNAC_VERSION: "signac==1.8.0"
       PYTHON: python
 
-  test-install-pip-python-311: &test-install-pip
+  test-install-pip-python-311:
     docker:
       - image: cimg/python:3.11
 
@@ -101,39 +101,6 @@ jobs:
             ${PYTHON} -c 'import signac'
             ${PYTHON} -m flow --version
             ${PYTHON} -c 'import flow'
-
-
-  test-install-pip-python-310: &test-install-pip
-    docker:
-      - image: cimg/python:3.10
-
-    environment:
-      PYTHON: python
-
-    steps:
-
-      - run:
-          name: install-with-pip
-          command: |
-            ${PYTHON} -m pip install --progress-bar off signac signac-flow
-
-      - run: &smoke-test
-          name: smoke-test
-          command: |
-            ${PYTHON} -m signac --version
-            ${PYTHON} -c 'import signac'
-            ${PYTHON} -m flow --version
-            ${PYTHON} -c 'import flow'
-
-  test-install-pip-python-39:
-    <<: *test-install-pip
-    docker:
-      - image: cimg/python:3.9
-
-  test-install-pip-python-38:
-    <<: *test-install-pip
-    docker:
-      - image: cimg/python:3.8
 
   test-install-conda: &test-install-conda
     environment:
@@ -158,24 +125,6 @@ jobs:
     <<: *test-install-conda
     environment:
       PYTHON_DEP: "python=3.11"
-      PYTHON: python
-
-  test-install-conda-python-310:
-    <<: *test-install-conda
-    environment:
-      PYTHON_DEP: "python=3.10"
-      PYTHON: python
-
-  test-install-conda-python-39:
-    <<: *test-install-conda
-    environment:
-      PYTHON_DEP: "python=3.9"
-      PYTHON: python
-
-  test-install-conda-python-38:
-    <<: *test-install-conda
-    environment:
-      PYTHON_DEP: "python=3.8"
       PYTHON: python
 
   check-metadata:
@@ -251,7 +200,6 @@ workflows:
             - linux-python-311
             - linux-python-310
             - linux-python-39
-            - linux-python-38
             - linux-python-38-oldest
   nightly:
     triggers:
@@ -264,14 +212,8 @@ workflows:
     jobs:
       - linux-python-311-signac-latest
       - test-install-pip-python-311
-      - test-install-pip-python-310
-      - test-install-pip-python-39
-      - test-install-pip-python-38
       - test-install-conda
       - test-install-conda-python-311
-      - test-install-conda-python-310
-      - test-install-conda-python-39
-      - test-install-conda-python-38
   deploy:
     jobs:
       - deploy-pypi:

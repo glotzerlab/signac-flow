@@ -16,7 +16,7 @@ def test_print_status():
         name=gen.STATUS_OPTIONS_PROJECT_NAME
     ) as status_pr:
         gen.init(p)
-        fp = gen._TestProject.get_project(root=p.root_directory())
+        fp = gen._TestProject.get_project(root=p.path)
         status_pr.import_from(origin=gen.ARCHIVE_PATH)
         for job in status_pr:
             kwargs = job.statepoint()

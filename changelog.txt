@@ -10,11 +10,22 @@ Version 0.23
 
 [0.23.0] -- 20xx-xx-xx
 
+Changed
++++++++
+
+- Require ``signac`` version 1.8.0 (#693).
+- Deprecated ``alias`` CLI argument to ``flow init`` (#693).
+
 Fixed
 +++++
 
 - Detecting correct environment on Delta GPU nodes (#682).
 - Identical aggregates are used only once in submission and running (#694).
+
+Removed
++++++++
+
+- The ``flow.testing`` module (#691).
 
 Version 0.22
 ============

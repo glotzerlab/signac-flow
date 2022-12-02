@@ -57,29 +57,11 @@ jobs:
           path: test-reports
           destination: test-reports
 
-  linux-python-310-signac-16:
-    <<: *test-template
-    environment:
-      DEPENDENCIES: "NEWEST"
-      SIGNAC_VERSION: "signac~=1.6.0"
-      PYTHON: python
-  linux-python-310-signac-15:
-    <<: *test-template
-    environment:
-      DEPENDENCIES: "NEWEST"
-      SIGNAC_VERSION: "signac~=1.5.0"
-      PYTHON: python
   linux-python-310-signac-latest:
     <<: *test-template
     environment:
       DEPENDENCIES: "NEWEST"
       SIGNAC_VERSION: "git+ssh://git@github.com/glotzerlab/signac.git"
-      PYTHON: python
-  linux-python-310-signac-next:
-    <<: *test-template
-    environment:
-      DEPENDENCIES: "NEWEST"
-      SIGNAC_VERSION: "git+ssh://git@github.com/glotzerlab/signac.git@next"
       PYTHON: python
   linux-python-39:
     <<: *test-template
@@ -95,7 +77,7 @@ jobs:
       - image: cimg/python:3.8
     environment:
       DEPENDENCIES: "OLDEST"
-      SIGNAC_VERSION: "signac==1.3.0"
+      SIGNAC_VERSION: "signac==1.8.0"
       PYTHON: python
 
   test-install-pip-python-310: &test-install-pip
@@ -225,16 +207,6 @@ workflows:
       - linux-python-38-oldest:
           post-steps:
             - codecov/upload
-      - linux-python-310-signac-16:
-          requires:
-            - linux-python-310
-          post-steps:
-            - codecov/upload
-      - linux-python-310-signac-15:
-          requires:
-            - linux-python-310
-          post-steps:
-            - codecov/upload
       - check-metadata:
           filters:
             branches:
@@ -248,8 +220,6 @@ workflows:
             - linux-python-39
             - linux-python-38
             - linux-python-38-oldest
-            - linux-python-310-signac-16
-            - linux-python-310-signac-15
   nightly:
     triggers:
       - schedule:
@@ -260,7 +230,6 @@ workflows:
                 - master
     jobs:
       - linux-python-310-signac-latest
-#     - linux-python-310-signac-next
       - test-install-pip-python-310
       - test-install-pip-python-39
       - test-install-pip-python-38

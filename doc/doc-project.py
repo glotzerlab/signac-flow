@@ -6,4 +6,4 @@ class DocumentationProject(flow.FlowProject):
 
 
 if __name__ == "__main__":
-    DocumentationProject.init_project("DocumentationProject").main()
+    DocumentationProject.init_project().main()

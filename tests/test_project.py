@@ -55,7 +55,7 @@ def setup_project_subprocess_execution(project, stderr_output=sys.stderr):
     Optionally capture stderr with a passed in output or by default output to stderr like normal.
     """
     with _add_cwd_to_environment_pythonpath(), _switch_to_directory(
-        project.root_directory()
+        project.path
     ), redirect_stderr(stderr_output):
         yield
 
@@ -349,7 +349,7 @@ class TestProjectClass(TestProjectBase):
 
         @A.operation(with_job=True)
         def test_context(job):
-            assert os.path.realpath(os.getcwd()) == os.path.realpath(job.ws)
+            assert os.path.realpath(os.getcwd()) == os.path.realpath(job.path)
 
         project = self.mock_project(A)
         with setup_project_subprocess_execution(project):
@@ -2262,7 +2262,7 @@ class TestHooksSetUp(TestProjectBase):
         _cmd = f"python {fn_script} {subcmd} --debug"
         with _add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
             try:
-                with _switch_to_directory(self.project.root_directory()):
+                with _switch_to_directory(self.project.path):
                     return subprocess.check_output(_cmd.split(), stderr=stderr)
             except subprocess.CalledProcessError as error:
                 print(error, file=sys.stderr)
@@ -2417,7 +2417,7 @@ class TestHooksInvalidOption(TestHooksSetUp):
         _cmd = f"python {fn_script} {subcmd} --debug"
         with _add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
             try:
-                with _switch_to_directory(self.project.root_directory()):
+                with _switch_to_directory(self.project.path):
                     return subprocess.check_output(_cmd.split(), stderr=stderr)
             except subprocess.CalledProcessError as error:
                 return str(error.output)

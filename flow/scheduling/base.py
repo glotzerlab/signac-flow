@@ -101,6 +101,10 @@ class JobStatus(enum.IntEnum):
         except KeyError:
             raise ValueError(f"No equivalent group status for {status}.")
 
+    def __str__(self):
+        """Get the status name as a string."""
+        return self.name
+
 
 class ClusterJob:
     """Class representing a cluster job."""

@@ -86,7 +86,7 @@ jobs:
 
   test-install-pip-python-311: &test-install-pip
     docker:
-      - image: cimg/python:3.10
+      - image: cimg/python:3.11
 
     environment:
       PYTHON: python
@@ -161,7 +161,7 @@ jobs:
   test-install-conda-python-311:
     <<: *test-install-conda
     environment:
-      PYTHON_DEP: "python=3.10"
+      PYTHON_DEP: "python=3.11"
       PYTHON: python
 
   test-install-conda-python-310:

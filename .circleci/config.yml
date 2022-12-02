@@ -182,9 +182,6 @@ workflows:
       - linux-python-39:
           post-steps:
             - codecov/upload
-      - linux-python-38:
-          post-steps:
-            - codecov/upload
       - linux-python-38-oldest:
           post-steps:
             - codecov/upload

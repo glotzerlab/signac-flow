@@ -32,8 +32,12 @@ def generate_flow_project():
     def op3(job):
         pass
 
-    @SimpleAggregateProject.operation
+    @SimpleAggregateProject.operation(aggregator=aggregator())
     def op4(job):
+        pass
+
+    @SimpleAggregateProject.operation
+    def op5(job):
         pass
 
     return SimpleAggregateProject
@@ -406,8 +410,11 @@ class TestAggregateUtilities(AggregateProjectSetup):
         # Check that length and actual iteration are the same and correct.
         # If this did not skip duplicates the length would be 19.
         stores = _AggregateStoresCursor(mocked_project)
-        assert len(stores) == 17
-        assert len(list(stores)) == 17
+        assert len(stores) == 18
+        assert len(list(stores)) == 18
+        # Ensure that some known aggregates are in the cursor
+        assert tuple(mocked_project) in stores
+        assert all((job,) in stores for job in mocked_project)
 
     def test_filters(self, mocked_project):
         agg_cursor = _JobAggregateCursor(
@@ -417,7 +424,7 @@ class TestAggregateUtilities(AggregateProjectSetup):
 
     def test_reregister_aggregates(self, mocked_project):
         agg_cursor = _AggregateStoresCursor(project=mocked_project)
-        NUM_BEFORE_REREGISTRATION = 17
+        NUM_BEFORE_REREGISTRATION = 18
         assert len(agg_cursor) == NUM_BEFORE_REREGISTRATION
         new_jobs = [
             mocked_project.open_job(dict(i=10, is_even=True, half=5)),

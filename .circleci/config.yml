@@ -16,9 +16,9 @@ references:
     key: python-env-v1-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "setup.py" }}-{{ checksum "requirements/requirements-test.txt" }}-{{ checksum ".circleci/ci-oldest-reqs.txt" }}
 
 jobs:
-  linux-python-310: &test-template
+  linux-python-311: &test-template
     docker:
-      - image: cimg/python:3.10
+      - image: cimg/python:3.11
 
     environment:
       DEPENDENCIES: "NEWEST"
@@ -57,12 +57,16 @@ jobs:
           path: test-reports
           destination: test-reports
 
-  linux-python-310-signac-latest:
+  linux-python-311-signac-latest:
     <<: *test-template
     environment:
       DEPENDENCIES: "NEWEST"
       SIGNAC_VERSION: "git+ssh://git@github.com/glotzerlab/signac.git"
       PYTHON: python
+  linux-python-310:
+    <<: *test-template
+    docker:
+      - image: cimg/python:3.10
   linux-python-39:
     <<: *test-template
     docker:
@@ -80,9 +84,9 @@ jobs:
       SIGNAC_VERSION: "signac==1.8.0"
       PYTHON: python
 
-  test-install-pip-python-310: &test-install-pip
+  test-install-pip-python-311:
     docker:
-      - image: cimg/python:3.10
+      - image: cimg/python:3.11
 
     environment:
       PYTHON: python
@@ -101,16 +105,6 @@ jobs:
             ${PYTHON} -c 'import signac'
             ${PYTHON} -m flow --version
             ${PYTHON} -c 'import flow'
-
-  test-install-pip-python-39:
-    <<: *test-install-pip
-    docker:
-      - image: cimg/python:3.9
-
-  test-install-pip-python-38:
-    <<: *test-install-pip
-    docker:
-      - image: cimg/python:3.8
 
   test-install-conda: &test-install-conda
     environment:
@@ -131,27 +125,15 @@ jobs:
       - run:
           <<: *smoke-test
 
-  test-install-conda-python-310:
+  test-install-conda-python-311:
     <<: *test-install-conda
     environment:
-      PYTHON_DEP: "python=3.10"
-      PYTHON: python
-
-  test-install-conda-python-39:
-    <<: *test-install-conda
-    environment:
-      PYTHON_DEP: "python=3.9"
-      PYTHON: python
-
-  test-install-conda-python-38:
-    <<: *test-install-conda
-    environment:
-      PYTHON_DEP: "python=3.8"
+      PYTHON_DEP: "python=3.11"
       PYTHON: python
 
   check-metadata:
     docker:
-      - image: cimg/python:3.10
+      - image: cimg/python:3.11
 
     working_directory: ~/repo
 
@@ -170,7 +152,7 @@ jobs:
 
   test-deploy-pypi:
     docker:
-      - image: cimg/python:3.10
+      - image: cimg/python:3.11
     working_directory: ~/repo
     steps:
       - checkout
@@ -181,7 +163,7 @@ jobs:
 
   deploy-pypi:
     docker:
-      - image: cimg/python:3.10
+      - image: cimg/python:3.11
     working_directory: ~/repo
     steps:
       - checkout
@@ -195,6 +177,9 @@ workflows:
   version: 2
   test:
     jobs:
+      - linux-python-311:
+          post-steps:
+            - codecov/upload
       - linux-python-310:
           post-steps:
             - codecov/upload
@@ -216,6 +201,7 @@ workflows:
             branches:
               only: /release\/.*/
           requires:
+            - linux-python-311
             - linux-python-310
             - linux-python-39
             - linux-python-38
@@ -229,14 +215,10 @@ workflows:
               only:
                 - master
     jobs:
-      - linux-python-310-signac-latest
-      - test-install-pip-python-310
-      - test-install-pip-python-39
-      - test-install-pip-python-38
+      - linux-python-311-signac-latest
+      - test-install-pip-python-311
       - test-install-conda
-      - test-install-conda-python-310
-      - test-install-conda-python-39
-      - test-install-conda-python-38
+      - test-install-conda-python-311
   deploy:
     jobs:
       - deploy-pypi:

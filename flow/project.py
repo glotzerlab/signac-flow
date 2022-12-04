@@ -671,7 +671,7 @@ class FlowGroupEntry:
         # `@operation`.
         self.group_aggregator = group_aggregator
 
-    def __call__(self, func=None, *, directives=None):
+    def __call__(self, func=None, /, *, directives=None):
         """Add the function into the group's operations.
 
         This call operator allows the class to be used as a decorator.

@@ -14,7 +14,7 @@ Version 0.23
 Added
 +++++
 
-- The ``FlowGroupEntry`` class can be called with a ``directives`` keyword argument now e.g. ``FlowGroupEntry(directives={...})``(#696).
+- The ``FlowGroupEntry`` class can be called with a ``directives`` keyword argument: ``FlowGroupEntry(directives={...})`` (#696).
 
 Changed
 +++++++

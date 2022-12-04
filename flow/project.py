@@ -1259,15 +1259,14 @@ class _FlowProjectClass(type):
 
             .. code-block:: python
 
-                @Project.operation
                 @Project.pre(lambda job: not job.doc.get('hello'))
+                @Project.operation
                 def hello(job):
                     print('hello', job)
                     job.doc.hello = True
 
-                @Project.operation
-                @aggregator()
                 @Project.pre(lambda *jobs: all("hi_all" not in job.doc for job in jobs))
+                @Project.operation(aggregator=aggregator())
                 def hi_all(*jobs):
                     print('hi', jobs)
                     for job in jobs:
@@ -1286,10 +1285,20 @@ class _FlowProjectClass(type):
             _parent_class = parent_class
 
             def __call__(self, func):
+                # Have to traverse the mro to ensure that func is already an operation and that
+                # self.condition is not.
                 operation_functions = [
-                    operation[1]
-                    for operation in self._parent_class._collect_operations()
+                    func for name, func in self._parent_class._collect_operations()
                 ]
+                if func not in operation_functions:
+                    _deprecated_warning(
+                        deprecation="Placing conditions below the @FlowProject.operation "
+                        "decorator.",
+                        alternative="Place decorator above @FlowProject.operation to remove the "
+                        "warning.",
+                        deprecated_in="0.23.0",
+                        removed_in="0.24.0",
+                    )
                 if self.condition in operation_functions:
                     raise FlowProjectDefinitionError(
                         "Operation functions cannot be used as preconditions."
@@ -1348,15 +1357,14 @@ class _FlowProjectClass(type):
 
             .. code-block:: python
 
-                @Project.operation
                 @Project.post(lambda job: job.doc.get('bye'))
+                @Project.operation
                 def bye(job):
                     print('bye', job)
                     job.doc.bye = True
 
-                @Project.operation
-                @aggregator()
                 @Project.post(lambda *jobs: all("bye_all" in job.doc for job in jobs))
+                @Project.operation(aggregator=aggregator())
                 def bye_all(*jobs):
                     print('bye', jobs)
                     for job in jobs:
@@ -1377,10 +1385,20 @@ class _FlowProjectClass(type):
             _parent_class = parent_class
 
             def __call__(self, func):
+                # Have to traverse the mro to ensure that func is already an operation and that
+                # self.condition is not.
                 operation_functions = [
-                    operation[1]
-                    for operation in self._parent_class._collect_operations()
+                    func for name, func in self._parent_class._collect_operations()
                 ]
+                if func not in operation_functions:
+                    _deprecated_warning(
+                        deprecation="Placing conditions below the @FlowProject.operation "
+                        "decorator.",
+                        alternative="Place decorator above @FlowProject.operation to remove the "
+                        "warning.",
+                        deprecated_in="0.23.0",
+                        removed_in="0.24.0",
+                    )
                 if self.condition in operation_functions:
                     raise FlowProjectDefinitionError(
                         "Operation functions cannot be used as postconditions."
@@ -4756,7 +4774,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "job_id",
                 "filter",
                 "doc_filter",
-                "show_traceback",
             ]
         }
         if args.pop("full"):
@@ -4964,12 +4981,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 help="Increase output verbosity.",
             )
             _parser.add_argument(
-                "--show-traceback",
-                dest="show_traceback",
-                action="store_true",
-                help="No op. Exists to be backwards comaptible with signac-flow version <= 0.21.",
-            )
-            _parser.add_argument(
                 "--debug",
                 dest=prefix + "debug",
                 action="store_true",
@@ -5111,14 +5122,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         if not hasattr(args, "func"):
             parser.print_usage()
             sys.exit(2)
-
-        if args.show_traceback:
-            _deprecated_warning(
-                deprecation="--show-traceback",
-                alternative="",
-                deprecated_in="0.22.0",
-                removed_in="0.23.0",
-            )
 
         # Manually 'merge' the various global options defined for both the main parser
         # and the parent parser that are shared by all subparsers:

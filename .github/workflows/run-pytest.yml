@@ -25,7 +25,6 @@ jobs:
                   {python: '3.9', dependencies: 'newest'},
                   {python: '3.10', dependencies: 'newest'},
                   {python: '3.11', dependencies: 'newest'},
-                  {python: '3.11', dependencies: 'minimal'},
                   {python: '3.8', dependencies: 'oldest'} ]
     steps:
     - uses: actions/checkout@v3
@@ -39,10 +38,6 @@ jobs:
       run: |
         pip install -r requirements/requirements-test.txt
       if: ${{ matrix.config.dependencies == 'newest' }}
-    - name: Install minimal dependencies
-      run: |
-        pip install -r requirements/requirements-test.txt
-      if: ${{ matrix.config.dependencies == 'minimal' }}
     - name: Install oldest supported dependencies
       # To prevent Dependabot from updating the pinnings in this "oldest"
       # dependency list, we have to avoid the word "requirements" in the

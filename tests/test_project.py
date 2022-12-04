@@ -1703,7 +1703,9 @@ class TestGroupProject(TestProjectBase):
             def foo_operation(job):
                 pass
 
-    @pytest.mark.filterwarnings("ignore:*with_directives*:FutureWarning")
+    @pytest.mark.filterwarnings(
+        "ignore:.*with_directives has been deprecated.*:FutureWarning"
+    )
     def test_repeat_operation_group_directives_definition(self):
         """Test that operations cannot be registered with group directives multiple times."""
 

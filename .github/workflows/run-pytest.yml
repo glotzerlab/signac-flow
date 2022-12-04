@@ -37,11 +37,11 @@ jobs:
         python-version: ${{ matrix.config.python }}
     - name: Install newest dependencies
       run: |
-        pip install -r requirements-test.txt
+        pip install -r requirements/requirements-test.txt
       if: ${{ matrix.config.dependencies == 'newest' }}
     - name: Install minimal dependencies
       run: |
-        pip install -r requirements-test.txt
+        pip install -r requirements/requirements-test.txt
       if: ${{ matrix.config.dependencies == 'minimal' }}
     - name: Install oldest supported dependencies
       # To prevent Dependabot from updating the pinnings in this "oldest"

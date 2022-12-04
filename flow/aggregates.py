@@ -662,10 +662,9 @@ class _AggregateStoresCursor(_AggregatesCursor):
         existing_stores = set()
         for aggregate_store in self._stores:
             for agg_id, aggregate in aggregate_store.items():
-                if agg_id in existing_stores:
-                    continue
-                existing_stores.add(agg_id)
-                yield aggregate
+                if agg_id not in existing_stores:
+                    existing_stores.add(agg_id)
+                    yield aggregate
 
 
 class _JobAggregateCursor(_AggregatesCursor):

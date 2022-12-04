@@ -19,18 +19,25 @@ Added
 Changed
 +++++++
 
+- Deprecated placing ``@FlowProject.pre`` and ``@FlowProject.post`` before the ``FlowProject.operation`` decorator (#690).
 - Require ``signac`` version 1.8.0 (#693).
 - Deprecated ``alias`` CLI argument to ``flow init`` (#693).
+- Algorithm for computing cluster job ids (#695).
 - Updated CI to use GitHub Actions (#698).
 
 Fixed
 +++++
 
 - Detecting correct environment on Delta GPU nodes (#682).
+- Identical aggregates are used only once in submission and running (#694).
 
 Removed
 +++++++
 
+- ``show_traceback`` from CLI and config (#690).
+- Formatting the output of a ``FlowCmdOperation`` (#686).
+- ``@flow.cmd`` and ``flow.with_job`` (#686).
+- ``@FlowProject.operation.with_directives`` (#686).
 - The ``flow.testing`` module (#691).
 
 Version 0.22

@@ -10,7 +10,6 @@ _FLOW_SCHEMA = {
     "type": "object",
     "properties": {
         "status_performance_warn_threshold": {"type": "number"},
-        "show_traceback": {"type": "boolean"},
         "eligible_jobs_max_lines": {"type": "integer"},
         "status_parallelization": {"type": "string"},
     },

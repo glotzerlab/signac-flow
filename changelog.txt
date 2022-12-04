@@ -9,12 +9,14 @@ Version 0.23
 ============
 
 [0.23.0] -- 20xx-xx-xx
+----------------------
 
 Changed
 +++++++
 
 - Require ``signac`` version 1.8.0 (#693).
 - Deprecated ``alias`` CLI argument to ``flow init`` (#693).
+- Algorithm for computing cluster job ids (#695).
 
 Fixed
 +++++

@@ -22,7 +22,6 @@ from flow.scheduling.fake_scheduler import FakeScheduler
 
 # Define a consistent submission name so that we can test that job names are
 # being correctly generated.
-PROJECT_NAME = "SubmissionTest"
 ARCHIVE_DIR = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "./template_reference_data.tar.gz")
 )
@@ -164,7 +163,9 @@ def _store_bundled(self, operations):
         return operations[0].id
     else:
         h = ".".join(op.id for op in operations)
-        bid = "{}/bundle/{}".format(self, sha1(h.encode("utf-8")).hexdigest())
+        bid = "{}/bundle/{}".format(
+            self.__class__.__name__, sha1(h.encode("utf-8")).hexdigest()
+        )
         return bid
 
 
@@ -176,7 +177,7 @@ def get_masked_flowproject(p, environment=None):
     try:
         old_executable = sys.executable
         sys.executable = MOCK_EXECUTABLE
-        fp = TestProject.get_project(root=p.path)
+        fp = TestProject.get_project(p.path)
         if environment is not None:
             fp._environment = environment
         fp._entrypoint.setdefault("path", "generate_template_reference_data.py")
@@ -217,7 +218,7 @@ def main(args):
             )
             return
 
-    with signac.TemporaryProject(name=PROJECT_NAME) as p:
+    with signac.TemporaryProject() as p:
         init(p)
         with get_masked_flowproject(p) as fp:
             # Here we set the appropriate executable for all the operations. This

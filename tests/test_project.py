@@ -85,8 +85,8 @@ class TestProjectStatusPerformance(TestProjectBase):
     class Project(FlowProject):
         pass
 
-    @Project.operation
     @Project.post.isfile("DOES_NOT_EXIST")
+    @Project.operation
     def foo(job):
         pass
 
@@ -126,8 +126,8 @@ class TestProjectStatusNoEligibleOperations(TestProjectBase):
     class Project(FlowProject):
         pass
 
-    @Project.operation
     @Project.post(lambda job: True)
+    @Project.operation
     def foo(job):
         pass
 
@@ -248,7 +248,15 @@ class TestProjectClass(TestProjectBase):
         with pytest.raises(FlowProjectDefinitionError):
 
             @A.pre(attempted_precondition)
+            @A.operation
             def op1(job):
+                pass
+
+        with pytest.raises(FlowProjectDefinitionError):
+
+            @A.post(attempted_precondition)
+            @A.operation
+            def op2(job):
                 pass
 
     def test_repeat_operation_definition_with_inheritance(self):
@@ -322,6 +330,7 @@ class TestProjectClass(TestProjectBase):
         @B.pre.true("test_B")
         @A.operation
         @B.operation
+        @C.operation
         def op1(job):
             pass
 
@@ -336,6 +345,7 @@ class TestProjectClass(TestProjectBase):
         @B.post.true("test_B")
         @A.operation
         @B.operation
+        @C.operation
         def op2(job):
             pass
 
@@ -657,25 +667,25 @@ class TestProjectClass(TestProjectBase):
         class A(FlowProject):
             pass
 
-        @A.operation
         @A.post(lambda job: "a" in job.doc)
+        @A.operation
         def op1(job):
             job.doc.a = True
 
-        @A.operation
         @A.post.true("b")
+        @A.operation
         def op2(job):
             job.doc.b = True
 
-        @A.operation
         @A.pre.after(op1, op2)
         @A.post.true("c")
+        @A.operation
         def op3(job):
             job.doc.c = True
 
-        @A.operation
         @A.pre.copy_from(op1, op3)
         @A.post.true("d")
+        @A.operation
         def op4(job):
             job.doc.d = True
 
@@ -719,22 +729,20 @@ class TestProjectClass(TestProjectBase):
 
         with pytest.raises(FlowProjectDefinitionError):
 
-            @A.operation
             @A.pre.after(condition_fun)
+            @A.operation
             def op2(job):
                 pass
 
-        with pytest.raises(FlowProjectDefinitionError):
+        with pytest.warns(FutureWarning):
 
-            @A.operation
-            @A.pre(op1)
+            @A.post(condition_fun)
             def op3(job):
                 pass
 
-        with pytest.raises(FlowProjectDefinitionError):
+        with pytest.warns(FutureWarning):
 
-            @A.operation
-            @A.post(op1)
+            @A.pre(condition_fun)
             def op4(job):
                 pass
 
@@ -747,8 +755,8 @@ class TestProjectClass(TestProjectBase):
         class A(FlowProject):
             pass
 
-        @A.operation
         @A.post(partial(cond, extra_arg=True))
+        @A.operation
         def op1(job):
             job.doc.a = True
 
@@ -871,8 +879,8 @@ class TestProject(TestProjectBase):
         class A(FlowProject):
             pass
 
-        @A.operation
         @A.post(partial(cond, extra_arg=True))
+        @A.operation
         def op1(job):
             job.doc.a = True
 
@@ -883,8 +891,8 @@ class TestProject(TestProjectBase):
         class B(FlowProject):
             pass
 
-        @B.operation
         @B.post(partial(cond, extra_arg=True), tag="tag")
+        @B.operation
         def op2(job):
             job.doc.a = True
 
@@ -1223,11 +1231,11 @@ class TestExecutionProject(TestProjectBase):
         class Project(FlowProject):
             pass
 
-        @Project.operation
         @Project.pre(make_cond(0b1000))
         @Project.pre(make_cond(0b0100))
         @Project.post(make_cond(0b0010))
         @Project.post(make_cond(0b0001))
+        @Project.operation
         def op1(job):
             pass
 

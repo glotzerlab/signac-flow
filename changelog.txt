@@ -14,7 +14,7 @@ Version 0.23
 Added
 +++++
 
-- Support for Python 3.11 (#697).
+- Add official support for Python version 3.11 (#697).
 
 Changed
 +++++++

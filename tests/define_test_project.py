@@ -48,7 +48,7 @@ def b_is_even(job):
     },
 )
 def op1(job):
-    return f'echo "hello" > {job.ws}/world.txt'
+    return f'echo "hello" > {job.path}/world.txt'
 
 
 def _need_to_fork(job):

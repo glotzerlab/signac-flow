@@ -39,7 +39,7 @@ def b_is_even(job):
 @_TestProject.post.isfile("world.txt")
 @_TestProject.operation(cmd=True)
 def op1(job):
-    return f'echo "hello" > {job.ws}/world.txt'
+    return f'echo "hello" > {job.path}/world.txt'
 
 
 @group1

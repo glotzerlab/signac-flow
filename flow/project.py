@@ -89,7 +89,7 @@ variable, for example in the project configuration file. The current template di
 {template_dir}
 
 All template variables can be placed within a template using the standard jinja2
-syntax, e.g., the project root directory can be written as: {{{{ project.root_directory() }}}}.
+syntax, e.g., the project root directory can be written as: {{{{ project.path }}}}.
 The available template variables are:
 {template_vars}
 
@@ -984,9 +984,8 @@ class FlowGroup:
         else:
             op_string = operation_name
 
-        root_directory = project.root_directory()
         aggregate_id = get_aggregate_id(aggregate)
-        full_name = f"{root_directory}%{aggregate_id}%{op_string}"
+        full_name = f"{project.path}%{aggregate_id}%{op_string}"
         # The job_op_id is a hash computed from the unique full name.
         job_op_id = md5(full_name.encode("utf-8")).hexdigest()
 
@@ -1003,7 +1002,7 @@ class FlowGroup:
         separator = getattr(project._environment, "JOB_ID_SEPARATOR", "/")
         readable_name = "{project}{sep}{aggregate_id}{sep}{op_string}{sep}".format(
             sep=separator,
-            project=str(project)[:12],
+            project=project.__class__.__name__[:12],
             aggregate_id=aggregate_id,
             op_string=op_string[:12],
         )[:max_len]
@@ -1587,7 +1586,7 @@ class _FlowProjectClass(type):
                     with jobs[0] as job:
                         if getattr(func, "_flow_cmd", False):
                             return (
-                                f'trap "cd $(pwd)" EXIT && cd {job.ws} && {func(job)}'
+                                f'trap "cd $(pwd)" EXIT && cd {job.path} && {func(job)}'
                             )
                         else:
                             return func(job)
@@ -1779,7 +1778,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # the project root directory. This directory may be specified with the 'template_dir'
         # configuration variable.
         self._template_dir = os.path.join(
-            self.root_directory(), self._config.get("template_dir", "templates")
+            self.path, self._config.get("template_dir", "templates")
         )
         self._template_environment_ = {}
 
@@ -2152,7 +2151,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _fn_bundle(self, bundle_id):
         """Return the canonical name to store bundle information."""
-        return os.path.join(self.root_directory(), ".bundles", bundle_id)
+        return os.path.join(self.path, ".bundles", bundle_id)
 
     def _store_bundled(self, operations):
         """Store operation-ids as part of a bundle and return bundle id.
@@ -2178,7 +2177,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             return operations[0].id
         sep = getattr(self._environment, "JOB_ID_SEPARATOR", "/")
         _id = sha1(".".join(op.id for op in operations).encode("utf-8")).hexdigest()
-        bundle_id = f"{self}{sep}bundle{sep}{_id}"
+        bundle_id = f"{self.__class__.__name__}{sep}bundle{sep}{_id}"
         fn_bundle = self._fn_bundle(bundle_id)
         os.makedirs(os.path.dirname(fn_bundle), exist_ok=True)
         with open(fn_bundle, "w") as file:
@@ -4855,7 +4854,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         if args.switch_to_project_root:
             with _add_cwd_to_environment_pythonpath():
-                with _switch_to_directory(self.root_directory()):
+                with _switch_to_directory(self.path):
                     run()
         else:
             run()

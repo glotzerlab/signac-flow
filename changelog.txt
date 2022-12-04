@@ -9,6 +9,14 @@ Version 0.23
 ============
 
 [0.23.0] -- 20xx-xx-xx
+----------------------
+
+Changed
++++++++
+
+- Require ``signac`` version 1.8.0 (#693).
+- Deprecated ``alias`` CLI argument to ``flow init`` (#693).
+- Algorithm for computing cluster job ids (#695).
 
 Changed
 +++++++
@@ -27,6 +35,7 @@ Removed
 - Formatting the output of a ``FlowCmdOperation`` (#686).
 - ``@flow.cmd`` and ``flow.with_job`` (#686).
 - ``@FlowProject.operation.with_directives`` (#686).
+- The ``flow.testing`` module (#691).
 
 Version 0.22
 ============

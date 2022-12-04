@@ -14,14 +14,10 @@ Version 0.23
 Changed
 +++++++
 
+- Deprecated placing ``@FlowProject.pre`` and ``@FlowProject.post`` before the ``FlowProject.operation`` decorator (#690).
 - Require ``signac`` version 1.8.0 (#693).
 - Deprecated ``alias`` CLI argument to ``flow init`` (#693).
 - Algorithm for computing cluster job ids (#695).
-
-Changed
-+++++++
-
-- Deprecated placing ``@FlowProject.pre`` and ``@FlowProject.post`` before the ``FlowProject.operation`` decorator (#690).
 
 Fixed
 +++++

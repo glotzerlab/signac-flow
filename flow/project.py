@@ -697,7 +697,7 @@ class FlowGroupEntry:
             return functools.partial(self._internal_call, directives=directives)
         return self._internal_call(func, directives=directives)
 
-    def _internal_call(self, func, *, directives):
+    def _internal_call(self, func, /, *, directives):
         if not any(
             func == op_func for _, op_func in self._project._OPERATION_FUNCTIONS
         ):

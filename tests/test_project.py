@@ -30,7 +30,7 @@ from flow.errors import (
     SubmitError,
     UserOperationError,
 )
-from flow.project import IgnoreConditions, _AggregateStoresCursor, _JobAggregateCursor
+from flow.project import IgnoreConditions, _AggregateStoresCursor
 from flow.scheduling.base import JobStatus, Scheduler
 from flow.util.misc import (
     _add_cwd_to_environment_pythonpath,
@@ -2063,41 +2063,6 @@ class TestAggregatesProjectBase(TestProjectBase):
         self.project = self.mock_project()
         os.chdir(self._tmp_dir.name)
         request.addfinalizer(self.switch_to_cwd)
-
-
-class TestAggregatesProjectUtilities(TestAggregatesProjectBase):
-    def test_AggregatesCursor(self):
-        project = self.mock_project()
-        agg_cursor = _AggregateStoresCursor(project=project)
-        # All operations will return aggregates, even if the aggregates are not
-        # unique to that operation, because every operation/group in this
-        # project has a custom aggregator defined. Only the default aggregator
-        # can de-duplicate the returned results in the cursor, thus it is
-        # expected that the length of the cursor is larger than the number of
-        # unique ids present in the cursor.
-        assert len(agg_cursor) == 42
-        assert len({get_aggregate_id(agg) for agg in agg_cursor}) == 34
-        assert tuple(project) in agg_cursor
-        assert all((job,) in agg_cursor for job in project)
-
-    def test_filters(self):
-        project = self.mock_project()
-        agg_cursor = _JobAggregateCursor(project=project, filter={"even": True})
-        assert len(agg_cursor) == 15
-
-    def test_reregister_aggregates(self):
-        project = self.mock_project()
-        agg_cursor = _AggregateStoresCursor(project=project)
-        NUM_BEFORE_REREGISTRATION = 42
-        assert len(agg_cursor) == NUM_BEFORE_REREGISTRATION
-        new_job = project.open_job(dict(i=31, even=False))
-        assert new_job not in project
-        new_job.init()
-        # Default aggregate store doesn't need to be re-registered.
-        assert len(agg_cursor) == NUM_BEFORE_REREGISTRATION + 1
-        project._reregister_aggregates()
-        # The operation agg_op2 adds another aggregate in the project.
-        assert len(agg_cursor) == NUM_BEFORE_REREGISTRATION + 2
 
     @pytest.mark.filterwarnings("ignore:@aggregator():FutureWarning")
     def test_aggregator_with_job(self):

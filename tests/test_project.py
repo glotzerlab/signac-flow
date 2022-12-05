@@ -1711,6 +1711,9 @@ class TestGroupProject(TestProjectBase):
             def foo_operation(job):
                 pass
 
+    @pytest.mark.filterwarnings(
+        "ignore:.*with_directives has been deprecated.*:FutureWarning"
+    )
     def test_repeat_operation_group_directives_definition(self):
         """Test that operations cannot be registered with group directives multiple times."""
 
@@ -1733,12 +1736,12 @@ class TestGroupProject(TestProjectBase):
 
         group = A.make_group("group")
 
-        @group.with_directives(dict(ngpu=2, nranks=4))
+        @group(directives={"ngpu": 2, "nranks": 4})
         @A.operation
         def op1(job):
             pass
 
-        @group.with_directives(dict(ngpu=2, nranks=4))
+        @group(directives={"ngpu": 2, "nranks": 4})
         @A.operation
         def op2(job):
             pass
@@ -1764,7 +1767,7 @@ class TestGroupProject(TestProjectBase):
 
         group = A.make_group("group")
 
-        @group.with_directives(dict(ngpu=2, nranks=4))
+        @group(directives={"ngpu": 2, "nranks": 4})
         @A.operation
         def op1(job):
             pass

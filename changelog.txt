@@ -11,6 +11,11 @@ Version 0.23
 [0.23.0] -- 20xx-xx-xx
 ----------------------
 
+Added
++++++
+
+- The ``FlowGroupEntry`` class can be called with a ``directives`` keyword argument: ``FlowGroupEntry(directives={...})`` (#696).
+
 Changed
 +++++++
 
@@ -18,6 +23,7 @@ Changed
 - Require ``signac`` version 1.8.0 (#693).
 - Deprecated ``alias`` CLI argument to ``flow init`` (#693).
 - Algorithm for computing cluster job ids (#695).
+- Deprecated ``FlowGroupEntry.with_directives`` in favor of a directives keyword argument in ``FlowGroupEntry()``(#696).
 
 Fixed
 +++++

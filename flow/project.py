@@ -65,7 +65,6 @@ from .util.misc import (
     _add_cwd_to_environment_pythonpath,
     _bidict,
     _cached_partial,
-    _deprecated_warning,
     _get_parallel_executor,
     _positive_int,
     _roundrobin,
@@ -731,48 +730,6 @@ class FlowGroupEntry:
         else:
             func._flow_group_operation_directives = {self.name: directives}
 
-    def with_directives(self, directives):
-        """Decorate an operation to provide additional execution directives for this group.
-
-        Directives can be used to provide information about required resources
-        such as the number of processors required for execution of parallelized
-        operations. For a list of supported directives, see
-        :meth:`.FlowProject.operation.with_directives`. For more information,
-        see :ref:`signac-docs:cluster_submission_directives`.
-
-        The directives specified in this decorator are only applied when
-        executing the operation through the :class:`FlowGroup`.
-        To apply directives to an individual operation executed outside of the
-        group, see :meth:`.FlowProject.operation`.
-
-        Note:
-            This method has been deprecated and will be removed in 0.24.0.
-
-        Parameters
-        ----------
-        directives : dict
-            Directives to use for resource requests and execution.
-
-        Returns
-        -------
-        function
-            A decorator which registers the operation with the group using the
-            specified directives.
-        """
-        _deprecated_warning(
-            deprecation="@FlowGroupEntry.with_directives",
-            alternative="Use the directives keyword argument in base decorator e.g. "
-            "@FlowGroupEntry(directives={...}).",
-            deprecated_in="0.23.0",
-            removed_in="0.24.0",
-        )
-
-        def decorator(func):
-            self._set_directives(func, directives)
-            return self(func)
-
-        return decorator
-
 
 class FlowGroup:
     """A :class:`~.FlowGroup` represents a subset of a workflow for a project.
@@ -1317,13 +1274,8 @@ class _FlowProjectClass(type):
                     func for name, func in self._parent_class._collect_operations()
                 ]
                 if func not in operation_functions:
-                    _deprecated_warning(
-                        deprecation="Placing conditions below the @FlowProject.operation "
-                        "decorator.",
-                        alternative="Place decorator above @FlowProject.operation to remove the "
-                        "warning.",
-                        deprecated_in="0.23.0",
-                        removed_in="0.24.0",
+                    raise FlowProjectDefinitionError(
+                        "Conditions must come after (above) @FlowProject.operation."
                     )
                 if self.condition in operation_functions:
                     raise FlowProjectDefinitionError(
@@ -1417,13 +1369,8 @@ class _FlowProjectClass(type):
                     func for name, func in self._parent_class._collect_operations()
                 ]
                 if func not in operation_functions:
-                    _deprecated_warning(
-                        deprecation="Placing conditions below the @FlowProject.operation "
-                        "decorator.",
-                        alternative="Place decorator above @FlowProject.operation to remove the "
-                        "warning.",
-                        deprecated_in="0.23.0",
-                        removed_in="0.24.0",
+                    raise FlowProjectDefinitionError(
+                        "Conditions must come after (above) @FlowProject.operation."
                     )
                 if self.condition in operation_functions:
                     raise FlowProjectDefinitionError(

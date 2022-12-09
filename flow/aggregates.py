@@ -12,9 +12,6 @@ from abc import abstractmethod
 from collections.abc import Collection, Iterable, Mapping
 from hashlib import md5
 
-from .errors import FlowProjectDefinitionError
-from .util.misc import _deprecated_warning
-
 
 def _get_unique_function_id(func):
     """Generate unique id for the provided function.
@@ -334,40 +331,6 @@ class aggregator:
             return _DefaultAggregateStore(project)
         else:
             return _AggregateStore(self, project)
-
-    def __call__(self, func=None):
-        """Add this aggregator to a provided operation.
-
-        This call operator allows the class to be used as a decorator.
-
-        Parameters
-        ----------
-        func : callable
-            The function to decorate.
-
-        """
-        _deprecated_warning(
-            deprecation="@aggregator(...)",
-            alternative="Use FlowProject.operation(aggregator=aggregator(...)) instead.",
-            deprecated_in="0.23.0",
-            removed_in="0.24.0",
-        )
-        if not callable(func):
-            raise FlowProjectDefinitionError(
-                "Invalid argument passed while calling the aggregate "
-                f"instance. Expected a callable, got {type(func)}."
-            )
-        if getattr(func, "_flow_with_job", False):
-            raise FlowProjectDefinitionError(
-                "The with_job option cannot be used with aggregation."
-            )
-        current_agg = getattr(func, "_flow_aggregate", None)
-        if current_agg is not None and current_agg != aggregator.groupsof(1):
-            raise FlowProjectDefinitionError(
-                "Cannot specify aggregates in function and decorator."
-            )
-        setattr(func, "_flow_aggregate", self)
-        return func
 
 
 class _BaseAggregateStore(Mapping):

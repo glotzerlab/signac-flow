@@ -8,17 +8,20 @@ The numbers in brackets denote the related GitHub issue and/or pull request.
 Version 0.23
 ============
 
-[0.23.0] -- 20xx-xx-xx
+[0.23.0] -- 2022-12-09
 ----------------------
 
 Added
 +++++
 
+- Official Python 3.11 support (#697).
+- The ``flow.FlowProject.operation`` decorator now has an ``aggregator`` keyword argument: ``@FlowProject.operation(aggregator=aggregator.groupsof(2))`` (#681).
 - The ``FlowGroupEntry`` class can be called with a ``directives`` keyword argument: ``FlowGroupEntry(directives={...})`` (#696).
 
 Changed
 +++++++
 
+- Deprecated using ``flow.aggregate.aggregator`` as a decorator.
 - Deprecated placing ``@FlowProject.pre`` and ``@FlowProject.post`` before the ``FlowProject.operation`` decorator (#690).
 - Require ``signac`` version 1.8.0 (#693).
 - Deprecated ``alias`` CLI argument to ``flow init`` (#693).
@@ -29,16 +32,16 @@ Fixed
 +++++
 
 - Detecting correct environment on Delta GPU nodes (#682).
-- Identical aggregates are used only once in submission and running (#694).
+- Identical aggregates are used only once in submission and running (#694, #688).
 
 Removed
 +++++++
 
 - ``show_traceback`` from CLI and config (#690).
 - Formatting the output of a ``FlowCmdOperation`` (#686).
-- ``@flow.cmd`` and ``flow.with_job`` (#686).
+- ``@flow.cmd`` and ``flow.with_job`` (#686, #669).
 - ``@FlowProject.operation.with_directives`` (#686).
-- The ``flow.testing`` module (#691).
+- The ``flow.testing`` module (#691, #692).
 
 Version 0.22
 ============

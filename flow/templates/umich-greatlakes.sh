@@ -12,7 +12,7 @@
     {% set nn = nn|default((nn_cpu, nn_gpu)|max, true) %}
     {% if partition == 'gpu' %}
 #SBATCH --nodes={{ nn|default(1, true) }}
-#SBATCH --ntasks-per-node={{ (gpu_tasks, cpu_tasks)|max }}
+#SBATCH --ntasks-per-node={{ ((gpu_tasks, cpu_tasks)|max / nn)|int }}
 #SBATCH --gpus={{ gpu_tasks }}
     {% else %}{# standard compute partition #}
 #SBATCH --nodes={{ nn }}

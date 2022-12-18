@@ -4,7 +4,7 @@ set -e
 set -u
 
 python -m pip install --progress-bar off --user -U -r requirements/requirements-test.txt
-python -m pip install --progress-bar off --user -U twine wheel setuptools
+python -m pip install --progress-bar off --user -U twine wheel setuptools build
 
 # PYPI_API_TOKEN - (Required, Secret) Token for the publisher's account on PyPI
 # TEST_PYPI_API_TOKEN - (Required, Secret) Token for the publisher's account on TestPyPI
@@ -26,8 +26,7 @@ password: ${TEST_PYPI_API_TOKEN}
 EOF
 
 # Create wheels and source distribution
-python setup.py bdist_wheel
-python setup.py sdist
+python -m build --sdist --wheel --outdir dist/ .
 
 # Test generated wheel
 python -m pip install signac-flow --progress-bar off -U --force-reinstall -f dist/

@@ -10,10 +10,10 @@ orbs:
 references:
   restore_keys: &restore_keys
     keys:
-      - python-env-v1-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "setup.py" }}-{{ checksum "requirements/requirements-test.txt" }}-{{ checksum ".circleci/ci-oldest-reqs.txt" }}
+      - python-env-v1-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "pyproject.toml" }}-{{ checksum "requirements/requirements-test.txt" }}-{{ checksum ".circleci/ci-oldest-reqs.txt" }}
 
   save_key: &save_key
-    key: python-env-v1-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "setup.py" }}-{{ checksum "requirements/requirements-test.txt" }}-{{ checksum ".circleci/ci-oldest-reqs.txt" }}
+    key: python-env-v1-{{ arch }}-{{ .Environment.CIRCLE_JOB }}-{{ checksum "pyproject.toml" }}-{{ checksum "requirements/requirements-test.txt" }}-{{ checksum ".circleci/ci-oldest-reqs.txt" }}
 
 jobs:
   linux-python-311: &test-template
@@ -51,7 +51,7 @@ jobs:
           name: Run tests
           command: |
             . venv/bin/activate
-            ${PYTHON} -m pytest --cov=flow --cov-config=setup.cfg --cov-report=xml tests/ -v
+            ${PYTHON} -m pytest --cov=flow --cov-config=pyproject.toml --cov-report=xml tests/ -v
 
       - store_artifacts:
           path: test-reports

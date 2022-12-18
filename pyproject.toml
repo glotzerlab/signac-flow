@@ -19,3 +19,23 @@ exclude = '''
 [tool.isort]
 profile = 'black'
 skip_glob = 'flow/util/mistune/*'
+
+[tool.coverage.run]
+branch = true
+concurrency = [ "thread" , "multiprocessing" ]
+parallel = true
+source = [ "signac" ]
+omit = [ "*/flow/templates/*.pyt", "*/flow/util/mistune/*.py" ]
+
+[tool.pydocstyle]
+convention = "numpy"
+match = "^((?!\\.sync-zenodo-metadata|setup).)*\\.py$"
+match-dir = "^((?!\\.|tests|mistune).)*$"
+ignore-decorators = "deprecated"
+
+[tool.pytest.ini_options]
+filterwarnings = [
+	"ignore:.*The env argument is deprecated*:DeprecationWarning",
+	"ignore:Returning format strings in a cmd:FutureWarning"
+
+]

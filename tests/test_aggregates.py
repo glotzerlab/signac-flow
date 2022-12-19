@@ -11,9 +11,6 @@ from flow.aggregates import (
     aggregator,
     get_aggregate_id,
 )
-from flow.errors import FlowProjectDefinitionError
-
-ignore_call_warning = pytest.mark.filterwarnings("ignore:@aggregator():FutureWarning")
 
 
 def generate_flow_project():
@@ -346,27 +343,6 @@ class TestAggregate(AggregateProjectSetup, AggregateFixtures):
     def test_invalid_select(self, select):
         with pytest.raises(TypeError):
             aggregator(select=select)
-
-    @ignore_call_warning
-    @pytest.mark.parametrize("param", ["str", 1, None])
-    def test_invalid_call(self, param):
-        aggregator_instance = aggregator()
-        with pytest.raises(FlowProjectDefinitionError):
-            aggregator_instance(param)
-
-    @ignore_call_warning
-    def test_call_without_argument(self):
-        aggregate_instance = aggregator()
-        with pytest.raises(FlowProjectDefinitionError):
-            aggregate_instance()
-
-    @ignore_call_warning
-    def test_call_with_decorator(self):
-        @aggregator()
-        def test_function(x):
-            return x
-
-        assert hasattr(test_function, "_flow_aggregate")
 
     @pytest.mark.parametrize("invalid_value", [{}, "str", -1, -1.5])
     def test_groups_of_invalid_num(self, invalid_value):

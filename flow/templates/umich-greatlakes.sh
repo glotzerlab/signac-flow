@@ -12,11 +12,21 @@
     {% set nn = nn|default((nn_cpu, nn_gpu)|max, true) %}
     {% if partition == 'gpu' %}
 #SBATCH --nodes={{ nn|default(1, true) }}
+    {# Check to make sure requested tasks is a multiple of number of nodes. #}
+    {% if (gpu_tasks, cpu_tasks)|max % nn == 0 %}
 #SBATCH --ntasks-per-node={{ ((gpu_tasks, cpu_tasks)|max / nn)|int }}
+    {% else %}
+#SBATCH --ntasks={{ (gpu_tasks, cpu_tasks)|max }}
+    {% endif %}
 #SBATCH --gpus={{ gpu_tasks }}
     {% else %}{# standard compute partition #}
 #SBATCH --nodes={{ nn }}
-#SBATCH --ntasks-per-node={{ (36, cpu_tasks)|min }}
+    {# Check to make sure requested tasks is a multiple of number of nodes. #}
+    {% if cpu_tasks % nn == 0 %}
+#SBATCH --ntasks-per-node={{ (cpu_tasks / nn)|int }}
+    {% else %}
+#SBATCH --ntasks={{ cpu_tasks }}
+    {% endif %}
     {% endif %}
 {% endblock tasks %}
 {% block header %}

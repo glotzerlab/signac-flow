@@ -227,20 +227,21 @@ class CrusherEnvironment(DefaultSlurmEnvironment):
         Also raise an error when the requested resource do not come close to saturating the asked
         for nodes.
         """
-        nodes_gpu = int(ceil(ngpus / cls.gpus_per_node))
-        nodes_cpu = int(ceil(ngpus / cls.gpus_per_node))
-        if nodes_gpu > nodes_cpu:
+        nodes_gpu = max(1, int(ceil(ngpus / cls.gpus_per_node)))
+        nodes_cpu = max(1, int(ceil(ngpus / cls.gpus_per_node)))
+        if nodes_gpu >= nodes_cpu:
             check_utilization(nodes_gpu, ngpus, 8, threshold, "compute")
             return nodes_gpu
         check_utilization(nodes_cpu, ncpus, 64, threshold, "compute")
         return nodes_cpu
 
+    @classmethod
     def _get_mpi_prefix(cls, operation, parallel):
         """Get the correct srun command for the job.
 
         We don't currently support CPU/GPU mapping and expect the program to do this in code.
         """
-        ngpus = operation.directives["ngpus"]
+        ngpus = operation.directives["ngpu"]
         nranks = operation.directives.get("nranks", 1)
         ncpus = max(
             nranks * operation.directives.get("omp_num_threads", 1),
@@ -254,7 +255,7 @@ class CrusherEnvironment(DefaultSlurmEnvironment):
                 operation.directives.get("np", 1),
             )
         else:
-            threads = operation.directives.get("omp_num_threads", 1)
+            threads = max(1, operation.directives.get("omp_num_threads", 1))
         base_str += f" -c{threads} --gpus={ngpus}"
         return base_str
 

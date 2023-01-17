@@ -4,10 +4,10 @@
     {% set threshold = 0 if force else 0.9 %}
     {% set cpu_tasks = operations|calc_tasks('np', parallel, force) %}
     {% set gpu_tasks = operations|calc_tasks('ngpu', parallel, force) %}
-    {% if gpu_tasks %}
+    {% if not gpu_tasks %}
         {% raise "Template requires GPU jobs." %}
     {% endif %}
-    {% set nn = gpu_tasks|calc_num_nodes(gpu_tasks, parallel) %}
+    {% set nn = gpu_tasks|calc_num_nodes(cpu_tasks, threshold) %}
 #SBATCH -N {{ nn }}
 {% endblock tasks %}
 {% block header %}
@@ -16,6 +16,6 @@
     {% if account %}
 #SBATCH -A {{ account }}
     {% endif %}
-#SBATCH -p compute
+#SBATCH -p batch
 #SBATCH --threads-per-core=2
 {% endblock header %}

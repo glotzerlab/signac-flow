@@ -5,13 +5,14 @@
 
 http://www.doeleadershipcomputing.org/
 """
-from math import gcd
+from math import ceil, gcd
 
 from ..environment import (
     DefaultLSFEnvironment,
     DefaultSlurmEnvironment,
     template_filter,
 )
+from ..util.template_filters import check_utilization
 
 
 class SummitEnvironment(DefaultLSFEnvironment):
@@ -207,4 +208,55 @@ class AndesEnvironment(DefaultSlurmEnvironment):
         )
 
 
-__all__ = ["SummitEnvironment", "AndesEnvironment"]
+class CrusherEnvironment(DefaultSlurmEnvironment):
+    """Environment profile for the Cluster supercomputer.
+
+    https://docs.olcf.ornl.gov/systems/crusher_quick_start_guide.html
+    """
+
+    hostname_pattern = r".*\.crusher\.olcf\.ornl\.gov"
+    template = "crusher.sh"
+    cores_per_node = 128
+    gpus_per_node = 8
+    mpi_cmd = "srun"
+
+    @template_filter
+    def calc_num_nodes(cls, ngpus, ncpus, threshold):
+        """Compute the number of nodes needed to meet the resource request.
+
+        Also raise an error when the requested resource do not come close to saturating the asked
+        for nodes.
+        """
+        nodes_gpu = int(ceil(ngpus / cls.gpus_per_node))
+        nodes_cpu = int(ceil(ngpus / cls.gpus_per_node))
+        if nodes_gpu > nodes_cpu:
+            check_utilization(nodes_gpu, ngpus, 8, threshold, "compute")
+            return nodes_gpu
+        check_utilization(nodes_cpu, ncpus, 64, threshold, "compute")
+        return nodes_cpu
+
+    def _get_mpi_prefix(cls, operation, parallel):
+        """Get the correct srun command for the job.
+
+        We don't currently support CPU/GPU mapping and expect the program to do this in code.
+        """
+        ngpus = operation.directives["ngpus"]
+        nranks = operation.directives.get("nranks", 1)
+        ncpus = max(
+            nranks * operation.directives.get("omp_num_threads", 1),
+            operation.directives.get("np", 1),
+        )
+        nodes = int(ceil(max(ngpus / cls.gpus_per_node, ncpus / cls.cores_per_node)))
+        base_str = f"{cls.mpi_cmd} -N{nodes} -n{nranks}"
+        if nranks == 1:
+            threads = max(
+                operation.directives.get("omp_num_threads", 1),
+                operation.directives.get("np", 1),
+            )
+        else:
+            threads = operation.directives.get("omp_num_threads", 1)
+        base_str += f" -c{threads} --gpus={ngpus}"
+        return base_str
+
+
+__all__ = ["SummitEnvironment", "AndesEnvironment", "CrusherEnvironment"]

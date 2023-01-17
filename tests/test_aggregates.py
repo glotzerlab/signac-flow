@@ -4,12 +4,44 @@ from math import ceil
 import pytest
 from conftest import TestProjectBase
 
-from flow.aggregates import aggregator, get_aggregate_id
-from flow.errors import FlowProjectDefinitionError
+import flow
+from flow.aggregates import (
+    _AggregateStoresCursor,
+    _JobAggregateCursor,
+    aggregator,
+    get_aggregate_id,
+)
+
+
+def generate_flow_project():
+    class SimpleAggregateProject(flow.FlowProject):
+        pass
+
+    @SimpleAggregateProject.operation(aggregator=aggregator.groupby("is_even"))
+    def op1(job):
+        pass
+
+    @SimpleAggregateProject.operation(aggregator=aggregator.groupby("is_even"))
+    def op2(job):
+        pass
+
+    @SimpleAggregateProject.operation(aggregator=aggregator.groupsof(2))
+    def op3(job):
+        pass
+
+    @SimpleAggregateProject.operation(aggregator=aggregator())
+    def op4(job):
+        pass
+
+    @SimpleAggregateProject.operation
+    def op5(job):
+        pass
+
+    return SimpleAggregateProject
 
 
 class AggregateProjectSetup(TestProjectBase):
-    project_name = "AggregateTestProject"
+    project_class = generate_flow_project()
 
     def mock_project(self):
         project = self.project_class.get_project(root=self._tmp_dir.name)
@@ -19,6 +51,7 @@ class AggregateProjectSetup(TestProjectBase):
                 project.open_job(dict(i=i, half=i / 2, is_even=is_even)).init()
             else:
                 project.open_job(dict(i=i, is_even=is_even)).init()
+        project._reregister_aggregates()
         return project
 
     @pytest.fixture
@@ -311,24 +344,6 @@ class TestAggregate(AggregateProjectSetup, AggregateFixtures):
         with pytest.raises(TypeError):
             aggregator(select=select)
 
-    @pytest.mark.parametrize("param", ["str", 1, None])
-    def test_invalid_call(self, param):
-        aggregator_instance = aggregator()
-        with pytest.raises(FlowProjectDefinitionError):
-            aggregator_instance(param)
-
-    def test_call_without_argument(self):
-        aggregate_instance = aggregator()
-        with pytest.raises(FlowProjectDefinitionError):
-            aggregate_instance()
-
-    def test_call_with_decorator(self):
-        @aggregator()
-        def test_function(x):
-            return x
-
-        assert hasattr(test_function, "_flow_aggregate")
-
     @pytest.mark.parametrize("invalid_value", [{}, "str", -1, -1.5])
     def test_groups_of_invalid_num(self, invalid_value):
         with pytest.raises((TypeError, ValueError)):
@@ -364,3 +379,38 @@ class TestAggregate(AggregateProjectSetup, AggregateFixtures):
             for agg2 in list_of_aggregators:
                 if agg1 == agg2:
                     assert hash(agg1) == hash(agg2)
+
+
+class TestAggregateUtilities(AggregateProjectSetup):
+    def test_skips_duplicate_aggregates(self, mocked_project):
+        # Check that length and actual iteration are the same and correct.
+        # If this did not skip duplicates the length would be 19.
+        stores = _AggregateStoresCursor(mocked_project)
+        assert len(stores) == 18
+        assert len(list(stores)) == 18
+        # Ensure that some known aggregates are in the cursor
+        assert tuple(mocked_project) in stores
+        assert all((job,) in stores for job in mocked_project)
+
+    def test_filters(self, mocked_project):
+        agg_cursor = _JobAggregateCursor(
+            project=mocked_project, filter={"is_even": True}
+        )
+        assert len(agg_cursor) == 5
+
+    def test_reregister_aggregates(self, mocked_project):
+        agg_cursor = _AggregateStoresCursor(project=mocked_project)
+        NUM_BEFORE_REREGISTRATION = 18
+        assert len(agg_cursor) == NUM_BEFORE_REREGISTRATION
+        new_jobs = [
+            mocked_project.open_job(dict(i=10, is_even=True, half=5)),
+            mocked_project.open_job(dict(i=11, is_even=False)),
+        ]
+        assert not any(j in mocked_project for j in new_jobs)
+        for job in new_jobs:
+            job.init()
+        # Default aggregate store doesn't need to be re-registered.
+        assert len(agg_cursor) == NUM_BEFORE_REREGISTRATION + 2
+        mocked_project._reregister_aggregates()
+        # The operation op3 adds another aggregate in the mocked_project.
+        assert len(agg_cursor) == NUM_BEFORE_REREGISTRATION + 3

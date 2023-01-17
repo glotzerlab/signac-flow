@@ -28,22 +28,13 @@ def main_init(args):
 
     The available templates are defined in the template module.
     """
-    if not args.alias.isidentifier():
-        raise ValueError(
-            "The alias '{}' is not a valid Python identifier and can therefore "
-            "not be used as a FlowProject alias.".format(args.alias)
-        )
     try:
         get_project()
     except LookupError:
-        init_project(name=args.alias)
-        print(
-            "Initialized signac project with name '{}' in "
-            "current directory.".format(args.alias),
-            file=sys.stderr,
-        )
+        init_project()
+        print("Initialized signac project in current directory.", file=sys.stderr)
     try:
-        return template.init(alias=args.alias, template=args.template)
+        return template.init(template=args.template)
     except OSError as error:
         raise RuntimeError(
             f"Error occurred while trying to initialize a flow project: {error}"
@@ -116,16 +107,6 @@ def main():
         "init", help="Initialize a signac-flow project."
     )
     parser_init.set_defaults(func=main_init)
-    parser_init.add_argument(
-        "alias",
-        type=str,
-        nargs="?",
-        default="project",
-        help="Name of the FlowProject module to initialize. "
-        "This name will also be used to initialize a signac project if "
-        "no signac project was initialized prior to calling 'init'. "
-        "Default value: 'project'.",
-    )
     parser_init.add_argument(
         "-t",
         "--template",

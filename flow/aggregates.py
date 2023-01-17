@@ -12,8 +12,6 @@ from abc import abstractmethod
 from collections.abc import Collection, Iterable, Mapping
 from hashlib import md5
 
-from .errors import FlowProjectDefinitionError
-
 
 def _get_unique_function_id(func):
     """Generate unique id for the provided function.
@@ -45,7 +43,7 @@ def _get_unique_function_id(func):
 
 
 class aggregator:
-    """Decorator for operation functions that operate on aggregates.
+    """Class for generating aggregates for use in operations.
 
     By default, if the ``aggregator_function`` is ``None``, an aggregate of all
     jobs will be created.
@@ -57,8 +55,7 @@ class aggregator:
 
     .. code-block:: python
 
-        @aggregator()
-        @FlowProject.operation
+        @FlowProject.operation(aggregator=aggregator())
         def foo(*jobs):
             print(len(jobs))
 
@@ -133,8 +130,7 @@ class aggregator:
 
         .. code-block:: python
 
-            @aggregator.groupsof(num=2)
-            @FlowProject.operation
+            @FlowProject.operation(aggregator=aggregator.groupsof(num=2))
             def foo(*jobs):
                 print(len(jobs))
 
@@ -198,8 +194,7 @@ class aggregator:
 
         .. code-block:: python
 
-            @aggregator.groupby(key="key", default=-1)
-            @FlowProject.operation
+            @FlowProject.operation(aggregator=aggregator.groupby(key="key", default=-1))
             def foo(*jobs):
                 print(len(jobs))
 
@@ -336,29 +331,6 @@ class aggregator:
             return _DefaultAggregateStore(project)
         else:
             return _AggregateStore(self, project)
-
-    def __call__(self, func=None):
-        """Add this aggregator to a provided operation.
-
-        This call operator allows the class to be used as a decorator.
-
-        Parameters
-        ----------
-        func : callable
-            The function to decorate.
-
-        """
-        if not callable(func):
-            raise FlowProjectDefinitionError(
-                "Invalid argument passed while calling the aggregate "
-                f"instance. Expected a callable, got {type(func)}."
-            )
-        if getattr(func, "_flow_with_job", False):
-            raise FlowProjectDefinitionError(
-                "The with_job option cannot be used with aggregation."
-            )
-        setattr(func, "_flow_aggregate", self)
-        return func
 
 
 class _BaseAggregateStore(Mapping):
@@ -645,11 +617,17 @@ class _AggregateStoresCursor(_AggregatesCursor):
 
     def __len__(self):
         # Return number of aggregates summed across all aggregate stores
-        return sum(len(aggregate_store) for aggregate_store in self._stores)
+        return len(
+            {id_ for aggregate_store in self._stores for id_ in aggregate_store.keys()}
+        )
 
     def __iter__(self):
+        existing_stores = set()
         for aggregate_store in self._stores:
-            yield from aggregate_store.values()
+            for agg_id, aggregate in aggregate_store.items():
+                if agg_id not in existing_stores:
+                    existing_stores.add(agg_id)
+                    yield aggregate
 
 
 class _JobAggregateCursor(_AggregatesCursor):

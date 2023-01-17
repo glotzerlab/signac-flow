@@ -23,6 +23,7 @@ Contents
    installation
    supported_environments
    cli
+   project-cli
    api
    changes
    support

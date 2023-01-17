@@ -126,6 +126,10 @@
             "affiliation": "University of Delhi (India)",
             "name": "Rohan Babbar",
             "orcid": "0000-0002-7203-7641"
+        },
+        {
+            "affiliation": "University of Michigan",
+            "name": "Ignacio Blanco Varela"
         }
     ],
     "creators": [
@@ -180,5 +184,5 @@
     },
     "title": "signac-flow",
     "upload_type": "software",
-    "version": "0.21.0"
+    "version": "0.23.0"
 }

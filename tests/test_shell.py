@@ -69,17 +69,14 @@ class TestCLI:
 
     def test_init_flowproject(self):
         self.call("python -m flow init".split())
-        assert str(signac.get_project()) == "project"
         assert os.path.exists("project.py")
 
     def test_init_flowproject_alias(self):
-        self.call("python -m flow init my_project".split())
-        assert str(signac.get_project()) == "my_project"
-        assert os.path.exists("my_project.py")
+        self.call("python -m flow init".split())
+        assert os.path.exists("project.py")
 
     def test_init_flowproject_fail_if_exists(self):
         self.call("python -m flow init".split())
-        assert str(signac.get_project()) == "project"
         assert os.path.exists("project.py")
         with pytest.raises(ExitCodeError):
             self.call("python -m flow init".split())
@@ -87,7 +84,6 @@ class TestCLI:
     @pytest.mark.parametrize("template", flow.template.TEMPLATES)
     def test_init_flowproject_template(self, template):
         self.call(f"python -m flow init -t {template}".split())
-        assert str(signac.get_project()) == "project"
         assert os.path.exists("project.py")
 
     @pytest.mark.parametrize(

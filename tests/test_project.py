@@ -23,15 +23,7 @@ from define_test_project import _DynamicTestProject, _TestProject
 from deprecation import fail_if_not_removed
 
 import flow
-from flow import (
-    FlowProject,
-    aggregator,
-    cmd,
-    directives,
-    get_aggregate_id,
-    init,
-    with_job,
-)
+from flow import FlowProject, aggregator, get_aggregate_id, init
 from flow.environment import ComputeEnvironment
 from flow.errors import (
     DirectivesError,
@@ -39,7 +31,7 @@ from flow.errors import (
     SubmitError,
     UserOperationError,
 )
-from flow.project import IgnoreConditions, _AggregateStoresCursor, _JobAggregateCursor
+from flow.project import IgnoreConditions, _AggregateStoresCursor
 from flow.scheduling.base import JobStatus, Scheduler
 from flow.util.misc import (
     _add_cwd_to_environment_pythonpath,
@@ -64,7 +56,7 @@ def setup_project_subprocess_execution(project, stderr_output=sys.stderr):
     Optionally capture stderr with a passed in output or by default output to stderr like normal.
     """
     with _add_cwd_to_environment_pythonpath(), _switch_to_directory(
-        project.root_directory()
+        project.path
     ), redirect_stderr(stderr_output):
         yield
 
@@ -94,8 +86,8 @@ class TestProjectStatusPerformance(TestProjectBase):
     class Project(FlowProject):
         pass
 
-    @Project.operation
     @Project.post.isfile("DOES_NOT_EXIST")
+    @Project.operation
     def foo(job):
         pass
 
@@ -135,8 +127,8 @@ class TestProjectStatusNoEligibleOperations(TestProjectBase):
     class Project(FlowProject):
         pass
 
-    @Project.operation
     @Project.post(lambda job: True)
+    @Project.operation
     def foo(job):
         pass
 
@@ -257,7 +249,15 @@ class TestProjectClass(TestProjectBase):
         with pytest.raises(FlowProjectDefinitionError):
 
             @A.pre(attempted_precondition)
+            @A.operation
             def op1(job):
+                pass
+
+        with pytest.raises(FlowProjectDefinitionError):
+
+            @A.post(attempted_precondition)
+            @A.operation
+            def op2(job):
                 pass
 
     def test_repeat_operation_definition_with_inheritance(self):
@@ -331,6 +331,7 @@ class TestProjectClass(TestProjectBase):
         @B.pre.true("test_B")
         @A.operation
         @B.operation
+        @C.operation
         def op1(job):
             pass
 
@@ -345,6 +346,7 @@ class TestProjectClass(TestProjectBase):
         @B.post.true("test_B")
         @A.operation
         @B.operation
+        @C.operation
         def op2(job):
             pass
 
@@ -352,13 +354,13 @@ class TestProjectClass(TestProjectBase):
         assert len(B._collect_postconditions()[op2]) == 2
         assert len(C._collect_postconditions()[op2]) == 3
 
-    def test_with_job_decorator(self):
+    def test_with_job_argument(self):
         class A(FlowProject):
             pass
 
         @A.operation(with_job=True)
         def test_context(job):
-            assert os.path.realpath(os.getcwd()) == os.path.realpath(job.ws)
+            assert os.path.realpath(os.getcwd()) == os.path.realpath(job.path)
 
         project = self.mock_project(A)
         with setup_project_subprocess_execution(project):
@@ -366,13 +368,13 @@ class TestProjectClass(TestProjectBase):
             project.run()
             assert os.getcwd() == starting_dir
 
-    def test_cmd_operation_argument_as_command(self):
+    def test_cmd_operation_argument(self):
         class A(FlowProject):
             pass
 
         @A.operation(with_job=True, cmd=True)
         def test_cmd(joba, jobb="test"):
-            return "echo '{joba} {jobb}' > output.txt"
+            return f"echo '{joba} {jobb}' > output.txt"
 
         project = self.mock_project(A)
         with setup_project_subprocess_execution(project):
@@ -382,117 +384,6 @@ class TestProjectClass(TestProjectBase):
             with open(job.fn("output.txt")) as f:
                 lines = f.readlines()
             assert f"{job.id} test\n" == lines[0]
-
-    def test_cmd_operation_argument_as_command_invalid(self):
-        class A(FlowProject):
-            pass
-
-        @A.operation(with_job=True, cmd=True)
-        def test_cmd(job):
-            return "echo '{jobabc}' > output.txt"
-
-        project = self.mock_project(A)
-        with setup_project_subprocess_execution(project):
-            with pytest.raises(KeyError):
-                project.run()
-        for job in project:
-            assert not os.path.isfile(job.fn("output.txt"))
-
-    def test_cmd_argument_deprecated_jobs_argument(self):
-        class A(FlowProject):
-            pass
-
-        @A.operation(cmd=True, with_job=True)
-        def test_cmd(job123):
-            return "echo '{jobs}' > output.txt"
-
-        project = self.mock_project(A)
-        with setup_project_subprocess_execution(project):
-            with pytest.warns(FutureWarning):
-                project.run()
-        for job in project:
-            assert os.path.isfile(job.fn("output.txt"))
-
-    def test_cmd_argument_deprecated_job_argument(self):
-        class A(FlowProject):
-            pass
-
-        @A.operation(with_job=True, cmd=True)
-        def test_cmd(job123):
-            return "echo '{job}' > output.txt"
-
-        project = self.mock_project(A)
-        with setup_project_subprocess_execution(project):
-            with pytest.warns(FutureWarning):
-                project.run()
-        for job in project:
-            assert os.path.isfile(job.fn("output.txt"))
-
-    @pytest.mark.filterwarnings("ignore:@flow.cmd")
-    def test_cmd_decorator_with_cmd_argument(self):
-        class A(FlowProject):
-            pass
-
-        with pytest.raises(FlowProjectDefinitionError):
-
-            @A.operation(cmd=True)
-            @cmd
-            def op1(job):
-                pass
-
-        with pytest.raises(FlowProjectDefinitionError):
-
-            @cmd
-            @A.operation(cmd=True)
-            def op2(job):
-                pass
-
-    @pytest.mark.filterwarnings("ignore:@flow.with_job")
-    def test_with_job_decorator_with_with_job_argument(self):
-        class A(FlowProject):
-            pass
-
-        with pytest.raises(FlowProjectDefinitionError):
-
-            @A.operation(with_job=True)
-            @with_job
-            def op1(job):
-                pass
-
-        with pytest.raises(FlowProjectDefinitionError):
-
-            @with_job
-            @A.operation(with_job=True)
-            def op2(job):
-                pass
-
-    @pytest.mark.filterwarnings("ignore:@flow.with_job")
-    @pytest.mark.filterwarnings("ignore:@flow.cmd")
-    def test_cmd_with_job_invalid_ordering(self):
-        class A(FlowProject):
-            pass
-
-        with pytest.raises(FlowProjectDefinitionError):
-
-            @A.operation(cmd=True)
-            @with_job
-            def op1(job):
-                pass
-
-        with pytest.raises(FlowProjectDefinitionError):
-
-            @cmd
-            @A.operation(with_job=True)
-            def op4(job):
-                pass
-
-        with pytest.raises(FlowProjectDefinitionError):
-
-            @A.operation
-            @cmd
-            @with_job
-            def op5(job):
-                pass
 
     def test_with_job_works_with_cmd(self):
         class A(FlowProject):
@@ -773,62 +664,29 @@ class TestProjectClass(TestProjectBase):
             not callable(value) for value in submit_job_operation.directives.values()
         )
 
-    @pytest.mark.filterwarnings("ignore:@FlowProject.operation.with_directives")
-    def test_operation_with_directives(self):
-        class A(FlowProject):
-            pass
-
-        @A.operation.with_directives({"executable": "python3", "nranks": 4})
-        def test_context(job):
-            return "exit 1"
-
-        project = self.mock_project(A)
-        for job in project:
-            for next_op in project._next_operations([(job,)]):
-                assert next_op.directives["executable"] == "python3"
-                assert next_op.directives["nranks"] == 4
-            break
-
-    def test_old_directives_decorator(self):
-        class A(FlowProject):
-            pass
-
-        # TODO: Add deprecation warning context manager in v0.15
-        @A.operation
-        @directives(executable=lambda job: f"mpirun -np {job.doc.np} python")
-        def test_context(job):
-            return "exit 1"
-
-        project = self.mock_project(A)
-        for job in project:
-            job.doc.np = 3
-            for next_op in project._next_operations([(job,)]):
-                assert "mpirun -np 3 python" in next_op.cmd
-            break
-
     def test_copy_conditions(self):
         class A(FlowProject):
             pass
 
-        @A.operation
         @A.post(lambda job: "a" in job.doc)
+        @A.operation
         def op1(job):
             job.doc.a = True
 
-        @A.operation
         @A.post.true("b")
+        @A.operation
         def op2(job):
             job.doc.b = True
 
-        @A.operation
         @A.pre.after(op1, op2)
         @A.post.true("c")
+        @A.operation
         def op3(job):
             job.doc.c = True
 
-        @A.operation
         @A.pre.copy_from(op1, op3)
         @A.post.true("d")
+        @A.operation
         def op4(job):
             job.doc.d = True
 
@@ -872,22 +730,20 @@ class TestProjectClass(TestProjectBase):
 
         with pytest.raises(FlowProjectDefinitionError):
 
-            @A.operation
             @A.pre.after(condition_fun)
+            @A.operation
             def op2(job):
                 pass
 
         with pytest.raises(FlowProjectDefinitionError):
 
-            @A.operation
-            @A.pre(op1)
+            @A.post(condition_fun)
             def op3(job):
                 pass
 
         with pytest.raises(FlowProjectDefinitionError):
 
-            @A.operation
-            @A.post(op1)
+            @A.pre(condition_fun)
             def op4(job):
                 pass
 
@@ -900,8 +756,8 @@ class TestProjectClass(TestProjectBase):
         class A(FlowProject):
             pass
 
-        @A.operation
         @A.post(partial(cond, extra_arg=True))
+        @A.operation
         def op1(job):
             job.doc.a = True
 
@@ -1024,8 +880,8 @@ class TestProject(TestProjectBase):
         class A(FlowProject):
             pass
 
-        @A.operation
         @A.post(partial(cond, extra_arg=True))
+        @A.operation
         def op1(job):
             job.doc.a = True
 
@@ -1036,8 +892,8 @@ class TestProject(TestProjectBase):
         class B(FlowProject):
             pass
 
-        @B.operation
         @B.post(partial(cond, extra_arg=True), tag="tag")
+        @B.operation
         def op2(job):
             job.doc.a = True
 
@@ -1376,11 +1232,11 @@ class TestExecutionProject(TestProjectBase):
         class Project(FlowProject):
             pass
 
-        @Project.operation
         @Project.pre(make_cond(0b1000))
         @Project.pre(make_cond(0b0100))
         @Project.post(make_cond(0b0010))
         @Project.post(make_cond(0b0001))
+        @Project.operation
         def op1(job):
             pass
 
@@ -1856,41 +1712,24 @@ class TestGroupProject(TestProjectBase):
             def foo_operation(job):
                 pass
 
-    def test_repeat_operation_group_directives_definition(self):
-        """Test that operations cannot be registered with group directives multiple times."""
-
-        class A(FlowProject):
-            pass
-
-        foo_group = A.make_group("foo")
-
-        with pytest.raises(FlowProjectDefinitionError):
-
-            @foo_group.with_directives({"np": 1})
-            @foo_group.with_directives({"np": 1})
-            @A.operation
-            def foo_operation(job):
-                pass
-
     def test_submission_combine_directives(self):
         class A(flow.FlowProject):
             pass
 
         group = A.make_group("group")
 
-        @group.with_directives(dict(ngpu=2, nranks=4))
+        @group(directives={"ngpu": 2, "nranks": 4})
         @A.operation
         def op1(job):
             pass
 
-        @group.with_directives(dict(ngpu=2, nranks=4))
+        @group(directives={"ngpu": 2, "nranks": 4})
         @A.operation
         def op2(job):
             pass
 
         @group
-        @A.operation
-        @flow.directives(nranks=2)
+        @A.operation(directives={"nranks": 2})
         def op3(job):
             pass
 
@@ -1910,7 +1749,7 @@ class TestGroupProject(TestProjectBase):
 
         group = A.make_group("group")
 
-        @group.with_directives(dict(ngpu=2, nranks=4))
+        @group(directives={"ngpu": 2, "nranks": 4})
         @A.operation
         def op1(job):
             pass
@@ -1921,8 +1760,7 @@ class TestGroupProject(TestProjectBase):
             pass
 
         @group
-        @A.operation
-        @flow.directives(nranks=2)
+        @A.operation(directives={"nranks": 2})
         def op3(job):
             pass
 
@@ -2211,61 +2049,14 @@ class TestAggregatesProjectBase(TestProjectBase):
         os.chdir(self._tmp_dir.name)
         request.addfinalizer(self.switch_to_cwd)
 
-
-class TestAggregatesProjectUtilities(TestAggregatesProjectBase):
-    def test_AggregatesCursor(self):
-        project = self.mock_project()
-        agg_cursor = _AggregateStoresCursor(project=project)
-        # All operations will return aggregates, even if the aggregates are not
-        # unique to that operation, because every operation/group in this
-        # project has a custom aggregator defined. Only the default aggregator
-        # can de-duplicate the returned results in the cursor, thus it is
-        # expected that the length of the cursor is larger than the number of
-        # unique ids present in the cursor.
-        assert len(agg_cursor) == 42
-        assert len({get_aggregate_id(agg) for agg in agg_cursor}) == 34
-        assert tuple(project) in agg_cursor
-        assert all((job,) in agg_cursor for job in project)
-
-    def test_filters(self):
-        project = self.mock_project()
-        agg_cursor = _JobAggregateCursor(project=project, filter={"even": True})
-        assert len(agg_cursor) == 15
-
-    def test_reregister_aggregates(self):
-        project = self.mock_project()
-        agg_cursor = _AggregateStoresCursor(project=project)
-        NUM_BEFORE_REREGISTRATION = 42
-        assert len(agg_cursor) == NUM_BEFORE_REREGISTRATION
-        new_job = project.open_job(dict(i=31, even=False))
-        assert new_job not in project
-        new_job.init()
-        # Default aggregate store doesn't need to be re-registered.
-        assert len(agg_cursor) == NUM_BEFORE_REREGISTRATION + 1
-        project._reregister_aggregates()
-        # The operation agg_op2 adds another aggregate in the project.
-        assert len(agg_cursor) == NUM_BEFORE_REREGISTRATION + 2
-
     def test_aggregator_with_job(self):
         class A(FlowProject):
             pass
 
         with pytest.raises(FlowProjectDefinitionError):
 
-            @aggregator()
-            @A.operation(with_job=True)
-            def test_invalid_decorators(job):
-                pass
-
-    def test_with_job_aggregator(self):
-        class A(FlowProject):
-            pass
-
-        with pytest.raises(FlowProjectDefinitionError):
-
-            @aggregator()
-            @A.operation(with_job=True)
-            def test_invalid_decorators(job):
+            @A.operation(with_job=True, aggregator=aggregator())
+            def test_invalid_decorator_combination(job):
                 pass
 
 
@@ -2449,7 +2240,7 @@ class TestHooksSetUp(TestProjectBase):
         _cmd = f"python {fn_script} {subcmd} --debug"
         with _add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
             try:
-                with _switch_to_directory(self.project.root_directory()):
+                with _switch_to_directory(self.project.path):
                     return subprocess.check_output(_cmd.split(), stderr=stderr)
             except subprocess.CalledProcessError as error:
                 print("STDOUT:", error.stdout, sep="\n", file=sys.stderr)
@@ -2516,7 +2307,7 @@ class TestHooksBase(TestHooksSetUp):
 
 
 class TestHooksCmd(TestHooksBase):
-    # Tests hook decorators for a job operation with the @cmd decorator
+    # Tests hook decorators for a job operation with the cmd keyword argument
     error_message = 42
 
     @pytest.fixture(params=["base_cmd"])
@@ -2549,7 +2340,7 @@ class TestHooksInstallBase(TestHooksBase, TestHooksInstallSetUp):
 
 
 class TestHooksInstallCmd(TestHooksCmd, TestHooksInstallSetUp):
-    # Tests project-wide hooks on job operations with the @cmd decorator.
+    # Tests project-wide hooks on job operations with the cmd keyword argument.
     # Job operations are with or without operation level hooks
 
     # Check job document for keys from installed, project-wide hooks
@@ -2574,7 +2365,7 @@ class TestHooksInstallWithDecorators(TestHooksBase, TestHooksInstallSetUp):
 
 class TestHooksInstallCmdWithDecorators(TestHooksCmd, TestHooksInstallSetUp):
     # Tests if project-wide hooks interfere with operation level hooks
-    # in job operations with the @cmd decorator
+    # in job operations with the cmd keyword argument
     @pytest.fixture()
     def operation_name(self):
         return "base_cmd"
@@ -2609,7 +2400,7 @@ class TestHooksInvalidOption(TestHooksSetUp):
         _cmd = f"python {fn_script} {subcmd} --debug"
         with _add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
             try:
-                with _switch_to_directory(self.project.root_directory()):
+                with _switch_to_directory(self.project.path):
                     return subprocess.check_output(_cmd.split(), stderr=stderr)
             except subprocess.CalledProcessError as error:
                 if error.stderr:

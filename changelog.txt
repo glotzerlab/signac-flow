@@ -5,6 +5,25 @@ Changelog
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 The numbers in brackets denote the related GitHub issue and/or pull request.
 
+Version 0.24
+============
+
+[0.24.0] -- 20xx-xx-xx
+----------------------
+
+Changed
++++++++
+
+- Placing ``@FlowProject.pre`` and ``@FlowProject.post`` before the ``FlowProject.operation`` decorator raises an error (#700).
+- Updated CI to use GitHub Actions (#698).
+
+Removed
++++++++
+
+- ``@flow.aggregates.aggregator()`` use ``FlowProject.operation(aggregator=...)`` instead (#700).
+- ``alias`` CLI argument to ``flow init`` (#700).
+- ``FlowGroupEntry.with_directives`` use directives keyword argument in ``FlowGroupEntry()``(#700).
+
 Version 0.23
 ============
 
@@ -21,7 +40,7 @@ Added
 Changed
 +++++++
 
-- Deprecated using ``flow.aggregate.aggregator`` as a decorator.
+- Deprecated using ``flow.aggregates.aggregator`` as a decorator.
 - Deprecated placing ``@FlowProject.pre`` and ``@FlowProject.post`` before the ``FlowProject.operation`` decorator (#690).
 - Require ``signac`` version 1.8.0 (#693).
 - Deprecated ``alias`` CLI argument to ``flow init`` (#693).

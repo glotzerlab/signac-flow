@@ -19,7 +19,6 @@ import jinja2
 from signac import get_project, init_project
 
 from . import __version__, environment, template
-from .util.misc import _deprecated_warning
 
 logger = logging.getLogger(__name__)
 
@@ -32,13 +31,6 @@ def main_init(args):
     try:
         get_project()
     except LookupError:
-        if args.alias != "":
-            _deprecated_warning(
-                deprecation="alias",
-                alternative="",
-                deprecated_in="0.23.0",
-                removed_in="0.24.0",
-            )
         init_project()
         print("Initialized signac project in current directory.", file=sys.stderr)
     try:
@@ -115,13 +107,6 @@ def main():
         "init", help="Initialize a signac-flow project."
     )
     parser_init.set_defaults(func=main_init)
-    parser_init.add_argument(
-        "alias",
-        type=str,
-        nargs="?",
-        default="",
-        help="Unused, will be removed in flow 0.24.0.",
-    )
     parser_init.add_argument(
         "-t",
         "--template",

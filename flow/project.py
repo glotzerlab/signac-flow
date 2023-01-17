@@ -65,7 +65,6 @@ from .util.misc import (
     _add_cwd_to_environment_pythonpath,
     _bidict,
     _cached_partial,
-    _deprecated_warning,
     _get_parallel_executor,
     _positive_int,
     _roundrobin,
@@ -634,12 +633,10 @@ class FlowGroupEntry:
 
     Operation functions can be marked for inclusion into a :class:`FlowGroup`
     by decorating the functions with a corresponding :class:`FlowGroupEntry`.
-    If the operation requires specific directives, :meth:`~.with_directives`
-    accepts keyword arguments that are mapped to directives and returns a
-    decorator that can be applied to the operation to mark it for inclusion in
-    the group and indicate that it should be executed using the specified
-    directives. This overrides the default directives specified by
-    :meth:`flow.directives`.
+    If the operation requires group specific directives, calling the
+    :class:`FlowGroupEntry` with the keyword argument ``directives`` allows the
+    setting of directives for the exclusively for the group. Doing this overrides
+    the default directives specified by :meth:`FlowProject.operation`.
 
     Parameters
     ----------
@@ -673,7 +670,7 @@ class FlowGroupEntry:
         # `@operation`.
         self.group_aggregator = group_aggregator
 
-    def __call__(self, func):
+    def __call__(self, func=None, /, *, directives=None):
         """Add the function into the group's operations.
 
         This call operator allows the class to be used as a decorator.
@@ -683,12 +680,23 @@ class FlowGroupEntry:
         func : callable
             The function to decorate.
 
+        directives : dict
+            Directives to use for resource requests and execution.
+            The directives specified in this decorator are only applied when
+            executing the operation through the :class:`FlowGroup`.
+            To apply directives to an individual operation executed outside of the
+            group, see :meth:`.FlowProject.operation`.
+
         Returns
         -------
-        callable
+        func
             The decorated function.
-
         """
+        if func is None:
+            return functools.partial(self._internal_call, directives=directives)
+        return self._internal_call(func, directives=directives)
+
+    def _internal_call(self, func, /, *, directives):
         if not any(
             func == op_func for _, op_func in self._project._OPERATION_FUNCTIONS
         ):
@@ -702,6 +710,13 @@ class FlowGroupEntry:
                 f"Cannot reregister operation '{func}' with the group '{self.name}'."
             )
         func._flow_groups[self._project].add(self.name)
+        if directives is None:
+            return func
+
+        if hasattr(func, "_flow_group_operation_directives"):
+            func._flow_group_operation_directives[self.name] = directives
+        else:
+            func._flow_group_operation_directives = {self.name: directives}
         return func
 
     def _set_directives(self, func, directives):
@@ -714,38 +729,6 @@ class FlowGroupEntry:
             func._flow_group_operation_directives[self.name] = directives
         else:
             func._flow_group_operation_directives = {self.name: directives}
-
-    def with_directives(self, directives):
-        """Decorate an operation to provide additional execution directives for this group.
-
-        Directives can be used to provide information about required resources
-        such as the number of processors required for execution of parallelized
-        operations. For a list of supported directives, see
-        :meth:`.FlowProject.operation.with_directives`. For more information,
-        see :ref:`signac-docs:cluster_submission_directives`.
-
-        The directives specified in this decorator are only applied when
-        executing the operation through the :class:`FlowGroup`.
-        To apply directives to an individual operation executed outside of the
-        group, see :meth:`.FlowProject.operation`.
-
-        Parameters
-        ----------
-        directives : dict
-            Directives to use for resource requests and execution.
-
-        Returns
-        -------
-        function
-            A decorator which registers the operation with the group using the
-            specified directives.
-        """
-
-        def decorator(func):
-            self._set_directives(func, directives)
-            return self(func)
-
-        return decorator
 
 
 class FlowGroup:
@@ -763,7 +746,7 @@ class FlowGroup:
 
         group = FlowProject.make_group(name='example_group')
 
-        @group.with_directives({"nranks": 4})
+        @group(directives={"nranks": 4})
         @FlowProject.operation({"nranks": 2, "executable": "python3"})
         def op1(job):
             pass
@@ -1291,13 +1274,8 @@ class _FlowProjectClass(type):
                     func for name, func in self._parent_class._collect_operations()
                 ]
                 if func not in operation_functions:
-                    _deprecated_warning(
-                        deprecation="Placing conditions below the @FlowProject.operation "
-                        "decorator.",
-                        alternative="Place decorator above @FlowProject.operation to remove the "
-                        "warning.",
-                        deprecated_in="0.23.0",
-                        removed_in="0.24.0",
+                    raise FlowProjectDefinitionError(
+                        "Conditions must come after (above) @FlowProject.operation."
                     )
                 if self.condition in operation_functions:
                     raise FlowProjectDefinitionError(
@@ -1391,13 +1369,8 @@ class _FlowProjectClass(type):
                     func for name, func in self._parent_class._collect_operations()
                 ]
                 if func not in operation_functions:
-                    _deprecated_warning(
-                        deprecation="Placing conditions below the @FlowProject.operation "
-                        "decorator.",
-                        alternative="Place decorator above @FlowProject.operation to remove the "
-                        "warning.",
-                        deprecated_in="0.23.0",
-                        removed_in="0.24.0",
+                    raise FlowProjectDefinitionError(
+                        "Conditions must come after (above) @FlowProject.operation."
                     )
                 if self.condition in operation_functions:
                     raise FlowProjectDefinitionError(

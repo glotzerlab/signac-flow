@@ -734,13 +734,13 @@ class TestProjectClass(TestProjectBase):
             def op2(job):
                 pass
 
-        with pytest.warns(FutureWarning):
+        with pytest.raises(FlowProjectDefinitionError):
 
             @A.post(condition_fun)
             def op3(job):
                 pass
 
-        with pytest.warns(FutureWarning):
+        with pytest.raises(FlowProjectDefinitionError):
 
             @A.pre(condition_fun)
             def op4(job):
@@ -1711,34 +1711,18 @@ class TestGroupProject(TestProjectBase):
             def foo_operation(job):
                 pass
 
-    def test_repeat_operation_group_directives_definition(self):
-        """Test that operations cannot be registered with group directives multiple times."""
-
-        class A(FlowProject):
-            pass
-
-        foo_group = A.make_group("foo")
-
-        with pytest.raises(FlowProjectDefinitionError):
-
-            @foo_group.with_directives({"np": 1})
-            @foo_group.with_directives({"np": 1})
-            @A.operation
-            def foo_operation(job):
-                pass
-
     def test_submission_combine_directives(self):
         class A(flow.FlowProject):
             pass
 
         group = A.make_group("group")
 
-        @group.with_directives(dict(ngpu=2, nranks=4))
+        @group(directives={"ngpu": 2, "nranks": 4})
         @A.operation
         def op1(job):
             pass
 
-        @group.with_directives(dict(ngpu=2, nranks=4))
+        @group(directives={"ngpu": 2, "nranks": 4})
         @A.operation
         def op2(job):
             pass
@@ -1764,7 +1748,7 @@ class TestGroupProject(TestProjectBase):
 
         group = A.make_group("group")
 
-        @group.with_directives(dict(ngpu=2, nranks=4))
+        @group(directives={"ngpu": 2, "nranks": 4})
         @A.operation
         def op1(job):
             pass
@@ -2064,24 +2048,9 @@ class TestAggregatesProjectBase(TestProjectBase):
         os.chdir(self._tmp_dir.name)
         request.addfinalizer(self.switch_to_cwd)
 
-    @pytest.mark.filterwarnings("ignore:@aggregator():FutureWarning")
     def test_aggregator_with_job(self):
         class A(FlowProject):
             pass
-
-        with pytest.raises(FlowProjectDefinitionError):
-
-            @aggregator()
-            @A.operation(with_job=True)
-            def test_invalid_decorators(job):
-                pass
-
-        with pytest.raises(FlowProjectDefinitionError):
-
-            @A.operation(with_job=True)
-            @aggregator()
-            def test_invalid_decorators_2(job):
-                pass
 
         with pytest.raises(FlowProjectDefinitionError):
 

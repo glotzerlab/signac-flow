@@ -21,7 +21,6 @@ import sys
 import textwrap
 import threading
 import time
-import traceback
 from collections import Counter, defaultdict
 from copy import deepcopy
 from enum import IntFlag
@@ -32,10 +31,10 @@ from multiprocessing.pool import ThreadPool
 
 import cloudpickle
 import jinja2
+import jsonschema
 import signac
 from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
 from signac.contrib.filterparse import parse_filter_arg
-from tqdm.auto import tqdm
 
 from .aggregates import (
     _AggregatesCursor,
@@ -46,7 +45,7 @@ from .aggregates import (
     get_aggregate_id,
 )
 from .directives import _document_directive
-from .environment import ComputeEnvironment, get_environment
+from .environment import ComputeEnvironment, get_environment, registered_environments
 from .errors import (
     ConfigKeyError,
     FlowProjectDefinitionError,
@@ -56,21 +55,23 @@ from .errors import (
     UserConditionError,
     UserOperationError,
 )
+from .hooks import _Hooks
 from .labels import _is_label_func, classlabel, label, staticlabel
 from .render_status import _render_status
 from .scheduling.base import ClusterJob, JobStatus
 from .util import config as flow_config
 from .util import template_filters
 from .util.misc import (
-    TrackGetItemDict,
+    _add_cwd_to_environment_pythonpath,
     _bidict,
     _cached_partial,
     _get_parallel_executor,
     _positive_int,
+    _roundrobin,
+    _switch_to_directory,
     _to_hashable,
-    add_cwd_to_environment_pythonpath,
-    roundrobin,
-    switch_to_directory,
+    _TrackGetItemDict,
+    tqdm,
 )
 from .util.translate import abbreviate, shorten
 
@@ -87,7 +88,7 @@ variable, for example in the project configuration file. The current template di
 {template_dir}
 
 All template variables can be placed within a template using the standard jinja2
-syntax, e.g., the project root directory can be written as: {{{{ project.root_directory() }}}}.
+syntax, e.g., the project root directory can be written as: {{{{ project.path }}}}.
 The available template variables are:
 {template_vars}
 
@@ -106,6 +107,13 @@ _FMT_SCHEDULER_STATUS = {
     JobStatus.queued: "Q",
     JobStatus.active: "A",
     JobStatus.error: "E",
+    JobStatus.group_registered: "GR",
+    JobStatus.group_inactive: "GI",
+    JobStatus.group_submitted: "GS",
+    JobStatus.group_held: "GH",
+    JobStatus.group_queued: "GQ",
+    JobStatus.group_active: "GA",
+    JobStatus.group_error: "GE",
     JobStatus.placeholder: " ",
 }
 
@@ -121,7 +129,7 @@ class IgnoreConditions(IntFlag):
         # Compute the largest number of bits used to represent one of the flags
         # so that we can XOR the appropriate number.
         max_bits = len(bin(max(elem.value for elem in type(self)))) - 2
-        return self.__class__((2 ** max_bits - 1) ^ self._value_)
+        return self.__class__((2**max_bits - 1) ^ self._value_)
 
     NONE = 0
     """Check all conditions."""
@@ -311,7 +319,7 @@ class _JobOperation:
         # We use a special dictionary that tracks all keys that have been
         # evaluated by the template engine and compare them to those explicitly
         # set by the user. See also comment below.
-        self.directives = TrackGetItemDict(directives)
+        self.directives = _TrackGetItemDict(directives)
 
         # Keys which were explicitly set by the user, but are not evaluated by
         # the template engine are cause for concern and might hint at a bug in
@@ -529,7 +537,7 @@ class BaseFlowOperation:
 class FlowCmdOperation(BaseFlowOperation):
     """An operation that executes a shell command.
 
-    When an operation has the ``@cmd`` directive specified, it is
+    When an operation has the ``FlowProject.operation(cmd=True)`` directive specified, it is
     instantiated as a :class:`~.FlowCmdOperation`. The operation should be a
     function of one or more positional arguments that are instances of
     :class:`~signac.contrib.job.Job`. The command (cmd) may either be a
@@ -547,7 +555,7 @@ class FlowCmdOperation(BaseFlowOperation):
     ----------
     cmd : str or callable
         The command to execute the operation. Callable values will be
-        provided one or more positional arguments (``*jobs``) that are
+        provided one or more positional arguments that are
         instances of :class:`~signac.contrib.job.Job`. String values will be
         formatted with ``cmd.format(jobs=jobs)`` where ``jobs`` is a tuple of
         :class:`~signac.contrib.job.Job`, or ``cmd.format(jobs=jobs,
@@ -568,17 +576,13 @@ class FlowCmdOperation(BaseFlowOperation):
 
     def __call__(self, *jobs):
         """Return the command formatted with the supplied job(s)."""
-        cmd = self._cmd(*jobs) if callable(self._cmd) else self._cmd
-        format_arguments = {"jobs": jobs}
-        if len(jobs) == 1:
-            format_arguments["job"] = jobs[0]
-        return cmd.format(**format_arguments)
+        return self._cmd(*jobs) if callable(self._cmd) else self._cmd
 
 
 class FlowOperation(BaseFlowOperation):
     """An operation that executes a Python function.
 
-    All operations without the ``@cmd`` directive use this class. The
+    All operations without the ``FlowProject.operation(cmd=True)`` directive use this class. The
     callable ``op_func`` should be a function of one or more instances of
     :class:`~signac.contrib.job.Job`.
 
@@ -629,28 +633,36 @@ class FlowGroupEntry:
 
     Operation functions can be marked for inclusion into a :class:`FlowGroup`
     by decorating the functions with a corresponding :class:`FlowGroupEntry`.
-    If the operation requires specific directives, :meth:`~.with_directives`
-    accepts keyword arguments that are mapped to directives and returns a
-    decorator that can be applied to the operation to mark it for inclusion in
-    the group and indicate that it should be executed using the specified
-    directives. This overrides the default directives specified by
-    :meth:`flow.directives`.
+    If the operation requires group specific directives, calling the
+    :class:`FlowGroupEntry` with the keyword argument ``directives`` allows the
+    setting of directives for the exclusively for the group. Doing this overrides
+    the default directives specified by :meth:`FlowProject.operation`.
 
     Parameters
     ----------
     name : str
         The name of the :class:`FlowGroup` to be created.
-    options : str
+    project : flow.FlowProject
+        The project the group is associated with.
+    submit_options : str
         The :meth:`FlowProject.run` options to pass when submitting the group.
         These will be included in all submissions. Submissions use run
         commands to execute.
+    run_options : str
+        The options to pass to ``entrypoint exec`` when running the group. Specifying this will
+        cause the operation to be forked even if it otherwise would run in the current Python
+        interpreter.
     group_aggregator : :class:`~.aggregator`
         aggregator object associated with the :class:`FlowGroup` (Default value = None).
     """
 
-    def __init__(self, name, options="", group_aggregator=None):
+    def __init__(
+        self, name, project, submit_options="", run_options="", group_aggregator=None
+    ):
         self.name = name
-        self.options = options
+        self._project = project
+        self.submit_options = submit_options
+        self.run_options = run_options
         # We register aggregators associated with operation functions in
         # `_register_groups` and we do not set the aggregator explicitly.
         # We delay setting the aggregator because we do not restrict the
@@ -658,7 +670,7 @@ class FlowGroupEntry:
         # `@operation`.
         self.group_aggregator = group_aggregator
 
-    def __call__(self, func):
+    def __call__(self, func=None, /, *, directives=None):
         """Add the function into the group's operations.
 
         This call operator allows the class to be used as a decorator.
@@ -668,20 +680,43 @@ class FlowGroupEntry:
         func : callable
             The function to decorate.
 
+        directives : dict
+            Directives to use for resource requests and execution.
+            The directives specified in this decorator are only applied when
+            executing the operation through the :class:`FlowGroup`.
+            To apply directives to an individual operation executed outside of the
+            group, see :meth:`.FlowProject.operation`.
+
         Returns
         -------
-        callable
+        func
             The decorated function.
-
         """
-        if hasattr(func, "_flow_groups"):
-            if self.name in func._flow_groups:
-                raise FlowProjectDefinitionError(
-                    f"Cannot reregister operation '{func}' with the group '{self.name}'."
-                )
-            func._flow_groups.append(self.name)
+        if func is None:
+            return functools.partial(self._internal_call, directives=directives)
+        return self._internal_call(func, directives=directives)
+
+    def _internal_call(self, func, /, *, directives):
+        if not any(
+            func == op_func for _, op_func in self._project._OPERATION_FUNCTIONS
+        ):
+            raise FlowProjectDefinitionError(
+                f"Cannot add function '{func}' to group without making the function an "
+                f"operation. Add @MyProjectClass.operation below group decorator."
+            )
+
+        if self.name in func._flow_groups[self._project]:
+            raise FlowProjectDefinitionError(
+                f"Cannot reregister operation '{func}' with the group '{self.name}'."
+            )
+        func._flow_groups[self._project].add(self.name)
+        if directives is None:
+            return func
+
+        if hasattr(func, "_flow_group_operation_directives"):
+            func._flow_group_operation_directives[self.name] = directives
         else:
-            func._flow_groups = [self.name]
+            func._flow_group_operation_directives = {self.name: directives}
         return func
 
     def _set_directives(self, func, directives):
@@ -694,38 +729,6 @@ class FlowGroupEntry:
             func._flow_group_operation_directives[self.name] = directives
         else:
             func._flow_group_operation_directives = {self.name: directives}
-
-    def with_directives(self, directives):
-        """Decorate an operation to provide additional execution directives for this group.
-
-        Directives can be used to provide information about required resources
-        such as the number of processors required for execution of parallelized
-        operations. For a list of supported directives, see
-        :meth:`.FlowProject.operation.with_directives`. For more information,
-        see :ref:`signac-docs:cluster_submission_directives`.
-
-        The directives specified in this decorator are only applied when
-        executing the operation through the :class:`FlowGroup`.
-        To apply directives to an individual operation executed outside of the
-        group, see :meth:`.FlowProject.operation.with_directives`.
-
-        Parameters
-        ----------
-        directives : dict
-            Directives to use for resource requests and execution.
-
-        Returns
-        -------
-        function
-            A decorator which registers the operation with the group using the
-            specified directives.
-        """
-
-        def decorator(func):
-            self._set_directives(func, directives)
-            return self(func)
-
-        return decorator
 
 
 class FlowGroup:
@@ -743,13 +746,13 @@ class FlowGroup:
 
         group = FlowProject.make_group(name='example_group')
 
-        @group.with_directives({"nranks": 4})
-        @FlowProject.operation.with_directives({"nranks": 2, "executable": "python3"})
+        @group(directives={"nranks": 4})
+        @FlowProject.operation({"nranks": 2, "executable": "python3"})
         def op1(job):
             pass
 
         @group
-        @FlowProject.operation.with_directives({"nranks": 2, "executable": "python3"})
+        @FlowProject.operation({"nranks": 2, "executable": "python3"})
         def op2(job):
             pass
 
@@ -768,17 +771,28 @@ class FlowGroup:
         the directives of the singleton group containing that operation are
         used. To prevent this, set the directives to an empty dictionary for
         that operation.
-    options : str
-        A string of options to append to the output of the object's call method.
-        This allows options like ``--num_passes`` to be given to a group.
-
+    submit_options : str
+        The :meth:`FlowProject.run` options to pass when submitting the group. These will be
+        included in all submissions. Submissions use run commands to execute.
+    run_options : str
+        The options to pass to ``entrypoint exec`` when running the group. Specifying this will
+        cause the operation to be forked even if it otherwise would run in the current Python
+        interpreter.
     """
 
     MAX_LEN_ID = 100
 
-    def __init__(self, name, operations=None, operation_directives=None, options=""):
+    def __init__(
+        self,
+        name,
+        operations=None,
+        operation_directives=None,
+        submit_options="",
+        run_options="",
+    ):
         self.name = name
-        self.options = options
+        self.submit_options = submit_options
+        self.run_options = run_options
         # Requires Python >=3.6: dict must be ordered to ensure consistent
         # pretend submission output for templates.
         self.operations = {} if operations is None else dict(operations)
@@ -823,34 +837,31 @@ class FlowGroup:
             all_directives.update(defaults.get(name, {}))
         return all_directives
 
-    def _submit_cmd(self, entrypoint, ignore_conditions, jobs=None):
+    def _submit_cmd(self, entrypoint, ignore_conditions, jobs):
         entrypoint = self._determine_entrypoint(entrypoint, {}, jobs)
         cmd = f"{entrypoint} run -o {self.name}"
         cmd = cmd if jobs is None else cmd + f" -j {get_aggregate_id(jobs)}"
-        cmd = cmd if self.options is None else cmd + " " + self.options
+        options = self.submit_options
         if ignore_conditions != IgnoreConditions.NONE:
-            return cmd.strip() + " --ignore-conditions=" + str(ignore_conditions)
-        return cmd.strip()
+            options += " --ignore-conditions=" + str(ignore_conditions)
+        return " ".join((cmd, options)).strip()
 
     def _run_cmd(self, entrypoint, operation_name, operation, directives, jobs):
         if isinstance(operation, FlowCmdOperation):
             return operation(*jobs).lstrip()
         entrypoint = self._determine_entrypoint(entrypoint, directives, jobs)
-        return f"{entrypoint} exec {operation_name} {get_aggregate_id(jobs)}".lstrip()
+        cmd = f"{entrypoint} exec {operation_name} {get_aggregate_id(jobs)} {self.run_options}"
+        return cmd.strip()
 
     def __iter__(self):
         yield from self.operations.values()
 
     def __repr__(self):
         return (
-            "{type}(name='{name}', operations='{operations}', "
-            "operation_directives={directives}, options='{options}')".format(
-                type=type(self).__name__,
-                name=self.name,
-                operations=" ".join(list(self.operations)),
-                directives=self.operation_directives,
-                options=self.options,
-            )
+            f"{type(self).__name__}(name={repr(self.name)}, operations='"
+            f"{' '.join(list(self.operations))}',"
+            f"operation_directives={self.operation_directives}, "
+            f"submit_options={repr(self.submit_options)}, run_options={repr(self.run_options)})"
         )
 
     def _eligible(self, aggregate, ignore_conditions=IgnoreConditions.NONE):
@@ -956,9 +967,8 @@ class FlowGroup:
         else:
             op_string = operation_name
 
-        root_directory = project.root_directory()
         aggregate_id = get_aggregate_id(aggregate)
-        full_name = f"{root_directory}%{aggregate_id}%{op_string}"
+        full_name = f"{project.path}%{aggregate_id}%{op_string}"
         # The job_op_id is a hash computed from the unique full name.
         job_op_id = md5(full_name.encode("utf-8")).hexdigest()
 
@@ -975,7 +985,7 @@ class FlowGroup:
         separator = getattr(project._environment, "JOB_ID_SEPARATOR", "/")
         readable_name = "{project}{sep}{aggregate_id}{sep}{op_string}{sep}".format(
             sep=separator,
-            project=str(project)[:12],
+            project=project.__class__.__name__[:12],
             aggregate_id=aggregate_id,
             op_string=op_string[:12],
         )[:max_len]
@@ -1148,7 +1158,7 @@ class FlowGroup:
                 # to True since we must launch a separate process. Override
                 # the command directly.
                 prefix = jobs[0]._project._environment.get_prefix(job_op)
-                if prefix != "":
+                if prefix != "" or self.run_options != "":
                     job_op.directives["fork"] = True
                     job_op._cmd = f"{prefix} {job_op.cmd}"
                 yield job_op
@@ -1192,6 +1202,7 @@ class _FlowProjectClass(type):
         cls._OPERATION_FUNCTIONS = []
         cls._OPERATION_PRECONDITIONS = defaultdict(list)
         cls._OPERATION_POSTCONDITIONS = defaultdict(list)
+        cls._OPERATION_HOOK_REGISTRY = defaultdict(lambda: defaultdict(list))
 
         # All label functions are registered with the label() classmethod,
         # which is intended to be used as decorator function. The
@@ -1216,6 +1227,8 @@ class _FlowProjectClass(type):
         cls._GROUPS = []
         cls._GROUP_NAMES = set()
 
+        cls.operation_hooks = cls._setup_hooks_object(parent_class=cls)
+
         return cls
 
     @staticmethod
@@ -1229,15 +1242,14 @@ class _FlowProjectClass(type):
 
             .. code-block:: python
 
-                @Project.operation
                 @Project.pre(lambda job: not job.doc.get('hello'))
+                @Project.operation
                 def hello(job):
                     print('hello', job)
                     job.doc.hello = True
 
-                @Project.operation
-                @aggregator()
                 @Project.pre(lambda *jobs: all("hi_all" not in job.doc for job in jobs))
+                @Project.operation(aggregator=aggregator())
                 def hi_all(*jobs):
                     print('hi', jobs)
                     for job in jobs:
@@ -1256,10 +1268,15 @@ class _FlowProjectClass(type):
             _parent_class = parent_class
 
             def __call__(self, func):
+                # Have to traverse the mro to ensure that func is already an operation and that
+                # self.condition is not.
                 operation_functions = [
-                    operation[1]
-                    for operation in self._parent_class._collect_operations()
+                    func for name, func in self._parent_class._collect_operations()
                 ]
+                if func not in operation_functions:
+                    raise FlowProjectDefinitionError(
+                        "Conditions must come after (above) @FlowProject.operation."
+                    )
                 if self.condition in operation_functions:
                     raise FlowProjectDefinitionError(
                         "Operation functions cannot be used as preconditions."
@@ -1318,15 +1335,14 @@ class _FlowProjectClass(type):
 
             .. code-block:: python
 
-                @Project.operation
                 @Project.post(lambda job: job.doc.get('bye'))
+                @Project.operation
                 def bye(job):
                     print('bye', job)
                     job.doc.bye = True
 
-                @Project.operation
-                @aggregator()
                 @Project.post(lambda *jobs: all("bye_all" in job.doc for job in jobs))
+                @Project.operation(aggregator=aggregator())
                 def bye_all(*jobs):
                     print('bye', jobs)
                     for job in jobs:
@@ -1347,10 +1363,15 @@ class _FlowProjectClass(type):
             _parent_class = parent_class
 
             def __call__(self, func):
+                # Have to traverse the mro to ensure that func is already an operation and that
+                # self.condition is not.
                 operation_functions = [
-                    operation[1]
-                    for operation in self._parent_class._collect_operations()
+                    func for name, func in self._parent_class._collect_operations()
                 ]
+                if func not in operation_functions:
+                    raise FlowProjectDefinitionError(
+                        "Conditions must come after (above) @FlowProject.operation."
+                    )
                 if self.condition in operation_functions:
                     raise FlowProjectDefinitionError(
                         "Operation functions cannot be used as postconditions."
@@ -1388,11 +1409,11 @@ class _FlowProjectClass(type):
                 def hello(job):
                     print('Hello', job)
 
-            Directives can also be specified by using :meth:`FlowProject.operation.with_directives`.
+            Directives can also be specified by using :meth:`FlowProject.operation`.
 
             .. code-block:: python
 
-                @FlowProject.operation.with_directives({"nranks": 4})
+                @FlowProject.operation({"nranks": 4})
                 def mpi_hello(job):
                     print("hello")
 
@@ -1403,6 +1424,17 @@ class _FlowProjectClass(type):
             name : str
                 The operation name. Uses the name of the function if None.
                 (Default value = None)
+            cmd : bool, optional, keyword-only
+                Whether the decorated function returns a shell executable string or not. When
+                ``True``, the returned string is executed by the shell. Defaults to ``False``.
+            with_job : bool, optional, keyword-only
+                Whether to change directories to the job workspace when running the job. Defaults to
+                ``False``.
+            directives : dict, optional, keyword-only
+                Directives to use for resource requests and execution.
+            aggregator : flow.aggregator, optional, keyword-only
+                The aggregator to use for the operation. Default value uses aggregator of size one
+                (i.e. individual jobs).
 
             Returns
             -------
@@ -1412,10 +1444,46 @@ class _FlowProjectClass(type):
 
             _parent_class = parent_class
 
-            def __call__(self, func, name=None):
+            def __call__(
+                self,
+                func=None,
+                name=None,
+                *,
+                cmd=False,
+                with_job=False,
+                directives=None,
+                aggregator=None,
+            ):
                 if isinstance(func, str):
-                    return lambda op: self(op, name=func)
+                    return lambda op: self._internal_call(
+                        op,
+                        name=func,
+                        cmd=cmd,
+                        with_job=with_job,
+                        directives=directives,
+                        op_aggregator=aggregator,
+                    )
+                if func is None:
+                    return lambda op: self._internal_call(
+                        op,
+                        name=name,
+                        cmd=cmd,
+                        with_job=with_job,
+                        directives=directives,
+                        op_aggregator=aggregator,
+                    )
+                return self._internal_call(
+                    func,
+                    name=name,
+                    cmd=cmd,
+                    with_job=with_job,
+                    directives=directives,
+                    op_aggregator=aggregator,
+                )
 
+            def _internal_call(
+                self, func, name, *, cmd, with_job, directives, op_aggregator
+            ):
                 if func in chain(
                     *self._parent_class._OPERATION_PRECONDITIONS.values(),
                     *self._parent_class._OPERATION_POSTCONDITIONS.values(),
@@ -1423,6 +1491,15 @@ class _FlowProjectClass(type):
                     raise FlowProjectDefinitionError(
                         "A condition function cannot be used as an operation."
                     )
+
+                if cmd:
+                    setattr(func, "_flow_cmd", True)
+                if with_job:
+                    func = self._with_job(func)
+
+                # Store directives
+                if directives is not None:
+                    func._flow_directives = directives
 
                 if name is None:
                     name = func.__name__
@@ -1445,7 +1522,15 @@ class _FlowProjectClass(type):
                     )
 
                 if not getattr(func, "_flow_aggregate", False):
-                    func._flow_aggregate = aggregator.groupsof(1)
+                    default_aggregator = aggregator.groupsof(1)
+                    if op_aggregator is None:
+                        op_aggregator = default_aggregator
+                    elif op_aggregator != default_aggregator:
+                        if getattr(func, "_flow_with_job", False):
+                            raise FlowProjectDefinitionError(
+                                "The with_job option cannot be used with aggregation."
+                            )
+                    func._flow_aggregate = op_aggregator
 
                 # Append the name and function to the class registry
                 self._parent_class._OPERATION_FUNCTIONS.append((name, func))
@@ -1454,58 +1539,142 @@ class _FlowProjectClass(type):
                 # delay setting the aggregator because we do not restrict the decorator
                 # placement in terms of `@FlowGroupEntry`, `@aggregator`, or
                 # `@operation`.
-                self._parent_class._GROUPS.append(FlowGroupEntry(name=name, options=""))
-                if hasattr(func, "_flow_groups"):
-                    func._flow_groups.append(name)
-                else:
-                    func._flow_groups = [name]
+                self._parent_class._GROUPS.append(
+                    FlowGroupEntry(name=name, project=self._parent_class)
+                )
+                if not hasattr(func, "_flow_groups"):
+                    func._flow_groups = {}
+                func._flow_groups[self._parent_class] = {name}
                 return func
 
-            def with_directives(self, directives, name=None):
-                """Decorate a function to make it an operation with additional execution directives.
+            def _with_job(self, func):
+                base_aggregator = aggregator.groupsof(1)
+                if getattr(func, "_flow_aggregate", base_aggregator) != base_aggregator:
+                    raise FlowProjectDefinitionError(
+                        "The with_job keyword argument cannot be used with aggregation."
+                    )
 
-                Directives can be used to provide information about required
-                resources such as the number of processors required for
-                execution of parallelized operations. For more information, see
-                :ref:`signac-docs:cluster_submission_directives`. To apply
-                directives to an operation that is part of a group, use
-                :meth:`.FlowGroupEntry.with_directives`.
+                @functools.wraps(func)
+                def decorated(*jobs):
+                    with jobs[0] as job:
+                        if getattr(func, "_flow_cmd", False):
+                            return (
+                                f'trap "cd $(pwd)" EXIT && cd {job.path} && {func(job)}'
+                            )
+                        else:
+                            return func(job)
+
+                decorated._flow_with_job = True
+                decorated._flow_cmd = getattr(func, "_flow_cmd", False)
+                return decorated
+
+        _directives_to_document = (
+            ComputeEnvironment._get_default_directives()._directive_definitions.values()
+        )
+        OperationRegister.__doc__ += textwrap.indent(
+            "\n\n**Supported Directives:**\n\n"
+            + "\n\n".join(
+                _document_directive(directive) for directive in _directives_to_document
+            ),
+            " " * 16,
+        )
+        return OperationRegister()
+
+    @staticmethod
+    def _setup_hooks_object(parent_class):
+        class _HooksRegister:
+            """Add hooks to an operation.
+
+            This object is designed to be used as a decorator. The example
+            below shows an operation level decorator that prints the
+            operation name and job id at the start of the operation
+            execution.
+
+            .. code-block:: python
+
+                def start_hook(operation_name, job):
+                    print(f"Starting operation {operation_name} on job {job.id}.")
+
+                @FlowProject.operation_hooks.on_start(start_hook)
+                @FlowProject.operation
+                def foo(job):
+                    pass
+
+            A hook is a function that is called at specific points during
+            the execution of a job operation. In the example above, the
+            ``start_hook`` hook function is executed before the operation
+            **foo** runs. Hooks can also run after an operation finishes,
+            when an operation exits with error, or when an operation exits
+            without error.
+
+            The available triggers are ``on_start``, ``on_exit``, ``on_exception``, and
+            ``on_success`` which run when the operation starts, completes, fails, and
+            succeeds respectively.
+
+            Parameters
+            ----------
+            hook_func : callable
+                The function that will be executed at a specified point.
+            trigger : string
+                The point when a hook operation is executed.
+            """
+
+            _parent_class = parent_class
+
+            def __init__(self, hook_func, trigger):
+                self._hook_func = hook_func
+                self._hook_trigger = trigger
+
+            @classmethod
+            def on_start(cls, hook_func):
+                """Add a hook function triggered before an operation starts."""
+                return cls(hook_func, trigger="on_start")
+
+            @classmethod
+            def on_exit(cls, hook_func):
+                """Add a hook function triggered after the operation exits.
+
+                The hook is triggered regardless of whether the operation exits
+                with or without an error.
+                """
+                return cls(hook_func, trigger="on_exit")
+
+            @classmethod
+            def on_success(cls, hook_func):
+                """Add a hook function triggered after the operation exits without error."""
+                return cls(hook_func, trigger="on_success")
+
+            @classmethod
+            def on_exception(cls, hook_func):
+                """Add a hook function triggered after the operation exits with an error."""
+                return cls(hook_func, trigger="on_exception")
+
+            def __call__(self, func):
+                """Add the decorated function to the operation hook registry.
 
                 Parameters
                 ----------
-                directives : dict
-                    Directives to use for resource requests and execution.
-                name : str
-                    The operation name. Uses the name of the function if None
-                    (Default value = None).
-
-                Returns
-                -------
-                function
-                    A decorator which registers the function with the provided
-                    name and directives as an operation of the
-                    :class:`~.FlowProject` subclass.
+                func : callable
+                    The operation function associated with the hook function.
                 """
+                self._parent_class._OPERATION_HOOK_REGISTRY[func][
+                    self._hook_trigger
+                ].append(self._hook_func)
+                return func
 
-                def add_operation_with_directives(function):
-                    function._flow_directives = directives
-                    return self(function, name)
+        return _HooksRegister
 
-                return add_operation_with_directives
 
-            _directives_to_document = (
-                ComputeEnvironment._get_default_directives()._directive_definitions.values()
-            )
-            with_directives.__doc__ += textwrap.indent(
-                "\n\n**Supported Directives:**\n\n"
-                + "\n\n".join(
-                    _document_directive(directive)
-                    for directive in _directives_to_document
-                ),
-                " " * 16,
-            )
-
-        return OperationRegister()
+def _config_value_as_bool(value):
+    # Function to interpret a configobj bool-like value as a boolean.
+    if isinstance(value, str):
+        if value.lower() in {"true", "on", "yes", "1"}:
+            return True
+        elif value.lower() in {"false", "off", "no", "0"}:
+            return False
+        else:
+            raise ValueError("Invalid boolean config value.")
+    return bool(value)
 
 
 class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
@@ -1546,6 +1715,32 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def __init__(self, config=None, environment=None, entrypoint=None):
         super().__init__(config=config)
 
+        # Initialize the local config.
+        # TODO: In signac 2.0 we will not allow config modification after
+        # project initialization. The flow config is already effectively
+        # immutable since it is an internal variable that is not exposed to the
+        # user in any way. Once signac no longer relies on configobj and stops
+        # supporting in-place config modification, flow can make use of the
+        # signac Project config dictionary directly and that can be updated by
+        # any flow config APIs. For now, we store the flow config separately to
+        # avoid any side effects associated with modifying instances of
+        # signac.contrib._ProjectConfig.
+        self._flow_config = {
+            **flow_config._FLOW_CONFIG_DEFAULTS,
+            **self._config.get("flow", {}),
+        }
+        self._flow_config["eligible_jobs_max_lines"] = int(
+            self._flow_config["eligible_jobs_max_lines"]
+        )
+        self._flow_config["status_performance_warn_threshold"] = float(
+            self._flow_config["status_performance_warn_threshold"]
+        )
+        jsonschema.validate(
+            self._flow_config,
+            flow_config._FLOW_SCHEMA,
+            format_checker=jsonschema.draft7_format_checker,
+        )
+
         # Associate this class with a compute environment.
         self._environment = environment or get_environment()
 
@@ -1556,9 +1751,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # the project root directory. This directory may be specified with the 'template_dir'
         # configuration variable.
         self._template_dir = os.path.join(
-            self.root_directory(), self._config.get("template_dir", "templates")
+            self.path, self._config.get("template_dir", "templates")
         )
         self._template_environment_ = {}
+
+        # Setup execution hooks
+        self._project_hooks = _Hooks()
+        self._operation_hooks = defaultdict(_Hooks)
 
         # Register all label functions with this project instance.
         self._label_functions = {}
@@ -1580,19 +1779,24 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         script() and _submit_operations() / submit() function and the
         corresponding command line subcommands.
         """
-        if self._config.get("flow") and self._config["flow"].get("environment_modules"):
-            envs = self._config["flow"].as_list("environment_modules")
-        else:
-            envs = []
+        environment_modules = [
+            cls.__module__
+            for cls in registered_environments()
+            if not cls.__module__.startswith("flow.environments")
+        ]
 
         # Templates are searched in the local template directory first, then in additionally
         # installed packages, then in the main package 'templates' directory.
         extra_packages = []
-        for env in envs:
+        for env in environment_modules:
             try:
                 extra_packages.append(jinja2.PackageLoader(env, "templates"))
             except ImportError as error:
                 logger.warning(f"Unable to load template from package '{error.name}'.")
+            except ValueError as error:
+                logger.warning(
+                    f"Unable to load template from package. Original Error '{error}'."
+                )
 
         load_envs = (
             [jinja2.FileSystemLoader(self._template_dir)]
@@ -1626,16 +1830,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         ] = template_filters.homogeneous_openmp_mpi_config
         template_environment.filters["get_config_value"] = flow_config.get_config_value
         template_environment.filters[
-            "require_config_value"
-        ] = flow_config.require_config_value
-        template_environment.filters[
             "get_account_name"
         ] = template_filters.get_account_name
         template_environment.filters["print_warning"] = template_filters.print_warning
-        if "max" not in template_environment.filters:  # for jinja2 < 2.10
-            template_environment.filters["max"] = max
-        if "min" not in template_environment.filters:  # for jinja2 < 2.10
-            template_environment.filters["min"] = min
         template_environment.filters["quote_argument"] = shlex.quote
 
         return template_environment
@@ -1675,6 +1872,25 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             )
         )
         sys.exit(2)
+
+    @property
+    def project_hooks(self):
+        """:class:`.hooks.Hooks` defined for all project operations.
+
+        Project-wide hooks are added to an *instance* of the FlowProject, not
+        the class. For example:
+
+        .. code-block:: python
+
+            def finish_hook(operation_name, job):
+                print(f"Finished operation {operation_name} on job {job.id}")
+
+            if __name__ == "__main__":
+                project = FlowProject()
+                project.project_hooks.on_exit.append(finish_hook)
+                project.main()
+        """
+        return self._project_hooks
 
     @classmethod
     def label(cls, label_name_or_func=None):
@@ -1908,7 +2124,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _fn_bundle(self, bundle_id):
         """Return the canonical name to store bundle information."""
-        return os.path.join(self.root_directory(), ".bundles", bundle_id)
+        return os.path.join(self.path, ".bundles", bundle_id)
 
     def _store_bundled(self, operations):
         """Store operation-ids as part of a bundle and return bundle id.
@@ -1934,7 +2150,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             return operations[0].id
         sep = getattr(self._environment, "JOB_ID_SEPARATOR", "/")
         _id = sha1(".".join(op.id for op in operations).encode("utf-8")).hexdigest()
-        bundle_id = f"{self}{sep}bundle{sep}{_id}"
+        bundle_id = f"{self.__class__.__name__}{sep}bundle{sep}{_id}"
         fn_bundle = self._fn_bundle(bundle_id)
         os.makedirs(os.path.dirname(fn_bundle), exist_ok=True)
         with open(fn_bundle, "w") as file:
@@ -2207,12 +2423,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         starting_dict = functools.partial(dict, scheduler_status=JobStatus.unknown)
         status_dict = defaultdict(starting_dict)
 
-        # TODO: Add support for groups that are not single operations.
-        single_operation_groups = {self._groups[name] for name in self.operations}
-
         for aggregate_id, aggregate, group, in self._generate_selected_aggregate_groups(
             selected_aggregates=[aggregate],
-            selected_groups=single_operation_groups,
         ):
             completed = group._complete(aggregate)
             # If the group is not completed, it is sufficient to determine
@@ -2422,7 +2634,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             )
 
         parallel_executor = _get_parallel_executor(status_parallelization)
-        single_operation_groups = {self._groups[name] for name in self.operations}
 
         # Update the project's status cache
         scheduler_info = self._query_scheduler_status(
@@ -2431,8 +2642,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         def compute_status(data):
             scheduler_id, scheduler_status, aggregate_id, aggregate, group = data
-            # Only single-operation groups are supported for status fetching
-            assert len(group.operations) == 1
 
             status = {}
             error_text = None
@@ -2440,12 +2649,16 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 status["scheduler_status"] = scheduler_status
                 completed = group._complete(aggregate)
                 status["completed"] = completed
-                # If the group is not completed, it is sufficient to determine
-                # eligibility while ignoring postconditions (we know at least
-                # one postcondition is not met).
-                status["eligible"] = not completed and group._eligible(
-                    aggregate, ignore_conditions=IgnoreConditions.POST
-                )
+                if len(group.operations) > 1:
+                    status["eligible"] = group._eligible(aggregate)
+                else:
+                    # For groups with only one operation, if the group is not
+                    # complete, it is sufficient to determine eligibility while
+                    # ignoring postconditions (we know at least one
+                    # postcondition is not met).
+                    status["eligible"] = not completed and group._eligible(
+                        aggregate, ignore_conditions=IgnoreConditions.POST
+                    )
             except Exception as error:
                 logger.debug(
                     "Error while getting operations status for job '%s': '%s'.",
@@ -2457,12 +2670,31 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 error_text = str(error)
                 status["completed"] = False
                 status["eligible"] = False
-            result = {
-                "aggregate_id": aggregate_id,
-                "group_name": group.name,
-                "status": status,
-                "_error": error_text,
-            }
+            result = [
+                {
+                    "aggregate_id": aggregate_id,
+                    "group_name": group.name,
+                    "status": status,
+                    "_error": error_text,
+                }
+            ]
+            if (
+                group.name not in self._operations
+                and scheduler_status != JobStatus.unknown
+            ):
+                operation_status = {
+                    **status,
+                    "scheduler_status": JobStatus._to_group(scheduler_status),
+                }
+                for op_name in group.operations:
+                    result.append(
+                        {
+                            "aggregate_id": aggregate_id,
+                            "group_name": op_name,
+                            "status": operation_status,
+                            "_error": error_text,
+                        }
+                    )
             return result
 
         with self._buffered():
@@ -2470,19 +2702,20 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 self._generate_selected_aggregate_groups_with_status(
                     scheduler_info=scheduler_info,
                     selected_aggregates=aggregates,
-                    selected_groups=single_operation_groups,
                 )
             )
-            status_results = parallel_executor(
+            status_results = []
+            for result in parallel_executor(
                 compute_status,
                 aggregate_groups,
                 desc="Fetching status",
                 file=err,
-            )
+            ):
+                status_results.extend(result)
             # aggregate_groups is a list of tuples containing scheduler,
             # aggregate, and group information. To compute labels, we fetch the
             # unique jobs from the aggregates containing only one job.
-            if len(single_operation_groups) > 0:
+            if len(self._groups) > 0:
                 individual_jobs = {
                     aggregate_group[3][0]
                     for aggregate_group in aggregate_groups
@@ -2502,6 +2735,23 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 file=err,
             )
 
+        def combine_group_and_operation_status(aggregate_status_results):
+            group_statuses = {}
+            # Iterate over all status results for singleton groups and all user created groups.
+            # Given group job statuses being exclusive with respect to standard statuses we can
+            # store only the group status (e.g. Group Active) in group submission.
+            for status_result in aggregate_status_results:
+                group_name = status_result["group_name"]
+                # Only true when both a user group and singleton group report a status. We use the
+                # one that is not unknown, so we don't store this status and continue.
+                if (
+                    group_name in group_statuses
+                    and status_result["status"]["scheduler_status"] == JobStatus.unknown
+                ):
+                    continue
+                group_statuses[group_name] = status_result["status"]
+            return group_statuses
+
         status_results_combined = []
         for aggregate_id, aggregate_results in groupby(
             sorted(status_results, key=lambda result: result["aggregate_id"]),
@@ -2519,10 +2769,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             status_results_combined.append(
                 {
                     "aggregate_id": aggregate_id,
-                    "groups": {
-                        result["group_name"]: result["status"]
-                        for result in aggregate_results
-                    },
+                    "groups": combine_group_and_operation_status(aggregate_results),
                     "_error": error_message,
                 }
             )
@@ -2615,11 +2862,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         aggregates = self._convert_jobs_to_aggregates(jobs)
 
         if eligible_jobs_max_lines is None:
-            eligible_jobs_max_lines = flow_config.get_config_value(
-                "eligible_jobs_max_lines"
-            )
+            eligible_jobs_max_lines = self._flow_config["eligible_jobs_max_lines"]
 
-        status_parallelization = self.config["flow"]["status_parallelization"]
+        status_parallelization = self._flow_config["status_parallelization"]
 
         # initialize jinja2 template environment and necessary filters
         template_environment = self._template_environment()
@@ -2762,10 +3007,24 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 1 for _ in filter(_has_any_eligible_group, status_results)
             )
 
-        statuses = {
-            status_entry["aggregate_id"]: status_entry
-            for status_entry in status_results
-        }
+        def display_group_name(group_name):
+            """Return the operation name or group name with number of operations."""
+            # If the name is from a group that is not an operation, we append the
+            # number of operations to its name in the status.
+            if group_name not in self._operations:
+                num_operations = len(self._groups[group_name].operations)
+                return f"{group_name} ({num_operations} ops)"
+            return group_name
+
+        statuses = {}
+        # We store the name for display in statuses[aggregate_id][group_name]["display_name"] to
+        # prevent the need for a Jinja filter. We store this as an additional parameter as multiple
+        # places in the templates need this value including the statuses dictionary itself.
+        for status_entry in status_results:
+            statuses[status_entry["aggregate_id"]] = status_entry
+            group_statuses = status_entry["groups"]
+            for group_name, group_status in group_statuses.items():
+                group_status["display_name"] = display_group_name(group_name)
 
         # Add labels to the status information.
         for job_label_data in job_labels:
@@ -2827,23 +3086,42 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 if aggregate_id.startswith("agg-"):
                     # TODO: Fill parameters with empty values (or shared values?)
                     raise ValueError("Cannot show parameters for aggregates.")
-                statepoint = self.open_job(id=aggregate_id).statepoint()
+                job = self.open_job(id=aggregate_id)
+                # Cache the job state point and document if used to render status parameters.
+                statepoint = None
+                document = None
 
                 def dotted_get(mapping, key):
                     """Fetch a value from a nested mapping using a dotted key."""
-                    if mapping is None:
-                        return None
                     tokens = key.split(".")
-                    if len(tokens) > 1:
-                        return dotted_get(mapping.get(tokens[0]), ".".join(tokens[1:]))
-                    return mapping.get(key)
+                    v = mapping
+                    for token in tokens:
+                        if v is None:
+                            return None
+                        v = v.get(token)
+                    return v
 
                 status["parameters"] = {}
                 for parameter in parameters:
-                    status["parameters"][parameter] = shorten(
-                        str(self._alias(dotted_get(statepoint, parameter))),
-                        param_max_width,
-                    )
+                    if not parameter.startswith("doc."):
+                        if parameter.startswith("sp."):
+                            parameter_name = parameter[3:]
+                        else:
+                            parameter_name = parameter
+                        if statepoint is None:
+                            statepoint = job.statepoint()
+                        status["parameters"][parameter] = shorten(
+                            str(self._alias(dotted_get(statepoint, parameter_name))),
+                            param_max_width,
+                        )
+                    else:
+                        parameter_name = parameter[4:]
+                        if document is None:
+                            document = job.document()
+                        status["parameters"][parameter] = shorten(
+                            str(self._alias(dotted_get(document, parameter_name))),
+                            param_max_width,
+                        )
 
             for status in statuses.values():
                 _add_parameters(status)
@@ -2855,7 +3133,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             # get detailed view info
 
             if compact:
-                num_operations = len(self._operations)
+                num_operations = len(self._groups)
 
             if pretty:
                 OPERATION_STATUS_SYMBOLS = {
@@ -2921,10 +3199,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         op_submission_status_counter = defaultdict(Counter)
         for job in context["jobs"]:
             for group_name, group_status in job["groups"].items():
+                # Exclude placeholder operations, which have no display name.
                 if group_name != "":
+                    display_name = group_status["display_name"]
                     if group_status["eligible"]:
-                        op_counter[group_name] += 1
-                    op_submission_status_counter[group_name][
+                        op_counter[display_name] += 1
+                    op_submission_status_counter[display_name][
                         group_status["scheduler_status"]
                     ] += 1
 
@@ -2949,7 +3229,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         num_omitted_operations = len(op_counter) - len(context["op_counter"])
         if num_omitted_operations > 0:
             context["op_counter"].append(
-                (f"[{num_omitted_operations} more operations omitted]", "")
+                (f"[{num_omitted_operations} more operations omitted]", "", "")
             )
 
         # We have to make a deep copy of the template environment if we're
@@ -3100,6 +3380,29 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         for result in results:
             result.get(timeout=timeout)
 
+    @contextlib.contextmanager
+    def _run_with_hooks(self, operation):
+        name = operation.name
+        jobs = operation._jobs
+
+        # Determine operation hooks
+        operation_hooks = self._operation_hooks.get(name, _Hooks())
+
+        self.project_hooks.on_start(name, *jobs)
+        operation_hooks.on_start(name, *jobs)
+        try:
+            yield
+        except Exception as error:
+            self.project_hooks.on_exception(name, error, *jobs)
+            operation_hooks.on_exception(name, error, *jobs)
+            raise
+        else:
+            self.project_hooks.on_success(name, *jobs)
+            operation_hooks.on_success(name, *jobs)
+        finally:
+            self.project_hooks.on_exit(name, *jobs)
+            operation_hooks.on_exit(name, *jobs)
+
     def _execute_operation(self, operation, timeout=None, pretend=False):
         """Execute an operation.
 
@@ -3121,6 +3424,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             return None
 
         logger.info("Execute operation '%s'...", operation)
+
+        execution_error_message = (
+            f"An exception was raised during operation {operation.name} for "
+            f"job or aggregate with id {get_aggregate_id(operation._jobs)}."
+        )
+
         # Check if we need to fork for operation execution...
         if (
             # The 'fork' directive was provided and evaluates to True:
@@ -3138,7 +3447,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 operation,
                 operation.cmd,
             )
-            subprocess.run(operation.cmd, shell=True, timeout=timeout, check=True)
+            try:
+                with self._run_with_hooks(operation):
+                    subprocess.run(
+                        operation.cmd, shell=True, timeout=timeout, check=True
+                    )
+            except subprocess.CalledProcessError as error:
+                raise UserOperationError(execution_error_message) from error
         else:
             # ... executing operation in interpreter process as function:
             logger.debug(
@@ -3147,12 +3462,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 os.getpid(),
             )
             try:
-                self._operations[operation.name](*operation._jobs)
+                with self._run_with_hooks(operation):
+                    self._operations[operation.name](*operation._jobs)
             except Exception as error:
-                raise UserOperationError(
-                    f"An exception was raised during operation {operation.name} "
-                    f"for job or aggregate with id {get_aggregate_id(operation._jobs)}."
-                ) from error
+                raise UserOperationError(execution_error_message) from error
 
     def _get_default_directives(self):
         return {
@@ -3378,7 +3691,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                         sorted(operations, key=key_func_by_job), key=key_func_by_job
                     )
                 ]
-                operations = list(roundrobin(*groups))
+                operations = list(_roundrobin(*groups))
             elif order == "random":
                 random.shuffle(operations)
             elif order is None or order in ("none", "by-job"):
@@ -3925,7 +4238,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             dest="operation_name",
             nargs="+",
             help="Only select operation or groups that match the given "
-            "operation/group name(s).",
+            "operation/group name(s). These are interpreted as regular expressions.",
         )
         selection_group.add_argument(
             "-n",
@@ -4037,8 +4350,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             "--parameters",
             type=str,
             nargs="*",
-            help="Display select parameters of the job's "
-            "statepoint with the detailed view.",
+            help="Display select parameters of the job state point "
+            "(with optional prefix 'sp.') or job document (by using prefix 'doc.') "
+            "in the detailed view.",
         )
         view_group.add_argument(
             "--param-max-width", type=int, help="Limit the width of each parameter row."
@@ -4204,6 +4518,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "post": postconditions.get(func, None),
             }
 
+            # Update operation hooks
+            self._operation_hooks[name].update(
+                _Hooks(**self._OPERATION_HOOK_REGISTRY[func])
+            )
+
             # Construct FlowOperation:
             if getattr(func, "_flow_cmd", False):
                 self._operations[name] = FlowCmdOperation(cmd=func, **params)
@@ -4211,7 +4530,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 self._operations[name] = FlowOperation(op_func=func, **params)
 
     @classmethod
-    def make_group(cls, name, options="", group_aggregator=None):
+    def make_group(cls, name, submit_options="", run_options="", group_aggregator=None):
         r"""Make a :class:`~.FlowGroup` named ``name`` and return a decorator to make groups.
 
         A :class:`~.FlowGroup` is used to group operations together for
@@ -4234,9 +4553,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         ----------
         name : str
             The name of the :class:`~.FlowGroup`.
-        options : str
-            A string to append to submissions. Can be any valid
-            :meth:`FlowOperation.run` option. (Default value = "")
+        submit_options : str
+            The :meth:`FlowProject.run` options to pass when submitting the group. These will be
+            included in all submissions. Submissions use run commands to execute.
+        run_options : str
+            The options to pass to ``entrypoint exec`` when running the group. Specifying this will
+            cause the operation to be forked even if it otherwise would run in the current Python
+            interpreter.
         group_aggregator : :class:`~.aggregator`
             An instance of :class:`~flow.aggregator` to associate with the :class:`FlowGroup`.
             If None, no aggregation takes place (Default value = None).
@@ -4259,7 +4582,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             )
         cls._GROUP_NAMES.add(name)
         group_entry = FlowGroupEntry(
-            name=name, options=options, group_aggregator=group_aggregator
+            name=name,
+            project=cls,
+            submit_options=submit_options,
+            run_options=run_options,
+            group_aggregator=group_aggregator,
         )
         cls._GROUPS.append(group_entry)
         return group_entry
@@ -4282,7 +4609,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # equivalent aggregators only generate once.
         created_aggregate_stores = {}
         for entry in group_entries:
-            group = FlowGroup(entry.name, options=entry.options)
+            group = FlowGroup(
+                entry.name,
+                submit_options=entry.submit_options,
+                run_options=entry.run_options,
+            )
             self._groups[entry.name] = group
             # Handle unset aggregators
             if entry.group_aggregator is None:
@@ -4313,9 +4644,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             else:
                 func = operation._op_func
 
-            if hasattr(func, "_flow_groups"):
-                op_directives = getattr(func, "_flow_group_operation_directives", {})
-                for group_name in func._flow_groups:
+            op_directives = getattr(func, "_flow_group_operation_directives", {})
+            for cls in self.__class__.__mro__:
+                # Need to use `get` since we don't know which class in the
+                # hierarchy this function was registered to.
+                for group_name in func._flow_groups.get(cls, []):
                     directives = op_directives.get(group_name)
                     self._groups[group_name].add_operation(
                         operation_name, operation, directives
@@ -4403,7 +4736,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "The -1/--one-line argument is incompatible with "
                 "'--stack' and will be ignored."
             )
-        show_traceback = args.debug or args.show_traceback
         args = {
             key: val
             for key, val in vars(args).items()
@@ -4412,7 +4744,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "func",
                 "verbose",
                 "debug",
-                "show_traceback",
                 "job_id",
                 "filter",
                 "doc_filter",
@@ -4425,19 +4756,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         try:
             self.print_status(jobs=aggregates, **args)
         except Exception as error:
-            if show_traceback:
-                logger.error(
-                    f"Error during status update: {str(error)}\nUse '--ignore-errors' to "
-                    "complete the update anyways."
-                )
-            else:
-                logger.error(
-                    f"Error during status update: {str(error)}\nUse '--ignore-errors' to "
-                    "complete the update anyways or '--show-traceback' to show "
-                    "the full traceback."
-                )
-                error = error.__cause__  # Always show the user traceback cause.
-            traceback.print_exception(type(error), error, error.__traceback__)
+            logger.error(
+                f"Error during status update: {str(error)}\nUse '--ignore-errors' to "
+                "complete the update anyways."
+            )
+            raise error
         else:
             if aggregates is None:
                 length_jobs = sum(
@@ -4449,7 +4772,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             # Use small offset to account for overhead with few jobs
             delta_t = (time.time() - start - 0.5) / max(length_jobs, 1)
             config_key = "status_performance_warn_threshold"
-            warn_threshold = flow_config.get_config_value(config_key)
+            warn_threshold = self._flow_config[config_key]
             if not args["profile"] and delta_t > warn_threshold >= 0:
                 print(
                     "WARNING: "
@@ -4503,8 +4826,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         )
 
         if args.switch_to_project_root:
-            with add_cwd_to_environment_pythonpath():
-                with switch_to_directory(self.root_directory()):
+            with _add_cwd_to_environment_pythonpath():
+                with _switch_to_directory(self.path):
                     run()
         else:
             run()
@@ -4526,7 +4849,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             if isinstance(operation, FlowCmdOperation):
 
                 def operation_function(job):
-                    cmd = operation(job).format(job=job)
+                    cmd = operation(job)
                     subprocess.run(cmd, shell=True, check=True)
 
             else:
@@ -4631,16 +4954,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 help="Increase output verbosity.",
             )
             _parser.add_argument(
-                "--show-traceback",
-                dest=prefix + "show_traceback",
-                action="store_true",
-                help="Show the full traceback on error.",
-            )
-            _parser.add_argument(
                 "--debug",
                 dest=prefix + "debug",
                 action="store_true",
-                help="This option implies `-vv --show-traceback`.",
+                help="This option implies `-vv`.",
             )
 
         subparsers = parser.add_subparsers()
@@ -4781,18 +5098,12 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         # Manually 'merge' the various global options defined for both the main parser
         # and the parent parser that are shared by all subparsers:
-        for dest in ("verbose", "show_traceback", "debug"):
+        for dest in ("verbose", "debug"):
             setattr(args, dest, getattr(args, "main_" + dest) or getattr(args, dest))
             delattr(args, "main_" + dest)
 
-        # Read the config file and set the internal flag.
-        # Do not overwrite with False if not present in config file
-        if flow_config.get_config_value("show_traceback"):
-            args.show_traceback = True
-
-        if args.debug:  # Implies '-vv' and '--show-traceback'
+        if args.debug:  # Implies '-vv'
             args.verbose = max(2, args.verbose)
-            args.show_traceback = True
 
         # Support print_status argument alias
         if args.func == self._main_status and args.full:
@@ -4806,70 +5117,18 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Set verbosity level according to the `-v` argument.
         logging.basicConfig(level=max(0, logging.WARNING - 10 * args.verbose))
 
-        def _show_traceback_and_exit(error):
-            if args.show_traceback:
-                traceback.print_exception(type(error), error, error.__traceback__)
-            elif isinstance(error, (UserOperationError, UserConditionError)):
-                # Always show the user traceback cause.
-                error = error.__cause__
-                traceback.print_exception(type(error), error, error.__traceback__)
-                print(
-                    "Execute with '--show-traceback' or '--debug' to show the "
-                    "full traceback.",
-                    file=sys.stderr,
-                )
-            else:
-                print(
-                    "Execute with '--show-traceback' or '--debug' to get more "
-                    "information.",
-                    file=sys.stderr,
-                )
-            sys.exit(1)
-
         try:
             args.func(args)
-        except SubmitError as error:
-            print("Submission error:", error, file=sys.stderr)
-            _show_traceback_and_exit(error)
         except (TimeoutError, subprocess.TimeoutExpired) as error:
             print(
                 "Error: Failed to complete execution due to "
                 f"timeout ({args.timeout} seconds).",
                 file=sys.stderr,
             )
-            _show_traceback_and_exit(error)
+            raise error
         except Jinja2TemplateNotFound as error:
             print(f"Did not find template script '{error}'.", file=sys.stderr)
-            _show_traceback_and_exit(error)
-        except AssertionError as error:
-            if not args.show_traceback:
-                print(
-                    "ERROR: Encountered internal error during program execution.",
-                    file=sys.stderr,
-                )
-            _show_traceback_and_exit(error)
-        except (UserOperationError, UserConditionError) as error:
-            if str(error):
-                print(f"ERROR: {error}\n", file=sys.stderr)
-            else:
-                print(
-                    "ERROR: Encountered error during program execution.\n",
-                    file=sys.stderr,
-                )
-            _show_traceback_and_exit(error)
-        except Exception as error:
-            if str(error):
-                print(
-                    "ERROR: Encountered error during program execution: "
-                    f"'{error}'\n",
-                    file=sys.stderr,
-                )
-            else:
-                print(
-                    "ERROR: Encountered error during program execution.\n",
-                    file=sys.stderr,
-                )
-            _show_traceback_and_exit(error)
+            raise error
 
 
 def _deserialize_and_run_operation(loads, project, operation_data):

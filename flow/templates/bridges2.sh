@@ -11,7 +11,7 @@
         {#- GPU nodes have 8 NVIDIA V100-32GB SXM2 #}
         {% set nn_gpu = gpu_tasks|calc_num_nodes(8) %}
         {% set nn = nn_gpu %}
-        {% else %}
+    {% else %}
         {% if 'GPU' in partition and not force %}
             {% raise "Requesting GPU partition, but no GPUs requested!" %}
         {% endif %}
@@ -26,11 +26,9 @@
     {% endif %}
     {% if partition == 'GPU' %}
 #SBATCH -N {{ nn|check_utilization(gpu_tasks, 8, threshold, 'GPU') }}
-#SBATCH --ntasks-per-node={{ cpus_per_node }}
 #SBATCH --gpus={{ gpu_tasks }}
     {% elif partition == 'GPU-shared' %}
 #SBATCH -N {{ nn|check_utilization(gpu_tasks, 1, threshold, 'GPU') }}
-#SBATCH --ntasks-per-node={{ cpus_per_node }}
 #SBATCH --gpus={{ gpu_tasks }}
     {% elif partition == 'EM' %}
 #SBATCH -N {{ nn|check_utilization(cpu_tasks, 96, threshold, 'CPU') }}
@@ -49,7 +47,7 @@
 {% endblock tasks %}
 {% block header %}
     {{- super() -}}
-    {% set account = account|default(environment|get_account_name, true) %}
+    {% set account = account|default(project|get_account_name, true) %}
     {% if account %}
 #SBATCH -A {{ account }}
     {% endif %}

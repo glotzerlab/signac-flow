@@ -8,7 +8,7 @@ from functools import partial
 from math import ceil
 
 from ..errors import ConfigKeyError, SubmitError
-from .config import require_config_value
+from .config import get_config_value
 
 
 def identical(iterable):
@@ -306,13 +306,13 @@ def print_warning(msg):
 _GET_ACCOUNT_NAME_MESSAGES_SHOWN = set()
 
 
-def get_account_name(environment, required=False):
+def get_account_name(project, required=False):
     """Get account name for environment with user-friendly messages on failure.
 
     Parameters
     ----------
-    environment : :class:`~.ComputeEnvironment`
-        The environment for which to obtain the account variable.
+    project : flow.FlowProject
+        The project whose config is queried.
     required : bool
         Specify whether the account name is required instead of optional.
         (Default value = False)
@@ -328,9 +328,9 @@ def get_account_name(environment, required=False):
         Raised if ``required`` is True and the account name is missing.
 
     """
-    env_name = environment.__name__
+    env_name = project._environment.__name__
     try:
-        return require_config_value("account", ns=env_name)
+        return get_config_value(project, "account", ns=env_name)
     except ConfigKeyError as error:
         ACCOUNT_MESSAGE = (
             "Environment '{env}' {requires_or_allows} the specification of an "

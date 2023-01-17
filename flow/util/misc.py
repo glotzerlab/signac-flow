@@ -5,6 +5,7 @@
 import argparse
 import logging
 import os
+import warnings
 from collections.abc import MutableMapping
 from contextlib import contextmanager
 from functools import lru_cache, partial
@@ -13,6 +14,16 @@ from itertools import cycle, islice
 import cloudpickle
 from tqdm.contrib import tmap
 from tqdm.contrib.concurrent import process_map, thread_map
+
+try:
+    # If ipywidgets is installed, use "auto" tqdm to improve notebook support.
+    # Otherwise, use only text-based progress bars. This workaround can be
+    # removed after https://github.com/tqdm/tqdm/pull/1218.
+    import ipywidgets  # noqa: F401
+except ImportError:
+    from tqdm import tqdm
+else:
+    from tqdm.auto import tqdm
 
 
 def _positive_int(value):
@@ -84,7 +95,7 @@ def redirect_log(job, filename="run.log", formatter=None, logger=None):
 
 
 @contextmanager
-def add_path_to_environment_pythonpath(path):
+def _add_path_to_environment_pythonpath(path):
     """Insert the provided path into the environment PYTHONPATH variable.
 
     This method is a context manager. It restores the previous PYTHONPATH when
@@ -120,14 +131,14 @@ def add_path_to_environment_pythonpath(path):
 
 
 @contextmanager
-def add_cwd_to_environment_pythonpath():
+def _add_cwd_to_environment_pythonpath():
     """Add current working directory to PYTHONPATH."""
-    with add_path_to_environment_pythonpath(os.getcwd()):
+    with _add_path_to_environment_pythonpath(os.getcwd()):
         yield
 
 
 @contextmanager
-def switch_to_directory(root=None):
+def _switch_to_directory(root=None):
     """Temporarily switch into the given root directory (if not None).
 
     This method is a context manager. It switches to the previous working
@@ -151,7 +162,7 @@ def switch_to_directory(root=None):
             os.chdir(cwd)
 
 
-class TrackGetItemDict(dict):
+class _TrackGetItemDict(dict):
     """A dict that tracks which keys have been accessed.
 
     Keys accessed with ``__getitem__`` are stored in the property
@@ -182,7 +193,7 @@ class TrackGetItemDict(dict):
         return self._keys_used.copy()
 
 
-def roundrobin(*iterables):
+def _roundrobin(*iterables):
     """Round robin iterator.
 
     Cycles through a sequence of iterables, taking one item from each iterable
@@ -348,7 +359,10 @@ def _get_parallel_executor(parallelization="none"):
 
     """
     if parallelization == "thread":
-        parallel_executor = thread_map
+
+        def parallel_executor(func, iterable, **kwargs):
+            return thread_map(func, iterable, tqdm_class=tqdm, **kwargs)
+
     elif parallelization == "process":
 
         def parallel_executor(func, iterable, **kwargs):
@@ -365,6 +379,7 @@ def _get_parallel_executor(parallelization="none"):
                 # regardless of whether it is a local function.
                 partial(_run_cloudpickled_func, cloudpickle.dumps(func)),
                 map(cloudpickle.dumps, iterable),
+                tqdm_class=tqdm,
                 **kwargs,
             )
 
@@ -374,6 +389,35 @@ def _get_parallel_executor(parallelization="none"):
             if "chunksize" in kwargs:
                 # Chunk size only applies to thread/process parallel executors
                 del kwargs["chunksize"]
-            return list(tmap(func, iterable, **kwargs))
+            return list(tmap(func, iterable, tqdm_class=tqdm, **kwargs))
 
     return parallel_executor
+
+
+def _deprecated_warning(
+    *,
+    deprecation: str,
+    alternative: str,
+    deprecated_in: str,
+    removed_in: str,
+    category: Warning = FutureWarning,
+):
+    warnings.warn(
+        " ".join(
+            (
+                deprecation,
+                "has been deprecated as of",
+                deprecated_in,
+                "and will be removed in",
+                removed_in + ".",
+                alternative,
+            )
+        ),
+        category,
+        stacklevel=2,
+    )
+
+
+__all__ = [
+    "redirect_log",
+]

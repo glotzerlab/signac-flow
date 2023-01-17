@@ -9,25 +9,23 @@ import click
 import jinja2
 import signac
 
-import flow
-
 
 def add_operation(Project, name):
     click.echo("Specify directives for the next operation.")
-    nranks = click.prompt("nranks", default=0)
-    omp_num_threads = click.prompt("omp_num_threads", default=0)
-    np = click.prompt("np", default=max(1, nranks) * max(1, omp_num_threads))
-    ngpu = click.prompt("ngpus", default=0)
+    directives = {}
+    directives["nranks"] = click.prompt("nranks", default=0)
+    directives["omp_num_threads"] = click.prompt("omp_num_threads", default=0)
+    directives["np"] = click.prompt(
+        "np",
+        default=max(1, directives["nranks"]) * max(1, directives["omp_num_threads"]),
+    )
+    directives["ngpu"] = click.prompt("ngpus", default=0)
 
-    @flow.directives(np=np)
-    @flow.directives(nranks=nranks)
-    @flow.directives(omp_num_threads=omp_num_threads)
-    @flow.directives(ngpu=ngpu)
     def op(job):
         pass
 
     op.__name__ = name
-    Project.operation(op)
+    Project.operation(op, directives=directives)
 
     return click.prompt("Do you want to add more operations?", default=False)
 
@@ -82,7 +80,7 @@ def cli(num_jobs, bundle, parallel, entrypoint):
     with signac.TemporaryProject() as tmp_project:
         for i in range(num_jobs):
             tmp_project.open_job(dict(foo=i)).init()
-        flow_project = Project.get_project(root=tmp_project.root_directory())
+        flow_project = Project.get_project(root=tmp_project.path)
         flow_project._entrypoint.setdefault("path", entrypoint)
 
         partition = ""

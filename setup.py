@@ -7,15 +7,17 @@ from setuptools import find_packages, setup
 
 requirements = [
     # The core package.
-    "signac>=1.3.0",
+    "signac>=1.8.0",
     # For the templated generation of (submission) scripts.
-    "jinja2>=2.10",
+    "jinja2>=3.0.0",
     # To enable the parallelized execution of operations across processes.
-    "cloudpickle>=1.1.1",
+    "cloudpickle>=1.6.0",
     # Deprecation management
     "deprecation>=2.0.0",
     # Progress bars
-    "tqdm>=4.48.1",
+    "tqdm>=4.60.0",
+    # For schema validation
+    "jsonschema>=3.0.0",
 ]
 
 description = "Simple workflow management for signac projects."
@@ -30,7 +32,7 @@ except OSError:
 
 setup(
     name="signac-flow",
-    version="0.16.0",
+    version="0.23.0",
     packages=find_packages(),
     include_package_data=True,
     zip_safe=True,
@@ -49,10 +51,10 @@ setup(
         "Intended Audience :: Developers",
         "License :: OSI Approved :: BSD License",
         "Topic :: Scientific/Engineering :: Physics",
-        "Programming Language :: Python :: 3.6",
-        "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
     ],
     entry_points={
         "console_scripts": [
@@ -65,5 +67,5 @@ setup(
     install_requires=requirements,
     # Supported versions are determined according to NEP 29.
     # https://numpy.org/neps/nep-0029-deprecation_policy.html
-    python_requires=">=3.6, <4",
+    python_requires=">=3.8",
 )

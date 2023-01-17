@@ -8,23 +8,22 @@ configure and implement a workflow to operate on a signac_ data space.
 
 .. _signac: https://signac.io/
 """
-from . import environment, errors, scheduling, testing
+from . import environment, environments, errors, hooks, scheduling
 from .aggregates import aggregator, get_aggregate_id
 from .environment import get_environment
-from .operations import cmd, directives, with_job
 from .project import FlowProject, IgnoreConditions, classlabel, label, staticlabel
 from .template import init
 
 # Import packaged environments unless disabled in config:
-from .util.config import get_config_value as _get_config_value
 from .util.misc import redirect_log
 from .version import __version__
 
 __all__ = [
     "environment",
+    "environments",
     "errors",
+    "hooks",
     "scheduling",
-    "testing",
     "aggregator",
     "get_aggregate_id",
     "get_environment",
@@ -40,9 +39,3 @@ __all__ = [
     "redirect_log",
     "__version__",
 ]
-
-
-if _get_config_value("import_packaged_environments", default=True):
-    from . import environments  # noqa: F401
-
-    __all__.append("environments")

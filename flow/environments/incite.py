@@ -19,7 +19,7 @@ class SummitEnvironment(DefaultLSFEnvironment):
 
     Example::
 
-        @Project.operation.with_directives({
+        @Project.operation(directives={
             "nranks": 3,  # 3 MPI ranks per operation
             "ngpu": 3,  # 3 GPUs
             "np": 3,  # 3 CPU cores

@@ -1,4 +1,4 @@
-Signac-flow package documentation
+signac-flow package documentation
 =================================
 
 .. note::
@@ -6,7 +6,7 @@ Signac-flow package documentation
     This is documentation for the **signac-flow** package, which is part of the signac_ framework.
     See `here <signac-docs_>`_ for a comprehensive introduction to the **signac** *framework*.
 
-.. _signac: https://www.signac.io/
+.. _signac: https://signac.io/
 .. _signac-docs: https://docs.signac.io/
 
 Contents
@@ -22,6 +22,8 @@ Contents
 
    installation
    supported_environments
+   cli
+   project-cli
    api
    changes
    support

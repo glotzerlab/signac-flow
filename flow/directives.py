@@ -507,7 +507,7 @@ For example:
 
 .. code-block:: python
 
-    @Project.operation.with_directives({"memory": "4g"})
+    @Project.operation(directives={"memory": "4g"})
     def op(job):
         pass
 
@@ -517,7 +517,7 @@ For example:
 
 .. code-block:: python
 
-    @Project.operation.with_directives({"memory": "512m"})
+    @Project.operation(directives={"memory": "512m"})
     def op(job):
         pass
 
@@ -527,11 +527,11 @@ For example:
 
 .. code-block:: python
 
-    @Project.operation.with_directives({"memory": "4"})
+    @Project.operation(directives={"memory": "4"})
     def op1(job):
         pass
 
-    @Project.operation.with_directives({"memory": 4})
+    @Project.operation(directives={"memory": 4})
     def op2(job):
         pass
 """
@@ -601,7 +601,7 @@ For example:
 
 .. code-block:: python
 
-    @Project.operation.with_directives({"walltime": 24})
+    @Project.operation(directives={"walltime": 24})
     def op(job):
         # This operation takes 1 day to run
         pass

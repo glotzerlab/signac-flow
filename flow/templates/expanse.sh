@@ -24,7 +24,6 @@
             {% raise "Cannot request more than 10 CPUs per GPU." %}
         {% endif %}
     {% endif %}
-
     {% if partition == 'gpu' %}
 #SBATCH -N {{ nn|check_utilization(gpu_tasks, 4, threshold, 'GPU') }}
 #SBATCH --ntasks-per-node={{ cpus_per_node }}
@@ -49,8 +48,8 @@
     {% endif %}
 {% endblock tasks %}
 {% block header %}
-    {{ super() -}}
-    {% set account = account|default(environment|get_account_name, true) %}
+    {{- super() -}}
+    {% set account = account|default(project|get_account_name, true) %}
     {% if account %}
 #SBATCH -A {{ account }}
     {% endif %}

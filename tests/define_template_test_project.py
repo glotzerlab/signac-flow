@@ -13,62 +13,64 @@ class TestProject(flow.FlowProject):
 group1 = TestProject.make_group(name="group1")
 
 
-@TestProject.operation
 @group1
+@TestProject.operation
 def serial_op(job):
     pass
 
 
-@TestProject.operation.with_directives({"np": TestProject.np})
 @group1
+@TestProject.operation(directives={"np": TestProject.np})
 def parallel_op(job):
     pass
 
 
-@TestProject.operation.with_directives({"nranks": TestProject.nranks})
+@TestProject.operation(directives={"nranks": TestProject.nranks})
 def mpi_op(job):
     pass
 
 
-@TestProject.operation.with_directives({"omp_num_threads": TestProject.omp_num_threads})
+@TestProject.operation(directives={"omp_num_threads": TestProject.omp_num_threads})
 def omp_op(job):
     pass
 
 
-@TestProject.operation.with_directives(
-    {"nranks": TestProject.nranks, "omp_num_threads": TestProject.omp_num_threads}
+@TestProject.operation(
+    directives={
+        "nranks": TestProject.nranks,
+        "omp_num_threads": TestProject.omp_num_threads,
+    }
 )
 def hybrid_op(job):
     pass
 
 
-@TestProject.operation.with_directives(
-    {"ngpu": TestProject.ngpu, "nranks": TestProject.ngpu}
+@TestProject.operation(
+    directives={"ngpu": TestProject.ngpu, "nranks": TestProject.ngpu}
 )
 def gpu_op(job):
     pass
 
 
-@TestProject.operation.with_directives(
-    {"ngpu": TestProject.ngpu, "nranks": TestProject.nranks}
+@TestProject.operation(
+    directives={"ngpu": TestProject.ngpu, "nranks": TestProject.nranks}
 )
 def mpi_gpu_op(job):
     pass
 
 
-@TestProject.operation.with_directives({"memory": TestProject.memory})
 @group1
+@TestProject.operation(directives={"memory": TestProject.memory})
 def memory_op(job):
     pass
 
 
-@TestProject.operation.with_directives({"walltime": TestProject.walltime})
 @group1
+@TestProject.operation(directives={"walltime": TestProject.walltime})
 def walltime_op(job):
     pass
 
 
-@TestProject.operation
-@flow.cmd
+@TestProject.operation(cmd=True)
 def multiline_cmd(job):
     return 'echo "First line"\necho "Second line"'

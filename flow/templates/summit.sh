@@ -7,7 +7,7 @@
 {% endblock tasks %}
 {% block header %}
     {{- super() -}}
-    {% set account = account|default(environment|get_account_name, true) %}
+    {% set account = account|default(project|get_account_name, true) %}
     {% if account %}
 #BSUB -P {{ account }}
     {% endif %}

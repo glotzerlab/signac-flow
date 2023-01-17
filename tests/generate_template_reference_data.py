@@ -22,7 +22,6 @@ from flow.scheduling.fake_scheduler import FakeScheduler
 
 # Define a consistent submission name so that we can test that job names are
 # being correctly generated.
-PROJECT_NAME = "SubmissionTest"
 ARCHIVE_DIR = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "./template_reference_data.tar.gz")
 )
@@ -128,6 +127,26 @@ def init(project):
                 "bundle": [["mpi_op", "omp_op"]],
             },
         ],
+        "environments.drexel.PicotteEnvironment": [
+            {
+                "partition": ["def", "gpu"],
+            },
+            {
+                "partition": ["def"],
+                "parallel": [False, True],
+                "bundle": [["mpi_op", "omp_op"]],
+            },
+        ],
+        "environments.xsede.DeltaEnvironment": [
+            {
+                "partition": ["cpu", "gpuA40x4", "gpuA100x4"],
+            },
+            {
+                "partition": ["cpu"],
+                "parallel": [False, True],
+                "bundle": [["mpi_op", "omp_op"]],
+            },
+        ],
     }
 
     for environment, parameter_combinations in environments.items():
@@ -144,7 +163,9 @@ def _store_bundled(self, operations):
         return operations[0].id
     else:
         h = ".".join(op.id for op in operations)
-        bid = "{}/bundle/{}".format(self, sha1(h.encode("utf-8")).hexdigest())
+        bid = "{}/bundle/{}".format(
+            self.__class__.__name__, sha1(h.encode("utf-8")).hexdigest()
+        )
         return bid
 
 
@@ -152,11 +173,11 @@ def _store_bundled(self, operations):
 def get_masked_flowproject(p, environment=None):
     """Mock environment-dependent attributes and functions. Need to mock
     sys.executable before the FlowProject is instantiated, and then modify the
-    root_directory and project_dir elements after creation."""
+    path and project_dir elements after creation."""
     try:
         old_executable = sys.executable
         sys.executable = MOCK_EXECUTABLE
-        fp = TestProject.get_project(root=p.root_directory())
+        fp = TestProject.get_project(p.path)
         if environment is not None:
             fp._environment = environment
         fp._entrypoint.setdefault("path", "generate_template_reference_data.py")
@@ -170,10 +191,10 @@ def get_masked_flowproject(p, environment=None):
             mocking has to happen within this method to avoid affecting other
             methods called during the test that access the project root directory.
             """
-            old_root_directory = fp.root_directory
-            fp.root_directory = lambda: PROJECT_DIRECTORY
+            old_path = fp.path
+            fp._path = PROJECT_DIRECTORY
             operation_id = old_generate_id(self, aggregate, *args, **kwargs)
-            fp.root_directory = old_root_directory
+            fp._path = old_path
             return operation_id
 
         flow.project.FlowGroup._generate_id = wrapped_generate_id
@@ -197,7 +218,7 @@ def main(args):
             )
             return
 
-    with signac.TemporaryProject(name=PROJECT_NAME) as p:
+    with signac.TemporaryProject() as p:
         init(p)
         with get_masked_flowproject(p) as fp:
             # Here we set the appropriate executable for all the operations. This

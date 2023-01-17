@@ -5,15 +5,213 @@ Changelog
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 The numbers in brackets denote the related GitHub issue and/or pull request.
 
-Version 0.17
+Version 0.24
 ============
 
-[0.17.0] -- 2021-xx-xx
+[0.24.0] -- 20xx-xx-xx
+----------------------
+
+Changed
++++++++
+
+- Placing ``@FlowProject.pre`` and ``@FlowProject.post`` before the ``FlowProject.operation`` decorator raises an error (#700).
+- Updated CI to use GitHub Actions (#698).
+
+Removed
++++++++
+
+- ``@flow.aggregates.aggregator()`` use ``FlowProject.operation(aggregator=...)`` instead (#700).
+- ``alias`` CLI argument to ``flow init`` (#700).
+- ``FlowGroupEntry.with_directives`` use directives keyword argument in ``FlowGroupEntry()``(#700).
+
+Version 0.23
+============
+
+[0.23.0] -- 2022-12-09
+----------------------
+
+Added
++++++
+
+- Official Python 3.11 support (#697).
+- The ``flow.FlowProject.operation`` decorator now has an ``aggregator`` keyword argument: ``@FlowProject.operation(aggregator=aggregator.groupsof(2))`` (#681).
+- The ``FlowGroupEntry`` class can be called with a ``directives`` keyword argument: ``FlowGroupEntry(directives={...})`` (#696).
+
+Changed
++++++++
+
+- Deprecated using ``flow.aggregates.aggregator`` as a decorator.
+- Deprecated placing ``@FlowProject.pre`` and ``@FlowProject.post`` before the ``FlowProject.operation`` decorator (#690).
+- Require ``signac`` version 1.8.0 (#693).
+- Deprecated ``alias`` CLI argument to ``flow init`` (#693).
+- Algorithm for computing cluster job ids (#695).
+- Deprecated ``FlowGroupEntry.with_directives`` in favor of a directives keyword argument in ``FlowGroupEntry()``(#696).
+
+Fixed
++++++
+
+- Detecting correct environment on Delta GPU nodes (#682).
+- Identical aggregates are used only once in submission and running (#694, #688).
+
+Removed
++++++++
+
+- ``show_traceback`` from CLI and config (#690).
+- Formatting the output of a ``FlowCmdOperation`` (#686).
+- ``@flow.cmd`` and ``flow.with_job`` (#686, #669).
+- ``@FlowProject.operation.with_directives`` (#686).
+- The ``flow.testing`` module (#691, #692).
+
+Version 0.22
+============
+
+[0.22.0] -- 2022-10-14
+----------------------
+
+Added
++++++
+
+- Support for formatting with operation function arguments for ``FlowCmdOperation`` (#666, #630).
+- The CLI ``status`` command can show document parameters by using flag ``-p doc.PARAM`` (#667).
+- ``FlowProject.operation`` now has ``cmd``, ``with_job``, and ``directives`` keyword only arguments (#679, #655, #669).
+
+Changed
++++++++
+
+- Deprecated formatting the output of a ``FlowCmdOperation`` (#666, #630).
+- ``@flow.cmd`` and ``flow.with_job`` are deprecated (#679, #669, #665).
+- ``@FlowProject.operation.with_directives`` is deprecated (#679, #665).
+- Deprecated the ``--show-traceback`` for ``flow``'s CLI ``run`` and ``submit`` commands (#674, #169).
+- ``flow`` CLI ``run`` and ``submit`` show tracebacks by default (#674, #169).
+- Broke ``TestBidict`` and ``TestTemplateFilters`` into smaller and simpler functions (#626).
+
+Version 0.21
+============
+
+[0.21.0] -- 2022-08-18
+----------------------
+
+Added
++++++
+
+- XSEDE Delta environment and template (#658).
+
+Changed
++++++++
+
+- Changed ``get_config_value`` template filter to error without default on missing key (#649).
+- Changed ``get_config_value`` template filter now takes a ``FlowProject`` as its first argument (#649).
+
+Removed
++++++++
+
+- Removed ``require_config_value`` template filter (#649).
+- Removed configuration key 'flow.import_packaged_environments' (#653).
+- Removed configuaration key 'flow.environment_modules' (#651).
+
+Version 0.20
+============
+
+[0.20.0] -- 2022-06-23
+----------------------
+
+Added
++++++
+
+- Added support to run aggregate operations in parallel (#642, #644).
+- Added an argument, ``run_options``, to ``FlowProject.make_group`` which allows passing options to ``exec`` for operations running in a different process (#650).
+
+Changed
++++++++
+
+- Deprecated configuaration key 'flow.environment_modules' (#651).
+- Deprecated configuration key 'flow.import_packaged_environments' (#651).
+- Changed argument ``options`` to ``submit_options`` in ``FlowProject.make_group`` (#650).
+
+Removed
++++++++
+
+- Dropped support for cloudpickle versions below `1.6.0` (#644).
+- Removed upper bound on ``python_requires`` (#654).
+
+Version 0.19
+============
+
+[0.19.0] -- 2022-04-07
+----------------------
+
+Changed
++++++++
+
+- Dropped support for `tqdm <https://github.com/tqdm/tqdm>`__ versions older than `4.60.0` (#614).
+- Renamed hook triggers `on_finish` to `on_exit` and `on_fail` to `on_exception` (#612, #627).
+
+Fixed
++++++
+
+- Progress bars shown in notebooks fall back to text-based output if ipywidgets is not available (#602, #614).
+
+Removed
++++++++
+
+- Internal utility functions have been removed from the public API (#615).
+- Dropped support for Python 3.6 and Python 3.7 following the recommended support schedules of `NEP 29 <https://numpy.org/neps/nep-0029-deprecation_policy.html>`__ (#628).
+- Dropped support for `Jinja2 <https://palletsprojects.com/p/jinja/>`__ versions below `3.0.0` (#628).
+
+Version 0.18
+============
+
+[0.18.1] -- 2022-02-14
 ----------------------
 
 Fixed
 +++++
+
+- Fixed bug in project status output when no operations are eligible (#607, #609).
+- Improved traceback handling for errors in signac-flow (#608).
+
+[0.18.0] -- 2022-02-03
+----------------------
+
+Added
++++++
+
+- Feature to install execution hooks for the automated execution of functions with operations (#28, #189, #508).
+
+Changed
++++++++
+
+- Add user defined ``FlowGroups`` to status output (#547, #593).
+- Raise ``UserOperationError`` for failed execution of ``FlowProject`` operations (#571, #601).
+
+Fixed
++++++
+
+- Fix issue with GPU submission on Bridges-2 (#588, #589).
+
+Version 0.17
+============
+
+[0.17.0] -- 2021-11-15
+----------------------
+
+Added
++++++
+
+- Add official support for Python version 3.10 (#578).
+
+Fixed
++++++
+
 - Scripts are now generated correctly when project path contains spaces and special characters (#572).
+- XSEDE Expanse template has been fixed to remove leading spaces (#575, #576).
+- Error raised when a ``FlowGroup`` decorates functions that are not ``FlowProject`` operations (#538, #544).
+
+Changed
++++++++
+
+- FlowProject configuration is now validated independently of signac Project configuration (#573).
+- jsonschema is now a dependency (#573).
 
 Version 0.16
 ============
@@ -28,6 +226,7 @@ Added
 - Added a ``custom_content`` block to templates for user customization (#553, #520).
 - Added official support for XSEDE Expanse cluster (#537).
 - Added ``FlowProjectDefinitionError`` for exceptions involving ``FlowProject`` definitions (#549).
+- Added official support for Drexel University's Picotte cluster (#561).
 
 Changed
 +++++++

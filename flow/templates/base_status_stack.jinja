@@ -10,8 +10,8 @@ Detailed View:
             {% set para_output = ns.field_parameters | format(*job['parameters'].values()) %}
         {% endif %}
 | {{job['aggregate_id']}} | {{ para_output }}{{ job['labels'] | join(', ') }} |
-        {% for key, value in job['groups'].items() if value | job_filter(scheduler_status_code, all_ops) %}
-| {{ field_operation | highlight(value['eligible'], pretty) | format(value | get_operation_status(operation_status_symbols), key, '['+scheduler_status_code[value['scheduler_status']]+']') }} |
+        {% for value['display_name'], value in job['groups'].items() if value | job_filter(scheduler_status_code, all_ops) %}
+| {{ field_operation | highlight(value['eligible'], pretty) | format(value | get_operation_status(operation_status_symbols), value['display_name'], '['+scheduler_status_code[value['scheduler_status']]+']') }} |
         {% endfor %}
     {% endfor %}
 {{ operation_status_legend }}

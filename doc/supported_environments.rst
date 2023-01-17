@@ -29,8 +29,10 @@ In addition, the package provides specialized submission templates for the follo
    supported_environments/summit
    supported_environments/andes
    supported_environments/bridges2
+   supported_environments/delta
    supported_environments/expanse
    supported_environments/stampede2
+   supported_environments/drexel
    supported_environments/umich
    supported_environments/umn
 

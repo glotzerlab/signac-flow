@@ -30,6 +30,8 @@ nosetests.xml
 .pytest_cache
 benchmarks/*.prof
 benchmarks/*.txt
+coverage.xml
+htmlcov
 
 # Translations
 *.mo
@@ -43,8 +45,6 @@ benchmarks/*.txt
 .*.swp
 
 # custom
+doc/_build
 *.log
-
 .DS_Store
-
-_build

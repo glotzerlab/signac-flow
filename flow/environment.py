@@ -9,14 +9,11 @@ subclassed to automatically detect specific computational environments.
 This enables the user to adjust their workflow based on the present
 environment, e.g. for the adjustment of scheduler submission scripts.
 """
-import importlib
 import logging
 import os
 import re
 import socket
 from functools import lru_cache
-
-from signac.common import config
 
 from .directives import (
     _FORK,
@@ -37,7 +34,6 @@ from .scheduling.lsf import LSFScheduler
 from .scheduling.pbs import PBSScheduler
 from .scheduling.simple_scheduler import SimpleScheduler
 from .scheduling.slurm import SlurmScheduler
-from .util import config as flow_config
 
 logger = logging.getLogger(__name__)
 
@@ -50,41 +46,6 @@ def _cached_fqdn():
     be slow on macOS.
     """
     return socket.getfqdn()
-
-
-def setup(py_modules, **attrs):
-    """Set up user-defined environment modules.
-
-    Use this function in place of :meth:`setuptools.setup` to not only install
-    an environment's module, but also register it with the global signac
-    configuration. Once registered, the environment is automatically
-    imported when the :meth:`~flow.get_environment` function is called.
-    """
-    import setuptools
-    from setuptools.command.install import install
-
-    class InstallAndConfig(install):
-        def run(self):
-            super().run()
-            cfg = config.read_config_file(config.FN_CONFIG)
-            try:
-                envs = cfg["flow"].as_list("environment_modules")
-            except KeyError:
-                envs = []
-            new = set(py_modules).difference(envs)
-            if new:
-                for name in new:
-                    self.announce(
-                        msg=f"registering module '{name}' in global signac configuration",
-                        level=2,
-                    )
-                cfg.setdefault("flow", {})
-                cfg["flow"]["environment_modules"] = envs + list(new)
-                cfg.write()
-
-    return setuptools.setup(
-        py_modules=py_modules, cmdclass={"install": InstallAndConfig}, **attrs
-    )
 
 
 class _ComputeEnvironmentType(type):
@@ -225,43 +186,6 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
 
         """
         pass
-
-    @classmethod
-    def get_config_value(cls, key, default=flow_config._GET_CONFIG_VALUE_NONE):
-        """Request a value from the user's configuration.
-
-        This method should be used whenever values need to be provided
-        that are specific to a user's environment, e.g. account names.
-
-        When a key is not configured and no default value is provided, a
-        :class:`~flow.errors.SubmitError` will be raised and the user will be
-        prompted to add the missing key to their configuration.
-
-        Please note, that the key will be automatically expanded to
-        be specific to this environment definition. For example, a
-        key should be ``'account'``, not ``'MyEnvironment.account'``.
-
-        Parameters
-        ----------
-        key : str
-            The environment specific configuration key.
-        default : str
-            A default value in case the key cannot be found
-            within the user's configuration.
-
-        Returns
-        -------
-        object
-            The value or default value.
-
-        Raises
-        ------
-        :class:`~flow.errors.SubmitError`
-            If the key is not in the user's configuration
-            and no default value is provided.
-
-        """
-        return flow_config.require_config_value(key, ns=cls.__name__, default=default)
 
     @classmethod
     def _get_omp_prefix(cls, operation):
@@ -507,26 +431,8 @@ class DefaultLSFEnvironment(ComputeEnvironment):
         )
 
 
-def _import_configured_environments():
-    cfg = config.load_config(config.FN_CONFIG)
-    try:
-        for name in cfg["flow"].as_list("environment_modules"):
-            try:
-                importlib.import_module(name)
-            except ImportError as error:
-                logger.warning(error)
-    except KeyError:
-        pass
-
-
-def registered_environments(import_configured=True):
+def registered_environments():
     """Return a list of registered environments.
-
-    Parameters
-    ----------
-    import_configured : bool
-        Whether to import environments specified in the flow configuration.
-        (Default value = True)
 
     Returns
     -------
@@ -534,12 +440,10 @@ def registered_environments(import_configured=True):
         List of registered environments.
 
     """
-    if import_configured:
-        _import_configured_environments()
     return list(ComputeEnvironment.registry.values())
 
 
-def get_environment(test=False, import_configured=True):
+def get_environment(test=False):
     """Attempt to detect the present environment.
 
     This function iterates through all defined :class:`~.ComputeEnvironment`
@@ -565,7 +469,7 @@ def get_environment(test=False, import_configured=True):
         return TestEnvironment
 
     # Obtain a list of all registered environments
-    env_types = registered_environments(import_configured=import_configured)
+    env_types = registered_environments()
     logger.debug(
         "List of registered environments:\n\t{}".format(
             "\n\t".join(str(env.__name__) for env in env_types)

@@ -10,22 +10,20 @@ class _DirectivesTestProject(FlowProject):
 group = _DirectivesTestProject.make_group(name="walltimegroup")
 
 
-@_DirectivesTestProject.operation.with_directives({"walltime": 1.0})
 @group
+@_DirectivesTestProject.operation(directives={"walltime": 1.0})
 def op_walltime(job):
     pass
 
 
-@_DirectivesTestProject.operation.with_directives({"walltime": None})
 @group
+@_DirectivesTestProject.operation(directives={"walltime": None})
 def op_walltime_2(job):
     pass
 
 
-@_DirectivesTestProject.operation.with_directives(
-    {"walltime": datetime.timedelta(hours=2)}
-)
 @group
+@_DirectivesTestProject.operation(directives={"walltime": datetime.timedelta(hours=2)})
 def op_walltime_3(job):
     pass
 

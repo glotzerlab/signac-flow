@@ -2,10 +2,9 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 """Status rendering logic."""
-from tqdm.auto import tqdm
-
 from .scheduling.base import JobStatus
 from .util import mistune
+from .util.misc import tqdm
 
 
 def _render_status(

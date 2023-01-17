@@ -1,0 +1,55 @@
+name: Run Unit Tests
+
+on:
+  # trigger on pull requests
+  pull_request:
+
+  # trigger on all commits to master
+  push:
+    branches:
+      - 'master'
+
+  # trigger on request
+  workflow_dispatch:
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        config: [ {python: '3.8', dependencies: 'newest'},
+                  {python: '3.9', dependencies: 'newest'},
+                  {python: '3.10', dependencies: 'newest'},
+                  {python: '3.11', dependencies: 'newest'},
+                  {python: '3.8', dependencies: 'oldest'} ]
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: "recursive"
+    - name: Set up Python ${{ matrix.config.python }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.config.python }}
+    - name: Install newest dependencies
+      run: |
+        pip install -r requirements/requirements-test.txt
+      if: ${{ matrix.config.dependencies == 'newest' }}
+    - name: Install oldest supported dependencies
+      # To prevent Dependabot from updating the pinnings in this "oldest"
+      # dependency list, we have to avoid the word "requirements" in the
+      # filename. That's why it is in the .github/ directory and named "reqs"
+      # instead of "requirements."
+      run: |
+        pip install -r .github/workflows/ci-oldest-reqs.txt
+      if: ${{ matrix.config.dependencies == 'oldest' }}
+    - name: Install the package
+      run: |
+        pip install -e .
+    - name: Test with pytest
+      run: |
+        pytest --cov=flow --cov-config=setup.cfg --cov-report=xml tests/ -v
+    - uses: codecov/codecov-action@v3

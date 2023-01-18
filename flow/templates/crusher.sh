@@ -4,7 +4,7 @@
     {% set threshold = 0 if force else 0.9 %}
     {% set cpu_tasks = operations|calc_tasks('np', parallel, force) %}
     {% set gpu_tasks = operations|calc_tasks('ngpu', parallel, force) %}
-    {% if not gpu_tasks %}
+    {% if not gpu_tasks and not force %}
         {% raise "Template requires GPU jobs." %}
     {% endif %}
     {% set nn = gpu_tasks|calc_num_nodes(cpu_tasks, threshold) %}

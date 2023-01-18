@@ -545,12 +545,15 @@ Expects a nonnegative integer. Defaults to 0.
 _NP = _Directive(
     "np", validator=_natural_number, default=_NP_DEFAULT, finalize=_finalize_np
 )
-_NP.__doc__ = """The number of tasks to launch for a given operation i.e., the number of CPU
-cores to be requested for a given operation.
+_NP.__doc__ = """The total number of CPU orse to request for a given operation.
 
 Expects a natural number (i.e. an integer >= 1). This directive introspects into
 the "nranks" or "omp_num_threads" directives and uses their product if it is
 greater than the current set value. Defaults to 1.
+
+Warning:
+    Generally for multicore applications, either this if not using MPI, or "nranks" and
+    "omp_num_threads" should be specified but not both.
 """
 
 _NRANKS = _Directive("nranks", validator=_nonnegative_int, default=0)
@@ -561,6 +564,11 @@ Expects a nonnegative integer.
 
 _OMP_NUM_THREADS = _Directive("omp_num_threads", validator=_nonnegative_int, default=0)
 _OMP_NUM_THREADS.__doc__ = """The number of OpenMP threads to use for this operation. Defaults to 0.
+
+When used in conjunction with "nranks" this specifies the OpenMP threads per rank.
+
+Using this directive sets the environmental variable ``OMP_NUM_THREADS`` in the operation's
+execution environment.
 
 Expects a nonnegative integer.
 """

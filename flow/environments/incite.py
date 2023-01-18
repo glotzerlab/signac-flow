@@ -230,9 +230,9 @@ class CrusherEnvironment(DefaultSlurmEnvironment):
         nodes_gpu = max(1, int(ceil(ngpus / cls.gpus_per_node)))
         nodes_cpu = max(1, int(ceil(ngpus / cls.gpus_per_node)))
         if nodes_gpu >= nodes_cpu:
-            check_utilization(nodes_gpu, ngpus, 8, threshold, "compute")
+            check_utilization(nodes_gpu, ngpus, cls.gpus_per_node, threshold, "compute")
             return nodes_gpu
-        check_utilization(nodes_cpu, ncpus, 64, threshold, "compute")
+        check_utilization(nodes_cpu, ncpus, cls.cores_per_node, threshold, "compute")
         return nodes_cpu
 
     @classmethod

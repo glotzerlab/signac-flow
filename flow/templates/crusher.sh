@@ -17,5 +17,4 @@
 #SBATCH -A {{ account }}
     {% endif %}
 #SBATCH -p batch
-#SBATCH --threads-per-core=2
 {% endblock header %}

@@ -216,7 +216,7 @@ class CrusherEnvironment(DefaultSlurmEnvironment):
 
     hostname_pattern = r".*\.crusher\.olcf\.ornl\.gov"
     template = "crusher.sh"
-    cores_per_node = 128
+    cores_per_node = 64
     gpus_per_node = 8
     mpi_cmd = "srun"
 
@@ -228,7 +228,7 @@ class CrusherEnvironment(DefaultSlurmEnvironment):
         for nodes.
         """
         nodes_gpu = max(1, int(ceil(ngpus / cls.gpus_per_node)))
-        nodes_cpu = max(1, int(ceil(ngpus / cls.gpus_per_node)))
+        nodes_cpu = max(1, int(ceil(ncpus / cls.cores_per_node)))
         if nodes_gpu >= nodes_cpu:
             check_utilization(nodes_gpu, ngpus, cls.gpus_per_node, threshold, "compute")
             return nodes_gpu
@@ -243,19 +243,17 @@ class CrusherEnvironment(DefaultSlurmEnvironment):
         """
         ngpus = operation.directives["ngpu"]
         nranks = operation.directives.get("nranks", 1)
-        ncpus = max(
-            nranks * operation.directives.get("omp_num_threads", 1),
-            operation.directives.get("np", 1),
-        )
+        np = operation.directives.get("np", 1)
+        omp_num_threads = operation.directives.get("omp_num_threads", 1)
+        mpi_np_calc = nranks * omp_num_threads
+        if np > 1 and nranks > 1 and np != mpi_np_calc:
+            raise RuntimeWarning(
+                "Using provided value for np, which seems incompatible with MPI directives."
+            )
+        ncpus = max(mpi_np_calc, np)
         nodes = int(ceil(max(ngpus / cls.gpus_per_node, ncpus / cls.cores_per_node)))
         base_str = f"{cls.mpi_cmd} -N{nodes} -n{nranks}"
-        if nranks == 1:
-            threads = max(
-                operation.directives.get("omp_num_threads", 1),
-                operation.directives.get("np", 1),
-            )
-        else:
-            threads = max(1, operation.directives.get("omp_num_threads", 1))
+        threads = max(omp_num_threads, np) if nranks == 1 else max(1, omp_num_threads)
         base_str += f" -c{threads} --gpus={ngpus}"
         return base_str
 

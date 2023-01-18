@@ -244,11 +244,12 @@ class CrusherEnvironment(DefaultSlurmEnvironment):
         ngpus = operation.directives["ngpu"]
         nranks = operation.directives.get("nranks", 1)
         np = operation.directives.get("np", 1)
-        omp_num_threads = operation.directives.get("omp_num_threads", 1)
+        omp_num_threads = max(operation.directives.get("omp_num_threads", 1), 1)
         mpi_np_calc = nranks * omp_num_threads
         if np > 1 and nranks > 1 and np != mpi_np_calc:
             raise RuntimeWarning(
-                "Using provided value for np, which seems incompatible with MPI directives."
+                f"Using provided value for np={np}, which seems incompatible with MPI directives "
+                f"{mpi_np_calc}."
             )
         ncpus = max(mpi_np_calc, np)
         nodes = int(ceil(max(ngpus / cls.gpus_per_node, ncpus / cls.cores_per_node)))

@@ -1,0 +1,15 @@
+[bumpversion]
+current_version = 0.23.0
+commit = True
+tag = False
+message = Bump up to version {new_version}.
+
+[bumpversion:file:pyproject.toml]
+
+[bumpversion:file:flow/version.py]
+
+[bumpversion:file:doc/conf.py]
+
+[bumpversion:file:CITATION.cff]
+
+[bumpversion:file:.zenodo.json]

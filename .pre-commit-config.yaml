@@ -8,9 +8,7 @@ repos:
     rev: 'v4.4.0'
     hooks:
       - id: end-of-file-fixer
-        exclude: 'setup.cfg'
       - id: trailing-whitespace
-        exclude: 'setup.cfg'
       - id: debug-statements
   - repo: https://github.com/asottile/pyupgrade
     rev: 'v3.3.1'
@@ -40,3 +38,5 @@ repos:
             ^tests/|
             ^flow/util/mistune/
           )
+        additional_dependencies:
+          - toml

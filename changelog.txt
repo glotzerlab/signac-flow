@@ -15,6 +15,7 @@ Changed
 +++++++
 
 - Placing ``@FlowProject.pre`` and ``@FlowProject.post`` before the ``FlowProject.operation`` decorator raises an error (#700).
+- Updated CI to use GitHub Actions (#698).
 
 Removed
 +++++++

@@ -30,7 +30,9 @@ classifiers = [
 ]
 dependencies = [
     # The core package.
-    "signac>=2.0.0",
+    # TODO: Test against the released 2.0.0 once available.
+    #"signac>=2.0.0",
+    "signac @ git+https://github.com/glotzerlab/signac@master",
     # For the templated generation of (submission) scripts.
     "jinja2>=3.0.0",
     # To enable the parallelized execution of operations across processes.

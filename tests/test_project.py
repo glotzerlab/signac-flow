@@ -1239,7 +1239,7 @@ class TestExecutionProject(TestProjectBase):
         def op1(job):
             pass
 
-        project = Project(project.config)
+        project = Project(project.path)
         assert len(project)
         with redirect_stderr(StringIO()):
             for state, expected_evaluation in [

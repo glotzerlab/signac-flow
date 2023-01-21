@@ -90,7 +90,7 @@ class TestProjectBase:
         MockScheduler.reset()
         self._tmp_dir = tempfile.TemporaryDirectory(prefix="signac-flow_")
         request.addfinalizer(self._tmp_dir.cleanup)
-        self.project = self.project_class.init_project(root=self._tmp_dir.name)
+        self.project = self.project_class.init_project(path=self._tmp_dir.name)
         self.cwd = os.getcwd()
 
     def switch_to_cwd(self):
@@ -100,7 +100,7 @@ class TestProjectBase:
         self, project_class=None, heterogeneous=False, config_overrides=None
     ):
         project_class = project_class if project_class else self.project_class
-        project = project_class.get_project(root=self._tmp_dir.name)
+        project = project_class.get_project(path=self._tmp_dir.name)
         if config_overrides is not None:
 
             def recursive_update(d, u):

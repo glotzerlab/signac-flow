@@ -75,7 +75,7 @@ def main(args):
     ) as status_pr:
         init(p)
         init_status_options(status_pr)
-        fp = _TestProject.get_project(root=p.path)
+        fp = _TestProject.get_project(path=p.path)
         env = flow.environment.TestEnvironment
         # We need to set the scheduler manually. The FakeScheduler
         # won't try to call any cluster executable (e.g. squeue)

@@ -34,7 +34,7 @@ import jinja2
 import jsonschema
 import signac
 from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
-from signac.contrib.filterparse import parse_filter_arg
+from signac.filterparse import parse_filter_arg
 
 from .aggregates import (
     _AggregatesCursor,
@@ -1677,7 +1677,7 @@ def _config_value_as_bool(value):
     return bool(value)
 
 
-class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
+class FlowProject(signac.Project, metaclass=_FlowProjectClass):
     """A signac project class specialized for workflow management.
 
     This class is used to define, execute, and submit workflows based on
@@ -1697,9 +1697,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     Parameters
     ----------
-    config : :class:`signac.contrib.project._ProjectConfig`
-        A signac configuration, defaults to the configuration loaded
-        from the current directory.
+    path : str, optional
+        The project directory. By default, the current working directory
+        (Default value = None).
     environment : :class:`flow.environment.ComputeEnvironment`
         An environment to use for scheduler submission. If ``None``, the
         environment is automatically identified. The default is ``None``.
@@ -1712,8 +1712,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     """
 
-    def __init__(self, config=None, environment=None, entrypoint=None):
-        super().__init__(config=config)
+    def __init__(self, path=None, environment=None, entrypoint=None):
+        super().__init__(path=path)
 
         # Initialize the local config.
         # TODO: In signac 2.0 we will not allow config modification after

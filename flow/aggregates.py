@@ -637,17 +637,13 @@ class _JobAggregateCursor(_AggregatesCursor):
     ----------
     project : :class:`~.FlowProject`
         A FlowProject whose jobs are aggregated.
-    filter : dict
-        A mapping of key-value pairs that all indexed job state points are
-        compared against (Default value = None).
-    doc_filter : dict
-        A mapping of key-value pairs that all indexed job documents are
-        compared against (Default value = None).
+    filter : Mapping, optional
+        A mapping of key-value pairs used for the query (Default value = None).
 
     """
 
-    def __init__(self, project, filter=None, doc_filter=None):
-        self._cursor = project.find_jobs(filter, doc_filter)
+    def __init__(self, project, filter=None):
+        self._cursor = project.find_jobs(filter)
 
     def __eq__(self, other):
         # Cursors cannot compare equal if one is over aggregates and the other

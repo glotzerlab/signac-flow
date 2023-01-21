@@ -1852,7 +1852,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         return self._template_environment_[environment]
 
     def _get_standard_template_context(self):
-        """Return the standard templating context for run and submission scripts."""
+        """Return the standard template context for run and submission scripts."""
         context = {}
         context["project"] = self
         return context

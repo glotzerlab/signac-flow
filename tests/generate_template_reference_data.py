@@ -182,8 +182,9 @@ def get_masked_flowproject(p, environment=None):
             fp._environment = environment
         fp._entrypoint.setdefault("path", "generate_template_reference_data.py")
         old_generate_id = flow.project.FlowGroup._generate_id
+        old_standard_template_context = flow.FlowProject._get_standard_template_context
 
-        def wrapped_generate_id(self, aggregate, *args, **kwargs):
+        def mocked_generate_id(self, aggregate, *args, **kwargs):
             """Mock the root directory used for id generation.
 
             We need to generate consistent ids for all operations. This
@@ -196,7 +197,13 @@ def get_masked_flowproject(p, environment=None):
             fp._path = old_path
             return operation_id
 
-        flow.project.FlowGroup._generate_id = wrapped_generate_id
+        def mocked_template_context(self):
+            context = old_standard_template_context(self)
+            context["project"]._path = PROJECT_DIRECTORY
+            return context
+
+        flow.project.FlowGroup._generate_id = mocked_generate_id
+        flow.FlowProject._get_standard_template_context = mocked_template_context
         yield fp
 
     finally:

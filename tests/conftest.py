@@ -111,9 +111,12 @@ class TestProjectBase:
                         d[k] = v
                 return d
 
-            config = project.config.copy()
+            config = signac._config._read_config_file(
+                signac._config._get_project_config_fn(self._tmp_dir.name)
+            )
             config = recursive_update(config, config_overrides)
-            project = project_class(config=config)
+            config.write()
+            project = project_class.get_project(path=self._tmp_dir.name)
         for a in range(2):
             if heterogeneous:
                 # Add jobs with only the `a` key without `b`.

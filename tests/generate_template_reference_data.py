@@ -173,7 +173,7 @@ def _store_bundled(self, operations):
 def get_masked_flowproject(p, environment=None):
     """Mock environment-dependent attributes and functions. Need to mock
     sys.executable before the FlowProject is instantiated, and then modify the
-    path and project_dir elements after creation."""
+    path after creation."""
     try:
         old_executable = sys.executable
         sys.executable = MOCK_EXECUTABLE
@@ -181,7 +181,6 @@ def get_masked_flowproject(p, environment=None):
         if environment is not None:
             fp._environment = environment
         fp._entrypoint.setdefault("path", "generate_template_reference_data.py")
-        fp.config.project_dir = PROJECT_DIRECTORY
         old_generate_id = flow.project.FlowGroup._generate_id
 
         def wrapped_generate_id(self, aggregate, *args, **kwargs):

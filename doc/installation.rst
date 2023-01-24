@@ -52,10 +52,14 @@ To upgrade the package, simply execute the same command with the ``--upgrade`` o
 Source Code Installation
 ========================
 
-Alternatively you can clone the `git repository <https://github.com/glotzerlab/signac-flow>`_ and execute the ``setup.py`` script to install the package.
+Alternatively you can clone the `git repository <https://github.com/glotzerlab/signac-flow>`_ and pip install it directly, or install directly from git.
 
 .. code:: bash
 
+  # Option 1
   git clone https://github.com/glotzerlab/signac-flow.git
-  cd signac-flow
-  python setup.py install --user
+  cd signac
+  pip install .
+
+  # Option 2
+  pip install git+https://github.com/glotzerlab/signac-flow.git

@@ -4987,7 +4987,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             "for the majority of runtime required for status determination. "
             "Optionally provide a filename pattern to select for what files "
             "to show result for. Defaults to the main module. "
-            "(requires profile)",
+            "(requires pprofile)",
         )
         parser_status.add_argument(
             "--no-progress", action="store_true", help="Do not show progress bar"

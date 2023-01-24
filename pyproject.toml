@@ -1,3 +1,62 @@
+# Copyright (c) 2022 The Regents of the University of Michigan
+# All rights reserved.
+# This software is licensed under the BSD 3-Clause License.
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = ["setuptools>=64.0.0"]
+
+[project]
+name = "signac-flow"
+version = "0.23.0"
+description = "Simple workflow management for signac projects."
+readme = "README.md"
+# Supported versions are determined according to NEP 29.
+# https://numpy.org/neps/nep-0029-deprecation_policy.html
+requires-python = ">=3.8"
+license = { file = "LICENSE.txt" }
+maintainers = [{ name = "signac Developers", email = "signac-support@umich.edu" }]
+authors = [{ name = "Carl Simon Adorf et al.", email = "csadorf@umich.edu" }]
+keywords = ["workflow management"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: BSD License",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: Implementation :: CPython",
+]
+dependencies = [
+    # The core package.
+    "signac>=1.8.0",
+    # For the templated generation of (submission) scripts.
+    "jinja2>=3.0.0",
+    # To enable the parallelized execution of operations across processes.
+    "cloudpickle>=1.6.0",
+    # Deprecation management
+    "deprecation>=2.0.0",
+    # Progress bars
+    "tqdm>=4.60.0",
+    # For schema validation
+    "jsonschema>=3.0.0",
+]
+
+[project.scripts]
+flow = "flow.__main__:main"
+
+[project.urls]
+Homepage = "https://signac.io"
+Documentation = "https://docs.signac.io"
+Download = "https://pypi.org/project/signac-flow/"
+Source = "https://github.com/glotzerlab/signac-flow"
+Issues = "https://github.com/glotzerlab/signac-flow/issues"
+
+[tool.setuptools]
+packages = { find = { namespaces = false, exclude = ["tests*"] } }
+script-files = ["bin/simple-scheduler"]
+
 [tool.black]
 target-version = ['py38']
 include = '\.pyi?$'
@@ -19,3 +78,23 @@ exclude = '''
 [tool.isort]
 profile = 'black'
 skip_glob = 'flow/util/mistune/*'
+
+[tool.coverage.run]
+branch = true
+concurrency = [ "thread" , "multiprocessing" ]
+parallel = true
+source = [ "signac" ]
+omit = [ "*/flow/templates/*.pyt", "*/flow/util/mistune/*.py" ]
+
+[tool.pydocstyle]
+convention = "numpy"
+match = "^((?!\\.sync-zenodo-metadata|setup).)*\\.py$"
+match-dir = "^((?!\\.|tests|mistune).)*$"
+ignore-decorators = "deprecated"
+
+[tool.pytest.ini_options]
+filterwarnings = [
+	"ignore:.*The env argument is deprecated*:DeprecationWarning",
+	"ignore:Returning format strings in a cmd:FutureWarning"
+
+]

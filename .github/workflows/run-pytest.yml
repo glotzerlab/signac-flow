@@ -51,5 +51,5 @@ jobs:
         pip install -e .
     - name: Test with pytest
       run: |
-        pytest --cov=flow --cov-config=setup.cfg --cov-report=xml tests/ -v
+        pytest --cov=flow --cov-config=pyproject.toml --cov-report=xml tests/ -v
     - uses: codecov/codecov-action@v3

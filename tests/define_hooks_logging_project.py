@@ -2,7 +2,6 @@ import logging
 
 from define_hooks_test_project import HOOKS_ERROR_MESSAGE
 
-import flow
 from flow import FlowProject
 from flow.hooks import LogOperations
 
@@ -37,8 +36,7 @@ def base(job):
 @_HooksLogOperationsProject.operation_hooks.on_start(operation_log.on_start)
 @_HooksLogOperationsProject.operation_hooks.on_success(operation_log.on_success)
 @_HooksLogOperationsProject.operation_hooks.on_exception(operation_log.on_exception)
-@_HooksLogOperationsProject.operation
-@flow.cmd
+@_HooksLogOperationsProject.operation(cmd=True)
 def base_cmd(job):
     if job.sp.raise_exception:
         return "exit 42"

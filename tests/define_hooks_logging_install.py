@@ -22,8 +22,7 @@ def base(job):
         raise RuntimeError(HOOKS_ERROR_MESSAGE)
 
 
-@_HooksLogOperationsProject.operation
-@flow.cmd
+@_HooksLogOperationsProject.operation(cmd=True)
 def base_cmd(job):
     if job.sp.raise_exception:
         return "exit 42"

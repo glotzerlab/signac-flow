@@ -32,7 +32,7 @@ def test_hide_progress_bar(hide_progress_bar, parallelization):
         for job in status_pr:
             kwargs = job.statepoint()
             tmp_err = io.TextIOWrapper(io.BytesIO(), sys.stderr.encoding)
-            fp.print_status(**kwargs, err=tmp_err, no_progress=hide_progress_bar)
+            fp.print_status(**kwargs, err=tmp_err, hide_progress=hide_progress_bar)
             tmp_err.seek(0)
             generated_tqdm = tmp_err.read()
             if hide_progress_bar:

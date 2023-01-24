@@ -336,7 +336,7 @@ def _run_cloudpickled_func(func, *args):
     return unpickled_func(*args)
 
 
-def _get_parallel_executor(parallelization="none", progress=True):
+def _get_parallel_executor(parallelization="none", hide_progress=False):
     """Get an executor for the desired parallelization strategy.
 
     This executor shows a progress bar while executing a function over an
@@ -352,8 +352,8 @@ def _get_parallel_executor(parallelization="none", progress=True):
     parallelization : str
         Parallelization mode. Allowed values are "thread", "process", or
         "none". (Default value = "none")
-    progress : bool
-        Show a progress bar when printing status output (Default value = False).
+    hide_progress: bool
+        Hide the progress bar when printing status output (Default value = False).
 
     Returns
     -------
@@ -361,7 +361,23 @@ def _get_parallel_executor(parallelization="none", progress=True):
         A callable with signature ``func, iterable, **kwargs``.
 
     """
-    if progress:
+    if hide_progress:
+        if parallelization == "thread":
+
+            def parallel_executor(func, iterable, **kwargs):
+                return ThreadPoolExecutor().map(func, iterable)
+
+        elif parallelization == "process":
+
+            def parallel_executor(func, iterable, **kwargs):
+                return ProcessPoolExecutor().map(func, iterable)
+
+        else:
+
+            def parallel_executor(func, iterable, **kwargs):
+                return [func(i) for i in iterable]
+
+    else:
         if parallelization == "thread":
 
             def parallel_executor(func, iterable, **kwargs):
@@ -394,22 +410,6 @@ def _get_parallel_executor(parallelization="none", progress=True):
                     # Chunk size only applies to thread/process parallel executors
                     del kwargs["chunksize"]
                 return list(tmap(func, iterable, tqdm_class=tqdm, **kwargs))
-
-    else:
-        if parallelization == "thread":
-
-            def parallel_executor(func, iterable, **kwargs):
-                return ThreadPoolExecutor().map(func, iterable)
-
-        elif parallelization == "process":
-
-            def parallel_executor(func, iterable, **kwargs):
-                return ProcessPoolExecutor().map(func, iterable)
-
-        else:
-
-            def parallel_executor(func, iterable, **kwargs):
-                return [func(i) for i in iterable]
 
     return parallel_executor
 

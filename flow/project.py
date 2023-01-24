@@ -2595,7 +2595,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         err,
         ignore_errors,
         status_parallelization="none",
-        progress=True,
+        hide_progress=False,
     ):
         """Fetch status for the provided aggregates / jobs.
 
@@ -2610,8 +2610,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         status_parallelization : str
             Parallelization mode for fetching the status. Allowed values are
             "thread", "process", or "none". (Default value = "none")
-        progress : bool
-            Show a progress bar when printing status output (Default value = False).
+        hide_progress : bool
+            Hide the progress bar when printing status output (Default value = False).
 
         Returns
         -------
@@ -2636,7 +2636,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "Valid choices are 'thread', 'process', or 'none'."
             )
 
-        parallel_executor = _get_parallel_executor(status_parallelization, progress)
+        parallel_executor = _get_parallel_executor(
+            status_parallelization, hide_progress
+        )
 
         # Update the project's status cache
         scheduler_info = self._query_scheduler_status(
@@ -2804,8 +2806,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         profile=False,
         eligible_jobs_max_lines=None,
         output_format="terminal",
-        no_progress=False,
-        print_status=True,
+        hide_progress=False,
     ):
         """Print the status of the project.
 
@@ -2856,9 +2857,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         output_format : str
             Status output format, supports:
             'terminal' (default), 'markdown' or 'html'.
-        no_progress : bool
+        hide_progress : bool
             Hide the progress bar from the status output. (Default value = False)
-
         """
         if file is None:
             file = sys.stdout
@@ -2902,7 +2902,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     err=err,
                     ignore_errors=ignore_errors,
                     status_parallelization=status_parallelization,
-                    progress=not no_progress,
+                    hide_progress=hide_progress,
                 )
 
             prof._mergeFileTiming()
@@ -2982,7 +2982,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 err=err,
                 ignore_errors=ignore_errors,
                 status_parallelization=status_parallelization,
-                progress=not no_progress,
+                hide_progress=hide_progress,
             )
             profiling_results = None
 
@@ -4990,7 +4990,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             "(requires profile)",
         )
         parser_status.add_argument(
-            "--no-progress", action="store_true", help="Do not show progress bar"
+            "--hide-progress", action="store_true", help="Hide the progress bar"
         )
         parser_status.set_defaults(func=self._main_status)
 

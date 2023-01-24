@@ -35,10 +35,7 @@ def test_hide_progress_bar(hide_progress_bar, parallelization):
             fp.print_status(**kwargs, err=tmp_err, hide_progress=hide_progress_bar)
             tmp_err.seek(0)
             generated_tqdm = tmp_err.read()
-            if hide_progress_bar:
-                assert "Fetching status" not in generated_tqdm
-            else:
-                assert "Fetching status" in generated_tqdm
+            assert ("Fetching status" not in generated_tqdm) == hide_progress_bar
 
 
 def test_print_status():

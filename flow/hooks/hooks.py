@@ -29,7 +29,7 @@ class _Hooks:
     starts, succeeds, fails, or finishes (regardless of whether the operation
     executed successfully or failed).
 
-    Hooks can be installed at the operation level as decorators, or on an
+    Hooks can be installed at the operation level as decorators, or on
     instance of :class:`~.FlowProject` through
     :meth:`~.FlowProject.project_hooks`.
 

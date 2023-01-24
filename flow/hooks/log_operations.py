@@ -14,6 +14,16 @@ class LogOperations:
 
     The default formating for the log provides the time, job id, log level, and log message.
 
+    Examples
+    --------
+    The code block below provides an example of how install  :class:`~.LogOperations` to a
+    instance of :class:`~.FlowProject`
+
+    .. code-block:: python
+        from flow import FLowProject
+        from flow.hooks import LogOperations  # Import build
+
+
     Parameters
     ----------
     fn_logfile: log filename

@@ -1,4 +1,6 @@
-signac>=1.8.0
+# TODO: Test against the released 2.0.0 once available.
+# signac>=2.0.0
+signac @ git+https://github.com/glotzerlab/signac@master
 jinja2>=3.0.0
 cloudpickle>=1.6.0
 deprecation>=2.0.0

@@ -34,7 +34,7 @@ class LogOperations:
         self._fn_logfile = fn_logfile
         # getLogger keep its own cache. This just serves to reduce the time spent setting up loggers
         # by only doing it once.
-        self._loggers = dict()
+        self._loggers = {}
 
     def on_start(self, operation, job):
         """Log the start of execution of a given job(s) operation pair."""

@@ -20,7 +20,7 @@ Changed
 Fixed
 +++++
 
-- Bumped ``isort`` to 5.12.0 in the pre-commit configuration file (#715)
+- Bumped ``isort`` to 5.12.0 in the pre-commit configuration file (#715).
 
 Removed
 +++++++

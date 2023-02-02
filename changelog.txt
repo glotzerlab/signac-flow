@@ -22,6 +22,11 @@ Changed
 - Placing ``@FlowProject.pre`` and ``@FlowProject.post`` before the ``FlowProject.operation`` decorator raises an error (#700).
 - Updated CI to use GitHub Actions (#698).
 
+Fixed
++++++
+
+- Bumped ``isort`` to 5.12.0 in the pre-commit configuration file (#715).
+
 Removed
 +++++++
 

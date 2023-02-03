@@ -216,7 +216,7 @@ class CrusherEnvironment(DefaultSlurmEnvironment):
 
     hostname_pattern = r".*\.crusher\.olcf\.ornl\.gov"
     template = "crusher.sh"
-    cores_per_node = 64
+    cores_per_node = 56
     gpus_per_node = 8
     mpi_cmd = "srun"
 
@@ -253,9 +253,9 @@ class CrusherEnvironment(DefaultSlurmEnvironment):
             )
         ncpus = max(mpi_np_calc, np)
         nodes = int(ceil(max(ngpus / cls.gpus_per_node, ncpus / cls.cores_per_node)))
-        base_str = f"{cls.mpi_cmd} -N{nodes} -n{nranks}"
+        base_str = f"{cls.mpi_cmd} --ntasks={nranks}"
         threads = max(omp_num_threads, np) if nranks == 1 else max(1, omp_num_threads)
-        base_str += f" -c{threads} --gpus={ngpus}"
+        base_str += f" --cpus-per-task={threads} --gpus={ngpus}"
         return base_str
 
 

@@ -545,7 +545,7 @@ Expects a nonnegative integer. Defaults to 0.
 _NP = _Directive(
     "np", validator=_natural_number, default=_NP_DEFAULT, finalize=_finalize_np
 )
-_NP.__doc__ = """The total number of CPU orse to request for a given operation.
+_NP.__doc__ = """The total number of CPU cores to request for a given operation.
 
 Expects a natural number (i.e. an integer >= 1). This directive introspects into
 the "nranks" or "omp_num_threads" directives and uses their product if it is

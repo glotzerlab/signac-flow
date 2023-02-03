@@ -241,8 +241,10 @@ class CrusherEnvironment(DefaultSlurmEnvironment):
 
         We don't currently support CPU/GPU mapping and expect the program to do this in code.
         """
+        nranks = operation.directives.get("nranks", 0)
+        if nranks == 0:
+            return ""
         ngpus = operation.directives["ngpu"]
-        nranks = operation.directives.get("nranks", 1)
         np = operation.directives.get("np", 1)
         omp_num_threads = max(operation.directives.get("omp_num_threads", 1), 1)
         mpi_np_calc = nranks * omp_num_threads
@@ -251,8 +253,6 @@ class CrusherEnvironment(DefaultSlurmEnvironment):
                 f"Using provided value for np={np}, which seems incompatible with MPI directives "
                 f"{mpi_np_calc}."
             )
-        ncpus = max(mpi_np_calc, np)
-        nodes = int(ceil(max(ngpus / cls.gpus_per_node, ncpus / cls.cores_per_node)))
         base_str = f"{cls.mpi_cmd} --ntasks={nranks}"
         threads = max(omp_num_threads, np) if nranks == 1 else max(1, omp_num_threads)
         base_str += f" --cpus-per-task={threads} --gpus={ngpus}"

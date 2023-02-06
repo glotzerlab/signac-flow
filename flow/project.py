@@ -2423,7 +2423,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         starting_dict = functools.partial(dict, scheduler_status=JobStatus.unknown)
         status_dict = defaultdict(starting_dict)
 
-        for aggregate_id, aggregate, group, in self._generate_selected_aggregate_groups(
+        for (
+            aggregate_id,
+            aggregate,
+            group,
+        ) in self._generate_selected_aggregate_groups(
             selected_aggregates=[aggregate],
         ):
             completed = group._complete(aggregate)
@@ -3368,7 +3372,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     operations, desc="Serialize tasks", file=sys.stderr
                 )
             ]
-        except Exception as error:  # Masking all errors since they must be pickling related.
+        except (
+            Exception
+        ) as error:  # Masking all errors since they must be pickling related.
             raise self._PickleError(error)
 
         results = [
@@ -4462,7 +4468,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             selected_groups = {self._groups[name] for name in self.operations}
         else:
             selected_groups = set(self._gather_flow_groups(operation_names))
-        for aggregate_id, aggregate, group, in self._generate_selected_aggregate_groups(
+        for (
+            aggregate_id,
+            aggregate,
+            group,
+        ) in self._generate_selected_aggregate_groups(
             selected_aggregates=jobs,
             selected_groups=selected_groups,
         ):

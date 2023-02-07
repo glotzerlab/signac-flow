@@ -28,6 +28,7 @@ In addition, the package provides specialized submission templates for the follo
 .. toctree::
    supported_environments/summit
    supported_environments/andes
+   supported_environments/crusher
    supported_environments/bridges2
    supported_environments/delta
    supported_environments/expanse

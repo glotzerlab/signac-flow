@@ -2161,7 +2161,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
     def _expand_bundled_jobs(self, scheduler_jobs):
         """Expand jobs which were submitted as part of a bundle."""
         sep = getattr(self._environment, "JOB_ID_SEPARATOR", "/")
-        bundle_prefix = f"{self}{sep}bundle{sep}"
+        bundle_prefix = f"{self.__class__.__name__}{sep}bundle{sep}"
         if scheduler_jobs is None:
             return
         for job in scheduler_jobs:

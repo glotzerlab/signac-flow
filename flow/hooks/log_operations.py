@@ -32,7 +32,9 @@ class LogOperations:
 
 
         if __name__ == "__main__":
-            LogOperations.install_project_hooks(Project).main()
+            project = Project()
+            project = LogOperations().install_hooks(project)
+            project.main()
 
 
     Parameters

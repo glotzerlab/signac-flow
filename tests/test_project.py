@@ -992,7 +992,6 @@ class TestExecutionProject(TestProjectBase):
                 assert not job.isfile("world.txt")
 
     def test_run_condition_inheritance(self):
-
         # This assignment is necessary to use the `mock_project` function on
         # classes A, B, and C. Otherwise, the self.project_class reassignment
         # would break future tests.
@@ -1035,7 +1034,6 @@ class TestExecutionProject(TestProjectBase):
         for project_class, bad_ops in zip(
             [A, B, C], [["op1"], ["op2", "op3"], ["op1", "op3"]]
         ):
-
             for job in self.project.find_jobs():
                 job.remove()
             project = self.mock_project(project_class=project_class)

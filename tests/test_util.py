@@ -10,7 +10,6 @@ class TestBidict:
         return _bidict({"a": 1, "b": 2})
 
     def test_basic_dict(self, bd):
-
         bd["c"] = 1
         assert bd == {"a": 1, "c": 1, "b": 2}
         assert bd.inverse == {1: ["a", "c"], 2: ["b"]}

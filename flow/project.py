@@ -2126,6 +2126,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """Return the canonical name to store bundle information."""
         return os.path.join(self.path, ".bundles", bundle_id)
 
+    @property
+    def _bundle_prefix(self):
+        sep = getattr(self._environment, "JOB_ID_SEPARATOR", "/")
+        return f"{self.__class__.__name__}{sep}bundle{sep}"
+
     def _store_bundled(self, operations):
         """Store operation-ids as part of a bundle and return bundle id.
 
@@ -2148,9 +2153,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         """
         if len(operations) == 1:
             return operations[0].id
-        sep = getattr(self._environment, "JOB_ID_SEPARATOR", "/")
         _id = sha1(".".join(op.id for op in operations).encode("utf-8")).hexdigest()
-        bundle_id = f"{self.__class__.__name__}{sep}bundle{sep}{_id}"
+        bundle_id = self._bundle_prefix + _id
         fn_bundle = self._fn_bundle(bundle_id)
         os.makedirs(os.path.dirname(fn_bundle), exist_ok=True)
         with open(fn_bundle, "w") as file:
@@ -2160,10 +2164,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     def _expand_bundled_jobs(self, scheduler_jobs):
         """Expand jobs which were submitted as part of a bundle."""
-        sep = getattr(self._environment, "JOB_ID_SEPARATOR", "/")
-        bundle_prefix = f"{self.__class__.__name__}{sep}bundle{sep}"
         if scheduler_jobs is None:
             return
+        bundle_prefix = self._bundle_prefix
         for job in scheduler_jobs:
             if job.name().startswith(bundle_prefix):
                 with open(self._fn_bundle(job.name())) as file:

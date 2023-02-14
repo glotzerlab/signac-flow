@@ -20,8 +20,19 @@ class LogOperations:
     instance of :class:`~.FlowProject`
 
     .. code-block:: python
-        from flow import FLowProject
+        from flow import FlowProject
         from flow.hooks import LogOperations  # Import build
+
+
+        class Project(FlowProject):
+            pass
+
+
+        # Do something
+
+
+        if __name__ == "__main__":
+            LogOperations.install_project_hooks(Project).main()
 
 
     Parameters

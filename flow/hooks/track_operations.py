@@ -52,14 +52,28 @@ class TrackOperations:
             metadata["error"] = None if error is None else str(error)
 
             # Write metadata to collection inside job workspace.
-            with Collection.open(operation.job.fn(self._fn_logfile)) as logfile:
+            with Collection.open(operation.job.fn(FN_LOGFILE)) as logfile:
                 logfile.insert_one(metadata)
 
         return _log_operation
 
-    def install_hooks(self, project):
+    def on_start(self, operation, job):
         """TO DO."""
-        project.hooks.on_start.append(self.log_operation(stage="prior"))
+        self.log_operation(stage="prior")(operation)
+
+    def on_success(self, operation, job):
+        """TO DO."""
+        self.log_operation(stage="after")(operation)
+
+    def on_exception(self, operation, error, job):
+        """TO DO."""
+        self.log_operation(stage="after")(operation, error)
+
+    def install_project_hooks(self, project):
+        """TO DO."""
+        project.project_hooks.on_start.append(self.on_start)
+        project.project_hooks.on_success.append(self.on_success)
+        project.project_hooks.on_exception.append(self.on_exception)
         return project
 
-    __call__ = install_hooks
+    __call__ = install_project_hooks

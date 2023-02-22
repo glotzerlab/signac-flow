@@ -26,6 +26,7 @@ Fixed
 +++++
 
 - Bumped ``isort`` to 5.12.0 in the pre-commit configuration file (#715).
+- Fixed bundle status information not being correctly read for subclasses of ``FlowProject`` (#718, #720).
 
 Removed
 +++++++

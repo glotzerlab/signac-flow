@@ -39,7 +39,6 @@ def test_hide_progress_bar(hide_progress_bar, parallelization):
 
 
 def test_print_status():
-
     # Must import the data into the project.
     with signac.TemporaryProject(name=gen.PROJECT_NAME) as p, signac.TemporaryProject(
         name=gen.STATUS_OPTIONS_PROJECT_NAME

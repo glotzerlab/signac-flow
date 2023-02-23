@@ -4231,6 +4231,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             nargs="+",
             help="Only select jobs that match the given document filter.",
         )
+        parser.add_argument(
+            "-o",
+            "--operation",
+            type=str,
+            nargs="+",
+            help="Only select operation or groups that match the given "
+            "operation/group name(s). These are interpreted as regular expressions.",
+        )
 
     @classmethod
     def _add_operation_selection_arg_group(cls, parser):

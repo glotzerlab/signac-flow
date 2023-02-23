@@ -4377,7 +4377,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             help="Ignore errors that might occur when querying the scheduler.",
         )
         view_group.add_argument(
-            "-o",
             "--output-format",
             type=str,
             default="terminal",

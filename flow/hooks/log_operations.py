@@ -14,8 +14,41 @@ class LogOperations:
 
     The default formating for the log provides the time, job id, log level, and log message.
 
+    .. note::
+
+        All logging is performed at the INFO level. To ensure outputs are captured in log files,
+        use the `--debug` flag when running or submitting jobs, or specify `run_options=--debug`
+        and `submit_options=--debug` in your directives (example shown below).
+
+
     Examples
     --------
+    The following example will install :class:`~.LogOperations` at the operation level.
+    Where the log will be stored in a file name `foo.log` in the job workspace.
+
+    .. code-block:: python
+        from flow import FlowProject
+        from flow.hooks import LogOperations
+
+
+        class Project(FlowProject):
+            pass
+
+
+        def install_operation_log_hook(operation_name, project_cls):
+            log = LogOperation(f"{operation_name}.log")
+            return lambda op: log.install_operation_hooks(op, project_cls)
+
+
+        @install_operation_log_hook("foo", Project)
+        @Project.operation(directives={
+            "run_options": "--debug",  # Always run operation foo with the --debug flag
+            "submit_options": "--debug"  # Always submit operation foo with the --debug flag
+        })
+        def foo(job):
+            pass
+
+
     The code block below provides an example of how install  :class:`~.LogOperations` to a
     instance of :class:`~.FlowProject`
 
@@ -33,8 +66,9 @@ class LogOperations:
 
         if __name__ == "__main__":
             project = Project()
-            project = LogOperations().install_hooks(project)
+            project = LogOperations().install_project_hooks(project)
             project.main()
+
 
 
     Parameters

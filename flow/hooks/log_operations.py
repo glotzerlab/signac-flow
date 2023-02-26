@@ -17,8 +17,8 @@ class LogOperations:
     .. note::
 
         All logging is performed at the INFO level. To ensure outputs are captured in log files,
-        use the `--debug` flag when running or submitting jobs, or specify `run_options=--debug`
-        and `submit_options=--debug` in your directives (example shown below).
+        use the `--debug` flag when running or submitting jobs, or specify
+        `submit_options=--debug` in your directives (example shown below).
 
 
     Examples
@@ -42,7 +42,6 @@ class LogOperations:
 
         @install_operation_log_hook("foo", Project)
         @Project.operation(directives={
-            "run_options": "--debug",  # Always run operation foo with the --debug flag
             "submit_options": "--debug"  # Always submit operation foo with the --debug flag
         })
         def foo(job):

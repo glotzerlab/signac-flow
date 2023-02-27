@@ -20,6 +20,6 @@
         {% endif %}
     {% endblock preamble %}
     {% block tasks %}
-#SBATCH --ntasks={{ operations|calc_tasks('np', parallel, force) }}
+#SBATCH --ntasks={{ resources.ncpu_tasks }}
     {% endblock tasks %}
 {% endblock header %}

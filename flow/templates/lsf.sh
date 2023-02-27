@@ -17,6 +17,6 @@
 #BSUB -eo {{ job_output }}
     {% endif %}
     {% block tasks %}
-#BSUB -n {{ operations|calc_tasks('np', parallel, force) }}
+#BSUB -n {{ resources.ncpu_tasks }}
     {% endblock tasks %}
 {% endblock header %}

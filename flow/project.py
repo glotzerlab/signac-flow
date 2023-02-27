@@ -663,6 +663,7 @@ class FlowGroupEntry:
         self._project = project
         self.submit_options = submit_options
         self.run_options = run_options
+        # TODO: This is no longer true.
         # We register aggregators associated with operation functions in
         # `_register_groups` and we do not set the aggregator explicitly.
         # We delay setting the aggregator because we do not restrict the
@@ -1534,6 +1535,7 @@ class _FlowProjectClass(type):
 
                 # Append the name and function to the class registry
                 self._parent_class._OPERATION_FUNCTIONS.append((name, func))
+                # TODO: This is no longer true and can likely be changed.
                 # We register aggregators associated with operation functions in
                 # `_register_groups` and we do not set the aggregator explicitly.  We
                 # delay setting the aggregator because we do not restrict the decorator
@@ -3948,6 +3950,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         context["id"] = _id
         context["operations"] = list(operations)
         context.update(kwargs)
+        context["resources_"] = self._environment._get_scheduler_values(
+            context, operations
+        )
         if show_template_help:
             self._show_template_help_and_exit(template_environment, context)
         return template.render(**context)

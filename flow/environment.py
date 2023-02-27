@@ -34,6 +34,7 @@ from .scheduling.lsf import LSFScheduler
 from .scheduling.pbs import PBSScheduler
 from .scheduling.simple_scheduler import SimpleScheduler
 from .scheduling.slurm import SlurmScheduler
+from .util.template_filters import calc_num_nodes, calc_tasks
 
 logger = logging.getLogger(__name__)
 
@@ -282,6 +283,36 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
                 _WALLTIME,
             )
         )
+
+    @classmethod
+    def _get_scheduler_values(cls, context, operations):
+        """Return a dictionary of computed quantities regarding submission.
+
+        Warning
+        -------
+            Must be called after the rest of the template context has been gathered.
+        """
+        threshold = 0.0 if context.get("force", False) else 0.9
+        cpu_tasks_total = calc_tasks(
+            operations,
+            "np",
+            context.get("parallel", False),
+            context.get("force", False),
+        )
+        gpu_tasks_total = calc_tasks(
+            operations,
+            "ngpu",
+            context.get("parallel", False),
+            context.get("force", False),
+        )
+        num_nodes_cpu = calc_num_nodes(cpu_tasks_total, cls._cpus_per_node, threshold)
+        num_nodes_gpu = calc_num_nodes(gpu_tasks_total, cls._gpus_per_node, threshold)
+        num_nodes = max(num_nodes_cpu, num_nodes_gpu, 1)
+        return {
+            "ncpu_tasks": cpu_tasks_total,
+            "ngpu_tasks": gpu_tasks_total,
+            "num_nodes": num_nodes,
+        }
 
 
 class StandardEnvironment(ComputeEnvironment):

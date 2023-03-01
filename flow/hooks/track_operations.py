@@ -35,9 +35,9 @@ class TrackOperations:
     def log_operation(self, stage):
         """TO DO."""
 
-        def _log_operation(operation, error=None):
+        def _log_operation(operation, job, error=None):
             if self.strict_git:
-                if git.Repo(operation.job._project.root_directory()).is_dirty():
+                if git.Repo(job._project.root_directory()).is_dirty():
                     raise RuntimeError(
                         "Unable to reliably log operation, because the git repository in "
                         "the project root directory is dirty.\n\nMake sure to commit all "
@@ -45,29 +45,29 @@ class TrackOperations:
                             type(self).__name__
                         )
                     )
-            metadata = collect_metadata(operation)
+            metadata = collect_metadata(operation, job)
 
             # Add additional execution-related information to metadata.
             metadata["stage"] = stage
             metadata["error"] = None if error is None else str(error)
 
             # Write metadata to collection inside job workspace.
-            with Collection.open(operation.job.fn(FN_LOGFILE)) as logfile:
+            with Collection.open(job.fn(FN_LOGFILE)) as logfile:
                 logfile.insert_one(metadata)
 
         return _log_operation
 
     def on_start(self, operation, job):
         """TO DO."""
-        self.log_operation(stage="prior")(operation)
+        self.log_operation(stage="prior")(operation, job)
 
     def on_success(self, operation, job):
         """TO DO."""
-        self.log_operation(stage="after")(operation)
+        self.log_operation(stage="after")(operation, job)
 
     def on_exception(self, operation, error, job):
         """TO DO."""
-        self.log_operation(stage="after")(operation, error)
+        self.log_operation(stage="after")(operation, job, error)
 
     def install_project_hooks(self, project):
         """TO DO."""

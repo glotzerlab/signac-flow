@@ -2617,8 +2617,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         status_parallelization : str
             Parallelization mode for fetching the status. Allowed values are
             "thread", "process", or "none". (Default value = "none")
-        names : TODO
-            TODO something about taking in operation of interest
+        names : iterable of :class:`str`
+            Only execute operations that match the provided set of names
+            (interpreted as regular expressions), or all if the argument is
+            None. (Default value = None)
 
         Returns
         -------
@@ -2874,8 +2876,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         output_format : str
             Status output format, supports:
             'terminal' (default), 'markdown' or 'html'.
-        operation : TODO
-            TODO
+        operation : iterable of :class:`str`
+            Only execute operations that match the provided set of names
+            (interpreted as regular expressions), or all if the argument is
+            None. (Default value = None)
 
         """
         if file is None:
@@ -2920,7 +2924,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     err=err,
                     ignore_errors=ignore_errors,
                     status_parallelization=status_parallelization,
-                    operation=operation,
+                    names=operation,
                 )
 
             prof._mergeFileTiming()

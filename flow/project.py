@@ -2602,6 +2602,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         err,
         ignore_errors,
         status_parallelization="none",
+        names=None,
     ):
         """Fetch status for the provided aggregates / jobs.
 
@@ -2616,6 +2617,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         status_parallelization : str
             Parallelization mode for fetching the status. Allowed values are
             "thread", "process", or "none". (Default value = "none")
+        names : TODO
+            TODO something about taking in operation of interest
 
         Returns
         -------
@@ -2634,6 +2637,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             only has to occur one time.
 
         """
+        if names is not None:
+            absent_ops = (set(self._groups.keys()) ^ set(names)) & set(names)
+            if absent_ops:
+                print(
+                    f"Unrecognized flow operation(s): {', '.join(absent_ops)}",
+                    file=sys.stderr,
+                )
+
         if status_parallelization not in ("thread", "process", "none"):
             raise RuntimeError(
                 "Configuration value status_parallelization is invalid. "
@@ -2649,9 +2660,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         def compute_status(data):
             scheduler_id, scheduler_status, aggregate_id, aggregate, group = data
-
             status = {}
             error_text = None
+            # if (operation is None) or (operation )
             try:
                 status["scheduler_status"] = scheduler_status
                 completed = group._complete(aggregate)
@@ -2704,11 +2715,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     )
             return result
 
+        submission_groups = set(self._gather_flow_groups(names))
+
         with self._buffered():
             aggregate_groups = list(
                 self._generate_selected_aggregate_groups_with_status(
                     scheduler_info=scheduler_info,
                     selected_aggregates=aggregates,
+                    selected_groups=submission_groups,
                 )
             )
             status_results = []
@@ -2809,6 +2823,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         profile=False,
         eligible_jobs_max_lines=None,
         output_format="terminal",
+        operation=None,
     ):
         """Print the status of the project.
 
@@ -2859,6 +2874,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         output_format : str
             Status output format, supports:
             'terminal' (default), 'markdown' or 'html'.
+        operation : TODO
+            TODO
 
         """
         if file is None:
@@ -2903,6 +2920,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     err=err,
                     ignore_errors=ignore_errors,
                     status_parallelization=status_parallelization,
+                    operation=operation,
                 )
 
             prof._mergeFileTiming()
@@ -2982,6 +3000,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 err=err,
                 ignore_errors=ignore_errors,
                 status_parallelization=status_parallelization,
+                names=operation,
             )
             profiling_results = None
 

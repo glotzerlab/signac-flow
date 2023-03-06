@@ -25,7 +25,7 @@ def test_hide_progress_bar(hide_progress_bar, parallelization):
         name=gen.STATUS_OPTIONS_PROJECT_NAME
     ) as status_pr:
         gen.init(p)
-        fp = gen._TestProject.get_project(root=p.root_directory())
+        fp = gen._TestProject.get_project(root=p.path)
         fp.config["status_parallelization"] = parallelization
         status_pr.import_from(origin=gen.ARCHIVE_PATH)
         for job in status_pr:

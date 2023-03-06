@@ -3277,7 +3277,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             print("\n" + "\n".join(profiling_results), file=file)
 
     def _run_operations(
-        self, operations, pretend=False, np=None, timeout=None, progress=False
+        self, operations, pretend=False, np=None, timeout=None, hide_progress=True
     ):
         """Execute the next operations as specified by the project's workflow.
 
@@ -3298,8 +3298,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             An optional timeout for each operation in seconds after which
             execution will be cancelled. Use None to indicate no timeout
             (Default value = None).
-        progress : bool
-            Show a progress bar when printing status output (Default value = False).
+        hide_progress : bool
+            Hides progress bar when printing status output (Default value = True).
 
         """
         if timeout is not None and timeout < 0:
@@ -3307,7 +3307,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         operations = list(operations)  # ensure list
 
         if np is None or np == 1 or pretend:
-            if progress:
+            if not hide_progress:
                 operations = tqdm(operations)
             for operation in operations:
                 self._execute_operation(operation, timeout, pretend)
@@ -3319,7 +3319,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 )
                 try:
                     self._run_operations_in_parallel(
-                        pool, operations, progress, timeout
+                        pool, operations, hide_progress, timeout
                     )
                 except self._PickleError as error:
                     raise RuntimeError(
@@ -3347,7 +3347,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             id, name, jobs, cmd, directives, directives._keys_set_by_user
         )
 
-    def _run_operations_in_parallel(self, pool, operations, progress, timeout):
+    def _run_operations_in_parallel(self, pool, operations, hide_progress, timeout):
         """Execute operations in parallel.
 
         This function executes the given list of operations with the provided
@@ -3363,8 +3363,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Process pool.
         operations : Sequence of instances of :class:`_JobOperation`
             The operations to execute.
-        progress : bool
-            Show a progress bar when printing status output (Default value = False).
+        hide_progress : bool
+            Hides progress bar when printing status output (Default value = True).
         timeout : float
             A timeout for each operation in seconds after which
             execution will be cancelled. Use None to indicate no timeout
@@ -3392,7 +3392,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             pool.apply_async(_deserialize_and_run_operation, task)
             for task in serialized_tasks
         ]
-        if progress:
+        if not hide_progress:
             results = tqdm(results)
         for result in results:
             result.get(timeout=timeout)
@@ -3499,7 +3499,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         timeout=None,
         num=None,
         num_passes=1,
-        progress=False,
+        hide_progress=True,
         order=None,
         ignore_conditions=IgnoreConditions.NONE,
     ):
@@ -3542,8 +3542,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             The total number of executions of one specific job-operation pair
             will not exceed this argument. The default is 1, there is no limit
             if this argument is None.
-        progress : bool
-            Show a progress bar when printing status output (Default value = False).
+        hide_progress : bool
+            Hides progress bar when printing status output (Default value = True).
         order : str, callable, or None
             Specify the order of operations. Possible values are:
 
@@ -3726,7 +3726,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 i_pass,
             )
             self._run_operations(
-                operations, pretend=pretend, np=np, timeout=timeout, progress=progress
+                operations,
+                pretend=pretend,
+                np=np,
+                timeout=timeout,
+                hide_progress=hide_progress,
             )
 
     def _gather_flow_groups(self, names=None):
@@ -4841,7 +4845,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             timeout=args.timeout,
             num=args.num,
             num_passes=args.num_passes,
-            progress=args.progress,
+            hide_progress=args.hide_progress,
             order=args.order,
             ignore_conditions=args.ignore_conditions,
         )
@@ -5028,9 +5032,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             help="Do not actually execute commands, just show them.",
         )
         execution_group.add_argument(
-            "--progress",
-            action="store_true",
-            help="Display a progress bar during execution.",
+            "--hide_progress",
+            action="store_false",
+            help="Hide the progress bar during execution.",
         )
         execution_group.add_argument(
             "--num-passes",

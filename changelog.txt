@@ -5,6 +5,17 @@ Changelog
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 The numbers in brackets denote the related GitHub issue and/or pull request.
 
+next
+====
+
+next -- 2023-xx-xx
+------------------
+
+Added
++++++
+
+- Added feature to hide the status of the progress bar (#685).
+
 Version 0.24
 ============
 
@@ -15,7 +26,6 @@ Added
 +++++
 
 - Added the OCLF Crusher environment (#708).
-- Added feature to hide the status of the progress bar (#685).
 
 Changed
 +++++++

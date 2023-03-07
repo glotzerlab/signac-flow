@@ -13,7 +13,8 @@ class GreatLakesEnvironment(DefaultSlurmEnvironment):
 
     hostname_pattern = r"gl(-login)?[0-9]+\.arc-ts\.umich\.edu"
     template = "umich-greatlakes.sh"
-    cores_per_node = 1
+    _cpus_per_node = {"default": 36, "gpu": 40}
+    _gpus_per_node = {"default": 2}
 
     @classmethod
     def add_args(cls, parser):

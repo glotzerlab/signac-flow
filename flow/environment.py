@@ -293,6 +293,7 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
             Must be called after the rest of the template context has been gathered.
         """
         threshold = 0.0 if context.get("force", False) else 0.9
+        partition = context.get("partition", "default")
         cpu_tasks_total = calc_tasks(
             operations,
             "np",
@@ -305,14 +306,29 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
             context.get("parallel", False),
             context.get("force", False),
         )
-        num_nodes_cpu = calc_num_nodes(cpu_tasks_total, cls._cpus_per_node, threshold)
-        num_nodes_gpu = calc_num_nodes(gpu_tasks_total, cls._gpus_per_node, threshold)
+        num_nodes_cpu = calc_num_nodes(
+            cpu_tasks_total, cls._get_cpus_per_node(partition), threshold
+        )
+        if gpu_tasks_total > 0:
+            num_nodes_gpu = calc_num_nodes(
+                gpu_tasks_total, cls._get_gpus_per_node(partition), threshold
+            )
+        else:
+            num_nodes_gpu = 0
         num_nodes = max(num_nodes_cpu, num_nodes_gpu, 1)
         return {
             "ncpu_tasks": cpu_tasks_total,
             "ngpu_tasks": gpu_tasks_total,
             "num_nodes": num_nodes,
         }
+
+    @classmethod
+    def _get_cpus_per_node(cls, partition):
+        return cls._cpus_per_node.get(partition, cls._cpus_per_node["default"])
+
+    @classmethod
+    def _get_gpus_per_node(cls, partition):
+        return cls._gpus_per_node.get(partition, cls._gpus_per_node["default"])
 
 
 class StandardEnvironment(ComputeEnvironment):

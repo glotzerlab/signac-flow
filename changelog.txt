@@ -8,14 +8,26 @@ The numbers in brackets denote the related GitHub issue and/or pull request.
 Version 0.24
 ============
 
-[0.24.0] -- 20xx-xx-xx
+[0.24.0] -- 2023-02-22
 ----------------------
+
+Added
++++++
+
+- Added the OCLF Crusher environment (#708).
 
 Changed
 +++++++
 
+- Switched to a pyproject.toml based build (#704).
 - Placing ``@FlowProject.pre`` and ``@FlowProject.post`` before the ``FlowProject.operation`` decorator raises an error (#700).
 - Updated CI to use GitHub Actions (#698).
+
+Fixed
++++++
+
+- Bumped ``isort`` to 5.12.0 in the pre-commit configuration file (#715).
+- Fixed bundle status information not being correctly read for subclasses of ``FlowProject`` (#718, #720).
 
 Removed
 +++++++

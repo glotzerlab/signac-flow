@@ -10,7 +10,6 @@ import signac
 
 
 def test_print_status():
-
     # Must import the data into the project.
     with signac.TemporaryProject() as p, signac.TemporaryProject() as status_pr:
         gen.init(p)

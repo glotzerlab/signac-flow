@@ -147,6 +147,13 @@ def init(project):
                 "bundle": [["mpi_op", "omp_op"]],
             },
         ],
+        "environments.incite.CrusherEnvironment": [
+            {},
+            {
+                "parallel": [False, True],
+                "bundle": [["mpi_op", "omp_op"]],
+            },
+        ],
     }
 
     for environment, parameter_combinations in environments.items():

@@ -29,7 +29,6 @@ def init(project):
 
 
 def init_status_options(project):
-
     options = [
         {},  # default options
         {"overview": False},  # --no-overview
@@ -90,7 +89,6 @@ def main(args):
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser(description="Generate reference status output")
     parser.add_argument(
         "-f",

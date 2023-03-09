@@ -5021,7 +5021,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             "--operation",
             type=str,
             nargs="+",
-            help="Only select operation or groups that match the given "
+            help="Select operation or groups that match the given "
             "operation/group name(s). These are interpreted as regular expressions.",
         )
         parser_status.set_defaults(func=self._main_status)

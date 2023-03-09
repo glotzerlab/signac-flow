@@ -2618,7 +2618,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Parallelization mode for fetching the status. Allowed values are
             "thread", "process", or "none". (Default value = "none")
         names : iterable of :class:`str`
-            Only execute operations that match the provided set of names
+            Only show status for operations that match the provided set of names
             (interpreted as regular expressions), or all if the argument is
             None. (Default value = None)
 

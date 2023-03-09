@@ -2877,7 +2877,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             Status output format, supports:
             'terminal' (default), 'markdown' or 'html'.
         operation : iterable of :class:`str`
-            Only execute operations that match the provided set of names
+            Show status of operations that match the provided set of names
             (interpreted as regular expressions), or all if the argument is
             None. (Default value = None)
 

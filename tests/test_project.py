@@ -12,6 +12,7 @@ from io import StringIO
 from itertools import groupby
 
 import define_hooks_test_project
+import define_status_test_project
 import pytest
 import signac
 from conftest import MockScheduler, TestProjectBase
@@ -120,6 +121,46 @@ class TestProjectStatusPerformance(TestProjectBase):
             number=10,
         )
         assert time < 10
+
+
+class TestProjectStatusFilterOperations(TestProjectBase):
+    project_class = define_status_test_project._TestProject
+
+    def mock_project(self):
+        project = self.project_class.get_project(root=self._tmp_dir.name)
+
+        for a in range(2, 4):
+            for b in range(2):
+                job = project.open_job(dict(a=a, b=b)).init()
+                job.doc.a = a
+                job = project.open_job(dict(a=dict(a=a), b=b)).init()
+                job.doc.b = b
+
+        return project
+
+    @pytest.fixture(scope="function")
+    def project(self):
+        return self.mock_project()
+
+    @pytest.fixture(scope="function")
+    def get_status(self, project):
+        def _get_status(kwargs):
+            with redirect_stdout(StringIO()) as stdout:
+                with redirect_stderr(StringIO()) as stderr:
+                    project.print_status(**kwargs)
+                    return stdout.getvalue().split("\n"), stderr.getvalue().split("\n")
+
+        return _get_status
+
+    @pytest.mark.parametrize(
+        "groups",
+        [["group1"], ["group2"], ["group1", "group2"]],
+        ids=["group1", "group2", "group1_2"],
+    )
+    def test_groups(self, groups, get_status):
+        stdout, stderr = get_status({"operation": groups})
+        for line, group in zip(stdout[11:], groups):
+            assert group in line
 
 
 class TestProjectStatusNoEligibleOperations(TestProjectBase):

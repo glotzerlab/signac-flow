@@ -2664,7 +2664,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             scheduler_id, scheduler_status, aggregate_id, aggregate, group = data
             status = {}
             error_text = None
-            # if (operation is None) or (operation )
             try:
                 status["scheduler_status"] = scheduler_status
                 completed = group._complete(aggregate)

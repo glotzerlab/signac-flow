@@ -2716,14 +2716,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     )
             return result
 
-        submission_groups = set(self._gather_flow_groups(names))
+        status_groups = set(self._gather_flow_groups(names))
 
         with self._buffered():
             aggregate_groups = list(
                 self._generate_selected_aggregate_groups_with_status(
                     scheduler_info=scheduler_info,
                     selected_aggregates=aggregates,
-                    selected_groups=submission_groups,
+                    selected_groups=status_groups,
                 )
             )
             status_results = []

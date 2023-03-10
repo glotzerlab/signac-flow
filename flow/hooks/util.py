@@ -6,7 +6,19 @@ from datetime import datetime, timezone
 
 
 def collect_metadata(operation, job):
-    """TO DO."""
+    """TODO.
+
+    We can no longer track the following
+    because we take in the operation name as a string
+    rather than as an object, but I think this is
+    still super useful information.
+
+    Should we just drop it or see if there's still some
+    way to access this info?
+
+    "cmd": operation.cmd,
+    "directives": operation.directives,
+    """
     return {
         # the metadata schema version:
         "_schema_version": "1",

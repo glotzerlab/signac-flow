@@ -154,13 +154,39 @@ class TestProjectStatusFilterOperations(TestProjectBase):
 
     @pytest.mark.parametrize(
         "groups",
-        [["group1"], ["group2"], ["group1", "group2"]],
-        ids=["group1", "group2", "group1_2"],
+        [
+            ["group1"],
+            ["group2"],
+            ["group1", "group2"],
+            ["op1"],
+            ["group1", "op3"],
+            ["group2", "op1"],
+            ["op1", "op3"],
+        ],
+        ids=[
+            "group1",
+            "group2",
+            "group1_2",
+            "op1",
+            "group1_op3",
+            "group2_op1",
+            "op1_op3",
+        ],
     )
     def test_groups(self, groups, get_status):
-        stdout, stderr = get_status({"operation": groups})
-        for line, group in zip(stdout[11:], groups):
-            assert group in line
+        stdout, _ = get_status({"operation": groups})
+        excluded_groups = {"group1", "group2", "op1", "op2", "op3"} - set(groups)
+        if len(excluded_groups) > 0:
+            # This needs to be modified if we test most than two groups
+            for excluded_group in list(excluded_groups):
+                assert excluded_group not in "".join(stdout)
+        operations_output = "".join(stdout)
+        for group in groups:
+            assert group in operations_output
+
+    def test_operation_in_group(self, get_status):
+        with pytest.raises(ValueError):
+            get_status({"operation": ["op1", "group1"]})
 
 
 class TestProjectStatusNoEligibleOperations(TestProjectBase):

@@ -24,12 +24,12 @@ Changed
 Fixed
 +++++
 
-- 
+-
 
 Removed
 +++++++
 
-- 
+-
 
 Version 0.24
 ============

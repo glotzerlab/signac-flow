@@ -5,6 +5,32 @@ Changelog
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 The numbers in brackets denote the related GitHub issue and/or pull request.
 
+Version X.XX
+============
+
+[X.XX.X] -- 2023-XX-XX
+----------------------
+
+Added
++++++
+
+- Added ``-o`` flag to report project status information for specific operations.
+
+Changed
++++++++
+
+- Removed ``-o`` flag as an alias for ``--output``
+
+Fixed
++++++
+
+- 
+
+Removed
++++++++
+
+- 
+
 Version 0.24
 ============
 

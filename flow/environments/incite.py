@@ -36,8 +36,8 @@ class SummitEnvironment(DefaultLSFEnvironment):
     hostname_pattern = r".*\.summit\.olcf\.ornl\.gov"
     template = "summit.sh"
     mpi_cmd = "jsrun"
-    cores_per_node = 42
-    gpus_per_node = 6
+    _cpus_per_node = {"default": 42}
+    _gpus_per_node = {"default": 6}
 
     @template_filter
     def calc_num_nodes(cls, resource_sets, parallel=False):
@@ -187,7 +187,8 @@ class AndesEnvironment(DefaultSlurmEnvironment):
     hostname_pattern = r"andes-.*\.olcf\.ornl\.gov"
     template = "andes.sh"
     mpi_cmd = "srun"
-    cores_per_node = 32
+    _cpus_per_node = {"default": 32, "gpu": 28}
+    _gpus_per_node = {"default": 0, "gpu": 2}
 
     @classmethod
     def add_args(cls, parser):
@@ -216,8 +217,8 @@ class CrusherEnvironment(DefaultSlurmEnvironment):
 
     hostname_pattern = r".*\.crusher\.olcf\.ornl\.gov"
     template = "crusher.sh"
-    cores_per_node = 56
-    gpus_per_node = 8
+    _cpus_per_node = {"default": 56}
+    _gpus_per_node = {"default": 8}
     mpi_cmd = "srun"
 
     @template_filter

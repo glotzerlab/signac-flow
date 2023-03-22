@@ -25,7 +25,7 @@
         {% if ppn %}
 #PBS -l nodes={{ resources.num_nodes }}:ppn={{ ppn }}{{ s_gpu }}
         {% else %}
-#PBS -l procs={{ cpu_tasks }}{{ s_gpu }}
+#PBS -l procs={{ resources.cpu_tasks }}{{ s_gpu }}
         {% endif %}
     {% endblock tasks %}
 {% endblock header %}

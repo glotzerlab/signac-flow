@@ -15,14 +15,10 @@
             {% raise "Cannot request more than 14 CPUs per GPU." %}
         {% endif %}
     {% endif %}
-    {% if partition == 'gpu' %}
 #SBATCH -N {{ resources.num_nodes }}
 #SBATCH --ntasks={{ resourecs.ncpus_tasks }}
+    {% if partition == 'gpu' %}
 #SBATCH --gpus={{ resources.ngpu_tasks }}
-    {% else %}
-        {# This should cover batch #}
-#SBATCH -N {{ resources.num_nodes }}
-#SBATCH --ntasks={{ (32 * resources.num_nodes, resources.ncpu_tasks)|min }}
     {% endif %}
 {% endblock tasks %}
 {% block header %}

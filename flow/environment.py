@@ -306,15 +306,18 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
             context.get("parallel", False),
             context.get("force", False),
         )
-        num_nodes_cpu = calc_num_nodes(
-            cpu_tasks_total, cls._get_cpus_per_node(partition), threshold
-        )
         if gpu_tasks_total > 0:
             num_nodes_gpu = calc_num_nodes(
                 gpu_tasks_total, cls._get_gpus_per_node(partition), threshold
             )
+            num_nodes_cpu = calc_num_nodes(
+                cpu_tasks_total, cls._get_cpus_per_node(partition), 0
+            )
         else:
             num_nodes_gpu = 0
+            num_nodes_cpu = calc_num_nodes(
+                cpu_tasks_total, cls._get_cpus_per_node(partition), threshold
+            )
         num_nodes = max(num_nodes_cpu, num_nodes_gpu, 1)
         return {
             "ncpu_tasks": cpu_tasks_total,

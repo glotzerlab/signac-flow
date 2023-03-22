@@ -12,19 +12,12 @@
 
 {% block tasks %}
     {% set threshold = 0 if force else 0.9 %}
-    {% if operations|calc_tasks('ngpu', false, true) and not force %}
+    {% if resources.ngpu_tasks and not force %}
         {% raise "GPUs were requested but are unsupported by Stampede2!" %}
     {% endif %}
     {% set cpn = 48 if 'skx' in partition else 68 %}
-    {% if ns.use_launcher %}
-        {% set cpu_tasks = operations|calc_tasks('np', true, force) %}
-#SBATCH --nodes={{ nn|default(cpu_tasks|calc_num_nodes(cpn, threshold, 'CPU'), true) }}
-#SBATCH --ntasks={{ nn|default(cpu_tasks|calc_num_nodes(cpn, threshold, 'CPU'), true) * cpn }}
-    {% else %}
-        {% set cpu_tasks = operations|calc_tasks('np', parallel, force) %}
-#SBATCH --nodes={{ nn|default(cpu_tasks|calc_num_nodes(cpn, threshold, 'CPU'), true) }}
-#SBATCH --ntasks={{ (operations|calc_tasks('nranks', parallel, force), 1)|max }}
-    {% endif %}
+#SBATCH --nodes={{ resources.num_nodes }}
+#SBATCH --ntasks={{ resources.ncpu_tasks }}
 {% endblock tasks %}
 
 {% block header %}
@@ -36,7 +29,7 @@
 {% endblock %}
 
 {% block body %}
-    {% if ns.use_launcher %}
+    {% if use_launcher %}
         {% if parallel %}
             {{ ("Bundled submission without MPI on Stampede2 is using launcher; the --parallel option is therefore ignored.")|print_warning }}
         {% endif %}

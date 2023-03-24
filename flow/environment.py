@@ -108,6 +108,8 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
     submit_flags = None
     template = "base_script.sh"
     mpi_cmd = "mpiexec"
+    _cpus_per_node = {"default": -1}
+    _gpus_per_node = {"default": -1}
 
     @classmethod
     def is_present(cls):
@@ -306,16 +308,17 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
             context.get("parallel", False),
             context.get("force", False),
         )
+
         if gpu_tasks_total > 0:
-            num_nodes_gpu = calc_num_nodes(
+            num_nodes_gpu = cls._calc_num_nodes(
                 gpu_tasks_total, cls._get_gpus_per_node(partition), threshold
             )
-            num_nodes_cpu = calc_num_nodes(
+            num_nodes_cpu = cls._calc_num_nodes(
                 cpu_tasks_total, cls._get_cpus_per_node(partition), 0
             )
         else:
             num_nodes_gpu = 0
-            num_nodes_cpu = calc_num_nodes(
+            num_nodes_cpu = cls._calc_num_nodes(
                 cpu_tasks_total, cls._get_cpus_per_node(partition), threshold
             )
         num_nodes = max(num_nodes_cpu, num_nodes_gpu, 1)
@@ -332,6 +335,13 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
     @classmethod
     def _get_gpus_per_node(cls, partition):
         return cls._gpus_per_node.get(partition, cls._gpus_per_node["default"])
+
+    @classmethod
+    def _calc_num_nodes(cls, tasks, processors, threshold):
+        """Call calc_num_nodes but handles the -1 sentinal value."""
+        if processors == -1:
+            return 1
+        return calc_num_nodes(tasks, processors, threshold)
 
 
 class StandardEnvironment(ComputeEnvironment):

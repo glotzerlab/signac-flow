@@ -2,6 +2,7 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 import datetime
+import json
 import logging
 import os
 import subprocess
@@ -18,6 +19,7 @@ from conftest import MockScheduler, TestProjectBase
 from define_aggregate_test_project import _AggregateTestProject
 from define_dag_test_project import DagTestProject
 from define_directives_test_project import _DirectivesTestProject
+from define_hooks_track_operations_project import _HooksTrackOperations
 from define_test_project import _DynamicTestProject, _TestProject
 from deprecation import fail_if_not_removed
 
@@ -2433,6 +2435,65 @@ class TestHooksInvalidOption(TestHooksSetUp):
         )
 
         assert "RuntimeError" in error_output
+
+
+class TestHooksTrackOperations(TestHooksSetUp):
+    project_class = _HooksTrackOperations
+    entrypoint = dict(
+        path=os.path.realpath(
+            os.path.join(
+                os.path.dirname(__file__), "define_hooks_track_operations_project.py"
+            )
+        )
+    )
+    log_fname = ".operations_log.txt"
+
+    @pytest.fixture(
+        params=[
+            "strict_git_false",
+            # "strict_git_false_cmd"
+        ]
+    )
+    def operation_name(self, request):
+        return request.param
+
+    def mock_project(self):
+        project = self.project_class.get_project(root=self._tmp_dir.name)
+        project.open_job(dict(raise_exception=False)).init()
+        project.open_job(dict(raise_exception=True)).init()
+        project = project.get_project(root=self._tmp_dir.name)
+        return project
+
+    def split_log(self, job):
+        with open(job.fn(self.log_fname)) as f:
+            values = f.read().split("\n")
+        if values[-1] == "":
+            values = values[:-1]
+        return values
+
+    def test_on_start(self, project, job, operation_name):
+        assert not job.isfile(self.log_fname)
+
+        if job.sp.raise_exception:
+            with pytest.raises(subprocess.CalledProcessError):
+                self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+        else:
+            self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+
+        assert job.isfile(self.log_fname)
+        values = self.split_log(job)
+
+        # There will always be 4 entries in this file because
+        # for every operation, we install the following hooks
+        # at the operation and project level:
+        # (1) on_start and (2) on_exception / on_success
+        assert len(values) == 4
+        for value in values[:2]:
+            metadata = json.loads(value)
+            assert metadata["stage"] == "prior"
+            job_op_metadata = metadata["job-operation"]
+            assert job_op_metadata["job_id"] == job.id
+            assert job_op_metadata["name"] == operation_name
 
 
 class TestIgnoreConditions:

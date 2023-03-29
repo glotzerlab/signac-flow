@@ -2471,7 +2471,7 @@ class TestHooksTrackOperations(TestHooksSetUp):
             values = values[:-1]
         return values
 
-    def test_on_start(self, project, job, operation_name):
+    def test_metadata(self, project, job, operation_name):
         assert not job.isfile(self.log_fname)
 
         time = datetime.datetime.now(datetime.timezone.utc)
@@ -2505,6 +2505,32 @@ class TestHooksTrackOperations(TestHooksSetUp):
             start_time = datetime.datetime.fromisoformat(metadata["time"])
             difference = start_time - time
             assert difference.seconds < 5 * 60
+            job_op_metadata = metadata["job-operation"]
+            assert job_op_metadata["job_id"] == job.id
+            assert job_op_metadata["name"] == operation_name
+
+        for value in values[2:]:
+            metadata = json.loads(value)
+            assert metadata["stage"] == "after"
+            # I think job._project.path gives us a relative path in the test, while
+            # job._project.path in hooks.utils.collect_metadata gives us the absolute path
+            # I don't know why this is happening.
+            assert job._project.path in metadata["project"]["path"]
+            assert metadata["project"]["schema_version"] == job._project.config.get(
+                "schema_version"
+            )
+            # Just assumed that the operation should start within 5 minutes
+            # from where we recorded the time line 2477. This seems generous and
+            # we can adjust it if needed.
+            start_time = datetime.datetime.fromisoformat(metadata["time"])
+            difference = start_time - time
+            assert difference.seconds < 5 * 60
+
+            if job.sp.raise_exception:
+                assert metadata["error"] == self.error_message
+            else:
+                assert metadata["error"] is None
+
             job_op_metadata = metadata["job-operation"]
             assert job_op_metadata["job_id"] == job.id
             assert job_op_metadata["name"] == operation_name

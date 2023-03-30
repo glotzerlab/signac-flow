@@ -12,6 +12,8 @@ import flow
 import flow.environments
 from flow.scheduling.fake_scheduler import FakeScheduler
 
+PROJECT_NAME = "StatusTest"
+STATUS_OPTIONS_PROJECT_NAME = "StatusOptionsData"
 ARCHIVE_PATH = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "./status_reference_data.tar.gz")
 )
@@ -67,10 +69,12 @@ def main(args):
             )
             return
 
-    with signac.TemporaryProject() as p, signac.TemporaryProject() as status_pr:
+    with signac.TemporaryProject(name=PROJECT_NAME) as p, signac.TemporaryProject(
+        name=STATUS_OPTIONS_PROJECT_NAME
+    ) as status_pr:
         init(p)
         init_status_options(status_pr)
-        fp = _TestProject.get_project(path=p.path)
+        fp = _TestProject.get_project(root=p.path)
         env = flow.environment.TestEnvironment
         # We need to set the scheduler manually. The FakeScheduler
         # won't try to call any cluster executable (e.g. squeue)

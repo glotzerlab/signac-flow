@@ -29,7 +29,7 @@ TEMPLATES = {
 }
 
 
-def init(alias=None, template=None, path=None):
+def init(alias=None, template=None, root=None):
     """Initialize a templated :class:`~.FlowProject` module.
 
     Parameters
@@ -47,7 +47,7 @@ def init(alias=None, template=None, path=None):
 
         Uses ``"minimal"`` if None. (Default value = None)
 
-    path : str
+    root : str
         Directory where the output file is placed. Uses the current working
         directory if None. (Default value = None)
 
@@ -101,8 +101,8 @@ def init(alias=None, template=None, path=None):
     files_created = []
     for fn, code in codes.items():
         try:
-            if path is not None:
-                fn = os.path.join(path, fn)
+            if root is not None:
+                fn = os.path.join(root, fn)
             with open(fn, "x") as fw:
                 fw.write(code + "\n")
         except OSError as error:

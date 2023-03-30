@@ -14,8 +14,8 @@ class TestConfigFilter(TestProjectBase):
     project_class = _ConfigProject
 
     def test_base(self):
-        project = self.mock_project(config_overrides={"flow": {"foo": "test_string"}})
-        assert get_config_value(project, "foo") == "test_string"
+        project = self.mock_project(config_overrides={"flow": {"foo": 4}})
+        assert get_config_value(project, "foo") == 4
 
     def test_missing_key(self):
         project = self.mock_project()
@@ -24,29 +24,27 @@ class TestConfigFilter(TestProjectBase):
 
     def test_missing_key_with_default(self):
         project = self.mock_project()
-        default = "default_string"
+        default = 52
         assert get_config_value(project, "foo", default=default) == default
 
     def test_set_key_with_default(self):
-        default = "default_string"
-        set_value = "test_string"
+        default = 52
+        set_value = 4
         project = self.mock_project(config_overrides={"flow": {"foo": set_value}})
         assert get_config_value(project, "foo", default=default) == set_value
 
     def test_with_namespace(self):
-        project = self.mock_project(
-            config_overrides={"flow": {"bar": {"foo": "test_string"}}}
-        )
-        assert get_config_value(project, "foo", ns="bar") == "test_string"
+        project = self.mock_project(config_overrides={"flow": {"bar": {"foo": 4}}})
+        assert get_config_value(project, "foo", ns="bar") == 4
 
     def test_missing_key_with_default_with_namespace(self):
-        default = "default_string"
+        default = 52
         project = self.mock_project()
         assert get_config_value(project, "foo", ns="bar", default=default) == default
 
     def test_set_key_with_default_with_namespace(self):
-        default = "default_string"
-        set_value = "test_string"
+        default = 52
+        set_value = 4
         project = self.mock_project(
             config_overrides={"flow": {"bar": {"foo": set_value}}}
         )

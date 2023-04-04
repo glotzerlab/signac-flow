@@ -321,8 +321,8 @@ class TestDirectives:
         self, available_directives_list, non_default_directive_values
     ):
         _tmp_dir = TemporaryDirectory(prefix="flow-directives_")
-        FlowProject.init_project(root=_tmp_dir.name)
-        project = FlowProject.get_project(root=_tmp_dir.name)
+        FlowProject.init_project(path=_tmp_dir.name)
+        project = FlowProject.get_project(path=_tmp_dir.name)
         for i in range(5):
             project.open_job(dict(i=i)).init()
 

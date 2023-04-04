@@ -30,6 +30,17 @@ Removed
 +++++++
 
 -
+=======
+Version 0.25
+============
+
+[0.25.0] -- 2023-03-30
+----------------------
+
+Changed
++++++++
+
+- Requires signac 2.0.0 (#734).
 
 Version 0.24
 ============
@@ -40,7 +51,7 @@ Version 0.24
 Added
 +++++
 
-- Added the OCLF Crusher environment (#708).
+- Added the OLCF Crusher environment (#708).
 
 Changed
 +++++++

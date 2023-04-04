@@ -19,8 +19,8 @@ This project is open-source.
 Users are highly encouraged to contribute directly by implementing new features and fixing issues.
 Development for packages as part of the **signac** framework should follow the general development guidelines outlined `here <http://docs.signac.io/en/latest/community.html#contributions>`__.
 
-A brief summary of contributing guidelines are outlined in the `CONTRIBUTING.md <https://github.com/glotzerlab/signac-flow/blob/master/CONTRIBUTING.md>`_ file as part of the repository.
-All contributors must agree to the `Contributor Agreement <https://github.com/glotzerlab/signac-flow/blob/master/ContributorAgreement.md>`_ before their pull request can be merged.
+A brief summary of contributing guidelines are outlined in the `CONTRIBUTING.md <https://github.com/glotzerlab/signac-flow/blob/main/CONTRIBUTING.md>`_ file as part of the repository.
+All contributors must agree to the `Contributor Agreement <https://github.com/glotzerlab/signac-flow/blob/main/ContributorAgreement.md>`_ before their pull request can be merged.
 
 Set up a development environment
 --------------------------------
@@ -153,7 +153,7 @@ Before you begin the process, make sure you have the following packages installe
 
 Once you've written the environment class and the template as described above, contributing the environments to the package involves the following:
 
-  1. Create a new branch of **signac-flow** based on the *master* branch.
+  1. Create a new branch of **signac-flow** based on the *main* branch.
   2. Add your environment class to the *flow/environments/* directory, and add the corresponding template to the *flow/templates/* directory.
   3. Run the `tests/test_templates.py` test script. It should fail on your environment, indicating that no reference scripts exist yet.
   4. Update the `environments` dictionary in the `init` function of `tests/generate_template_reference_data.py`. The dictionary indicates the submission argument combinations that need to be tested for your environment.

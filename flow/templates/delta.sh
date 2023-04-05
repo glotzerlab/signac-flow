@@ -15,8 +15,10 @@
             {% raise "Requesting GPU partition, but no GPUs requested!" %}
         {% endif %}
     {% endif %}
+    {% if resources.num_nodes > 1 %}
 #SBATCH -N {{ resources.num_nodes }}
-#SBATCH --ntasks={{ resources.ncpus_tasks }}
+    {% endif %}
+#SBATCH --ntasks={{ resources.ncpu_tasks }}
     {% if "gpu" in partition %}
 #SBATCH --gpus-per-node={{ resources.gpu_tasks }}
     {% endif %}

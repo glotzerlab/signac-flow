@@ -93,7 +93,7 @@ class TestProjectStatusPerformance(TestProjectBase):
     project_class = Project
 
     def mock_project(self):
-        project = self.project_class.get_project(root=self._tmp_dir.name)
+        project = self.project_class.get_project(path=self._tmp_dir.name)
         for i in range(1000):
             project.open_job(dict(i=i)).init()
         return project
@@ -134,7 +134,7 @@ class TestProjectStatusNoEligibleOperations(TestProjectBase):
     project_class = Project
 
     def mock_project(self):
-        project = self.project_class.get_project(root=self._tmp_dir.name)
+        project = self.project_class.get_project(path=self._tmp_dir.name)
         project.open_job({"i": 0}).init()
         return project
 
@@ -865,7 +865,7 @@ class TestProject(TestProjectBase):
 
     def test_init(self):
         with redirect_stderr(StringIO()):
-            for fn in init(root=self._tmp_dir.name):
+            for fn in init(path=self._tmp_dir.name):
                 fn_ = os.path.join(self._tmp_dir.name, fn)
                 assert os.path.isfile(fn_)
 
@@ -1237,7 +1237,7 @@ class TestExecutionProject(TestProjectBase):
         def op1(job):
             pass
 
-        project = Project(project.config)
+        project = Project(project.path)
         assert len(project)
         with redirect_stderr(StringIO()):
             for state, expected_evaluation in [
@@ -2033,10 +2033,10 @@ class TestAggregatesProjectBase(TestProjectBase):
     )
 
     def mock_project(self):
-        project = self.project_class.get_project(root=self._tmp_dir.name)
+        project = self.project_class.get_project(path=self._tmp_dir.name)
         for i in range(1, 31):
             project.open_job(dict(i=i, even=bool(i % 2 == 0))).init()
-        project = project.get_project(root=self._tmp_dir.name)
+        project = project.get_project(path=self._tmp_dir.name)
         project._entrypoint = self.entrypoint
         return project
 
@@ -2224,10 +2224,10 @@ class TestHooksSetUp(TestProjectBase):
         return request.param
 
     def mock_project(self):
-        project = self.project_class.get_project(root=self._tmp_dir.name)
+        project = self.project_class.get_project(path=self._tmp_dir.name)
         project.open_job(dict(raise_exception=False)).init()
         project.open_job(dict(raise_exception=True)).init()
-        project = project.get_project(root=self._tmp_dir.name)
+        project = project.get_project(path=self._tmp_dir.name)
         project._entrypoint = self.entrypoint
         return project
 

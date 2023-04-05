@@ -108,8 +108,10 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
     submit_flags = None
     template = "base_script.sh"
     mpi_cmd = "mpiexec"
+
     _cpus_per_node = {"default": -1}
     _gpus_per_node = {"default": -1}
+    _shared_partitions = {}
 
     @classmethod
     def is_present(cls):
@@ -287,23 +289,27 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
         )
 
     @classmethod
-    def _get_scheduler_values(cls, context, operations):
+    def _get_scheduler_values(cls, context):
         """Return a dictionary of computed quantities regarding submission.
 
         Warning
         -------
             Must be called after the rest of the template context has been gathered.
         """
-        threshold = 0.0 if context.get("force", False) else 0.9
-        partition = context.get("partition", "default")
+        partition = context.get("partition", None)
+        force = context.get("force", False)
+        if force or partition in cls._shared_partitions:
+            threshold = 0.0
+        else:
+            threshold = 0.9
         cpu_tasks_total = calc_tasks(
-            operations,
+            context["operations"],
             "np",
             context.get("parallel", False),
             context.get("force", False),
         )
         gpu_tasks_total = calc_tasks(
-            operations,
+            context["operations"],
             "ngpu",
             context.get("parallel", False),
             context.get("force", False),

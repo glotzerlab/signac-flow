@@ -259,6 +259,7 @@ class DeltaEnvironment(DefaultSlurmEnvironment):
         "gpuMI100x8": 128,
     }
     _gpus_per_node = {"default": 4, "gpuA100x8": 8, "gpuMI100x8": 8}
+    _shared_partitions = {"cpu", "gpuA100x4", "gpuA40x4", "gpuA100x8", "gpuMI100x8"}
 
     @classmethod
     def add_args(cls, parser):

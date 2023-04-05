@@ -3948,9 +3948,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         context["id"] = _id
         context["operations"] = list(operations)
         context.update(kwargs)
-        context["resources"] = self._environment._get_scheduler_values(
-            context, operations
-        )
+        context["resources"] = self._environment._get_scheduler_values(context)
         if show_template_help:
             self._show_template_help_and_exit(template_environment, context)
         return template.render(**context)

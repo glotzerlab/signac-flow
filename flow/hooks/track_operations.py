@@ -2,7 +2,7 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 """TO DO."""
-from signac import Collection
+import json
 
 try:
     import git
@@ -52,8 +52,9 @@ class TrackOperations:
             metadata["error"] = None if error is None else str(error)
 
             # Write metadata to collection inside job workspace.
-            with Collection.open(job.fn(FN_LOGFILE)) as logfile:
-                logfile.insert_one(metadata)
+            with open(job.fn(FN_LOGFILE), "a") as logfile:
+                # HELP: Is there any reason we used Collections instead of a regular dictionary?
+                logfile.write(json.dumps(metadata) + "\n")
 
         return _log_operation
 

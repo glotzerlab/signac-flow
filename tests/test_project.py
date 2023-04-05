@@ -13,13 +13,13 @@ from io import StringIO
 from itertools import groupby
 
 import define_hooks_test_project
+import define_hooks_track_operations_project
 import pytest
 import signac
 from conftest import MockScheduler, TestProjectBase
 from define_aggregate_test_project import _AggregateTestProject
 from define_dag_test_project import DagTestProject
 from define_directives_test_project import _DirectivesTestProject
-from define_hooks_track_operations_project import _HooksTrackOperations
 from define_test_project import _DynamicTestProject, _TestProject
 from deprecation import fail_if_not_removed
 
@@ -39,6 +39,18 @@ from flow.util.misc import (
     _add_path_to_environment_pythonpath,
     _switch_to_directory,
 )
+
+"""
+try:
+    import git
+
+    skip_git = False
+except ImportError:
+    skip_git = True
+
+
+git_mark_skipif = pytest.mark.skipif(skip_git, reason="git could not be imported")
+"""
 
 
 @contextmanager
@@ -2437,8 +2449,9 @@ class TestHooksInvalidOption(TestHooksSetUp):
         assert "RuntimeError" in error_output
 
 
+# @git_mark_skipif
 class TestHooksTrackOperations(TestHooksSetUp):
-    project_class = _HooksTrackOperations
+    project_class = define_hooks_track_operations_project._HooksTrackOperations
     entrypoint = dict(
         path=os.path.realpath(
             os.path.join(
@@ -2450,19 +2463,15 @@ class TestHooksTrackOperations(TestHooksSetUp):
 
     @pytest.fixture(
         params=[
-            "strict_git_false",
-            # "strict_git_false_cmd"
+            (
+                "strict_git_false",
+                define_hooks_track_operations_project.HOOKS_ERROR_MESSAGE,
+            ),
+            ("strict_git_false_cmd", "non-zero exit status 42"),
         ]
     )
-    def operation_name(self, request):
+    def operation_info(self, request):
         return request.param
-
-    def mock_project(self):
-        project = self.project_class.get_project(root=self._tmp_dir.name)
-        project.open_job(dict(raise_exception=False)).init()
-        project.open_job(dict(raise_exception=True)).init()
-        project = project.get_project(root=self._tmp_dir.name)
-        return project
 
     def split_log(self, job):
         with open(job.fn(self.log_fname)) as f:
@@ -2471,7 +2480,8 @@ class TestHooksTrackOperations(TestHooksSetUp):
             values = values[:-1]
         return values
 
-    def test_metadata(self, project, job, operation_name):
+    def test_metadata(self, project, job, operation_info):
+        operation_name, error_message = operation_info
         assert not job.isfile(self.log_fname)
 
         time = datetime.datetime.now(datetime.timezone.utc)
@@ -2527,13 +2537,17 @@ class TestHooksTrackOperations(TestHooksSetUp):
             assert difference.seconds < 5 * 60
 
             if job.sp.raise_exception:
-                assert metadata["error"] == self.error_message
+                assert error_message in metadata["error"]
+
             else:
                 assert metadata["error"] is None
 
             job_op_metadata = metadata["job-operation"]
             assert job_op_metadata["job_id"] == job.id
             assert job_op_metadata["name"] == operation_name
+
+        def test_strict_git():
+            pass
 
 
 class TestIgnoreConditions:

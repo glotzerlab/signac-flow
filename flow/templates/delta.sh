@@ -6,7 +6,7 @@
                   increased charges and is expected to be suitable for a
                   minority of use cases." %}
     {% endif %}
-    {% if gpu_tasks %}
+    {% if resources.ngpu_tasks %}
         {% if not ("gpu" in partition or force) %}
             {% raise "GPU operations require a GPU partition!" %}
         {% endif %}
@@ -20,7 +20,7 @@
     {% endif %}
 #SBATCH --ntasks={{ resources.ncpu_tasks }}
     {% if "gpu" in partition %}
-#SBATCH --gpus-per-node={{ resources.gpu_tasks }}
+#SBATCH --gpus={{ resources.ngpu_tasks }}
     {% endif %}
 {% endblock tasks %}
 {% block header %}

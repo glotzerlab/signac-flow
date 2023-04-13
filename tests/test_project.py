@@ -2466,7 +2466,7 @@ class TestHooksTrackOperations(TestHooksSetUp):
             ("strict_git_false_cmd", "non-zero exit status 42"),
         ]
     )
-    def operation_info(self, request):
+    def strict_git_false_operation_info(self, request):
         return request.param
 
     def split_log(self, job):
@@ -2476,8 +2476,8 @@ class TestHooksTrackOperations(TestHooksSetUp):
             values = values[:-1]
         return values
 
-    def test_metadata(self, project, job, operation_info):
-        operation_name, error_message = operation_info
+    def test_metadata(self, project, job, strict_git_false_operation_info):
+        operation_name, error_message = strict_git_false_operation_info
         assert not job.isfile(self.log_fname)
 
         time = datetime.datetime.now(datetime.timezone.utc)
@@ -2543,7 +2543,7 @@ class TestHooksTrackOperations(TestHooksSetUp):
             assert job_op_metadata["name"] == operation_name
 
     @git_mark_skipif
-    def test_strict_git(self, project):
+    def test_strict_git(self, project, job, operation_info):
         pass
 
 

@@ -40,17 +40,14 @@ from flow.util.misc import (
     _switch_to_directory,
 )
 
-"""
 try:
     import git
-
     skip_git = False
 except ImportError:
     skip_git = True
 
 
 git_mark_skipif = pytest.mark.skipif(skip_git, reason="git could not be imported")
-"""
 
 
 @contextmanager
@@ -2449,7 +2446,6 @@ class TestHooksInvalidOption(TestHooksSetUp):
         assert "RuntimeError" in error_output
 
 
-# @git_mark_skipif
 class TestHooksTrackOperations(TestHooksSetUp):
     project_class = define_hooks_track_operations_project._HooksTrackOperations
     entrypoint = dict(
@@ -2546,8 +2542,9 @@ class TestHooksTrackOperations(TestHooksSetUp):
             assert job_op_metadata["job_id"] == job.id
             assert job_op_metadata["name"] == operation_name
 
-        def test_strict_git():
-            pass
+    @git_mark_skipif
+    def test_strict_git(self, project):
+        pass
 
 
 class TestIgnoreConditions:

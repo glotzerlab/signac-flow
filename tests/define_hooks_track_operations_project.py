@@ -66,38 +66,39 @@ Strict Git True
 """
 
 
-"""
-@_HooksTrackOperations.operation_hooks.on_start(
-    TrackOperations(strict_git=True).on_start
-)
-@_HooksTrackOperations.operation_hooks.on_exception(
-    TrackOperations(strict_git=True).on_exception
-)
-@_HooksTrackOperations.operation_hooks.on_success(
-    TrackOperations(strict_git=True).on_success
-)
-@_HooksTrackOperations.operation
-def strict_git_true(job):
-    if job.sp.raise_exception:
-        raise RuntimeError(HOOKS_ERROR_MESSAGE)
+try:
+    @_HooksTrackOperations.operation_hooks.on_start(
+        TrackOperations(strict_git=True).on_start
+    )
+    @_HooksTrackOperations.operation_hooks.on_exception(
+        TrackOperations(strict_git=True).on_exception
+    )
+    @_HooksTrackOperations.operation_hooks.on_success(
+        TrackOperations(strict_git=True).on_success
+    )
+    @_HooksTrackOperations.operation
+    def strict_git_true(job):
+        if job.sp.raise_exception:
+            raise RuntimeError(HOOKS_ERROR_MESSAGE)
 
 
-@_HooksTrackOperations.operation_hooks.on_start(
-    TrackOperations(strict_git=True).on_start
-)
-@_HooksTrackOperations.operation_hooks.on_exception(
-    TrackOperations(strict_git=True).on_exception
-)
-@_HooksTrackOperations.operation_hooks.on_success(
-    TrackOperations(strict_git=True).on_success
-)
-@_HooksTrackOperations.operation(cmd=True, with_job=True)
-def strict_git_true_cmd(job):
-    if job.sp.raise_exception:
-        return "exit 42"
-    else:
-        return "touch base_cmd.txt"
-"""
+    @_HooksTrackOperations.operation_hooks.on_start(
+        TrackOperations(strict_git=True).on_start
+    )
+    @_HooksTrackOperations.operation_hooks.on_exception(
+        TrackOperations(strict_git=True).on_exception
+    )
+    @_HooksTrackOperations.operation_hooks.on_success(
+        TrackOperations(strict_git=True).on_success
+    )
+    @_HooksTrackOperations.operation(cmd=True, with_job=True)
+    def strict_git_true_cmd(job):
+        if job.sp.raise_exception:
+            return "exit 42"
+        else:
+            return "touch base_cmd.txt"
+except RuntimeError:
+    pass
 
 
 if __name__ == "__main__":

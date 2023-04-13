@@ -7,10 +7,10 @@ import git
 from .util import collect_metadata
 
 
-def collect_metadata_with_git(operation):
+def collect_metadata_with_git(operation, job):
     """TODO."""
-    repo = git.Repo(operation.job._project.root_directory())
-    metadata = collect_metadata(operation)
+    repo = git.Repo(job._project.root_directory())
+    metadata = collect_metadata(operation, job)
     metadata["project"]["git"] = {
         "commit_id": str(repo.commit()),
         "dirty": repo.is_dirty(),

@@ -2469,6 +2469,18 @@ class TestHooksTrackOperations(TestHooksSetUp):
     def strict_git_false_operation_info(self, request):
         return request.param
 
+    @pytest.fixture(
+        params=[
+            (
+                "strict_git_true",
+                define_hooks_track_operations_project.HOOKS_ERROR_MESSAGE,
+            ),
+            ("strict_git_true_cmd", "non-zero exit status 42"),
+        ]
+    )
+    def strict_git_true_operation_info(self, request):
+        return request.param
+
     def split_log(self, job):
         with open(job.fn(self.log_fname)) as f:
             values = f.read().split("\n")
@@ -2542,9 +2554,38 @@ class TestHooksTrackOperations(TestHooksSetUp):
             assert job_op_metadata["job_id"] == job.id
             assert job_op_metadata["name"] == operation_name
 
+    def git_repo(self, project, make_dirty=False):
+        repo = git.Repo.init(project.path)
+        if make_dirty:
+            with open(project.fn("test.txt"), "w") as f:
+                pass
+
+
     @git_mark_skipif
-    def test_strict_git(self, project, job, operation_info):
-        pass
+    def test_strict_git_not_dirty(self, project, job, strict_git_true_operation_info):
+        operation_name, error_message = strict_git_true_operation_info
+        assert not job.isfile(self.log_fname)
+
+        if job.sp.raise_exception:
+            with pytest.raises(subprocess.CalledProcessError):
+                self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+        else:
+            self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+
+    @git_mark_skipif
+    def test_strict_git_is_dirty(self, project, job, strict_git_true_operation_info):
+        operation_name, error_message = strict_git_true_operation_info
+
+        breakpoint()
+
+        # assert not job.isfile(self.log_fname)
+
+        # with pytest.raises(RuntimeError):
+            # if job.sp.raise_exception:
+                # with pytest.raises(subprocess.CalledProcessError):
+                    # self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+            # else:
+                # self.call_subcmd(f"run -o {operation_name} -j {job.id}")
 
 
 class TestIgnoreConditions:

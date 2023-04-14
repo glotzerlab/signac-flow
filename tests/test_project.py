@@ -1307,6 +1307,18 @@ class TestProjectMainInterface(TestProjectBase):
             else:
                 assert not job.isfile("world.txt")
 
+    def test_main_run_filter(self):
+        assert len(self.project)
+        for job in self.project:
+            assert not job.isfile("world.txt")
+        self.call_subcmd("run -o op1 -f b 2")
+        even_jobs = [job for job in self.project if job.sp.b == 2]
+        for job in self.project:
+            if job in even_jobs:
+                assert job.isfile("world.txt")
+            else:
+                assert not job.isfile("world.txt")
+
     def test_main_run_invalid_op(self):
         assert len(self.project)
         run_output = self.call_subcmd(

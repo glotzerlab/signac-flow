@@ -4870,11 +4870,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
 
     def _select_jobs_from_args(self, args):
         """Select jobs with the given command line arguments ('-j/-f/--job-id')."""
-        if (
-            not args.func == self._main_exec
-            and args.job_id
-            and (args.filter)
-        ):
+        if not args.func == self._main_exec and args.job_id and (args.filter):
             raise ValueError(
                 "Cannot provide both -j/--job-id and -f/--filter in combination."
             )

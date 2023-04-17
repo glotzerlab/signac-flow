@@ -175,7 +175,7 @@ class Bridges2Environment(DefaultSlurmEnvironment):
     mpi_cmd = "mpirun"
     _cpus_per_node = {"default": 128, "EM": 96, "GPU": 40, "GPU-shared": 40}
     _gpus_per_node = {"default": 8}
-
+    _shared_partitions = {"RM-shared", "GPU-shared"}
     @classmethod
     def add_args(cls, parser):
         """Add arguments to parser.

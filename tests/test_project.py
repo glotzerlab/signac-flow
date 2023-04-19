@@ -42,6 +42,7 @@ from flow.util.misc import (
 
 try:
     import git
+
     skip_git = False
 except ImportError:
     skip_git = True
@@ -2576,7 +2577,6 @@ class TestHooksTrackOperations(TestHooksSetUp):
             with open(project.fn("dirty.txt"), "w") as f:
                 pass
         return repo
-
 
     @git_mark_skipif
     def test_strict_git_not_dirty(self, project, job, strict_git_true_operation_info):

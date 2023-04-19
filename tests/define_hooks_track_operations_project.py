@@ -67,6 +67,7 @@ Strict Git True
 
 
 try:
+
     @_HooksTrackOperations.operation_hooks.on_start(
         TrackOperations(strict_git=True).on_start
     )
@@ -80,7 +81,6 @@ try:
     def strict_git_true(job):
         if job.sp.raise_exception:
             raise RuntimeError(HOOKS_ERROR_MESSAGE)
-
 
     @_HooksTrackOperations.operation_hooks.on_start(
         TrackOperations(strict_git=True).on_start
@@ -97,6 +97,7 @@ try:
             return "exit 42"
         else:
             return "touch base_cmd.txt"
+
 except RuntimeError:
     pass
 

@@ -37,7 +37,7 @@ class TrackOperations:
 
         def _log_operation(operation, job, error=None):
             if self.strict_git:
-                if git.Repo(job._project.root_directory()).is_dirty():
+                if git.Repo(job._project.path).is_dirty():
                     raise RuntimeError(
                         "Unable to reliably log operation, because the git repository in "
                         "the project root directory is dirty.\n\nMake sure to commit all "

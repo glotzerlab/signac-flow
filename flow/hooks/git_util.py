@@ -9,7 +9,7 @@ from .util import collect_metadata
 
 def collect_metadata_with_git(operation, job):
     """TODO."""
-    repo = git.Repo(job._project.root_directory())
+    repo = git.Repo(job._project.path)
     metadata = collect_metadata(operation, job)
     metadata["project"]["git"] = {
         "commit_id": str(repo.commit()),

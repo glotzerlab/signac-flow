@@ -249,9 +249,11 @@ class DeltaEnvironment(DefaultSlurmEnvironment):
 
     # Example hostnames
     # login: dt-login02.delta.internal.ncsa.edu
-    # cpu host: cn001.delta.internal.ncsa.edu
-    # gpu host: gpua075.delta.internal.ncsa.edu
-    hostname_pattern = r"(gpua|dt|cn)(-login)?[0-9]+\.delta\.internal\.ncsa\.edu"
+    # cpu host: cn001.delta.ncsa.illinois.edu
+    # gpu host: gpua049.delta.ncsa.illinois.edu
+    # Avoid full specification of patterns as Delta has a habit of changing hostnames. This should
+    # be safer given the parts listed are less likely to change.
+    hostname_pattern = r"(gpua|dt|cn)(-login)?[0-9]+\.delta.*\.ncsa.*\.edu"
     template = "delta.sh"
     _cpus_per_node = {
         "default": 128,

@@ -8,12 +8,13 @@ The numbers in brackets denote the related GitHub issue and/or pull request.
 Version 0.25
 ============
 
-[0.25.1] -- 2023-XX-XX
+[0.25.1] -- 2023-04-21
 ----------------------
 
 Fixed
 +++++
 
+- Delta hostname detection (#740).
 - Fix filter argument (#737, #738).
 
 Removed

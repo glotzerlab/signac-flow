@@ -2824,7 +2824,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         profile=False,
         eligible_jobs_max_lines=None,
         output_format="terminal",
-        names=None,
+        operation=None,
     ):
         """Print the status of the project.
 
@@ -2875,7 +2875,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         output_format : str
             Status output format, supports:
             'terminal' (default), 'markdown' or 'html'.
-        names : iterable of :class:`str`
+        operation : iterable of :class:`str`
             Show status of operations that match the provided set of names
             (interpreted as regular expressions), or all if the argument is
             None. (Default value = None)
@@ -2923,7 +2923,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
                     err=err,
                     ignore_errors=ignore_errors,
                     status_parallelization=status_parallelization,
-                    names=names,
+                    names=operation,
                 )
 
             prof._mergeFileTiming()
@@ -3003,7 +3003,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
                 err=err,
                 ignore_errors=ignore_errors,
                 status_parallelization=status_parallelization,
-                names=names,
+                names=operation,
             )
             profiling_results = None
 
@@ -5003,7 +5003,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         )
         parser_status.add_argument(
             "-o",
-            "--names",
+            "--operation",
             type=str,
             nargs="+",
             help="Select operation or groups that match the given "

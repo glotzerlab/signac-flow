@@ -127,7 +127,7 @@ class TestProjectStatusFilterOperations(TestProjectBase):
     project_class = define_status_test_project._TestProject
 
     def mock_project(self):
-        project = self.project_class.get_project(root=self._tmp_dir.name)
+        project = self.project_class.get_project(path=self._tmp_dir.name)
 
         for a in range(2, 4):
             for b in range(2):
@@ -174,7 +174,7 @@ class TestProjectStatusFilterOperations(TestProjectBase):
         ],
     )
     def test_groups(self, groups, get_status):
-        stdout, _ = get_status({"operation": groups})
+        stdout, _ = get_status({"names": groups})
         excluded_groups = {"group1", "group2", "op1", "op2", "op3"} - set(groups)
         operations_output = "".join(stdout)
         for excluded_group in excluded_groups:
@@ -184,7 +184,7 @@ class TestProjectStatusFilterOperations(TestProjectBase):
 
     def test_operation_in_group(self, get_status):
         with pytest.raises(ValueError):
-            get_status({"operation": ["op1", "group1"]})
+            get_status({"names": ["op1", "group1"]})
 
 
 class TestProjectStatusNoEligibleOperations(TestProjectBase):

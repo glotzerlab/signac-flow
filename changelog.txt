@@ -34,6 +34,20 @@ Removed
 Version 0.25
 ============
 
+[0.25.1] -- 2023-04-21
+----------------------
+
+Fixed
++++++
+
+- Delta hostname detection (#740).
+- Fix filter argument (#737, #738).
+
+Removed
++++++++
+
+- ``--doc-filter`` argument (#738).
+
 [0.25.0] -- 2023-03-30
 ----------------------
 

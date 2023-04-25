@@ -174,7 +174,7 @@ class TestProjectStatusFilterOperations(TestProjectBase):
         ],
     )
     def test_groups(self, groups, get_status):
-        stdout, _ = get_status({"names": groups})
+        stdout, _ = get_status({"operation": groups})
         excluded_groups = {"group1", "group2", "op1", "op2", "op3"} - set(groups)
         operations_output = "".join(stdout)
         for excluded_group in excluded_groups:
@@ -184,7 +184,7 @@ class TestProjectStatusFilterOperations(TestProjectBase):
 
     def test_operation_in_group(self, get_status):
         with pytest.raises(ValueError):
-            get_status({"names": ["op1", "group1"]})
+            get_status({"operation": ["op1", "group1"]})
 
 
 class TestProjectStatusNoEligibleOperations(TestProjectBase):

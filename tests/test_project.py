@@ -176,11 +176,9 @@ class TestProjectStatusFilterOperations(TestProjectBase):
     def test_groups(self, groups, get_status):
         stdout, _ = get_status({"operation": groups})
         excluded_groups = {"group1", "group2", "op1", "op2", "op3"} - set(groups)
-        if len(excluded_groups) > 0:
-            # This needs to be modified if we test most than two groups
-            for excluded_group in list(excluded_groups):
-                assert excluded_group not in "".join(stdout)
         operations_output = "".join(stdout)
+        for excluded_group in excluded_groups:
+            assert excluded_group not in operations_output
         for group in groups:
             assert group in operations_output
 

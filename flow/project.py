@@ -5003,7 +5003,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         )
         parser_status.add_argument(
             "-o",
-            "--operation",
+            "--names",
             type=str,
             nargs="+",
             help="Select operation or groups that match the given "

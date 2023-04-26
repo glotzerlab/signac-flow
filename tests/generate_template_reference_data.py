@@ -154,6 +154,14 @@ def init(project):
                 "bundle": [["mpi_op", "omp_op"]],
             },
         ],
+        # Cannot use partitions as logic requires gpu in the name of paritions that are gpu nodes.
+        "environments.incite.FrontierEnvironment": [
+            {},
+            {
+                "parallel": [False, True],
+                "bundle": [["mpi_op", "omp_op"]],
+            },
+        ],
     }
 
     for environment, parameter_combinations in environments.items():

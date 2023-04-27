@@ -154,7 +154,7 @@ def init(project):
                 "bundle": [["mpi_op", "omp_op"]],
             },
         ],
-        # Cannot use partitions as logic requires gpu in the name of paritions that are gpu nodes.
+        # Frontier cannot use partitions as logic requires gpu in the name of partitions that are gpu nodes.
         "environments.incite.FrontierEnvironment": [
             {},
             {

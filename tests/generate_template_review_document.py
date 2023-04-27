@@ -40,7 +40,7 @@ def process_job(document, job):
 
     if job.sp.parameters.get("bundle", False):
         h = "Bundled MPI and OpenMP jobs"
-        for fn in os.listdir(job.workspace()):
+        for fn in os.listdir(job.path):
             if fn == "signac_statepoint.json":
                 continue
             document.add_heading(h, level=3)

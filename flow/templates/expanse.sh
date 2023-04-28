@@ -13,7 +13,9 @@
     {% if "shared" in partition and resources.num_nodes > 1 %}
         {% raise "Cannot request shared partition with resources spanning multiple nodes." %}
     {% endif %}
+    {% if "shared" not in partition %}
 #SBATCH -N {{ resources.num_nodes }}
+    {% endif %}
 #SBATCH --ntasks={{ resources.ncpus_tasks }}
     {% if 'gpu' in partition %}
 #SBATCH --gpus={{ resources.gpu_tasks }}

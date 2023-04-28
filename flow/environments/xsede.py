@@ -213,6 +213,7 @@ class ExpanseEnvironment(DefaultSlurmEnvironment):
     template = "expanse.sh"
     _cpus_per_node = {"default": 128, "GPU": 40}
     _gpus_per_node = {"default": 4}
+    _shared_partitions = {"shared", "gpu-shared"}
 
     @classmethod
     def add_args(cls, parser):

@@ -259,4 +259,60 @@ class CrusherEnvironment(DefaultSlurmEnvironment):
         return base_str
 
 
-__all__ = ["SummitEnvironment", "AndesEnvironment", "CrusherEnvironment"]
+class FrontierEnvironment(DefaultSlurmEnvironment):
+    """Environment profile for the Frontier supercomputer.
+
+    https://docs.olcf.ornl.gov/systems/frontier_user_guide.html
+    """
+
+    hostname_pattern = r".*\.frontier\.olcf\.ornl\.gov"
+    template = "frontier.sh"
+    cores_per_node = 64
+    gpus_per_node = 8
+    mpi_cmd = "srun"
+
+    @template_filter
+    def calc_num_nodes(cls, ngpus, ncpus, threshold):
+        """Compute the number of nodes needed to meet the resource request.
+
+        Also raise an error when the requested resource do not come close to saturating the asked
+        for nodes.
+        """
+        nodes_gpu = max(1, int(ceil(ngpus / cls.gpus_per_node)))
+        nodes_cpu = max(1, int(ceil(ncpus / cls.cores_per_node)))
+        if nodes_gpu >= nodes_cpu:
+            check_utilization(nodes_gpu, ngpus, cls.gpus_per_node, threshold, "compute")
+            return nodes_gpu
+        check_utilization(nodes_cpu, ncpus, cls.cores_per_node, threshold, "compute")
+        return nodes_cpu
+
+    @classmethod
+    def _get_mpi_prefix(cls, operation, parallel):
+        """Get the correct srun command for the job.
+
+        We don't currently support CPU/GPU mapping and expect the program to do this in code.
+        """
+        nranks = operation.directives.get("nranks", 0)
+        if nranks == 0:
+            return ""
+        ngpus = operation.directives["ngpu"]
+        np = operation.directives.get("np", 1)
+        omp_num_threads = max(operation.directives.get("omp_num_threads", 1), 1)
+        mpi_np_calc = nranks * omp_num_threads
+        if np > 1 and nranks > 1 and np != mpi_np_calc:
+            raise RuntimeWarning(
+                f"Using provided value for np={np}, which seems incompatible with MPI directives "
+                f"{mpi_np_calc}."
+            )
+        base_str = f"{cls.mpi_cmd} --ntasks={nranks}"
+        threads = max(omp_num_threads, np) if nranks == 1 else max(1, omp_num_threads)
+        base_str += f" --cpus-per-task={threads} --gpus={ngpus}"
+        return base_str
+
+
+__all__ = [
+    "SummitEnvironment",
+    "AndesEnvironment",
+    "CrusherEnvironment",
+    "FrontierEnvironment",
+]

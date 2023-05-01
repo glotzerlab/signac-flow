@@ -5,10 +5,11 @@ Changelog
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 The numbers in brackets denote the related GitHub issue and/or pull request.
 
-Version X.XX
+============
+Version 0.26
 ============
 
-[X.XX.X] -- 2023-XX-XX
+[0.26.0] -- 2023-xx-xx
 ----------------------
 
 Added
@@ -31,6 +32,10 @@ Removed
 
 -
 =======
+=======
+- Frontier environment and template (#743).
+
+>>>>>>> main
 Version 0.25
 ============
 

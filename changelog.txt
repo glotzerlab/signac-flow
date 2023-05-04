@@ -5,7 +5,6 @@ Changelog
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 The numbers in brackets denote the related GitHub issue and/or pull request.
 
-============
 Version 0.26
 ============
 
@@ -15,27 +14,14 @@ Version 0.26
 Added
 +++++
 
-- Added ``-o`` flag to report project status information for specific operations.
+- Frontier environment and template (#743).
+- Added ``-o`` flag to report project status information for specific operations (#725).
 
 Changed
 +++++++
 
 - Removed ``-o`` flag as an alias for ``--output``
 
-Fixed
-+++++
-
--
-
-Removed
-+++++++
-
--
-=======
-=======
-- Frontier environment and template (#743).
-
->>>>>>> main
 Version 0.25
 ============
 

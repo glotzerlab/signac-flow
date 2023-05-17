@@ -176,4 +176,8 @@ contributors:
     given-names: Brian
     orcid: "https://orcid.org/0000-0002-2461-6614"
     affiliation: "University of Michigan"
+  -
+    family-names: Asare
+    given-names: Raymond
+    affiliation: "University of Michigan"
 ...

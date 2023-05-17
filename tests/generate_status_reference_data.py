@@ -46,8 +46,9 @@ def init_status_options(project):
         {"compact": True},  # -1, --one-line
         {"pretty": True},  # --pretty
         {"eligible_jobs_max_lines": 2},  # --eligible-jobs-max-lines 2
-        {"output_format": "markdown"},  # -o markdown, --output-format markdown
-        {"output_format": "html"},  # -o html, --output-format html
+        {"output_format": "markdown"},  # --output-format markdown
+        {"output_format": "html"},  # --output-format html
+        {"operation": ["op1", "op2"]},  # -o op1 op2, --operation op1 op2
     ]
 
     for sp in options:

@@ -144,11 +144,10 @@ class TestProjectStatusFilterOperations(TestProjectBase):
 
     @pytest.fixture(scope="function")
     def get_status(self, project):
-        def _get_status(kwargs):
+        def _get_status(**kwargs):
             with redirect_stdout(StringIO()) as stdout:
-                with redirect_stderr(StringIO()) as stderr:
-                    project.print_status(**kwargs)
-                    return stdout.getvalue().split("\n"), stderr.getvalue().split("\n")
+                project.print_status(**kwargs)
+                return stdout.getvalue().split("\n")
 
         return _get_status
 
@@ -174,7 +173,7 @@ class TestProjectStatusFilterOperations(TestProjectBase):
         ],
     )
     def test_groups(self, groups, get_status):
-        stdout, _ = get_status({"operation": groups})
+        stdout = get_status(operation=groups)
         excluded_groups = {"group1", "group2", "op1", "op2", "op3"} - set(groups)
         operations_output = "".join(stdout)
         for excluded_group in excluded_groups:
@@ -184,7 +183,7 @@ class TestProjectStatusFilterOperations(TestProjectBase):
 
     def test_operation_in_group(self, get_status):
         with pytest.raises(ValueError):
-            get_status({"operation": ["op1", "group1"]})
+            get_status(operation=["op1", "group1"])
 
 
 class TestProjectStatusNoEligibleOperations(TestProjectBase):

@@ -19,6 +19,7 @@ import jinja2
 from signac import get_project, init_project
 
 from . import __version__, environment, template
+from .scripts.template_test import test_workflow_parser
 
 logger = logging.getLogger(__name__)
 
@@ -154,6 +155,12 @@ def main():
     if "--version" in sys.argv:
         print("signac-flow", __version__)
         sys.exit(0)
+
+    parser_test_environment = subparsers.add_parser(
+        "test-workflow",
+        help="Setup a test workspace with a project.py to test new environments.",
+    )
+    test_workflow_parser(parser_test_environment)
 
     args = parser.parse_args()
     if args.debug:

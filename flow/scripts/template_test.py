@@ -2,12 +2,41 @@
 import errno
 import logging
 import os
+import stat
 import string
 import subprocess
 
 import jinja2
 
 logger = logging.getLogger(__name__)
+
+
+def _make_executable(fn):
+    mode = stat.S_IMODE(os.stat(fn).st_mode)
+    os.chmod(fn, mode | stat.S_IXUSR)
+
+
+def _cleanup():
+    for fn in ("init.py", "project.py"):
+        if os.path.exists(fn):
+            os.remove(fn)
+
+
+def _create_file(fn, content):
+    try:
+        with open(fn, "x") as fh:
+            fh.write(content)
+    except OSError as error:
+        if error.errno == errno.EEXIST:
+            logger.error(
+                f"Error while trying to create custom template. Delete '{fn}' "
+                f"first and rerun command."
+            )
+        else:
+            logger.error(f"Error while trying to create testing project: '{error}'.")
+        _cleanup()
+        raise
+    _make_executable(fn)
 
 
 def main_test_workflow(args):
@@ -17,42 +46,21 @@ def main_test_workflow(args):
     difficult.
     """
     # Create project.py
-    prompt = "Number of {} per node."
-    ngpus = args.ngpus if args.ngpus is not None else int(input(prompt.format("GPU")))
-    ncpus = args.ncpus if args.ncpus is not None else int(input(prompt.format("CPU")))
-    context = {"ncpus": ncpus, "ngpus": ngpus}
-    jinja_env = jinja2.Environment(loader=jinja2.PackageLoader("flow"))
-    project_template = jinja_env.get_template("project.py")
+    prompt = "Number of {} per node: "
+    num_cpus = args.num_cpus[0] if args.num_cpus is not None else int(input(prompt.format("CPU")))
+    num_gpus = args.num_gpus[0] if args.num_gpus is not None else int(input(prompt.format("GPU")))
+    context = {"num_cpus": num_cpus, "num_gpus": num_gpus}
+    jinja_env = jinja2.Environment(
+        loader=jinja2.PackageLoader("flow", "templates"))
+    project_template = jinja_env.get_template("project_test_environment.pyt")
     project_content = project_template.render(**context).strip(string.whitespace)
-
-    try:
-        with open("project.py", "x") as fh:
-            fh.write(project_content)
-    except OSError as error:
-        if error.errno == errno.EEXIST:
-            logger.error(
-                "Error while trying to create custom template. Delete 'project.py' "
-                "first and rerun command."
-            )
-        else:
-            logger.error(f"Error while trying to create testing project: '{error}'.")
-        raise
+    _create_file("project.py", project_content)
 
     # create init.py
-    init_content = jinja_env.get_template("init.py").render(num_jobs=args.num_jobs)
-    try:
-        with open("init.py", "x") as fh:
-            fh.write(init_content)
-    except OSError as error:
-        if error.errno == errno.EEXIST:
-            logger.error(
-                "Error while trying to create custom template. Delete 'init.py' "
-                "first and rerun command."
-            )
-        else:
-            logger.error(f"Error while trying to create testing project: '{error}'.")
-        os.remove("project.py")
-        raise
+    init_content = jinja_env.get_template(
+        "init_test_environment.pyt"
+    ).render(num_jobs=args.num_jobs[0])
+    _create_file("init.py", init_content)
 
     # Run init.py
     try:
@@ -87,7 +95,7 @@ def test_workflow_parser(subparser):
         "-n",
         nargs=1,
         type=int,
-        default=10,
+        default=(10,),
         help="Specify the number of jobs to initialize. Defaults to 10.",
     )
 

@@ -47,19 +47,26 @@ def main_test_workflow(args):
     """
     # Create project.py
     prompt = "Number of {} per node: "
-    num_cpus = args.num_cpus[0] if args.num_cpus is not None else int(input(prompt.format("CPU")))
-    num_gpus = args.num_gpus[0] if args.num_gpus is not None else int(input(prompt.format("GPU")))
+    num_cpus = (
+        args.num_cpus[0]
+        if args.num_cpus is not None
+        else int(input(prompt.format("CPU")))
+    )
+    num_gpus = (
+        args.num_gpus[0]
+        if args.num_gpus is not None
+        else int(input(prompt.format("GPU")))
+    )
     context = {"num_cpus": num_cpus, "num_gpus": num_gpus}
-    jinja_env = jinja2.Environment(
-        loader=jinja2.PackageLoader("flow", "templates"))
+    jinja_env = jinja2.Environment(loader=jinja2.PackageLoader("flow", "templates"))
     project_template = jinja_env.get_template("project_test_environment.pyt")
     project_content = project_template.render(**context).strip(string.whitespace)
     _create_file("project.py", project_content)
 
     # create init.py
-    init_content = jinja_env.get_template(
-        "init_test_environment.pyt"
-    ).render(num_jobs=args.num_jobs[0])
+    init_content = jinja_env.get_template("init_test_environment.pyt").render(
+        num_jobs=args.num_jobs[0]
+    )
     _create_file("init.py", init_content)
 
     # Run init.py

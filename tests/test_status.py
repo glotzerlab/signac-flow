@@ -39,11 +39,9 @@ def test_hide_progress_bar(hide_progress_bar, parallelization):
 
 def test_print_status():
     # Must import the data into the project.
-    with signac.TemporaryProject(name=gen.PROJECT_NAME) as p, signac.TemporaryProject(
-        name=gen.STATUS_OPTIONS_PROJECT_NAME
-    ) as status_pr:
+    with signac.TemporaryProject() as p, signac.TemporaryProject() as status_pr:
         gen.init(p)
-        fp = gen._TestProject.get_project(root=p.path)
+        fp = gen._TestProject.get_project(path=p.path)
         status_pr.import_from(origin=gen.ARCHIVE_PATH)
         for job in status_pr:
             kwargs = job.statepoint()

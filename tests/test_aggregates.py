@@ -44,7 +44,7 @@ class AggregateProjectSetup(TestProjectBase):
     project_class = generate_flow_project()
 
     def mock_project(self):
-        project = self.project_class.get_project(root=self._tmp_dir.name)
+        project = self.project_class.get_project(path=self._tmp_dir.name)
         for i in range(10):
             is_even = (i % 2) == 0
             if is_even:

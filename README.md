@@ -1,11 +1,10 @@
-# <img src="https://raw.githubusercontent.com/glotzerlab/signac-flow/master/doc/images/palette-header.png" width="75" height="58"> signac-flow - manage workflows with signac
+# <img src="https://raw.githubusercontent.com/glotzerlab/signac-flow/main/doc/images/palette-header.png" width="75" height="58"> signac-flow - manage workflows with signac
 
 [![Affiliated with NumFOCUS](https://img.shields.io/badge/NumFOCUS-affiliated%20project-orange.svg?style=flat&colorA=E1523D&colorB=007D8A)](https://numfocus.org/sponsored-projects/affiliated-projects)
 [![PyPI](https://img.shields.io/pypi/v/signac-flow.svg)](https://pypi.org/project/signac-flow/)
 [![conda-forge](https://img.shields.io/conda/vn/conda-forge/signac-flow.svg?style=flat)](https://anaconda.org/conda-forge/signac-flow)
-![CircleCI](https://img.shields.io/circleci/project/github/glotzerlab/signac-flow/master.svg)
 [![RTD](https://img.shields.io/readthedocs/signac.svg?style=flat)](https://docs.signac.io)
-[![License](https://img.shields.io/github/license/glotzerlab/signac-flow.svg)](https://github.com/glotzerlab/signac-flow/blob/master/LICENSE.txt)
+[![License](https://img.shields.io/github/license/glotzerlab/signac-flow.svg)](https://github.com/glotzerlab/signac-flow/blob/main/LICENSE.txt)
 [![PyPI-downloads](https://img.shields.io/pypi/dm/signac-flow.svg?style=flat)](https://pypistats.org/packages/signac-flow)
 [![Slack](https://img.shields.io/badge/Slack-chat%20support-brightgreen.svg?style=flat&logo=slack)](https://signac.io/slack-invite/)
 [![Twitter](https://img.shields.io/twitter/follow/signacdata?style=social)](https://twitter.com/signacdata)

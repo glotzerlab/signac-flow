@@ -80,7 +80,7 @@ def cli(num_jobs, bundle, parallel, entrypoint):
     with signac.TemporaryProject() as tmp_project:
         for i in range(num_jobs):
             tmp_project.open_job(dict(foo=i)).init()
-        flow_project = Project.get_project(root=tmp_project.path)
+        flow_project = Project.get_project(path=tmp_project.path)
         flow_project._entrypoint.setdefault("path", entrypoint)
 
         partition = ""

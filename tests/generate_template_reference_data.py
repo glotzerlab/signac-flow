@@ -154,6 +154,15 @@ def init(project):
                 "bundle": [["mpi_op", "omp_op"]],
             },
         ],
+        # Frontier cannot use partitions as logic requires gpu
+        # in the name of partitions that are gpu nodes.
+        "environments.incite.FrontierEnvironment": [
+            {},
+            {
+                "parallel": [False, True],
+                "bundle": [["mpi_op", "omp_op"]],
+            },
+        ],
     }
 
     for environment, parameter_combinations in environments.items():
@@ -180,7 +189,7 @@ def _store_bundled(self, operations):
 def get_masked_flowproject(p, environment=None):
     """Mock environment-dependent attributes and functions. Need to mock
     sys.executable before the FlowProject is instantiated, and then modify the
-    path and project_dir elements after creation."""
+    path after creation."""
     try:
         old_executable = sys.executable
         sys.executable = MOCK_EXECUTABLE
@@ -188,10 +197,10 @@ def get_masked_flowproject(p, environment=None):
         if environment is not None:
             fp._environment = environment
         fp._entrypoint.setdefault("path", "generate_template_reference_data.py")
-        fp.config.project_dir = PROJECT_DIRECTORY
         old_generate_id = flow.project.FlowGroup._generate_id
+        old_standard_template_context = flow.FlowProject._get_standard_template_context
 
-        def wrapped_generate_id(self, aggregate, *args, **kwargs):
+        def mocked_generate_id(self, aggregate, *args, **kwargs):
             """Mock the root directory used for id generation.
 
             We need to generate consistent ids for all operations. This
@@ -204,7 +213,13 @@ def get_masked_flowproject(p, environment=None):
             fp._path = old_path
             return operation_id
 
-        flow.project.FlowGroup._generate_id = wrapped_generate_id
+        def mocked_template_context(self):
+            context = old_standard_template_context(self)
+            context["project"]._path = PROJECT_DIRECTORY
+            return context
+
+        flow.project.FlowGroup._generate_id = mocked_generate_id
+        flow.FlowProject._get_standard_template_context = mocked_template_context
         yield fp
 
     finally:

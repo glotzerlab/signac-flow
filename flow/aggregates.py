@@ -204,7 +204,7 @@ class aggregator:
             The method by which jobs are grouped. It may be a state point key
             or an iterable of state point keys whose values define the
             groupings. It may also be an arbitrary callable of
-            :class:`~signac.contrib.job.Job` when greater flexibility is
+            :class:`~signac.job.Job` when greater flexibility is
             needed.
         default : Any
             Default value used for grouping if the key is missing or invalid.
@@ -318,7 +318,7 @@ class aggregator:
 
         Parameters
         ----------
-        project : :class:`signac.contrib.project.Project`
+        project : :class:`signac.Project`
             A signac project used to fetch jobs for creating aggregates.
 
         Returns
@@ -338,7 +338,7 @@ class _BaseAggregateStore(Mapping):
 
     An aggregate store is a mapping from aggregate ids to aggregates, where
     an aggregate is defined as a tuple of instances of
-    :class:`signac.contrib.job.Job`.
+    :class:`signac.job.Job`.
     """
 
     def __init__(self, project):
@@ -358,7 +358,7 @@ class _AggregateStore(_BaseAggregateStore):
     ----------
     aggregator : :class:`aggregator`
         aggregator object used to generate aggregates for this store.
-    project : :class:`flow.FlowProject` or :class:`signac.contrib.project.Project`
+    project : :class:`flow.FlowProject` or :class:`signac.Project`
         A signac project containing the jobs that will be used to create
         aggregates.
 
@@ -477,7 +477,7 @@ class _DefaultAggregateStore(_BaseAggregateStore):
 
     Parameters
     ----------
-    project : :class:`flow.FlowProject` or :class:`signac.contrib.project.Project`
+    project : :class:`flow.FlowProject` or :class:`signac.Project`
         A signac project used to fetch jobs for creating aggregates.
 
     """
@@ -560,7 +560,7 @@ def get_aggregate_id(aggregate):
 
     Parameters
     ----------
-    aggregate : tuple of :class:`~signac.contrib.job.Job`
+    aggregate : tuple of :class:`~signac.job.Job`
         Aggregate of signac jobs.
 
     Returns
@@ -637,17 +637,13 @@ class _JobAggregateCursor(_AggregatesCursor):
     ----------
     project : :class:`~.FlowProject`
         A FlowProject whose jobs are aggregated.
-    filter : dict
-        A mapping of key-value pairs that all indexed job state points are
-        compared against (Default value = None).
-    doc_filter : dict
-        A mapping of key-value pairs that all indexed job documents are
-        compared against (Default value = None).
+    filter : Mapping, optional
+        A mapping of key-value pairs used for the query (Default value = None).
 
     """
 
-    def __init__(self, project, filter=None, doc_filter=None):
-        self._cursor = project.find_jobs(filter, doc_filter)
+    def __init__(self, project, filter=None):
+        self._cursor = project.find_jobs(filter)
 
     def __eq__(self, other):
         # Cursors cannot compare equal if one is over aggregates and the other

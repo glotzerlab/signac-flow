@@ -66,7 +66,7 @@ def redirect_log(job, filename="run.log", formatter=None, logger=None):
 
     Parameters
     ----------
-    job : :class:`signac.contrib.job.Job`
+    job : :class:`signac.job.Job`
         The signac job whose workspace will store the redirected logs.
     filename : str
         File name of the log. (Default value = "run.log")

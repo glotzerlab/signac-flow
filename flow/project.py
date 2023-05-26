@@ -34,7 +34,7 @@ import jinja2
 import jsonschema
 import signac
 from jinja2 import TemplateNotFound as Jinja2TemplateNotFound
-from signac.contrib.filterparse import parse_filter_arg
+from signac.filterparse import parse_filter_arg
 
 from .aggregates import (
     _AggregatesCursor,
@@ -295,7 +295,7 @@ class _JobOperation:
         The id of this _JobOperation instance. The id should be unique.
     name : str
         The name of the _JobOperation.
-    jobs : tuple of :class:`~signac.contrib.job.Job`
+    jobs : tuple of :class:`~signac.job.Job`
         The jobs associated with this operation.
     cmd : callable or str
         The command that executes this operation. Can be a callable that when
@@ -495,7 +495,7 @@ class BaseFlowOperation:
 
         Parameters
         ----------
-        aggregate : tuple of :class:`~signac.contrib.job.Job`
+        aggregate : tuple of :class:`~signac.job.Job`
             The aggregate of signac jobs.
         ignore_conditions : :class:`~.IgnoreConditions`
             Specify if preconditions and/or postconditions are to be ignored
@@ -540,9 +540,9 @@ class FlowCmdOperation(BaseFlowOperation):
     When an operation has the ``FlowProject.operation(cmd=True)`` directive specified, it is
     instantiated as a :class:`~.FlowCmdOperation`. The operation should be a
     function of one or more positional arguments that are instances of
-    :class:`~signac.contrib.job.Job`. The command (cmd) may either be a
+    :class:`~signac.job.Job`. The command (cmd) may either be a
     callable that expects one or more instances of
-    :class:`~signac.contrib.job.Job` as positional arguments and returns a
+    :class:`~signac.job.Job` as positional arguments and returns a
     string containing valid shell commands, or the string of commands itself.
     In either case, the resulting string may contain any attributes of the
     job (or jobs) placed in curly braces, which will then be substituted by
@@ -556,9 +556,9 @@ class FlowCmdOperation(BaseFlowOperation):
     cmd : str or callable
         The command to execute the operation. Callable values will be
         provided one or more positional arguments that are
-        instances of :class:`~signac.contrib.job.Job`. String values will be
+        instances of :class:`~signac.job.Job`. String values will be
         formatted with ``cmd.format(jobs=jobs)`` where ``jobs`` is a tuple of
-        :class:`~signac.contrib.job.Job`, or ``cmd.format(jobs=jobs,
+        :class:`~signac.job.Job`, or ``cmd.format(jobs=jobs,
         job=job)`` if only one job is provided.
     pre : sequence of callables
         List of preconditions.
@@ -584,7 +584,7 @@ class FlowOperation(BaseFlowOperation):
 
     All operations without the ``FlowProject.operation(cmd=True)`` directive use this class. The
     callable ``op_func`` should be a function of one or more instances of
-    :class:`~signac.contrib.job.Job`.
+    :class:`~signac.job.Job`.
 
     .. note::
         This class should not be instantiated directly.
@@ -613,7 +613,7 @@ class FlowOperation(BaseFlowOperation):
 
         Parameters
         ----------
-        \*jobs : One or more instances of :class:`~signac.contrib.job.Job`.
+        \*jobs : One or more instances of :class:`~signac.job.Job`.
             The jobs passed to the operation.
 
         Returns
@@ -872,7 +872,7 @@ class FlowGroup:
 
         Parameters
         ----------
-        aggregate : tuple of :class:`~signac.contrib.job.Job`
+        aggregate : tuple of :class:`~signac.job.Job`
             The aggregate of signac jobs.
         ignore_conditions : :class:`~.IgnoreConditions`
             Specify if preconditions and/or postconditions are to be ignored
@@ -948,7 +948,7 @@ class FlowGroup:
 
         Parameters
         ----------
-        aggregate : tuple of :class:`signac.contrib.job.Job`
+        aggregate : tuple of :class:`signac.job.Job`
             The aggregate of signac jobs.
         operation_name : str
             Operation name defining the unique id. (Default value = None)
@@ -1014,7 +1014,7 @@ class FlowGroup:
             ``default_directives``. If no defaults are desired, the argument
             can be set to an empty dictionary. This must be done explicitly,
             however.
-        jobs : tuple of :class:`~signac.contrib.job.Job`
+        jobs : tuple of :class:`~signac.job.Job`
             The jobs that the :class:`~._JobOperation` is based on.
         ignore_conditions_on_execution : :class:`~.IgnoreConditions`
             Specify if preconditions and/or postconditions are to be ignored
@@ -1115,7 +1115,7 @@ class FlowGroup:
             for user-specified groups to inherit directives from
             ``default_directives``. If no defaults are desired, the argument
             must be explicitly set to an empty dictionary.
-        jobs : tuple of :class:`~signac.contrib.job.Job`
+        jobs : tuple of :class:`~signac.job.Job`
             The jobs that the :class:`~._JobOperation` is based on.
         ignore_conditions : :class:`~.IgnoreConditions`
             Specify if preconditions and/or postconditions are to be ignored
@@ -1677,7 +1677,7 @@ def _config_value_as_bool(value):
     return bool(value)
 
 
-class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
+class FlowProject(signac.Project, metaclass=_FlowProjectClass):
     """A signac project class specialized for workflow management.
 
     This class is used to define, execute, and submit workflows based on
@@ -1697,9 +1697,9 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     Parameters
     ----------
-    config : :class:`signac.contrib.project._ProjectConfig`
-        A signac configuration, defaults to the configuration loaded
-        from the current directory.
+    path : str, optional
+        The project directory. By default, the current working directory
+        (Default value = None).
     environment : :class:`flow.environment.ComputeEnvironment`
         An environment to use for scheduler submission. If ``None``, the
         environment is automatically identified. The default is ``None``.
@@ -1712,8 +1712,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
     """
 
-    def __init__(self, config=None, environment=None, entrypoint=None):
-        super().__init__(config=config)
+    def __init__(self, path=None, environment=None, entrypoint=None):
+        super().__init__(path=path)
 
         # Initialize the local config.
         # TODO: In signac 2.0 we will not allow config modification after
@@ -1724,7 +1724,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # signac Project config dictionary directly and that can be updated by
         # any flow config APIs. For now, we store the flow config separately to
         # avoid any side effects associated with modifying instances of
-        # signac.contrib._ProjectConfig.
+        # signac.project._ProjectConfig.
         self._flow_config = {
             **flow_config._FLOW_CONFIG_DEFAULTS,
             **self._config.get("flow", {}),
@@ -1852,7 +1852,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         return self._template_environment_[environment]
 
     def _get_standard_template_context(self):
-        """Return the standard templating context for run and submission scripts."""
+        """Return the standard template context for run and submission scripts."""
         context = {}
         context["project"] = self
         return context
@@ -2270,7 +2270,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Parameters
         ----------
-        selected_aggregates : sequence of tuples of :class:`~signac.contrib.job.Job`
+        selected_aggregates : sequence of tuples of :class:`~signac.job.Job`
             Aggregates to select.
         selected_groups : set of :class:`~.FlowGroup`
             Groups to select.
@@ -2283,7 +2283,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         ------
         aggregate_id : str
             Selected aggregate id.
-        aggregate : tuple of :class:`~signac.contrib.job.Job`
+        aggregate : tuple of :class:`~signac.job.Job`
             Selected aggregate.
         group : :class:`~.FlowGroup`
             Selected group.
@@ -2384,7 +2384,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             The scheduler status of this aggregate and group.
         aggregate_id : str
             Selected aggregate id.
-        aggregate : tuple of :class:`~signac.contrib.job.Job`
+        aggregate : tuple of :class:`~signac.job.Job`
             Selected aggregate.
         group : :class:`~.FlowGroup`
             Selected group.
@@ -2408,7 +2408,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Parameters
         ----------
-        aggregate : tuple of :class:`~signac.contrib.job.Job`
+        aggregate : tuple of :class:`~signac.job.Job`
             Aggregate for which status information is fetched.
         cached_status : dict
             Dictionary of cached status information. The keys are uniquely
@@ -2458,7 +2458,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Parameters
         ----------
-        aggregate : tuple of :class:`~signac.contrib.job.Job`
+        aggregate : tuple of :class:`~signac.job.Job`
             Aggregate for which status information is fetched.
         cached_status : dict
             Dictionary of cached status information. The keys are uniquely
@@ -2500,7 +2500,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Parameters
         ----------
-        job : :class:`~signac.contrib.job.Job`
+        job : :class:`~signac.job.Job`
             The signac job.
         ignore_errors : bool
             Whether to ignore exceptions raised during status check. (Default value = False)
@@ -2568,7 +2568,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Parameters
         ----------
-        job : :class:`signac.contrib.job.Job`
+        job : :class:`signac.job.Job`
             Job handle.
         ignore_errors : bool
             Whether to ignore errors raised while fetching labels. (Default value = False)
@@ -2603,6 +2603,8 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         ignore_errors,
         status_parallelization="none",
         hide_progress=False,
+        names=None,
+
     ):
         """Fetch status for the provided aggregates / jobs.
 
@@ -2619,6 +2621,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             "thread", "process", or "none". (Default value = "none")
         hide_progress : bool
             Hide the progress bar when printing status output (Default value = False).
+        names : iterable of :class:`str`
+            Only show status for operations that match the provided set of names
+            (interpreted as regular expressions), or all if the argument is
+            None. (Default value = None)
 
         Returns
         -------
@@ -2628,7 +2634,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         job_labels : list
             A list of dictionaries containing keys ``job_id``, ``labels``,
             and ``_labels_error``.
-        individual_jobs : list of :class:`~signac.contrib.job.Job`
+        individual_jobs : list of :class:`~signac.job.Job`
             List of jobs, filtered from aggregates containing one job. This
             is used internally to generate labels (labels are only supported
             by individual jobs) and the calling code in
@@ -2637,6 +2643,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             only has to occur one time.
 
         """
+        if names is not None:
+            absent_ops = (set(self._groups.keys()) ^ set(names)) & set(names)
+            if absent_ops:
+                print(
+                    f"Unrecognized flow operation(s): {', '.join(absent_ops)}",
+                    file=sys.stderr,
+                )
+
         if status_parallelization not in ("thread", "process", "none"):
             raise RuntimeError(
                 "Configuration value status_parallelization is invalid. "
@@ -2654,7 +2668,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         def compute_status(data):
             scheduler_id, scheduler_status, aggregate_id, aggregate, group = data
-
             status = {}
             error_text = None
             try:
@@ -2709,11 +2722,14 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     )
             return result
 
+        status_groups = set(self._gather_flow_groups(names))
+
         with self._buffered():
             aggregate_groups = list(
                 self._generate_selected_aggregate_groups_with_status(
                     scheduler_info=scheduler_info,
                     selected_aggregates=aggregates,
+                    selected_groups=status_groups,
                 )
             )
             status_results = []
@@ -2814,12 +2830,13 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         eligible_jobs_max_lines=None,
         output_format="terminal",
         hide_progress=False,
+        operation=None,
     ):
         """Print the status of the project.
 
         Parameters
         ----------
-        jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates
+        jobs : iterable of :class:`~signac.job.Job` or aggregates
             If ``None``, print status for all jobs/aggregates. If not
             ``None``, only print status for the given jobs or aggregates
             (Default value = None).
@@ -2866,6 +2883,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             'terminal' (default), 'markdown' or 'html'.
         hide_progress : bool
             Hide the progress bar from the status output. (Default value = False)
+        operation : iterable of :class:`str`
+            Show status of operations that match the provided set of names
+            (interpreted as regular expressions), or all if the argument is
+            None. (Default value = None)
+
         """
         if file is None:
             file = sys.stdout
@@ -2910,6 +2932,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                     ignore_errors=ignore_errors,
                     status_parallelization=status_parallelization,
                     hide_progress=hide_progress,
+                    names=operation,
                 )
 
             prof._mergeFileTiming()
@@ -2990,6 +3013,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 ignore_errors=ignore_errors,
                 status_parallelization=status_parallelization,
                 hide_progress=hide_progress,
+                names=operation,
             )
             profiling_results = None
 
@@ -3516,7 +3540,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Parameters
         ----------
-        jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates
+        jobs : iterable of :class:`~signac.job.Job` or aggregates
             If ``None``, execute operations for all eligible jobs/aggregates.
             If not ``None``, only execute operations for the given jobs or
             aggregates (Default value = None).
@@ -3789,7 +3813,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Parameters
         ----------
-        aggregates : sequence of tuples of :class:`~signac.contrib.job.Job`
+        aggregates : sequence of tuples of :class:`~signac.job.Job`
             The aggregates to consider for submission.
         default_directives : dict
             The default directives to use for the operations. This is to allow
@@ -3901,7 +3925,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         # Handle user-provided jobs/aggregates
         aggregates = []
         for aggregate in jobs:
-            if isinstance(aggregate, signac.contrib.job.Job):
+            if isinstance(aggregate, signac.job.Job):
                 # aggregate is a single signac job.
                 if aggregate not in self:
                     raise LookupError(f"Did not find job {aggregate} in the project")
@@ -3909,9 +3933,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             else:
                 try:
                     aggregate = tuple(aggregate)
-                    assert all(
-                        isinstance(job, signac.contrib.job.Job) for job in aggregate
-                    )
+                    assert all(isinstance(job, signac.job.Job) for job in aggregate)
                 except (AssertionError, TypeError) as error:
                     raise TypeError(
                         "Invalid jobs argument. Please provide a valid "
@@ -4073,7 +4095,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         ----------
         bundle_size : int
             Specify the number of operations to be bundled into one submission, defaults to 1.
-        jobs : iterable of :class:`~signac.contrib.job.Job` or aggregates
+        jobs : iterable of :class:`~signac.job.Job` or aggregates
             If ``None``, submit operations for all eligible jobs/aggregates.
             If not ``None``, only submit operations for the given jobs or
             aggregates (Default value = None).
@@ -4237,12 +4259,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             nargs="+",
             help="Only select jobs that match the given state point filter.",
         )
-        parser.add_argument(
-            "--doc-filter",
-            type=str,
-            nargs="+",
-            help="Only select jobs that match the given document filter.",
-        )
 
     @classmethod
     def _add_operation_selection_arg_group(cls, parser):
@@ -4389,7 +4405,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             help="Ignore errors that might occur when querying the scheduler.",
         )
         view_group.add_argument(
-            "-o",
             "--output-format",
             type=str,
             default="terminal",
@@ -4403,7 +4418,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Parameters
         ----------
-        job : :class:`signac.contrib.job.Job`
+        job : :class:`signac.job.Job`
             Job handle.
 
         Yields
@@ -4439,7 +4454,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Parameters
         ----------
-        job : :class:`~signac.contrib.job.Job`
+        job : :class:`~signac.job.Job`
             The signac job handle.
 
         Yields
@@ -4459,7 +4474,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
 
         Parameters
         ----------
-        jobs : tuple of :class:`~signac.contrib.job.Job`
+        jobs : tuple of :class:`~signac.job.Job`
             The signac job handles. By default all the aggregates are evaluated
             to get the next operation associated.
         operation_names : iterable of :class:`str`
@@ -4717,7 +4732,7 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         ----------
         flow_group : :class:`~.FlowGroup`
             The FlowGroup used to determine eligibility.
-        aggregate : tuple of :class:`~signac.contrib.job.Job`
+        aggregate : tuple of :class:`~signac.job.Job`
             The aggregate of signac jobs.
         scheduler_status : :class:`~.JobStatus`
             The status of the provided group and aggregate (this should be
@@ -4771,7 +4786,6 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
                 "debug",
                 "job_id",
                 "filter",
-                "doc_filter",
             ]
         }
         if args.pop("full"):
@@ -4890,14 +4904,10 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             operation_function(*aggregate)
 
     def _select_jobs_from_args(self, args):
-        """Select jobs with the given command line arguments ('-j/-f/--doc-filter/--job-id')."""
-        if (
-            not args.func == self._main_exec
-            and args.job_id
-            and (args.filter or args.doc_filter)
-        ):
+        """Select jobs with the given command line arguments ('-j/-f/--job-id')."""
+        if not args.func == self._main_exec and args.job_id and (args.filter):
             raise ValueError(
-                "Cannot provide both -j/--job-id and -f/--filter or --doc-filter in combination."
+                "Cannot provide both -j/--job-id and -f/--filter in combination."
             )
 
         if args.job_id:
@@ -4914,12 +4924,11 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
         elif args.func == self._main_exec:
             # exec command does not support filters, so we must exit early.
             return _AggregateStoresCursor(self)
-        elif args.filter or args.doc_filter:
-            # filter or doc_filter provided. Filters can only be used to select
+        elif args.filter:
+            # filter, including doc_filter provided. Filters can only be used to select
             # single jobs and not aggregates of multiple jobs.
             filter_ = parse_filter_arg(args.filter)
-            doc_filter = parse_filter_arg(args.doc_filter)
-            return _JobAggregateCursor(self, filter_, doc_filter)
+            return _JobAggregateCursor(self, filter_)
         else:
             # Use all aggregates
             return _AggregateStoresCursor(self)
@@ -5007,7 +5016,15 @@ class FlowProject(signac.contrib.Project, metaclass=_FlowProjectClass):
             "(requires pprofile)",
         )
         parser_status.add_argument(
-            "--hide-progress", action="store_true", help="Hide the progress bar"
+            "--hide-progress", action="store_true", help="Hide the progress bar",
+        )
+        parser_status.add_argument(
+            "-o",
+            "--operation",
+            type=str,
+            nargs="+",
+            help="Select operation or groups that match the given "
+            "operation/group name(s). These are interpreted as regular expressions.",
         )
         parser_status.set_defaults(func=self._main_status)
 

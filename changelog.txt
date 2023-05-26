@@ -5,16 +5,49 @@ Changelog
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 The numbers in brackets denote the related GitHub issue and/or pull request.
 
-next
-====
+Version 0.26
+============
 
-next -- 2023-xx-xx
-------------------
+[0.26.0] -- 2023-xx-xx
+----------------------
 
 Added
 +++++
 
 - Added feature to hide the status of the progress bar (#685).
+- Frontier environment and template (#743).
+- Added ``-o`` / ``--operation`` flag to report project status information for specific operations (#725).
+
+Changed
++++++++
+
+- Removed ``-o`` flag as an alias for ``--output`` in `status` CLI subcommand (#725).
+
+Version 0.25
+============
+
+[0.25.1] -- 2023-04-21
+----------------------
+
+Fixed
++++++
+
+- Delta hostname detection (#740).
+- Fix filter argument (#737, #738).
+
+Removed
++++++++
+
+- ``--doc-filter`` argument (#738).
+
+[0.25.0] -- 2023-03-30
+----------------------
+
+Changed
++++++++
+
+- Requires signac 2.0.0 (#734).
+
 
 Version 0.24
 ============
@@ -25,7 +58,7 @@ Version 0.24
 Added
 +++++
 
-- Added the OCLF Crusher environment (#708).
+- Added the OLCF Crusher environment (#708).
 
 Changed
 +++++++

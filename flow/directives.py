@@ -199,7 +199,7 @@ class _Directives(MutableMapping):
             The other set of directives.
         aggregate : bool
             Whether to combine directives according to serial/parallel rules.
-        jobs : :class:`signac.contrib.job.Job` or tuple of :class:`signac.contrib.job.Job`
+        jobs : :class:`signac.job.Job` or tuple of :class:`signac.job.Job`
             The jobs used to evaluate directives.
         parallel : bool
             Whether to aggregate according to parallel rules.
@@ -218,7 +218,7 @@ class _Directives(MutableMapping):
 
         Parameters
         ----------
-        jobs : :class:`signac.contrib.job.Job` or tuple of :class:`signac.contrib.job.Job`
+        jobs : :class:`signac.job.Job` or tuple of :class:`signac.job.Job`
             The jobs used to evaluate directives.
 
         """

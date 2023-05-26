@@ -12,6 +12,7 @@ from io import StringIO
 from itertools import groupby
 
 import define_hooks_test_project
+import define_status_test_project
 import pytest
 import signac
 from conftest import MockScheduler, TestProjectBase
@@ -93,7 +94,7 @@ class TestProjectStatusPerformance(TestProjectBase):
     project_class = Project
 
     def mock_project(self):
-        project = self.project_class.get_project(root=self._tmp_dir.name)
+        project = self.project_class.get_project(path=self._tmp_dir.name)
         for i in range(1000):
             project.open_job(dict(i=i)).init()
         return project
@@ -122,6 +123,69 @@ class TestProjectStatusPerformance(TestProjectBase):
         assert time < 10
 
 
+class TestProjectStatusFilterOperations(TestProjectBase):
+    project_class = define_status_test_project._TestProject
+
+    def mock_project(self):
+        project = self.project_class.get_project(path=self._tmp_dir.name)
+
+        for a in range(2, 4):
+            for b in range(2):
+                job = project.open_job(dict(a=a, b=b)).init()
+                job.doc.a = a
+                job = project.open_job(dict(a=dict(a=a), b=b)).init()
+                job.doc.b = b
+
+        return project
+
+    @pytest.fixture(scope="function")
+    def project(self):
+        return self.mock_project()
+
+    @pytest.fixture(scope="function")
+    def get_status(self, project):
+        def _get_status(**kwargs):
+            with redirect_stdout(StringIO()) as stdout:
+                project.print_status(**kwargs)
+                return stdout.getvalue().split("\n")
+
+        return _get_status
+
+    @pytest.mark.parametrize(
+        "groups",
+        [
+            ["group1"],
+            ["group2"],
+            ["group1", "group2"],
+            ["op1"],
+            ["group1", "op3"],
+            ["group2", "op1"],
+            ["op1", "op3"],
+        ],
+        ids=[
+            "group1",
+            "group2",
+            "group1_2",
+            "op1",
+            "group1_op3",
+            "group2_op1",
+            "op1_op3",
+        ],
+    )
+    def test_groups(self, groups, get_status):
+        stdout = get_status(operation=groups)
+        excluded_groups = {"group1", "group2", "op1", "op2", "op3"} - set(groups)
+        operations_output = "".join(stdout)
+        for excluded_group in excluded_groups:
+            assert excluded_group not in operations_output
+        for group in groups:
+            assert group in operations_output
+
+    def test_operation_in_group(self, get_status):
+        with pytest.raises(ValueError):
+            get_status(operation=["op1", "group1"])
+
+
 class TestProjectStatusNoEligibleOperations(TestProjectBase):
     class Project(FlowProject):
         pass
@@ -134,7 +198,7 @@ class TestProjectStatusNoEligibleOperations(TestProjectBase):
     project_class = Project
 
     def mock_project(self):
-        project = self.project_class.get_project(root=self._tmp_dir.name)
+        project = self.project_class.get_project(path=self._tmp_dir.name)
         project.open_job({"i": 0}).init()
         return project
 
@@ -865,7 +929,7 @@ class TestProject(TestProjectBase):
 
     def test_init(self):
         with redirect_stderr(StringIO()):
-            for fn in init(root=self._tmp_dir.name):
+            for fn in init(path=self._tmp_dir.name):
                 fn_ = os.path.join(self._tmp_dir.name, fn)
                 assert os.path.isfile(fn_)
 
@@ -1237,7 +1301,7 @@ class TestExecutionProject(TestProjectBase):
         def op1(job):
             pass
 
-        project = Project(project.config)
+        project = Project(project.path)
         assert len(project)
         with redirect_stderr(StringIO()):
             for state, expected_evaluation in [
@@ -1301,6 +1365,18 @@ class TestProjectMainInterface(TestProjectBase):
             assert not job.isfile("world.txt")
         self.call_subcmd("run -o op1")
         even_jobs = [job for job in self.project if job.sp.b % 2 == 0]
+        for job in self.project:
+            if job in even_jobs:
+                assert job.isfile("world.txt")
+            else:
+                assert not job.isfile("world.txt")
+
+    def test_main_run_filter(self):
+        assert len(self.project)
+        for job in self.project:
+            assert not job.isfile("world.txt")
+        self.call_subcmd("run -o op1 -f b 2")
+        even_jobs = [job for job in self.project if job.sp.b == 2]
         for job in self.project:
             if job in even_jobs:
                 assert job.isfile("world.txt")
@@ -2033,10 +2109,10 @@ class TestAggregatesProjectBase(TestProjectBase):
     )
 
     def mock_project(self):
-        project = self.project_class.get_project(root=self._tmp_dir.name)
+        project = self.project_class.get_project(path=self._tmp_dir.name)
         for i in range(1, 31):
             project.open_job(dict(i=i, even=bool(i % 2 == 0))).init()
-        project = project.get_project(root=self._tmp_dir.name)
+        project = project.get_project(path=self._tmp_dir.name)
         project._entrypoint = self.entrypoint
         return project
 
@@ -2224,10 +2300,10 @@ class TestHooksSetUp(TestProjectBase):
         return request.param
 
     def mock_project(self):
-        project = self.project_class.get_project(root=self._tmp_dir.name)
+        project = self.project_class.get_project(path=self._tmp_dir.name)
         project.open_job(dict(raise_exception=False)).init()
         project.open_job(dict(raise_exception=True)).init()
-        project = project.get_project(root=self._tmp_dir.name)
+        project = project.get_project(path=self._tmp_dir.name)
         project._entrypoint = self.entrypoint
         return project
 

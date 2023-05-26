@@ -2604,7 +2604,6 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         status_parallelization="none",
         hide_progress=False,
         names=None,
-
     ):
         """Fetch status for the provided aggregates / jobs.
 
@@ -5016,7 +5015,9 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
             "(requires pprofile)",
         )
         parser_status.add_argument(
-            "--hide-progress", action="store_true", help="Hide the progress bar",
+            "--hide-progress",
+            action="store_true",
+            help="Hide the progress bar",
         )
         parser_status.add_argument(
             "-o",

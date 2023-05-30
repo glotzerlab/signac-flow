@@ -370,7 +370,13 @@ def _get_parallel_executor(parallelization="none", hide_progress=False):
         elif parallelization == "process":
 
             def parallel_executor(func, iterable, **kwargs):
-                return ProcessPoolExecutor().map(func, iterable)
+                return [
+                    result
+                    for result in ProcessPoolExecutor().map(
+                        partial(_run_cloudpickled_func, cloudpickle.dumps(func)),
+                        map(cloudpickle.dumps, iterable),
+                    )
+                ]
 
         else:
 

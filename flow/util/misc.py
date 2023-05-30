@@ -365,7 +365,7 @@ def _get_parallel_executor(parallelization="none", hide_progress=False):
         if parallelization == "thread":
 
             def parallel_executor(func, iterable, **kwargs):
-                return ThreadPoolExecutor().map(func, iterable)
+                return [result for result in ThreadPoolExecutor().map(func, iterable)]
 
         elif parallelization == "process":
 

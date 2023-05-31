@@ -14,6 +14,7 @@ Version 0.26
 Added
 +++++
 
+- ``test-workflow`` CLI option for testing template environments/submission scripts (#747).
 - Frontier environment and template (#743).
 - Added ``-o`` / ``--operation`` flag to report project status information for specific operations (#725).
 

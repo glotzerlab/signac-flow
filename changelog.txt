@@ -39,7 +39,7 @@ Added
 +++++
 
 - Added the OLCF Crusher environment (#708).
-- Added `TrackOperations` as a builtin hook (#739).
+- Added `TrackOperations` as a built in hook (#739).
 
 Changed
 +++++++

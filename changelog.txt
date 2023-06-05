@@ -49,7 +49,6 @@ Changed
 
 - Requires signac 2.0.0 (#734).
 
-
 Version 0.24
 ============
 

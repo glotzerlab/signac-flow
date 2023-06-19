@@ -16,6 +16,7 @@ List of commands:
     * `init`_
     * `template`_
     * `template create`_
+    * `test-workflow`_
 
 .. _flow-cli-init:
 
@@ -37,3 +38,10 @@ template create
 ---------------
 
 .. command-output:: flow template create --help
+
+.. _flow-cli-test-workflow:
+
+test-workflow
+-------------
+
+.. command-output:: flow test-workflow --help

@@ -2602,6 +2602,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         err,
         ignore_errors,
         status_parallelization="none",
+        names=None,
     ):
         """Fetch status for the provided aggregates / jobs.
 
@@ -2616,6 +2617,10 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         status_parallelization : str
             Parallelization mode for fetching the status. Allowed values are
             "thread", "process", or "none". (Default value = "none")
+        names : iterable of :class:`str`
+            Only show status for operations that match the provided set of names
+            (interpreted as regular expressions), or all if the argument is
+            None. (Default value = None)
 
         Returns
         -------
@@ -2634,6 +2639,14 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
             only has to occur one time.
 
         """
+        if names is not None:
+            absent_ops = (set(self._groups.keys()) ^ set(names)) & set(names)
+            if absent_ops:
+                print(
+                    f"Unrecognized flow operation(s): {', '.join(absent_ops)}",
+                    file=sys.stderr,
+                )
+
         if status_parallelization not in ("thread", "process", "none"):
             raise RuntimeError(
                 "Configuration value status_parallelization is invalid. "
@@ -2649,7 +2662,6 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
 
         def compute_status(data):
             scheduler_id, scheduler_status, aggregate_id, aggregate, group = data
-
             status = {}
             error_text = None
             try:
@@ -2704,11 +2716,14 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
                     )
             return result
 
+        status_groups = set(self._gather_flow_groups(names))
+
         with self._buffered():
             aggregate_groups = list(
                 self._generate_selected_aggregate_groups_with_status(
                     scheduler_info=scheduler_info,
                     selected_aggregates=aggregates,
+                    selected_groups=status_groups,
                 )
             )
             status_results = []
@@ -2809,6 +2824,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         profile=False,
         eligible_jobs_max_lines=None,
         output_format="terminal",
+        operation=None,
     ):
         """Print the status of the project.
 
@@ -2859,6 +2875,10 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         output_format : str
             Status output format, supports:
             'terminal' (default), 'markdown' or 'html'.
+        operation : iterable of :class:`str`
+            Show status of operations that match the provided set of names
+            (interpreted as regular expressions), or all if the argument is
+            None. (Default value = None)
 
         """
         if file is None:
@@ -2903,6 +2923,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
                     err=err,
                     ignore_errors=ignore_errors,
                     status_parallelization=status_parallelization,
+                    names=operation,
                 )
 
             prof._mergeFileTiming()
@@ -2982,6 +3003,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
                 err=err,
                 ignore_errors=ignore_errors,
                 status_parallelization=status_parallelization,
+                names=operation,
             )
             profiling_results = None
 
@@ -4223,12 +4245,6 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
             nargs="+",
             help="Only select jobs that match the given state point filter.",
         )
-        parser.add_argument(
-            "--doc-filter",
-            type=str,
-            nargs="+",
-            help="Only select jobs that match the given document filter.",
-        )
 
     @classmethod
     def _add_operation_selection_arg_group(cls, parser):
@@ -4375,7 +4391,6 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
             help="Ignore errors that might occur when querying the scheduler.",
         )
         view_group.add_argument(
-            "-o",
             "--output-format",
             type=str,
             default="terminal",
@@ -4757,7 +4772,6 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
                 "debug",
                 "job_id",
                 "filter",
-                "doc_filter",
             ]
         }
         if args.pop("full"):
@@ -4876,14 +4890,10 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
             operation_function(*aggregate)
 
     def _select_jobs_from_args(self, args):
-        """Select jobs with the given command line arguments ('-j/-f/--doc-filter/--job-id')."""
-        if (
-            not args.func == self._main_exec
-            and args.job_id
-            and (args.filter or args.doc_filter)
-        ):
+        """Select jobs with the given command line arguments ('-j/-f/--job-id')."""
+        if not args.func == self._main_exec and args.job_id and (args.filter):
             raise ValueError(
-                "Cannot provide both -j/--job-id and -f/--filter or --doc-filter in combination."
+                "Cannot provide both -j/--job-id and -f/--filter in combination."
             )
 
         if args.job_id:
@@ -4900,12 +4910,11 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         elif args.func == self._main_exec:
             # exec command does not support filters, so we must exit early.
             return _AggregateStoresCursor(self)
-        elif args.filter or args.doc_filter:
-            # filter or doc_filter provided. Filters can only be used to select
+        elif args.filter:
+            # filter, including doc_filter provided. Filters can only be used to select
             # single jobs and not aggregates of multiple jobs.
             filter_ = parse_filter_arg(args.filter)
-            doc_filter = parse_filter_arg(args.doc_filter)
-            return _JobAggregateCursor(self, filter_, doc_filter)
+            return _JobAggregateCursor(self, filter_)
         else:
             # Use all aggregates
             return _AggregateStoresCursor(self)
@@ -4991,6 +5000,14 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
             "Optionally provide a filename pattern to select for what files "
             "to show result for. Defaults to the main module. "
             "(requires pprofile)",
+        )
+        parser_status.add_argument(
+            "-o",
+            "--operation",
+            type=str,
+            nargs="+",
+            help="Select operation or groups that match the given "
+            "operation/group name(s). These are interpreted as regular expressions.",
         )
         parser_status.set_defaults(func=self._main_status)
 

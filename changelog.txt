@@ -5,8 +5,40 @@ Changelog
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 The numbers in brackets denote the related GitHub issue and/or pull request.
 
+Version 0.26
+============
+
+[0.26.0] -- 2023-xx-xx
+----------------------
+
+Added
++++++
+
+- ``test-workflow`` CLI option for testing template environments/submission scripts (#747).
+- Frontier environment and template (#743).
+- Added ``-o`` / ``--operation`` flag to report project status information for specific operations (#725).
+
+Changed
++++++++
+
+- Removed ``-o`` flag as an alias for ``--output`` in `status` CLI subcommand (#725).
+
 Version 0.25
 ============
+
+[0.25.1] -- 2023-04-21
+----------------------
+
+Fixed
++++++
+
+- Delta hostname detection (#740).
+- Fix filter argument (#737, #738).
+
+Removed
++++++++
+
+- ``--doc-filter`` argument (#738).
 
 [0.25.0] -- 2023-03-30
 ----------------------

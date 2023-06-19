@@ -135,3 +135,18 @@ class TestCLI:
         with open("templates/script.sh") as fh:
             custom_script_lines = fh.read().splitlines()
         assert '{% extends "slurm.sh" %}' in custom_script_lines[0]
+
+    def test_test_workflow(self):
+        self.call("python -m flow test-workflow -c 20 -g 8".split())
+        assert os.path.exists("init.py")
+        assert os.path.exists("project.py")
+        assert os.path.exists("workspace")
+        assert len(os.listdir("workspace")) == 10
+        with open("project.py") as fh:
+            lines = fh.read().splitlines()
+            assert lines[6].endswith("20")
+            assert lines[7].endswith("8")
+
+    def test_test_workflow_num_jobs(self):
+        self.call("python -m flow test-workflow -c 20 -g 8 -n 5".split())
+        assert len(os.listdir("workspace")) == 5

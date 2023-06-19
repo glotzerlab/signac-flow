@@ -13,6 +13,7 @@ from itertools import groupby
 
 import define_hooks_logging_project
 import define_hooks_test_project
+import define_status_test_project
 import pytest
 import signac
 from conftest import MockScheduler, TestProjectBase
@@ -121,6 +122,69 @@ class TestProjectStatusPerformance(TestProjectBase):
             number=10,
         )
         assert time < 10
+
+
+class TestProjectStatusFilterOperations(TestProjectBase):
+    project_class = define_status_test_project._TestProject
+
+    def mock_project(self):
+        project = self.project_class.get_project(path=self._tmp_dir.name)
+
+        for a in range(2, 4):
+            for b in range(2):
+                job = project.open_job(dict(a=a, b=b)).init()
+                job.doc.a = a
+                job = project.open_job(dict(a=dict(a=a), b=b)).init()
+                job.doc.b = b
+
+        return project
+
+    @pytest.fixture(scope="function")
+    def project(self):
+        return self.mock_project()
+
+    @pytest.fixture(scope="function")
+    def get_status(self, project):
+        def _get_status(**kwargs):
+            with redirect_stdout(StringIO()) as stdout:
+                project.print_status(**kwargs)
+                return stdout.getvalue().split("\n")
+
+        return _get_status
+
+    @pytest.mark.parametrize(
+        "groups",
+        [
+            ["group1"],
+            ["group2"],
+            ["group1", "group2"],
+            ["op1"],
+            ["group1", "op3"],
+            ["group2", "op1"],
+            ["op1", "op3"],
+        ],
+        ids=[
+            "group1",
+            "group2",
+            "group1_2",
+            "op1",
+            "group1_op3",
+            "group2_op1",
+            "op1_op3",
+        ],
+    )
+    def test_groups(self, groups, get_status):
+        stdout = get_status(operation=groups)
+        excluded_groups = {"group1", "group2", "op1", "op2", "op3"} - set(groups)
+        operations_output = "".join(stdout)
+        for excluded_group in excluded_groups:
+            assert excluded_group not in operations_output
+        for group in groups:
+            assert group in operations_output
+
+    def test_operation_in_group(self, get_status):
+        with pytest.raises(ValueError):
+            get_status(operation=["op1", "group1"])
 
 
 class TestProjectStatusNoEligibleOperations(TestProjectBase):
@@ -1302,6 +1366,18 @@ class TestProjectMainInterface(TestProjectBase):
             assert not job.isfile("world.txt")
         self.call_subcmd("run -o op1")
         even_jobs = [job for job in self.project if job.sp.b % 2 == 0]
+        for job in self.project:
+            if job in even_jobs:
+                assert job.isfile("world.txt")
+            else:
+                assert not job.isfile("world.txt")
+
+    def test_main_run_filter(self):
+        assert len(self.project)
+        for job in self.project:
+            assert not job.isfile("world.txt")
+        self.call_subcmd("run -o op1 -f b 2")
+        even_jobs = [job for job in self.project if job.sp.b == 2]
         for job in self.project:
             if job in even_jobs:
                 assert job.isfile("world.txt")

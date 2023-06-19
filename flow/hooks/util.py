@@ -1,12 +1,14 @@
 # Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-"""TO DO."""
+"""Define a function to collect metadata on the operation and job."""
 from datetime import datetime, timezone
 
 
 def collect_metadata(operation, job):
-    """TODO.
+    """Collect metadata related to the operation and job.
+
+    Returns a directory including schema version, time, project, and job-operation.
 
     We can no longer track the following
     because we take in the operation name as a string

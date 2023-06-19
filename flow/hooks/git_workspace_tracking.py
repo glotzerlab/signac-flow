@@ -1,7 +1,7 @@
 # Copyright (c) 2018 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-"""TO DO."""
+"""Define functions to track the workspace state using git."""
 import json
 import logging
 import os
@@ -71,7 +71,7 @@ class GitWorkspace:
             return git.Repo.init(root)
 
     def commit_before(self, operation):
-        """TODO."""
+        """Commit changes before executing the operation."""
         metadata = collect_metadata(operation)
         metadata["stage"] = "prior"
         repo = self._get_repo(operation)
@@ -79,7 +79,7 @@ class GitWorkspace:
         _commit(repo, f"Before executing operation {operation}.")
 
     def commit_after(self, operation, error=None):
-        """TODO."""
+        """Commit changes after executing the operation."""
         metadata = collect_metadata(operation)
         metadata["stage"] = "post"
         metadata["error"] = None if error is None else str(error)
@@ -96,7 +96,7 @@ class GitWorkspace:
         repo.git.notes("append", repo.commit(), "-m", "signac:" + json.dumps(metadata))
 
     def install_hooks(self, project):
-        """TODO."""
+        """Install hooks before and after operations."""
         project.hooks.on_start.append(self.commit_before)
         project.hooks.on_success.append(self.commit_after)
         project.hooks.on_fail.append(self.commit_after)

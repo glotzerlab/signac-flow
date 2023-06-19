@@ -2569,19 +2569,19 @@ class TestHooksTrackOperations(TestHooksSetUp):
 
     def git_repo(self, project, make_dirty=False):
         repo = git.Repo.init(project.path)
-        with open(project.fn("test.txt"), "w") as f:
+        with open(project.fn("test.txt"), "w"):
             pass
         repo.index.add(["test.txt"])
         repo.index.commit("Initial commit")
         if make_dirty:
-            with open(project.fn("dirty.txt"), "w") as f:
+            with open(project.fn("dirty.txt"), "w"):
                 pass
         return repo
 
     @git_mark_skipif
     def test_strict_git_not_dirty(self, project, job, strict_git_true_operation_info):
         operation_name, error_message = strict_git_true_operation_info
-        repo = self.git_repo(project, False)
+        # repo = self.git_repo(project, False)
 
         assert not job.isfile(self.log_fname)
 

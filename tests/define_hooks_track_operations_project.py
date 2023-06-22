@@ -8,6 +8,9 @@ class _HooksTrackOperations(FlowProject):
     pass
 
 
+track_operations = TrackOperations(strict_git=False)
+
+
 """
 Strict Git False
 """
@@ -45,14 +48,14 @@ def strict_git_false_cmd(job):
         return "touch base_cmd.txt"
 
 
-@TrackOperations(strict_git=False).install_operation_hooks(_HooksTrackOperations)
+@track_operations.install_operation_hooks(_HooksTrackOperations)
 @_HooksTrackOperations.operation
 def strict_git_false_install(job):
     if job.sp.raise_exception:
         raise RuntimeError(HOOKS_ERROR_MESSAGE)
 
 
-@TrackOperations(strict_git=False).install_operation_hooks(_HooksTrackOperations)
+@track_operations.install_operation_hooks(_HooksTrackOperations)
 @_HooksTrackOperations.operation(cmd=True, with_job=True)
 def strict_git_false_install_cmd(job):
     if job.sp.raise_exception:

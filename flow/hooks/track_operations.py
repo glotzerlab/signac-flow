@@ -1,4 +1,4 @@
-# Copyright (c) 2018 The Regents of the University of Michigan
+# Copyright (c) 2023 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 """Built in execution hook for basic tracking."""
@@ -22,7 +22,7 @@ FN_LOGFILE = ".operations_log.txt"
 class TrackOperations:
     """:class:`~.TrackOperations` tracks information about the execution of operations to a logfile.
 
-    This hooks provides information, optionally, on the start, successful completion, and/or
+    This hooks can provides information on the start, successful completion, and/or
     erroring of one or more operations in a `flow.FlowProject` instance. The logs are stored in a
     file given by the parameter ``fn_logfile``. This file will be appended to if it already exists.
     The default formating for the log provides the [time, job id, log level, and log message].
@@ -58,7 +58,7 @@ class TrackOperations:
             pass
 
 
-    The code block below provides an example of how install  :class:`~.TrackOperations` to a
+    The code block below provides an example of how install :class:`~.TrackOperations` to a
     instance of :class:`~.FlowProject`
 
     .. code-block:: python
@@ -70,19 +70,15 @@ class TrackOperations:
             pass
 
 
-        # Do something
-
-
         if __name__ == "__main__":
             project = Project()
             project = TrackOperations().install_project_hooks(project)
             project.main()
 
 
-
     Parameters
     ----------
-    fn_logfile: log filename
+    fn_logfile: str
         The name of the log file in the job workspace. Default is "execution-record.log".
     """
 
@@ -123,19 +119,19 @@ class TrackOperations:
         return _log_operation
 
     def on_start(self, operation, job):
-        """Track the start of execution of a given job(s) operation pair."""
+        """Track the start of execution of an operation on a job."""
         self.log_operation(stage="prior")(operation, job)
 
     def on_success(self, operation, job):
-        """Track the successful completion of a given job(s) operation pair."""
+        """Track the successful completion of an operation on a job."""
         self.log_operation(stage="after")(operation, job)
 
     def on_exception(self, operation, error, job):
-        """Log errors raised during the execution of a specific job(s) operation pair."""
+        """Log errors raised during the execution of an operation on a job."""
         self.log_operation(stage="after")(operation, job, error)
 
     def install_operation_hooks(self, op, project_cls=None):
-        """Decorate operation to install track operation to one operation in a Signac-flow project.
+        """Decorate operation to track execution.
 
         Parameters
         ----------
@@ -158,7 +154,7 @@ class TrackOperations:
         Parameters
         ----------
         project : flow.FlowProject
-            THe project to install project wide hooks.
+            The project to install hooks on.
         """
         project.project_hooks.on_start.append(self.on_start)
         project.project_hooks.on_success.append(self.on_success)

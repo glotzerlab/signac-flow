@@ -2640,6 +2640,7 @@ class TestHooksTrackOperations(TestHooksSetUp):
         if make_dirty:
             with open(project.fn("dirty.txt"), "w"):
                 pass
+            repo.index.add(["dirty.txt"])
         return repo
 
     @git_mark_skipif
@@ -2658,6 +2659,8 @@ class TestHooksTrackOperations(TestHooksSetUp):
     @git_mark_skipif
     def test_strict_git_is_dirty(self, project, job, strict_git_true_operation_info):
         operation_name, error_message = strict_git_true_operation_info
+        self.git_repo(project, True)
+
         assert not job.isfile(self.log_fname)
 
         with pytest.raises(subprocess.CalledProcessError):

@@ -149,7 +149,7 @@ class TrackOperations:
         return op
 
     def install_project_hooks(self, project):
-        """Install track operation to all operations in a Signac-flow project.
+        """Install track operation to all operations in a signac-flow project.
 
         Parameters
         ----------

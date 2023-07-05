@@ -2587,15 +2587,15 @@ class TestHooksTrackOperations(TestHooksSetUp):
         for value in values[:2]:
             metadata = json.loads(value)
             assert metadata["stage"] == "prior"
-            # I think job._project.path gives us a relative path in the test, while
-            # job._project.path in hooks.utils.collect_metadata gives us the absolute path
+            # I think job.project.path gives us a relative path in the test, while
+            # job.project.path in hooks.utils.collect_metadata gives us the absolute path
             # I don't know why this is happening.
-            assert job._project.path in metadata["project"]["path"]
-            assert metadata["project"]["schema_version"] == job._project.config.get(
+            assert job.project.path in metadata["project"]["path"]
+            assert metadata["project"]["schema_version"] == job.project.config.get(
                 "schema_version"
             )
             # Just assumed that the operation should start within 5 minutes
-            # from where we recorded the time line 2477. This seems generous and
+            # from where we start recorded the time. This seems generous and
             # we can adjust it if needed.
             start_time = datetime.datetime.fromisoformat(metadata["time"])
             difference = start_time - time
@@ -2607,15 +2607,15 @@ class TestHooksTrackOperations(TestHooksSetUp):
         for value in values[2:]:
             metadata = json.loads(value)
             assert metadata["stage"] == "after"
-            # I think job._project.path gives us a relative path in the test, while
-            # job._project.path in hooks.utils.collect_metadata gives us the absolute path
+            # I think job.project.path gives us a relative path in the test, while
+            # job.project.path in hooks.utils.collect_metadata gives us the absolute path
             # I don't know why this is happening.
-            assert job._project.path in metadata["project"]["path"]
-            assert metadata["project"]["schema_version"] == job._project.config.get(
+            assert job.project.path in metadata["project"]["path"]
+            assert metadata["project"]["schema_version"] == job.project.config.get(
                 "schema_version"
             )
             # Just assumed that the operation should start within 5 minutes
-            # from where we recorded the time line 2477. This seems generous and
+            # from where we start recorded the time. This seems generous and
             # we can adjust it if needed.
             start_time = datetime.datetime.fromisoformat(metadata["time"])
             difference = start_time - time

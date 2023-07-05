@@ -2645,7 +2645,7 @@ class TestHooksTrackOperations(TestHooksSetUp):
     @git_mark_skipif
     def test_strict_git_not_dirty(self, project, job, strict_git_true_operation_info):
         operation_name, error_message = strict_git_true_operation_info
-        # repo = self.git_repo(project, False)
+        self.git_repo(project, False)
 
         assert not job.isfile(self.log_fname)
 

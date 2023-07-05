@@ -13,7 +13,7 @@ def collect_metadata_with_git(operation, job):
     The git-related information includes the commit ID and a flag indicating if the
     repository is dirty (has uncommitted changes).
     """
-    repo = git.Repo(job._project.path)
+    repo = git.Repo(job.project.path)
     metadata = collect_metadata(operation, job)
     metadata["project"]["git"] = {
         "commit_id": str(repo.commit()),

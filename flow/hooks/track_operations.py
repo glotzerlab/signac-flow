@@ -4,14 +4,14 @@
 """Built in execution hook for basic tracking."""
 import json
 
+from .util import collect_metadata
+
 try:
     import git
 except ImportError:
-    from .util import collect_metadata
-
     GIT = False
 else:
-    from .git_util import collect_metadata_with_git as collect_metadata
+    from .git_util import collect_metadata_with_git
 
     GIT = True
 
@@ -105,7 +105,10 @@ class TrackOperations:
                             type(self).__name__
                         )
                     )
-            metadata = collect_metadata(operation, job)
+            if self.strict_git:
+                metadata = collect_metadata_with_git(operation, job)
+            else:
+                metadata = collect_metadata(operation, job)
 
             # Add additional execution-related information to metadata.
             metadata["stage"] = stage

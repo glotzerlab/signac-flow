@@ -26,9 +26,9 @@ def collect_metadata(operation, job):
         "_schema_version": "1",
         "time": datetime.now(timezone.utc).isoformat(),
         "project": {
-            "path": job._project.path,
+            "path": job.project.path,
             # the project schema version:
-            "schema_version": job._project.config.get("schema_version"),
+            "schema_version": job.project.config.get("schema_version"),
         },
         "job-operation": {
             "name": operation,

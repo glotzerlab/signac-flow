@@ -97,7 +97,7 @@ class TrackOperations:
 
         def _log_operation(operation, job, error=None):
             if self.strict_git:
-                if git.Repo(job._project.path).is_dirty():
+                if git.Repo(job.project.path).is_dirty():
                     raise RuntimeError(
                         "Unable to reliably log operation, because the git repository in "
                         "the project root directory is dirty.\n\nMake sure to commit all "
@@ -116,7 +116,6 @@ class TrackOperations:
 
             # Write metadata to collection inside job workspace.
             with open(job.fn(FN_LOGFILE), "a") as logfile:
-                # HELP: Is there any reason we used Collections instead of a regular dictionary?
                 logfile.write(json.dumps(metadata) + "\n")
 
         return _log_operation

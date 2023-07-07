@@ -2529,9 +2529,9 @@ class TestHooksLogOperationSetUp(TestHooksSetUp):
         )
     )
 
-    ON_START_MSG = "Starting execution of operation '{}'."
-    SUCCESS_MSG = "Successfully finished execution of operation '{}'."
-    EXCEPTION_MSG = "Execution of operation '{}' failed with error"
+    ON_START_MSG = "Operation '{}' started."
+    SUCCESS_MSG = "Operation '{}' finished without exception."
+    EXCEPTION_MSG = "Operation '{}' failed with error"
 
     @staticmethod
     def get_log_filename():
@@ -2565,7 +2565,7 @@ class TestHooksLogCmd(TestHooksLogOperationSetUp):
         assert self.ON_START_MSG.format(operation_name) in log_output
         if job.sp.raise_exception:
             assert self.error_message in log_output
-            assert self.EXCEPTION_MSG.format(operation_name)
+            assert self.EXCEPTION_MSG.format(operation_name) in log_output
         else:
             assert self.runtime_message in log_output
             assert self.SUCCESS_MSG.format(operation_name) in log_output

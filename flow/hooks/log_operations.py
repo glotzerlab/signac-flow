@@ -82,18 +82,18 @@ class LogOperations:
 
     def on_start(self, operation, job):
         """Log the start of execution of an operation on a job."""
-        self._get_logger(job).info(f"Starting execution of operation '{operation}'.")
+        self._get_logger(job).info(f"Operation '{operation}' started.")
 
     def on_success(self, operation, job):
         """Log the successful completion of a given job(s) operation pair."""
         self._get_logger(job).info(
-            f"Successfully finished execution of operation '{operation}'."
+            f"Operation '{operation}' finished without exception."
         )
 
     def on_exception(self, operation, error, job):
         """Log the raising of an error in the execution of a given job(s) operation pair."""
         self._get_logger(job).info(
-            f"Execution of operation '{operation}' failed with error '{error}'."
+            f"Operation '{operation}' failed with error '{error}'."
         )
 
     def _get_logger(self, job):

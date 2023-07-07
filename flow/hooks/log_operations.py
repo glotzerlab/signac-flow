@@ -24,7 +24,7 @@ class LogOperations:
     Examples
     --------
     The following example will install :class:`~.LogOperations` at the operation level.
-    Where the log will be stored in a file name `foo.log` in the job workspace.
+    Where the log will be stored in a file name `foo.log` in the job directory.
 
     .. code-block:: python
         from flow import FlowProject
@@ -71,7 +71,7 @@ class LogOperations:
     Parameters
     ----------
     fn_logfile : str
-        The name of the log file in the job workspace. Default is "operations.log".
+        The name of the log file in the job directory. Default is "operations.log".
     """
 
     def __init__(self, fn_logfile="operations.log"):

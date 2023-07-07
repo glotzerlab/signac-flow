@@ -1,4 +1,4 @@
-# Copyright (c) 2018 The Regents of the University of Michigan
+# Copyright (c) 2023 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 """Builtin execution hook for basic logging."""
@@ -8,7 +8,7 @@ import logging
 class LogOperations:
     """:class:`~.LogOperations` logs information about the execution of operations to a log file.
 
-    This hooks provides information, optionally, on the start, successful completion, and/or
+    This hook can provide information on the start, successful completion, and/or
     erroring of one or more operations in a `flow.FlowProject` instance. The logs are stored in a
     file given by the parameter ``fn_logfile``. This file will be appended to if it already exists.
 
@@ -48,7 +48,7 @@ class LogOperations:
             pass
 
 
-    The code block below provides an example of how install  :class:`~.LogOperations` to a
+    The code block below provides an example of how install :class:`~.LogOperations` to an
     instance of :class:`~.FlowProject`
 
     .. code-block:: python
@@ -68,22 +68,20 @@ class LogOperations:
             project = LogOperations().install_project_hooks(project)
             project.main()
 
-
-
     Parameters
     ----------
-    fn_logfile: log filename
+    fn_logfile : str
         The name of the log file in the job workspace. Default is "execution-record.log".
     """
 
     def __init__(self, fn_logfile="execution-record.log"):
         self._fn_logfile = fn_logfile
-        # getLogger keep its own cache. This just serves to reduce the time spent setting up loggers
+        # getLogger keep its own cache. This reduces the time spent setting up loggers
         # by only doing it once.
         self._loggers = {}
 
     def on_start(self, operation, job):
-        """Log the start of execution of a given job(s) operation pair."""
+        """Log the start of execution of an operation on a job."""
         self._get_logger(job).info(f"Starting execution of operation '{operation}'.")
 
     def on_success(self, operation, job):
@@ -115,7 +113,7 @@ class LogOperations:
         return logger
 
     def install_operation_hooks(self, op, project_cls=None):
-        """Decorate operation to install log operation to one operation in a signac-flow project.
+        """Decorate operation to log execution.
 
         Parameters
         ----------
@@ -138,7 +136,7 @@ class LogOperations:
         Parameters
         ----------
         project : flow.FlowProject
-            The project to install project wide hooks on.
+            The project to install hooks on.
         """
         project.project_hooks.on_start.append(self.on_start)
         project.project_hooks.on_success.append(self.on_success)

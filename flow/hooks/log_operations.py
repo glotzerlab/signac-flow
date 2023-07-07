@@ -60,7 +60,7 @@ class LogOperations:
             pass
 
 
-        # Do something
+        # Project operation definitions
 
 
         if __name__ == "__main__":
@@ -71,10 +71,10 @@ class LogOperations:
     Parameters
     ----------
     fn_logfile : str
-        The name of the log file in the job workspace. Default is "execution-record.log".
+        The name of the log file in the job workspace. Default is "operations.log".
     """
 
-    def __init__(self, fn_logfile="execution-record.log"):
+    def __init__(self, fn_logfile="operations.log"):
         self._fn_logfile = fn_logfile
         # getLogger keep its own cache. This reduces the time spent setting up loggers
         # by only doing it once.

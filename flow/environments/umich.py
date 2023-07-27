@@ -15,6 +15,9 @@ class GreatLakesEnvironment(DefaultSlurmEnvironment):
     template = "umich-greatlakes.sh"
     _cpus_per_node = {"default": 36, "gpu": 40}
     _gpus_per_node = {"default": 2}
+    _shared_partitions = {"standard", "gpu"}
+
+    mpi_cmd = "srun"
 
     @classmethod
     def add_args(cls, parser):

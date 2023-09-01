@@ -1,4 +1,4 @@
-click==8.1.6
+click==8.1.7
 coverage==7.2.7
 pytest-cov==4.1.0
 pytest==7.4.0

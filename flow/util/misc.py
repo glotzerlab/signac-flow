@@ -365,7 +365,7 @@ def _get_parallel_executor(parallelization="none", hide_progress=False):
         A callable with signature ``func, iterable, **kwargs`` which returns an interator.
 
     """
-    if parallelization == "progress":
+    if parallelization == "process":
         executor = ProcessPoolExecutor().map
         if not hide_progress:
             executor = partial(process_map, tqdm_class=tqdm)

@@ -347,6 +347,10 @@ def _get_parallel_executor(parallelization="none", hide_progress=False):
     (see :meth:`concurrent.futures.Executor.map`). All other ``**kwargs`` are
     passed to the tqdm progress bar.
 
+    Warning
+    -------
+    We ignore key word arguments when ``hide_progress == True``.
+
     Parameters
     ----------
     parallelization : str
@@ -364,25 +368,20 @@ def _get_parallel_executor(parallelization="none", hide_progress=False):
     if parallelization == "progress":
         executor = ProcessPoolExecutor().map
         if not hide_progress:
-            require_total = True
             executor = partial(process_map, tqdm_class=tqdm)
 
         def parallel_executor(func, iterable, **kwargs):
-            if require_total and "total" not in kwargs:
-                # The tqdm progress bar requires a total. We compute the total in
-                # advance because a map iterable (which has no total) is passed to
-                # process_map.
-                kwargs["total"] = len(iterable)
-
-            return executor(
-                # The top-level function called on each process cannot be a
-                # local function, it must be a module-level function. Creating
-                # a partial here allows us to use the passed function "func"
-                # regardless of whether it is a local function.
-                partial(_run_cloudpickled_func, cloudpickle.dumps(func)),
-                map(cloudpickle.dumps, iterable),
-                **kwargs,
-            )
+            # The top-level function called on each process cannot be a local function, it must be a
+            # module-level function. Creating a partial here allows us to use the passed function
+            # "func" regardless of whether it is a local function.
+            func = partial(_run_cloudpickled_func, cloudpickle.dumps(func))
+            iterable = map(cloudpickle.dumps, iterable)
+            if hide_progress:
+                return executor(func, iterable)
+            # The tqdm progress bar requires a total. We compute the total in advance because a map
+            # iterable (which has no total) is passed to process_map.
+            kwargs.setdefault("total", len(iterable))
+            return executor(func, iterable, **kwargs)
 
     elif parallelization == "thread":
         executor = ThreadPoolExecutor().map
@@ -390,15 +389,18 @@ def _get_parallel_executor(parallelization="none", hide_progress=False):
             executor = partial(thread_map, tqdm_class=tqdm)
 
         def parallel_executor(func, iterable, **kwargs):
-            return executor(func, iterable)
+            if hide_progress:
+                return executor(func, iterable)
+            return executor(func, iterable, **kwargs)
 
     else:
         executor = map if hide_progress else partial(tmap, tqdm_class=tqdm)
 
         def parallel_executor(func, iterable, **kwargs):
-            if "chunksize" in kwargs:
-                del kwargs["chunksize"]
-            return executor(func, iterable)
+            if hide_progress:
+                return executor(func, iterable)
+            kwargs.pop("chunksize", None)
+            return executor(func, iterable, **kwargs)
 
     return parallel_executor
 

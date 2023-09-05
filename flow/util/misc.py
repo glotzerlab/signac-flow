@@ -352,7 +352,7 @@ def _get_parallel_executor(parallelization="none", hide_progress=False):
     parallelization : str
         Parallelization mode. Allowed values are "thread", "process", or
         "none". (Default value = "none")
-    hide_progress: bool
+    hide_progress : bool
         Hide the progress bar when printing status output (Default value = False).
 
     Returns

@@ -375,12 +375,12 @@ def _get_parallel_executor(parallelization="none", hide_progress=False):
             # module-level function. Creating a partial here allows us to use the passed function
             # "func" regardless of whether it is a local function.
             func = partial(_run_cloudpickled_func, cloudpickle.dumps(func))
-            iterable = map(cloudpickle.dumps, iterable)
-            if hide_progress:
-                return executor(func, iterable)
             # The tqdm progress bar requires a total. We compute the total in advance because a map
             # iterable (which has no total) is passed to process_map.
             kwargs.setdefault("total", len(iterable))
+            iterable = map(cloudpickle.dumps, iterable)
+            if hide_progress:
+                return executor(func, iterable)
             return executor(func, iterable, **kwargs)
 
     elif parallelization == "thread":

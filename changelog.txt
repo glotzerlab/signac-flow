@@ -8,6 +8,14 @@ The numbers in brackets denote the related GitHub issue and/or pull request.
 Version 0.26
 ============
 
+[0.26.1] -- not yet released
+----------------------------
+
+Fixed
++++++
+
+- Schedule 56 cores per node on OLCF Frontier (#764).
+
 [0.26.0] -- 2023-09-06
 ----------------------
 

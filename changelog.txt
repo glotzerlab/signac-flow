@@ -14,9 +14,7 @@ Version 0.26
 Fixed
 +++++
 
-<<<<<<< HEAD
 - Packaging of files in ``flow.scripts`` used in CLI (#765).
-=======
 - Schedule 56 cores per node on OLCF Frontier (#764).
 
 [0.26.0] -- 2023-09-06

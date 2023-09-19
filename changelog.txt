@@ -8,12 +8,13 @@ The numbers in brackets denote the related GitHub issue and/or pull request.
 Version 0.26
 ============
 
-[0.26.1] -- not yet released
-----------------------------
+[0.26.1] -- 2023-xx-xx
+----------------------
 
 Fixed
 +++++
 
+- Packaging of files in ``flow.scripts`` used in CLI (#765).
 - Schedule 56 cores per node on OLCF Frontier (#764).
 
 [0.26.0] -- 2023-09-06

@@ -2,4 +2,4 @@ click==8.1.7
 coverage==7.3.0
 pytest-cov==4.1.0
 pytest==7.4.0
-ruamel.yaml==0.17.32
+ruamel.yaml==0.17.33

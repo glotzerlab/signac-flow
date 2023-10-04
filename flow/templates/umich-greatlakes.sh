@@ -8,11 +8,9 @@
         {% raise "Requesting gpu partition without GPUs!" %}
     {% endif %}
 #SBATCH --nodes={{ resources.num_nodes }}
-    {% if partition == 'gpu' %}
-#SBATCH --ntasks={{ (resources.ngpu_tasks, resources.ncpu_tasks)|max }}
-#SBATCH --gpus={{ resources.ngpu_tasks }}
-    {% else %}{# standard compute partition #}
 #SBATCH --ntasks={{ resources.ncpu_tasks }}
+    {% if partition == 'gpu' %}
+#SBATCH --gpus={{ resources.ngpu_tasks }}
     {% endif %}
 {% endblock tasks %}
 {% block header %}

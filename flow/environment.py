@@ -111,7 +111,7 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
 
     _cpus_per_node = {"default": -1}
     _gpus_per_node = {"default": -1}
-    _shared_partitions = {}
+    _shared_partitions = set()
 
     @classmethod
     def is_present(cls):

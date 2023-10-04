@@ -16,7 +16,7 @@
     {% if partition == 'RM-shared' and resources.ncpu_tasks > 64 %}
         {% raise "Cannot request RM-shared with more than 64 tasks or multiple nodes." %}
     {% endif %}
-    {% if resources.num_nodes > 1 or resources.ncpu_tasks >= 128 or resources.ngpu_tasks >= 8%}
+    {% if resources.num_nodes > 1 or resources.ncpu_tasks >= 128 or resources.ngpu_tasks >= 8 %}
 #SBATCH -N {{ resources.num_nodes }}
     {% endif %}
 #SBATCH --ntasks={{ resources.ncpu_tasks }}

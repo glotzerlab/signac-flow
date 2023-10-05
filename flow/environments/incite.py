@@ -38,7 +38,6 @@ class SummitEnvironment(DefaultLSFEnvironment):
     mpi_cmd = "jsrun"
     _cpus_per_node = {"default": 42}
     _gpus_per_node = {"default": 6}
-    _shared_partitions = set()
 
     @template_filter
     def calc_num_nodes(cls, resource_sets, parallel=False):
@@ -190,8 +189,6 @@ class AndesEnvironment(DefaultSlurmEnvironment):
     mpi_cmd = "srun"
     _cpus_per_node = {"default": 32, "gpu": 28}
     _gpus_per_node = {"default": 0, "gpu": 2}
-    # No shared partitions requests must be in full nodes.
-    _shared_partitions = set()
 
     @classmethod
     def add_args(cls, parser):
@@ -222,8 +219,6 @@ class CrusherEnvironment(DefaultSlurmEnvironment):
     template = "crusher.sh"
     _cpus_per_node = {"default": 56}
     _gpus_per_node = {"default": 8}
-    # Crusher has no shared partitions
-    _shared_partitions = set()
 
     mpi_cmd = "srun"
 

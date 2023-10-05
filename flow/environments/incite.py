@@ -269,7 +269,7 @@ class FrontierEnvironment(DefaultSlurmEnvironment):
 
     hostname_pattern = r".*\.frontier\.olcf\.ornl\.gov"
     template = "frontier.sh"
-    _cpus_per_node = {"default": 58}
+    _cpus_per_node = {"default": 56}
     _gpus_per_node = {"default": 8}
     mpi_cmd = "srun"
 

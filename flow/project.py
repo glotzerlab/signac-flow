@@ -2604,6 +2604,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         err,
         ignore_errors,
         status_parallelization="none",
+        hide_progress=False,
         names=None,
     ):
         """Fetch status for the provided aggregates / jobs.
@@ -2619,6 +2620,8 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         status_parallelization : str
             Parallelization mode for fetching the status. Allowed values are
             "thread", "process", or "none". (Default value = "none")
+        hide_progress : bool
+            Hide the progress bar when printing status output (Default value = False).
         names : iterable of :class:`str`
             Only show status for operations that match the provided set of names
             (interpreted as regular expressions), or all if the argument is
@@ -2655,7 +2658,9 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
                 "Valid choices are 'thread', 'process', or 'none'."
             )
 
-        parallel_executor = _get_parallel_executor(status_parallelization)
+        parallel_executor = _get_parallel_executor(
+            status_parallelization, hide_progress
+        )
 
         # Update the project's status cache
         scheduler_info = self._query_scheduler_status(
@@ -2752,11 +2757,13 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
                 self._get_job_labels,
                 ignore_errors=ignore_errors,
             )
-            job_labels = parallel_executor(
-                compute_labels,
-                individual_jobs,
-                desc="Fetching labels",
-                file=err,
+            job_labels = list(
+                parallel_executor(
+                    compute_labels,
+                    individual_jobs,
+                    desc="Fetching labels",
+                    file=err,
+                )
             )
 
         def combine_group_and_operation_status(aggregate_status_results):
@@ -2797,7 +2804,6 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
                     "_error": error_message,
                 }
             )
-
         return status_results_combined, job_labels, individual_jobs
 
     PRINT_STATUS_ALL_VARYING_PARAMETERS = True
@@ -2826,6 +2832,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         profile=False,
         eligible_jobs_max_lines=None,
         output_format="terminal",
+        hide_progress=False,
         operation=None,
     ):
         """Print the status of the project.
@@ -2877,6 +2884,8 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         output_format : str
             Status output format, supports:
             'terminal' (default), 'markdown' or 'html'.
+        hide_progress : bool
+            Hide the progress bar from the status output. (Default value = False)
         operation : iterable of :class:`str`
             Show status of operations that match the provided set of names
             (interpreted as regular expressions), or all if the argument is
@@ -2925,6 +2934,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
                     err=err,
                     ignore_errors=ignore_errors,
                     status_parallelization=status_parallelization,
+                    hide_progress=hide_progress,
                     names=operation,
                 )
 
@@ -3005,6 +3015,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
                 err=err,
                 ignore_errors=ignore_errors,
                 status_parallelization=status_parallelization,
+                hide_progress=hide_progress,
                 names=operation,
             )
             profiling_results = None
@@ -3559,7 +3570,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
             will not exceed this argument. The default is 1, there is no limit
             if this argument is None.
         progress : bool
-            Show a progress bar during execution. (Default value = False)
+            Show a progress bar during execution (Default value = False).
         order : str, callable, or None
             Specify the order of operations. Possible values are:
 
@@ -5003,6 +5014,11 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
             "Optionally provide a filename pattern to select for what files "
             "to show result for. Defaults to the main module. "
             "(requires pprofile)",
+        )
+        parser_status.add_argument(
+            "--hide-progress",
+            action="store_true",
+            help="Hide the progress bar",
         )
         parser_status.add_argument(
             "-o",

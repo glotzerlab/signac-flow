@@ -139,17 +139,17 @@ class Stampede2Environment(DefaultSlurmEnvironment):
         return prefix
 
     @classmethod
-    def _get_scheduler_values(cls, context, operations):
+    def _get_scheduler_values(cls, context):
         threshold = 0.0 if context.get("force", False) else 0.9
         partition = context.get("partition", "default")
         cpu_tasks_total = template_filters.calc_tasks(
-            operations,
+            context["operations"],
             "np",
-            len(operations) > 1 or context.get("parallel", False),
+            len(context["operations"]) > 1 or context.get("parallel", False),
             context.get("force", False),
         )
         gpu_tasks_total = template_filters.calc_tasks(
-            operations,
+            context["operations"],
             "ngpu",
             context.get("parallel", False),
             context.get("force", False),

@@ -6,7 +6,6 @@ import logging
 import os
 
 from ..environment import DefaultSlurmEnvironment, template_filter
-from ..util import template_filters
 
 logger = logging.getLogger(__name__)
 
@@ -137,31 +136,6 @@ class Stampede2Environment(DefaultSlurmEnvironment):
         else:
             prefix = ""
         return prefix
-
-    @classmethod
-    def _get_scheduler_values(cls, context):
-        threshold = 0.0 if context.get("force", False) else 0.9
-        partition = context.get("partition", "default")
-        cpu_tasks_total = template_filters.calc_tasks(
-            context["operations"],
-            "np",
-            len(context["operations"]) > 1 or context.get("parallel", False),
-            context.get("force", False),
-        )
-        gpu_tasks_total = template_filters.calc_tasks(
-            context["operations"],
-            "ngpu",
-            context.get("parallel", False),
-            context.get("force", False),
-        )
-        num_nodes = template_filters.calc_num_nodes(
-            cpu_tasks_total, cls._get_cpus_per_node(partition), threshold
-        )
-        return {
-            "ncpu_tasks": cpu_tasks_total,
-            "ngpu_tasks": gpu_tasks_total,
-            "num_nodes": num_nodes,
-        }
 
 
 class Bridges2Environment(DefaultSlurmEnvironment):

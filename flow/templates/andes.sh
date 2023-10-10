@@ -16,7 +16,7 @@
         {% endif %}
     {% endif %}
 #SBATCH -N {{ resources.num_nodes }}
-#SBATCH --ntasks={{ resourecs.ncpus_tasks }}
+#SBATCH --ntasks={{ resources.ncpus_tasks }}
     {% if partition == 'gpu' %}
 #SBATCH --gpus={{ resources.ngpu_tasks }}
     {% endif %}

@@ -663,12 +663,6 @@ class FlowGroupEntry:
         self._project = project
         self.submit_options = submit_options
         self.run_options = run_options
-        # TODO: This is no longer true.
-        # We register aggregators associated with operation functions in
-        # `_register_groups` and we do not set the aggregator explicitly.
-        # We delay setting the aggregator because we do not restrict the
-        # decorator placement in terms of `@FlowGroupEntry`, `@aggregator`, or
-        # `@operation`.
         self.group_aggregator = group_aggregator
 
     def __call__(self, func=None, /, *, directives=None):
@@ -1535,12 +1529,6 @@ class _FlowProjectClass(type):
 
                 # Append the name and function to the class registry
                 self._parent_class._OPERATION_FUNCTIONS.append((name, func))
-                # TODO: This is no longer true and can likely be changed.
-                # We register aggregators associated with operation functions in
-                # `_register_groups` and we do not set the aggregator explicitly.  We
-                # delay setting the aggregator because we do not restrict the decorator
-                # placement in terms of `@FlowGroupEntry`, `@aggregator`, or
-                # `@operation`.
                 self._parent_class._GROUPS.append(
                     FlowGroupEntry(name=name, project=self._parent_class)
                 )

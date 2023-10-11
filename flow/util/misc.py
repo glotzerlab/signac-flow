@@ -7,6 +7,7 @@ import logging
 import os
 import warnings
 from collections.abc import MutableMapping
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from contextlib import contextmanager
 from functools import lru_cache, partial
 from itertools import cycle, islice
@@ -335,7 +336,7 @@ def _run_cloudpickled_func(func, *args):
     return unpickled_func(*args)
 
 
-def _get_parallel_executor(parallelization="none"):
+def _get_parallel_executor(parallelization="none", hide_progress=False):
     """Get an executor for the desired parallelization strategy.
 
     This executor shows a progress bar while executing a function over an
@@ -346,50 +347,60 @@ def _get_parallel_executor(parallelization="none"):
     (see :meth:`concurrent.futures.Executor.map`). All other ``**kwargs`` are
     passed to the tqdm progress bar.
 
+    Warning
+    -------
+    We ignore key word arguments when ``hide_progress == True``.
+
     Parameters
     ----------
     parallelization : str
         Parallelization mode. Allowed values are "thread", "process", or
         "none". (Default value = "none")
+    hide_progress : bool
+        Hide the progress bar when printing status output (Default value = False).
 
     Returns
     -------
     callable
-        A callable with signature ``func, iterable, **kwargs``.
+        A callable with signature ``func, iterable, **kwargs`` which returns an interator.
 
     """
-    if parallelization == "thread":
+    if parallelization == "process":
+        executor = ProcessPoolExecutor().map
+        if not hide_progress:
+            executor = partial(process_map, tqdm_class=tqdm)
 
         def parallel_executor(func, iterable, **kwargs):
-            return thread_map(func, iterable, tqdm_class=tqdm, **kwargs)
+            # The top-level function called on each process cannot be a local function, it must be a
+            # module-level function. Creating a partial here allows us to use the passed function
+            # "func" regardless of whether it is a local function.
+            func = partial(_run_cloudpickled_func, cloudpickle.dumps(func))
+            # The tqdm progress bar requires a total. We compute the total in advance because a map
+            # iterable (which has no total) is passed to process_map.
+            kwargs.setdefault("total", len(iterable))
+            iterable = map(cloudpickle.dumps, iterable)
+            if hide_progress:
+                return executor(func, iterable)
+            return executor(func, iterable, **kwargs)
 
-    elif parallelization == "process":
+    elif parallelization == "thread":
+        executor = ThreadPoolExecutor().map
+        if not hide_progress:
+            executor = partial(thread_map, tqdm_class=tqdm)
 
         def parallel_executor(func, iterable, **kwargs):
-            # The tqdm progress bar requires a total. We compute the total in
-            # advance because a map iterable (which has no total) is passed to
-            # process_map.
-            if "total" not in kwargs:
-                kwargs["total"] = len(iterable)
-
-            return process_map(
-                # The top-level function called on each process cannot be a
-                # local function, it must be a module-level function. Creating
-                # a partial here allows us to use the passed function "func"
-                # regardless of whether it is a local function.
-                partial(_run_cloudpickled_func, cloudpickle.dumps(func)),
-                map(cloudpickle.dumps, iterable),
-                tqdm_class=tqdm,
-                **kwargs,
-            )
+            if hide_progress:
+                return executor(func, iterable)
+            return executor(func, iterable, **kwargs)
 
     else:
+        executor = map if hide_progress else partial(tmap, tqdm_class=tqdm)
 
         def parallel_executor(func, iterable, **kwargs):
-            if "chunksize" in kwargs:
-                # Chunk size only applies to thread/process parallel executors
-                del kwargs["chunksize"]
-            return list(tmap(func, iterable, tqdm_class=tqdm, **kwargs))
+            if hide_progress:
+                return executor(func, iterable)
+            kwargs.pop("chunksize", None)
+            return executor(func, iterable, **kwargs)
 
     return parallel_executor
 

@@ -7,7 +7,7 @@ requires = ["setuptools>=64.0.0"]
 
 [project]
 name = "signac-flow"
-version = "0.25.1"
+version = "0.26.1"
 description = "Simple workflow management for signac projects."
 readme = "README.md"
 # Supported versions are determined according to NEP 29.

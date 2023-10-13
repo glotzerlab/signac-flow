@@ -2721,7 +2721,8 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
                     )
             return result
 
-        status_groups = set(self._gather_flow_groups(names))
+        # self._gather_flow_groups only returns singleton groups when names == None
+        status_groups = set(self.groups if names is None else self._gather_flow_groups(names))
 
         with self._buffered():
             aggregate_groups = list(

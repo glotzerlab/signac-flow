@@ -3772,7 +3772,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
 
         """
         if names is None:
-            return list(self._groups.value())
+            return list(self._groups.values())
         operations = {}
         for name in names:
             if name in operations:

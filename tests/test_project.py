@@ -2521,7 +2521,7 @@ class TestHooksInvalidOption(TestHooksSetUp):
         assert "RuntimeError" in error_output
 
 
-class TestHooksLogOperationSetUp(TestHooksSetUp):
+class TestHooksLog(TestHooksSetUp):
     project_class = define_hooks_logging_project._HooksLogOperationsProject
     entrypoint = dict(
         path=os.path.realpath(
@@ -2541,16 +2541,17 @@ class TestHooksLogOperationSetUp(TestHooksSetUp):
     def get_log_output(job, log_filename):
         return "".join(line for line in open(job.fn(log_filename)))
 
-
-class TestHooksLogCmd(TestHooksLogOperationSetUp):
-    error_message = "42"
-    runtime_message = ""
-
-    @pytest.fixture(params=["base_cmd"])
+    @pytest.fixture(params=["base", "base_cmd"])
     def operation_name(self, request):
         return request.param
 
-    def test_logging(self, project, job, operation_name):
+    @pytest.fixture
+    def error_message(operation_name):
+        if operation_name == "base":
+            return define_hooks_logging_project.HOOKS_ERROR_MESSAGE
+        return "42"
+
+    def test_logging(self, project, job, operation_name, error_message):
         log_fn = self.get_log_filename()
         assert not job.isfile(log_fn)
 
@@ -2559,83 +2560,23 @@ class TestHooksLogCmd(TestHooksLogOperationSetUp):
                 self.call_subcmd(f"run -o {operation_name} -j {job.id}")
         else:
             self.call_subcmd(f"run -o {operation_name} -j {job.id}")
-
         assert job.isfile(log_fn)
         log_output = self.get_log_output(job, log_fn)
         assert self.ON_START_MSG.format(operation_name) in log_output
         if job.sp.raise_exception:
-            assert self.error_message in log_output
+            assert error_message in log_output
             assert self.EXCEPTION_MSG.format(operation_name) in log_output
         else:
-            assert self.runtime_message in log_output
+            assert error_message not in log_output
             assert self.SUCCESS_MSG.format(operation_name) in log_output
 
 
-class TestHooksLogBase(TestHooksLogCmd):
-    error_message = define_hooks_logging_project.HOOKS_ERROR_MESSAGE
-
-    @pytest.fixture(params=["base"])
-    def operation_name(self, request):
-        return request.param
-
-    def test_start(self, project, job, operation_name):
-        log_fn = self.get_log_filename()
-
-        assert not job.isfile(log_fn)
-
-        if job.sp.raise_exception:
-            with pytest.raises(subprocess.CalledProcessError):
-                self.call_subcmd(f"run -o {operation_name} -j {job.id}")
-        else:
-            self.call_subcmd(f"run -o {operation_name} -j {job.id}")
-
-        assert job.isfile(log_fn)
-
-        log_output = self.get_log_output(job, log_fn)
-
-        assert self.runtime_message in log_output
-
-        assert self.ON_START_MSG.format(operation_name) in log_output
-        if job.sp.raise_exception:
-            assert self.error_message in log_output
-            assert self.EXCEPTION_MSG.format(operation_name)
-        else:
-            assert self.error_message not in log_output
-            assert self.SUCCESS_MSG.format(operation_name) in log_output
-
-
-class TestHooksLogInstall(TestHooksLogOperationSetUp):
+class TestHooksLogInstall(TestHooksLog):
     entrypoint = dict(
         path=os.path.realpath(
             os.path.join(os.path.dirname(__file__), "define_hooks_logging_install.py")
         )
     )
-
-    def test_install(self, project, job):
-        log_fn = job.fn("operations.log")
-
-        assert not job.isfile(log_fn)
-
-        if job.sp.raise_exception:
-            with pytest.raises(subprocess.CalledProcessError):
-                self.call_subcmd(f"run -j {job.id} -o base")
-            with pytest.raises(subprocess.CalledProcessError):
-                self.call_subcmd(f"run -j {job.id} -o base_cmd")
-        else:
-            self.call_subcmd(f"run -j {job.id} -o base")
-            self.call_subcmd(f"run -j {job.id} -o base_cmd")
-
-        assert job.isfile(log_fn)
-        log_output = self.get_log_output(job, log_fn)
-
-        if job.sp.raise_exception:
-            assert "42" in log_output
-            assert define_hooks_logging_project.HOOKS_ERROR_MESSAGE in log_output
-            assert self.EXCEPTION_MSG.format("base") in log_output
-            assert self.EXCEPTION_MSG.format("base_cmd") in log_output
-        else:
-            assert self.SUCCESS_MSG.format("base") in log_output
-            assert self.SUCCESS_MSG.format("base_cmd") in log_output
 
 
 class TestIgnoreConditions:

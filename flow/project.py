@@ -3757,7 +3757,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
     def _gather_selected_flow_groups(self, names=None):
         r"""Grabs :class:`~.FlowGroup`\ s that match any of a set of names.
 
-        The provided names can be any regular expression that fully match a group name.
+        The provided names can be any regular expression that fully matches a group name.
 
         Parameters
         ----------
@@ -3793,9 +3793,9 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
 
         Note
         ----
-            The behavior is distinct from ``_gather_selected_flow_groups`` in that
-            for execution the default set is not all groups but all singelton
-            groups (operations).
+        The behavior is distinct from ``_gather_selected_flow_groups`` in that
+        for execution the default set is not all groups but all singleton
+        groups (operations).
 
         Parameters
         ----------

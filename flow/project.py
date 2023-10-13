@@ -2721,7 +2721,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
                     )
             return result
 
-        status_groups = self._gather_selected_flow_groups(names))
+        status_groups = self._gather_selected_flow_groups(names)
 
         with self._buffered():
             aggregate_groups = list(

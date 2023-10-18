@@ -2715,7 +2715,9 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
                         {
                             "aggregate_id": aggregate_id,
                             "group_name": op_name,
-                            "status": operation_status,
+                            # Need to copy status otherwise we can overwrite the status
+                            # dictionary of all constituent operations at once.
+                            "status": operation_status.copy(),
                             "_error": error_text,
                         }
                     )

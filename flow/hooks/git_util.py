@@ -4,19 +4,19 @@
 """Define a function to collect metadata with git."""
 import git
 
-from .util import collect_metadata
 
+def collect_git_metadata(job):
+    """Collect git metadata for a given workspace.
 
-def collect_metadata_with_git(operation, job):
-    """Collect metadata for a given operation on a job, including git-related information.
-
-    The git-related information includes the commit ID and a flag indicating if the
+    The information includes the commit ID and a flag indicating if the
     repository is dirty (has uncommitted changes).
     """
     repo = git.Repo(job.project.path)
-    metadata = collect_metadata(operation, job)
-    metadata["project"]["git"] = {
-        "commit_id": str(repo.commit()),
-        "dirty": repo.is_dirty(),
+    return {
+        "project": {
+            "git": {
+                "commit_id": str(repo.commit()),
+                "dirty": repo.is_dirty(),
+            }
+        }
     }
-    return metadata

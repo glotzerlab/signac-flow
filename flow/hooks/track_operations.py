@@ -11,12 +11,9 @@ try:
 except ImportError:
     GIT = False
 else:
-    from .git_util import collect_metadata_with_git
+    from .git_util import collect_git_metadata
 
     GIT = True
-
-
-FN_LOGFILE = ".operations_log.txt"
 
 
 class TrackOperations:
@@ -26,10 +23,12 @@ class TrackOperations:
     erroring of one or more operations in a `flow.FlowProject` instance. The logs are stored in a
     file given by the parameter ``fn_logfile``. This file will be appended to if it already exists.
     The default formating for the log provides the [time, job id, log level, and log message].
-    .. note::
-        All tracking is performed at the INFO level. To ensure outputs are captured in log files,
-        use the ``--debug`` flag when running or submitting jobs, or specify
-        ``submit_options=--debug`` in your directives (example shown below).
+
+    Note
+    ----
+    All tracking is performed at the INFO level. To ensure outputs are captured in log files,
+    use the `--debug` flag when running or submitting jobs, or specify
+    `submit_options=--debug` in your directives (example shown below).
 
     Examples
     --------
@@ -78,11 +77,15 @@ class TrackOperations:
 
     Parameters
     ----------
-    fn_logfile: str
-        The name of the log file in the job workspace. Default is "execution-record.log".
+    log_filename: str, optional
+        The name of the log file in the job workspace. If ``None`` store in a list in the job
+        document in a key labeled ``{operation_name}_history``. Defaults to ``None``.
+    strict_git: bool, optional
+        Whether to fail if ``GitPython`` cannot be imported. Defaults to ``True``.
     """
 
-    def __init__(self, strict_git=True):
+    def __init__(self, log_filename=None, strict_git=True):
+        self.log_filename = log_filename
         if strict_git and not GIT:
             raise RuntimeError(
                 "Unable to collect git metadata from the repository, "
@@ -92,45 +95,41 @@ class TrackOperations:
             )
         self.strict_git = strict_git
 
-    def log_operation(self, stage):
-        """Define log_operation to collect metadata of job workspace and write to log files."""
+    def _write_metadata(self, job, operation_name, data):
+        if self.log_filename is None:
+            job.doc.setdefault(f"{operation_name}_history", []).append(data)
+            return
+        with open(job.fn(self.log_filename), "a") as logfile:
+            logfile.write(json.dumps(data) + "\n")
 
-        def _log_operation(operation, job, error=None):
-            if self.strict_git:
-                if git.Repo(job.project.path).is_dirty():
-                    raise RuntimeError(
-                        "Unable to reliably log operation, because the git repository in "
-                        "the project root directory is dirty.\n\nMake sure to commit all "
-                        "changes or ignore this warning by setting '{}(strict_git=False)'.".format(
-                            type(self).__name__
-                        )
+    def _get_metadata(self, operation, job, stage, error=None):
+        """Define log_operation to collect metadata of job workspace and write to logfiles."""
+        # Add execution-related information to metadata.
+        metadata = {"stage": stage, "error": None if error is None else str(error)}
+        if self.strict_git:
+            if git.Repo(job.project.path).is_dirty():
+                raise RuntimeError(
+                    "Unable to reliably log operation, because the git repository in "
+                    "the project root directory is dirty.\n\nMake sure to commit all "
+                    "changes or ignore this warning by setting '{}(strict_git=False)'.".format(
+                        type(self).__name__
                     )
-            if self.strict_git:
-                metadata = collect_metadata_with_git(operation, job)
-            else:
-                metadata = collect_metadata(operation, job)
-
-            # Add additional execution-related information to metadata.
-            metadata["stage"] = stage
-            metadata["error"] = None if error is None else str(error)
-
-            # Write metadata to collection inside job workspace.
-            with open(job.fn(FN_LOGFILE), "a") as logfile:
-                logfile.write(json.dumps(metadata) + "\n")
-
-        return _log_operation
+                )
+            metadata.update(collect_git_metadata(job))
+        metadata.update(collect_metadata(operation, job))
+        return metadata
 
     def on_start(self, operation, job):
         """Track the start of execution of an operation on a job."""
-        self.log_operation(stage="prior")(operation, job)
+        self._write_metadata(self._get_metadata(operation, job, stage="prior"))
 
     def on_success(self, operation, job):
         """Track the successful completion of an operation on a job."""
-        self.log_operation(stage="after")(operation, job)
+        self._write_metadata(self._get_metadata(operation, job, stage="after"))
 
     def on_exception(self, operation, error, job):
         """Log errors raised during the execution of an operation on a job."""
-        self.log_operation(stage="after")(operation, job, error)
+        self._write_metadata(self._get_metadata(operation, job, error, stage="after"))
 
     def install_operation_hooks(self, op, project_cls=None):
         """Decorate operation to track execution.

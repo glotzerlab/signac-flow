@@ -28,8 +28,8 @@ class TrackOperations:
     The default formating for the log provides the [time, job id, log level, and log message].
     .. note::
         All tracking is performed at the INFO level. To ensure outputs are captured in log files,
-        use the `--debug` flag when running or submitting jobs, or specify
-        `submit_options=--debug` in your directives (example shown below).
+        use the ``--debug`` flag when running or submitting jobs, or specify
+        ``submit_options=--debug`` in your directives (example shown below).
 
     Examples
     --------
@@ -93,7 +93,7 @@ class TrackOperations:
         self.strict_git = strict_git
 
     def log_operation(self, stage):
-        """Define log_operation to collect metadata of job workspace and write to logfiles."""
+        """Define log_operation to collect metadata of job workspace and write to log files."""
 
         def _log_operation(operation, job, error=None):
             if self.strict_git:
@@ -151,7 +151,7 @@ class TrackOperations:
         return op
 
     def install_project_hooks(self, project):
-        """Install track operation to all operations in a signac-flow project.
+        """Install hooks to track all operations in a `flow.FlowProject`.
 
         Parameters
         ----------

@@ -3,6 +3,7 @@
 # This software is licensed under the BSD 3-Clause License.
 """Built in execution hook for basic tracking."""
 import json
+from collections.abc import Mapping
 
 from .util import collect_metadata
 
@@ -95,12 +96,16 @@ class TrackOperations:
             )
         self.strict_git = strict_git
 
-    def _write_metadata(self, job, operation_name, data):
+    def _write_metadata(self, job, metadata):
+        print(f"Writing... {metadata}.", flush=True)
         if self.log_filename is None:
-            job.doc.setdefault(f"{operation_name}_history", []).append(data)
+            history = job.doc.setdefault("execution_history", {})
+            # No need to store job id or operation name.
+            operation_name = metadata.pop("job-operation")["name"]
+            history.setdefault(operation_name, []).append(metadata)
             return
         with open(job.fn(self.log_filename), "a") as logfile:
-            logfile.write(json.dumps(data) + "\n")
+            logfile.write(json.dumps(metadata) + "\n")
 
     def _get_metadata(self, operation, job, stage, error=None):
         """Define log_operation to collect metadata of job workspace and write to logfiles."""
@@ -116,20 +121,33 @@ class TrackOperations:
                     )
                 )
             metadata.update(collect_git_metadata(job))
-        metadata.update(collect_metadata(operation, job))
-        return metadata
+
+        def nested_update(a, b):
+            for k, v in b.items():
+                if k not in a:
+                    a[k] = v
+                    continue
+                if isinstance(a[k], Mapping) and isinstance(b[k], Mapping):
+                    nested_update(a[k], b[k])
+                else:
+                    a[k] = v
+            return a
+
+        return nested_update(metadata, collect_metadata(operation, job))
 
     def on_start(self, operation, job):
         """Track the start of execution of an operation on a job."""
-        self._write_metadata(self._get_metadata(operation, job, stage="prior"))
+        self._write_metadata(job, self._get_metadata(operation, job, stage="prior"))
 
     def on_success(self, operation, job):
         """Track the successful completion of an operation on a job."""
-        self._write_metadata(self._get_metadata(operation, job, stage="after"))
+        self._write_metadata(job, self._get_metadata(operation, job, stage="after"))
 
     def on_exception(self, operation, error, job):
         """Log errors raised during the execution of an operation on a job."""
-        self._write_metadata(self._get_metadata(operation, job, error, stage="after"))
+        self._write_metadata(
+            job, self._get_metadata(operation, job, stage="after", error=error)
+        )
 
     def install_operation_hooks(self, op, project_cls=None):
         """Decorate operation to track execution.

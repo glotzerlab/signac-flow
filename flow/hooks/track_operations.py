@@ -3,7 +3,6 @@
 # This software is licensed under the BSD 3-Clause License.
 """Built in execution hook for basic tracking."""
 import json
-from collections.abc import Mapping
 
 from .util import collect_metadata
 
@@ -80,7 +79,8 @@ class TrackOperations:
     ----------
     log_filename: str, optional
         The name of the log file in the job workspace. If ``None`` store in a list in the job
-        document in a key labeled ``{operation_name}_history``. Defaults to ``None``.
+        document in a key labeled ``f"{operation_name}"`` under the ``"execution_history"`` key.
+        Defaults to ``None``.
     strict_git: bool, optional
         Whether to fail if ``GitPython`` cannot be imported. Defaults to ``True``.
     """
@@ -111,6 +111,7 @@ class TrackOperations:
         """Define log_operation to collect metadata of job workspace and write to logfiles."""
         # Add execution-related information to metadata.
         metadata = {"stage": stage, "error": None if error is None else str(error)}
+        metadata.update(collect_metadata(operation, job))
         if self.strict_git:
             if git.Repo(job.project.path).is_dirty():
                 raise RuntimeError(
@@ -120,20 +121,8 @@ class TrackOperations:
                         type(self).__name__
                     )
                 )
-            metadata.update(collect_git_metadata(job))
-
-        def nested_update(a, b):
-            for k, v in b.items():
-                if k not in a:
-                    a[k] = v
-                    continue
-                if isinstance(a[k], Mapping) and isinstance(b[k], Mapping):
-                    nested_update(a[k], b[k])
-                else:
-                    a[k] = v
-            return a
-
-        return nested_update(metadata, collect_metadata(operation, job))
+            metadata["project"]["git"] = collect_git_metadata(job)
+        return metadata
 
     def on_start(self, operation, job):
         """Track the start of execution of an operation on a job."""

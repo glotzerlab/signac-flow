@@ -12,11 +12,4 @@ def collect_git_metadata(job):
     repository is dirty (has uncommitted changes).
     """
     repo = git.Repo(job.project.path)
-    return {
-        "project": {
-            "git": {
-                "commit_id": str(repo.commit()),
-                "dirty": repo.is_dirty(),
-            }
-        }
-    }
+    return {"commit_id": str(repo.commit()), "dirty": repo.is_dirty()}

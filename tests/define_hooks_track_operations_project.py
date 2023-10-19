@@ -8,104 +8,52 @@ class _HooksTrackOperations(FlowProject):
     pass
 
 
+LOG_FILENAME = "operations.log"
+
+
 track_operations = TrackOperations(strict_git=False)
+track_operations_with_file = TrackOperations(LOG_FILENAME, strict_git=False)
 
 
-"""
-Strict Git False
-"""
-
-
-@_HooksTrackOperations.operation_hooks.on_start(
-    TrackOperations(strict_git=False).on_start
-)
-@_HooksTrackOperations.operation_hooks.on_exception(
-    TrackOperations(strict_git=False).on_exception
-)
-@_HooksTrackOperations.operation_hooks.on_success(
-    TrackOperations(strict_git=False).on_success
-)
+@track_operations_with_file.install_operation_hooks(_HooksTrackOperations)
+@track_operations.install_operation_hooks(_HooksTrackOperations)
 @_HooksTrackOperations.operation
-def strict_git_false(job):
+def base(job):
     if job.sp.raise_exception:
         raise RuntimeError(HOOKS_ERROR_MESSAGE)
 
 
-@_HooksTrackOperations.operation_hooks.on_start(
-    TrackOperations(strict_git=False).on_start
-)
-@_HooksTrackOperations.operation_hooks.on_exception(
-    TrackOperations(strict_git=False).on_exception
-)
-@_HooksTrackOperations.operation_hooks.on_success(
-    TrackOperations(strict_git=False).on_success
-)
+@track_operations_with_file.install_operation_hooks(_HooksTrackOperations)
+@track_operations.install_operation_hooks(_HooksTrackOperations)
 @_HooksTrackOperations.operation(cmd=True, with_job=True)
-def strict_git_false_cmd(job):
+def cmd(job):
     if job.sp.raise_exception:
         return "exit 42"
     else:
         return "touch base_cmd.txt"
 
 
-@track_operations.install_operation_hooks(_HooksTrackOperations)
+track_operations_strict = TrackOperations()
+track_operations_strict_with_file = TrackOperations(LOG_FILENAME)
+
+
+@track_operations_strict.install_operation_hooks(_HooksTrackOperations)
+@track_operations_strict_with_file.install_operation_hooks(_HooksTrackOperations)
 @_HooksTrackOperations.operation
-def strict_git_false_install(job):
+def strict_base(job):
     if job.sp.raise_exception:
         raise RuntimeError(HOOKS_ERROR_MESSAGE)
 
 
-@track_operations.install_operation_hooks(_HooksTrackOperations)
+@track_operations_strict.install_operation_hooks(_HooksTrackOperations)
+@track_operations_strict_with_file.install_operation_hooks(_HooksTrackOperations)
 @_HooksTrackOperations.operation(cmd=True, with_job=True)
-def strict_git_false_install_cmd(job):
+def strict_cmd(job):
     if job.sp.raise_exception:
         return "exit 42"
     else:
         return "touch base_cmd.txt"
-
-
-"""
-Strict Git True
-"""
-
-
-try:
-
-    @_HooksTrackOperations.operation_hooks.on_start(
-        TrackOperations(strict_git=True).on_start
-    )
-    @_HooksTrackOperations.operation_hooks.on_exception(
-        TrackOperations(strict_git=True).on_exception
-    )
-    @_HooksTrackOperations.operation_hooks.on_success(
-        TrackOperations(strict_git=True).on_success
-    )
-    @_HooksTrackOperations.operation
-    def strict_git_true(job):
-        if job.sp.raise_exception:
-            raise RuntimeError(HOOKS_ERROR_MESSAGE)
-
-    @_HooksTrackOperations.operation_hooks.on_start(
-        TrackOperations(strict_git=True).on_start
-    )
-    @_HooksTrackOperations.operation_hooks.on_exception(
-        TrackOperations(strict_git=True).on_exception
-    )
-    @_HooksTrackOperations.operation_hooks.on_success(
-        TrackOperations(strict_git=True).on_success
-    )
-    @_HooksTrackOperations.operation(cmd=True, with_job=True)
-    def strict_git_true_cmd(job):
-        if job.sp.raise_exception:
-            return "exit 42"
-        else:
-            return "touch base_cmd.txt"
-
-except RuntimeError:
-    pass
 
 
 if __name__ == "__main__":
-    TrackOperations(strict_git=False).install_project_hooks(
-        _HooksTrackOperations()
-    ).main()
+    _HooksTrackOperations().main()

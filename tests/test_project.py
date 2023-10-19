@@ -2523,7 +2523,54 @@ class TestHooksInvalidOption(TestHooksSetUp):
         assert "RuntimeError" in error_output
 
 
-class TestHooksTrackOperations(TestHooksSetUp):
+class TestHooksTrackOperationDecorators(TestProjectBase):
+    def test_operation_decorators(self):
+        class A(FlowProject):
+            pass
+
+        track = flow.hooks.TrackOperations(strict_git=False)
+
+        @A.operation_hooks.on_exception(track.on_exception)
+        @A.operation_hooks.on_success(track.on_success)
+        @A.operation_hooks.on_start(track.on_start)
+        @A.operation
+        def op(job):
+            pass
+
+        assert len(A._OPERATION_HOOK_REGISTRY[op]["on_start"])
+        assert len(A._OPERATION_HOOK_REGISTRY[op]["on_success"])
+        assert len(A._OPERATION_HOOK_REGISTRY[op]["on_exception"])
+
+        @track.install_operation_hooks(A)
+        @A.operation
+        def op2(job):
+            pass
+
+        assert len(A._OPERATION_HOOK_REGISTRY[op2]["on_start"]) == 1
+        assert len(A._OPERATION_HOOK_REGISTRY[op2]["on_success"]) == 1
+        assert len(A._OPERATION_HOOK_REGISTRY[op2]["on_exception"]) == 1
+
+    def test_project_decorator(self):
+        class A(FlowProject):
+            pass
+
+        @A.operation
+        def op(job):
+            pass
+
+        @A.operation
+        def op2(job):
+            pass
+
+        project = self.mock_project(A)
+        track = flow.hooks.TrackOperations(strict_git=False)
+        track.install_project_hooks(project)
+        assert len(project.project_hooks.on_start) == 1
+        assert len(project.project_hooks.on_success) == 1
+        assert len(project.project_hooks.on_exception) == 1
+
+
+class TestHooksTrackOperationsNotStrict(TestHooksSetUp):
     project_class = define_hooks_track_operations_project._HooksTrackOperations
     entrypoint = dict(
         path=os.path.realpath(
@@ -2532,41 +2579,76 @@ class TestHooksTrackOperations(TestHooksSetUp):
             )
         )
     )
-    log_fname = ".operations_log.txt"
+    log_fname = define_hooks_track_operations_project.LOG_FILENAME
 
     @pytest.fixture(
         params=[
-            (
-                "strict_git_false",
-                define_hooks_track_operations_project.HOOKS_ERROR_MESSAGE,
-            ),
-            ("strict_git_false_cmd", "non-zero exit status 42"),
-        ]
+            ("base", define_hooks_track_operations_project.HOOKS_ERROR_MESSAGE),
+            ("cmd", "non-zero exit status 42"),
+        ],
+        ids=lambda x: x[0],
     )
-    def strict_git_false_operation_info(self, request):
+    def operation_info(self, request):
         return request.param
 
-    @pytest.fixture(
-        params=[
-            (
-                "strict_git_true",
-                define_hooks_track_operations_project.HOOKS_ERROR_MESSAGE,
-            ),
-            ("strict_git_true_cmd", "non-zero exit status 42"),
-        ]
-    )
-    def strict_git_true_operation_info(self, request):
-        return request.param
+    @pytest.fixture
+    def setup(self):
+        """Empty setup to enable code reuse in checking strict git hooks."""
+        return None
 
-    def split_log(self, job):
-        with open(job.fn(self.log_fname)) as f:
+    def split_log(self, job, fn):
+        with open(job.fn(fn)) as f:
             values = f.read().split("\n")
         if values[-1] == "":
             values = values[:-1]
         return values
 
-    def test_metadata(self, project, job, strict_git_false_operation_info):
-        operation_name, error_message = strict_git_false_operation_info
+    def get_log(self, job, fn=None):
+        if fn is None:
+            execution_history = job.doc["execution_history"]()
+            # Add back in redundent information to make check_metadata universal
+            for key, item in execution_history.items():
+                for entry in item:
+                    entry["job-operation"] = {"name": key, "job_id": job.id}
+            return execution_history
+        log_entries = [json.loads(entry) for entry in self.split_log(job, fn)]
+        execution_history = {}
+        for entry in log_entries:
+            operation_name = entry["job-operation"]["name"]
+            execution_history.setdefault(operation_name, []).append(entry)
+        return execution_history
+
+    def check_metadata(
+        self,
+        metadata,
+        job,
+        operation_name,
+        error_message,
+        before_execution,
+        expected_stage,
+    ):
+        assert metadata["stage"] == expected_stage
+        # I think job.project.path gives us a relative path in the test, while
+        # job.project.path in hooks.utils.collect_metadata gives us the absolute path
+        # I don't know why this is happening.
+        assert job.project.path in metadata["project"]["path"]
+        assert metadata["project"]["schema_version"] == job.project.config.get(
+            "schema_version"
+        )
+        start_time = datetime.datetime.fromisoformat(metadata["time"])
+        assert before_execution < start_time
+        job_op_metadata = metadata["job-operation"]
+        assert job_op_metadata["job_id"] == job.id
+        assert job_op_metadata["name"] == operation_name
+
+        if expected_stage != "prior" and job.sp.raise_exception:
+            assert error_message in metadata["error"]
+
+        else:
+            assert metadata["error"] is None
+
+    def test_metadata(self, project, job, operation_info, setup):
+        operation_name, error_message = operation_info
         assert not job.isfile(self.log_fname)
 
         time = datetime.datetime.now(datetime.timezone.utc)
@@ -2577,59 +2659,32 @@ class TestHooksTrackOperations(TestHooksSetUp):
             self.call_subcmd(f"run -o {operation_name} -j {job.id}")
 
         assert job.isfile(self.log_fname)
-        values = self.split_log(job)
+        for filename in (None, self.log_fname):
+            metadata = self.get_log(job, filename)
+            # For the single operation
+            # Each metadata whether file or document is one since they both
+            # write to different places.
+            assert len(metadata) == 1
+            for op, entries in metadata.items():
+                assert len(entries) == 2
+                self.check_metadata(
+                    entries[0], job, operation_name, error_message, time, "prior"
+                )
+                self.check_metadata(
+                    entries[1], job, operation_name, error_message, time, "after"
+                )
 
-        # There will always be 4 entries in this file because
-        # for every operation, we install the following hooks
-        # at the operation and project level:
-        # (1) on_start and (2) on_exception / on_success
-        assert len(values) == 4
-        for value in values[:2]:
-            metadata = json.loads(value)
-            assert metadata["stage"] == "prior"
-            # I think job.project.path gives us a relative path in the test, while
-            # job.project.path in hooks.utils.collect_metadata gives us the absolute path
-            # I don't know why this is happening.
-            assert job.project.path in metadata["project"]["path"]
-            assert metadata["project"]["schema_version"] == job.project.config.get(
-                "schema_version"
-            )
-            # Just assumed that the operation should start within 5 minutes
-            # from where we start recorded the time. This seems generous and
-            # we can adjust it if needed.
-            start_time = datetime.datetime.fromisoformat(metadata["time"])
-            difference = start_time - time
-            assert difference.seconds < 5 * 60
-            job_op_metadata = metadata["job-operation"]
-            assert job_op_metadata["job_id"] == job.id
-            assert job_op_metadata["name"] == operation_name
 
-        for value in values[2:]:
-            metadata = json.loads(value)
-            assert metadata["stage"] == "after"
-            # I think job.project.path gives us a relative path in the test, while
-            # job.project.path in hooks.utils.collect_metadata gives us the absolute path
-            # I don't know why this is happening.
-            assert job.project.path in metadata["project"]["path"]
-            assert metadata["project"]["schema_version"] == job.project.config.get(
-                "schema_version"
-            )
-            # Just assumed that the operation should start within 5 minutes
-            # from where we start recorded the time. This seems generous and
-            # we can adjust it if needed.
-            start_time = datetime.datetime.fromisoformat(metadata["time"])
-            difference = start_time - time
-            assert difference.seconds < 5 * 60
-
-            if job.sp.raise_exception:
-                assert error_message in metadata["error"]
-
-            else:
-                assert metadata["error"] is None
-
-            job_op_metadata = metadata["job-operation"]
-            assert job_op_metadata["job_id"] == job.id
-            assert job_op_metadata["name"] == operation_name
+class TestHooksTrackOperationsStrict(TestHooksTrackOperationsNotStrict):
+    @pytest.fixture(
+        params=[
+            ("strict_base", define_hooks_track_operations_project.HOOKS_ERROR_MESSAGE),
+            ("strict_cmd", "non-zero exit status 42"),
+        ],
+        ids=lambda x: x[0],
+    )
+    def operation_info(self, request):
+        return request.param
 
     def git_repo(self, project, make_dirty=False):
         repo = git.Repo.init(project.path)
@@ -2641,33 +2696,38 @@ class TestHooksTrackOperations(TestHooksSetUp):
             with open(project.fn("dirty.txt"), "w"):
                 pass
             repo.index.add(["dirty.txt"])
-        return repo
+
+    @pytest.fixture
+    def setup(self, project):
+        self.git_repo(project)
+
+    def check_metadata(
+        self,
+        metadata,
+        job,
+        operation_name,
+        error_message,
+        before_execution,
+        expected_stage,
+    ):
+        super().check_metadata(
+            metadata,
+            job,
+            operation_name,
+            error_message,
+            before_execution,
+            expected_stage,
+        )
+        repo = git.Repo(job.project.path)
+        assert metadata["project"]["git"]["commit_id"] == str(repo.commit())
+        assert metadata["project"]["git"]["dirty"] == repo.is_dirty()
 
     @git_mark_skipif
-    def test_strict_git_not_dirty(self, project, job, strict_git_true_operation_info):
-        operation_name, error_message = strict_git_true_operation_info
-        self.git_repo(project, False)
-
-        assert not job.isfile(self.log_fname)
-
-        if job.sp.raise_exception:
-            with pytest.raises(subprocess.CalledProcessError):
-                self.call_subcmd(f"run -o {operation_name} -j {job.id}")
-        else:
-            self.call_subcmd(f"run -o {operation_name} -j {job.id}")
-
-    @git_mark_skipif
-    def test_strict_git_is_dirty(self, project, job, strict_git_true_operation_info):
-        operation_name, error_message = strict_git_true_operation_info
+    def test_strict_git_is_dirty(self, project, job, operation_info):
+        operation_name, error_message = operation_info
         self.git_repo(project, True)
-
-        assert not job.isfile(self.log_fname)
-
         with pytest.raises(subprocess.CalledProcessError):
-            if job.sp.raise_exception:
-                self.call_subcmd(f"run -o {operation_name} -j {job.id}")
-            else:
-                self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+            self.call_subcmd(f"run -o {operation_name} -j {job.id}")
 
 
 class TestIgnoreConditions:

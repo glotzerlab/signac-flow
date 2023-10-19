@@ -2715,13 +2715,15 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
                         {
                             "aggregate_id": aggregate_id,
                             "group_name": op_name,
-                            "status": operation_status,
+                            # Need to copy status otherwise we can overwrite the status
+                            # dictionary of all constituent operations at once.
+                            "status": operation_status.copy(),
                             "_error": error_text,
                         }
                     )
             return result
 
-        status_groups = set(self._gather_flow_groups(names))
+        status_groups = self._gather_selected_flow_groups(names)
 
         with self._buffered():
             aggregate_groups = list(
@@ -3692,7 +3694,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
                 # Generate _JobOperation instances for selected groups and aggregates.
                 with self._buffered():
                     operations = []
-                    run_groups = set(self._gather_flow_groups(names))
+                    run_groups = set(self._gather_executable_flow_groups(names))
                     for (
                         aggregate_id,
                         aggregate,
@@ -3754,17 +3756,16 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
                 operations, pretend=pretend, np=np, timeout=timeout, progress=progress
             )
 
-    def _gather_flow_groups(self, names=None):
+    def _gather_selected_flow_groups(self, names=None):
         r"""Grabs :class:`~.FlowGroup`\ s that match any of a set of names.
 
-        The provided names can be any regular expressions that fully match a group name.
+        The provided names can be any regular expression that fully matches a group name.
 
         Parameters
         ----------
         names : iterable of :class:`str`
-            Only select operations that match the provided set of names
-            (interpreted as regular expressions), or all if the argument is
-            None. (Default value = None)
+            Only select groups that match the provided set of names (interpreted as regular
+            expressions), or all if the argument is None. (Default value = None)
 
         Returns
         -------
@@ -3773,24 +3774,48 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
 
         """
         if names is None:
-            # If no names are selected, use all singleton groups
-            operations = [self._groups[name] for name in self.operations]
-        else:
-            operations = {}
-            for name in names:
-                if name in operations:
-                    continue
-                groups = [
-                    group
-                    for group_name, group in self.groups.items()
-                    if re.fullmatch(name, group_name)
-                ]
-                if len(groups) > 0:
-                    for group in groups:
-                        operations[group.name] = group
-                else:
-                    continue
-            operations = list(operations.values())
+            return list(self._groups.values())
+        operations = {}
+        for name in names:
+            if name in operations:
+                continue
+            groups = [
+                group
+                for group_name, group in self.groups.items()
+                if re.fullmatch(name, group_name)
+            ]
+            for group in groups:
+                operations[group.name] = group
+        return list(operations.values())
+
+    def _gather_executable_flow_groups(self, names=None):
+        r"""Grabs immediately executable flow groups that match any given name.
+
+        The provided names can be any regular expression that fully match a group name.
+
+        Note
+        ----
+        The behavior is distinct from ``_gather_selected_flow_groups`` in that
+        for execution the default set is not all groups but all singleton
+        groups (operations).
+
+        Parameters
+        ----------
+        names : iterable of :class:`str`
+            Only select groups that match the provided set of names (interpreted as regular
+            expressions), or all singleton groups if the argument is None. (Default value = None)
+
+        Returns
+        -------
+        list
+            List of groups matching the provided names.
+
+        """
+        if names is None:
+            return [self._groups[op_name] for op_name in self.operations]
+        operations = self._gather_selected_flow_groups(names)
+        # Have to verify no overlap to ensure all returned groups are
+        # simultaneously executable.
         if not FlowProject._verify_group_compatibility(operations):
             raise ValueError(
                 "Cannot specify groups or operations that will be included "
@@ -3839,7 +3864,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
             been collected appropriately from its contained operations.
 
         """
-        submission_groups = set(self._gather_flow_groups(names))
+        submission_groups = set(self._gather_executable_flow_groups(names))
 
         # Fetch scheduler status
         scheduler_info = self._query_scheduler_status()
@@ -4494,7 +4519,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         if operation_names is None:
             selected_groups = {self._groups[name] for name in self.operations}
         else:
-            selected_groups = set(self._gather_flow_groups(operation_names))
+            selected_groups = set(self._gather_executable_flow_groups(operation_names))
         for (
             aggregate_id,
             aggregate,

@@ -10,14 +10,12 @@ def collect_metadata(operation, job):
 
     Returns a directory including schema version, time, project, and job-operation.
 
-    We can no longer track the following because we take in the operation name as a
-    xstring rather than as an object, but I think this is still super useful
-    information.
+    We can no longer track the following because we take in the operation name as a string rather
+    than as an object, but they provide useful information. We could try to perform introspection
+    of the project through the job later if desired to get these values.
 
-    Should we just drop it or see if there's still some way to access this info?
-
-    "cmd": operation.cmd,
-    "directives": operation.directives,
+    - "cmd": operation.cmd,
+    - "directives": operation.directives,
     """
     return {
         # the metadata schema version:

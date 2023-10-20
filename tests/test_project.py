@@ -2718,9 +2718,10 @@ class TestHooksTrackOperationsStrict(TestHooksTrackOperationsNotStrict):
             before_execution,
             expected_stage,
         )
-        repo = git.Repo(job.project.path)
-        assert metadata["project"]["git"]["commit_id"] == str(repo.commit())
-        assert metadata["project"]["git"]["dirty"] == repo.is_dirty()
+        if not skip_git:
+            repo = git.Repo(job.project.path)
+            assert metadata["project"]["git"]["commit_id"] == str(repo.commit())
+            assert metadata["project"]["git"]["dirty"] == repo.is_dirty()
 
     @git_mark_skipif
     def test_strict_git_is_dirty(self, project, job, operation_info):

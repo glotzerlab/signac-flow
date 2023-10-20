@@ -42,6 +42,7 @@ from flow.util.misc import (
 )
 
 try:
+    import define_hooks_track_operations_strict_project
     import git
 
     skip_git = False
@@ -2675,60 +2676,63 @@ class TestHooksTrackOperationsNotStrict(TestHooksSetUp):
                 )
 
 
-class TestHooksTrackOperationsStrict(TestHooksTrackOperationsNotStrict):
-    @pytest.fixture(
-        params=[
-            ("strict_base", define_hooks_track_operations_project.HOOKS_ERROR_MESSAGE),
-            ("strict_cmd", "non-zero exit status 42"),
-        ],
-        ids=lambda x: x[0],
-    )
-    def operation_info(self, request):
-        return request.param
+if not skip_git:
 
-    def git_repo(self, project, make_dirty=False):
-        repo = git.Repo.init(project.path)
-        with open(project.fn("test.txt"), "w"):
-            pass
-        repo.index.add(["test.txt"])
-        repo.index.commit("Initial commit")
-        if make_dirty:
-            with open(project.fn("dirty.txt"), "w"):
+    class TestHooksTrackOperationsStrict(TestHooksTrackOperationsNotStrict):
+        project_class = (
+            define_hooks_track_operations_strict_project._HooksTrackOperations
+        )
+        entrypoint = dict(
+            path=os.path.realpath(
+                os.path.join(
+                    os.path.dirname(__file__),
+                    "define_hooks_track_operations_strict_project.py",
+                )
+            )
+        )
+        log_fname = define_hooks_track_operations_project.LOG_FILENAME
+
+        def git_repo(self, project, make_dirty=False):
+            repo = git.Repo.init(project.path)
+            with open(project.fn("test.txt"), "w"):
                 pass
-            repo.index.add(["dirty.txt"])
+            repo.index.add(["test.txt"])
+            repo.index.commit("Initial commit")
+            if make_dirty:
+                with open(project.fn("dirty.txt"), "w"):
+                    pass
+                repo.index.add(["dirty.txt"])
 
-    @pytest.fixture
-    def setup(self, project):
-        self.git_repo(project)
+        @pytest.fixture
+        def setup(self, project):
+            self.git_repo(project)
 
-    def check_metadata(
-        self,
-        metadata,
-        job,
-        operation_name,
-        error_message,
-        before_execution,
-        expected_stage,
-    ):
-        super().check_metadata(
+        def check_metadata(
+            self,
             metadata,
             job,
             operation_name,
             error_message,
             before_execution,
             expected_stage,
-        )
-        if not skip_git:
+        ):
+            super().check_metadata(
+                metadata,
+                job,
+                operation_name,
+                error_message,
+                before_execution,
+                expected_stage,
+            )
             repo = git.Repo(job.project.path)
             assert metadata["project"]["git"]["commit_id"] == str(repo.commit())
             assert metadata["project"]["git"]["dirty"] == repo.is_dirty()
 
-    @git_mark_skipif
-    def test_strict_git_is_dirty(self, project, job, operation_info):
-        operation_name, error_message = operation_info
-        self.git_repo(project, True)
-        with pytest.raises(subprocess.CalledProcessError):
-            self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+        def test_strict_git_is_dirty(self, project, job, operation_info):
+            operation_name, error_message = operation_info
+            self.git_repo(project, True)
+            with pytest.raises(subprocess.CalledProcessError):
+                self.call_subcmd(f"run -o {operation_name} -j {job.id}")
 
 
 class TestIgnoreConditions:

@@ -182,8 +182,8 @@ class TestProjectStatusFilterOperations(TestProjectBase):
             assert group in operations_output
 
     def test_operation_in_group(self, get_status):
-        with pytest.raises(ValueError):
-            get_status(operation=["op1", "group1"])
+        # Ensure groups with overlapping operations work
+        get_status(operation=["op1", "group1"])
 
 
 class TestProjectStatusNoEligibleOperations(TestProjectBase):

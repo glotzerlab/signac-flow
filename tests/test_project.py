@@ -46,7 +46,7 @@ try:
     import git
 
     skip_git = False
-except ImportError:
+except RuntimeError:
     skip_git = True
 
 

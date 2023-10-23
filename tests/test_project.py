@@ -1149,7 +1149,9 @@ class TestExecutionProject(TestProjectBase):
         assert len(list(MockScheduler.jobs())) == 0
         cluster_job_id = project._store_bundled(operations)
         with redirect_stderr(StringIO()):
-            project._submit_operations(_id=cluster_job_id, operations=operations)
+            project._submit_operations(
+                _id=cluster_job_id, operations=operations, force=True
+            )
         assert len(list(MockScheduler.jobs())) == 1
 
     def test_submit(self):
@@ -1208,13 +1210,15 @@ class TestExecutionProject(TestProjectBase):
     def test_bundles(self):
         project = self.mock_project()
         assert len(list(MockScheduler.jobs())) == 0
+        # Cannot use GPU operations since this will lead to missmatched resources
+        op_names = ["op1", "op2", "op4"]
         with redirect_stderr(StringIO()):
-            project.submit(bundle_size=2, num=2)
+            project.submit(bundle_size=2, num=2, names=op_names)
             assert len(list(MockScheduler.jobs())) == 1
-            project.submit(bundle_size=2, num=4)
+            project.submit(bundle_size=2, num=4, names=op_names)
             assert len(list(MockScheduler.jobs())) == 3
             MockScheduler.reset()
-            project.submit(bundle_size=0)
+            project.submit(bundle_size=0, names=op_names)
             assert len(list(MockScheduler.jobs())) == 1
 
     def test_submit_status(self):
@@ -1265,7 +1269,9 @@ class TestExecutionProject(TestProjectBase):
         project = self.mock_project()
         operations = []
         for job in project:
-            operations.extend(project._next_operations([(job,)]))
+            operations.extend(
+                project._next_operations([(job,)], operation_names=["op1"])
+            )
         assert len(list(MockScheduler.jobs())) == 0
         cluster_job_id = project._store_bundled(operations)
         stderr = StringIO()

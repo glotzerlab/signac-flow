@@ -1,9 +1,7 @@
 {# Templated in accordance with: https://www.olcf.ornl.gov/for-users/system-user-guides/summit/running-jobs/ #}
 {% extends "lsf.sh" %}
 {% block tasks %}
-    {% set threshold = 0 if force else 0.9 %}
-    {% set nn = operations|map('guess_resource_sets')|calc_num_nodes(parallel) %}
-#BSUB -nnodes {{ nn }}
+#BSUB -nnodes {{ resources.num_nodes }}
 {% endblock tasks %}
 {% block header %}
     {{- super() -}}

@@ -112,8 +112,8 @@ class TrackOperations:
         # Add execution-related information to metadata.
         metadata = {"stage": stage, "error": None if error is None else str(error)}
         metadata.update(collect_metadata(operation, job))
-        if self.strict_git:
-            if git.Repo(job.project.path).is_dirty():
+        if GIT:
+            if self.strict_git and git.Repo(job.project.path).is_dirty():
                 raise RuntimeError(
                     "Unable to reliably log operation, because the git repository in "
                     "the project root directory is dirty.\n\nMake sure to commit all "

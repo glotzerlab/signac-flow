@@ -2581,6 +2581,7 @@ class TestHooksTrackOperationsNotStrict(TestHooksSetUp):
         )
     )
     log_fname = define_hooks_track_operations_project.LOG_FILENAME
+    error_on_no_git = False
 
     @pytest.fixture(
         params=[
@@ -2592,10 +2593,23 @@ class TestHooksTrackOperationsNotStrict(TestHooksSetUp):
     def operation_info(self, request):
         return request.param
 
-    @pytest.fixture
-    def setup(self):
-        """Empty setup to enable code reuse in checking strict git hooks."""
-        return None
+    @pytest.fixture(
+        params=None if skip_git else (True, False),
+        ids=None if skip_git else ("git-dirty", "git-clean"),
+    )
+    def git_repo(self, project, request):
+        if request.param is None:
+            return
+        repo = git.Repo.init(project.path)
+        with open(project.fn("test.txt"), "w"):
+            pass
+        repo.index.add(["test.txt"])
+        repo.index.commit("Initial commit")
+        if request.param:
+            with open(project.fn("dirty.txt"), "w"):
+                pass
+            repo.index.add(["dirty.txt"])
+        return repo
 
     def split_log(self, job, fn):
         with open(job.fn(fn)) as f:
@@ -2627,6 +2641,7 @@ class TestHooksTrackOperationsNotStrict(TestHooksSetUp):
         error_message,
         before_execution,
         expected_stage,
+        repo,
     ):
         assert metadata["stage"] == expected_stage
         # I think job.project.path gives us a relative path in the test, while
@@ -2648,12 +2663,24 @@ class TestHooksTrackOperationsNotStrict(TestHooksSetUp):
         else:
             assert metadata["error"] is None
 
-    def test_metadata(self, project, job, operation_info, setup):
+        if repo is not None:
+            assert metadata["project"]["git"]["commit_id"] == str(repo.commit())
+            assert metadata["project"]["git"]["dirty"] == repo.is_dirty()
+        else:
+            if self.error_on_no_git:
+                # Should not happen in actual testing, here for developers.
+                assert False, "Expected gitpython for test."
+
+    def test_metadata(self, project, job, operation_info, git_repo):
         operation_name, error_message = operation_info
         assert not job.isfile(self.log_fname)
 
         time = datetime.datetime.now(datetime.timezone.utc)
-        if job.sp.raise_exception:
+        if git_repo is not None and self.error_on_no_git and git_repo.is_dirty():
+            with pytest.raises(subprocess.CalledProcessError):
+                self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+            return
+        elif job.sp.raise_exception:
             with pytest.raises(subprocess.CalledProcessError):
                 self.call_subcmd(f"run -o {operation_name} -j {job.id}")
         else:
@@ -2669,10 +2696,22 @@ class TestHooksTrackOperationsNotStrict(TestHooksSetUp):
             for op, entries in metadata.items():
                 assert len(entries) == 2
                 self.check_metadata(
-                    entries[0], job, operation_name, error_message, time, "prior"
+                    entries[0],
+                    job,
+                    operation_name,
+                    error_message,
+                    time,
+                    "prior",
+                    git_repo,
                 )
                 self.check_metadata(
-                    entries[1], job, operation_name, error_message, time, "after"
+                    entries[1],
+                    job,
+                    operation_name,
+                    error_message,
+                    time,
+                    "after",
+                    git_repo,
                 )
 
 
@@ -2690,49 +2729,7 @@ if not skip_git:
                 )
             )
         )
-        log_fname = define_hooks_track_operations_project.LOG_FILENAME
-
-        def git_repo(self, project, make_dirty=False):
-            repo = git.Repo.init(project.path)
-            with open(project.fn("test.txt"), "w"):
-                pass
-            repo.index.add(["test.txt"])
-            repo.index.commit("Initial commit")
-            if make_dirty:
-                with open(project.fn("dirty.txt"), "w"):
-                    pass
-                repo.index.add(["dirty.txt"])
-
-        @pytest.fixture
-        def setup(self, project):
-            self.git_repo(project)
-
-        def check_metadata(
-            self,
-            metadata,
-            job,
-            operation_name,
-            error_message,
-            before_execution,
-            expected_stage,
-        ):
-            super().check_metadata(
-                metadata,
-                job,
-                operation_name,
-                error_message,
-                before_execution,
-                expected_stage,
-            )
-            repo = git.Repo(job.project.path)
-            assert metadata["project"]["git"]["commit_id"] == str(repo.commit())
-            assert metadata["project"]["git"]["dirty"] == repo.is_dirty()
-
-        def test_strict_git_is_dirty(self, project, job, operation_info):
-            operation_name, error_message = operation_info
-            self.git_repo(project, True)
-            with pytest.raises(subprocess.CalledProcessError):
-                self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+        error_on_no_git = True
 
 
 class TestIgnoreConditions:

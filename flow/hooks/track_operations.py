@@ -7,12 +7,10 @@ import json
 from .util import collect_metadata
 
 try:
-    import git
+    from .git_util import collect_git_metadata
 except ImportError:
     GIT = False
 else:
-    from .git_util import collect_git_metadata
-
     GIT = True
 
 
@@ -113,7 +111,8 @@ class TrackOperations:
         metadata = {"stage": stage, "error": None if error is None else str(error)}
         metadata.update(collect_metadata(operation, job))
         if GIT:
-            if self.strict_git and git.Repo(job.project.path).is_dirty():
+            git_metadata = collect_git_metadata(job)
+            if self.strict_git and git_metadata["dirty"]:
                 raise RuntimeError(
                     "Unable to reliably log operation, because the git repository in "
                     "the project root directory is dirty.\n\nMake sure to commit all "
@@ -121,7 +120,7 @@ class TrackOperations:
                         type(self).__name__
                     )
                 )
-            metadata["project"]["git"] = collect_git_metadata(job)
+            metadata["project"]["git"] = git_metadata
         return metadata
 
     def on_start(self, operation, job):

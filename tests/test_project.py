@@ -11,6 +11,7 @@ from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from functools import partial
 from io import StringIO
 from itertools import groupby
+from pathlib import Path
 
 import define_hooks_test_project
 import define_hooks_track_operations_project
@@ -2598,7 +2599,9 @@ class TestHooksTrackOperationsNotStrict(TestHooksSetUp):
         ids=None if skip_git else ("git-dirty", "git-clean"),
     )
     def git_repo(self, project, request):
-        if request.param is None:
+        # params=None is equivalent to not passing a parameter which results in
+        # result.param being unset.
+        if not hasattr(request, "param"):
             return
         repo = git.Repo.init(project.path)
         with open(project.fn("test.txt"), "w"):
@@ -2644,7 +2647,18 @@ class TestHooksTrackOperationsNotStrict(TestHooksSetUp):
         repo,
     ):
         assert metadata["stage"] == expected_stage
-        assert job.project.path == metadata["project"]["path"]
+        # When running on MacOS CI a private/ is prepended to job.project.path
+        # seemingly indeterminetly. If metadata["project"]["path"] is checked
+        # then job.project.path will have "private" in it. If I check
+        # job.project.path then metadata["project"]["path"] will have "private"
+        # in it. If I check neither, one of them will have "private" in it.
+        test_path = os.path.join(
+            *filter(lambda x: x != "private", Path(metadata["project"]["path"]).parts)
+        )
+        current_path = os.path.join(
+            *filter(lambda x: x != "private", Path(job.project.path).parts)
+        )
+        assert current_path == test_path
         assert metadata["project"]["schema_version"] == job.project.config.get(
             "schema_version"
         )

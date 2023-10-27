@@ -2644,10 +2644,7 @@ class TestHooksTrackOperationsNotStrict(TestHooksSetUp):
         repo,
     ):
         assert metadata["stage"] == expected_stage
-        # I think job.project.path gives us a relative path in the test, while
-        # job.project.path in hooks.utils.collect_metadata gives us the absolute path
-        # I don't know why this is happening.
-        assert job.project.path in metadata["project"]["path"]
+        assert job.project.path == metadata["project"]["path"]
         assert metadata["project"]["schema_version"] == job.project.config.get(
             "schema_version"
         )

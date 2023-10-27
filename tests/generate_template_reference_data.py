@@ -163,6 +163,16 @@ def init(project):
                 "bundle": [["mpi_op", "omp_op"]],
             },
         ],
+        "environments.purdue.AnvilEnvironment": [
+            {
+                "partition": ["debug", "gpu-debug", "wholenode", "wide", "shared", "highmem", "gpu"],
+            },
+            {
+                "partition": ["wholenode"],
+                "parallel": [False, True],
+                "bundle": [["mpi_op", "omp_op"]],
+            },
+        ],
     }
 
     for environment, parameter_combinations in environments.items():

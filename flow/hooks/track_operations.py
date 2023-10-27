@@ -17,21 +17,27 @@ else:
 class TrackOperations:
     """:class:`~.TrackOperations` tracks information about the execution of operations to a logfile.
 
-    This hooks can provides information on the start, successful completion, and/or
-    erroring of one or more operations in a `flow.FlowProject` instance. The logs are stored in a
-    file given by the parameter ``fn_logfile``. This file will be appended to if it already exists.
-    The default formating for the log provides the [time, job id, log level, and log message].
+    This hooks can provides information on the start, successful completion, and/or erroring of
+    one or more operations in a `flow.FlowProject` instance. The logs are stored either in the
+    job document or the file given by ``log_filename``. If stored in the job document, it uses
+    the key ``execution_history``. The file or document list will be appended to if it already
+    exists.
 
-    Note
-    ----
-    All tracking is performed at the INFO level. To ensure outputs are captured in log files,
-    use the `--debug` flag when running or submitting jobs, or specify
-    `submit_options=--debug` in your directives (example shown below).
+    The hooks stores metadata regarding the execution of the operation and the state of the
+    project at the time of execution, error, and/or completion. The data will also include
+    information about the git status if the project is detected as a git repo and
+    ``GitPython`` is installed in the environment.
+
+    Warning
+    -------
+    This class will error on construction if GitPython is not available and ``strict_git`` is set
+    to ``True``. If ``strict_git`` is ``True`` trying to execute an operation with uncommitted
+    changes.
 
     Examples
     --------
     The following example will install :class:`~.TrackOperations` at the operation level.
-    Where the log will be stored in a file name `foo.log` in the job workspace.
+    Where the log will be stored in the job document.
 
     .. code-block:: python
         from flow import FlowProject
@@ -42,15 +48,11 @@ class TrackOperations:
             pass
 
 
-        def install_operation_track_hook(operation_name, project_cls):
-            track = TrackOperation(f"{operation_name}.log")
-            return lambda op: track.install_operation_hooks(op, project_cls)
+        track = TrackOperation()
 
 
-        @install_operation_log_hook("foo", Project)
-        @Project.operation(directives={
-            "submit_options": "--debug"  # Always submit operation foo with the --debug flag
-        })
+        @track.install_operation_hooks(Project)
+        @Project.operation
         def foo(job):
             pass
 
@@ -60,7 +62,7 @@ class TrackOperations:
 
     .. code-block:: python
         from flow import FlowProject
-        from flow.hooks import TrackOperations  # Import build
+        from flow.hooks import TrackOperations
 
 
         class Project(FlowProject):
@@ -80,7 +82,8 @@ class TrackOperations:
         document in a key labeled ``f"{operation_name}"`` under the ``"execution_history"`` key.
         Defaults to ``None``.
     strict_git: bool, optional
-        Whether to fail if ``GitPython`` cannot be imported. Defaults to ``True``.
+        Whether to fail if ``GitPython`` cannot be imported or if there are uncommitted changes
+        to the project's git repo. Defaults to ``True``.
     """
 
     def __init__(self, log_filename=None, strict_git=True):

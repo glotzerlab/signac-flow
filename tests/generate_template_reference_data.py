@@ -165,7 +165,15 @@ def init(project):
         ],
         "environments.purdue.AnvilEnvironment": [
             {
-                "partition": ["debug", "gpu-debug", "wholenode", "wide", "shared", "highmem", "gpu"],
+                "partition": [
+                    "debug",
+                    "gpu-debug",
+                    "wholenode",
+                    "wide",
+                    "shared",
+                    "highmem",
+                    "gpu",
+                ],
             },
             {
                 "partition": ["wholenode"],

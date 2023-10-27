@@ -2538,9 +2538,9 @@ class TestHooksTrackOperationDecorators(TestProjectBase):
         def op(job):
             pass
 
-        assert len(A._OPERATION_HOOK_REGISTRY[op]["on_start"])
-        assert len(A._OPERATION_HOOK_REGISTRY[op]["on_success"])
-        assert len(A._OPERATION_HOOK_REGISTRY[op]["on_exception"])
+        assert len(A._OPERATION_HOOK_REGISTRY[op]["on_start"]) == 1
+        assert len(A._OPERATION_HOOK_REGISTRY[op]["on_success"]) == 1
+        assert len(A._OPERATION_HOOK_REGISTRY[op]["on_exception"]) == 1
 
         @track.install_operation_hooks(A)
         @A.operation

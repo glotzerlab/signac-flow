@@ -11,6 +11,11 @@ Version 0.27
 [0.27.0] -- 202x-xx-xx
 ----------------------
 
+Added
++++++
+
+- Purdue Anvil environment and template (#775).
+
 Fixed
 +++++
 

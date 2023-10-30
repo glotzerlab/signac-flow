@@ -5126,6 +5126,11 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         )
         self._environment.add_args(env_group)
         parser_submit.set_defaults(func=self._main_submit)
+        print(
+            "Using environment configuration:",
+            self._environment.__name__,
+            file=sys.stderr,
+        )
 
         parser_exec = subparsers.add_parser(
             "exec",
@@ -5171,13 +5176,6 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
 
         # Set verbosity level according to the `-v` argument.
         logging.basicConfig(level=max(0, logging.WARNING - 10 * args.verbose))
-
-        if args.verbose >= 1:
-            print(
-                "Using environment configuration:",
-                self._environment.__name__,
-                file=sys.stderr,
-            )
 
         try:
             args.func(args)

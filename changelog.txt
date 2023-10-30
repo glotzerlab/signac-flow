@@ -16,6 +16,10 @@ Added
 
 - Purdue Anvil environment and template (#775).
 
+Changed
++++++++
+- Show the "Using environment configuration:" message only in verbose output (#776).
+
 Fixed
 +++++
 

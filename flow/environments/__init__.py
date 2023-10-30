@@ -2,11 +2,12 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 """The environments module contains a set of provided environment profiles."""
-from . import drexel, incite, umich, umn, xsede
+from . import drexel, incite, purdue, umich, umn, xsede
 
 __all__ = [
     "drexel",
     "incite",
+    "purdue",
     "umich",
     "umn",
     "xsede",

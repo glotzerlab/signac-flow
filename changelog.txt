@@ -11,6 +11,10 @@ Version 0.27
 [0.27.0] -- 202x-xx-xx
 ----------------------
 
+Changed
++++++++
+- Show the "Using environment configuration:" message only in verbose output (#776).
+
 Fixed
 +++++
 

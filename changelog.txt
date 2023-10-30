@@ -15,6 +15,7 @@ Fixed
 +++++
 
 - Restored static output of non-singleton groups (#773, #774).
+- Show the "Using environment configuration:" message only in verbose output (#776).
 
 Version 0.26
 ============

@@ -17,7 +17,7 @@ class GreatLakesEnvironment(DefaultSlurmEnvironment):
     _gpus_per_node = {"default": 2}
     _shared_partitions = {"standard", "gpu"}
 
-    mpi_cmd = "srun"
+    mpi_cmd = "mpirun"
 
     @classmethod
     def add_args(cls, parser):

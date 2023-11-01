@@ -17,7 +17,11 @@ class GreatLakesEnvironment(DefaultSlurmEnvironment):
     _gpus_per_node = {"default": 2}
     _shared_partitions = {"standard", "gpu"}
 
-    mpi_cmd = "mpirun"
+    # For unknown reasons, srun fails to export environment variables such as
+    # PATH on Great Lakes unless explicitly requested to with --export=ALL.
+    # On Great Lakes, srun also fails to flush the buffer until the end of
+    # the job without explicitly setting -u.
+    mpi_cmd = "srun -u --export=ALL"
 
     @classmethod
     def add_args(cls, parser):

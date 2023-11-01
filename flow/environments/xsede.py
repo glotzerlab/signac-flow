@@ -5,7 +5,7 @@
 import logging
 import os
 
-from ..environment import DefaultSlurmEnvironment, template_filter
+from ..environment import DefaultSlurmEnvironment, _PartitionConfig, template_filter
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +25,7 @@ class Stampede2Environment(DefaultSlurmEnvironment):
     mpi_cmd = "ibrun"
     offset_counter = 0
     base_offset = _STAMPEDE_OFFSET
+
     _cpus_per_node = {
         "default": 48,
         "skx-dev": 68,
@@ -147,9 +148,11 @@ class Bridges2Environment(DefaultSlurmEnvironment):
     hostname_pattern = r".*\.bridges2\.psc\.edu$"
     template = "bridges2.sh"
     mpi_cmd = "mpirun"
-    _cpus_per_node = {"default": 128, "EM": 96, "GPU": 40, "GPU-shared": 40}
-    _gpus_per_node = {"default": 8}
-    _shared_partitions = {"RM-shared", "GPU-shared"}
+    _partition_config = _PartitionConfig(
+        cpus_per_node={"default": 128, "EM": 96, "GPU": 40, "GPU-shared": 40},
+        gpus_per_node={"default": 8},
+        shared_partitions={"RM-shared", "GPU-shared"},
+    )
 
     @classmethod
     def add_args(cls, parser):
@@ -185,9 +188,11 @@ class ExpanseEnvironment(DefaultSlurmEnvironment):
 
     hostname_pattern = r".*\.expanse\.sdsc\.edu$"
     template = "expanse.sh"
-    _cpus_per_node = {"default": 128, "GPU": 40}
-    _gpus_per_node = {"default": 4}
-    _shared_partitions = {"shared", "gpu-shared"}
+    _partition_config = _PartitionConfig(
+        cpus_per_node={"default": 128, "GPU": 40},
+        gpus_per_node={"default": 4},
+        shared_partitions={"shared", "gpu-shared"},
+    )
 
     @classmethod
     def add_args(cls, parser):
@@ -229,15 +234,17 @@ class DeltaEnvironment(DefaultSlurmEnvironment):
     # be safer given the parts listed are less likely to change.
     hostname_pattern = r"(gpua|dt|cn)(-login)?[0-9]+\.delta.*\.ncsa.*\.edu"
     template = "delta.sh"
-    _cpus_per_node = {
-        "default": 128,
-        "gpuA40x4": 64,
-        "gpuA100x4": 64,
-        "gpuA100x8": 128,
-        "gpuMI100x8": 128,
-    }
-    _gpus_per_node = {"default": 4, "gpuA100x8": 8, "gpuMI100x8": 8}
-    _shared_partitions = {"cpu", "gpuA100x4", "gpuA40x4", "gpuA100x8", "gpuMI100x8"}
+    _partition_config = _PartitionConfig(
+        cpus_per_node={
+            "default": 128,
+            "gpuA40x4": 64,
+            "gpuA100x4": 64,
+            "gpuA100x8": 128,
+            "gpuMI100x8": 128,
+        },
+        gpus_per_node={"default": 4, "gpuA100x8": 8, "gpuMI100x8": 8},
+        shared_partitions={"cpu", "gpuA100x4", "gpuA40x4", "gpuA100x8", "gpuMI100x8"},
+    )
 
     @classmethod
     def add_args(cls, parser):

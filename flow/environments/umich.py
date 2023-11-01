@@ -2,7 +2,7 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 """Environments for the University of Michigan HPC environment."""
-from ..environment import DefaultSlurmEnvironment
+from ..environment import DefaultSlurmEnvironment, _PartitionConfig
 
 
 class GreatLakesEnvironment(DefaultSlurmEnvironment):
@@ -13,11 +13,12 @@ class GreatLakesEnvironment(DefaultSlurmEnvironment):
 
     hostname_pattern = r"gl(-login)?[0-9]+\.arc-ts\.umich\.edu"
     template = "umich-greatlakes.sh"
-    _cpus_per_node = {"default": 36, "gpu": 40}
-    _gpus_per_node = {"default": 2}
-    _shared_partitions = {"standard", "gpu"}
-
     mpi_cmd = "srun"
+    _partition_config = _PartitionConfig(
+        cpus_per_node={"default": 36, "gpu": 40},
+        gpus_per_node={"default": 2},
+        shared_partitions={"standard", "gpu"},
+    )
 
     @classmethod
     def add_args(cls, parser):

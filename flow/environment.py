@@ -90,6 +90,56 @@ def template_filter(func):
     return classmethod(func)
 
 
+class _PartitionConfig:
+    def __init__(self, cpus_per_node=None, gpus_per_node=None, shared_partitions=None):
+        self.cpus_per_node = (
+            {"default": None} if cpus_per_node is None else cpus_per_node
+        )
+        self.gpus_per_node = (
+            {"default": None} if gpus_per_node is None else gpus_per_node
+        )
+        self.shared_partitions = (
+            set() if shared_partitions is None else shared_partitions
+        )
+
+    def __getitem__(self, partition):
+        return _Partition(
+            partition,
+            self._get_cpus(partition),
+            self._get_gpus(partition),
+            partition in self.shared_partitions,
+        )
+
+    def _get_cpus(self, partition):
+        return self.cpus_per_node.get(partition, self.cpus_per_node["default"])
+
+    def _get_gpus(self, partition):
+        return self.gpus_per_node.get(partition, self.gpus_per_node["default"])
+
+
+class _Partition:
+    def __init__(self, name, gpus, cpus, shared):
+        self.name = name
+        self.gpus = gpus
+        self.cpus = cpus
+        self.shared = shared
+
+    def calculate_num_nodes(self, cpu_tasks, gpu_tasks, threshold):
+        if gpu_tasks > 0:
+            num_nodes_gpu = self._nodes_for_task(gpu_tasks, self.gpus, threshold)
+            num_nodes_cpu = self._nodes_for_task(cpu_tasks, self.cpus, 0)
+        else:
+            num_nodes_gpu = 0
+            num_nodes_cpu = self._nodes_for_task(cpu_tasks, self.cpus, threshold)
+        return max(num_nodes_cpu, num_nodes_gpu, 1)
+
+    def _nodes_for_task(self, tasks, processors, threshold):
+        """Call calc_num_nodes but handles the None sentinal value."""
+        if processors is None:
+            return 1
+        return calc_num_nodes(tasks, processors, threshold)
+
+
 class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
     """Define computational environments.
 
@@ -109,9 +159,7 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
     template = "base_script.sh"
     mpi_cmd = "mpiexec"
 
-    _cpus_per_node = {"default": -1}
-    _gpus_per_node = {"default": -1}
-    _shared_partitions = set()
+    _partition_config = _PartitionConfig()
 
     @classmethod
     def is_present(cls):
@@ -296,9 +344,9 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
         -------
             Must be called after the rest of the template context has been gathered.
         """
-        partition = context.get("partition", None)
+        partition = cls._partition_config[context.get("partition", None)]
         force = context.get("force", False)
-        if force or partition in cls._shared_partitions:
+        if force or partition.shared:
             threshold = 0.0
         else:
             threshold = 0.9
@@ -315,39 +363,15 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
             context.get("force", False),
         )
 
-        if gpu_tasks_total > 0:
-            num_nodes_gpu = cls._calc_num_nodes(
-                gpu_tasks_total, cls._get_gpus_per_node(partition), threshold
-            )
-            num_nodes_cpu = cls._calc_num_nodes(
-                cpu_tasks_total, cls._get_cpus_per_node(partition), 0
-            )
-        else:
-            num_nodes_gpu = 0
-            num_nodes_cpu = cls._calc_num_nodes(
-                cpu_tasks_total, cls._get_cpus_per_node(partition), threshold
-            )
-        num_nodes = max(num_nodes_cpu, num_nodes_gpu, 1)
+        num_nodes = partition.calculate_num_nodes(
+            cpu_tasks_total, gpu_tasks_total, threshold
+        )
+
         return {
             "ncpu_tasks": cpu_tasks_total,
             "ngpu_tasks": gpu_tasks_total,
             "num_nodes": num_nodes,
         }
-
-    @classmethod
-    def _get_cpus_per_node(cls, partition):
-        return cls._cpus_per_node.get(partition, cls._cpus_per_node["default"])
-
-    @classmethod
-    def _get_gpus_per_node(cls, partition):
-        return cls._gpus_per_node.get(partition, cls._gpus_per_node["default"])
-
-    @classmethod
-    def _calc_num_nodes(cls, tasks, processors, threshold):
-        """Call calc_num_nodes but handles the -1 sentinal value."""
-        if processors == -1:
-            return 1
-        return calc_num_nodes(tasks, processors, threshold)
 
 
 class StandardEnvironment(ComputeEnvironment):

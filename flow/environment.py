@@ -92,14 +92,54 @@ def template_filter(func):
 
 
 class _NodeTypes(enum.Enum):
+    """Defines for a partition the acceptable node requests.
+
+    - SHARED: Only support partial nodes requests to full node. Note that you
+        can restrict the cores provided in `_PartitionConfig` to restrict below
+        even full nodes.
+    - MIXED: No restriction on partial to full node requests.
+    - WHOLENODE: Only support submissions in units of whole nodes.
+    """
+
     SHARED = 1
     MIXED = 2
     WHOLENODE = 3
 
 
 class _PartitionConfig:
+    """The configuration of partition for a given environment.
+
+    Currently supports the ideas of
+    - CPUs for a partition
+    - GPUs for a partition
+    - Node type of a partition
+
+    When querying a value for a specific partition the logic first searches the
+    provided mapping if any for the partition, if it is not found then the
+    mapping is searched for "default" if it exists, if not the class default is
+    used.
+
+    1. Partition specific -> 2. Provided default -> 3. _PartitionConfig default
+
+    The class defaults are
+
+    - CPUs: ``None`` which represents any number. This will be interpretted as
+      an unlimited supply of CPUs practically.
+    - GPUs: 0.
+    - Node type: `_NodeTypes.MIXED`.
+
+    Parameters
+    ----------
+    cpus_per_node: dict[str, int], optional
+        Mapping between partitions and CPUs per node. Defaults to an empyt `dict`.
+    gpus_per_node: dict[str, int], optional
+        Mapping between partitions and GPUs per node. Defaults to an empyt `dict`.
+    node_types: dict[str, _NodeTypes], optional
+        Mapping between partitions and node types. Defaults to an empyt `dict`.
+    """
+
     _default_cpus_per_node = None
-    _default_gpus_per_node = None
+    _default_gpus_per_node = 0
     _default_node_type = _NodeTypes.MIXED
 
     def __init__(self, cpus_per_node=None, gpus_per_node=None, node_types=None):
@@ -108,6 +148,7 @@ class _PartitionConfig:
         self.node_types = {} if node_types is None else node_types
 
     def __getitem__(self, partition):
+        """Get the `_Partition` object for the provided partition."""
         return _Partition(
             partition,
             self._get(partition, self.cpus_per_node, self._default_cpus_per_node),
@@ -117,26 +158,83 @@ class _PartitionConfig:
 
     @staticmethod
     def _get(key, mapping, default):
+        """Get the value of key following the class priority chain."""
         return mapping.get(key, mapping.get("default", default))
 
 
 class _Partition:
+    """Represents a partition and associated data.
+
+    Parameters
+    ----------
+    name: str
+        The name of the partition.
+    cpus: int
+        The CPUs per node.
+    gpus: int
+        The GPUs per node.
+    node_type: _NodeTypes
+        The node type for the partition.
+
+    Attributes
+    ----------
+    name: str
+        The name of the partition.
+    cpus: int
+        The CPUs per node.
+    gpus: int
+        The GPUs per node.
+    node_type: _NodeTypes
+        The node type for the partition.
+    """
+
     def __init__(self, name, cpus, gpus, node_type):
-        self.name = name
+        # Use empty string for error messages.
+        self.name = name if name is not None else ""
         self.gpus = gpus
         self.cpus = cpus
         self.node_type = node_type
 
-    def calculate_num_nodes(self, cpu_tasks, gpu_tasks, threshold, force):
+    def calculate_num_nodes(self, cpu_tasks, gpu_tasks, force):
+        """Compute the number of nodes for the given workload.
+
+        Parameters
+        ----------
+        cpu_tasks: int
+            Total CPU tasks/cores.
+        gpu_tasks: int
+            Total GPUs requested.
+        force: bool
+            Whether to allow seemingly nonsensical/erronous resource requests.
+
+        Raises
+        ------
+        SubmitError:
+            Raises a SubmitError for
+            1. non-zero GPUs on non-GPU partitions
+            2. zero GPUs on GPU partitions.
+            3. Requests larger than a node on `_NodeTypes.SHARED` partitions (through
+               `~._nodes_for_task`).
+            4. Requests less than 0.9 of the last node for `_NodeTypes.WHOLENODE`
+               partitions (through `calc_num_nodes`)
+            if ``not force``.
+        """
+        threshold = 0.9 if self.node_type == _NodeTypes.WHOLENODE and not force else 0.0
         if gpu_tasks > 0:
-            if (self.gpus is None or self.gpus == 0) and not force:
-                raise SubmitError(
-                    f"Cannot request GPU's on nonGPU partition, {self.name}."
-                )
-            num_nodes_gpu = self._nodes_for_task(gpu_tasks, self.gpus, threshold)
+            if self.gpus == 0:
+                # Required for current tests. Also skips a divide by zero error
+                # if user actually wants to submit CPU only jobs to GPU partitions.
+                if force:
+                    num_nodes_gpu = 1
+                else:
+                    raise SubmitError(
+                        f"Cannot request GPU's on nonGPU partition, {self.name}."
+                    )
+            else:
+                num_nodes_gpu = self._nodes_for_task(gpu_tasks, self.gpus, threshold)
             num_nodes_cpu = self._nodes_for_task(cpu_tasks, self.cpus, 0)
         else:
-            if (self.gpus is not None and self.gpus > 0) and not force:
+            if self.gpus > 0 and not force:
                 raise SubmitError(
                     f"Cannot submit to GPU partition, {self.name}, without GPUs."
                 )
@@ -362,10 +460,6 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
         """
         partition = cls._partition_config[context.get("partition", None)]
         force = context.get("force", False)
-        if partition.node_type == _NodeTypes.WHOLENODE and not force:
-            threshold = 0.9
-        else:
-            threshold = 0.0
         cpu_tasks_total = calc_tasks(
             context["operations"],
             "np",
@@ -380,7 +474,7 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
         )
 
         num_nodes = partition.calculate_num_nodes(
-            cpu_tasks_total, gpu_tasks_total, threshold, force
+            cpu_tasks_total, gpu_tasks_total, force
         )
 
         return {

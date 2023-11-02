@@ -127,11 +127,19 @@ class _Partition:
         self.cpus = cpus
         self.node_type = node_type
 
-    def calculate_num_nodes(self, cpu_tasks, gpu_tasks, threshold):
+    def calculate_num_nodes(self, cpu_tasks, gpu_tasks, threshold, force):
         if gpu_tasks > 0:
+            if (self.gpus is None or self.gpus == 0) and not force:
+                raise SubmitError(
+                    f"Cannot request GPU's on nonGPU partition, {self.name}."
+                )
             num_nodes_gpu = self._nodes_for_task(gpu_tasks, self.gpus, threshold)
             num_nodes_cpu = self._nodes_for_task(cpu_tasks, self.cpus, 0)
         else:
+            if (self.gpus is not None and self.gpus > 0) and not force:
+                raise SubmitError(
+                    f"Cannot submit to GPU partition, {self.name}, without GPUs."
+                )
             num_nodes_gpu = 0
             num_nodes_cpu = self._nodes_for_task(cpu_tasks, self.cpus, threshold)
         return max(num_nodes_cpu, num_nodes_gpu, 1)
@@ -372,7 +380,7 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
         )
 
         num_nodes = partition.calculate_num_nodes(
-            cpu_tasks_total, gpu_tasks_total, threshold
+            cpu_tasks_total, gpu_tasks_total, threshold, force
         )
 
         return {

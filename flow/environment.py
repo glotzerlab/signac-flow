@@ -314,6 +314,12 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
             context.get("parallel", False),
             context.get("force", False),
         )
+        ranks_total = calc_tasks(
+            context["operations"],
+            "nranks",
+            context.get("parallel", False),
+            context.get("force", False),
+        )
 
         if gpu_tasks_total > 0:
             num_nodes_gpu = cls._calc_num_nodes(
@@ -331,6 +337,7 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
         return {
             "ncpu_tasks": cpu_tasks_total,
             "ngpu_tasks": gpu_tasks_total,
+            "nranks": max(ranks_total,1),
             "num_nodes": num_nodes,
         }
 

@@ -7,10 +7,11 @@
     {% if 'gpu' in partition and resources.ngpu_tasks == 0 and not force %}
         {% raise "Requesting gpu partition without GPUs!" %}
     {% endif %}
-#SBATCH --nodes={{ resources.num_nodes }}
-#SBATCH --ntasks={{ resources.ncpu_tasks }}
+#SBATCH --nodes={{ resources.num_nodes }}-{{ resources.num_nodes }}
+#SBATCH --ntasks={{ resources.nranks }}
+#SBATCH --cpus-per-task={{ resources.ncpu_tasks // resources.nranks}}
     {% if partition == 'gpu' %}
-#SBATCH --gpus={{ resources.ngpu_tasks }}
+#SBATCH --gpus-per-task={{ resources.ngpu_tasks // resources.nranks }}
     {% endif %}
 {% endblock tasks %}
 {% block header %}

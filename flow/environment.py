@@ -34,6 +34,7 @@ from .scheduling.lsf import LSFScheduler
 from .scheduling.pbs import PBSScheduler
 from .scheduling.simple_scheduler import SimpleScheduler
 from .scheduling.slurm import SlurmScheduler
+from .util.template_filters import calc_num_nodes, calc_tasks
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +108,10 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
     submit_flags = None
     template = "base_script.sh"
     mpi_cmd = "mpiexec"
+
+    _cpus_per_node = {"default": -1}
+    _gpus_per_node = {"default": -1}
+    _shared_partitions = set()
 
     @classmethod
     def is_present(cls):
@@ -282,6 +287,67 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
                 _WALLTIME,
             )
         )
+
+    @classmethod
+    def _get_scheduler_values(cls, context):
+        """Return a dictionary of computed quantities regarding submission.
+
+        Warning
+        -------
+            Must be called after the rest of the template context has been gathered.
+        """
+        partition = context.get("partition", None)
+        force = context.get("force", False)
+        if force or partition in cls._shared_partitions:
+            threshold = 0.0
+        else:
+            threshold = 0.9
+        cpu_tasks_total = calc_tasks(
+            context["operations"],
+            "np",
+            context.get("parallel", False),
+            context.get("force", False),
+        )
+        gpu_tasks_total = calc_tasks(
+            context["operations"],
+            "ngpu",
+            context.get("parallel", False),
+            context.get("force", False),
+        )
+
+        if gpu_tasks_total > 0:
+            num_nodes_gpu = cls._calc_num_nodes(
+                gpu_tasks_total, cls._get_gpus_per_node(partition), threshold
+            )
+            num_nodes_cpu = cls._calc_num_nodes(
+                cpu_tasks_total, cls._get_cpus_per_node(partition), 0
+            )
+        else:
+            num_nodes_gpu = 0
+            num_nodes_cpu = cls._calc_num_nodes(
+                cpu_tasks_total, cls._get_cpus_per_node(partition), threshold
+            )
+        num_nodes = max(num_nodes_cpu, num_nodes_gpu, 1)
+        return {
+            "ncpu_tasks": cpu_tasks_total,
+            "ngpu_tasks": gpu_tasks_total,
+            "num_nodes": num_nodes,
+        }
+
+    @classmethod
+    def _get_cpus_per_node(cls, partition):
+        return cls._cpus_per_node.get(partition, cls._cpus_per_node["default"])
+
+    @classmethod
+    def _get_gpus_per_node(cls, partition):
+        return cls._gpus_per_node.get(partition, cls._gpus_per_node["default"])
+
+    @classmethod
+    def _calc_num_nodes(cls, tasks, processors, threshold):
+        """Call calc_num_nodes but handles the -1 sentinal value."""
+        if processors == -1:
+            return 1
+        return calc_num_nodes(tasks, processors, threshold)
 
 
 class StandardEnvironment(ComputeEnvironment):

@@ -25,6 +25,14 @@ class Stampede2Environment(DefaultSlurmEnvironment):
     mpi_cmd = "ibrun"
     offset_counter = 0
     base_offset = _STAMPEDE_OFFSET
+    _cpus_per_node = {
+        "default": 48,
+        "skx-dev": 68,
+        "skx-normal": 68,
+        "skx-large": 68,
+        "icx-normal": 80,
+    }
+    _gpus_per_node = {"default": 0.0}
 
     @template_filter
     def return_and_increment(cls, increment):
@@ -138,8 +146,10 @@ class Bridges2Environment(DefaultSlurmEnvironment):
 
     hostname_pattern = r".*\.bridges2\.psc\.edu$"
     template = "bridges2.sh"
-    cores_per_node = 128
     mpi_cmd = "mpirun"
+    _cpus_per_node = {"default": 128, "EM": 96, "GPU": 40, "GPU-shared": 40}
+    _gpus_per_node = {"default": 8}
+    _shared_partitions = {"RM-shared", "GPU-shared"}
 
     @classmethod
     def add_args(cls, parser):
@@ -175,8 +185,9 @@ class ExpanseEnvironment(DefaultSlurmEnvironment):
 
     hostname_pattern = r".*\.expanse\.sdsc\.edu$"
     template = "expanse.sh"
-    cores_per_node = 128
-    gpus_per_node = 4
+    _cpus_per_node = {"default": 128, "GPU": 40}
+    _gpus_per_node = {"default": 4}
+    _shared_partitions = {"shared", "gpu-shared"}
 
     @classmethod
     def add_args(cls, parser):
@@ -218,7 +229,15 @@ class DeltaEnvironment(DefaultSlurmEnvironment):
     # be safer given the parts listed are less likely to change.
     hostname_pattern = r"(gpua|dt|cn)(-login)?[0-9]+\.delta.*\.ncsa.*\.edu"
     template = "delta.sh"
-    cores_per_node = 128
+    _cpus_per_node = {
+        "default": 128,
+        "gpuA40x4": 64,
+        "gpuA100x4": 64,
+        "gpuA100x8": 128,
+        "gpuMI100x8": 128,
+    }
+    _gpus_per_node = {"default": 4, "gpuA100x8": 8, "gpuMI100x8": 8}
+    _shared_partitions = {"cpu", "gpuA100x4", "gpuA40x4", "gpuA100x8", "gpuMI100x8"}
 
     @classmethod
     def add_args(cls, parser):

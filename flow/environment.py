@@ -9,6 +9,7 @@ subclassed to automatically detect specific computational environments.
 This enables the user to adjust their workflow based on the present
 environment, e.g. for the adjustment of scheduler submission scripts.
 """
+import enum
 import logging
 import os
 import re
@@ -27,7 +28,7 @@ from .directives import (
     _WALLTIME,
     _Directives,
 )
-from .errors import NoSchedulerError
+from .errors import NoSchedulerError, SubmitError
 from .scheduling.base import JobStatus
 from .scheduling.fake_scheduler import FakeScheduler
 from .scheduling.lsf import LSFScheduler
@@ -90,39 +91,41 @@ def template_filter(func):
     return classmethod(func)
 
 
+class _NodeTypes(enum.Enum):
+    SHARED = 1
+    MIXED = 2
+    WHOLENODE = 3
+
+
 class _PartitionConfig:
-    def __init__(self, cpus_per_node=None, gpus_per_node=None, shared_partitions=None):
-        self.cpus_per_node = (
-            {"default": None} if cpus_per_node is None else cpus_per_node
-        )
-        self.gpus_per_node = (
-            {"default": None} if gpus_per_node is None else gpus_per_node
-        )
-        self.shared_partitions = (
-            set() if shared_partitions is None else shared_partitions
-        )
+    _default_cpus_per_node = None
+    _default_gpus_per_node = None
+    _default_node_type = _NodeTypes.MIXED
+
+    def __init__(self, cpus_per_node=None, gpus_per_node=None, node_types=None):
+        self.cpus_per_node = {} if cpus_per_node is None else cpus_per_node
+        self.gpus_per_node = {} if gpus_per_node is None else gpus_per_node
+        self.node_types = {} if node_types is None else node_types
 
     def __getitem__(self, partition):
         return _Partition(
             partition,
-            self._get_cpus(partition),
-            self._get_gpus(partition),
-            partition in self.shared_partitions,
+            self._get(partition, self.cpus_per_node, self._default_cpus_per_node),
+            self._get(partition, self.gpus_per_node, self._default_gpus_per_node),
+            self._get(partition, self.node_types, self._default_node_type),
         )
 
-    def _get_cpus(self, partition):
-        return self.cpus_per_node.get(partition, self.cpus_per_node["default"])
-
-    def _get_gpus(self, partition):
-        return self.gpus_per_node.get(partition, self.gpus_per_node["default"])
+    @staticmethod
+    def _get(key, mapping, default):
+        return mapping.get(key, mapping.get("default", default))
 
 
 class _Partition:
-    def __init__(self, name, cpus, gpus, shared):
+    def __init__(self, name, cpus, gpus, node_type):
         self.name = name
         self.gpus = gpus
         self.cpus = cpus
-        self.shared = shared
+        self.node_type = node_type
 
     def calculate_num_nodes(self, cpu_tasks, gpu_tasks, threshold):
         if gpu_tasks > 0:
@@ -137,7 +140,12 @@ class _Partition:
         """Call calc_num_nodes but handles the None sentinal value."""
         if processors is None:
             return 1
-        return calc_num_nodes(tasks, processors, threshold)
+        nodes = calc_num_nodes(tasks, processors, threshold)
+        if self.node_type == _NodeTypes.SHARED and nodes > 1:
+            raise SubmitError(
+                f"Cannot submit {tasks} tasks to shared partition {self.name}"
+            )
+        return nodes
 
 
 class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
@@ -346,10 +354,10 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
         """
         partition = cls._partition_config[context.get("partition", None)]
         force = context.get("force", False)
-        if force or partition.shared:
-            threshold = 0.0
-        else:
+        if partition.node_type == _NodeTypes.WHOLENODE and not force:
             threshold = 0.9
+        else:
+            threshold = 0.0
         cpu_tasks_total = calc_tasks(
             context["operations"],
             "np",

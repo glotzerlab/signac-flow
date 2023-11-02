@@ -10,6 +10,7 @@ from math import ceil, gcd
 from ..environment import (
     DefaultLSFEnvironment,
     DefaultSlurmEnvironment,
+    _NodeTypes,
     _PartitionConfig,
     template_filter,
 )
@@ -38,7 +39,9 @@ class SummitEnvironment(DefaultLSFEnvironment):
     template = "summit.sh"
     mpi_cmd = "jsrun"
     _partition_config = _PartitionConfig(
-        cpus_per_node={"default": 42}, gpus_per_node={"default": 6}
+        cpus_per_node={"default": 42},
+        gpus_per_node={"default": 6},
+        node_types={"default": _NodeTypes.WHOLENODE},
     )
 
     @template_filter
@@ -190,7 +193,9 @@ class AndesEnvironment(DefaultSlurmEnvironment):
     template = "andes.sh"
     mpi_cmd = "srun"
     _partition_config = _PartitionConfig(
-        cpus_per_node={"default": 32, "gpu": 28}, gpus_per_node={"default": 0, "gpu": 2}
+        cpus_per_node={"default": 32, "gpu": 28},
+        gpus_per_node={"gpu": 2},
+        node_types={"default": _NodeTypes.WHOLENODE},
     )
 
     @classmethod
@@ -221,7 +226,9 @@ class CrusherEnvironment(DefaultSlurmEnvironment):
     hostname_pattern = r".*\.crusher\.olcf\.ornl\.gov"
     template = "crusher.sh"
     _partition_config = _PartitionConfig(
-        cpus_per_node={"default": 56}, gpus_per_node={"default": 8}
+        cpus_per_node={"default": 56},
+        gpus_per_node={"default": 8},
+        node_types={"default": _NodeTypes.WHOLENODE},
     )
 
     mpi_cmd = "srun"
@@ -274,7 +281,9 @@ class FrontierEnvironment(DefaultSlurmEnvironment):
     hostname_pattern = r".*\.frontier\.olcf\.ornl\.gov"
     template = "frontier.sh"
     _partition_config = _PartitionConfig(
-        cpus_per_node={"default": 56}, gpus_per_node={"default": 8}
+        cpus_per_node={"default": 56},
+        gpus_per_node={"default": 8},
+        node_types={"default": _NodeTypes.WHOLENODE},
     )
     mpi_cmd = "srun"
 

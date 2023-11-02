@@ -16,8 +16,7 @@ class GreatLakesEnvironment(DefaultSlurmEnvironment):
     mpi_cmd = "srun"
     _partition_config = _PartitionConfig(
         cpus_per_node={"default": 36, "gpu": 40},
-        gpus_per_node={"default": 2},
-        shared_partitions={"standard", "gpu"},
+        gpus_per_node={"gpu": 2},
     )
 
     @classmethod

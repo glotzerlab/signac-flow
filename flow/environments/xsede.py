@@ -5,7 +5,12 @@
 import logging
 import os
 
-from ..environment import DefaultSlurmEnvironment, _PartitionConfig, template_filter
+from ..environment import (
+    DefaultSlurmEnvironment,
+    _NodeTypes,
+    _PartitionConfig,
+    template_filter,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -149,9 +154,21 @@ class Bridges2Environment(DefaultSlurmEnvironment):
     template = "bridges2.sh"
     mpi_cmd = "mpirun"
     _partition_config = _PartitionConfig(
-        cpus_per_node={"default": 128, "EM": 96, "GPU": 40, "GPU-shared": 40},
-        gpus_per_node={"default": 8},
-        shared_partitions={"RM-shared", "GPU-shared"},
+        cpus_per_node={
+            "default": 128,
+            "RM-shared": 64,
+            "EM": 96,
+            "GPU": 40,
+            "GPU-shared": 20,
+        },
+        gpus_per_node={"GPU": 8, "GPU-shared": 4},
+        node_types={
+            "RM-shared": _NodeTypes.SHARED,
+            "GPU-shared": _NodeTypes.SHARED,
+            "EM": _NodeTypes.SHARED,
+            "RM": _NodeTypes.WHOLENODE,
+            "GPU": _NodeTypes.WHOLENODE,
+        },
     )
 
     @classmethod
@@ -170,7 +187,6 @@ class Bridges2Environment(DefaultSlurmEnvironment):
             choices=[
                 "RM",
                 "RM-shared",
-                "RM-small",
                 "EM",
                 "GPU",
                 "GPU-shared",
@@ -189,9 +205,15 @@ class ExpanseEnvironment(DefaultSlurmEnvironment):
     hostname_pattern = r".*\.expanse\.sdsc\.edu$"
     template = "expanse.sh"
     _partition_config = _PartitionConfig(
-        cpus_per_node={"default": 128, "GPU": 40},
-        gpus_per_node={"default": 4},
-        shared_partitions={"shared", "gpu-shared"},
+        cpus_per_node={"default": 128, "gpu": 40, "gpu-shared": 40, "gpu-debug": 40},
+        gpus_per_node={"gpu": 4, "gpu-shared": 4, "gpu-debug": 4},
+        node_types={
+            "shared": _NodeTypes.SHARED,
+            "large-shared": _NodeTypes.SHARED,
+            "gpu-shared": _NodeTypes.SHARED,
+            "compute": _NodeTypes.WHOLENODE,
+            "gpu": _NodeTypes.WHOLENODE,
+        },
     )
 
     @classmethod
@@ -212,6 +234,7 @@ class ExpanseEnvironment(DefaultSlurmEnvironment):
                 "shared",
                 "large-shared",
                 "gpu",
+                "gpu-debug",
                 "gpu-shared",
                 "debug",
             ],
@@ -236,14 +259,13 @@ class DeltaEnvironment(DefaultSlurmEnvironment):
     template = "delta.sh"
     _partition_config = _PartitionConfig(
         cpus_per_node={
-            "default": 128,
+            "cpu": 128,
             "gpuA40x4": 64,
             "gpuA100x4": 64,
             "gpuA100x8": 128,
             "gpuMI100x8": 128,
         },
-        gpus_per_node={"default": 4, "gpuA100x8": 8, "gpuMI100x8": 8},
-        shared_partitions={"cpu", "gpuA100x4", "gpuA40x4", "gpuA100x8", "gpuMI100x8"},
+        gpus_per_node={"gpuA40x4": 4, "gpuA100x4": 4, "gpuA100x8": 8, "gpuMI100x8": 8},
     )
 
     @classmethod

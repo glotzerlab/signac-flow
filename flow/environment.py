@@ -118,7 +118,7 @@ class _PartitionConfig:
 
 
 class _Partition:
-    def __init__(self, name, gpus, cpus, shared):
+    def __init__(self, name, cpus, gpus, shared):
         self.name = name
         self.gpus = gpus
         self.cpus = cpus

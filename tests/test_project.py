@@ -1158,7 +1158,7 @@ class TestExecutionProject(TestProjectBase):
         project = self.mock_project()
         assert len(list(MockScheduler.jobs())) == 0
         with redirect_stderr(StringIO()):
-            project.submit()
+            project.submit(force=True)  # force set due to GPU directives
         even_jobs = [job for job in project if job.sp.b % 2 == 0]
         num_jobs_submitted = (2 * len(project)) + len(even_jobs)
         assert len(list(MockScheduler.jobs())) == num_jobs_submitted
@@ -1194,13 +1194,13 @@ class TestExecutionProject(TestProjectBase):
         assert len(list(MockScheduler.jobs())) == 0
         with redirect_stderr(StringIO()):
             # Initial submission
-            project.submit()
+            project.submit(force=True)  # force set due to GPU directives
             assert len(list(MockScheduler.jobs())) == num_jobs_submitted
 
             # Resubmit a bunch of times:
             for i in range(1, self.expected_number_of_steps + 3):
                 MockScheduler.step()
-                project.submit()
+                project.submit(force=True)  # force set due to GPU directives
                 if len(list(MockScheduler.jobs())) == 0:
                     break  # break when there are no jobs left
 
@@ -1239,7 +1239,7 @@ class TestExecutionProject(TestProjectBase):
                 assert next_op.id not in cached_status
 
         with redirect_stderr(StringIO()):
-            project.submit()
+            project.submit(force=True)  # force set due to GPU directives
         assert len(list(MockScheduler.jobs())) == num_jobs_submitted
 
         cached_status = project._get_cached_scheduler_status()

@@ -337,7 +337,7 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
         return {
             "ncpu_tasks": cpu_tasks_total,
             "ngpu_tasks": gpu_tasks_total,
-            "nranks": max(ranks_total,1),
+            "nranks": max(ranks_total, 1),
             "num_nodes": num_nodes,
         }
 

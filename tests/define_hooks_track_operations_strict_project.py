@@ -12,11 +12,9 @@ LOG_FILENAME = "operations.log"
 
 
 track_operations = TrackOperations()
-track_operations_with_file = TrackOperations(LOG_FILENAME)
 
 
 @track_operations.install_operation_hooks(_HooksTrackOperations)
-@track_operations_with_file.install_operation_hooks(_HooksTrackOperations)
 @_HooksTrackOperations.operation
 def base(job):
     if job.sp.raise_exception:
@@ -24,7 +22,6 @@ def base(job):
 
 
 @track_operations.install_operation_hooks(_HooksTrackOperations)
-@track_operations_with_file.install_operation_hooks(_HooksTrackOperations)
 @_HooksTrackOperations.operation(cmd=True, with_job=True)
 def cmd(job):
     if job.sp.raise_exception:

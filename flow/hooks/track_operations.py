@@ -14,6 +14,9 @@ else:
     GIT = True
 
 
+_DEFAULT_FILENAME = "signac-execution-history.log"
+
+
 class TrackOperations:
     """:class:`~.TrackOperations` tracks information about the execution of operations to a logfile.
 
@@ -80,15 +83,13 @@ class TrackOperations:
     Parameters
     ----------
     log_filename : str, optional
-        The name of the log file in the job workspace. If ``None``, store in a list in the job
-        document in ``job.document["execution_history"][operation_name]``.
-        Defaults to ``None``.
+        The name of the log file in the job workspace. Defaults to "signac-execution-history.log".
     strict_git : bool, optional
         Whether to fail if ``GitPython`` cannot be imported or if there are uncommitted changes
         to the project's git repo. Defaults to ``True``.
     """
 
-    def __init__(self, log_filename=None, strict_git=True):
+    def __init__(self, log_filename=_DEFAULT_FILENAME, strict_git=True):
         self.log_filename = log_filename
         if strict_git and not GIT:
             raise RuntimeError(
@@ -100,13 +101,6 @@ class TrackOperations:
         self.strict_git = strict_git
 
     def _write_metadata(self, job, metadata):
-        print(f"Writing {metadata}...", flush=True)
-        if self.log_filename is None:
-            history = job.doc.setdefault("execution_history", {})
-            # No need to store job id or operation name.
-            operation_name = metadata.pop("job-operation")["name"]
-            history.setdefault(operation_name, []).append(metadata)
-            return
         with open(job.fn(self.log_filename), "a") as logfile:
             logfile.write(json.dumps(metadata) + "\n")
 
@@ -172,3 +166,23 @@ class TrackOperations:
         project.project_hooks.on_success.append(self.on_success)
         project.project_hooks.on_exception.append(self.on_exception)
         return project
+
+    @classmethod
+    def read_log(cls, job, log_filename=_DEFAULT_FILENAME):
+        """Return the execution log data as a list of dictionaries.
+
+        Parameters
+        ----------
+        job : signac.job.Job
+            The job to read the execution history of.
+        log_filename : str, optional
+            The name of the log file in the job workspace. Defaults to
+            "signac-execution-history.log".
+
+        Returns
+        -------
+        log : list[dict[str, any]]
+            Returns the job's current execution history for logged operations.
+        """
+        with open(job.fn(log_filename)) as fh:
+            return [json.loads(line) for line in fh.readlines() if line != ""]

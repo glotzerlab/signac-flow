@@ -8,14 +8,12 @@ class _HooksTrackOperations(FlowProject):
     pass
 
 
-LOG_FILENAME = "operations.log"
+LOG_FILENAME = "signac-execution-history.log"
 
 
 track_operations = TrackOperations(strict_git=False)
-track_operations_with_file = TrackOperations(LOG_FILENAME, strict_git=False)
 
 
-@track_operations_with_file.install_operation_hooks(_HooksTrackOperations)
 @track_operations.install_operation_hooks(_HooksTrackOperations)
 @_HooksTrackOperations.operation
 def base(job):
@@ -23,7 +21,6 @@ def base(job):
         raise RuntimeError(HOOKS_ERROR_MESSAGE)
 
 
-@track_operations_with_file.install_operation_hooks(_HooksTrackOperations)
 @track_operations.install_operation_hooks(_HooksTrackOperations)
 @_HooksTrackOperations.operation(cmd=True, with_job=True)
 def cmd(job):

@@ -2,7 +2,6 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 import datetime
-import json
 import logging
 import os
 import platform
@@ -2608,25 +2607,11 @@ class TestHooksTrackOperationsNotStrict(TestHooksSetUp):
             repo.index.add(["dirty.txt"])
         return repo
 
-    def split_log(self, job, fn):
-        with open(job.fn(fn)) as f:
-            values = f.read().split("\n")
-        if values[-1] == "":
-            values = values[:-1]
-        return values
-
-    def get_log(self, job, fn=None):
-        if fn is None:
-            execution_history = job.doc["execution_history"]()
-            # Add back in redundent information to make check_metadata universal
-            for key, item in execution_history.items():
-                for entry in item:
-                    entry["job-operation"] = {"name": key, "job_id": job.id}
-            return execution_history
-        log_entries = [json.loads(entry) for entry in self.split_log(job, fn)]
+    def get_log(self, job):
+        log_entries = flow.hooks.TrackOperations.read_log(job)
         execution_history = {}
         for entry in log_entries:
-            operation_name = entry["job-operation"]["name"]
+            operation_name = entry["operation"]
             execution_history.setdefault(operation_name, []).append(entry)
         return execution_history
 
@@ -2659,9 +2644,8 @@ class TestHooksTrackOperationsNotStrict(TestHooksSetUp):
         )
         start_time = datetime.datetime.fromisoformat(metadata["time"])
         assert before_execution < start_time
-        job_op_metadata = metadata["job-operation"]
-        assert job_op_metadata["job_id"] == job.id
-        assert job_op_metadata["name"] == operation_name
+        assert metadata["job_id"] == job.id
+        assert metadata["operation"] == operation_name
 
         if expected_stage != "prior" and job.sp.raise_exception:
             assert error_message in metadata["error"]
@@ -2689,7 +2673,7 @@ class TestHooksTrackOperationsNotStrict(TestHooksSetUp):
 
         assert job.isfile(self.log_fname)
         for filename in (None, self.log_fname):
-            metadata = self.get_log(job, filename)
+            metadata = self.get_log(job)
             # For the single operation
             # Each metadata whether file or document is one since they both
             # write to different places.

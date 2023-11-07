@@ -21,15 +21,17 @@ class TrackOperations:
     """:class:`~.TrackOperations` tracks information about the execution of operations to a logfile.
 
     This hook can provides information on the start, successful completion, and/or error of
-    one or more operations in a :class:`~.FlowProject` instance. The logs are stored either in the
-    job document or the file given by ``log_filename``. If stored in the job document, it uses
-    the key ``execution_history``. The file or document list will be appended to if it already
+    one or more operations in a :class:`~.FlowProject` instance. The logs are stored the file
+    given by ``log_filename`` within the job's path. The file  will be appended to if it already
     exists.
 
     The hooks stores metadata regarding the execution of the operation and the state of the
     project at the time of execution, error, and/or completion. The data will also include
     information about the git status if the project is detected as a git repo and
     ``GitPython`` is installed in the environment.
+
+    Each call to the hook adds a single JSON line to the log file. These can be
+    read using the `json` builtin package or `~.read_log`.
 
     Warning
     -------
@@ -42,6 +44,7 @@ class TrackOperations:
     - ``time``: The time of querying the metadata.
     - ``stage``: The stage of execution either "prior" or "after" both referring operation
       exectution.
+    - ``error``: The error message on executing the operation if any.
     - ``project``
       - ``path``: Filepath to the project
       - ``schema_version``: The project's schema version
@@ -54,8 +57,7 @@ class TrackOperations:
 
     Examples
     --------
-    The following example will install :class:`~.TrackOperations` at the operation level in the
-    the job document.
+    The following example will install :class:`~.TrackOperations` at the operation level.
 
     .. code-block:: python
 

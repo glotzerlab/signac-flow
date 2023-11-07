@@ -20,8 +20,6 @@ def collect_metadata(operation, job):
             # the project schema version:
             "schema_version": job.project.config.get("schema_version"),
         },
-        "job-operation": {
-            "name": operation,
-            "job_id": job.id,
-        },
+        "operation": operation,
+        "job_id": job.id,
     }

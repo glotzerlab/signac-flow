@@ -15,7 +15,9 @@ from pathlib import Path
 
 import define_hooks_test_project
 import define_hooks_track_operations_project
+import define_hooks_track_operations_strict_project
 import define_status_test_project
+import git
 import pytest
 import signac
 from conftest import MockScheduler, TestProjectBase
@@ -41,17 +43,6 @@ from flow.util.misc import (
     _add_path_to_environment_pythonpath,
     _switch_to_directory,
 )
-
-try:
-    import define_hooks_track_operations_strict_project
-    import git
-
-    skip_git = False
-except RuntimeError:
-    skip_git = True
-
-
-git_mark_skipif = pytest.mark.skipif(skip_git, reason="git could not be imported")
 
 
 @contextmanager
@@ -2600,10 +2591,7 @@ class TestHooksTrackOperationsNotStrict(TestHooksSetUp):
     def operation_info(self, request):
         return request.param
 
-    @pytest.fixture(
-        params=None if skip_git else (True, False),
-        ids=None if skip_git else ("git-dirty", "git-clean"),
-    )
+    @pytest.fixture(params=(True, False), ids=("git-dirty", "git-clean"))
     def git_repo(self, project, request):
         # params=None is equivalent to not passing a parameter which results in
         # result.param being unset.
@@ -2680,13 +2668,8 @@ class TestHooksTrackOperationsNotStrict(TestHooksSetUp):
         else:
             assert metadata["error"] is None
 
-        if repo is not None:
-            assert metadata["project"]["git"]["commit_id"] == str(repo.commit())
-            assert metadata["project"]["git"]["dirty"] == repo.is_dirty()
-        else:
-            if self.error_on_no_git:
-                # Should not happen in actual testing, here for developers.
-                assert False, "Expected gitpython for test."
+        assert metadata["project"]["git"]["commit_id"] == str(repo.commit())
+        assert metadata["project"]["git"]["dirty"] == repo.is_dirty()
 
     def test_metadata(self, project, job, operation_info, git_repo):
         operation_name, error_message = operation_info
@@ -2732,21 +2715,17 @@ class TestHooksTrackOperationsNotStrict(TestHooksSetUp):
                 )
 
 
-if not skip_git:
-
-    class TestHooksTrackOperationsStrict(TestHooksTrackOperationsNotStrict):
-        project_class = (
-            define_hooks_track_operations_strict_project._HooksTrackOperations
-        )
-        entrypoint = dict(
-            path=os.path.realpath(
-                os.path.join(
-                    os.path.dirname(__file__),
-                    "define_hooks_track_operations_strict_project.py",
-                )
+class TestHooksTrackOperationsStrict(TestHooksTrackOperationsNotStrict):
+    project_class = define_hooks_track_operations_strict_project._HooksTrackOperations
+    entrypoint = dict(
+        path=os.path.realpath(
+            os.path.join(
+                os.path.dirname(__file__),
+                "define_hooks_track_operations_strict_project.py",
             )
         )
-        error_on_no_git = True
+    )
+    error_on_no_git = True
 
 
 class TestIgnoreConditions:

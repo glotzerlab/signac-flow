@@ -36,8 +36,8 @@ class TrackOperations:
 
     Examples
     --------
-    The following example will install :class:`~.TrackOperations` at the operation level.
-    Where the log will be stored in the job document.
+    The following example will install :class:`~.TrackOperations` at the operation level in the
+    the job document.
 
     .. code-block:: python
 
@@ -148,8 +148,8 @@ class TrackOperations:
         Parameters
         ----------
         op : function or type
-            An operation function to log or a subclass of :class:`~.FlowProject` if ``project_cls`` is
-            ``None``.
+            An operation function to log or a subclass of :class:`~.FlowProject` if
+            ``project_cls`` is ``None``.
         project_cls : type
             A subclass of :class:`~.FlowProject`.
         """

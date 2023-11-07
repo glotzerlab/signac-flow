@@ -31,7 +31,7 @@ class TrackOperations:
     ``GitPython`` is installed in the environment.
 
     Each call to the hook adds a single JSON line to the log file. These can be
-    read using the `json` builtin package or :method:`~.read_log`.
+    read using the `json` builtin package or :meth:`~.TrackOperations.read_log`.
 
     The current schema has the following structure:
 

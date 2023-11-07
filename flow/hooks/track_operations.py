@@ -31,13 +31,7 @@ class TrackOperations:
     ``GitPython`` is installed in the environment.
 
     Each call to the hook adds a single JSON line to the log file. These can be
-    read using the `json` builtin package or `~.read_log`.
-
-    Warning
-    -------
-    This class will error on construction if GitPython is not available and ``strict_git`` is set
-    to ``True`` or if ``strict_git`` is ``True`` when executing an operation with uncommitted
-    changes.
+    read using the `json` builtin package or :method:`~.read_log`.
 
     The current schema has the following structure:
 
@@ -54,6 +48,13 @@ class TrackOperations:
       - ``commit_id``: The current commit of the project's git repo.
       - ``dirty``: Whether the project's repo has uncommitted changes or not.
     - ``_schema_version``: The metadata storage's schema version. Schema is currently in version 1.
+
+
+    Warning
+    -------
+    This class will error on construction if GitPython is not available and ``strict_git`` is set
+    to ``True`` or if ``strict_git`` is ``True`` when executing an operation with uncommitted
+    changes.
 
     Examples
     --------

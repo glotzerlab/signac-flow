@@ -17,8 +17,8 @@ else:
 class TrackOperations:
     """:class:`~.TrackOperations` tracks information about the execution of operations to a logfile.
 
-    This hooks can provides information on the start, successful completion, and/or erroring of
-    one or more operations in a `flow.FlowProject` instance. The logs are stored either in the
+    This hook can provides information on the start, successful completion, and/or error of
+    one or more operations in a :class:`~.FlowProject` instance. The logs are stored either in the
     job document or the file given by ``log_filename``. If stored in the job document, it uses
     the key ``execution_history``. The file or document list will be appended to if it already
     exists.
@@ -31,7 +31,7 @@ class TrackOperations:
     Warning
     -------
     This class will error on construction if GitPython is not available and ``strict_git`` is set
-    to ``True``. If ``strict_git`` is ``True`` trying to execute an operation with uncommitted
+    to ``True`` or if ``strict_git`` is ``True`` when executing an operation with uncommitted
     changes.
 
     Examples
@@ -40,6 +40,7 @@ class TrackOperations:
     Where the log will be stored in the job document.
 
     .. code-block:: python
+
         from flow import FlowProject
         from flow.hooks import TrackOperations
 
@@ -61,6 +62,7 @@ class TrackOperations:
     instance of :class:`~.FlowProject`
 
     .. code-block:: python
+
         from flow import FlowProject
         from flow.hooks import TrackOperations
 
@@ -77,11 +79,11 @@ class TrackOperations:
 
     Parameters
     ----------
-    log_filename: str, optional
-        The name of the log file in the job workspace. If ``None`` store in a list in the job
-        document in a key labeled ``f"{operation_name}"`` under the ``"execution_history"`` key.
+    log_filename : str, optional
+        The name of the log file in the job workspace. If ``None``, store in a list in the job
+        document in ``job.document["execution_history"][operation_name]``.
         Defaults to ``None``.
-    strict_git: bool, optional
+    strict_git : bool, optional
         Whether to fail if ``GitPython`` cannot be imported or if there are uncommitted changes
         to the project's git repo. Defaults to ``True``.
     """
@@ -98,7 +100,7 @@ class TrackOperations:
         self.strict_git = strict_git
 
     def _write_metadata(self, job, metadata):
-        print(f"Writing... {metadata}.", flush=True)
+        print(f"Writing {metadata}...", flush=True)
         if self.log_filename is None:
             history = job.doc.setdefault("execution_history", {})
             # No need to store job id or operation name.
@@ -146,10 +148,10 @@ class TrackOperations:
         Parameters
         ----------
         op : function or type
-            An operation function to log or a subclass of `flow.FlowProject` if ``project_cls`` is
+            An operation function to log or a subclass of :class:`~.FlowProject` if ``project_cls`` is
             ``None``.
         project_cls : type
-            A subclass of `flow.FlowProject`.
+            A subclass of :class:`~.FlowProject`.
         """
         if project_cls is None:
             return lambda func: self.install_operation_hooks(func, op)

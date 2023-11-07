@@ -10,12 +10,6 @@ def collect_metadata(operation, job):
 
     Returns a directory including schema version, time, project, and job-operation.
 
-    We can no longer track the following because we take in the operation name as a string rather
-    than as an object, but they provide useful information. We could try to perform introspection
-    of the project through the job later if desired to get these values.
-
-    - "cmd": operation.cmd,
-    - "directives": operation.directives,
     """
     return {
         # the metadata schema version:

@@ -40,13 +40,13 @@ class TrackOperations:
       exectution.
     - ``error``: The error message on executing the operation if any.
     - ``project``
-      - ``path``: Filepath to the project
-      - ``schema_version``: The project's schema version
+       - ``path``: Filepath to the project
+       - ``schema_version``: The project's schema version
     - ``operation``: The operation name
     - ``job_id``: The job id
     - ``git``
-      - ``commit_id``: The current commit of the project's git repo.
-      - ``dirty``: Whether the project's repo has uncommitted changes or not.
+       - ``commit_id``: The current commit of the project's git repo.
+       - ``dirty``: Whether the project's repo has uncommitted changes or not.
     - ``_schema_version``: The metadata storage's schema version. Schema is currently in version 1.
 
 

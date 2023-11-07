@@ -17,14 +17,12 @@ import socket
 from functools import lru_cache
 
 from .directives import (
-    _FORK,
     _GET_EXECUTABLE,
-    _MEMORY,
-    _NGPU,
-    _NP,
-    _NRANKS,
-    _OMP_NUM_THREADS,
-    _PROCESSOR_FRACTION,
+    _GPUS_PER_PROCESS,
+    _LAUNCHER,
+    _MEMORY_PER_CPU,
+    _PROCESSES,
+    _THREADS_PER_PROCESS,
     _WALLTIME,
     _Directives,
 )
@@ -439,13 +437,11 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
         return _Directives(
             (
                 _GET_EXECUTABLE(),
-                _FORK,
-                _MEMORY,
-                _NGPU,
-                _NP,
-                _NRANKS,
-                _OMP_NUM_THREADS,
-                _PROCESSOR_FRACTION,
+                _MEMORY_PER_CPU,
+                _GPUS_PER_PROCESS,
+                _PROCESSES,
+                _THREADS_PER_PROCESS,
+                _LAUNCHER,
                 _WALLTIME,
             )
         )

@@ -8,7 +8,6 @@ of processors required for an operation.
 """
 import datetime
 import functools
-import operator
 import sys
 from collections.abc import MutableMapping
 
@@ -18,13 +17,8 @@ from flow.errors import DirectivesError
 class _Directive:
     """The definition of a single directive.
 
-    Logic for validation of values when setting, defaults, and the ability
-    for directives to inspect other directives (such as using ``nranks`` and
-    ``omp_num_threads`` for computing ``np``). This is only meant to work
+    Logic for validation when setting and providing defaults. This is only meant to work
     with the internals of signac-flow.
-
-    The validation of a directive occurs before the call to ``finalize``. It is
-    the caller's responsibility to ensure that finalized values are still valid.
 
     Since directive values can be dependent on jobs we allow all directives to
     be set to a callable which is lazily validated.
@@ -40,23 +34,6 @@ class _Directive:
         callable directly returns the passed value. Defaults to ``None``.
     default : any, optional
         Sets the default for the directive, defaults to ``None``.
-    serial : callable, optional
-        A callable that takes two inputs for the directive and returns the
-        appropriate value for these operations running in serial. If ``None`` or
-        not provided, the ``max`` function is used. Defaults to ``None``.
-    parallel : callable, optional
-        A callable that takes two inputs for the directive and returns the
-        appropriate value for these operations running in parallel. If ``None``
-        or not provided, the ``operator.add`` function is used. Defaults to
-        ``None``.  Defaults to ``None``.
-    finalize : callable, optional
-        A callable that takes the set value of the directive and the
-        :class:`~._Directives` object it is a child of and outputs the finalized
-        value for that directive. This is useful if some directives have
-        multiple ways to be set or are dependent in some way on other
-        directives. If ``None`` or not provided, the set value is returned.
-        Defaults to ``None``.
-
     """
 
     def __init__(
@@ -65,23 +42,14 @@ class _Directive:
         *,
         validator=None,
         default=None,
-        serial=max,
-        parallel=operator.add,
-        finalize=None,
     ):
         self._name = name
         self._default = default
-        self._serial = serial
-        self._parallel = parallel
 
         def identity(value):
             return value
 
-        def default_finalize(value, directives):
-            return value
-
         self._validator = identity if validator is None else validator
-        self._finalize = default_finalize if finalize is None else finalize
 
     def __call__(self, value):
         """Return a validated value for the given directive.
@@ -157,7 +125,7 @@ class _Directives(MutableMapping):
     def __getitem__(self, key):
         if key in self._defined_directives and key in self._directive_definitions:
             value = self._defined_directives[key]
-            return self._directive_definitions[key]._finalize(value, self)
+            return value
         if key in self._user_directives:
             return self._user_directives[key]
         raise KeyError(f"{key} not in directives.")
@@ -188,28 +156,6 @@ class _Directives(MutableMapping):
     def __repr__(self):
         return f"_Directives({str(self)})"
 
-    def update(self, other, aggregate=False, jobs=None, parallel=False):
-        """Update directives with another set of directives.
-
-        This method accounts for serial/parallel behavior and aggregation.
-
-        Parameters
-        ----------
-        other : :class:`~._Directives`
-            The other set of directives.
-        aggregate : bool
-            Whether to combine directives according to serial/parallel rules.
-        jobs : :class:`signac.job.Job` or tuple of :class:`signac.job.Job`
-            The jobs used to evaluate directives.
-        parallel : bool
-            Whether to aggregate according to parallel rules.
-
-        """
-        if aggregate:
-            self._aggregate(other, jobs=jobs, parallel=parallel)
-        else:
-            super().update(other)
-
     def evaluate(self, jobs):
         """Evaluate directives for the provided jobs.
 
@@ -226,18 +172,6 @@ class _Directives(MutableMapping):
             for key, value in self.items():
                 self[key] = _evaluate(value, jobs)
             self._evaluated = True
-
-    def _aggregate(self, other, jobs=None, parallel=False):
-        self.evaluate(jobs)
-        other.evaluate(jobs)
-        agg_func_attr = "_parallel" if parallel else "_serial"
-        for name in self._defined_directives:
-            agg_func = getattr(self._directive_definitions[name], agg_func_attr)
-            default_value = self._directive_definitions[name]._default
-            other_directive = other.get(name, default_value)
-            directive = self[name]
-            if other_directive is not None:
-                self._defined_directives[name] = agg_func(directive, other_directive)
 
     @property
     def user_keys(self):  # noqa: D401
@@ -295,36 +229,6 @@ def _raise_below(threshold, allow_none=False):
         return value
 
     return is_greater_or_equal
-
-
-_NP_DEFAULT = 1
-
-
-def _finalize_np(np, directives):
-    """Return the actual number of processes/threads to use.
-
-    We check the default np because when aggregation occurs we multiply the
-    number of MPI ranks and OMP_NUM_THREADS. If we always took the greater of
-    the given NP and ranks * threads then after aggregating we will inflate the
-    number of processors needed as (r1 * t1) + (r2 * t2) <= (r1 + r2) * (t1 + t2)
-    for numbers greater than one.
-    """
-    if callable(np) or np != _NP_DEFAULT:
-        return np
-    nranks = directives.get("nranks", 1)
-    omp_num_threads = directives.get("omp_num_threads", 1)
-    if callable(nranks) or callable(omp_num_threads):
-        return np
-    return max(np, max(1, nranks) * max(1, omp_num_threads))
-
-
-# Helper validators for defining _Directive
-def _no_aggregation(value, other):
-    """Return the first argument.
-
-    This is used for directives that ignore aggregation rules.
-    """
-    return value
 
 
 def _is_fraction(value):
@@ -401,40 +305,7 @@ def _parse_memory(memory):
         )
 
 
-def _max_not_none(value, other):
-    """Return the max of two values, with special handling of None.
-
-    This is used for memory directives in serial and walltime directives in
-    parallel.
-    """
-    if value is None and other is None:
-        return None
-    elif other is None:
-        return value
-    elif value is None:
-        return other
-    else:
-        return max(value, other)
-
-
-def _sum_not_none(value, other):
-    """Return the sum of two values, with special handling of None.
-
-    This is used for memory directives in parallel and walltime directives in
-    serial.
-    """
-    if value is None and other is None:
-        return None
-    elif other is None:
-        return value
-    elif value is None:
-        return other
-    else:
-        return operator.add(value, other)
-
-
 # Definitions used for validating directives
-_bool = _OnlyTypes(bool)
 _natural_number = _OnlyTypes(int, postprocess=_raise_below(1))
 _nonnegative_int = _OnlyTypes(int, postprocess=_raise_below(0))
 _positive_real_walltime = _OnlyTypes(
@@ -461,10 +332,8 @@ def _GET_EXECUTABLE():
     # This is because we mock `sys.executable` while generating template reference data.
     _EXECUTABLE = _Directive(
         "executable",
-        validator=_OnlyTypes(str),
+        validator=_OnlyTypes(str, type(None)),
         default=sys.executable,
-        serial=_no_aggregation,
-        parallel=_no_aggregation,
     )
     _EXECUTABLE.__doc__ = """Return the path to the executable to be used for an operation.
 
@@ -478,25 +347,27 @@ can be a path to an executable Python script. Defaults to ``sys.executable``.
     return _EXECUTABLE
 
 
-_FORK = _Directive("fork", validator=_bool, default=False)
-_FORK.__doc__ = """The fork directive can be set to True to enforce that a
-particular operation is always executed within a subprocess and not within the
-Python interpreter's process even if there are no other reasons that would prevent that.
+_LAUNCHER = _Directive("launcher", validator=_OnlyTypes(str, type(None)), default=None)
+_LAUNCHER.__doc__ = """The launcher to use to execute this operation.
 
-.. note::
+A launcher is defined as a separate program used to launch an application.
+Primarily this is designed to specify whether or not MPI should be used to
+launch the operation. Set to "mpi" for this case. Defaults to ``None``.
 
-    Setting ``fork=False`` will not prevent forking if there are other reasons for forking,
-    such as a timeout.
+For example:
+
+.. code-block:: python
+
+    @Project.operation(directives={"launcher": "mpi"})
+    def op(job):
+        pass
 """
 
-_MEMORY = _Directive(
-    "memory",
-    validator=_positive_real_memory,
-    default=None,
-    serial=_max_not_none,
-    parallel=_sum_not_none,
+
+_MEMORY_PER_CPU = _Directive(
+    "memory_per_cpu", validator=_positive_real_memory, default=None
 )
-_MEMORY.__doc__ = """The memory to request for this operation.
+_MEMORY_PER_CPU.__doc__ = """The memory to request per CPU for this operation.
 
 The memory to validate should be either a float, int, or string.
 A valid memory argument is defined as:
@@ -536,36 +407,24 @@ For example:
         pass
 """
 
-_NGPU = _Directive("ngpu", validator=_nonnegative_int, default=0)
-_NGPU.__doc__ = """The number of GPUs to use for this operation.
+_GPUS_PER_PROCESS = _Directive(
+    "gpus_per_process", validator=_nonnegative_int, default=0
+)
+_GPUS_PER_PROCESS.__doc__ = """The number of GPUs to use per process.
 
 Expects a nonnegative integer. Defaults to 0.
 """
 
-_NP = _Directive(
-    "np", validator=_natural_number, default=_NP_DEFAULT, finalize=_finalize_np
+_PROCESSES = _Directive("processes", validator=_natural_number, default=1)
+_PROCESSES.__doc__ = """The number of processes the operation plans on using.
+
+Expects a natural number (i.e. an integer >= 1). Defualts to 1.
+"""
+
+_THREADS_PER_PROCESS = _Directive(
+    "threads_per_process", validator=_nonnegative_int, default=0
 )
-_NP.__doc__ = """The total number of CPU cores to request for a given operation.
-
-Expects a natural number (i.e. an integer >= 1). This directive introspects into
-the "nranks" or "omp_num_threads" directives and uses their product if it is
-greater than the current set value. Defaults to 1.
-
-Warning:
-    Generally for multicore applications, either this if not using MPI, or "nranks" and
-    "omp_num_threads" should be specified but not both.
-"""
-
-_NRANKS = _Directive("nranks", validator=_nonnegative_int, default=0)
-_NRANKS.__doc__ = """The number of MPI ranks to use for this operation. Defaults to 0.
-
-Expects a nonnegative integer.
-"""
-
-_OMP_NUM_THREADS = _Directive("omp_num_threads", validator=_nonnegative_int, default=0)
-_OMP_NUM_THREADS.__doc__ = """The number of OpenMP threads to use for this operation. Defaults to 0.
-
-When used in conjunction with "nranks" this specifies the OpenMP threads per rank.
+_THREADS_PER_PROCESS.__doc__ = """The number of threads to use per process. Defaults to 0.
 
 Using this directive sets the environmental variable ``OMP_NUM_THREADS`` in the operation's
 execution environment.
@@ -573,30 +432,7 @@ execution environment.
 Expects a nonnegative integer.
 """
 
-_PROCESSOR_FRACTION = _Directive(
-    "processor_fraction",
-    validator=_OnlyTypes(float, postprocess=_is_fraction),
-    default=1.0,
-    serial=_no_aggregation,
-    parallel=_no_aggregation,
-)
-_PROCESSOR_FRACTION.__doc__ = """Fraction of a resource to use on a single operation.
-
-If set to 0.5 for a bundled job with 20 operations (all with 'np' set to 1), 10
-CPUs will be used. Defaults to 1.
-
-.. note::
-
-    This can be particularly useful on Stampede2's launcher.
-"""
-
-_WALLTIME = _Directive(
-    "walltime",
-    validator=_positive_real_walltime,
-    default=None,
-    serial=_sum_not_none,
-    parallel=_max_not_none,
-)
+_WALLTIME = _Directive("walltime", validator=_positive_real_walltime, default=None)
 _WALLTIME.__doc__ = """The number of hours to request for executing this job.
 
 This directive expects a float representing the walltime in hours. Fractional

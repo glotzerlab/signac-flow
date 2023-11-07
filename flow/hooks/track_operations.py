@@ -37,6 +37,21 @@ class TrackOperations:
     to ``True`` or if ``strict_git`` is ``True`` when executing an operation with uncommitted
     changes.
 
+    The current schema has the following structure:
+
+    - ``time``: The time of querying the metadata.
+    - ``stage``: The stage of execution either "prior" or "after" both referring operation
+      exectution.
+    - ``project``
+      - ``path``: Filepath to the project
+      - ``schema_version``: The project's schema version
+    - ``operation``: The operation name
+    - ``job_id``: The job id
+    - ``git``
+      - ``commit_id``: The current commit of the project's git repo.
+      - ``dirty``: Whether the project's repo has uncommitted changes or not.
+    - ``_schema_version``: The metadata storage's schema version. Schema is currently in version 1.
+
     Examples
     --------
     The following example will install :class:`~.TrackOperations` at the operation level in the

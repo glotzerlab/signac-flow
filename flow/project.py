@@ -277,22 +277,18 @@ def _make_bundles(operations, size=None):
 
 
 class _JobOperation:
-    """Class containing execution information for one group and one job.
+    """Class containing execution or submission information for one group and one aggregate.
 
-    The execution or submission of a :class:`~.FlowGroup` uses a passed-in command
-    which can either be a string or function with no arguments that returns a shell
-    executable command. The shell executable command won't be used if it is
-    determined that the group can be executed without forking.
+    The class serves as a helper class to :class:`~._RunOperation` and
+    :class:`~._SubmissionOperation`.
 
-    .. note::
-
-        This class is used by the :class:`~.FlowGroup` class for the execution and
-        submission process and should not be instantiated by users themselves.
+    Note
+    ----
+    This class and subclasses are used by the :class:`~.FlowGroup` class for the execution and
+    submission process and should not be instantiated by users themselves.
 
     Parameters
     ----------
-    id : str
-        The id of this _JobOperation instance. The id should be unique.
     name : str
         The name of the _JobOperation.
     jobs : tuple of :class:`~signac.job.Job`
@@ -300,56 +296,26 @@ class _JobOperation:
     cmd : callable or str
         The command that executes this operation. Can be a callable that when
         evaluated returns a string.
-    directives : dict
-        A `dict` object of additional parameters that provide instructions on
-        how to execute this operation, e.g., specifically required resources.
-    user_directives : set
-        Keys in ``directives`` that correspond to user-specified directives
-        that are not part of the environment's standard directives.
     """
 
-    def __init__(self, id, name, jobs, cmd, directives, user_directives):
-        self._id = id
+    def __init__(self, name, jobs, cmd):
         self.name = name
         self._jobs = jobs
         if not (callable(cmd) or isinstance(cmd, str)):
             raise ValueError("cmd must be a callable or string.")
         self._cmd = cmd
 
-        # We use a special dictionary that tracks all keys that have been
-        # evaluated by the template engine and compare them to those explicitly
-        # set by the user. See also comment below.
-        self.directives = _TrackGetItemDict(directives)
-
-        # Keys which were explicitly set by the user, but are not evaluated by
-        # the template engine are cause for concern and might hint at a bug in
-        # the template script or ill-defined directives. We are therefore
-        # keeping track of all keys set by the user and check whether they have
-        # been evaluated by the template script engine later.
-        self.directives._keys_set_by_user = user_directives
-
     def __str__(self):
         aggregate_id = get_aggregate_id(self._jobs)
         return f"{self.name}({aggregate_id})"
 
     def __repr__(self):
-        return "{type}(name='{name}', jobs='{jobs}', cmd={cmd}, directives={directives})".format(
+        return "{type}(name='{name}', jobs='{jobs}', cmd={cmd})".format(
             type=type(self).__name__,
             name=self.name,
             jobs="(" + ", ".join(map(repr, self._jobs)) + ")",
             cmd=repr(self.cmd),
-            directives=self.directives,
         )
-
-    def __hash__(self):
-        return hash(self.id)
-
-    def __eq__(self, other):
-        return self.id == other.id
-
-    @property
-    def id(self):
-        return self._id
 
     @property
     def cmd(self):
@@ -364,8 +330,49 @@ class _JobOperation:
         return self._cmd
 
 
+class _RunOperation(_JobOperation):
+    """Class containing execution information for one operation and one aggregate.
+
+    The execution of a :class:`~.FlowOperation` uses a passed-in command
+    which can either be a string or function with no arguments that returns a shell
+    executable command. The shell executable command won't be used if it is
+    determined that the group can be executed without forking.
+
+    .. note::
+
+        This class is used by the :class:`~.FlowGroup` class for the execution
+        process and should not be instantiated by users themselves.
+
+    Parameters
+    ----------
+    name : str
+        The name of the _JobOperation.
+    jobs : tuple of :class:`~signac.job.Job`
+        The jobs associated with this operation.
+    cmd : callable or str
+        The command that executes this operation. Can be a callable that when
+        evaluated returns a string.
+    fork : bool
+        Whether the operation needs to fork to execute correctly. See
+        :meth:`FlowGroup._fork_op` for logic.
+    """
+
+    def __init__(self, name, jobs, cmd, fork):
+        super().__init__(name, jobs, cmd)
+        self.fork = fork
+
+    def __repr__(self):
+        return "{type}(name='{name}', jobs='{jobs}', cmd={cmd}, fork={fork})".format(
+            type=type(self).__name__,
+            name=self.name,
+            jobs="(" + ", ".join(map(repr, self._jobs)) + ")",
+            cmd=repr(self.cmd),
+            fork=self.fork,
+        )
+
+
 class _SubmissionJobOperation(_JobOperation):
-    r"""Class containing submission information for one group and one job.
+    r"""Class containing submission information for one group and one aggregate.
 
     This class extends :class:`_JobOperation` to include a set of groups
     that will be executed via the "run" command. These groups are known at
@@ -373,8 +380,15 @@ class _SubmissionJobOperation(_JobOperation):
 
     Parameters
     ----------
-    \*args
-        Passed to the constructor of :class:`_JobOperation`.
+    name : str
+        The name of the _JobOperation.
+    jobs : tuple of :class:`~signac.job.Job`
+        The jobs associated with this operation.
+    cmd : callable or str
+        The command that executes this operation. Can be a callable that when
+        evaluated returns a string.
+    directives_list : list[dict[str, any]]
+        List of directives for each operation in the flow group.
     eligible_operations : list
         A list of :class:`_JobOperation` that will be executed when this
         submitted job is executed.
@@ -394,13 +408,20 @@ class _SubmissionJobOperation(_JobOperation):
 
     def __init__(
         self,
-        *args,
+        name,
+        job,
+        cmd,
+        id,
+        directives_list,
         eligible_operations=None,
         operations_with_unmet_preconditions=None,
         operations_with_met_postconditions=None,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
+        super().__init__(name, job, cmd)
+        self._id = id
+        # Will need to handle user directives somehow.
+        self.directives_list = directives_list
 
         if eligible_operations is None:
             eligible_operations = []
@@ -413,6 +434,10 @@ class _SubmissionJobOperation(_JobOperation):
         if operations_with_met_postconditions is None:
             operations_with_met_postconditions = []
         self.operations_with_met_postconditions = operations_with_met_postconditions
+
+    @property
+    def id(self):
+        return self._id
 
 
 class _FlowCondition:
@@ -825,6 +850,16 @@ class FlowGroup:
         return "{} {}".format(entrypoint["executable"], entrypoint["path"]).lstrip()
 
     def _resolve_directives(self, name, defaults, env):
+        """Resolve a single operation's directives.
+
+        Search for the operation in ``operation_directives`` first and if not
+        there use provided default if any.
+
+        Note
+        ----
+        Any unevaluated function directives will remain unevaluated, and must be
+        called before use.
+        """
         all_directives = env._get_default_directives()
         if name in self.operation_directives:
             all_directives.update(self.operation_directives[name])
@@ -841,12 +876,14 @@ class FlowGroup:
             options += " --ignore-conditions=" + str(ignore_conditions)
         return " ".join((cmd, options)).strip()
 
-    def _run_cmd(self, entrypoint, operation_name, operation, directives, jobs):
+    def _run_cmd(
+        self, entrypoint, operation_name, operation, directives, jobs, environment
+    ):
         if isinstance(operation, FlowCmdOperation):
             return operation(*jobs).lstrip()
         entrypoint = self._determine_entrypoint(entrypoint, directives, jobs)
         cmd = f"{entrypoint} exec {operation_name} {get_aggregate_id(jobs)} {self.run_options}"
-        return cmd.strip()
+        return (environment.get_prefix(directives) + cmd).strip()
 
     def __iter__(self):
         yield from self.operations.values()
@@ -1076,18 +1113,16 @@ class FlowGroup:
             eligible_operations, IgnoreConditions.POST
         )
 
-        submission_job_operation = _SubmissionJobOperation(
-            self._generate_id(jobs),
+        return _SubmissionJobOperation(
             self.name,
             jobs,
             cmd=unevaluated_cmd,
-            directives=dict(submission_directives),
-            user_directives=set(submission_directives.user_keys),
+            id=self._generate_id(jobs),
+            directives=submission_directives,
             eligible_operations=eligible_operations,
             operations_with_unmet_preconditions=operations_with_unmet_preconditions,
             operations_with_met_postconditions=operations_with_met_postconditions,
         )
-        return submission_job_operation
 
     def _create_run_job_operations(
         self,
@@ -1119,8 +1154,8 @@ class FlowGroup:
 
         Returns
         -------
-        Iterator[_JobOperation]
-            Iterator of eligible instances of :class:`~._JobOperation`.
+        Iterator[_RunOperation]
+            Iterator of eligible instances of :class:`~._RunOperation`.
 
         """
         # Assuming all the jobs belong to the same FlowProject
@@ -1129,8 +1164,7 @@ class FlowGroup:
             if operation._eligible(jobs, ignore_conditions):
                 directives = self._resolve_directives(
                     operation_name, default_directives, env
-                )
-                directives.evaluate(jobs)
+                ).evaluate(jobs)
                 # Return an unevaluated command to make evaluation lazy and
                 # reduce side effects in callable FlowCmdOperations.
                 unevaluated_cmd = _cached_partial(
@@ -1140,46 +1174,51 @@ class FlowGroup:
                     operation=operation,
                     directives=directives,
                     jobs=jobs,
+                    environment=env,
                 )
-                job_op = _JobOperation(
-                    self._generate_id(jobs, operation_name),
+                yield _RunOperation(
                     operation_name,
                     jobs,
                     cmd=unevaluated_cmd,
-                    directives=dict(directives),
-                    user_directives=set(directives.user_keys),
+                    fork=self._fork_op(directives),
                 )
-                # Get the prefix, and if it's non-empty, set the fork directive
-                # to True since we must launch a separate process. Override
-                # the command directly.
-                prefix = jobs[0]._project._environment.get_prefix(job_op)
-                if prefix != "" or self.run_options != "":
-                    job_op.directives["fork"] = True
-                    job_op._cmd = f"{prefix} {job_op.cmd}"
-                yield job_op
+
+    @staticmethod
+    def _fork_op(directives):
+        # TODO: note that since we use threads_per_process and not specifically
+        # omp_num_threads, we don't necessarily need to fork when setting
+        # threads_per_process, however, to correctly use OMP we do. Perhaps this
+        # is an argument for an omp directive. Otherwise, we need to fork here
+        # if that is set which we currently don't.
+        return (
+            directives["executable"] != sys.executable
+            or directives["launcher"] is not None
+        )
 
     def _get_submission_directives(self, default_directives, jobs):
-        """Get the combined resources for submission.
+        """Get the resolved and evaluated resources for submission.
 
         No checks are done to mitigate inappropriate aggregation of operations.
         This can lead to poor utilization of computing resources.
         """
         env = jobs[0]._project._environment
         operation_names = list(self.operations.keys())
-        # The first operation's directives are evaluated, then all other
-        # operations' directives are applied as updates with aggregate=True
-        directives = self._resolve_directives(
-            operation_names[0], default_directives, env
-        )
-        directives.evaluate(jobs)
-        for name in operation_names[1:]:
-            # get directives for operation
-            directives.update(
-                self._resolve_directives(name, default_directives, env),
-                aggregate=True,
-                jobs=jobs,
+        return [
+            self._directives_to_track_dict(
+                self._resolve_directives(name, default_directives, env).evaluate(jobs),
+                set(env._get_default_directives().keys()),
             )
-        return directives
+            for name in operation_names
+        ]
+
+    def _directives_to_track_dict(directives, internal_keys):
+        """Convert evaluated directives to tracking dictionaries.
+
+        Excludes environment/internal keys from tracking.
+        """
+        dict_ = _TrackGetItemDict(**directives)
+        dict_._keys_used = internal_keys
+        return dict_
 
 
 class _FlowProjectClass(type):
@@ -3348,21 +3387,18 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         """Indicates a pickling error while trying to parallelize the execution of operations."""
 
     @staticmethod
-    def _job_operation_to_tuple(operation):
+    def _run_operation_to_tuple(operation):
         return (
-            operation.id,
             operation.name,
             [job.id for job in operation._jobs],
             operation.cmd,
-            operation.directives,
+            operation.fork,
         )
 
-    def _job_operation_from_tuple(self, data):
-        id, name, job_ids, cmd, directives = data
+    def _run_operation_from_tuple(self, data):
+        name, job_ids, cmd, fork = data
         jobs = tuple(self.open_job(id=job_id) for job_id in job_ids)
-        return _JobOperation(
-            id, name, jobs, cmd, directives, directives._keys_set_by_user
-        )
+        return _RunOperation(name, jobs, cmd, fork)
 
     def _run_operations_in_parallel(self, pool, operations, progress, timeout):
         """Execute operations in parallel.
@@ -3394,7 +3430,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
                 (
                     cloudpickle.loads,
                     serialized_project,
-                    self._job_operation_to_tuple(operation),
+                    self._run_operation_to_tuple(operation),
                 )
                 for operation in tqdm(
                     operations, desc="Serialize tasks", file=sys.stderr
@@ -3466,14 +3502,11 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
 
         # Check if we need to fork for operation execution...
         if (
-            # The 'fork' directive was provided and evaluates to True:
-            operation.directives.get("fork", False)
+            operation.fork
             # A separate process is needed to cancel with timeout:
             or timeout is not None
             # The operation function is an instance of FlowCmdOperation:
             or isinstance(self._operations[operation.name], FlowCmdOperation)
-            # The specified executable is not the same as the interpreter instance:
-            or operation.directives.get("executable", sys.executable) != sys.executable
         ):
             # ... need to fork:
             logger.debug(
@@ -4075,10 +4108,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
             keys_unused = {
                 key
                 for op in operations
-                for key in op.directives._keys_set_by_user.difference(
-                    op.directives.keys_used
-                )
-                if key not in ("fork", "nranks", "omp_num_threads")  # ignore list
+                for key in op.directives.keys() - op.directives.keys_used
             }
             if keys_unused:
                 logger.warning(
@@ -5195,7 +5225,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
 
 def _deserialize_and_run_operation(loads, project, operation_data):
     project = loads(project)
-    project._execute_operation(project._job_operation_from_tuple(operation_data))
+    project._execute_operation(project._run_operation_from_tuple(operation_data))
     return None
 
 

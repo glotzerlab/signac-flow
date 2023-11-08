@@ -353,12 +353,12 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
         pass
 
     @classmethod
-    def _get_omp_prefix(cls, operation):
+    def _get_omp_prefix(cls, directives):
         """Get the OpenMP prefix based on the ``omp_num_threads`` directive.
 
         Parameters
         ----------
-        operation : :class:`flow.project._JobOperation`
+        directives : dict[str, any]
             The operation to be prefixed.
 
         Returns
@@ -367,22 +367,16 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
             The prefix to be added to the operation's command.
 
         """
-        return "export OMP_NUM_THREADS={}; ".format(
-            operation.directives["omp_num_threads"]
-        )
+        return "export OMP_NUM_THREADS={}; ".format(directives["omp_num_threads"])
 
     @classmethod
-    def _get_mpi_prefix(cls, operation, parallel):
+    def _get_mpi_prefix(cls, directives):
         """Get the MPI prefix based on the ``nranks`` directives.
 
         Parameters
         ----------
-        operation : :class:`flow.project._JobOperation`
+        directives : dict[str, any]
             The operation to be prefixed.
-        parallel : bool
-            If True, operations are assumed to be executed in parallel, which
-            means that the number of total tasks is the sum of all tasks
-            instead of the maximum number of tasks. Default is set to False.
 
         Returns
         -------
@@ -390,28 +384,18 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
             The prefix to be added to the operation's command.
 
         """
-        if operation.directives.get("nranks"):
-            return "{} -n {} ".format(cls.mpi_cmd, operation.directives["nranks"])
+        if directives.get("nranks"):
+            return "{} -n {} ".format(cls.mpi_cmd, directives["nranks"])
         return ""
 
     @template_filter
-    def get_prefix(cls, operation, parallel=False, mpi_prefix=None, cmd_prefix=None):
+    def get_prefix(cls, directives):
         """Template filter generating a command prefix from directives.
 
         Parameters
         ----------
         operation : :class:`flow.project._JobOperation`
             The operation to be prefixed.
-        parallel : bool
-            If True, operations are assumed to be executed in parallel, which means
-            that the number of total tasks is the sum of all tasks instead of the
-            maximum number of tasks. Default is set to False.
-        mpi_prefix : str
-            User defined mpi_prefix string. Default is set to None.
-            This will be deprecated and removed in the future.
-        cmd_prefix : str
-            User defined cmd_prefix string. Default is set to None.
-            This will be deprecated and removed in the future.
 
         Returns
         -------
@@ -420,16 +404,9 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
 
         """
         prefix = ""
-        if operation.directives.get("omp_num_threads"):
-            prefix += cls._get_omp_prefix(operation)
-        if mpi_prefix:
-            prefix += mpi_prefix
-        else:
-            prefix += cls._get_mpi_prefix(operation, parallel)
-        if cmd_prefix:
-            prefix += cmd_prefix
-        # if cmd_prefix and if mpi_prefix for backwards compatibility
-        # Can change to get them from directives for future
+        if directives.get("omp_num_threads"):
+            prefix += cls._get_omp_prefix(directives)
+        prefix += cls._get_mpi_prefix(directives)
         return prefix
 
     @classmethod

@@ -51,13 +51,9 @@ def op1(job):
     return f'echo "hello" > {job.path}/world.txt'
 
 
-def _need_to_fork(job):
-    return job.doc.get("fork")
-
-
 @group1
 @_TestProject.post.true("test")
-@_TestProject.operation(directives={"fork": _need_to_fork})
+@_TestProject.operation
 def op2(job):
     job.document.test = os.getpid()
 

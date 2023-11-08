@@ -1109,21 +1109,6 @@ class TestExecutionProject(TestProjectBase):
             good_ops = all_ops.difference(bad_ops)
             assert all([job.doc.get(op, False) for op in good_ops for job in project])
 
-    def test_run_fork(self):
-        project = self.mock_project()
-        for job in project:
-            job.doc.fork = True
-            break
-
-        with setup_project_subprocess_execution(project):
-            project.run()
-
-        for job in project:
-            if job.doc.get("fork"):
-                assert os.getpid() != job.doc.test
-            else:
-                assert os.getpid() == job.doc.test
-
     def test_run_invalid_ops(self):
         class A(FlowProject):
             pass

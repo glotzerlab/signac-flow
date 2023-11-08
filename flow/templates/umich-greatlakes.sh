@@ -1,8 +1,6 @@
 {% extends "slurm.sh" %}
 {% set partition = partition|default('standard', true) %}
-{% if not (force or operations|homogeneous_openmp_mpi_config) %}
-    {% raise "Can only submit jobs with identical nranks and omp_num_threads" %}
-{% endif %}
+{% set nranks = (operations|calc_tasks("nranks", parallel, force), 1) | max %}
 {% block tasks %}
     {% if resources.ngpu_tasks and 'gpu' not in partition and not force %}
         {% raise "Requesting GPUs requires a gpu partition!" %}
@@ -11,10 +9,10 @@
         {% raise "Requesting gpu partition without GPUs!" %}
     {% endif %}
 #SBATCH --nodes={{ resources.num_nodes }}-{{ resources.num_nodes }}
-#SBATCH --ntasks={{ resources.nranks }}
-#SBATCH --cpus-per-task={{ resources.ncpu_tasks // resources.nranks}}
+#SBATCH --ntasks={{ nranks }}
+#SBATCH --cpus-per-task={{ resources.ncpu_tasks // nranks}}
     {% if partition == 'gpu' %}
-#SBATCH --gpus-per-task={{ resources.ngpu_tasks // resources.nranks }}
+#SBATCH --gpus-per-task={{ resources.ngpu_tasks // nranks }}
     {% endif %}
 {% endblock tasks %}
 {% block header %}

@@ -1,5 +1,8 @@
 {% extends "slurm.sh" %}
 {% set partition = partition|default('standard', true) %}
+{% if not (force or operations|homogeneous_openmp_mpi_config) %}
+    {% raise "Can only submit jobs with identical nranks and omp_num_threads" %}
+{% endif %}
 {% block tasks %}
     {% if resources.ngpu_tasks and 'gpu' not in partition and not force %}
         {% raise "Requesting GPUs requires a gpu partition!" %}

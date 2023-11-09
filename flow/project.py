@@ -289,6 +289,9 @@ class _JobOperation:
 
     Parameters
     ----------
+    id : str
+        Unique id for the execution or submission unit. The id is needed for
+        execution counting in running and unique scheduler ids in submission.
     name : str
         The name of the _JobOperation.
     jobs : tuple of :class:`~signac.job.Job`
@@ -298,7 +301,8 @@ class _JobOperation:
         evaluated returns a string.
     """
 
-    def __init__(self, name, jobs, cmd):
+    def __init__(self, id, name, jobs, cmd):
+        self._id = id
         self.name = name
         self._jobs = jobs
         if not (callable(cmd) or isinstance(cmd, str)):
@@ -329,6 +333,16 @@ class _JobOperation:
             return self._cmd()
         return self._cmd
 
+    @property
+    def id(self):
+        return self._id
+
+    def __hash__(self):
+        return hash(self._id)
+
+    def __eq__(self, other):
+        return self.id == other.id
+
 
 class _RunOperation(_JobOperation):
     """Class containing execution information for one operation and one aggregate.
@@ -345,6 +359,8 @@ class _RunOperation(_JobOperation):
 
     Parameters
     ----------
+    id : str
+        Unique id for the execution unit.
     name : str
         The name of the _JobOperation.
     jobs : tuple of :class:`~signac.job.Job`
@@ -357,8 +373,8 @@ class _RunOperation(_JobOperation):
         :meth:`FlowGroup._fork_op` for logic.
     """
 
-    def __init__(self, name, jobs, cmd, fork):
-        super().__init__(name, jobs, cmd)
+    def __init__(self, id, name, jobs, cmd, fork):
+        super().__init__(id, name, jobs, cmd)
         self.fork = fork
 
     def __repr__(self):
@@ -380,6 +396,8 @@ class _SubmissionJobOperation(_JobOperation):
 
     Parameters
     ----------
+    id : str
+        Unique id for the submission unit.
     name : str
         The name of the _JobOperation.
     jobs : tuple of :class:`~signac.job.Job`
@@ -408,18 +426,17 @@ class _SubmissionJobOperation(_JobOperation):
 
     def __init__(
         self,
+        id,
         name,
         job,
         cmd,
-        id,
         directives_list,
         eligible_operations=None,
         operations_with_unmet_preconditions=None,
         operations_with_met_postconditions=None,
         **kwargs,
     ):
-        super().__init__(name, job, cmd)
-        self._id = id
+        super().__init__(id, name, job, cmd)
         # Will need to handle user directives somehow.
         self.directives_list = directives_list
 
@@ -434,10 +451,6 @@ class _SubmissionJobOperation(_JobOperation):
         if operations_with_met_postconditions is None:
             operations_with_met_postconditions = []
         self.operations_with_met_postconditions = operations_with_met_postconditions
-
-    @property
-    def id(self):
-        return self._id
 
 
 class _FlowCondition:
@@ -1114,10 +1127,10 @@ class FlowGroup:
         )
 
         return _SubmissionJobOperation(
-            self.name,
-            jobs,
-            cmd=unevaluated_cmd,
             id=self._generate_id(jobs),
+            name=self.name,
+            jobs=jobs,
+            cmd=unevaluated_cmd,
             directives=submission_directives,
             eligible_operations=eligible_operations,
             operations_with_unmet_preconditions=operations_with_unmet_preconditions,
@@ -1177,21 +1190,22 @@ class FlowGroup:
                     environment=env,
                 )
                 yield _RunOperation(
+                    self._generate_id(jobs, operation_name),
                     operation_name,
                     jobs,
                     cmd=unevaluated_cmd,
                     fork=self._fork_op(directives),
                 )
 
-    @staticmethod
-    def _fork_op(directives):
+    def _fork_op(self, directives):
         # TODO: note that since we use threads_per_process and not specifically
         # omp_num_threads, we don't necessarily need to fork when setting
         # threads_per_process, however, to correctly use OMP we do. Perhaps this
         # is an argument for an omp directive. Otherwise, we need to fork here
         # if that is set which we currently don't.
         return (
-            directives["executable"] != sys.executable
+            len(self.run_options) > 0
+            or directives["executable"] != sys.executable
             or directives["launcher"] is not None
         )
 
@@ -3389,6 +3403,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
     @staticmethod
     def _run_operation_to_tuple(operation):
         return (
+            operation.id,
             operation.name,
             [job.id for job in operation._jobs],
             operation.cmd,
@@ -3396,9 +3411,9 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         )
 
     def _run_operation_from_tuple(self, data):
-        name, job_ids, cmd, fork = data
+        id_, name, job_ids, cmd, fork = data
         jobs = tuple(self.open_job(id=job_id) for job_id in job_ids)
-        return _RunOperation(name, jobs, cmd, fork)
+        return _RunOperation(id_, name, jobs, cmd, fork)
 
     def _run_operations_in_parallel(self, pool, operations, progress, timeout):
         """Execute operations in parallel.

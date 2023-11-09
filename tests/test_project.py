@@ -1878,7 +1878,7 @@ class TestGroupProject(TestProjectBase):
             )
         )
         assert all(" --debug" in op.cmd for op in run_ops)
-        assert all(op.directives["fork"] for op in run_ops)
+        assert all(op.fork for op in run_ops)
 
 
 class TestGroupExecutionProject(TestProjectBase):

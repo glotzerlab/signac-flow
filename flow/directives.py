@@ -172,6 +172,7 @@ class _Directives(MutableMapping):
             for key, value in self.items():
                 self[key] = _evaluate(value, jobs)
             self._evaluated = True
+        return self
 
     @property
     def user_keys(self):  # noqa: D401

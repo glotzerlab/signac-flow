@@ -20,12 +20,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
-        config: [ {python: '3.8', dependencies: 'newest'},
-                  {python: '3.9', dependencies: 'newest'},
-                  {python: '3.10', dependencies: 'newest'},
-                  {python: '3.11', dependencies: 'newest'},
-                  {python: '3.8', dependencies: 'oldest'} ]
+        os: [ubuntu-latest]
+        python: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        include:
+          # Defaults to newest dependencies
+          - dependencies: 'newest'
+          # Other tests
+          - python: '3.8'
+            dependencies: 'oldest'
+          - os: 'macos-latest'
+            python: '3.8'
+            dependencies: 'oldest'
+          - os: 'macos-latest'
+            python: '3.12'
+            dependencies: 'newest'
     steps:
     - uses: actions/checkout@v3
       with:

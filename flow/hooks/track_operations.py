@@ -21,7 +21,7 @@ class TrackOperations:
     """:class:`~.TrackOperations` tracks information about the execution of operations to a logfile.
 
     This hook can provides information on the start, successful completion, and/or error of
-    one or more operations in a :class:`~.FlowProject` instance. The logs are stored the file
+    one or more operations in a :class:`~.FlowProject` instance. The logs are stored in the file
     given by ``log_filename`` within the job's path. The file  will be appended to if it already
     exists.
 
@@ -36,8 +36,8 @@ class TrackOperations:
     The current schema has the following structure:
 
     - ``time``: The time of querying the metadata.
-    - ``stage``: The stage of execution either "prior" or "after" both referring operation
-      exectution.
+    - ``stage``: Whether the hook was executed either "prior" or "after" the associated
+      operation's execution.
     - ``error``: The error message on executing the operation if any.
     - ``project``
        - ``path``: Filepath to the project
@@ -52,9 +52,8 @@ class TrackOperations:
 
     Warning
     -------
-    This class will error on construction if GitPython is not available and ``strict_git`` is set
-    to ``True`` or if ``strict_git`` is ``True`` when executing an operation with uncommitted
-    changes.
+    This class will raise an exception when strict_git is set to ``True`` and either GitPython is
+    not available or the repository contains uncommitted changes (i.e. is "dirty").
 
     Examples
     --------

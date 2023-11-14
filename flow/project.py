@@ -1728,7 +1728,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         jsonschema.validate(
             self._flow_config,
             flow_config._FLOW_SCHEMA,
-            format_checker=jsonschema.draft7_format_checker,
+            format_checker=jsonschema.Draft7Validator.FORMAT_CHECKER,
         )
 
         # Associate this class with a compute environment.

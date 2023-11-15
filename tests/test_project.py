@@ -11,6 +11,7 @@ from functools import partial
 from io import StringIO
 from itertools import groupby
 
+import define_hooks_logging_project
 import define_hooks_test_project
 import define_status_test_project
 import pytest
@@ -2313,7 +2314,7 @@ class TestHooksSetUp(TestProjectBase):
         project._entrypoint = self.entrypoint
         return project
 
-    def call_subcmd(self, subcmd, stderr=subprocess.DEVNULL):
+    def call_subcmd(self, subcmd, stderr=subprocess.PIPE):
         # Bypass raising the error/checking output since it interferes with hook.on_exception
         fn_script = self.entrypoint["path"]
         _cmd = f"python {fn_script} {subcmd} --debug"
@@ -2322,8 +2323,8 @@ class TestHooksSetUp(TestProjectBase):
                 with _switch_to_directory(self.project.path):
                     return subprocess.check_output(_cmd.split(), stderr=stderr)
             except subprocess.CalledProcessError as error:
-                print(error, file=sys.stderr)
-                print(error.output, file=sys.stderr)
+                print("STDOUT:", error.stdout, sep="\n", file=sys.stderr)
+                print("STDERR:", error.stderr, sep="\n", file=sys.stderr)
                 raise
 
     @pytest.fixture(scope="function")
@@ -2468,8 +2469,13 @@ class TestHooksInstallNoDecorators(TestHooksInstallSetUp):
 
 
 class TestHooksInvalidOption(TestHooksSetUp):
-    def call_subcmd(self, subcmd, stderr=subprocess.STDOUT):
-        # Return error as output instead of raising error
+    def call_subcmd(self, subcmd, stderr=subprocess.PIPE):
+        """Call a flow command through the CLI.
+
+        Return error as output instead of raising error. By default we also print out the stdout and
+        stderr of the `CalledProcessError` since pytest will capture it by default anyways. This
+        aids the debugging of tests by providing a traceback of the internal error.
+        """
         fn_script = self.entrypoint["path"]
         _cmd = f"python {fn_script} {subcmd} --debug"
         with _add_path_to_environment_pythonpath(os.path.abspath(self.cwd)):
@@ -2477,7 +2483,11 @@ class TestHooksInvalidOption(TestHooksSetUp):
                 with _switch_to_directory(self.project.path):
                     return subprocess.check_output(_cmd.split(), stderr=stderr)
             except subprocess.CalledProcessError as error:
-                return str(error.output)
+                if error.stderr:
+                    print("STDERR:", error.stderr, sep="\n")
+                if error.stdout:
+                    print("STDOUT:", error.stderr, sep="\n")
+                return str(error.stdout) + str(error.stderr)
 
     def test_invalid_hook(self):
         class A(FlowProject):
@@ -2515,6 +2525,64 @@ class TestHooksInvalidOption(TestHooksSetUp):
         )
 
         assert "RuntimeError" in error_output
+
+
+class TestHooksLog(TestHooksSetUp):
+    project_class = define_hooks_logging_project._HooksLogOperationsProject
+    entrypoint = dict(
+        path=os.path.realpath(
+            os.path.join(os.path.dirname(__file__), "define_hooks_logging_project.py")
+        )
+    )
+
+    ON_START_MSG = "Operation '{}' started."
+    SUCCESS_MSG = "Operation '{}' finished without exception."
+    EXCEPTION_MSG = "Operation '{}' failed with error"
+
+    @staticmethod
+    def get_log_filename():
+        return "operations.log"
+
+    @staticmethod
+    def get_log_output(job, log_filename):
+        return "".join(line for line in open(job.fn(log_filename)))
+
+    @pytest.fixture(params=["base", "base_cmd"])
+    def operation_name(self, request):
+        return request.param
+
+    @pytest.fixture
+    def error_message(operation_name):
+        if operation_name == "base":
+            return define_hooks_logging_project.HOOKS_ERROR_MESSAGE
+        return "42"
+
+    def test_logging(self, project, job, operation_name, error_message):
+        log_fn = self.get_log_filename()
+        assert not job.isfile(log_fn)
+
+        if job.sp.raise_exception:
+            with pytest.raises(subprocess.CalledProcessError):
+                self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+        else:
+            self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+        assert job.isfile(log_fn)
+        log_output = self.get_log_output(job, log_fn)
+        assert self.ON_START_MSG.format(operation_name) in log_output
+        if job.sp.raise_exception:
+            assert error_message in log_output
+            assert self.EXCEPTION_MSG.format(operation_name) in log_output
+        else:
+            assert error_message not in log_output
+            assert self.SUCCESS_MSG.format(operation_name) in log_output
+
+
+class TestHooksLogInstall(TestHooksLog):
+    entrypoint = dict(
+        path=os.path.realpath(
+            os.path.join(os.path.dirname(__file__), "define_hooks_logging_install.py")
+        )
+    )
 
 
 class TestIgnoreConditions:

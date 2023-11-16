@@ -44,7 +44,7 @@ from .aggregates import (
     aggregator,
     get_aggregate_id,
 )
-from .directives import _document_directive
+from .directives import _document_directive, _group_directive_aggregation
 from .environment import ComputeEnvironment, get_environment, registered_environments
 from .errors import (
     ConfigKeyError,
@@ -405,6 +405,9 @@ class _SubmissionJobOperation(_JobOperation):
     cmd : callable or str
         The command that executes this operation. Can be a callable that when
         evaluated returns a string.
+    primary_directives : list[dict[str, any]]
+        Directives of the maximal job or directives such that all operations
+        have their resources met.
     directives_list : list[dict[str, any]]
         List of directives for each operation in the flow group.
     eligible_operations : list
@@ -430,6 +433,7 @@ class _SubmissionJobOperation(_JobOperation):
         name,
         job,
         cmd,
+        primary_directives,
         directives_list,
         eligible_operations=None,
         operations_with_unmet_preconditions=None,
@@ -437,7 +441,7 @@ class _SubmissionJobOperation(_JobOperation):
         **kwargs,
     ):
         super().__init__(id, name, job, cmd)
-        # Will need to handle user directives somehow.
+        self.primary_directives = primary_directives
         self.directives_list = directives_list
 
         if eligible_operations is None:
@@ -772,20 +776,20 @@ class FlowGroup:
 
     Examples
     --------
-    In the example below, the directives will be ``{'nranks': 4}`` for op1 and
-    ``{'nranks': 2, 'executable': 'python3'}`` for op2.
+    In the example below, the directives will be ``{'processes': 4}`` for op1 and
+    ``{'processes': 2, 'executable': 'python3'}`` for op2.
 
     .. code-block:: python
 
         group = FlowProject.make_group(name='example_group')
 
-        @group(directives={"nranks": 4})
-        @FlowProject.operation({"nranks": 2, "executable": "python3"})
+        @group(directives={"processes": 4})
+        @FlowProject.operation({"processes": 2, "executable": "python3"})
         def op1(job):
             pass
 
         @group
-        @FlowProject.operation({"nranks": 2, "executable": "python3"})
+        @FlowProject.operation({"processes": 2, "executable": "python3"})
         def op2(job):
             pass
 
@@ -1118,6 +1122,7 @@ class FlowGroup:
         submission_directives = self._get_submission_directives(
             default_directives, jobs
         )
+        primary_directives = _group_directive_aggregation(submission_directives)
         eligible_operations = _get_run_ops([], IgnoreConditions.NONE)
         operations_with_unmet_preconditions = _get_run_ops(
             eligible_operations, IgnoreConditions.PRE
@@ -1129,9 +1134,10 @@ class FlowGroup:
         return _SubmissionJobOperation(
             id=self._generate_id(jobs),
             name=self.name,
-            jobs=jobs,
+            job=jobs,
             cmd=unevaluated_cmd,
-            directives=submission_directives,
+            primary_directives=primary_directives,
+            directives_list=submission_directives,
             eligible_operations=eligible_operations,
             operations_with_unmet_preconditions=operations_with_unmet_preconditions,
             operations_with_met_postconditions=operations_with_met_postconditions,
@@ -1225,6 +1231,7 @@ class FlowGroup:
             for name in operation_names
         ]
 
+    @staticmethod
     def _directives_to_track_dict(directives, internal_keys):
         """Convert evaluated directives to tracking dictionaries.
 
@@ -1461,7 +1468,7 @@ class _FlowProjectClass(type):
 
             .. code-block:: python
 
-                @FlowProject.operation({"nranks": 4})
+                @FlowProject.operation({"processes": 4, "launcher": "mpi"})
                 def mpi_hello(job):
                     print("hello")
 
@@ -4123,7 +4130,8 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
             keys_unused = {
                 key
                 for op in operations
-                for key in op.directives.keys() - op.directives.keys_used
+                for directives in op.directives_list
+                for key in directives.keys() - directives.keys_used
             }
             if keys_unused:
                 logger.warning(

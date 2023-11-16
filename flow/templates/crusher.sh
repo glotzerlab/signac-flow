@@ -5,9 +5,5 @@
 {% endblock tasks %}
 {% block header %}
     {{- super() -}}
-    {% set account = account|default(project|get_account_name, true) %}
-    {% if account %}
-#SBATCH --account={{ account }}
-    {% endif %}
 #SBATCH --partition=batch
 {% endblock header %}

@@ -8,10 +8,13 @@ of processors required for an operation.
 """
 import datetime
 import functools
+import operator
 import sys
+import warnings
 from collections.abc import MutableMapping
 
-from flow.errors import DirectivesError
+import flow.util.misc
+from flow.errors import DirectivesError, SubmitError
 
 
 class _Directive:
@@ -190,6 +193,156 @@ def _evaluate(value, jobs):
     return value
 
 
+def _list_of_dicts_to_dict_of_list(a):
+    """Help convert from a directives list to dict with list items."""
+    if len(a) == 0:
+        return {}
+    # This None could be problematic, but we use if for directives that will
+    # always exist.
+    return {k: [m.get(k, None) for m in a] for k in a[0]}
+
+
+def _get_directive_of_lists(directives_list):
+    directives = _list_of_dicts_to_dict_of_list(directives_list)
+    directives["cpus"] = flow.util.misc.list_op(
+        operator.mul, directives["processes"], directives["threads_per_process"]
+    )
+    directives["gpus"] = flow.util.misc.list_op(
+        operator.mul, directives["processes"], directives["gpus_per_process"]
+    )
+    directives["memory"] = flow.util.misc.list_op(
+        operator.mul,
+        directives["cpus"],
+        (0 if mem is None else mem for mem in directives["memory_per_cpu"]),
+    )
+    return directives
+
+
+def _check_compatible_directives(directives_of_lists):
+    """Routine checks for directives within a group."""
+    if "mpi" in directives_of_lists["launcher"]:
+        if (
+            len(set(directives_of_lists["gpus_per_process"])) != 1
+            or len(set(directives_of_lists["threads_per_process"])) != 1
+            or len(set(directives_of_lists["processes"])) != 1
+        ):
+            raise SubmitError("Cannot submit non-homogeneous MPI jobs.")
+        if None in directives_of_lists["launcher"]:
+            raise SubmitError("Cannot submit MPI and nonMPI jobs together.")
+    else:
+        if len(set(directives_of_lists["gpus"])) > 1:
+            warnings.warn(
+                "Operations with varying numbers of GPUs are being submitted together.",
+                RuntimeWarning,
+            )
+        if len(set(directives_of_lists["cpus"])) > 1:
+            warnings.warn(
+                "Operations with varying numbers of CPUs are being submitted together.",
+                RuntimeWarning,
+            )
+
+
+def _group_directive_aggregation(group_directives):
+    directives = _get_directive_of_lists(group_directives)
+    _check_compatible_directives(directives)
+    # Each group will have a primary operation (the one that requests the most
+    # resources. This may or may not be unique. We have to pick on for purposes
+    # of scheduling though to properly request resources.
+    if "mpi" in directives["launcher"]:
+        # All MPI operations must be homogeneous can pick any one and any non-MPI ones are subsets
+        # that should work correctly.
+        primary_operation_index = 0
+    else:
+        primary_operation_index = flow.util.misc.argmax(directives["cpus"])
+    primary_directive = group_directives[primary_operation_index]
+    primary_directive["walltime"] = sum(
+        (w for w in directives["walltime"] if w is not None), start=datetime.timedelta()
+    )
+    # Handle memory. Since we have potentially nonheterogeneous requests, we
+    # need to check that the highest memory job has enough memory.
+    max_memory_index = flow.util.misc.argmax(directives["memory"])
+    memory_per_cpu = (
+        directives["memory"][max_memory_index]
+        / directives["cpus"][primary_operation_index]
+    )
+    if memory_per_cpu != 0:
+        primary_directive["memory_per_cpu"] = memory_per_cpu
+    # TODO: Pretty sure this is broken for GPU submission with different number of GPUS.
+    return primary_directive
+
+
+def _check_bundle_directives(list_of_directives, parallel):
+    if "mpi" in list_of_directives["launcher"] and parallel:
+        raise SubmitError("Cannot run MPI operations in parallel.")
+    _check_compatible_directives(list_of_directives)
+
+
+def _bundle_directives_aggregation(list_of_directives, parallel):
+    directives_of_lists = _get_directive_of_lists(list_of_directives)
+    _check_compatible_directives(directives_of_lists)
+    # We know we don't have MPI operations here.
+    if parallel:
+        memory = sum(filter(lambda x: x is not None, directives_of_lists["memory"]))
+        cpus = sum(directives_of_lists["cpus"])
+        memory_per_cpu = None if memory == 0 else memory / cpus
+        return {
+            "launcher": None,
+            "walltime": max(
+                w for w in directives_of_lists["walltime"] if w is not None
+            ),
+            "processes": 1,
+            "threads_per_process": cpus,
+            "gpus_per_process": sum(directives_of_lists["gpus"]),
+            "memory_per_cpu": memory_per_cpu,
+        }
+    # Each group will have a primary operation (the one that requests the most
+    # resources. This may or may not be unique. We have to pick on for purposes
+    # of scheduling though to properly request resources.
+    walltime = sum(
+        (w for w in directives_of_lists["walltime"] if w is not None),
+        start=datetime.timedelta(),
+    )
+    max_memory_index = flow.util.misc.argmax(
+        filter(lambda x: x is not None, directives_of_lists["memory"])
+    )
+    if "mpi" in directives_of_lists["launcher"]:
+        if max_memory_index is None:
+            memory_per_cpu = None
+        else:
+            memory_per_cpu = (
+                directives_of_lists["memory"][max_memory_index]
+                / directives_of_lists["cpus"][0]
+            )
+
+        # All MPI operations must be homogeneous can pick any one and any non-MPI ones are subsets
+        # that should work correctly.
+        primary_operation = list_of_directives[0]
+        return {
+            "launcher": primary_operation["launcher"],
+            "walltime": walltime,
+            "processes": primary_operation["processes"],
+            "threads_per_process": primary_operation["threads_per_process"],
+            "gpus_per_process": primary_operation["gpus_per_process"],
+            "memory_per_cpu": memory_per_cpu,
+        }
+    primary_operation_index = flow.util.misc.argmax(directives_of_lists["cpus"])
+    if max_memory_index is None:
+        memory_per_cpu = None
+    else:
+        memory_per_cpu = (
+            directives_of_lists["memory"][max_memory_index]
+            / directives_of_lists["cpus"][primary_operation_index]
+        )
+    return {
+        "launcher": None,
+        "walltime": walltime,
+        "processes": 1,
+        "threads_per_process": directives_of_lists["cpus"][primary_operation_index],
+        "gpus_per_process": max(directives_of_lists["gpus_per_process"]),
+        "memory_per_cpu": memory_per_cpu,
+    }
+
+
 class _OnlyTypes:
     def __init__(self, *types, preprocess=None, postprocess=None):
         def identity(value):
@@ -259,9 +412,9 @@ def _parse_walltime(walltime):
     """
     if walltime is None:
         return None
-    if not isinstance(walltime, datetime.timedelta):
-        walltime = datetime.timedelta(hours=walltime)
-    return walltime
+    if isinstance(walltime, datetime.timedelta):
+        return walltime
+    return datetime.timedelta(hours=walltime)
 
 
 def _parse_memory(memory):
@@ -310,7 +463,6 @@ def _parse_memory(memory):
 _natural_number = _OnlyTypes(int, postprocess=_raise_below(1))
 _nonnegative_int = _OnlyTypes(int, postprocess=_raise_below(0))
 _positive_real_walltime = _OnlyTypes(
-    float,
     datetime.timedelta,
     type(None),
     preprocess=_parse_walltime,
@@ -423,7 +575,7 @@ Expects a natural number (i.e. an integer >= 1). Defualts to 1.
 """
 
 _THREADS_PER_PROCESS = _Directive(
-    "threads_per_process", validator=_nonnegative_int, default=0
+    "threads_per_process", validator=_nonnegative_int, default=1
 )
 _THREADS_PER_PROCESS.__doc__ = """The number of threads to use per process. Defaults to 0.
 

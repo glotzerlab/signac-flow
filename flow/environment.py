@@ -24,6 +24,7 @@ from .directives import (
     _PROCESSES,
     _THREADS_PER_PROCESS,
     _WALLTIME,
+    _bundle_directives_aggregation,
     _Directives,
 )
 from .errors import NoSchedulerError, SubmitError
@@ -33,7 +34,7 @@ from .scheduling.lsf import LSFScheduler
 from .scheduling.pbs import PBSScheduler
 from .scheduling.simple_scheduler import SimpleScheduler
 from .scheduling.slurm import SlurmScheduler
-from .util.template_filters import calc_num_nodes, calc_tasks
+from .util.template_filters import calc_num_nodes
 
 logger = logging.getLogger(__name__)
 
@@ -433,28 +434,18 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
         """
         partition = cls._partition_config[context.get("partition", None)]
         force = context.get("force", False)
-        cpu_tasks_total = calc_tasks(
-            context["operations"],
-            "np",
+        directives = _bundle_directives_aggregation(
+            [op.primary_directives for op in context["operations"]],
             context.get("parallel", False),
-            context.get("force", False),
-        )
-        gpu_tasks_total = calc_tasks(
-            context["operations"],
-            "ngpu",
-            context.get("parallel", False),
-            context.get("force", False),
         )
 
-        num_nodes = partition.calculate_num_nodes(
+        cpu_tasks_total = directives["processes"] * directives["threads_per_process"]
+        gpu_tasks_total = directives["processes"] * directives["gpus_per_process"]
+
+        directives["num_nodes"] = partition.calculate_num_nodes(
             cpu_tasks_total, gpu_tasks_total, force
         )
-
-        return {
-            "ncpu_tasks": cpu_tasks_total,
-            "ngpu_tasks": gpu_tasks_total,
-            "num_nodes": num_nodes,
-        }
+        return directives
 
 
 class StandardEnvironment(ComputeEnvironment):

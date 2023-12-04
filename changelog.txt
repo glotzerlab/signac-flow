@@ -49,6 +49,7 @@ Added
 - ``test-workflow`` CLI option for testing template environments/submission scripts (#747).
 - Frontier environment and template (#743).
 - Added ``-o`` / ``--operation`` flag to report project status information for specific operations (#725).
+- Added builtin `TrackOperations` execution hooks (#739).
 
 Changed
 +++++++
@@ -90,6 +91,7 @@ Added
 +++++
 
 - Added the OLCF Crusher environment (#708).
+- Added `TrackOperations` as a built in hook (#739).
 
 Changed
 +++++++

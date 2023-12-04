@@ -52,8 +52,8 @@ class TrackOperations:
 
     Warning
     -------
-    This class will raise an exception when ``strict_git`` is set to ``True`` and either GitPython is
-    not available or the repository contains uncommitted changes (i.e. is "dirty").
+    This class will raise an exception when ``strict_git`` is set to ``True`` and either
+    GitPython is not available or the repository contains uncommitted changes (i.e. is "dirty").
 
     Examples
     --------

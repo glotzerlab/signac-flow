@@ -14,7 +14,7 @@ else:
     GIT = True
 
 
-_DEFAULT_FILENAME = "signac-execution-history.log"
+_DEFAULT_FILENAME = "signac_execution_history.log"
 
 
 class TrackOperations:
@@ -22,7 +22,7 @@ class TrackOperations:
 
     This hook can provides information on the start, successful completion, and/or error of
     one or more operations in a :class:`~.FlowProject` instance. The logs are stored in the file
-    given by ``log_filename`` within the job's path. The file  will be appended to if it already
+    given by ``log_filename`` within the job's path. The file will be appended to if it already
     exists.
 
     The hooks stores metadata regarding the execution of the operation and the state of the
@@ -44,15 +44,15 @@ class TrackOperations:
        - ``schema_version``: The project's schema version
     - ``operation``: The operation name
     - ``job_id``: The job id
-    - ``git``
+    - ``git``:
        - ``commit_id``: The current commit of the project's git repo.
        - ``dirty``: Whether the project's repo has uncommitted changes or not.
-    - ``_schema_version``: The metadata storage's schema version. Schema is currently in version 1.
+    - ``_schema_version``: The metadata storage's schema version.
 
 
     Warning
     -------
-    This class will raise an exception when strict_git is set to ``True`` and either GitPython is
+    This class will raise an exception when ``strict_git`` is set to ``True`` and either GitPython is
     not available or the repository contains uncommitted changes (i.e. is "dirty").
 
     Examples
@@ -100,7 +100,7 @@ class TrackOperations:
     Parameters
     ----------
     log_filename : str, optional
-        The name of the log file in the job workspace. Defaults to "signac-execution-history.log".
+        The name of the log file in the job workspace. Defaults to "signac_execution_history.log".
     strict_git : bool, optional
         Whether to fail if ``GitPython`` cannot be imported or if there are uncommitted changes
         to the project's git repo. Defaults to ``True``.
@@ -194,7 +194,7 @@ class TrackOperations:
             The job to read the execution history of.
         log_filename : str, optional
             The name of the log file in the job workspace. Defaults to
-            "signac-execution-history.log".
+            "signac_execution_history.log".
 
         Returns
         -------

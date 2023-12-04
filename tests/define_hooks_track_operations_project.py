@@ -8,7 +8,7 @@ class _HooksTrackOperations(FlowProject):
     pass
 
 
-LOG_FILENAME = "signac-execution-history.log"
+LOG_FILENAME = "signac_execution_history.log"
 
 
 track_operations = TrackOperations(strict_git=False)

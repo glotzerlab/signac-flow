@@ -2631,13 +2631,11 @@ class TestHooksTrackOperationsNotStrict(TestHooksSetUp):
         current_path = job.project.path
         # Still allow for local MacOS check but skip in CI MacOS runners. Rather
         # than xfail or skip this ensures we test everything else.
-        if (
+        if not (
             "private" in test_path
             or "private" in current_path
             and platform.system == "Darwin"
         ):
-            pass
-        else:
             assert current_path == test_path
         assert metadata["project"]["schema_version"] == job.project.config.get(
             "schema_version"

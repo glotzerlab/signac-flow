@@ -117,9 +117,11 @@ class _PartitionConfig:
     When querying a value for a specific partition, the logic first searches the
     provided mapping, if any, for the partition. If it is not found, then the
     mapping is searched for "default" if it exists. If not, the class default is
-    used.
+    used. The list below shows the search order hierarchically.
 
-    1. Partition specific -> 2. Provided default -> 3. _PartitionConfig default
+    1. Partition specific
+    2. Provided default
+    3. _PartitionConfig default
 
     The class defaults are
 
@@ -131,11 +133,13 @@ class _PartitionConfig:
     Parameters
     ----------
     cpus_per_node: dict[str, int], optional
-        Mapping between partitions and CPUs per node. Defaults to an empty `dict`.
+        Mapping from partition names to CPUs per node. Defaults to an empty
+        `dict`.
     gpus_per_node: dict[str, int], optional
-        Mapping between partitions and GPUs per node. Defaults to an empty `dict`.
+        Mapping from partition names to GPUs per node. Defaults to an empty
+        `dict`.
     node_types: dict[str, _NodeTypes], optional
-        Mapping between partitions and node types. Defaults to an empty `dict`.
+        Mapping from partitions to node types. Defaults to an empty `dict`.
     """
 
     _default_cpus_per_node = None

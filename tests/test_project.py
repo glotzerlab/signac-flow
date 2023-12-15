@@ -1178,10 +1178,10 @@ class TestExecutionProject(TestProjectBase):
         project = self.mock_project()
         assert len(list(MockScheduler.jobs())) == 0
         with redirect_stderr(StringIO()):
-            project.submit(num=1)
+            project.submit(num=1, force=True)
         assert len(list(MockScheduler.jobs())) == 1
         with redirect_stderr(StringIO()):
-            project.submit(num=1)
+            project.submit(num=1, force=True)
         assert len(list(MockScheduler.jobs())) == 2
 
     def test_submit_error(self, monkeypatch):

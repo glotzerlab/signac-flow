@@ -4,7 +4,7 @@
 """Environments for Purdue supercomputers."""
 import logging
 
-from ..environment import DefaultSlurmEnvironment
+from ..environment import DefaultSlurmEnvironment, _NodeTypes, _PartitionConfig
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +18,17 @@ class AnvilEnvironment(DefaultSlurmEnvironment):
     hostname_pattern = r".*\.anvil\.rcac\.purdue\.edu$"
     template = "anvil.sh"
     mpi_cmd = "mpirun"
-    _cpus_per_node = {"default": 128}
-    _gpus_per_node = {"default": 4}
-    _shared_partitions = {"debug", "gpu-debug", "shared", "highmem", "gpu"}
+    _partition_config = _PartitionConfig(
+        cpus_per_node={"default": 128},
+        gpus_per_node={"gpu": 4, "gpu-debug": 4},
+        node_types={
+            "gpu-debug": _NodeTypes.SHARED,
+            "shared": _NodeTypes.SHARED,
+            "highmem": _NodeTypes.SHARED,
+            "wholenode": _NodeTypes.WHOLENODE,
+            "wide": _NodeTypes.WHOLENODE,
+        },
+    )
 
     @classmethod
     def add_args(cls, parser):

@@ -10,6 +10,8 @@ from math import ceil, gcd
 from ..environment import (
     DefaultLSFEnvironment,
     DefaultSlurmEnvironment,
+    _NodeTypes,
+    _PartitionConfig,
     template_filter,
 )
 from ..util.template_filters import check_utilization
@@ -36,8 +38,11 @@ class SummitEnvironment(DefaultLSFEnvironment):
     hostname_pattern = r".*\.summit\.olcf\.ornl\.gov"
     template = "summit.sh"
     mpi_cmd = "jsrun"
-    _cpus_per_node = {"default": 42}
-    _gpus_per_node = {"default": 6}
+    _partition_config = _PartitionConfig(
+        cpus_per_node={"default": 42},
+        gpus_per_node={"default": 6},
+        node_types={"default": _NodeTypes.WHOLENODE},
+    )
 
     @template_filter
     def calc_num_nodes(cls, resource_sets, parallel=False):
@@ -187,8 +192,11 @@ class AndesEnvironment(DefaultSlurmEnvironment):
     hostname_pattern = r"andes-.*\.olcf\.ornl\.gov"
     template = "andes.sh"
     mpi_cmd = "srun"
-    _cpus_per_node = {"default": 32, "gpu": 28}
-    _gpus_per_node = {"default": 0, "gpu": 2}
+    _partition_config = _PartitionConfig(
+        cpus_per_node={"default": 32, "gpu": 28},
+        gpus_per_node={"gpu": 2},
+        node_types={"default": _NodeTypes.WHOLENODE},
+    )
 
     @classmethod
     def add_args(cls, parser):
@@ -217,8 +225,11 @@ class CrusherEnvironment(DefaultSlurmEnvironment):
 
     hostname_pattern = r".*\.crusher\.olcf\.ornl\.gov"
     template = "crusher.sh"
-    _cpus_per_node = {"default": 56}
-    _gpus_per_node = {"default": 8}
+    _partition_config = _PartitionConfig(
+        cpus_per_node={"default": 56},
+        gpus_per_node={"default": 8},
+        node_types={"default": _NodeTypes.WHOLENODE},
+    )
 
     mpi_cmd = "srun"
 
@@ -269,8 +280,11 @@ class FrontierEnvironment(DefaultSlurmEnvironment):
 
     hostname_pattern = r".*\.frontier\.olcf\.ornl\.gov"
     template = "frontier.sh"
-    _cpus_per_node = {"default": 56}
-    _gpus_per_node = {"default": 8}
+    _partition_config = _PartitionConfig(
+        cpus_per_node={"default": 56},
+        gpus_per_node={"default": 8},
+        node_types={"default": _NodeTypes.WHOLENODE},
+    )
     mpi_cmd = "srun"
 
     @classmethod

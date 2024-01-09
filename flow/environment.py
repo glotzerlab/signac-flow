@@ -683,6 +683,7 @@ def get_environment(test=False):
             deprecated_in="v0.27.0",
             removed_in="v0.28.0",
         )
+    return env
 
 
 def _get_environment(test=False):

@@ -21,6 +21,10 @@ _STAMPEDE_OFFSET = os.environ.get("_FLOW_STAMPEDE_OFFSET_`", 0)
 class Stampede2Environment(DefaultSlurmEnvironment):
     """Environment profile for the Stampede2 supercomputer.
 
+    Warning
+    -------
+    This environments is deprecated and will be removed in 0.28.0.
+
     https://www.tacc.utexas.edu/systems/stampede2
     """
 

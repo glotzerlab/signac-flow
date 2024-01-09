@@ -2,5 +2,5 @@ click==8.1.7
 coverage==7.3.2
 GitPython==3.1.37
 pytest-cov==4.1.0
-pytest==7.4.3
+pytest==7.4.4
 ruamel.yaml==0.18.5

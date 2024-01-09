@@ -35,6 +35,7 @@ from .scheduling.lsf import LSFScheduler
 from .scheduling.pbs import PBSScheduler
 from .scheduling.simple_scheduler import SimpleScheduler
 from .scheduling.slurm import SlurmScheduler
+from .util.misc import _deprecated_warning
 from .util.template_filters import calc_num_nodes, calc_tasks
 
 logger = logging.getLogger(__name__)
@@ -648,6 +649,43 @@ def registered_environments():
 
 
 def get_environment(test=False):
+    """Attempt to detect the present environment.
+
+    This function iterates through all defined :class:`~.ComputeEnvironment`
+    classes in reversed order of definition and returns the first
+    environment where the :meth:`~.ComputeEnvironment.is_present` method
+    returns True.
+
+    Note
+    ----
+    Environments can be set to raise FutureWarnings by setting a class attribute
+    ``_deprecated`` to ``True``.
+
+    Parameters
+    ----------
+    test : bool
+        Whether to return the TestEnvironment. (Default value = False)
+    import_configured : bool
+        Whether to import environments specified in the flow configuration.
+        (Default value = True)
+
+    Returns
+    -------
+    :class:`~.ComputeEnvironment`
+        The detected environment class.
+
+    """
+    env = _get_environment(test)
+    if getattr(env, "_deprecated", False):
+        _deprecated_warning(
+            deprecation=str(env),
+            alternative="",
+            deprecated_in="v0.27.0",
+            removed_in="v0.28.0",
+        )
+
+
+def _get_environment(test=False):
     """Attempt to detect the present environment.
 
     This function iterates through all defined :class:`~.ComputeEnvironment`

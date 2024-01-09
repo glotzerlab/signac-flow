@@ -24,6 +24,7 @@ class Stampede2Environment(DefaultSlurmEnvironment):
     https://www.tacc.utexas.edu/systems/stampede2
     """
 
+    _deprecated = True
     hostname_pattern = ".*stampede2"
     template = "stampede2.sh"
     cores_per_node = 48

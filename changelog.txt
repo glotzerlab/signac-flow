@@ -19,6 +19,7 @@ Added
 
 Changed
 +++++++
+- The Stampede2 environment is deprecated (#798).
 - Show the "Using environment configuration:" message only in verbose output (#776).
 
 Fixed

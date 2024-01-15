@@ -19,6 +19,7 @@ Added
 
 Changed
 +++++++
+
 - The Stampede2 environment is deprecated (#798).
 - Deprecate the current keys for submission/execution directives (#792).
 - Show the "Using environment configuration:" message only in verbose output (#776).

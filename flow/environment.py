@@ -9,6 +9,7 @@ subclassed to automatically detect specific computational environments.
 This enables the user to adjust their workflow based on the present
 environment, e.g. for the adjustment of scheduler submission scripts.
 """
+import enum
 import logging
 import os
 import re
@@ -27,13 +28,14 @@ from .directives import (
     _WALLTIME,
     _Directives,
 )
-from .errors import NoSchedulerError
+from .errors import NoSchedulerError, SubmitError
 from .scheduling.base import JobStatus
 from .scheduling.fake_scheduler import FakeScheduler
 from .scheduling.lsf import LSFScheduler
 from .scheduling.pbs import PBSScheduler
 from .scheduling.simple_scheduler import SimpleScheduler
 from .scheduling.slurm import SlurmScheduler
+from .util.misc import _deprecated_warning
 from .util.template_filters import calc_num_nodes, calc_tasks
 
 logger = logging.getLogger(__name__)
@@ -90,6 +92,173 @@ def template_filter(func):
     return classmethod(func)
 
 
+class _NodeTypes(enum.Enum):
+    """Defines for a partition the acceptable node requests.
+
+    - SHARED: Only support partial nodes requests to full node. Note that you
+        can restrict the cores provided in `_PartitionConfig` to restrict below
+        even full nodes.
+    - MIXED: No restriction on partial to full node requests.
+    - WHOLENODE: Only support submissions in units of whole nodes.
+    """
+
+    SHARED = 1
+    MIXED = 2
+    WHOLENODE = 3
+
+
+class _PartitionConfig:
+    """The configuration of partition for a given environment.
+
+    Currently supports the ideas of
+    - CPUs for a partition
+    - GPUs for a partition
+    - Node type of a partition
+
+    When querying a value for a specific partition, the logic first searches the
+    provided mapping, if any, for the partition. If it is not found, then the
+    mapping is searched for "default" if it exists. If not, the class default is
+    used. The list below shows the search order hierarchically.
+
+    1. Partition specific
+    2. Provided default
+    3. _PartitionConfig default
+
+    The class defaults are
+
+    - CPUs: ``None`` which represents any number. This will be interpretted as
+      an unlimited supply of CPUs practically.
+    - GPUs: 0.
+    - Node type: `_NodeTypes.MIXED`.
+
+    Parameters
+    ----------
+    cpus_per_node: dict[str, int], optional
+        Mapping from partition names to CPUs per node. Defaults to an empty
+        `dict`.
+    gpus_per_node: dict[str, int], optional
+        Mapping from partition names to GPUs per node. Defaults to an empty
+        `dict`.
+    node_types: dict[str, _NodeTypes], optional
+        Mapping from partitions to node types. Defaults to an empty `dict`.
+    """
+
+    _default_cpus_per_node = None
+    _default_gpus_per_node = 0
+    _default_node_type = _NodeTypes.MIXED
+
+    def __init__(self, cpus_per_node=None, gpus_per_node=None, node_types=None):
+        self.cpus_per_node = {} if cpus_per_node is None else cpus_per_node
+        self.gpus_per_node = {} if gpus_per_node is None else gpus_per_node
+        self.node_types = {} if node_types is None else node_types
+
+    def __getitem__(self, partition):
+        """Get the `_Partition` object for the provided partition."""
+        return _Partition(
+            partition,
+            self._get(partition, self.cpus_per_node, self._default_cpus_per_node),
+            self._get(partition, self.gpus_per_node, self._default_gpus_per_node),
+            self._get(partition, self.node_types, self._default_node_type),
+        )
+
+    @staticmethod
+    def _get(key, mapping, default):
+        """Get the value of key following the class priority chain."""
+        return mapping.get(key, mapping.get("default", default))
+
+
+class _Partition:
+    """Represents a partition and associated data.
+
+    Parameters
+    ----------
+    name: str
+        The name of the partition.
+    cpus: int
+        The CPUs per node.
+    gpus: int
+        The GPUs per node.
+    node_type: _NodeTypes
+        The node type for the partition.
+
+    Attributes
+    ----------
+    name: str
+        The name of the partition.
+    cpus: int
+        The CPUs per node.
+    gpus: int
+        The GPUs per node.
+    node_type: _NodeTypes
+        The node type for the partition.
+    """
+
+    def __init__(self, name, cpus, gpus, node_type):
+        # Use empty string for error messages.
+        self.name = name if name is not None else ""
+        self.gpus = gpus
+        self.cpus = cpus
+        self.node_type = node_type
+
+    def calculate_num_nodes(self, cpu_tasks, gpu_tasks, force):
+        """Compute the number of nodes for the given workload.
+
+        Parameters
+        ----------
+        cpu_tasks: int
+            Total CPU tasks/cores.
+        gpu_tasks: int
+            Total GPUs requested.
+        force: bool
+            Whether to allow seemingly nonsensical/erronous resource requests.
+
+        Raises
+        ------
+        SubmitError:
+            Raises a SubmitError for
+            1. non-zero GPUs on non-GPU partitions
+            2. zero GPUs on GPU partitions.
+            3. Requests larger than a node on `_NodeTypes.SHARED` partitions (through
+               `~._nodes_for_task`).
+            4. Requests less than 0.9 of the last node for `_NodeTypes.WHOLENODE`
+               partitions (through `calc_num_nodes`)
+            if ``not force``.
+        """
+        threshold = 0.9 if self.node_type == _NodeTypes.WHOLENODE and not force else 0.0
+        if gpu_tasks > 0:
+            if self.gpus == 0:
+                # Required for current tests. Also skips a divide by zero error
+                # if user actually wants to submit CPU only jobs to GPU partitions.
+                if force:
+                    num_nodes_gpu = 1
+                else:
+                    raise SubmitError(
+                        f"Cannot request GPU's on nonGPU partition, {self.name}."
+                    )
+            else:
+                num_nodes_gpu = self._nodes_for_task(gpu_tasks, self.gpus, threshold)
+            num_nodes_cpu = self._nodes_for_task(cpu_tasks, self.cpus, 0)
+        else:
+            if self.gpus > 0 and not force:
+                raise SubmitError(
+                    f"Cannot submit to GPU partition, {self.name}, without GPUs."
+                )
+            num_nodes_gpu = 0
+            num_nodes_cpu = self._nodes_for_task(cpu_tasks, self.cpus, threshold)
+        return max(num_nodes_cpu, num_nodes_gpu, 1)
+
+    def _nodes_for_task(self, tasks, processors, threshold):
+        """Call calc_num_nodes but handles the None sentinal value."""
+        if processors is None:
+            return 1
+        nodes = calc_num_nodes(tasks, processors, threshold)
+        if self.node_type == _NodeTypes.SHARED and nodes > 1:
+            raise SubmitError(
+                f"Cannot submit {tasks} tasks to shared partition {self.name}"
+            )
+        return nodes
+
+
 class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
     """Define computational environments.
 
@@ -109,9 +278,7 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
     template = "base_script.sh"
     mpi_cmd = "mpiexec"
 
-    _cpus_per_node = {"default": -1}
-    _gpus_per_node = {"default": -1}
-    _shared_partitions = set()
+    _partition_config = _PartitionConfig()
 
     @classmethod
     def is_present(cls):
@@ -296,12 +463,8 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
         -------
             Must be called after the rest of the template context has been gathered.
         """
-        partition = context.get("partition", None)
+        partition = cls._partition_config[context.get("partition", None)]
         force = context.get("force", False)
-        if force or partition in cls._shared_partitions:
-            threshold = 0.0
-        else:
-            threshold = 0.9
         cpu_tasks_total = calc_tasks(
             context["operations"],
             "np",
@@ -315,39 +478,15 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
             context.get("force", False),
         )
 
-        if gpu_tasks_total > 0:
-            num_nodes_gpu = cls._calc_num_nodes(
-                gpu_tasks_total, cls._get_gpus_per_node(partition), threshold
-            )
-            num_nodes_cpu = cls._calc_num_nodes(
-                cpu_tasks_total, cls._get_cpus_per_node(partition), 0
-            )
-        else:
-            num_nodes_gpu = 0
-            num_nodes_cpu = cls._calc_num_nodes(
-                cpu_tasks_total, cls._get_cpus_per_node(partition), threshold
-            )
-        num_nodes = max(num_nodes_cpu, num_nodes_gpu, 1)
+        num_nodes = partition.calculate_num_nodes(
+            cpu_tasks_total, gpu_tasks_total, force
+        )
+
         return {
             "ncpu_tasks": cpu_tasks_total,
             "ngpu_tasks": gpu_tasks_total,
             "num_nodes": num_nodes,
         }
-
-    @classmethod
-    def _get_cpus_per_node(cls, partition):
-        return cls._cpus_per_node.get(partition, cls._cpus_per_node["default"])
-
-    @classmethod
-    def _get_gpus_per_node(cls, partition):
-        return cls._gpus_per_node.get(partition, cls._gpus_per_node["default"])
-
-    @classmethod
-    def _calc_num_nodes(cls, tasks, processors, threshold):
-        """Call calc_num_nodes but handles the -1 sentinal value."""
-        if processors == -1:
-            return 1
-        return calc_num_nodes(tasks, processors, threshold)
 
 
 class StandardEnvironment(ComputeEnvironment):
@@ -510,6 +649,44 @@ def registered_environments():
 
 
 def get_environment(test=False):
+    """Attempt to detect the present environment.
+
+    This function iterates through all defined :class:`~.ComputeEnvironment`
+    classes in reversed order of definition and returns the first
+    environment where the :meth:`~.ComputeEnvironment.is_present` method
+    returns True.
+
+    Note
+    ----
+    Environments can be set to raise FutureWarnings by setting a class attribute
+    ``_deprecated`` to ``True``.
+
+    Parameters
+    ----------
+    test : bool
+        Whether to return the TestEnvironment. (Default value = False)
+    import_configured : bool
+        Whether to import environments specified in the flow configuration.
+        (Default value = True)
+
+    Returns
+    -------
+    :class:`~.ComputeEnvironment`
+        The detected environment class.
+
+    """
+    env = _get_environment(test)
+    if getattr(env, "_deprecated", False):
+        _deprecated_warning(
+            deprecation=str(env),
+            alternative="",
+            deprecated_in="v0.27.0",
+            removed_in="v0.28.0",
+        )
+    return env
+
+
+def _get_environment(test=False):
     """Attempt to detect the present environment.
 
     This function iterates through all defined :class:`~.ComputeEnvironment`

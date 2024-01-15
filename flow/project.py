@@ -21,6 +21,7 @@ import sys
 import textwrap
 import threading
 import time
+import warnings
 from collections import Counter, defaultdict
 from copy import deepcopy
 from enum import IntFlag
@@ -687,6 +688,13 @@ class FlowGroupEntry:
         func
             The decorated function.
         """
+        if directives is not None:
+            warnings.warn(
+                "The current directives (e.g. nranks, np) are deprecated as of flow 0.27. "
+                "When updating flow please look at the documentation for the new style "
+                "(https://docs.signac.io/en/latest/cluster_submission.html#submission-directives).",
+                DeprecationWarning,
+            )
         if func is None:
             return functools.partial(self._internal_call, directives=directives)
         return self._internal_call(func, directives=directives)
@@ -785,6 +793,13 @@ class FlowGroup:
         submit_options="",
         run_options="",
     ):
+        if operation_directives is not None:
+            warnings.warn(
+                "The current directives (e.g. nranks, np) are deprecated as of flow 0.27. "
+                "When updating flow please look at the documentation for the new style "
+                "(https://docs.signac.io/en/latest/cluster_submission.html#submission-directives).",
+                DeprecationWarning,
+            )
         self.name = name
         self.submit_options = submit_options
         self.run_options = run_options
@@ -1728,7 +1743,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         jsonschema.validate(
             self._flow_config,
             flow_config._FLOW_SCHEMA,
-            format_checker=jsonschema.draft7_format_checker,
+            format_checker=jsonschema.Draft7Validator.FORMAT_CHECKER,
         )
 
         # Associate this class with a compute environment.

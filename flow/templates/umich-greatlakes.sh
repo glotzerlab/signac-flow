@@ -1,16 +1,12 @@
 {% extends "slurm.sh" %}
 {% set partition = partition|default('standard', true) %}
+{% set nranks = (operations|calc_tasks("nranks", parallel, force), 1) | max %}
 {% block tasks %}
-    {% if resources.ngpu_tasks and 'gpu' not in partition and not force %}
-        {% raise "Requesting GPUs requires a gpu partition!" %}
-    {% endif %}
-    {% if 'gpu' in partition and resources.ngpu_tasks == 0 and not force %}
-        {% raise "Requesting gpu partition without GPUs!" %}
-    {% endif %}
-#SBATCH --nodes={{ resources.num_nodes }}
-#SBATCH --ntasks={{ resources.ncpu_tasks }}
+#SBATCH --nodes={{ resources.num_nodes }}-{{ resources.num_nodes }}
+#SBATCH --ntasks={{ nranks }}
+#SBATCH --cpus-per-task={{ resources.ncpu_tasks // nranks}}
     {% if partition == 'gpu' %}
-#SBATCH --gpus={{ resources.ngpu_tasks }}
+#SBATCH --gpus-per-task={{ resources.ngpu_tasks // nranks }}
     {% endif %}
 {% endblock tasks %}
 {% block header %}

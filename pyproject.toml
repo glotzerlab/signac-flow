@@ -7,7 +7,7 @@ requires = ["setuptools>=64.0.0"]
 
 [project]
 name = "signac-flow"
-version = "0.26.1"
+version = "0.27.0"
 description = "Simple workflow management for signac projects."
 readme = "README.md"
 # Supported versions are determined according to NEP 29.
@@ -26,6 +26,7 @@ classifiers = [
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: Implementation :: CPython",
 ]
 dependencies = [
@@ -40,7 +41,7 @@ dependencies = [
     # Progress bars
     "tqdm>=4.60.0",
     # For schema validation
-    "jsonschema>=3.0.0",
+    "jsonschema>=4.5.0",
 ]
 
 [project.scripts]

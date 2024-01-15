@@ -160,6 +160,12 @@ Aggregation
 
 .. autofunction:: flow.get_aggregate_id
 
+Hooks
+-----
+
+.. autoclass:: flow.hooks.TrackOperations
+   :members:
+
 Compute Environments
 --------------------
 

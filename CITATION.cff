@@ -2,7 +2,7 @@
 ---
 cff-version: "1.0.3"
 title: signac-flow
-version: 0.26.1
+version: 0.27.0
 abstract: |
     The signac-flow tool provides the basic components to set up simple to complex workflows for projects as part of the signac framework. That includes the definition of data pipelines, execution of data space operations and the submission of operations to high-performance super computers.
 authors:
@@ -31,6 +31,11 @@ authors:
     given-names: Brandon
     affiliation: "University of Michigan"
     orcid: "https://orcid.org/0000-0001-7739-7796"
+  -
+    family-names: Kerr
+    given-names: "Corwin B."
+    affiliation: "University of Michigan"
+    orcid: "https://orcid.org/0000-0003-0776-2596"
   -
     family-names: Dodd
     given-names: "Paul M."

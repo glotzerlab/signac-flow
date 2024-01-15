@@ -31,6 +31,11 @@ Fixed
 - Restored static output of non-singleton groups (#773, #774).
 - Remove warnings by using new ``jsonschema`` API (#787).
 
+Removed
++++++++
+
+- Stampede 2 environment (#786).
+
 Version 0.26
 ============
 

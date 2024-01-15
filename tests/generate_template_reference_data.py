@@ -64,16 +64,6 @@ def init(project):
     # construct a minimal covering set of all test cases.
     environments = {
         "environment.StandardEnvironment": [],
-        "environments.xsede.Stampede2Environment": [
-            {
-                "partition": ["skx-normal"],
-            },
-            {
-                "partition": ["skx-normal"],
-                "parallel": [False, True],
-                "bundle": [["mpi_op", "mpi_op"], ["omp_op", "omp_op"]],
-            },
-        ],
         "environments.xsede.Bridges2Environment": [
             {
                 "partition": ["RM", "RM-shared", "GPU", "GPU-shared"],

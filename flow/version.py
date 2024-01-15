@@ -3,6 +3,6 @@
 # This software is licensed under the BSD 3-Clause License.
 """Define the signac-flow version."""
 
-__version__ = "0.26.1"
+__version__ = "0.27.0"
 
 __all__ = ["__version__"]

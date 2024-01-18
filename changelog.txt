@@ -8,7 +8,7 @@ The numbers in brackets denote the related GitHub issue and/or pull request.
 Version 0.27
 ============
 
-[0.27.0] -- 202x-xx-xx
+[0.27.0] -- 2024-01-15
 ----------------------
 
 Added
@@ -19,13 +19,22 @@ Added
 
 Changed
 +++++++
+
+- The Stampede2 environment is deprecated (#798).
+- Deprecate the current keys for submission/execution directives (#792).
 - Show the "Using environment configuration:" message only in verbose output (#776).
 
 Fixed
 +++++
 
+- ``srun`` invocation on Great-Lakes (#779).
 - Restored static output of non-singleton groups (#773, #774).
-- Remove warnings by using new `jsonschema` API (#787).
+- Remove warnings by using new ``jsonschema`` API (#787).
+
+Removed
++++++++
+
+- Stampede 2 environment (#786).
 
 Version 0.26
 ============
@@ -49,6 +58,7 @@ Added
 - ``test-workflow`` CLI option for testing template environments/submission scripts (#747).
 - Frontier environment and template (#743).
 - Added ``-o`` / ``--operation`` flag to report project status information for specific operations (#725).
+- Added builtin `TrackOperations` execution hooks (#739).
 
 Changed
 +++++++
@@ -90,6 +100,7 @@ Added
 +++++
 
 - Added the OLCF Crusher environment (#708).
+- Added `TrackOperations` as a built in hook (#739).
 
 Changed
 +++++++

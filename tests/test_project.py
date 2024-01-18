@@ -1,9 +1,10 @@
-# Copyright (c) 2018 The Regents of the University of Michigan
+# Copyright (c) 2023 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 import datetime
 import logging
 import os
+import platform
 import subprocess
 import sys
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
@@ -12,7 +13,10 @@ from io import StringIO
 from itertools import groupby
 
 import define_hooks_test_project
+import define_hooks_track_operations_project
+import define_hooks_track_operations_strict_project
 import define_status_test_project
+import git
 import pytest
 import signac
 from conftest import MockScheduler, TestProjectBase
@@ -1159,10 +1163,10 @@ class TestExecutionProject(TestProjectBase):
         project = self.mock_project()
         assert len(list(MockScheduler.jobs())) == 0
         with redirect_stderr(StringIO()):
-            project.submit(num=1)
+            project.submit(num=1, force=True)
         assert len(list(MockScheduler.jobs())) == 1
         with redirect_stderr(StringIO()):
-            project.submit(num=1)
+            project.submit(num=1, force=True)
         assert len(list(MockScheduler.jobs())) == 2
 
     def test_submit_error(self, monkeypatch):
@@ -2500,6 +2504,196 @@ class TestHooksInvalidOption(TestHooksSetUp):
         )
 
         assert "RuntimeError" in error_output
+
+
+class TestHooksTrackOperationDecorators(TestProjectBase):
+    def test_operation_decorators(self):
+        class A(FlowProject):
+            pass
+
+        track = flow.hooks.TrackOperations(strict_git=False)
+
+        @A.operation_hooks.on_exception(track.on_exception)
+        @A.operation_hooks.on_success(track.on_success)
+        @A.operation_hooks.on_start(track.on_start)
+        @A.operation
+        def op(job):
+            pass
+
+        assert len(A._OPERATION_HOOK_REGISTRY[op]["on_start"]) == 1
+        assert len(A._OPERATION_HOOK_REGISTRY[op]["on_success"]) == 1
+        assert len(A._OPERATION_HOOK_REGISTRY[op]["on_exception"]) == 1
+
+        @track.install_operation_hooks(A)
+        @A.operation
+        def op2(job):
+            pass
+
+        assert len(A._OPERATION_HOOK_REGISTRY[op2]["on_start"]) == 1
+        assert len(A._OPERATION_HOOK_REGISTRY[op2]["on_success"]) == 1
+        assert len(A._OPERATION_HOOK_REGISTRY[op2]["on_exception"]) == 1
+
+    def test_project_decorator(self):
+        class A(FlowProject):
+            pass
+
+        @A.operation
+        def op(job):
+            pass
+
+        @A.operation
+        def op2(job):
+            pass
+
+        project = self.mock_project(A)
+        track = flow.hooks.TrackOperations(strict_git=False)
+        track.install_project_hooks(project)
+        assert len(project.project_hooks.on_start) == 1
+        assert len(project.project_hooks.on_success) == 1
+        assert len(project.project_hooks.on_exception) == 1
+
+
+class TestHooksTrackOperationsNotStrict(TestHooksSetUp):
+    project_class = define_hooks_track_operations_project._HooksTrackOperations
+    entrypoint = dict(
+        path=os.path.realpath(
+            os.path.join(
+                os.path.dirname(__file__), "define_hooks_track_operations_project.py"
+            )
+        )
+    )
+    log_fname = define_hooks_track_operations_project.LOG_FILENAME
+    error_on_no_git = False
+
+    @pytest.fixture(
+        params=[
+            ("base", define_hooks_track_operations_project.HOOKS_ERROR_MESSAGE),
+            ("cmd", "non-zero exit status 42"),
+        ],
+        ids=lambda x: x[0],
+    )
+    def operation_info(self, request):
+        return request.param
+
+    @pytest.fixture(params=(True, False), ids=("git-dirty", "git-clean"))
+    def git_repo(self, project, request):
+        # params=None is equivalent to not passing a parameter which results in
+        # result.param being unset.
+        if not hasattr(request, "param"):
+            return
+        repo = git.Repo.init(project.path)
+        with open(project.fn("test.txt"), "w"):
+            pass
+        repo.index.add(["test.txt"])
+        repo.index.commit("Initial commit")
+        if request.param:
+            with open(project.fn("dirty.txt"), "w"):
+                pass
+            repo.index.add(["dirty.txt"])
+        return repo
+
+    def get_log(self, job):
+        log_entries = flow.hooks.TrackOperations.read_log(job)
+        execution_history = {}
+        for entry in log_entries:
+            operation_name = entry["operation"]
+            execution_history.setdefault(operation_name, []).append(entry)
+        return execution_history
+
+    def check_metadata(
+        self,
+        metadata,
+        job,
+        operation_name,
+        error_message,
+        before_execution,
+        expected_stage,
+        repo,
+    ):
+        assert metadata["stage"] == expected_stage
+
+        test_path = metadata["project"]["path"]
+        current_path = job.project.path
+        # Still allow for local MacOS check but skip in CI MacOS runners. Rather
+        # than xfail or skip this ensures we test everything else.
+        if not (
+            "private" in test_path
+            or "private" in current_path
+            and platform.system == "Darwin"
+        ):
+            assert current_path == test_path
+        assert metadata["project"]["schema_version"] == job.project.config.get(
+            "schema_version"
+        )
+        start_time = datetime.datetime.fromisoformat(metadata["time"])
+        assert before_execution < start_time
+        assert metadata["job_id"] == job.id
+        assert metadata["operation"] == operation_name
+
+        if expected_stage != "prior" and job.sp.raise_exception:
+            assert error_message in metadata["error"]
+
+        else:
+            assert metadata["error"] is None
+
+        assert metadata["project"]["git"]["commit_id"] == str(repo.commit())
+        assert metadata["project"]["git"]["dirty"] == repo.is_dirty()
+
+    def test_metadata(self, project, job, operation_info, git_repo):
+        operation_name, error_message = operation_info
+        assert not job.isfile(self.log_fname)
+
+        time = datetime.datetime.now(datetime.timezone.utc)
+        if git_repo is not None and self.error_on_no_git and git_repo.is_dirty():
+            with pytest.raises(subprocess.CalledProcessError):
+                self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+            return
+        elif job.sp.raise_exception:
+            with pytest.raises(subprocess.CalledProcessError):
+                self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+        else:
+            self.call_subcmd(f"run -o {operation_name} -j {job.id}")
+
+        assert job.isfile(self.log_fname)
+        for filename in (None, self.log_fname):
+            metadata = self.get_log(job)
+            # For the single operation
+            # Each metadata whether file or document is one since they both
+            # write to different places.
+            assert len(metadata) == 1
+            for op, entries in metadata.items():
+                assert len(entries) == 2
+                self.check_metadata(
+                    entries[0],
+                    job,
+                    operation_name,
+                    error_message,
+                    time,
+                    "prior",
+                    git_repo,
+                )
+                self.check_metadata(
+                    entries[1],
+                    job,
+                    operation_name,
+                    error_message,
+                    time,
+                    "after",
+                    git_repo,
+                )
+
+
+class TestHooksTrackOperationsStrict(TestHooksTrackOperationsNotStrict):
+    project_class = define_hooks_track_operations_strict_project._HooksTrackOperations
+    entrypoint = dict(
+        path=os.path.realpath(
+            os.path.join(
+                os.path.dirname(__file__),
+                "define_hooks_track_operations_strict_project.py",
+            )
+        )
+    )
+    error_on_no_git = True
 
 
 class TestIgnoreConditions:

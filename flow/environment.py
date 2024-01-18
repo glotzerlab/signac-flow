@@ -34,6 +34,7 @@ from .scheduling.lsf import LSFScheduler
 from .scheduling.pbs import PBSScheduler
 from .scheduling.simple_scheduler import SimpleScheduler
 from .scheduling.slurm import SlurmScheduler
+from .util.misc import _deprecated_warning
 from .util.template_filters import calc_num_nodes
 
 logger = logging.getLogger(__name__)
@@ -130,11 +131,13 @@ class _PartitionConfig:
     Parameters
     ----------
     cpus_per_node: dict[str, int], optional
-        Mapping between partitions and CPUs per node. Defaults to an empyt `dict`.
+        Mapping from partition names to CPUs per node. Defaults to an empty
+        `dict`.
     gpus_per_node: dict[str, int], optional
-        Mapping between partitions and GPUs per node. Defaults to an empyt `dict`.
+        Mapping from partition names to GPUs per node. Defaults to an empty
+        `dict`.
     node_types: dict[str, _NodeTypes], optional
-        Mapping between partitions and node types. Defaults to an empyt `dict`.
+        Mapping from partitions to node types. Defaults to an empty `dict`.
     """
 
     _default_cpus_per_node = None
@@ -608,6 +611,44 @@ def registered_environments():
 
 
 def get_environment(test=False):
+    """Attempt to detect the present environment.
+
+    This function iterates through all defined :class:`~.ComputeEnvironment`
+    classes in reversed order of definition and returns the first
+    environment where the :meth:`~.ComputeEnvironment.is_present` method
+    returns True.
+
+    Note
+    ----
+    Environments can be set to raise FutureWarnings by setting a class attribute
+    ``_deprecated`` to ``True``.
+
+    Parameters
+    ----------
+    test : bool
+        Whether to return the TestEnvironment. (Default value = False)
+    import_configured : bool
+        Whether to import environments specified in the flow configuration.
+        (Default value = True)
+
+    Returns
+    -------
+    :class:`~.ComputeEnvironment`
+        The detected environment class.
+
+    """
+    env = _get_environment(test)
+    if getattr(env, "_deprecated", False):
+        _deprecated_warning(
+            deprecation=str(env),
+            alternative="",
+            deprecated_in="v0.27.0",
+            removed_in="v0.28.0",
+        )
+    return env
+
+
+def _get_environment(test=False):
     """Attempt to detect the present environment.
 
     This function iterates through all defined :class:`~.ComputeEnvironment`

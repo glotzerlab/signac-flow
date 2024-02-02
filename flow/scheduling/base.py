@@ -204,9 +204,9 @@ def _call_submit(submit_cmd, script, pretend):
     """
     submit_cmd_string = " ".join(submit_cmd)
     if pretend:
-        print(f"# Submit command: {submit_cmd_string}")
         print(script)
         print()
+        print(f"# Submit command: {submit_cmd_string}")
     else:
         with tempfile.NamedTemporaryFile() as tmp_submit_script:
             tmp_submit_script.write(str(script).encode("utf-8"))

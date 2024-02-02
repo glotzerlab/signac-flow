@@ -14,8 +14,8 @@ class GreatLakesEnvironment(DefaultSlurmEnvironment):
     hostname_pattern = r"gl(-login)?[0-9]+\.arc-ts\.umich\.edu"
     template = "umich-greatlakes.sh"
     _partition_config = _PartitionConfig(
-        cpus_per_node={"default": 36, "gpu": 40},
-        gpus_per_node={"gpu": 2},
+        cpus_per_node={"default": 36, "gpu": 40, "gpu_mig40": 64},
+        gpus_per_node={"gpu": 2, "gpu_mig40": 8},
     )
     # For unknown reasons, srun fails to export environment variables such as
     # PATH on Great Lakes unless explicitly requested to with --export=ALL.
@@ -36,7 +36,7 @@ class GreatLakesEnvironment(DefaultSlurmEnvironment):
         super().add_args(parser)
         parser.add_argument(
             "--partition",
-            choices=("standard", "gpu", "largemem"),
+            choices=("standard", "gpu_mig40", "gpu", "largemem"),
             default="standard",
             help="Specify the partition to submit to. (default=standard)",
         )

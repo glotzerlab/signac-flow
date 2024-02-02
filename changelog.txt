@@ -8,6 +8,14 @@ The numbers in brackets denote the related GitHub issue and/or pull request.
 Version 0.27
 ============
 
+[next] -- not yet released
+--------------------------
+
+Fixed
++++++
+
+- Suppress warning for regex operation names that match groups (#804).
+
 [0.27.0] -- 2024-01-15
 ----------------------
 

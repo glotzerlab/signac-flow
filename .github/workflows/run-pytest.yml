@@ -30,7 +30,7 @@ jobs:
           - python: '3.8'
             dependencies: 'oldest'
           - os: 'macos-14'
-            python: '3.8'
+            python: '3.10'
             dependencies: 'oldest'
           - os: 'macos-14'
             python: '3.12'

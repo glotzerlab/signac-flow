@@ -4,9 +4,9 @@
     {% if "shared" not in partition %}
 #SBATCH -N {{ resources.num_nodes }}
     {% endif %}
-#SBATCH --ntasks={{ resources.ncpus_tasks }}
+#SBATCH --ntasks={{ resources.ncpu_tasks }}
     {% if 'gpu' in partition %}
-#SBATCH --gpus={{ resources.gpu_tasks }}
+#SBATCH --gpus={{ resources.ngpu_tasks }}
     {% endif %}
 {% endblock tasks %}
 {% block header %}

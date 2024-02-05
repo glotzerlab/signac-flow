@@ -11,6 +11,11 @@ Version 0.27
 [next] -- not yet released
 --------------------------
 
+Fixed
++++++
+
+- Generate correct SLURM scripts on SDSC Expanse (#810).
+
 Changed
 +++++++
 

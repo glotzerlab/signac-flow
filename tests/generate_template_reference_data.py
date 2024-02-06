@@ -76,7 +76,7 @@ def init(project):
         ],
         "environments.umich.GreatLakesEnvironment": [
             {
-                "partition": ["standard", "gpu"],
+                "partition": ["standard", "gpu", "gpu_mig40"],
             },
             {
                 "parallel": [False, True],

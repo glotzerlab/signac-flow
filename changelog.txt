@@ -11,6 +11,11 @@ Version 0.27
 [next] -- not yet released
 --------------------------
 
+Added
++++++
+
+- Support the ``gpu_mig40`` partition on UMich Great Lakes (#811).
+
 Fixed
 +++++
 

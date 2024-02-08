@@ -5,7 +5,7 @@
 #SBATCH --nodes={{ resources.num_nodes }}-{{ resources.num_nodes }}
 #SBATCH --ntasks={{ nranks }}
 #SBATCH --cpus-per-task={{ resources.ncpu_tasks // nranks}}
-    {% if partition == 'gpu' %}
+    {% if partition.startswith('gpu') %}
 #SBATCH --gpus-per-task={{ resources.ngpu_tasks // nranks }}
     {% endif %}
 {% endblock tasks %}

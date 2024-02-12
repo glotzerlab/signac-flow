@@ -61,4 +61,4 @@ jobs:
     - name: Test with pytest
       run: |
         pytest --cov=flow --cov-config=pyproject.toml --cov-report=xml tests/ -v
-    - uses: codecov/codecov-action@v3
+    - uses: codecov/codecov-action@v4

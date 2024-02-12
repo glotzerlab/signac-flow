@@ -26,6 +26,11 @@ Changed
 
 - Move "Submit command" comment to end of pretend output (#805).
 
+Removed
++++++++
+
+- Remove Zenodo (#816).
+
 [0.27.0] -- 2024-01-15
 ----------------------
 

@@ -89,7 +89,6 @@ omit = [ "*/flow/templates/*.pyt", "*/flow/util/mistune/*.py" ]
 
 [tool.pydocstyle]
 convention = "numpy"
-match = "^((?!\\.sync-zenodo-metadata|setup).)*\\.py$"
 match-dir = "^((?!\\.|tests|mistune).)*$"
 ignore-decorators = "deprecated"
 

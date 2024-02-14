@@ -235,19 +235,19 @@ class aggregator:
             if default is None:
 
                 def keyfunction(job):
-                    return job.statepoint[key]
+                    return job.cached_statepoint[key]
 
             else:
 
                 def keyfunction(job):
-                    return job.statepoint.get(key, default)
+                    return job.cached_statepoint.get(key, default)
 
         elif isinstance(key, Iterable):
             keys = list(key)
             if default is None:
 
                 def keyfunction(job):
-                    return [job.statepoint[key] for key in keys]
+                    return [job.cached_statepoint[key] for key in keys]
 
             else:
                 if isinstance(default, Iterable):
@@ -264,7 +264,7 @@ class aggregator:
 
                 def keyfunction(job):
                     return [
-                        job.statepoint.get(key, default_value)
+                        job.cached_statepoint.get(key, default_value)
                         for key, default_value in zip(keys, default)
                     ]
 
@@ -456,7 +456,7 @@ class _AggregateStore(_BaseAggregateStore):
             else:
 
                 def sort_function(job):
-                    return job.statepoint[self._aggregator._sort_by]
+                    return job.cached_statepoint[self._aggregator._sort_by]
 
             jobs = sorted(
                 jobs,

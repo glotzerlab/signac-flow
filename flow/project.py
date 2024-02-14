@@ -3113,10 +3113,10 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
                     {
                         key
                         for job in individual_jobs
-                        for key in job.statepoint.keys()
+                        for key in job.cached_statepoint.keys()
                         if len(
                             {
-                                _to_hashable(job.statepoint().get(key))
+                                _to_hashable(job.cached_statepoint.get(key))
                                 for job in individual_jobs
                             }
                         )
@@ -3156,7 +3156,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
                         else:
                             parameter_name = parameter
                         if statepoint is None:
-                            statepoint = job.statepoint()
+                            statepoint = job.cached_statepoint
                         status["parameters"][parameter] = shorten(
                             str(self._alias(dotted_get(statepoint, parameter_name))),
                             param_max_width,

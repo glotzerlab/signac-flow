@@ -28,6 +28,11 @@ Changed
 - Improve aggregate registration performance (#818).
 - Hide empty "Labels" section in status output when there are no labels (#818).
 
+Removed
++++++++
+
+- Remove Zenodo (#816).
+
 [0.27.0] -- 2024-01-15
 ----------------------
 

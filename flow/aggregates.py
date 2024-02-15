@@ -11,7 +11,6 @@ import itertools
 from abc import abstractmethod
 from collections.abc import Collection, Iterable, Mapping
 from hashlib import md5
-import signac
 
 
 def _get_unique_function_id(func):

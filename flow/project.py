@@ -1794,7 +1794,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         else:
             return super().__len__()
 
-    def  _contains_job_id(self, job_id):
+    def _contains_job_id(self, job_id):
         """Provide a cached view of jobs while in a buffered state."""
         if self._is_buffered:
             return job_id in self._jobs_cursor._id_set

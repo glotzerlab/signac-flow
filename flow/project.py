@@ -1273,6 +1273,11 @@ class _FlowProjectClass(type):
             are used by :meth:`~.detect_operation_graph` when comparing
             conditions for equality. The tag defaults to the bytecode of the
             function.
+
+            .. tip::
+
+                Use ``job.cached_statepoint`` for the best performance in pre conditions
+                that depend on the job's statepoint.
             """
 
             _parent_class = parent_class

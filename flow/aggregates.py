@@ -11,6 +11,7 @@ import itertools
 from abc import abstractmethod
 from collections.abc import Collection, Iterable, Mapping
 from hashlib import md5
+import signac
 
 
 def _get_unique_function_id(func):
@@ -430,11 +431,6 @@ class _AggregateStore(_BaseAggregateStore):
         # Initialize the internal mapping from id to aggregate
         self._aggregates_by_id = {}
         for aggregate in self._generate_aggregates():
-            for job in aggregate:
-                if job not in self._project:
-                    raise LookupError(
-                        f"The signac job {job.id} not found in {self._project}"
-                    )
             try:
                 stored_aggregate = tuple(aggregate)
             except TypeError:  # aggregate is not iterable
@@ -517,14 +513,7 @@ class _DefaultAggregateStore(_BaseAggregateStore):
             The job id.
 
         """
-        try:
-            self._project.open_job(id=id)
-        except KeyError:
-            return False
-        except LookupError:
-            raise
-        else:
-            return True
+        return self._project._contains_job_id(job_id=id)
 
     def __len__(self):
         return len(self._project)
@@ -538,8 +527,11 @@ class _DefaultAggregateStore(_BaseAggregateStore):
         return hash(self._project_repr)
 
     def keys(self):
-        for job in self._project:
-            yield job.id
+        if self._project._is_buffered:
+            return self._project._jobs_cursor._ids
+        else:
+            for job in self._project:
+                yield job.id
 
     def values(self):
         for job in self._project:

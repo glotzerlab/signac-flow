@@ -1746,6 +1746,9 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
             format_checker=jsonschema.Draft7Validator.FORMAT_CHECKER,
         )
 
+        self._is_buffered = False
+        self._jobs_cursor = None
+
         # Associate this class with a compute environment.
         self._environment = environment or get_environment()
 
@@ -1776,6 +1779,27 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         self._groups = {}
         self._group_to_aggregate_store = _bidict()
         self._register_groups()
+
+    def __iter__(self):
+        """Provide a cached view of jobs while in a buffered state."""
+        if self._is_buffered:
+            return iter(self._jobs_cursor)
+        else:
+            return super().__iter__()
+
+    def __len__(self):
+        """Provide a cached view of jobs while in a buffered state."""
+        if self._is_buffered:
+            return len(self._jobs_cursor._ids)
+        else:
+            return super().__len__()
+
+    def  _contains_job_id(self, job_id):
+        """Provide a cached view of jobs while in a buffered state."""
+        if self._is_buffered:
+            return job_id in self._jobs_cursor._id_set
+        else:
+            return super()._contains_job_id(job_id)
 
     def _setup_template_environment(self):
         """Set up the jinja2 template environment.
@@ -3981,9 +4005,17 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
     def _buffered(self):
         """Enable the use of buffered mode for certain functions."""
         logger.debug("Entering buffered mode.")
+
+        self._jobs_cursor = self.find_jobs()
+        self._is_buffered = True
+
         with signac.buffered():
             yield
+
         logger.debug("Exiting buffered mode.")
+
+        self._is_buffered = False
+        self._jobs_cursor = None
 
     def _generate_submit_script(
         self, _id, operations, template, show_template_help, **kwargs

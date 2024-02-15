@@ -2786,14 +2786,17 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
                 self._get_job_labels,
                 ignore_errors=ignore_errors,
             )
-            job_labels = list(
-                parallel_executor(
-                    compute_labels,
-                    individual_jobs,
-                    desc="Fetching labels",
-                    file=err,
+            if len(self._label_functions) > 0:
+                job_labels = list(
+                    parallel_executor(
+                        compute_labels,
+                        individual_jobs,
+                        desc="Fetching labels",
+                        file=err,
+                    )
                 )
-            )
+            else:
+                job_labels = []
 
         def combine_group_and_operation_status(aggregate_status_results):
             group_statuses = {}

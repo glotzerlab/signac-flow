@@ -1273,6 +1273,11 @@ class _FlowProjectClass(type):
             are used by :meth:`~.detect_operation_graph` when comparing
             conditions for equality. The tag defaults to the bytecode of the
             function.
+
+            .. tip::
+
+                Use ``job.cached_statepoint`` for the best performance in preconditions
+                that depend on the job's statepoint.
             """
 
             _parent_class = parent_class
@@ -1746,6 +1751,9 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
             format_checker=jsonschema.Draft7Validator.FORMAT_CHECKER,
         )
 
+        self._is_buffered = False
+        self._jobs_cursor = None
+
         # Associate this class with a compute environment.
         self._environment = environment or get_environment()
 
@@ -1776,6 +1784,27 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         self._groups = {}
         self._group_to_aggregate_store = _bidict()
         self._register_groups()
+
+    def __iter__(self):
+        """Provide a cached view of jobs while in a buffered state."""
+        if self._is_buffered:
+            return iter(self._jobs_cursor)
+        else:
+            return super().__iter__()
+
+    def __len__(self):
+        """Provide a cached view of jobs while in a buffered state."""
+        if self._is_buffered:
+            return len(self._jobs_cursor._ids)
+        else:
+            return super().__len__()
+
+    def _contains_job_id(self, job_id):
+        """Provide a cached view of jobs while in a buffered state."""
+        if self._is_buffered:
+            return job_id in self._jobs_cursor._id_set
+        else:
+            return super()._contains_job_id(job_id)
 
     def _setup_template_environment(self):
         """Set up the jinja2 template environment.
@@ -2754,14 +2783,17 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
                 self._get_job_labels,
                 ignore_errors=ignore_errors,
             )
-            job_labels = list(
-                parallel_executor(
-                    compute_labels,
-                    individual_jobs,
-                    desc="Fetching labels",
-                    file=err,
+            if len(self._label_functions) > 0:
+                job_labels = list(
+                    parallel_executor(
+                        compute_labels,
+                        individual_jobs,
+                        desc="Fetching labels",
+                        file=err,
+                    )
                 )
-            )
+            else:
+                job_labels = []
 
         def combine_group_and_operation_status(aggregate_status_results):
             group_statuses = {}
@@ -3105,10 +3137,10 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
                     {
                         key
                         for job in individual_jobs
-                        for key in job.statepoint.keys()
+                        for key in job.cached_statepoint.keys()
                         if len(
                             {
-                                _to_hashable(job.statepoint().get(key))
+                                _to_hashable(job.cached_statepoint.get(key))
                                 for job in individual_jobs
                             }
                         )
@@ -3148,7 +3180,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
                         else:
                             parameter_name = parameter
                         if statepoint is None:
-                            statepoint = job.statepoint()
+                            statepoint = job.cached_statepoint
                         status["parameters"][parameter] = shorten(
                             str(self._alias(dotted_get(statepoint, parameter_name))),
                             param_max_width,
@@ -3981,9 +4013,17 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
     def _buffered(self):
         """Enable the use of buffered mode for certain functions."""
         logger.debug("Entering buffered mode.")
+
+        self._jobs_cursor = self.find_jobs()
+        self._is_buffered = True
+
         with signac.buffered():
             yield
+
         logger.debug("Exiting buffered mode.")
+
+        self._is_buffered = False
+        self._jobs_cursor = None
 
     def _generate_submit_script(
         self, _id, operations, template, show_template_help, **kwargs

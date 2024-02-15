@@ -18,11 +18,13 @@
 Overview: {{ total_num_jobs_or_aggregates }} jobs/aggregates, {{ total_num_eligible_jobs_or_aggregates }} jobs/aggregates with eligible operations.
 
         {% block progress %}
+            {% if progress_sorted|length > 0 %}
 | label | ratio |
 | ----- | ----- |
-            {% for label in progress_sorted %}
+                {% for label in progress_sorted %}
 | {{ label[0] }} | {{ label[1]|draw_progress_bar(total_num_job_labels, '\\') }} |
-            {% endfor %}
+                {% endfor %}
+            {% endif %}
         {% endblock progress %}
 
         {% block operation_summary %}

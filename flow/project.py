@@ -1276,7 +1276,7 @@ class _FlowProjectClass(type):
 
             .. tip::
 
-                Use ``job.cached_statepoint`` for the best performance in pre conditions
+                Use ``job.cached_statepoint`` for the best performance in preconditions
                 that depend on the job's statepoint.
             """
 

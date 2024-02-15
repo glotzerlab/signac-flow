@@ -235,19 +235,19 @@ class aggregator:
             if default is None:
 
                 def keyfunction(job):
-                    return job.statepoint[key]
+                    return job.cached_statepoint[key]
 
             else:
 
                 def keyfunction(job):
-                    return job.statepoint.get(key, default)
+                    return job.cached_statepoint.get(key, default)
 
         elif isinstance(key, Iterable):
             keys = list(key)
             if default is None:
 
                 def keyfunction(job):
-                    return [job.statepoint[key] for key in keys]
+                    return [job.cached_statepoint[key] for key in keys]
 
             else:
                 if isinstance(default, Iterable):
@@ -264,7 +264,7 @@ class aggregator:
 
                 def keyfunction(job):
                     return [
-                        job.statepoint.get(key, default_value)
+                        job.cached_statepoint.get(key, default_value)
                         for key, default_value in zip(keys, default)
                     ]
 
@@ -430,11 +430,6 @@ class _AggregateStore(_BaseAggregateStore):
         # Initialize the internal mapping from id to aggregate
         self._aggregates_by_id = {}
         for aggregate in self._generate_aggregates():
-            for job in aggregate:
-                if job not in self._project:
-                    raise LookupError(
-                        f"The signac job {job.id} not found in {self._project}"
-                    )
             try:
                 stored_aggregate = tuple(aggregate)
             except TypeError:  # aggregate is not iterable
@@ -456,7 +451,7 @@ class _AggregateStore(_BaseAggregateStore):
             else:
 
                 def sort_function(job):
-                    return job.statepoint[self._aggregator._sort_by]
+                    return job.cached_statepoint[self._aggregator._sort_by]
 
             jobs = sorted(
                 jobs,
@@ -517,14 +512,7 @@ class _DefaultAggregateStore(_BaseAggregateStore):
             The job id.
 
         """
-        try:
-            self._project.open_job(id=id)
-        except KeyError:
-            return False
-        except LookupError:
-            raise
-        else:
-            return True
+        return self._project._contains_job_id(job_id=id)
 
     def __len__(self):
         return len(self._project)
@@ -538,8 +526,11 @@ class _DefaultAggregateStore(_BaseAggregateStore):
         return hash(self._project_repr)
 
     def keys(self):
-        for job in self._project:
-            yield job.id
+        if self._project._is_buffered:
+            return self._project._jobs_cursor._ids
+        else:
+            for job in self._project:
+                yield job.id
 
     def values(self):
         for job in self._project:

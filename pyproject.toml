@@ -31,7 +31,7 @@ classifiers = [
 ]
 dependencies = [
     # The core package.
-    "signac>=2.0.0",
+    "signac>=2.2.0",
     # For the templated generation of (submission) scripts.
     "jinja2>=3.0.0",
     # To enable the parallelized execution of operations across processes.

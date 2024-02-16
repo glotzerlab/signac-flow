@@ -5,6 +5,35 @@ Changelog
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 The numbers in brackets denote the related GitHub issue and/or pull request.
 
+Version 0.28
+============
+
+[next] -- not yet released
+--------------------------
+
+Added
++++++
+
+- Support the ``gpu_mig40`` partition on UMich Great Lakes (#811).
+
+Fixed
++++++
+
+- Generate correct SLURM scripts on SDSC Expanse (#810).
+- Suppress warning for regex operation names that match groups (#804).
+
+Changed
++++++++
+
+- Move "Submit command" comment to end of pretend output (#805).
+- Improve aggregate registration performance (#818).
+- Hide empty "Labels" section in status output when there are no labels (#818).
+
+Removed
++++++++
+
+- Remove Zenodo (#816).
+
 Version 0.27
 ============
 

@@ -21,8 +21,10 @@ That includes the definition of data pipelines, execution of data space operatio
   Examples, tutorials, topic guides, and package Python APIs.
 - [Package documentation](https://docs.signac.io/projects/flow/):
   API reference for the **signac-flow** package.
-- [Slack Chat Support](https://signac.io/slack-invite/):
-  Get help and ask questions on the **signac** Slack workspace.
+- [Discussion board](https://github.com/glotzerlab/signac-flow/discussions/):
+  Ask the **signac-flow** user community for help.
+- [Slack workspace](https://signac.io/slack-invite/):
+  Chat about **signac-flow**.
 - [**signac** website](https://signac.io/):
   Framework overview and news.
 

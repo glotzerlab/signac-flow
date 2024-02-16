@@ -1042,7 +1042,7 @@ class TestExecutionProject(TestProjectBase):
             project.run(names=["op1", "non-existent-op"])
             assert all(job.isfile("world.txt") for job in even_jobs)
             assert not any(job.doc.get("test") for job in project)
-            project.run(names=["op[^4]", "non-existent-op"])
+            project.run(names=["op[^4]", "non-existent-op", "non-existent.*"])
             assert all(job.isfile("world.txt") for job in even_jobs)
             assert all(job.doc.get("test") for job in project)
             assert all("dynamic" not in job.doc for job in project)

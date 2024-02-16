@@ -2676,14 +2676,6 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
             only has to occur one time.
 
         """
-        if names is not None:
-            absent_ops = (set(self._groups.keys()) ^ set(names)) & set(names)
-            if absent_ops:
-                print(
-                    f"Unrecognized flow operation(s): {', '.join(absent_ops)}",
-                    file=sys.stderr,
-                )
-
         if status_parallelization not in ("thread", "process", "none"):
             raise RuntimeError(
                 "Configuration value status_parallelization is invalid. "
@@ -3645,13 +3637,6 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
             )
         if names is None:
             names = list(self.operations)
-        else:
-            absent_ops = (set(self._groups.keys()) ^ set(names)) & set(names)
-            if absent_ops:
-                print(
-                    f"Unrecognized flow operation(s): {', '.join(absent_ops)}",
-                    file=sys.stderr,
-                )
 
         # Get default directives
         default_directives = self._get_default_directives()
@@ -3731,7 +3716,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
                 # Generate _JobOperation instances for selected groups and aggregates.
                 with self._buffered():
                     operations = []
-                    run_groups = set(self._gather_executable_flow_groups(names))
+                    run_groups = set(self._gather_executable_flow_groups(names, i_pass))
                     for (
                         aggregate_id,
                         aggregate,
@@ -3793,7 +3778,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
                 operations, pretend=pretend, np=np, timeout=timeout, progress=progress
             )
 
-    def _gather_selected_flow_groups(self, names=None):
+    def _gather_selected_flow_groups(self, names=None, i_pass=1):
         r"""Grabs :class:`~.FlowGroup`\ s that match any of a set of names.
 
         The provided names can be any regular expression that fully matches a group name.
@@ -3803,6 +3788,8 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         names : iterable of :class:`str`
             Only select groups that match the provided set of names (interpreted as regular
             expressions), or all if the argument is None. (Default value = None)
+        i_pass : int
+            The current pass in `run`. Used to print the warning message only once.
 
         Returns
         -------
@@ -3813,6 +3800,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         if names is None:
             return list(self._groups.values())
         operations = {}
+        absent_ops = []
         for name in names:
             if name in operations:
                 continue
@@ -3821,11 +3809,21 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
                 for group_name, group in self.groups.items()
                 if re.fullmatch(name, group_name)
             ]
+
+            if i_pass == 1 and len(groups) == 0:
+                absent_ops.append(name)
+
             for group in groups:
                 operations[group.name] = group
+
+        if len(absent_ops) > 0:
+            print(
+                f"Unrecognized flow operation(s): {', '.join(absent_ops)}",
+                file=sys.stderr,
+            )
         return list(operations.values())
 
-    def _gather_executable_flow_groups(self, names=None):
+    def _gather_executable_flow_groups(self, names=None, i_pass=1):
         r"""Grabs immediately executable flow groups that match any given name.
 
         The provided names can be any regular expression that fully match a group name.
@@ -3841,6 +3839,8 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         names : iterable of :class:`str`
             Only select groups that match the provided set of names (interpreted as regular
             expressions), or all singleton groups if the argument is None. (Default value = None)
+        i_pass : int
+            The current pass in `run`. Used to print the warning message only once.
 
         Returns
         -------
@@ -3850,7 +3850,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         """
         if names is None:
             return [self._groups[op_name] for op_name in self.operations]
-        operations = self._gather_selected_flow_groups(names)
+        operations = self._gather_selected_flow_groups(names, i_pass)
         # Have to verify no overlap to ensure all returned groups are
         # simultaneously executable.
         if not FlowProject._verify_group_compatibility(operations):
@@ -4189,14 +4189,6 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
             Additional keyword arguments forwarded to :meth:`~.ComputeEnvironment.submit`.
 
         """
-        if names is not None:
-            absent_ops = (set(self._groups.keys()) ^ set(names)) & set(names)
-            if absent_ops:
-                print(
-                    f"Unrecognized flow operation(s): {', '.join(absent_ops)}",
-                    file=sys.stderr,
-                )
-
         aggregates = self._convert_jobs_to_aggregates(jobs)
 
         # Regular argument checks and expansion

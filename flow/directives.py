@@ -8,7 +8,6 @@ of processors required for an operation.
 """
 import datetime
 import functools
-import operator
 import sys
 import warnings
 from collections.abc import MutableMapping
@@ -213,22 +212,6 @@ def _list_of_dicts_to_dict_of_list(a):
     return {k: [m.get(k, None) for m in a] for k in a[0]}
 
 
-def _get_directive_of_lists(directives_list):
-    directives = _list_of_dicts_to_dict_of_list(directives_list)
-    directives["cpus"] = flow.util.misc.list_op(
-        operator.mul, directives["processes"], directives["threads_per_process"]
-    )
-    directives["gpus"] = flow.util.misc.list_op(
-        operator.mul, directives["processes"], directives["gpus_per_process"]
-    )
-    directives["memory"] = flow.util.misc.list_op(
-        operator.mul,
-        directives["cpus"],
-        (0 if mem is None else mem for mem in directives["memory_per_cpu"]),
-    )
-    return directives
-
-
 def _check_compatible_directives(directives_of_lists):
     """Routine checks for directives within a group."""
     if "mpi" in directives_of_lists["launcher"]:
@@ -254,7 +237,7 @@ def _check_compatible_directives(directives_of_lists):
 
 
 def _group_directive_aggregation(group_directives):
-    directives = _get_directive_of_lists(group_directives)
+    directives = _list_of_dicts_to_dict_of_list(group_directives)
     _check_compatible_directives(directives)
     # Each group will have a primary operation (the one that requests the most
     # resources. This may or may not be unique. We have to pick on for purposes
@@ -262,23 +245,17 @@ def _group_directive_aggregation(group_directives):
     if "mpi" in directives["launcher"]:
         # All MPI operations must be homogeneous can pick any one and any non-MPI ones are subsets
         # that should work correctly.
-        primary_operation_index = 0
+        primary_directive = group_directives[0]
     else:
-        primary_operation_index = flow.util.misc.argmax(directives["cpus"])
-    primary_directive = group_directives[primary_operation_index]
-    primary_directive["walltime"] = sum(
-        (w for w in directives["walltime"] if w is not None), start=datetime.timedelta()
+        primary_operation_index = flow.util.misc._tolerant_argmax(directives["cpus"])
+        primary_directive = group_directives[primary_operation_index]
+        primary_directive["gpus"] = max(directives["gpus"])
+        primary_directive["cpus"] = max(directives["cpus"])
+        primary_directive["memory"] = flow.util.misc._tolerant_max(directives["memory"])
+
+    primary_directive["walltime"] = flow.util.misc._tolerant_sum(
+        directives["walltime"], start=datetime.timedelta()
     )
-    # Handle memory. Since we have potentially nonheterogeneous requests, we
-    # need to check that the highest memory job has enough memory.
-    max_memory_index = flow.util.misc.argmax(directives["memory"])
-    memory_per_cpu = (
-        directives["memory"][max_memory_index]
-        / directives["cpus"][primary_operation_index]
-    )
-    if memory_per_cpu != 0:
-        primary_directive["memory_per_cpu"] = memory_per_cpu
-    # TODO: Pretty sure this is broken for GPU submission with different number of GPUS.
     return primary_directive
 
 
@@ -289,45 +266,43 @@ def _check_bundle_directives(list_of_directives, parallel):
 
 
 def _bundle_directives_aggregation(list_of_directives, parallel):
-    directives_of_lists = _get_directive_of_lists(list_of_directives)
+    directives_of_lists = _list_of_dicts_to_dict_of_list(list_of_directives)
     _check_compatible_directives(directives_of_lists)
     # We know we don't have MPI operations here.
     if parallel:
-        memory = sum(filter(lambda x: x is not None, directives_of_lists["memory"]))
         cpus = sum(directives_of_lists["cpus"])
-        memory_per_cpu = None if memory == 0 else memory / cpus
+        gpus = sum(directives_of_lists["gpus"])
+        memory = flow.util.misc._tolerant_sum(directives_of_lists["memory"])
+        memory_per_cpu = None if memory is None else memory / cpus
         return {
             "launcher": None,
-            "walltime": max(
-                w for w in directives_of_lists["walltime"] if w is not None
-            ),
+            "walltime": flow.util.misc._tolerant_max(directives_of_lists["walltime"]),
             "processes": 1,
             "threads_per_process": cpus,
-            "gpus_per_process": sum(directives_of_lists["gpus"]),
+            "gpus_per_process": gpus,
             "memory_per_cpu": memory_per_cpu,
+            "cpus": cpus,
+            "gpus": gpus,
+            "memory": memory,
         }
     # Each group will have a primary operation (the one that requests the most
     # resources. This may or may not be unique. We have to pick on for purposes
     # of scheduling though to properly request resources.
-    walltime = sum(
-        (w for w in directives_of_lists["walltime"] if w is not None),
-        start=datetime.timedelta(),
-    )
-    max_memory_index = flow.util.misc.argmax(
-        filter(lambda x: x is not None, directives_of_lists["memory"])
+    walltime = flow.util.misc._tolerant_sum(
+        directives_of_lists["walltime"], start=datetime.timedelta()
     )
     if "mpi" in directives_of_lists["launcher"]:
+        max_memory_index = flow.util.misc._tolerant_argmax(
+            filter(lambda x: x is not None, directives_of_lists["memory"])
+        )
         if max_memory_index is None:
             memory_per_cpu = None
         else:
-            memory_per_cpu = (
-                directives_of_lists["memory"][max_memory_index]
-                / directives_of_lists["cpus"][0]
-            )
-
+            memory_per_cpu = directives_of_lists["memory_per_cpu"][max_memory_index]
         # All MPI operations must be homogeneous can pick any one and any non-MPI ones are subsets
         # that should work correctly.
         primary_operation = list_of_directives[0]
+        cpus = primary_operation["processes"] * primary_operation["threads_per_process"]
         return {
             "launcher": primary_operation["launcher"],
             "walltime": walltime,
@@ -335,22 +310,26 @@ def _bundle_directives_aggregation(list_of_directives, parallel):
             "threads_per_process": primary_operation["threads_per_process"],
             "gpus_per_process": primary_operation["gpus_per_process"],
             "memory_per_cpu": memory_per_cpu,
+            "cpus": cpus,
+            "gpus": primary_operation["processes"]
+            * primary_operation["gpus_per_process"],
+            "memory": None if memory_per_cpu is None else cpus * memory_per_cpu,
         }
-    primary_operation_index = flow.util.misc.argmax(directives_of_lists["cpus"])
-    if max_memory_index is None:
-        memory_per_cpu = None
-    else:
-        memory_per_cpu = (
-            directives_of_lists["memory"][max_memory_index]
-            / directives_of_lists["cpus"][primary_operation_index]
-        )
+    # Serial non-MPI
+    cpus = max(directives_of_lists["cpus"])
+    total_memory = flow.util.misc._tolerant_max(directives_of_lists["memory"])
+    memory_per_cpu = None if total_memory is None else total_memory / cpus
+    gpus = max(directives_of_lists["gpus"])
     return {
         "launcher": None,
         "walltime": walltime,
         "processes": 1,
-        "threads_per_process": directives_of_lists["cpus"][primary_operation_index],
-        "gpus_per_process": max(directives_of_lists["gpus_per_process"]),
+        "threads_per_process": cpus,
+        "gpus_per_process": gpus,
         "memory_per_cpu": memory_per_cpu,
+        "cpus": cpus,
+        "gpus": gpus,
+        "memory": total_memory,
     }
 
 

@@ -42,50 +42,6 @@ class SummitEnvironment(DefaultLSFEnvironment):
     )
 
     @template_filter
-    def calc_num_nodes(cls, resource_sets, parallel=False):
-        """Compute the number of nodes needed.
-
-        Parameters
-        ----------
-        resource_sets : iterable of tuples
-            Resource sets for each operation, as a sequence of tuples of
-            *(Number of resource sets, tasks (MPI Ranks) per resource set,
-            physical cores (CPUs) per resource set, GPUs per resource set)*.
-        parallel : bool
-            Whether operations should run in parallel or serial. (Default value
-            = False)
-
-        Returns
-        -------
-        int
-            Number of nodes needed.
-
-        """
-        nodes_used_final = 0
-        cores_used = gpus_used = nodes_used = 0
-        for nsets, tasks, cpus_per_task, gpus in resource_sets:
-            if not parallel:
-                # In serial mode we reset for every operation.
-                cores_used = gpus_used = nodes_used = 0
-            for _ in range(nsets):
-                cores_used += tasks * cpus_per_task
-                gpus_used += gpus
-                while cores_used > cls.cores_per_node or gpus_used > cls.gpus_per_node:
-                    nodes_used += 1
-                    cores_used = max(0, cores_used - cls.cores_per_node)
-                    gpus_used = max(0, gpus_used - cls.gpus_per_node)
-            if not parallel:
-                #  Note that when running in serial the "leftovers" must be
-                #  accounted for on a per-operation basis.
-                if cores_used > 0 or gpus_used > 0:
-                    nodes_used += 1
-                nodes_used_final = max(nodes_used, nodes_used_final)
-        if parallel:
-            if cores_used > 0 or gpus_used > 0:
-                nodes_used += 1
-            nodes_used_final = nodes_used
-        return nodes_used_final
-
     def guess_resource_sets(cls, directives):
         """Determine the resources sets needed for an operation.
 

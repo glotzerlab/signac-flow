@@ -214,15 +214,47 @@ def _list_of_dicts_to_dict_of_list(a):
 
 def _check_compatible_directives(directives_of_lists):
     """Routine checks for directives within a group."""
-    if "mpi" in directives_of_lists["launcher"]:
-        if (
-            len(set(directives_of_lists["gpus_per_process"])) != 1
-            or len(set(directives_of_lists["threads_per_process"])) != 1
-            or len(set(directives_of_lists["processes"])) != 1
+    mpi_directives = [
+        i
+        for i, launcher in enumerate(directives_of_lists["launcher"])
+        if launcher == "mpi"
+    ]
+    if len(mpi_directives) > 0:
+        base_directives = {
+            "processes": directives_of_lists["processes"][mpi_directives[0]],
+            "gpus_per_process": directives_of_lists["gpus_per_process"][
+                mpi_directives[0]
+            ],
+            "threads_per_process": directives_of_lists["threads_per_process"][
+                mpi_directives[0]
+            ],
+        }
+        if len(mpi_directives > 1) and any(
+            directives_of_lists["processes"][i] != base_directives["processes"]
+            or directives_of_lists["gpus_per_process"][i]
+            != base_directives["gpus_per_process"]
+            or directives_of_lists["threads_per_process"][i]
+            != base_directives["threads_per_process"]
+            for i in mpi_directives[1:]
         ):
             raise SubmitError("Cannot submit non-homogeneous MPI jobs.")
-        if None in directives_of_lists["launcher"]:
-            raise SubmitError("Cannot submit MPI and nonMPI jobs together.")
+        if len(mpi_directives) != len(directives_of_lists["processes"]):
+            for i in range(len(directives_of_lists["processes"])):
+                if i in mpi_directives:
+                    continue
+                if (
+                    directives_of_lists["cpus"]
+                    <= base_directives["threads_per_process"]
+                ):
+                    raise SubmitError(
+                        "Cannot submit nonMPI job that requires mores cores than "
+                        "threads per MPI task."
+                    )
+                if directives_of_lists["gpus"] <= base_directives["gpus_per_process"]:
+                    raise SubmitError(
+                        "Cannot submit nonMPI job that requires mores GPUs than "
+                        "GPUs per MPI task."
+                    )
     else:
         if len(set(directives_of_lists["gpus"])) > 1:
             warnings.warn(
@@ -267,6 +299,7 @@ def _check_bundle_directives(list_of_directives, parallel):
 
 def _bundle_directives_aggregation(list_of_directives, parallel):
     directives_of_lists = _list_of_dicts_to_dict_of_list(list_of_directives)
+    _check_bundle_directives(list_of_directives, parallel)
     _check_compatible_directives(directives_of_lists)
     # We know we don't have MPI operations here.
     if parallel:
@@ -285,24 +318,21 @@ def _bundle_directives_aggregation(list_of_directives, parallel):
             "gpus": gpus,
             "memory": memory,
         }
-    # Each group will have a primary operation (the one that requests the most
-    # resources. This may or may not be unique. We have to pick on for purposes
-    # of scheduling though to properly request resources.
     walltime = flow.util.misc._tolerant_sum(
         directives_of_lists["walltime"], start=datetime.timedelta()
     )
     if "mpi" in directives_of_lists["launcher"]:
-        max_memory_index = flow.util.misc._tolerant_argmax(
-            filter(lambda x: x is not None, directives_of_lists["memory"])
-        )
-        if max_memory_index is None:
-            memory_per_cpu = None
-        else:
-            memory_per_cpu = directives_of_lists["memory_per_cpu"][max_memory_index]
         # All MPI operations must be homogeneous can pick any one and any non-MPI ones are subsets
         # that should work correctly.
-        primary_operation = list_of_directives[0]
+        primary_operation = list_of_directives[
+            list_of_directives["launcher"].index("mpi")
+        ]
         cpus = primary_operation["processes"] * primary_operation["threads_per_process"]
+        memory = flow.util.misc._tolerant_max(directives_of_lists["memory"])
+        if memory is None:
+            memory_per_cpu = None
+        else:
+            memory_per_cpu = memory / cpus
         return {
             "launcher": primary_operation["launcher"],
             "walltime": walltime,
@@ -313,7 +343,7 @@ def _bundle_directives_aggregation(list_of_directives, parallel):
             "cpus": cpus,
             "gpus": primary_operation["processes"]
             * primary_operation["gpus_per_process"],
-            "memory": None if memory_per_cpu is None else cpus * memory_per_cpu,
+            "memory": memory,
         }
     # Serial non-MPI
     cpus = max(directives_of_lists["cpus"])

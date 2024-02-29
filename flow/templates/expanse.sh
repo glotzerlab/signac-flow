@@ -1,9 +1,7 @@
 {# Templated in accordance with: https://www.sdsc.edu/support/user_guides/expanse.html #}
 {% extends "slurm.sh" %}
 {% block tasks %}
-    {% if "shared" not in partition %}
 #SBATCH -N {{ resources.num_nodes }}
-    {% endif %}
 #SBATCH --ntasks={{ resources.ncpu_tasks }}
     {% if 'gpu' in partition %}
 #SBATCH --gpus={{ resources.ngpu_tasks }}

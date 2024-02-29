@@ -432,3 +432,31 @@ def _deprecated_warning(
 __all__ = [
     "redirect_log",
 ]
+
+
+def _argmax(a):
+    max_i = 0
+    max_ = None
+    for i, value in enumerate(a):
+        if max_ is None:
+            max_ = value
+            max_i = i
+        if max_ < value:
+            max_ = value
+            max_i = i
+    return max_i
+
+
+def _tolerant_iter_function(func):
+    def new_func(iter, *args, **kwargs):
+        values = [i for i in iter if i is not None]
+        if len(values) == 0:
+            return None
+        return func(values, *args, **kwargs)
+
+    return new_func
+
+
+_tolerant_argmax = _tolerant_iter_function(_argmax)
+_tolerant_max = _tolerant_iter_function(max)
+_tolerant_sum = _tolerant_iter_function(sum)

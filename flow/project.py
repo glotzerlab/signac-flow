@@ -406,7 +406,7 @@ class _SubmissionJobOperation(_JobOperation):
     cmd : callable or str
         The command that executes this operation. Can be a callable that when
         evaluated returns a string.
-    primary_directives : list[dict[str, any]]
+    primary_directives : dict[str, any]
         Directives of the maximal job or directives such that all operations
         have their resources met.
     directives_list : list[dict[str, any]]
@@ -1220,10 +1220,11 @@ class FlowGroup:
 
     def _fork_op(self, directives):
         # TODO: note that since we use threads_per_process and not specifically
-        # omp_num_threads, we don't necessarily need to fork when setting
+        # OMP threads, we don't necessarily need to fork when setting
         # threads_per_process, however, to correctly use OMP we do. Perhaps this
         # is an argument for an omp directive. Otherwise, we need to fork here
-        # if that is set which we currently don't.
+        # if that is set which we currently don't. Or allow for multiple
+        # launchers (consider OMP a launcher) and check for compatibility.
         return (
             len(self.run_options) > 0
             or directives["executable"] != sys.executable
@@ -1911,7 +1912,6 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         ] = template_filters.format_timedelta
         template_environment.filters["format_memory"] = template_filters.format_memory
         template_environment.filters["identical"] = template_filters.identical
-        template_environment.filters["with_np_offset"] = template_filters.with_np_offset
         template_environment.filters["calc_tasks"] = template_filters.calc_tasks
         template_environment.filters["calc_num_nodes"] = template_filters.calc_num_nodes
         template_environment.filters["calc_walltime"] = template_filters.calc_walltime
@@ -4124,7 +4124,7 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
 
         Parameters
         ----------
-        operations : A sequence of instances of :class:`~._JobOperation`
+        operations : A sequence of instances of :class:`~._SubmissionOperation`
             The operations to submit.
         _id : str
             The _id to be used for this submission. (Default value = None)

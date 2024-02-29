@@ -79,7 +79,7 @@ class TestItems:
     def test_default(self):
         assert _PROCESSES._default == 1
         assert _GPUS_PER_PROCESS._default == 0
-        assert _THREADS_PER_PROCESS._default == 0
+        assert _THREADS_PER_PROCESS._default == 1
         assert _MEMORY_PER_CPU._default is None
         assert _GET_EXECUTABLE()._default == sys.executable
         assert _WALLTIME._default is None

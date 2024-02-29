@@ -2,12 +2,12 @@ import flow
 
 
 class TestProject(flow.FlowProject):
-    ngpu = 2
-    np = 3
-    omp_num_threads = 4
-    nranks = 5
+    gpus_per_process = 1
+    processes = 3
+    threads_per_process = 4
+    launcher = "mpi"
     walltime = 1
-    memory = "512m"
+    memory_per_cpu = "512m"
 
 
 group1 = TestProject.make_group(name="group1")
@@ -20,25 +20,30 @@ def serial_op(job):
 
 
 @group1
-@TestProject.operation(directives={"np": TestProject.np})
+@TestProject.operation(directives={"processes": TestProject.processes})
 def parallel_op(job):
     pass
 
 
-@TestProject.operation(directives={"nranks": TestProject.nranks})
+@TestProject.operation(
+    directives={"processes": TestProject.processes, "launcher": TestProject.launcher}
+)
 def mpi_op(job):
     pass
 
 
-@TestProject.operation(directives={"omp_num_threads": TestProject.omp_num_threads})
+@TestProject.operation(
+    directives={"threads_per_process": TestProject.threads_per_process}
+)
 def omp_op(job):
     pass
 
 
 @TestProject.operation(
     directives={
-        "nranks": TestProject.nranks,
-        "omp_num_threads": TestProject.omp_num_threads,
+        "processes": TestProject.processes,
+        "threads_per_process": TestProject.threads_per_process,
+        "launcher": "mpi",
     }
 )
 def hybrid_op(job):
@@ -46,21 +51,29 @@ def hybrid_op(job):
 
 
 @TestProject.operation(
-    directives={"ngpu": TestProject.ngpu, "nranks": TestProject.ngpu}
+    directives={
+        "gpus_per_process": TestProject.gpus_per_process,
+        "processes": TestProject.gpus_per_process,
+        "launcher": TestProject.launcher,
+    }
 )
 def gpu_op(job):
     pass
 
 
 @TestProject.operation(
-    directives={"ngpu": TestProject.ngpu, "nranks": TestProject.nranks}
+    directives={
+        "gpus_per_process": TestProject.gpus_per_process,
+        "processes": TestProject.processes,
+        "launcher": "mpi",
+    }
 )
 def mpi_gpu_op(job):
     pass
 
 
 @group1
-@TestProject.operation(directives={"memory": TestProject.memory})
+@TestProject.operation(directives={"memory_per_cpu": TestProject.memory_per_cpu})
 def memory_op(job):
     pass
 

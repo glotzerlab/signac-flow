@@ -27,6 +27,12 @@ ARCHIVE_DIR = os.path.normpath(
 )
 PROJECT_DIRECTORY = '/home/user/path with spaces and "quotes" and \\backslashes/'
 MOCK_EXECUTABLE = "/usr/local/bin/python"
+DEFAULT_BUNDLES = [
+    ("omp_op", "parallel_op"),
+    ("mpi_op", "op", "memory_op"),
+    ("hybrid_op", "omp_op"),
+]
+DEFAULT_SETTING = {"bundles": DEFAULT_BUNDLES, "parallel": [True, False]}
 
 
 def cartesian(**kwargs):
@@ -68,91 +74,42 @@ def init(project):
             {
                 "partition": ["RM", "RM-shared", "GPU", "GPU-shared"],
             },
-            {
-                "partition": ["RM"],
-                "parallel": [False, True],
-                "bundle": [["mpi_op", "omp_op"]],
-            },
+            {"partition": ["RM"], **DEFAULT_SETTING},
         ],
         "environments.umich.GreatLakesEnvironment": [
             {
                 "partition": ["standard", "gpu", "gpu_mig40"],
             },
-            {
-                "parallel": [False, True],
-                "bundle": [["mpi_op", "omp_op"]],
-            },
+            DEFAULT_SETTING,
         ],
-        "environments.incite.SummitEnvironment": [
-            {},
-            {
-                "parallel": [False, True],
-                "bundle": [["mpi_op", "omp_op"]],
-            },
-        ],
+        "environments.incite.SummitEnvironment": [{}, DEFAULT_SETTING],
         "environments.incite.AndesEnvironment": [
-            {
-                "partition": ["batch", "gpu"],
-            },
-            {
-                "partition": ["batch"],
-                "parallel": [False, True],
-                "bundle": [["mpi_op", "omp_op"]],
-            },
+            {"partition": ["batch", "gpu"]},
+            {"partition": ["batch"], **DEFAULT_SETTING},
         ],
-        "environments.umn.MangiEnvironment": [
-            {},
-            {
-                "parallel": [False, True],
-                "bundle": [["mpi_op", "omp_op"]],
-            },
-        ],
+        "environments.umn.MangiEnvironment": [{}, DEFAULT_SETTING],
         "environments.xsede.ExpanseEnvironment": [
             {
                 "partition": ["compute", "shared", "gpu", "gpu-shared", "large-shared"],
             },
-            {
-                "partition": ["compute"],
-                "parallel": [False, True],
-                "bundle": [["mpi_op", "omp_op"]],
-            },
+            {"partition": ["compute"], **DEFAULT_SETTING},
         ],
         "environments.drexel.PicotteEnvironment": [
             {
                 "partition": ["def", "gpu"],
             },
-            {
-                "partition": ["def"],
-                "parallel": [False, True],
-                "bundle": [["mpi_op", "omp_op"]],
-            },
+            {"partition": ["def"], **DEFAULT_SETTING},
         ],
         "environments.xsede.DeltaEnvironment": [
             {
                 "partition": ["cpu", "gpuA40x4", "gpuA100x4"],
             },
-            {
-                "partition": ["cpu"],
-                "parallel": [False, True],
-                "bundle": [["mpi_op", "omp_op"]],
-            },
+            {"partition": ["cpu"], **DEFAULT_SETTING},
         ],
-        "environments.incite.CrusherEnvironment": [
-            {},
-            {
-                "parallel": [False, True],
-                "bundle": [["mpi_op", "omp_op"]],
-            },
-        ],
+        "environments.incite.CrusherEnvironment": [{}, DEFAULT_SETTING],
         # Frontier cannot use partitions as logic requires gpu
         # in the name of partitions that are gpu nodes.
-        "environments.incite.FrontierEnvironment": [
-            {},
-            {
-                "parallel": [False, True],
-                "bundle": [["mpi_op", "omp_op"]],
-            },
-        ],
+        "environments.incite.FrontierEnvironment": [{}, DEFAULT_SETTING],
         "environments.purdue.AnvilEnvironment": [
             {
                 "partition": [
@@ -165,11 +122,7 @@ def init(project):
                     "gpu",
                 ],
             },
-            {
-                "partition": ["wholenode"],
-                "parallel": [False, True],
-                "bundle": [["mpi_op", "omp_op"]],
-            },
+            {"partition": ["wholenode"], **DEFAULT_SETTING},
         ],
     }
 

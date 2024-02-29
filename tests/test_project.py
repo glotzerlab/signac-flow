@@ -27,6 +27,7 @@ from define_test_project import _DynamicTestProject, _TestProject
 from deprecation import fail_if_not_removed
 
 import flow
+import flow.directives
 from flow import FlowProject, aggregator, get_aggregate_id, init
 from flow.environment import ComputeEnvironment
 from flow.errors import (
@@ -71,6 +72,41 @@ class MockEnvironment(ComputeEnvironment):
     @classmethod
     def is_present(cls):
         return True
+
+
+def get_unevaluated_directive(
+    project: flow.FlowProject,
+    job: signac.job.Job,
+    operation_name: str,
+    directive_name: str,
+    group_name: str = None,
+):
+    base_directives = project._environment._get_default_directives()
+    if group_name is None:
+        operation_directives = project.groups[operation_name].operation_directives[
+            operation_name
+        ]
+    else:
+        operation_directives = project.groups[group_name].operation_directives[
+            operation_name
+        ]
+    base_directives.update(operation_directives)
+    return base_directives[directive_name]
+
+
+def get_evaluated_directive(
+    project: flow.FlowProject,
+    job: signac.job.Job,
+    operation_name: str,
+    directive_name: str,
+    group_name: str = None,
+):
+    unevaluated_directives = get_unevaluated_directive(
+        project, job, operation_name, directive_name, group_name
+    )
+    if isinstance(job, signac.job.Job):
+        job = (job,)
+    return flow.directives._evaluate(unevaluated_directives, job)
 
 
 class MockSchedulerSubmitError(Scheduler):
@@ -536,7 +572,7 @@ class TestProjectClass(TestProjectBase):
             class A(FlowProject):
                 pass
 
-            @A.operation(directives={"memory": value})
+            @A.operation(directives={"memory_per_cpu": value})
             def op1(job):
                 pass
 
@@ -564,17 +600,19 @@ class TestProjectClass(TestProjectBase):
             class A(FlowProject):
                 pass
 
-            @A.operation(directives={"memory": value})
+            @A.operation(directives={"memory_per_cpu": value})
             def op1(job):
                 pass
 
             project = self.mock_project(A)
             for job in project:
-                for op in project._next_operations([(job,)]):
-                    if value is None:
-                        assert op.directives["memory"] is None
-                    else:
-                        assert op.directives["memory"] == 0.5
+                unevalated_memory = get_unevaluated_directive(
+                    project, job, "op1", "memory_per_cpu"
+                )
+                if value is None:
+                    assert unevalated_memory is None
+                else:
+                    assert unevalated_memory == 0.5
 
     def test_walltime_directive(self):
         for value in [
@@ -595,11 +633,13 @@ class TestProjectClass(TestProjectBase):
 
             project = self.mock_project(A)
             for job in project:
-                for op in project._next_operations([(job,)]):
-                    if value is None:
-                        assert op.directives["walltime"] is None
-                    else:
-                        assert str(op.directives["walltime"]) == "1:00:00"
+                evaluated_walltime = get_evaluated_directive(
+                    project, job, "op1", "walltime"
+                )
+                if value is None:
+                    assert evaluated_walltime is None
+                else:
+                    assert str(evaluated_walltime) == "1:00:00"
 
     def test_invalid_walltime_directive(self):
         for value in [0, -1, "1.0", datetime.timedelta(0), {}]:
@@ -621,10 +661,7 @@ class TestProjectClass(TestProjectBase):
         """Test that callable directives are properly evaluated.
 
         _JobOperations and _SubmissionJobOperations should have fully evaluated
-        (no callable) directives when initialized. We additionally test that the
-        directives are evaluated to their proper value specifically in the case
-        of 'np' which is determined by 'nranks' and 'omp_num_threads' if not set
-        directly.
+        (no callable) directives when initialized.
         """
 
         class A(FlowProject):
@@ -632,8 +669,10 @@ class TestProjectClass(TestProjectBase):
 
         @A.operation(
             directives={
-                "nranks": lambda job: job.doc.get("nranks", 1),
-                "omp_num_threads": lambda job: job.doc.get("omp_num_threads", 1),
+                "processes": lambda job: job.doc.get("processes", 1),
+                "threads_per_process": lambda job: job.doc.get(
+                    "threads_per_process", 1
+                ),
             }
         )
         def a(job):
@@ -641,37 +680,27 @@ class TestProjectClass(TestProjectBase):
 
         project = self.mock_project(A)
 
-        # test setting neither nranks nor omp_num_threads
+        # test setting not setting directives
         for job in project:
             for next_op in project._next_operations([(job,)]):
-                assert next_op.directives["np"] == 1
+                processes = get_evaluated_directive(project, job, "a", "processes")
+                assert processes == 1
+                threads_per_process = get_evaluated_directive(
+                    project, job, "a", "threads_per_process"
+                )
+                assert threads_per_process == 1
 
-        # test only setting nranks
+        # test setting threads_per_process
         for i, job in enumerate(project):
-            job.doc.nranks = i + 1
-            for next_op in project._next_operations([(job,)]):
-                assert next_op.directives["np"] == next_op.directives["nranks"]
-            del job.doc["nranks"]
-
-        # test only setting omp_num_threads
-        for i, job in enumerate(project):
-            job.doc.omp_num_threads = i + 1
-            for next_op in project._next_operations([(job,)]):
-                assert next_op.directives["np"] == next_op.directives["omp_num_threads"]
-            del job.doc["omp_num_threads"]
-        # test setting both nranks and omp_num_threads
-        for i, job in enumerate(project):
-            job.doc.omp_num_threads = i + 1
-            job.doc.nranks = i % 3 + 1
-            expected_np = (i + 1) * (i % 3 + 1)
-            for next_op in project._next_operations([(job,)]):
-                assert next_op.directives["np"] == expected_np
+            job.doc.threads_per_process = i + 1
+            threads_per_process = get_evaluated_directive(
+                project, job, "a", "threads_per_process"
+            )
+            assert threads_per_process == i + 1
+            del job.doc["threads_per_process"]
 
         # test for proper evaluation of all directives
         job = next(iter(project))
-        job_operation = next(project._next_operations([(job,)]))
-        assert all(not callable(value) for value in job_operation.directives.values())
-        # Also test for submitting operations
         submit_job_operation = next(
             project._get_submission_operations(
                 aggregates=[(job,)],
@@ -679,7 +708,8 @@ class TestProjectClass(TestProjectBase):
             )
         )
         assert all(
-            not callable(value) for value in submit_job_operation.directives.values()
+            not callable(value)
+            for value in submit_job_operation.primary_directives.values()
         )
 
     def test_callable_directives_with_groups(self):
@@ -700,8 +730,10 @@ class TestProjectClass(TestProjectBase):
         @group
         @A.operation(
             directives={
-                "nranks": lambda job: job.doc.get("nranks", 1),
-                "omp_num_threads": lambda job: job.doc.get("omp_num_threads", 1),
+                "processes": lambda job: job.doc.get("processes", 1),
+                "threads_per_process": lambda job: job.doc.get(
+                    "threads_per_process", 1
+                ),
             }
         )
         def a(job):
@@ -710,8 +742,10 @@ class TestProjectClass(TestProjectBase):
         @group
         @A.operation(
             directives={
-                "nranks": lambda job: job.doc.get("nranks", 1),
-                "omp_num_threads": lambda job: job.doc.get("omp_num_threads", 1),
+                "processes": lambda job: job.doc.get("processes", 1),
+                "threads_per_process": lambda job: job.doc.get(
+                    "threads_per_process", 1
+                ),
             }
         )
         def b(job):
@@ -728,7 +762,8 @@ class TestProjectClass(TestProjectBase):
             if submit_job_operation.name == "group":
                 break
         assert all(
-            not callable(value) for value in submit_job_operation.directives.values()
+            not callable(value)
+            for value in submit_job_operation.primary_directives.values()
         )
 
     def test_copy_conditions(self):
@@ -1132,9 +1167,12 @@ class TestExecutionProject(TestProjectBase):
 
     def test_submit_operations(self):
         project = self.mock_project()
-        operations = []
-        for job in project:
-            operations.extend(project._next_operations([(job,)]))
+        operations = list(
+            project._get_submission_operations(
+                [(job,) for job in project],
+                project._environment._get_default_directives(),
+            )
+        )
         assert len(list(MockScheduler.jobs())) == 0
         cluster_job_id = project._store_bundled(operations)
         with redirect_stderr(StringIO()):
@@ -1256,16 +1294,19 @@ class TestExecutionProject(TestProjectBase):
 
     def test_submit_operations_bad_directive(self):
         project = self.mock_project()
-        operations = []
-        for job in project:
-            operations.extend(
-                project._next_operations([(job,)], operation_names=["op1"])
+        operations = list(
+            project._get_submission_operations(
+                [(job,) for job in project],
+                project._environment._get_default_directives(),
             )
+        )
         assert len(list(MockScheduler.jobs())) == 0
         cluster_job_id = project._store_bundled(operations)
         stderr = StringIO()
         with redirect_stderr(stderr):
-            project._submit_operations(_id=cluster_job_id, operations=operations)
+            project._submit_operations(
+                _id=cluster_job_id, operations=operations, force=True
+            )
         assert len(list(MockScheduler.jobs())) == 1
         assert "Some of the keys provided as part of the directives were not used by the template "
         "script, including: bad_directive\n" in stderr.getvalue()
@@ -1476,6 +1517,7 @@ class TestDirectivesProjectMainInterface(TestProjectBase):
             "submit -o op_walltime --pretend --template slurm.sh",
             subprocess.STDOUT,
         ).decode("utf-8")
+        print(output)
         assert "#SBATCH -t 01:00:00" in output
 
     def test_main_submit_walltime_no_directive(self, monkeypatch):
@@ -1665,7 +1707,10 @@ class TestGroupProject(TestProjectBase):
             )
             assert len(job_ops) == 1
             assert all(
-                [job_op.directives.get("omp_num_threads", 0) == 4 for job_op in job_ops]
+                [
+                    job_op.primary_directives.get("threads_per_process", 0) == 4
+                    for job_op in job_ops
+                ]
             )
             job_ops = list(
                 project._get_submission_operations(
@@ -1676,26 +1721,10 @@ class TestGroupProject(TestProjectBase):
             )
             assert len(job_ops) == 1
             assert all(
-                [job_op.directives.get("omp_num_threads", 0) == 1 for job_op in job_ops]
-            )
-            # Test run JobOperations
-            job_ops = list(
-                project.groups["group2"]._create_run_job_operations(
-                    project._entrypoint, project._get_default_directives(), (job,)
-                )
-            )
-            assert len(job_ops) == 1
-            assert all(
-                [job_op.directives.get("omp_num_threads", 0) == 4 for job_op in job_ops]
-            )
-            job_ops = list(
-                project.groups["op3"]._create_run_job_operations(
-                    project._entrypoint, project._get_default_directives(), (job,)
-                )
-            )
-            assert len(job_ops) == 1
-            assert all(
-                [job_op.directives.get("omp_num_threads", 0) == 1 for job_op in job_ops]
+                [
+                    job_op.primary_directives.get("threads_per_process", 0) == 1
+                    for job_op in job_ops
+                ]
             )
 
     def test_unique_group_operation_names(self):
@@ -1786,29 +1815,34 @@ class TestGroupProject(TestProjectBase):
 
         group = A.make_group("group")
 
-        @group(directives={"ngpu": 2, "nranks": 4})
+        @group(directives={"gpus_per_process": 1, "processes": 4})
         @A.operation
         def op1(job):
             pass
 
-        @group(directives={"ngpu": 2, "nranks": 4})
+        @group(directives={"gpus_per_process": 1, "processes": 4})
         @A.operation
         def op2(job):
             pass
 
         @group
-        @A.operation(directives={"nranks": 2})
+        @A.operation(directives={"processes": 2})
         def op3(job):
             pass
 
         project = self.mock_project(A)
         group = project.groups["group"]
         job = [j for j in project][0]
-        directives = group._get_submission_directives(
-            project._get_default_directives(), (job,)
+        submission_operations = list(
+            project._get_submission_operations(
+                [(job,)],
+                project._get_default_directives(),
+            )
         )
         assert all(
-            [directives["ngpu"] == 2, directives["nranks"] == 4, directives["np"] == 4]
+            [directives["gpus_per_process"] == 1 and directives["processes"] == 4]
+            for submission_op in submission_operations
+            for directives in submission_op.directives_list
         )
 
     def test_flowgroup_repr(self):
@@ -1817,7 +1851,7 @@ class TestGroupProject(TestProjectBase):
 
         group = A.make_group("group")
 
-        @group(directives={"ngpu": 2, "nranks": 4})
+        @group(directives={"gpus_per_process": 1, "processes": 4})
         @A.operation
         def op1(job):
             pass
@@ -1828,15 +1862,15 @@ class TestGroupProject(TestProjectBase):
             pass
 
         @group
-        @A.operation(directives={"nranks": 2})
+        @A.operation(directives={"processes": 2})
         def op3(job):
             pass
 
         project = self.mock_project(A)
         rep_string = repr(project.groups["group"])
         assert all(op in rep_string for op in ["op1", "op2", "op3"])
-        assert "'nranks': 4" in rep_string
-        assert "'ngpu': 2" in rep_string
+        assert "'processes': 4" in rep_string
+        assert "'gpus_per_process': 1" in rep_string
         assert "submit_options=''" in rep_string
         assert "run_options=''" in rep_string
         assert "name='group'" in rep_string

@@ -358,7 +358,7 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
 
     @classmethod
     def _get_omp_prefix(cls, directives):
-        """Get the OpenMP prefix based on the ``omp_num_threads`` directive.
+        """Get the OpenMP prefix based on the ``threads_per_process`` directive.
 
         Parameters
         ----------
@@ -371,7 +371,7 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
             The prefix to be added to the operation's command.
 
         """
-        return "export OMP_NUM_THREADS={}; ".format(directives["omp_num_threads"])
+        return "export OMP_NUM_THREADS={}; ".format(directives["threads_per_process"])
 
     @classmethod
     def _get_mpi_prefix(cls, directives):
@@ -388,9 +388,13 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
             The prefix to be added to the operation's command.
 
         """
-        if directives.get("nranks"):
-            return "{} -n {} ".format(cls.mpi_cmd, directives["nranks"])
-        return ""
+        processes = directives.get("processes", 0)
+        if processes == 0:
+            return ""
+        base_str = f"{cls.mpi_cmd} --ntasks={processes}"
+        base_str += f" --cpus-per-task={directives['threads_per_process']}"
+        base_str += f" --gpus-per-task={directives['gpus_per_process']}"
+        return base_str
 
     @template_filter
     def get_prefix(cls, directives):
@@ -408,7 +412,7 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
 
         """
         prefix = ""
-        if directives.get("omp_num_threads"):
+        if directives.get("threads_per_process"):
             prefix += cls._get_omp_prefix(directives)
         prefix += cls._get_mpi_prefix(directives)
         return prefix

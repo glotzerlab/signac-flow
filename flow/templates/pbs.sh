@@ -20,8 +20,8 @@
     {% endblock preamble %}
     {% block tasks %}
         {% set threshold = 0 if force else 0.9 %}
-        {% set s_gpu = ':gpus=1' if resources.ngpu_tasks else '' %}
-        {% set ppn = ppn|default(operations|calc_tasks('omp_num_threads', parallel, force), true) %}
+	{% set s_gpu = ':gpus={}'|format(resources.gpus_per_process) if resources.gpus_per_process else '' %}
+        {% set ppn = ppn|default(operations|calc_tasks('threads_per_process', parallel, force), true) %}
         {% if ppn %}
 #PBS -l nodes={{ resources.num_nodes }}:ppn={{ ppn }}{{ s_gpu }}
         {% else %}

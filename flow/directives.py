@@ -165,6 +165,9 @@ class _Directives(MutableMapping):
         This method updates the directives in place, replacing callable
         directives with their evaluated values.
 
+        The method also provides common intermediate quantities for determining
+        resource submission (cpus, gpus, and total memory).
+
         Parameters
         ----------
         jobs : :class:`signac.job.Job` or tuple of :class:`signac.job.Job`
@@ -175,7 +178,15 @@ class _Directives(MutableMapping):
             for key, value in self.items():
                 self[key] = _evaluate(value, jobs)
             self._evaluated = True
-        return self
+
+        directives = dict(self)
+        directives["cpus"] = directives["processes"] * directives["threads_per_process"]
+        directives["gpus"] = directives["processes"] * directives["gpus_per_process"]
+        if (memory := directives["memory_per_cpu"]) is not None:
+            directives["memory"] = directives["cpus"] * memory
+        else:
+            directives["memory"] = None
+        return directives
 
     @property
     def user_keys(self):  # noqa: D401

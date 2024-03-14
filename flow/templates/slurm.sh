@@ -4,9 +4,11 @@
 #!/bin/bash
 #SBATCH --job-name="{{ id }}"
         {% set memory_requested = operations | calc_memory(parallel)  %}
+{% block memory %}
         {% if memory_requested %}
 #SBATCH --mem={{ memory_requested|format_memory }}
         {% endif %}
+{% endblock memory %}
         {% if partition %}
 #SBATCH --partition={{ partition }}
         {% endif %}

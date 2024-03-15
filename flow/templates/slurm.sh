@@ -4,7 +4,7 @@
 #!/bin/bash
 #SBATCH --job-name="{{ id }}"
         {% set memory_requested = operations | calc_memory(parallel)  %}
-{% block memory %}
+{% block memory scoped %}
         {% if memory_requested %}
 #SBATCH --mem={{ memory_requested|format_memory }}
         {% endif %}

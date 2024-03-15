@@ -8,19 +8,13 @@ The numbers in brackets denote the related GitHub issue and/or pull request.
 Version 0.28
 ============
 
-[next] -- not yet released
---------------------------
+[0.28.0] -- 2024-02-19
+----------------------
 
 Added
 +++++
 
 - Support the ``gpu_mig40`` partition on UMich Great Lakes (#811).
-
-Fixed
-+++++
-
-- Generate correct SLURM scripts on SDSC Expanse (#810).
-- Suppress warning for regex operation names that match groups (#804).
 
 Changed
 +++++++
@@ -29,10 +23,17 @@ Changed
 - Improve aggregate registration performance (#818).
 - Hide empty "Labels" section in status output when there are no labels (#818).
 
+Fixed
++++++
+
+- Generate correct SLURM scripts on SDSC Expanse (#810).
+- Suppress warning for regex operation names that match groups (#804).
+
 Removed
 +++++++
 
 - Remove Zenodo (#816).
+- Remove stampede2 (#786).
 
 Version 0.27
 ============
@@ -59,11 +60,6 @@ Fixed
 - ``srun`` invocation on Great-Lakes (#779).
 - Restored static output of non-singleton groups (#773, #774).
 - Remove warnings by using new ``jsonschema`` API (#787).
-
-Removed
-+++++++
-
-- Stampede 2 environment (#786).
 
 Version 0.26
 ============

@@ -43,7 +43,7 @@ def omp_op(job):
     directives={
         "processes": TestProject.processes,
         "threads_per_process": TestProject.threads_per_process,
-        "launcher": "mpi",
+        "launcher": TestProject.launcher,
     }
 )
 def hybrid_op(job):

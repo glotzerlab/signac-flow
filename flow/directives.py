@@ -229,7 +229,7 @@ def _check_compatible_directives(directives_of_lists):
                 mpi_directives[0]
             ],
         }
-        if len(mpi_directives > 1) and any(
+        if len(mpi_directives) > 1 and any(
             directives_of_lists["processes"][i] != base_directives["processes"]
             or directives_of_lists["gpus_per_process"][i]
             != base_directives["gpus_per_process"]
@@ -291,16 +291,15 @@ def _group_directive_aggregation(group_directives):
     return primary_directive
 
 
-def _check_bundle_directives(list_of_directives, parallel):
-    if "mpi" in list_of_directives["launcher"] and parallel:
+def _check_bundle_directives(directives_of_lists, parallel):
+    if "mpi" in directives_of_lists["launcher"] and parallel:
         raise SubmitError("Cannot run MPI operations in parallel.")
-    _check_compatible_directives(list_of_directives)
+    _check_compatible_directives(directives_of_lists)
 
 
 def _bundle_directives_aggregation(list_of_directives, parallel):
     directives_of_lists = _list_of_dicts_to_dict_of_list(list_of_directives)
-    _check_bundle_directives(list_of_directives, parallel)
-    _check_compatible_directives(directives_of_lists)
+    _check_bundle_directives(directives_of_lists, parallel)
     # We know we don't have MPI operations here.
     if parallel:
         cpus = sum(directives_of_lists["cpus"])
@@ -325,7 +324,7 @@ def _bundle_directives_aggregation(list_of_directives, parallel):
         # All MPI operations must be homogeneous can pick any one and any non-MPI ones are subsets
         # that should work correctly.
         primary_operation = list_of_directives[
-            list_of_directives["launcher"].index("mpi")
+            directives_of_lists["launcher"].index("mpi")
         ]
         cpus = primary_operation["processes"] * primary_operation["threads_per_process"]
         memory = flow.util.misc._tolerant_max(directives_of_lists["memory"])

@@ -45,15 +45,15 @@ class TestEnvironments(conftest.TestProjectBase):
     class Project(flow.FlowProject):
         pass
 
-    @Project.operation(directives={"ngpu": 1})
+    @Project.operation(directives={"gpus_per_process": 1})
     def gpu_op(job):
         pass
 
-    @Project.operation(directives={"np": 1_000})
+    @Project.operation(directives={"processes": 1_000})
     def large_cpu_op(job):
         pass
 
-    @Project.operation(directives={"np": 1})
+    @Project.operation(directives={"processes": 1})
     def small_cpu_op(job):
         pass
 

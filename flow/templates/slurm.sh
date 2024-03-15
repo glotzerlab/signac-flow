@@ -3,23 +3,29 @@
     {% block preamble %}
 #!/bin/bash
 #SBATCH --job-name="{{ id }}"
-        {% set memory_requested = operations | calc_memory(parallel)  %}
-        {% if memory_requested %}
-#SBATCH --mem={{ memory_requested|format_memory }}
-        {% endif %}
-        {% if partition %}
+    {% if partition %}
 #SBATCH --partition={{ partition }}
-        {% endif %}
-        {% set walltime = operations | calc_walltime(parallel) %}
-        {% if walltime %}
-#SBATCH -t {{ walltime|format_timedelta }}
-        {% endif %}
-        {% if job_output %}
+    {% endif %}
+    {% if resources.walltime %}
+#SBATCH -t {{ resources.walltime|format_timedelta }}
+    {% endif %}
+    {% if job_output %}
 #SBATCH --output={{ job_output }}
 #SBATCH --error={{ job_output }}
-        {% endif %}
+    {% endif %}
+    {% set account = account|default(project|get_account_name, true) %}
+    {% if account %}
+#SBATCH --account={{ account }}
+    {% endif %}
     {% endblock preamble %}
     {% block tasks %}
-#SBATCH --ntasks={{ resources.ncpu_tasks }}
+#SBATCH --ntasks={{ resources.processes }}
+#SBATCH --cpus-per-task={{ resources.threads_per_process }}
+    {% if resources.memory_per_cpu is not none %}
+#SBATCH --mem-per-task={{ resources.memory_per_cpu|format_memory }}
+    {% endif %}
+    {% if resources.gpus_per_process > 0 %}
+#SBATCH --gpus-per-task={{ resources.gpus_per_process }}
+    {% endif %}
     {% endblock tasks %}
 {% endblock header %}

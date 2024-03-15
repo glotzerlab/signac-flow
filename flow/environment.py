@@ -17,15 +17,14 @@ import socket
 from functools import lru_cache
 
 from .directives import (
-    _FORK,
     _GET_EXECUTABLE,
-    _MEMORY,
-    _NGPU,
-    _NP,
-    _NRANKS,
-    _OMP_NUM_THREADS,
-    _PROCESSOR_FRACTION,
+    _GPUS_PER_PROCESS,
+    _LAUNCHER,
+    _MEMORY_PER_CPU,
+    _PROCESSES,
+    _THREADS_PER_PROCESS,
     _WALLTIME,
+    _bundle_directives_aggregation,
     _Directives,
 )
 from .errors import NoSchedulerError, SubmitError
@@ -36,7 +35,7 @@ from .scheduling.pbs import PBSScheduler
 from .scheduling.simple_scheduler import SimpleScheduler
 from .scheduling.slurm import SlurmScheduler
 from .util.misc import _deprecated_warning
-from .util.template_filters import calc_num_nodes, calc_tasks
+from .util.template_filters import calc_num_nodes
 
 logger = logging.getLogger(__name__)
 
@@ -115,14 +114,12 @@ class _PartitionConfig:
     - GPUs for a partition
     - Node type of a partition
 
-    When querying a value for a specific partition, the logic first searches the
-    provided mapping, if any, for the partition. If it is not found, then the
-    mapping is searched for "default" if it exists. If not, the class default is
-    used. The list below shows the search order hierarchically.
+    When querying a value for a specific partition the logic first searches the
+    provided mapping if any for the partition, if it is not found then the
+    mapping is searched for "default" if it exists, if not the class default is
+    used.
 
-    1. Partition specific
-    2. Provided default
-    3. _PartitionConfig default
+    1. Partition specific -> 2. Provided default -> 3. _PartitionConfig default
 
     The class defaults are
 
@@ -360,12 +357,12 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
         pass
 
     @classmethod
-    def _get_omp_prefix(cls, operation):
-        """Get the OpenMP prefix based on the ``omp_num_threads`` directive.
+    def _get_omp_prefix(cls, directives):
+        """Get the OpenMP prefix based on the ``threads_per_process`` directive.
 
         Parameters
         ----------
-        operation : :class:`flow.project._JobOperation`
+        directives : dict[str, any]
             The operation to be prefixed.
 
         Returns
@@ -374,22 +371,16 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
             The prefix to be added to the operation's command.
 
         """
-        return "export OMP_NUM_THREADS={}; ".format(
-            operation.directives["omp_num_threads"]
-        )
+        return "export OMP_NUM_THREADS={}; ".format(directives["threads_per_process"])
 
     @classmethod
-    def _get_mpi_prefix(cls, operation, parallel):
+    def _get_mpi_prefix(cls, directives):
         """Get the MPI prefix based on the ``nranks`` directives.
 
         Parameters
         ----------
-        operation : :class:`flow.project._JobOperation`
+        directives : dict[str, any]
             The operation to be prefixed.
-        parallel : bool
-            If True, operations are assumed to be executed in parallel, which
-            means that the number of total tasks is the sum of all tasks
-            instead of the maximum number of tasks. Default is set to False.
 
         Returns
         -------
@@ -397,28 +388,22 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
             The prefix to be added to the operation's command.
 
         """
-        if operation.directives.get("nranks"):
-            return "{} -n {} ".format(cls.mpi_cmd, operation.directives["nranks"])
-        return ""
+        processes = directives.get("processes", 0)
+        if processes == 0:
+            return ""
+        base_str = f"{cls.mpi_cmd} --ntasks={processes}"
+        base_str += f" --cpus-per-task={directives['threads_per_process']}"
+        base_str += f" --gpus-per-task={directives['gpus_per_process']}"
+        return base_str
 
     @template_filter
-    def get_prefix(cls, operation, parallel=False, mpi_prefix=None, cmd_prefix=None):
+    def get_prefix(cls, directives):
         """Template filter generating a command prefix from directives.
 
         Parameters
         ----------
         operation : :class:`flow.project._JobOperation`
             The operation to be prefixed.
-        parallel : bool
-            If True, operations are assumed to be executed in parallel, which means
-            that the number of total tasks is the sum of all tasks instead of the
-            maximum number of tasks. Default is set to False.
-        mpi_prefix : str
-            User defined mpi_prefix string. Default is set to None.
-            This will be deprecated and removed in the future.
-        cmd_prefix : str
-            User defined cmd_prefix string. Default is set to None.
-            This will be deprecated and removed in the future.
 
         Returns
         -------
@@ -427,16 +412,9 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
 
         """
         prefix = ""
-        if operation.directives.get("omp_num_threads"):
-            prefix += cls._get_omp_prefix(operation)
-        if mpi_prefix:
-            prefix += mpi_prefix
-        else:
-            prefix += cls._get_mpi_prefix(operation, parallel)
-        if cmd_prefix:
-            prefix += cmd_prefix
-        # if cmd_prefix and if mpi_prefix for backwards compatibility
-        # Can change to get them from directives for future
+        if directives.get("threads_per_process"):
+            prefix += cls._get_omp_prefix(directives)
+        prefix += cls._get_mpi_prefix(directives)
         return prefix
 
     @classmethod
@@ -444,13 +422,11 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
         return _Directives(
             (
                 _GET_EXECUTABLE(),
-                _FORK,
-                _MEMORY,
-                _NGPU,
-                _NP,
-                _NRANKS,
-                _OMP_NUM_THREADS,
-                _PROCESSOR_FRACTION,
+                _MEMORY_PER_CPU,
+                _GPUS_PER_PROCESS,
+                _PROCESSES,
+                _THREADS_PER_PROCESS,
+                _LAUNCHER,
                 _WALLTIME,
             )
         )
@@ -465,28 +441,18 @@ class ComputeEnvironment(metaclass=_ComputeEnvironmentType):
         """
         partition = cls._partition_config[context.get("partition", None)]
         force = context.get("force", False)
-        cpu_tasks_total = calc_tasks(
-            context["operations"],
-            "np",
+        directives = _bundle_directives_aggregation(
+            [op.primary_directives for op in context["operations"]],
             context.get("parallel", False),
-            context.get("force", False),
-        )
-        gpu_tasks_total = calc_tasks(
-            context["operations"],
-            "ngpu",
-            context.get("parallel", False),
-            context.get("force", False),
         )
 
-        num_nodes = partition.calculate_num_nodes(
+        cpu_tasks_total = directives["processes"] * directives["threads_per_process"]
+        gpu_tasks_total = directives["processes"] * directives["gpus_per_process"]
+
+        directives["num_nodes"] = partition.calculate_num_nodes(
             cpu_tasks_total, gpu_tasks_total, force
         )
-
-        return {
-            "ncpu_tasks": cpu_tasks_total,
-            "ngpu_tasks": gpu_tasks_total,
-            "num_nodes": num_nodes,
-        }
+        return directives
 
 
 class StandardEnvironment(ComputeEnvironment):

@@ -77,7 +77,14 @@ class TestTemplateFilters:
     def mock_operations(self):
         class MockOp:
             def __init__(self, memory=None):
-                self.directives = {"memory": memory}
+                self.primary_directives = {
+                    "processes": 1,
+                    "threads_per_process": 1,
+                    "memory_per_cpu": memory,
+                    "memory": memory,
+                    "cpus": 1,
+                    "gpus": 0,
+                }
 
         return [MockOp(1), MockOp(8), MockOp()]
 
@@ -94,7 +101,7 @@ class TestTemplateFilters:
     def test_calc_memory_parallel(self, mock_operations):
         # Test when operations run in parallel
         assert calc_memory([mock_operations[0], mock_operations[1]], True) == 9
-        assert calc_memory([mock_operations[2]], True) == 0
+        assert calc_memory([mock_operations[2]], True) is None
         assert (
             calc_memory(
                 [mock_operations[0], mock_operations[1], mock_operations[2]], True

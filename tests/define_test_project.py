@@ -44,29 +44,25 @@ def b_is_even(job):
         # The submit interface should warn about unused directives.
         "bad_directive": 0,
         # But not this one:
-        "np": 1,
+        "processes": 1,
     },
 )
 def op1(job):
     return f'echo "hello" > {job.path}/world.txt'
 
 
-def _need_to_fork(job):
-    return job.doc.get("fork")
-
-
 @group1
 @_TestProject.post.true("test")
-@_TestProject.operation(directives={"fork": _need_to_fork})
+@_TestProject.operation
 def op2(job):
     job.document.test = os.getpid()
 
 
-@group2(directives={"omp_num_threads": 4})
+@group2(directives={"threads_per_process": 4})
 @_TestProject.post.true("test3_true")
 @_TestProject.post.false("test3_false")
 @_TestProject.post.not_(lambda job: job.doc.test3_false)
-@_TestProject.operation(directives={"ngpu": 1, "omp_num_threads": 1})
+@_TestProject.operation(directives={"gpus_per_process": 1, "threads_per_process": 1})
 def op3(job):
     job.document.test3_true = True
     job.document.test3_false = False

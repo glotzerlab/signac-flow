@@ -2,7 +2,7 @@
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
 """Drexel University HPC Environments."""
-from ..environment import DefaultSlurmEnvironment
+from ..environment import DefaultSlurmEnvironment, _PartitionConfig
 
 
 class PicotteEnvironment(DefaultSlurmEnvironment):
@@ -14,6 +14,10 @@ class PicotteEnvironment(DefaultSlurmEnvironment):
 
     hostname_pattern = r".*\.cm\.cluster$"
     template = "drexel-picotte.sh"
+
+    _partition_config = _PartitionConfig(
+        cpus_per_node={"default": 48}, gpus_per_node={"gpu": 4}
+    )
 
     @classmethod
     def add_args(cls, parser):

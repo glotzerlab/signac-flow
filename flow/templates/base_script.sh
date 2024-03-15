@@ -1,9 +1,4 @@
 {# The following variables are available to all scripts. #}
-{% if parallel %}
-    {% set np_global = operations|map(attribute='directives.np')|sum %}
-{% else %}
-    {% set np_global = operations|map(attribute='directives.np')|max %}
-{% endif %}
 {% block header %}
     {% block preamble %}
     {% endblock preamble %}

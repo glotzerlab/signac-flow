@@ -4,11 +4,11 @@
 """Provide jinja2 template environment filter functions."""
 import datetime
 import sys
-from functools import partial
 from math import ceil
 
 from ..errors import ConfigKeyError, SubmitError
 from .config import get_config_value
+from .misc import _tolerant_max, _tolerant_sum
 
 
 def identical(iterable):
@@ -39,7 +39,11 @@ def homogeneous_openmp_mpi_config(operations):
     return (
         len(
             {
-                (op.directives.get("nranks"), op.directives.get("omp_num_threads"))
+                (
+                    op.directives.get("n_processes"),
+                    op.directives.get("threads_per_process"),
+                    op.directives.get("gpus_per_process"),
+                )
                 for op in operations
             }
         )
@@ -47,28 +51,19 @@ def homogeneous_openmp_mpi_config(operations):
     )
 
 
-def with_np_offset(operations):
-    """Add the np_offset variable to the operations' directives."""
-    offset = 0
-    for operation in operations:
-        operation.directives.setdefault("np_offset", offset)
-        offset += operation.directives["np"]
-    return operations
-
-
 def calc_tasks(operations, name, parallel=False, allow_mixed=False):
     """Compute the number of tasks required for the given set of operations.
 
     Calculates the number of tasks for a specific processing unit requested in
-    the operations' directive, e.g., 'np' or 'ngpu'.
+    the operations' directive, e.g., 'n_processes' or 'gpus_per_process'.
 
     Parameters
     ----------
     operations : :class:`~._JobOperation`
         The operations used to calculate the total number of required tasks.
     name : str
-        The name of the processing unit to calculate the tasks for, e.g., 'np'
-        or 'ngpu'.
+        The name of the processing unit to calculate the tasks for, e.g.,
+        'n_processes'.
     parallel : bool
         If True, operations are assumed to be executed in parallel, which means
         that the number of total tasks is the sum of all tasks instead of the
@@ -91,10 +86,7 @@ def calc_tasks(operations, name, parallel=False, allow_mixed=False):
         set to True.
 
     """
-    processing_units = [
-        op.directives[name] * op.directives.get("processor_fraction", 1)
-        for op in operations
-    ]
+    processing_units = [op.primary_directives[name] for op in operations]
     if identical(processing_units) or allow_mixed:
         if len(processing_units) > 0:
             sum_processing_units = round(sum(processing_units))
@@ -139,7 +131,7 @@ def calc_memory(operations, parallel=False):
     Parameters
     ----------
     operations : list
-        A list of :class:`~._JobOperation`\ s used to calculate the maximum
+        A list of :class:`~._SubmissionOperation`\ s used to calculate the maximum
         memory required.
     parallel : bool
         If True, operations are assumed to be executed in parallel, which
@@ -152,8 +144,8 @@ def calc_memory(operations, parallel=False):
     float
         The reserved memory (numeric value) in gigabytes.
     """
-    func = sum if parallel else max
-    return func(operation.directives["memory"] or 0 for operation in operations)
+    func = _tolerant_sum if parallel else _tolerant_max
+    return func(op.primary_directives["memory"] for op in operations)
 
 
 def calc_walltime(operations, parallel=False):
@@ -175,17 +167,11 @@ def calc_walltime(operations, parallel=False):
     :class:`datetime.timedelta`
         The total walltime.
     """
-    # Replace the sum function with partial(sum, start=datetime.timedelta())
-    # when dropping Python 3.7 support.
-    func = (
-        max
-        if parallel
-        else partial(lambda start, iterable: sum(iterable, start), datetime.timedelta())
-    )
-    return func(
-        operation.directives["walltime"] or datetime.timedelta()
-        for operation in operations
-    )
+    walltimes = (op.primary_directives["walltime"] for op in operations)
+    if parallel:
+        return _tolerant_max(walltimes)
+    else:
+        return _tolerant_sum(walltimes, start=datetime.timedelta())
 
 
 def check_utilization(nn, np, ppn, threshold=0.9, name=None):

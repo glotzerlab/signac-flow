@@ -9,12 +9,12 @@ import itertools
 import operator
 import os
 import sys
+from contextlib import redirect_stdout
 from hashlib import sha1
 
 import jinja2
 import signac
 from define_template_test_project import TestProject
-from test_project import redirect_stdout
 
 import flow
 import flow.environments
@@ -27,6 +27,17 @@ ARCHIVE_DIR = os.path.normpath(
 )
 PROJECT_DIRECTORY = '/home/user/path with spaces and "quotes" and \\backslashes/'
 MOCK_EXECUTABLE = "/usr/local/bin/python"
+DEFAULT_BUNDLES = [
+    {"bundles": [("omp_op", "parallel_op")], "parallel": [True, False]},
+    {"bundles": [("mpi_op", "op", "memory_op")], "parallel": [False]},
+    {"bundles": [("hybrid_op", "omp_op")], "parallel": [False]},
+]
+
+
+def set_bundles(partitions=None):
+    if partitions is None:
+        return DEFAULT_BUNDLES
+    return [{"partition": partitions, **bundle} for bundle in DEFAULT_BUNDLES]
 
 
 def cartesian(**kwargs):
@@ -65,94 +76,37 @@ def init(project):
     environments = {
         "environment.StandardEnvironment": [],
         "environments.xsede.Bridges2Environment": [
-            {
-                "partition": ["RM", "RM-shared", "GPU", "GPU-shared"],
-            },
-            {
-                "partition": ["RM"],
-                "parallel": [False, True],
-                "bundle": [["mpi_op", "omp_op"]],
-            },
+            {"partition": ["RM", "RM-shared", "GPU", "GPU-shared"]},
+            *set_bundles(["RM"]),
         ],
         "environments.umich.GreatLakesEnvironment": [
-            {
-                "partition": ["standard", "gpu", "gpu_mig40"],
-            },
-            {
-                "parallel": [False, True],
-                "bundle": [["mpi_op", "omp_op"]],
-            },
+            {"partition": ["standard", "gpu", "gpu_mig40"]},
+            *set_bundles(),
         ],
-        "environments.incite.SummitEnvironment": [
-            {},
-            {
-                "parallel": [False, True],
-                "bundle": [["mpi_op", "omp_op"]],
-            },
-        ],
+        "environments.incite.SummitEnvironment": [{}, *set_bundles()],
         "environments.incite.AndesEnvironment": [
-            {
-                "partition": ["batch", "gpu"],
-            },
-            {
-                "partition": ["batch"],
-                "parallel": [False, True],
-                "bundle": [["mpi_op", "omp_op"]],
-            },
+            {"partition": ["batch", "gpu"]},
+            *set_bundles(["batch"]),
         ],
-        "environments.umn.MangiEnvironment": [
-            {},
-            {
-                "parallel": [False, True],
-                "bundle": [["mpi_op", "omp_op"]],
-            },
-        ],
+        "environments.umn.MangiEnvironment": [{}, *set_bundles()],
         "environments.xsede.ExpanseEnvironment": [
             {
                 "partition": ["compute", "shared", "gpu", "gpu-shared", "large-shared"],
             },
-            {
-                "partition": ["compute"],
-                "parallel": [False, True],
-                "bundle": [["mpi_op", "omp_op"]],
-            },
+            *set_bundles(["compute"]),
         ],
         "environments.drexel.PicotteEnvironment": [
-            {
-                "partition": ["def", "gpu"],
-            },
-            {
-                "partition": ["def"],
-                "parallel": [False, True],
-                "bundle": [["mpi_op", "omp_op"]],
-            },
+            {"partition": ["def", "gpu"]},
+            *set_bundles(["def"]),
         ],
         "environments.xsede.DeltaEnvironment": [
-            {
-                "partition": ["cpu", "gpuA40x4", "gpuA100x4"],
-            },
-            {
-                "partition": ["cpu"],
-                "parallel": [False, True],
-                "bundle": [["mpi_op", "omp_op"]],
-            },
+            {"partition": ["cpu", "gpuA40x4", "gpuA100x4"]},
+            *set_bundles(["cpu"]),
         ],
-        "environments.incite.CrusherEnvironment": [
-            {},
-            {
-                "parallel": [False, True],
-                "bundle": [["mpi_op", "omp_op"]],
-            },
-        ],
+        "environments.incite.CrusherEnvironment": [{}, *set_bundles()],
         # Frontier cannot use partitions as logic requires gpu
         # in the name of partitions that are gpu nodes.
-        "environments.incite.FrontierEnvironment": [
-            {},
-            {
-                "parallel": [False, True],
-                "bundle": [["mpi_op", "omp_op"]],
-            },
-        ],
+        "environments.incite.FrontierEnvironment": [{}, *set_bundles()],
         "environments.purdue.AnvilEnvironment": [
             {
                 "partition": [
@@ -165,11 +119,7 @@ def init(project):
                     "gpu",
                 ],
             },
-            {
-                "partition": ["wholenode"],
-                "parallel": [False, True],
-                "bundle": [["mpi_op", "omp_op"]],
-            },
+            *set_bundles(["wholenode"]),
         ],
     }
 

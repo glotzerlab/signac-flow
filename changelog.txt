@@ -20,6 +20,7 @@ Fixed
 +++++
 
 - Always write the nodes parameter on Expanse SBATCH scripts (#827).
+- Ensure that a bundle exists in a project before yielding scheduler jobs from it (#758, #832).
 
 Version 0.28
 ============

@@ -2203,9 +2203,16 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         bundle_prefix = self._bundle_prefix
         for job in scheduler_jobs:
             if job.name().startswith(bundle_prefix):
-                with open(self._fn_bundle(job.name())) as file:
-                    for line in file:
-                        yield ClusterJob(line.strip(), job.status())
+                bundle_name = self._fn_bundle(job.name())
+                # Ensure that the bundle exists in this project before yielding
+                # jobs from it. This check is necessary because scheduler jobs
+                # with the same prefix could exist, submitted by other
+                # FlowProjects with the same name from this user or other
+                # users. See https://github.com/glotzerlab/signac-flow/issues/758
+                if os.path.exists(bundle_name):
+                    with open(bundle_name) as file:
+                        for line in file:
+                            yield ClusterJob(line.strip(), job.status())
             else:
                 yield job
 

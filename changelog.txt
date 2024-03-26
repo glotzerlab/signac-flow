@@ -5,6 +5,23 @@ Changelog
 The **signac-flow** package follows `semantic versioning <https://semver.org/>`_.
 The numbers in brackets denote the related GitHub issue and/or pull request.
 
+Version 0.29
+============
+
+[0.29.0] -- 2024-03-21
+----------------------
+
+Added
++++++
+
+- Added ``memory`` jinja2 block around memory options to override in custom SLURM scripts (#831).
+
+Fixed
++++++
+
+- Always write the nodes parameter on Expanse SBATCH scripts (#827).
+- Ensure that a bundle exists in a project before yielding scheduler jobs from it (#758, #832).
+
 Version 0.28
 ============
 

@@ -1846,9 +1846,9 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         )
 
         # Setup standard filters that can be used to format context variables.
-        template_environment.filters[
-            "format_timedelta"
-        ] = template_filters.format_timedelta
+        template_environment.filters["format_timedelta"] = (
+            template_filters.format_timedelta
+        )
         template_environment.filters["format_memory"] = template_filters.format_memory
         template_environment.filters["identical"] = template_filters.identical
         template_environment.filters["with_np_offset"] = template_filters.with_np_offset
@@ -1856,16 +1856,16 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         template_environment.filters["calc_num_nodes"] = template_filters.calc_num_nodes
         template_environment.filters["calc_walltime"] = template_filters.calc_walltime
         template_environment.filters["calc_memory"] = template_filters.calc_memory
-        template_environment.filters[
-            "check_utilization"
-        ] = template_filters.check_utilization
-        template_environment.filters[
-            "homogeneous_openmp_mpi_config"
-        ] = template_filters.homogeneous_openmp_mpi_config
+        template_environment.filters["check_utilization"] = (
+            template_filters.check_utilization
+        )
+        template_environment.filters["homogeneous_openmp_mpi_config"] = (
+            template_filters.homogeneous_openmp_mpi_config
+        )
         template_environment.filters["get_config_value"] = flow_config.get_config_value
-        template_environment.filters[
-            "get_account_name"
-        ] = template_filters.get_account_name
+        template_environment.filters["get_account_name"] = (
+            template_filters.get_account_name
+        )
         template_environment.filters["print_warning"] = template_filters.print_warning
         template_environment.filters["quote_argument"] = shlex.quote
 
@@ -3238,9 +3238,9 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
         status_legend = " ".join(f"[{v}]:{k}" for k, v in self.ALIASES.items())
         context["jobs"] = list(statuses.values())
         context["total_num_jobs_or_aggregates"] = total_num_jobs_or_aggregates
-        context[
-            "total_num_eligible_jobs_or_aggregates"
-        ] = total_num_eligible_jobs_or_aggregates
+        context["total_num_eligible_jobs_or_aggregates"] = (
+            total_num_eligible_jobs_or_aggregates
+        )
         context["total_num_job_labels"] = len(job_labels)
         context["overview"] = overview
         context["detailed"] = detailed
@@ -4736,9 +4736,9 @@ class FlowProject(signac.Project, metaclass=_FlowProjectClass):
                 else:
                     entry.group_aggregator = aggregator.groupsof()
             if entry.group_aggregator not in created_aggregate_stores:
-                created_aggregate_stores[
-                    entry.group_aggregator
-                ] = entry.group_aggregator._create_AggregateStore(self)
+                created_aggregate_stores[entry.group_aggregator] = (
+                    entry.group_aggregator._create_AggregateStore(self)
+                )
             # Associate the group with its aggregate store
             self._group_to_aggregate_store[group] = created_aggregate_stores[
                 entry.group_aggregator

@@ -435,9 +435,9 @@ class _AggregateStore(_BaseAggregateStore):
             except TypeError:  # aggregate is not iterable
                 raise ValueError("Invalid aggregator_function provided by the user.")
             # Store aggregate by id to allow searching by id
-            self._aggregates_by_id[
-                get_aggregate_id(stored_aggregate)
-            ] = stored_aggregate
+            self._aggregates_by_id[get_aggregate_id(stored_aggregate)] = (
+                stored_aggregate
+            )
 
     def _generate_aggregates(self):
         jobs = self._project

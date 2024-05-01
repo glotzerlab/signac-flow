@@ -1,7 +1,11 @@
 ci:
   autoupdate_schedule: quarterly
 
-exclude: '(?:^flow/util/mistune/)'
+exclude: |
+  (?x)^(
+    ^flow/util/mistune/|
+    ^.*\.pyt$
+  )
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -35,8 +39,7 @@ repos:
         exclude: |
           (?x)^(
             ^doc/|
-            ^tests/|
-            ^flow/util/mistune/
+            ^tests/
           )
         additional_dependencies:
           - tomli

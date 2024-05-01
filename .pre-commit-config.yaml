@@ -4,7 +4,7 @@ ci:
 exclude: |
   (?x)^(
     ^flow/util/mistune/|
-    ^.*\.pyt
+    ^.*\.pyt$
   )
 
 repos:

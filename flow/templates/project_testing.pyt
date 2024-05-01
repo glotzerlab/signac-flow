@@ -1,6 +1,8 @@
 import datetime
-from flow import FlowProject
+
 import signac
+
+from flow import FlowProject
 
 
 class {{ project_class_name }}(FlowProject):

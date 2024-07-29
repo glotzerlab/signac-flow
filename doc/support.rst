@@ -10,7 +10,7 @@ Getting help and reporting issues
 Use the `signac discussion board <https://github.com/glotzerlab/signac/discussions/>`_ to
 post questions, ask for support, and discuss potential new features.
 
-File bug reports on `signac-flow's issue tracker <https://github.com/glotzerlab/signac-dashboard/issues>`_.
+File bug reports on `signac-flow's issue tracker <https://github.com/glotzerlab/signac-flow/issues>`_.
 
 Code contributions
 ==================

@@ -15,6 +15,8 @@ The [**signac** framework](https://signac.io) helps users manage and scale file-
 The **signac-flow** tool provides the basic components to set up simple to complex workflows for projects managed by the [**signac** framework](https://signac.io).
 That includes the definition of data pipelines, execution of data space operations and the submission of operations to high-performance super computers.
 
+> Note: Check out [row](https://row.readthedocs.io), the actively maintained spiritual successor to **signac-flow**.
+
 ## Resources
 
 - [Framework documentation](https://docs.signac.io/):

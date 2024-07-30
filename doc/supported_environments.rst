@@ -39,4 +39,4 @@ In addition, the package provides specialized submission templates for the follo
    supported_environments/umn
 
 We develop environment templates and add scheduler support on an as-needed basis.
-Please `contact us <mailto:signac-support@umich.edu>`__ if you have trouble running **signac-flow** on your local cluster or need assistance with creating a template or supporting a new scheduler.
+Please `contact us <https://github.com/glotzerlab/signac/discussions>`__ if you have trouble running **signac-flow** on your local cluster or need assistance with creating a template or supporting a new scheduler.

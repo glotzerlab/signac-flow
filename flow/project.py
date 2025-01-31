@@ -692,7 +692,8 @@ class FlowGroupEntry:
             warnings.warn(
                 "The current directives (e.g. nranks, np) are deprecated as of flow 0.27. "
                 "When updating flow please look at the documentation for the new style "
-                "(https://docs.signac.io/en/latest/cluster_submission.html#submission-directives).",
+                "(https://signac.readthedocs.io/en/latest/"
+                "cluster_submission.html#submission-directives).",
                 DeprecationWarning,
             )
         if func is None:
@@ -797,7 +798,8 @@ class FlowGroup:
             warnings.warn(
                 "The current directives (e.g. nranks, np) are deprecated as of flow 0.27. "
                 "When updating flow please look at the documentation for the new style "
-                "(https://docs.signac.io/en/latest/cluster_submission.html#submission-directives).",
+                "(https://signac.readthedocs.io/en/latest/"
+                "cluster_submission.html#submission-directives).",
                 DeprecationWarning,
             )
         self.name = name

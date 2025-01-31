@@ -6,7 +6,7 @@
 The signac-flow package provides the basic infrastructure to easily
 configure and implement a workflow to operate on a signac_ data space.
 
-.. _signac: https://signac.io/
+.. _signac: https://signac.readthedocs.io/
 """
 from . import environment, environments, errors, hooks, scheduling
 from .aggregates import aggregator, get_aggregate_id

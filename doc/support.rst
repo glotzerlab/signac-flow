@@ -17,7 +17,7 @@ Code contributions
 
 This project is open-source.
 Users are highly encouraged to contribute directly by implementing new features and fixing issues.
-Development for packages as part of the **signac** framework should follow the general development guidelines outlined `here <http://docs.signac.io/en/latest/community.html#contributions>`__.
+Development for packages as part of the **signac** framework should follow the general development guidelines outlined `here <http://signac.readthedocs.io/en/latest/community.html#contributions>`__.
 
 A brief summary of contributing guidelines are outlined in the `CONTRIBUTING.md <https://github.com/glotzerlab/signac-flow/blob/main/CONTRIBUTING.md>`_ file as part of the repository.
 All contributors must agree to the `Contributor Agreement <https://github.com/glotzerlab/signac-flow/blob/main/ContributorAgreement.md>`_ before their pull request can be merged.
@@ -117,13 +117,13 @@ Then you can build the documentation from within the ``doc/`` directory as part 
 .. note::
 
     Documentation as part of the package should be largely limited to the API.
-    More elaborate documentation on how to integrate **signac-flow** into a computational workflow should be documented as part of the `framework documentation <https://docs.signac.io>`_, which is maintained `here <https://github.com/glotzerlab/signac-docs>`__.
+    More elaborate documentation on how to integrate **signac-flow** into a computational workflow should be documented as part of the `framework documentation <https://signac.readthedocs.io/>`_, which is maintained `here <https://github.com/glotzerlab/signac-docs>`__.
 
 
 Updating the changelog
 ----------------------
 
-To update the changelog, add a one-line description to the `changelog.txt <https://docs.signac.io/projects/flow/en/latest/changes.html>`_ file within the ``next`` section.
+To update the changelog, add a one-line description to the `changelog.txt <https://signac.readthedocs.io/projects/flow/en/latest/changes.html>`_ file within the ``next`` section.
 For example:
 
 .. code-block:: bash

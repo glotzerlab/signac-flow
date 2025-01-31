@@ -11,8 +11,8 @@ signac-flow package documentation
     See `here <signac-docs_>`_ for a comprehensive introduction to the **signac** *framework*.
 
 .. _row: https://row.readthedocs.io
-.. _signac: https://signac.io/
-.. _signac-docs: https://docs.signac.io/
+.. _signac: https://signac.readthedocs.io/
+.. _signac-docs: https://signac.readthedocs.io/
 
 Contents
 --------
@@ -20,7 +20,7 @@ Contents
 .. toctree::
    :hidden:
 
-   Go to Framework Documentation <https://docs.signac.io/>
+   Go to Framework Documentation <https://signac.readthedocs.io/>
 
 .. toctree::
    :maxdepth: 2

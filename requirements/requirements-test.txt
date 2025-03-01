@@ -1,5 +1,5 @@
-click==8.1.7
-coverage==7.6.8
-GitPython==3.1.43
+click==8.1.8
+coverage==7.6.12
+GitPython==3.1.44
 pytest-cov==6.0.0
-pytest==8.3.3
+pytest==8.3.4

@@ -12,10 +12,14 @@
 
 The [**signac** framework](https://signac.readthedocs.io/) helps users manage and scale file-based workflows, facilitating data reuse, sharing, and reproducibility.
 
+> ⚠️ **Attention**
+>
+> **signac-flow** is **no longer maintained**.
+>
+> **Switch to [`row`](https://github.com/glotzerlab/row)**.
+
 The **signac-flow** tool provides the basic components to set up simple to complex workflows for projects managed by the [**signac** framework](https://signac.readthedocs.io/).
 That includes the definition of data pipelines, execution of data space operations and the submission of operations to high-performance super computers.
-
-> Note: Check out [row](https://row.readthedocs.io), the actively maintained spiritual successor to **signac-flow**.
 
 ## Resources
 

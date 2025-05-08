@@ -6,7 +6,6 @@
 [![RTD](https://img.shields.io/readthedocs/signac.svg?style=flat)](https://signac.readthedocs.io/)
 [![License](https://img.shields.io/github/license/glotzerlab/signac-flow.svg)](https://github.com/glotzerlab/signac-flow/blob/main/LICENSE.txt)
 [![PyPI-downloads](https://img.shields.io/pypi/dm/signac-flow.svg?style=flat)](https://pypistats.org/packages/signac-flow)
-[![Slack](https://img.shields.io/badge/Slack-chat%20support-brightgreen.svg?style=flat&logo=slack)](https://signac.readthedocs.io/slack-invite/)
 [![Twitter](https://img.shields.io/twitter/follow/signacdata?style=social)](https://twitter.com/signacdata)
 [![GitHub Stars](https://img.shields.io/github/stars/glotzerlab/signac-flow?style=social)](https://github.com/glotzerlab/signac-flow/)
 

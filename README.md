@@ -1,3 +1,9 @@
+> [!IMPORTANT]
+>
+> **signac-flow** is **no longer maintained**.
+>
+> **Switch to [`row`](https://github.com/glotzerlab/row)**.
+
 # <img src="https://raw.githubusercontent.com/glotzerlab/signac-flow/main/doc/images/palette-header.png" width="75" height="58"> signac-flow - manage workflows with signac
 
 [![Affiliated with NumFOCUS](https://img.shields.io/badge/NumFOCUS-affiliated%20project-orange.svg?style=flat&colorA=E1523D&colorB=007D8A)](https://numfocus.org/sponsored-projects/affiliated-projects)
@@ -10,12 +16,6 @@
 [![GitHub Stars](https://img.shields.io/github/stars/glotzerlab/signac-flow?style=social)](https://github.com/glotzerlab/signac-flow/)
 
 The [**signac** framework](https://signac.readthedocs.io/) helps users manage and scale file-based workflows, facilitating data reuse, sharing, and reproducibility.
-
-> ⚠️ **Attention**
->
-> **signac-flow** is **no longer maintained**.
->
-> **Switch to [`row`](https://github.com/glotzerlab/row)**.
 
 The **signac-flow** tool provides the basic components to set up simple to complex workflows for projects managed by the [**signac** framework](https://signac.readthedocs.io/).
 That includes the definition of data pipelines, execution of data space operations and the submission of operations to high-performance super computers.

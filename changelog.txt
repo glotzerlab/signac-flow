@@ -8,6 +8,14 @@ The numbers in brackets denote the related GitHub issue and/or pull request.
 Version 0.29
 ============
 
+[0.29.1] -- 2026-07-09
+----------------------
+
+Fixed
++++++
+
+- Fix links on PyPI package page.
+
 [0.29.0] -- 2024-03-21
 ----------------------
 
